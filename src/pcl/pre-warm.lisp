@@ -49,6 +49,11 @@
 ;;; method function itself, and also that if a user overrides method
 ;;; function creation there is no danger of having the system get
 ;;; confused.
+
+;;; FIXME: these all go in dynamic space and then allocate a trampoline when
+;;; assigned into an FDEFN. Figure out how to put them in immobile space,
+;;; or can we allocate them _anywhere_ with embedded code now? I think so!
+;;; And why do we assign these info FDEFNs? What calls them via their names?
 #-sb-xc-host ; host doesn't need
 (!defstruct-with-alternate-metaclass %method-function
   :slot-names (fast-function)
@@ -92,6 +97,11 @@
     (long-method-combination long-method-combination-p)
     (short-method-combination short-method-combination-p)))
 
+(defmacro set-layout-valid (layout)
+  `(let ((layout ,layout))
+     (setf (layout-invalid layout) niL)
+     layout))
+
 #+sb-xc-host
 (progn
 ;;; Create #<SB-KERNEL::CONDITION-CLASSOID CONDITION>
@@ -103,14 +113,14 @@
 (let* ((name 'condition)
        (classoid (sb-kernel::make-condition-classoid :name name))
        (cell (sb-kernel::make-classoid-cell name classoid))
-       (layout (make-layout
-                (randomish-layout-clos-hash name)
-                classoid
-                :inherits (vector (find-layout 't))
-                :depthoid 1
-                :length (+ sb-vm:instance-data-start 2)
-                :flags +condition-layout-flag+
-                :invalid nil)))
+       (layout (set-layout-valid
+                (make-layout
+                 (randomish-layout-clos-hash name)
+                 classoid
+                 :inherits (vector (find-layout 't))
+                 :depthoid 1
+                 :length (+ sb-vm:instance-data-start 2)
+                 :flags +condition-layout-flag+))))
   (setf (classoid-layout classoid) layout
         (info :type :classoid-cell name) cell
         (info :type :kind name) :instance))
@@ -120,13 +130,13 @@
          (let* ((classoid (make-standard-classoid :name name))
                 (cell (sb-kernel::make-classoid-cell name classoid))
                 (layout
-                 (make-layout
-                  (randomish-layout-clos-hash name) classoid
-                  :inherits (map 'vector #'find-layout
-                                 (cons t (if fun-p '(function))))
-                  :length 0 ; don't care
-                  :depthoid -1
-                  :invalid nil)))
+                 (set-layout-valid
+                  (make-layout
+                   (randomish-layout-clos-hash name) classoid
+                   :inherits (map 'vector #'find-layout
+                                  (cons t (if fun-p '(function))))
+                   :length 0 ; don't care
+                   :depthoid -1))))
            (setf (classoid-layout classoid) layout
                  (info :type :classoid-cell name) cell
                  (info :type :kind name) :instance))))

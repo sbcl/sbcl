@@ -29,16 +29,10 @@
 (defmacro wrapper-class (wrapper)
   `(classoid-pcl-class (layout-classoid ,wrapper)))
 
-(declaim (inline make-wrapper-internal))
-(defun make-wrapper-internal (hash &key (bitmap -1) length classoid)
-  (make-layout hash classoid
-               :length length :invalid nil
-               :flags +pcl-object-layout-flag+ :bitmap bitmap))
-
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
-(defun !boot-make-wrapper (length name &optional class)
+(defun !boot-make-wrapper (length name &optional class (bitmap -1))
   (let ((found (find-classoid name nil)))
     (cond
      (found
@@ -49,10 +43,12 @@
         (aver layout)
         layout))
      (t
-      (make-wrapper-internal (randomish-layout-clos-hash name)
-                             :length length
-                             :classoid (make-standard-classoid
-                                        :name name :pcl-class class))))))
+      (set-layout-valid
+       (make-layout (randomish-layout-clos-hash name)
+                    (make-standard-classoid :name name :pcl-class class)
+                    :length length
+                    :flags +pcl-object-layout-flag+
+                    :bitmap bitmap))))))
 
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
@@ -78,9 +74,9 @@
                                               :name (and (symbolp name) name)))
                      (t
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
-       (make-wrapper-internal (randomish-layout-clos-hash name)
-                              :length length
-                              :classoid classoid)))
+       (set-layout-valid
+        (make-layout (randomish-layout-clos-hash name)
+                     classoid :length length :flags +pcl-object-layout-flag+))))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
             (layout (classoid-layout found)))

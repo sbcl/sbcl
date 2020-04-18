@@ -148,13 +148,11 @@
 ;;; Maximum value of N in ANCESTOR_N. Couldn't come up with a better name.
 (defconstant sb-c::layout-inherits-max-optimized-depth 5)
 (sb-xc:defstruct (layout
-             #+64-bit
              ;; Accept a specific subset of keywords
-             (:constructor %make-layout (clos-hash classoid flags
-                                         &key inherits bitmap info invalid))
-             #-64-bit
-             (:constructor make-layout (clos-hash classoid
-                                        &key flags invalid inherits depthoid length info bitmap))
+             #+64-bit (:constructor %make-layout
+                          (clos-hash classoid flags inherits info bitmap))
+             #-64-bit (:constructor %make-layout
+                          (clos-hash classoid depthoid length flags inherits info bitmap))
              (:copier nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
@@ -224,6 +222,23 @@
   (ancestor_5 0))
 (declaim (freeze-type layout))
 
+;;; Applicable only if bit-packed (for 64-bit architectures)
+(defmacro pack-layout-flags (depthoid length flags)
+  `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
+           (ash ,(or length 0) 16)
+           ,(or flags 0)))
+
+#-sb-xc-host
+(defun make-layout (clos-hash classoid
+                    &key (depthoid -1) (length 0) (flags 0)
+                         (inherits #())
+                         (info nil)
+                         (bitmap (if info (dd-bitmap info) +layout-all-tagged+)))
+  (%make-layout clos-hash classoid
+                #+64-bit (pack-layout-flags depthoid length flags)
+                #-64-bit depthoid #-64-bit length #-64-bit flags
+                inherits info bitmap))
+
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-MAPMAP (LAYOUT-INFO layout)).
 ;;;     GC wants it in the layout to avoid double indirection.
@@ -237,8 +252,8 @@
 #+sb-xc-host
 (progn
   (defstruct (layout (:include structure!object)
-                     (:constructor %make-layout (clos-hash classoid flags invalid
-                                                 inherits depthoid length info)))
+                     (:constructor make-layout
+                         (clos-hash classoid &key depthoid length flags inherits info)))
     (clos-hash nil :type layout-clos-hash) ; needed for cross-compiling some TYPECASE forms
     (classoid nil :type classoid)
     (flags 0 :type word)
@@ -248,19 +263,7 @@
     (length 0 :type layout-length)
     (info nil :type (or null defstruct-description)))
   (defun layout-bitmap (layout)
-    (if (layout-info layout) (dd-bitmap (layout-info layout)) -1))
-  ;; This is more-or-less the non-bit-packed constructor, ignoring BITMAP
-  (defun make-layout (clos-hash classoid &key (flags 0) (invalid :uninitialized)
-                                (inherits #()) (depthoid -1) (length 0) info
-                                bitmap)
-    (declare (ignore bitmap))
-    (%make-layout clos-hash classoid flags invalid inherits depthoid length info)))
-
-;;; Applicable only if bit-packed (for 64-bit architectures)
-(defmacro pack-layout-flags (depthoid length flags)
-  `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
-           (ash ,(or length 0) 16)
-           ,(or flags 0)))
+    (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 
 (defmacro populate-layout-ancestors (layout inherits &optional depthoid)
   `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
@@ -279,18 +282,10 @@
      (5 'layout-ancestor_5)))
 
 #+(and (not sb-xc-host) 64-bit)
-(progn
-(defmacro make-layout (clos-hash classoid &rest rest &key depthoid length flags &allow-other-keys)
-  (setq rest (copy-list rest))
-  (remf rest :depthoid)
-  (remf rest :length)
-  (remf rest :flags)
-  `(%make-layout ,clos-hash ,classoid (pack-layout-flags ,depthoid ,length ,flags) ,@rest))
-
 ;;; LAYOUT-DEPTHOID gets a vop and a stub
 (defmacro layout-length (layout) ; SETFable
   `(ldb (byte 16 16) (layout-flags ,layout)))
-) ; end PROGN
+
 (defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 
 ;;; Abstract out the differences between {32-bit,64-bit} target and XC layouts.

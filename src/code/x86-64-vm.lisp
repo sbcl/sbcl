@@ -221,7 +221,7 @@
                   sb-kernel:+layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
 
-(defconstant +fsc-layout-bitmap+
+(defconstant sb-pcl::+machine-code-embedding-fsc-instance-bitmap+
   (logxor (1- (ash 1 funcallable-instance-info-offset))
           (ash 1 (1- funcallable-instance-trampoline-slot))))
 
@@ -263,10 +263,8 @@
 #+immobile-code
 (defun make-immobile-funinstance (layout slot-vector)
   (let ((gf (truly-the funcallable-instance (alloc-immobile-funinstance))))
-    ;; Ensure that the layout has a bitmap indicating the indices of
-    ;; non-descriptor slots. Doing this just-in-time is easiest, it turns out.
-    (unless (= (layout-bitmap layout) +fsc-layout-bitmap+)
-      (setf (layout-bitmap layout) +fsc-layout-bitmap+))
+    ;; Assert that raw bytes will not cause GC invariant lossage
+    (aver (/= (layout-bitmap layout) +layout-all-tagged+))
     ;; Set layout prior to writing raw slots
     (setf (%funcallable-instance-layout gf) layout)
     ;; just being pedantic - liveness is preserved by the stack reference.

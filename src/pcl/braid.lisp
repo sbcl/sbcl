@@ -53,11 +53,7 @@
                    (sb-impl::new-instance-hash-code)))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and immobile-code)
-                    ((or (find (find-layout 'generic-function) (layout-inherits wrapper))
-                         ;; KLUDGE: early GFs are created with nothing in the layout-inherits.
-                         ;; Could we add some assertions that the standard CLOS type lattice
-                         ;; is correctly interconnected before allocating instances???
-                         (eq wrapper *sgf-wrapper*))
+                    ((/= (layout-bitmap wrapper) +layout-all-tagged+)
                      (truly-the funcallable-instance
                                 (sb-vm::make-immobile-funinstance wrapper slots)))
                     (t

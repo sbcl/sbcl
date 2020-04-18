@@ -1521,8 +1521,7 @@ or they must be declared locally notinline at each call site.~@:>"
                             :inherits inherits
                             :depthoid (length inherits)
                             :length (dd-length info)
-                            :info info
-                            :bitmap (dd-bitmap info))
+                            :info info)
                 inherits))))
       (cond
        ((not old-layout)
