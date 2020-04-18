@@ -454,10 +454,7 @@ evaluated as a PROGN."
                     ~%Do you want to supply a new value? "
                    name value)
          (format *query-io* "~&Type a form to be evaluated:~%")
-         (flet ((read-it () (eval (read *query-io*))))
-           (if (symbolp name) ;help user debug lexical variables
-               (progv (list name) (list value) (read-it))
-               (read-it))))
+         (eval (read *query-io*)))
         (t value)))
 
 ;;; CHECK-TYPE is written this way, to call CHECK-TYPE-ERROR, because
