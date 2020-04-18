@@ -956,9 +956,7 @@
                       ;; object with an invalid layout to a structure
                       ;; type test.
                       ,(if (<= 2 depthoid layout-inherits-max-optimized-depth)
-                           (let ((ancestor-slot
-                                  (package-symbolicate "SB-KERNEL" "LAYOUT-ANCESTOR_"
-                                                       (write-to-string depthoid))))
+                           (let ((ancestor-slot (layout-nth-ancestor-slot depthoid)))
                              (if abstract-base-p
                                  `(or (eq (,ancestor-slot ,n-layout) ,layout)
                                       (eq ,n-layout ,layout)) ; not likely

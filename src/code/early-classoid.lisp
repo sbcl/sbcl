@@ -271,6 +271,12 @@
            (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
            (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
      l))
+(defmacro sb-c::layout-nth-ancestor-slot (n)
+  `(case ,n
+     (2 'layout-ancestor_2)
+     (3 'layout-ancestor_3)
+     (4 'layout-ancestor_4)
+     (5 'layout-ancestor_5)))
 
 #+(and (not sb-xc-host) 64-bit)
 (progn
