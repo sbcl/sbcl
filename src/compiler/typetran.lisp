@@ -955,22 +955,21 @@
                       ;; because it is quite legitimate to pass an
                       ;; object with an invalid layout to a structure
                       ;; type test.
-                      ,(let ((ancestor-slot (case depthoid
-                                             (2 'sb-kernel::layout-depth2-ancestor)
-                                             (3 'sb-kernel::layout-depth3-ancestor)
-                                             (4 'sb-kernel::layout-depth4-ancestor))))
-                         (if ancestor-slot
+                      ,(if (<= 2 depthoid layout-inherits-max-optimized-depth)
+                           (let ((ancestor-slot
+                                  (package-symbolicate "SB-KERNEL" "LAYOUT-ANCESTOR_"
+                                                       (write-to-string depthoid))))
                              (if abstract-base-p
                                  `(or (eq (,ancestor-slot ,n-layout) ,layout)
                                       (eq ,n-layout ,layout)) ; not likely
                                  ;; Indifferent to order here. Might as well test
                                  ;; for an exact match first.
                                  `(or (eq ,n-layout ,layout)
-                                      (eq (,ancestor-slot ,n-layout) ,layout)))
+                                      (eq (,ancestor-slot ,n-layout) ,layout))))
                              (if abstract-base-p
                                  `(eq (if ,deeper-p ,get-ancestor ,n-layout) ,layout)
                                  `(cond ((eq ,n-layout ,layout) t)
-                                        (,deeper-p ,ancestor-layout-eq)))))))))
+                                        (,deeper-p ,ancestor-layout-eq))))))))
            ((and layout (>= (layout-depthoid layout) 0))
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above

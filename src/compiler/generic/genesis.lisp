@@ -1167,8 +1167,8 @@ core and return a descriptor to it."
                                        (host-constant-to-core '#(1 nil))))))
 
     (when (and (logtest flags +structure-layout-flag+) (> depthoid 2))
-      (loop with dsd-index = (get-dsd-index sb-kernel:layout sb-kernel::depth2-ancestor)
-            for i from 2 to (min (1- depthoid)  4)
+      (loop with dsd-index = (get-dsd-index sb-kernel:layout sb-kernel::ancestor_2)
+            for i from 2 to (min (1- depthoid) sb-c::layout-inherits-max-optimized-depth)
             do (write-wordindexed result
                                   (+ sb-vm:instance-slots-offset dsd-index)
                                   (cold-svref inherits i))

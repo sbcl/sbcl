@@ -153,15 +153,10 @@
                (layout-classoid layout) classoid)
          (assign-layout-slots layout :depthoid depthoid :length length :flags flags)
          #-sb-xc-host ; Assign target-only slots
-         (let ((struct-depth
-                (if (logtest +structure-layout-flag+ flags) depthoid 0)))
-           ;; struct-depth is generally the depthoid when the depthoid is >0,
-           ;; but not for FILE-STREAM which has depthoid=4 but is not a structure.
-           (macrolet ((inherit (n) `(if (> struct-depth ,n) (svref inherits ,n) 0)))
-             (setf (layout-bitmap layout) bitmap
-                   (layout-depth2-ancestor layout) (inherit 2)
-                   (layout-depth3-ancestor layout) (inherit 3)
-                   (layout-depth4-ancestor layout) (inherit 4))))
+         (when (logtest +structure-layout-flag+ flags)
+           ;; STRING-STREAM and FILE-STREAM have depthoid=4 but are not structure types
+           (setf (layout-bitmap layout) bitmap)
+           (populate-layout-ancestors layout inherits depthoid))
          ;; Finally, make it valid.
          (setf (layout-invalid layout) nil))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
@@ -367,18 +362,15 @@ between the ~A definition and the ~A definition"
                 (depthoid (layout-depthoid layout)))
             (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
-            (assign-layout-slots destruct-layout
-                                 :depthoid depthoid
-                                 :length (layout-length layout))
-            (setf (layout-invalid destruct-layout) nil
+            #-64-bit (setf (layout-depthoid destruct-layout) (layout-depthoid layout)
+                           (layout-length destruct-layout) (layout-length layout))
+            (setf (layout-flags destruct-layout) (layout-flags layout)
                   (layout-inherits destruct-layout) inherits
-                  (layout-info destruct-layout) (layout-info layout))
-            (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
-              (setf (layout-depth2-ancestor destruct-layout) (inherit 2)
-                    (layout-depth3-ancestor destruct-layout) (inherit 3)
-                    (layout-depth4-ancestor destruct-layout) (inherit 4)
-                    (layout-bitmap destruct-layout) (layout-bitmap layout)))
-            (setf (classoid-layout classoid) destruct-layout))
+                  (layout-info destruct-layout) (layout-info layout)
+                  (layout-bitmap destruct-layout) (layout-bitmap layout))
+            (populate-layout-ancestors destruct-layout inherits)
+            (setf (layout-invalid destruct-layout) nil
+                  (classoid-layout classoid) destruct-layout))
           (setf (layout-invalid layout) nil
                 (classoid-layout classoid) layout))
 

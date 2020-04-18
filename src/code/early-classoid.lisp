@@ -145,16 +145,16 @@
 
 ;;; 32-bit is not done yet. Three slots are still used, instead of two.
 
+;;; Maximum value of N in ANCESTOR_N. Couldn't come up with a better name.
+(defconstant sb-c::layout-inherits-max-optimized-depth 5)
 (sb-xc:defstruct (layout
              #+64-bit
              ;; Accept a specific subset of keywords
              (:constructor %make-layout (clos-hash classoid flags
-                                         &key inherits bitmap info invalid
-                                           depth2-ancestor depth3-ancestor depth4-ancestor))
+                                         &key inherits bitmap info invalid))
              #-64-bit
              (:constructor make-layout (clos-hash classoid
-                                        &key flags invalid inherits depthoid length info bitmap
-                                          depth2-ancestor depth3-ancestor depth4-ancestor))
+                                        &key flags invalid inherits depthoid length info bitmap))
              (:copier nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
@@ -218,12 +218,10 @@
   ;; inherited layouts or 0, only pertinent to structure classoids.
   ;; There is no need to store the layout at depths 0 or 1
   ;; since they're predetermined to be T and STRUCTURE-OBJECT.
-  ;; These 3 slots cause the length of a layout to be exactly 16 words
-  ;; with compact-instance-header, which avoids having to change some
-  ;; logic in 'immobile-space' that assumes this alignment constraint.
-  (depth2-ancestor 0)
-  (depth3-ancestor 0)
-  (depth4-ancestor 0))
+  (ancestor_2 0)
+  (ancestor_3 0)
+  (ancestor_4 0)
+  (ancestor_5 0))
 (declaim (freeze-type layout))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
@@ -231,7 +229,7 @@
 ;;;     GC wants it in the layout to avoid double indirection.
 ;;;   * EQUALP-TESTS - needed only for the target's implementation of EQUALP.
 ;;;   * SLOT-TABLE, and SLOT-LIST - used only by the CLOS implementation.
-;;;   * DEPTHn-ANCESTOR are optimizations for TYPEP.
+;;;   * ANCESTOR_N are optimizations for TYPEP.
 ;;; So none of those really make sense on the host.
 ;;; Also, we eschew the packed representation of length+depthoid+flags.
 ;;; FLAGS are not even strictly necessary, since they are for optimizing
@@ -251,12 +249,11 @@
     (info nil :type (or null defstruct-description)))
   (defun layout-bitmap (layout)
     (if (layout-info layout) (dd-bitmap (layout-info layout)) -1))
-  ;; This is more-or-less the non-bit-packed constructor,
-  ;; but we explicitly ignore BITMAP and DEPTHn-ANCESTOR.
+  ;; This is more-or-less the non-bit-packed constructor, ignoring BITMAP
   (defun make-layout (clos-hash classoid &key (flags 0) (invalid :uninitialized)
                                 (inherits #()) (depthoid -1) (length 0) info
-                                bitmap depth2-ancestor depth3-ancestor depth4-ancestor)
-    (declare (ignore bitmap depth2-ancestor depth3-ancestor depth4-ancestor))
+                                bitmap)
+    (declare (ignore bitmap))
     (%make-layout clos-hash classoid flags invalid inherits depthoid length info)))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
@@ -264,6 +261,16 @@
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
            (ash ,(or length 0) 16)
            ,(or flags 0)))
+
+(defmacro populate-layout-ancestors (layout inherits &optional depthoid)
+  `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
+     (declare (ignorable i d))
+     #-sb-xc-host
+     (setf (layout-ancestor_2 l) (if (> d 2) (svref i 2) 0)
+           (layout-ancestor_3 l) (if (> d 3) (svref i 3) 0)
+           (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
+           (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
+     l))
 
 #+(and (not sb-xc-host) 64-bit)
 (progn
