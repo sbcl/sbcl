@@ -5,6 +5,8 @@ changes relative to sbcl-2.0.3:
     ** 32-bit RISC-V is now fully supported. Unlike other ports, its backend
     is entirely shared with 64-bit RISC-V.
     ** native threads are now supported on RISC-V.
+  * enchancement: forward-referenced type tests can now be open-coded by using
+    block compilation.
   * bug fix: defstructs with empty initforms in the sbcl source are now
     explicitly intiialized with NIL, as that is undefined behavior under
     ANSI. This helps cross compilation hosts which do not implicitly

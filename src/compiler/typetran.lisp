@@ -1089,7 +1089,16 @@
   (if (and (not env)
            (typep spec '(cons (eql quote) (cons t null))))
       (with-current-source-form (spec)
-        (source-transform-typep object (cadr spec)))
+        ;; Decline to do the source transform when seeing an unknown
+        ;; type immediately while block converting, since it may be
+        ;; defined later. By waiting for the deftransform to fire
+        ;; during block compilation, we give ourselves a better chance
+        ;; at open-coding the type test.
+        (let ((type (cadr spec)))
+          (if (and (block-compile *compilation*)
+                   (unknown-type-p (specifier-type type)))
+              (values nil t)
+              (source-transform-typep object type))))
       (values nil t)))
 
 ;;;; coercion

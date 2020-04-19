@@ -1141,3 +1141,7 @@ whole program optimization and increased use of the local call
 convention. We do not currently support the @code{start-block} and
 @code{end-block} declarations, although we do support the same arguments
 to @code{compile-file} regarding block compilation.
+
+Unlike CMUCL, SBCL is able to open-code forward-referenced type tests
+while block compiling. This helps for mutually referential defstructs in
+particular.
