@@ -2425,12 +2425,13 @@
           (setq callables nil)
           (loop for i from sb-vm:code-constants-offset below (code-header-words code)
                 do (let* ((const (code-header-ref code i))
-                          (fun (typecase const
-                                 (fdefn (fdefn-fun const))
-                                 (function const))))
+                          (fdefn (if (typep const '(cons fdefn)) (car const) const))
+                          (fun (typecase fdefn
+                                 (fdefn (fdefn-fun fdefn))
+                                 (function fdefn))))
                      ;; This collection will only make sense for immobile objects,
                      ;; but it's fine to collect it.
-                     (when (fdefn-p const)
+                     (when (fdefn-p fdefn)
                        (push const callables))
                      (when (functionp fun)
                        (push fun callables))))

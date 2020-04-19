@@ -368,30 +368,16 @@
                                             (- (ash simple-fun-self-slot word-shift)
                                                fun-pointer-lowtag))))))
 
-;;; CALL-DIRECT-P when true indicates that at the instruction level
-;;; it is fine to change the JMP or CALL instruction - i.e. the offset is
-;;; a (SIGNED-BYTE 32), and the function can be called without loading
-;;; its address into RAX, *and* there is a 1:1 relation between the fdefns
-;;; and fdefn-funs for all callees of the code that contains FUN.
-;;; The 1:1 constraint is due to a design limit - when removing static links,
-;;; it is impossible to distinguish fdefns that point to the same called function.
-;;; FIXME: It would be a nice to remove the uniqueness constraint, either
-;;; by recording ay ambiguous fdefns, or just recording all replacements.
-(defun call-direct-p (fun code-header-funs)
-  #-immobile-code (declare (ignore fun code-header-funs))
-  #+immobile-code
-  (flet ((singly-occurs-p (thing things &aux (len (length things)))
-           ;; Return T if THING occurs exactly once in vector THINGS.
-           (declare (simple-vector things))
-           (dotimes (i len)
-             (when (eq (svref things i) thing)
-               ;; re-using I as the index is OK because we leave the outer loop
-               ;; after this.
-               (return (loop (cond ((>= (incf i) len) (return t))
-                                   ((eq thing (svref things i)) (return nil)))))))))
-    (and (immobile-space-obj-p fun)
-         (not (fun-requires-simplifying-trampoline-p fun))
-         (singly-occurs-p fun code-header-funs))))
+(defun singly-occurs-p (thing things &aux (len (length things)))
+  ;; Return T if THING occurs exactly once in vector THINGS,
+  ;; assuming that it occurs at all.
+  (declare (simple-vector things))
+  (dotimes (i len)
+    (when (eq (svref things i) thing)
+      ;; re-using I as the index is OK because we leave the outer loop
+      ;; after this.
+      (return (loop (cond ((>= (incf i) len) (return t))
+                          ((eq thing (svref things i)) (return nil))))))))
 
 ;;; Allocate a code object.
 (defun alloc-dynamic-space-code (total-words)
@@ -400,32 +386,80 @@
 ;;; Remove calls via fdefns from CODE when compiling into memory.
 (defun statically-link-code-obj (code fixups)
   (declare (ignorable code fixups))
-  #+immobile-code
-  (let ((insts (code-instructions code))
-        (fdefns)) ; group by fdefn
-    (loop for (offset . name) in fixups
-          do (binding* ((fdefn (find-fdefn name) :exit-if-null)
-                        (cell (assq fdefn fdefns)))
-               (if cell
-                   (push offset (cdr cell))
-                   (push (list fdefn offset) fdefns))))
-    (let ((funs (make-array (length fdefns))))
-      (sb-thread::with-system-mutex (sb-c::*static-linker-lock*)
-        (loop for i from 0 for (fdefn) in fdefns
-              do (setf (aref funs i) (fdefn-fun fdefn)))
-        (dolist (fdefn-use fdefns)
-          (let* ((fdefn (car fdefn-use))
-                 (callee (fdefn-fun fdefn)))
-            ;; Because we're holding the static linker lock, the elements of
-            ;; FUNS can not change while this test is performed.
-            (when (call-direct-p callee funs)
-              (let ((entry (sb-vm::fdefn-raw-addr fdefn)))
-                (dolist (offset (cdr fdefn-use))
-                  ;; Only a CALL or JMP will get statically linked.
-                  ;; A MOV will always load the address of the fdefn.
-                  (when (eql (logior (sap-ref-8 insts (1- offset)) 1) #xE9)
-                    ;; Set the statically-linked flag
-                    (sb-vm::set-fdefn-has-static-callers fdefn 1)
-                    ;; Change the machine instruction
-                    (setf (signed-sap-ref-32 insts offset)
-                          (- entry (+ (sap-int (sap+ insts offset)) 4)))))))))))))
+  (unless (immobile-space-obj-p code)
+    (return-from statically-link-code-obj code))
+  (let* ((fdefns-start (+ code-constants-offset
+                          (* code-slots-per-simple-fun (code-n-entries code))))
+         (fdefns-count (code-n-named-calls code))
+         (replacements (make-array fdefns-count :initial-element nil))
+         (ambiguous (make-array fdefns-count :initial-element 0 :element-type 'bit))
+         (any-replacements)
+         (any-ambiguous))
+    ;; For each fdefn, decide two things:
+    ;; * whether the fdefn can be replaced by its function - possible only when
+    ;;   that function is in immobile space and needs no trampoline.
+    ;; * whether the replacement creates ambiguitity - if #'F and #'G are the same
+    ;;   function, then substituting that function in for the fdefn of F and G
+    ;;   requires storing locations at which to replacement was done
+    (dotimes (i fdefns-count)
+      (let* ((fdefn (code-header-ref code (+ fdefns-start i)))
+             (fun (when (fdefn-p fdefn) (fdefn-fun fdefn))))
+        (when (and (immobile-space-obj-p fun)
+                   (not (fun-requires-simplifying-trampoline-p fun)))
+          (setf any-replacements t (aref replacements i) fun))))
+    (dotimes (i fdefns-count)
+      (when (and (aref replacements i)
+                 (not (singly-occurs-p (aref replacements i) replacements)))
+        (setf any-ambiguous t (bit ambiguous i) 1)))
+    (unless any-replacements
+      (return-from statically-link-code-obj))
+    ;; Map each fixup to an index in REPLACEMENTS (which currently holds functions,
+    ;; not fdefns, so we have to scan the code header).
+    ;; This can be done outside the lock
+    (flet ((index-of (fdefn)
+             (dotimes (i fdefns-count)
+               (when (eq fdefn (code-header-ref code (+ fdefns-start i)))
+                 (return i)))))
+      (setq fixups (mapcar (lambda (fixup) ; = (offset . #<fdefn>)
+                             (cons (index-of (cdr fixup)) (car fixup)))
+                           fixups)))
+    (let ((insts (code-instructions code)))
+      ;; One final check: if any of the fixed-up instructions is "MOV EAX, #xNNNN"
+      ;; instead of a CALL or JMP, we can't fixup that particular fdefn for any
+      ;; of its call sites. (They should all use MOV if any one does).
+      ;; This happens when *COMPILE-TO-MEMORY-SPACE* is set to :AUTOMATIC.
+      ;; In that case we don't know that the code will be within an imm32 of
+      ;; the target address, because the code might have gone into dynamic space.
+      (dolist (fixup fixups)
+        (binding* ((fdefn-index (car fixup) :exit-if-null)
+                   (offset (cdr fixup)))
+          (when (and (aref replacements fdefn-index)
+                     (not (eql (logior (sap-ref-8 insts (1- offset)) 1) #xE9)))
+            (setf (aref replacements fdefn-index) nil))))
+      (let ((stored-locs (if any-ambiguous
+                             (make-array fdefns-count :initial-element nil))))
+        (sb-thread::with-system-mutex (sb-c::*static-linker-lock*)
+          (dolist (fixup fixups)
+            (binding* ((fdefn-index (car fixup) :exit-if-null)
+                       (offset (cdr fixup))
+                       (fdefn (code-header-ref code (+ fdefns-start fdefn-index)))
+                       (fun (aref replacements fdefn-index)))
+              (when fun
+                ;; Set the statically-linked flag
+                (sb-vm::set-fdefn-has-static-callers fdefn 1)
+                (when (= (bit ambiguous fdefn-index) 1)
+                  (push offset (aref stored-locs fdefn-index)))
+                ;; Change the machine instruction
+                ;; %CLOSURE-CALLEE reads the entry addresss word of any
+                ;; kind of function, but as if it were a tagged fixnum.
+                (let ((entry (descriptor-sap (%closure-callee fun))))
+                  (setf (signed-sap-ref-32 insts offset)
+                        (sap- entry (sap+ insts (+ offset 4))))))))
+          ;; Replace ambiguous elements of the code header while still holding the lock
+          (dotimes (i fdefns-count)
+            (when (= (bit ambiguous i) 1)
+              (let ((wordindex (+ fdefns-start i))
+                    (locs (aref stored-locs i)))
+                (setf (code-header-ref code wordindex)
+                      (cons (code-header-ref code wordindex) locs)))))))))
+  code)

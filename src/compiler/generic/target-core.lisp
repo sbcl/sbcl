@@ -47,6 +47,7 @@
 
   ;; Return the address to which to jump when calling FDEFN,
   ;; which is either an fdefn or the name of an fdefn.
+  ;; FIXME: Shouldn't this go in x86-64-vm ?
   (defun sb-vm::fdefn-entry-address (fdefn)
     (let ((fdefn (if (fdefn-p fdefn) fdefn (find-or-create-fdefn fdefn))))
       (+ (get-lisp-obj-address fdefn)
@@ -73,6 +74,7 @@
          ;; CODE-OBJ must already be pinned in order to legally call this.
          ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
          ;; and the other is LOAD-CODE, both of which pin the code.
+         ;; SYM is a little bit of a misnomer - it may be a generalized function name.
          (when (sb-vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
@@ -90,9 +92,9 @@
                    (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
                    #+immobile-code
                    (:named-call
-                    (when statically-link-p
-                      (push (cons offset sym) (elt preserved-lists 0)))
-                    (sb-vm::fdefn-entry-address sym))
+                    (prog1 (sb-vm::fdefn-entry-address sym) ; creates if didn't exist
+                      (when statically-link-p
+                        (push (cons offset (find-fdefn sym)) (elt preserved-lists 0)))))
                    #+immobile-code (:static-call (sb-vm::function-raw-address sym)))
                  kind flavor)
            (ecase kind
@@ -124,8 +126,6 @@
          (awhen (elt preserved-lists 4)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))
-         (awhen (aref preserved-lists 0)
-           (sb-vm::statically-link-code-obj code-obj it))
          ;; Assign all SIMPLE-FUN-SELF slots
          (dotimes (i (code-n-entries code-obj))
            (let ((fun (%code-entry-point code-obj i)))
@@ -137,8 +137,9 @@
                    (truly-the (unsigned-byte 32)
                      (get-lisp-obj-address #.(find-layout 'function))))))
          ;; And finally, make the memory range executable
-         #-(or x86 x86-64)
-         (sb-vm:sanctify-for-execution code-obj)))
+         #-(or x86 x86-64) (sb-vm:sanctify-for-execution code-obj)
+         ;; Return fixups amenable to static linking
+         (aref preserved-lists 0)))
 
   (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
     (dx-let ((preserved (make-array 5 :initial-element nil)))
@@ -250,86 +251,90 @@
            (type index length)
            (list fixup-notes)
            (type core-object object))
-  (let ((debug-info (debug-info-for-component component)))
-    (let* ((2comp (component-info component))
-           (constants (ir2-component-constants 2comp))
-           (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
-           (code-obj (allocate-code-object
-                      (component-mem-space component)
-                      (count-if (lambda (x) (typep x '(cons (eql :named-call))))
-                                constants)
-                      nboxed length)))
+  (let* ((debug-info (debug-info-for-component component))
+         (2comp (component-info component))
+         (constants (ir2-component-constants 2comp))
+         (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
+         (code-obj (allocate-code-object
+                    (component-mem-space component)
+                    (count-if (lambda (x) (typep x '(cons (eql :named-call))))
+                              constants)
+                    nboxed length))
+         (named-call-fixups
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
       ;; A very specific store order is necessary to allow using uninitialized memory
       ;; pages for code. Storing of the debug-info slot does not need the code pinned,
       ;; but that store must occur between steps 1 and 2.
-      (with-pinned-objects (code-obj)
-        (let ((bytes (the (simple-array assembly-unit 1)
-                          (segment-contents-as-vector segment))))
-          ;; Note that this does not have to take care to ensure atomicity
-          ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
-          ;; interrupted in between the store of any individual byte, this code
-          ;; is GC-safe because we no longer need to know where simple-funs are embedded
-          ;; within the object to trace pointers. We *do* need to know where the funs
-          ;; are when transporting the object, but it's currently pinned.
-          (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
-        ;; Enforce that the final unboxed data word is published to memory
-        ;; before the debug-info is set.
-        (sb-thread:barrier (:write))
-        ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
-        ;; into this object, because the C code assumes that the fun table is in an
-        ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
-        ;; That is, C code can't deal with an interior code pointer until the fun-table
-        ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
-        ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
-        (setf (%code-debug-info code-obj) debug-info)
-        (apply-core-fixups fixup-notes code-obj))
+          (with-pinned-objects (code-obj)
+           (let ((bytes (the (simple-array assembly-unit 1)
+                             (segment-contents-as-vector segment))))
+             ;; Note that this does not have to take care to ensure atomicity
+             ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
+             ;; interrupted in between the store of any individual byte, this code
+             ;; is GC-safe because we no longer need to know where simple-funs are embedded
+             ;; within the object to trace pointers. We *do* need to know where the funs
+             ;; are when transporting the object, but it's currently pinned.
+             (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
+           ;; Enforce that the final unboxed data word is published to memory
+           ;; before the debug-info is set.
+           (sb-thread:barrier (:write))
+           ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
+           ;; into this object, because the C code assumes that the fun table is in an
+           ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
+           ;; That is, C code can't deal with an interior code pointer until the fun-table
+           ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
+           ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
+           (setf (%code-debug-info code-obj) debug-info)
+           (apply-core-fixups fixup-notes code-obj))))
 
       ;; Don't need code pinned now
       ;; (It will implicitly be pinned on the conservatively scavenged backends)
-      (let* ((entries (ir2-component-entries 2comp))
-             (fun-index (length entries)))
-        (dolist (entry-info entries)
-          (let ((fun (%code-entry-point code-obj (decf fun-index)))
-                (w (+ sb-vm:code-constants-offset
-                      (* sb-vm:code-slots-per-simple-fun fun-index))))
-            (setf (code-header-ref code-obj (+ w sb-vm:simple-fun-name-slot))
-                  (entry-info-name entry-info)
-                  (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))
-                  (entry-info-arguments entry-info)
-                  (code-header-ref code-obj (+ w sb-vm:simple-fun-source-slot))
-                  (entry-info-form/doc entry-info)
-                  (code-header-ref code-obj (+ w sb-vm:simple-fun-info-slot))
-                  (entry-info-type/xref entry-info))
-            (note-fun entry-info fun object))))
+    (let* ((entries (ir2-component-entries 2comp))
+           (fun-index (length entries)))
+      (dolist (entry-info entries)
+        (let ((fun (%code-entry-point code-obj (decf fun-index)))
+              (w (+ sb-vm:code-constants-offset
+                    (* sb-vm:code-slots-per-simple-fun fun-index))))
+          (setf (code-header-ref code-obj (+ w sb-vm:simple-fun-name-slot))
+                (entry-info-name entry-info)
+                (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))
+                (entry-info-arguments entry-info)
+                (code-header-ref code-obj (+ w sb-vm:simple-fun-source-slot))
+                (entry-info-form/doc entry-info)
+                (code-header-ref code-obj (+ w sb-vm:simple-fun-info-slot))
+                (entry-info-type/xref entry-info))
+          (note-fun entry-info fun object))))
 
-      (push debug-info (core-object-debug-info object))
+    (push debug-info (core-object-debug-info object))
 
-      (do ((index (+ sb-vm:code-constants-offset
-                     (* (length (ir2-component-entries 2comp))
-                        sb-vm:code-slots-per-simple-fun))
-                  (1+ index)))
-          ((>= index (length constants)))
-        (let* ((const (aref constants index))
-               (kind (if (listp const) (car const) const)))
-          (case kind
-            (:entry
-             (reference-core-fun code-obj index (cadr const) object))
-            ((nil))
-            (t
-             (let ((referent
-                    (etypecase kind
-                     ((member :named-call :fdefinition)
-                      (find-or-create-fdefn (cadr const)))
-                     ((eql :known-fun)
-                      (%coerce-name-to-fun (cadr const)))
-                     (constant
-                      (constant-value const)))))
-               (if (eq kind :named-call)
-                   (set-code-fdefn code-obj index referent)
-                   (setf (code-header-ref code-obj index) referent))))))))))
+    (do ((index (+ sb-vm:code-constants-offset
+                   (* (length (ir2-component-entries 2comp))
+                      sb-vm:code-slots-per-simple-fun))
+                (1+ index)))
+        ((>= index (length constants)))
+      (let* ((const (aref constants index))
+             (kind (if (listp const) (car const) const)))
+        (case kind
+          (:entry
+           (reference-core-fun code-obj index (cadr const) object))
+          ((nil))
+          (t
+           (let ((referent
+                  (etypecase kind
+                   ((member :named-call :fdefinition)
+                    (find-or-create-fdefn (cadr const)))
+                   ((eql :known-fun)
+                    (%coerce-name-to-fun (cadr const)))
+                   (constant
+                    (constant-value const)))))
+             (if (eq kind :named-call)
+                 (set-code-fdefn code-obj index referent)
+                 (setf (code-header-ref code-obj index) referent)))))))
+    (when named-call-fixups
+      (sb-vm::statically-link-code-obj code-obj named-call-fixups))
+    code-obj))
 
 (defun set-code-fdefn (code index fdefn)
   #+untagged-fdefns

@@ -130,3 +130,8 @@
                            (* kludge-big-endian-short-pointer-offset
                               n-word-bytes))
           new)))
+
+;;; Convert the descriptor into a SAP. The bits all stay the same, we just
+;;; change our notion of what we think they are.
+(declaim (inline descriptor-sap))
+(defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))

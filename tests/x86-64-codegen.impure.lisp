@@ -185,12 +185,13 @@
       (let ((lines (disassembly-lines 'c)))
         (expect "#<FUNCTION H>" lines))
       (let ((lines (disassembly-lines 'd)))
-        (expect "#<FDEFN F>" lines)
-        (expect "#<FDEFN G>" lines))
-      (handler-bind ((warning #'muffle-warning))
-        (defun g (x) (- x)))
+        (expect "#<FUNCTION H>" lines))
+      (setf (symbol-function 'g) #'+)
       (let ((lines (disassembly-lines 'c)))
-        (expect "#<FDEFN G>" lines)))))
+        (expect "#<FDEFN G>" lines))
+      (let ((lines (disassembly-lines 'd)))
+        (expect "#<FDEFN G>" lines)
+        (expect "#<FUNCTION H>" lines)))))
 
 (with-test (:name :c-call)
   (let* ((lines (split-string

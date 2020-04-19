@@ -44,11 +44,6 @@
 (defun read-only-space-usage ()
   (- (sap-int sb-vm:*read-only-space-free-pointer*) sb-vm:read-only-space-start))
 
-;;; Convert the descriptor into a SAP. The bits all stay the same, we just
-;;; change our notion of what we think they are.
-(declaim (inline descriptor-sap))
-(defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))
-
 (defun control-stack-usage ()
   #-stack-grows-downward-not-upward
   (sap- (control-stack-pointer-sap) (descriptor-sap sb-vm:*control-stack-start*))
