@@ -159,7 +159,6 @@
 (declaim (inline dsd-always-boundp
                  dsd-safe-p
                  ; dsd-read-only ; compilation order problem
-                 ; dsd-index
                  ))
 
 ;;; In general we type-check a slot when it is written, not when read.
@@ -186,10 +185,11 @@
 ;;; is used without specifying all slots.
 
 ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
-;; The index is -1 if this slot is not raw.
+;; The index is NIL if this slot is not raw.
 (defun dsd-rsd-index (dsd)
   (let ((val (ldb (byte 3 0) (dsd-bits dsd))))
-    (if (plusp val) (1- val))))
+    (if (plusp val) (the (mod #.(length *raw-slot-data*)) (1- val)))))
+
 ;; Whether the slot is always bound. Slots are almost always bound,
 ;; the exception being those which appear as an &AUX var with no value
 ;; in a BOA constructor.
@@ -199,7 +199,10 @@
 (defun dsd-safe-p (dsd) (logbitp 4 (dsd-bits dsd)))
 (defun dsd-read-only (dsd) (logbitp 5 (dsd-bits dsd)))
 ;; its position in the implementation sequence
-(defun dsd-index (dsd) (ash (dsd-bits dsd) (- +dsd-index-shift+)))
+(defun dsd-index (dsd)
+  (the index (ash (dsd-bits dsd) (- +dsd-index-shift+))))
+(sb-c:define-source-transform dsd-index (dsd)
+  `(truly-the index (ash (dsd-bits ,dsd) ,(- +dsd-index-shift+))))
 
 (!set-load-form-method defstruct-slot-description (:host :xc :target))
 (defmethod print-object ((x defstruct-slot-description) stream)

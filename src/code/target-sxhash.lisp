@@ -436,31 +436,83 @@
                             (psxhash (funcall getter key i) depthoid))))))
        result))))
 
+;;; Compute a PSXHASH for KEY. Salient points:
+;;; * It's not enough to use the bitmap to figure out how to mix in raw slots.
+;;;   The floating-point types all need special treatment. And we want to avoid
+;;;   consing, so we can't very well call PSXHASH.
+;;; * Even though PSXHASH requires that numerically equal numbers have the same
+;;;   hash e.g. 12 and 12d0 and #c(12d0 0d0) all hash the same, structures can
+;;;   weaken that restriction: instances are EQUAL only if they are of the same
+;;;   type and slot-for-slot EQUAL. So a float in a raw slot can't be EQUAL
+;;;   to a word in a different raw slot. In fact we don't even require that
+;;;   SINGLE- and DOUBLE-float hash the same for a given numerical value,
+;;;   because a raw slot can't hold either/or. But -0 and +0 must hash the same.
 (defun structure-object-psxhash (key depthoid)
   (declare (optimize speed))
   (declare (type structure-object key))
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
-  (let* ((layout (%instance-layout key))
-         (result (layout-clos-hash layout)))
-    (declare (type fixnum result))
-    (when (plusp depthoid)
-      (let ((max-iterations depthoid)
-            (depthoid (1- depthoid)))
-        ;; We don't mix in LAYOUT here because it was already done above.
-        (do-instance-tagged-slot (i key :layout layout :pad nil)
-          (mixf result (psxhash (%instance-ref key i) depthoid))
-          (if (zerop (decf max-iterations)) (return)))))
-    ;; [The following comment blurs some issues: indeed it would take
-    ;; a second loop in the non-interleaved-slots code; that loop might
-    ;; never execute because depthoid "cuts off", although that's an arbitrary
-    ;; choice and could be decided otherwise; and efficiency would likely
-    ;; demand that we store some additional metadata in the LAYOUT indicating
-    ;; how to mix the bits in, because floating-point +/-zeros have to
-    ;; be considered EQUALP]
-    ;; KLUDGE: Should hash untagged slots, too.  (Although +max-hash-depthoid+
-    ;; is pretty low currently, so they might not make it into the hash
-    ;; value anyway.)
-    result))
+  (macrolet ((rsd-index+1 (dsd)
+               ;; Return 0 if the DSD is not raw, otherwise 1+ the index into
+               ;; *RAW-SLOT-DATA*. This is exactly the low 3 bits of DSD-BITS.
+               `(truly-the (mod ,(1+ (length sb-kernel::*raw-slot-data*)))
+                           (ldb (byte 3 0) (sb-kernel::dsd-bits ,dsd))))
+             (raw-cases ()
+               (flet ((1+index-of (type)
+                        (or (1+ (position type sb-kernel::*raw-slot-data*
+                                          :key #'sb-kernel::raw-slot-data-raw-type))
+                            (error "Bad rsd spec ~s" type)))
+                      (mix-float (val zero)
+                        `(let ((x ,val))
+                           (mixf result (sxhash (if (= x ,zero) ,zero x))))))
+                 ;; This compiles to a jump table if supported
+                 `(case rsd-index+1
+                   ((,(1+index-of 'word) ,(1+index-of 'sb-vm:signed-word))
+                    ;; Access as unsigned. +X and -X hash differently because
+                    ;; of 2's complement, so disregarding the sign bit is fine.
+                    (mixf result (logand (%raw-instance-ref/word key i)
+                                         sb-xc:most-positive-fixnum)))
+                   (,(1+index-of 'single-float)
+                    ,(mix-float '(%raw-instance-ref/single key i) $0f0))
+                   (,(1+index-of 'double-float)
+                    ,(mix-float '(%raw-instance-ref/double key i) $0d0))
+                   (,(1+index-of 'sb-kernel:complex-single-float)
+                    (let ((cplx (%raw-instance-ref/complex-single key i)))
+                      ,(mix-float '(realpart cplx) $0f0)
+                      ,(mix-float '(imagpart cplx) $0f0)))
+                   (,(1+index-of 'sb-kernel:complex-double-float)
+                    (let ((cplx (%raw-instance-ref/complex-double key i)))
+                      ,(mix-float '(realpart cplx) $0d0)
+                      ,(mix-float '(imagpart cplx) $0d0)))))))
+    (let* ((layout (%instance-layout key))
+           (result (layout-clos-hash layout)))
+      (declare (type fixnum result))
+      (when (plusp depthoid)
+        (let ((max-iterations depthoid)
+              (depthoid (1- depthoid))
+              (len (%instance-length key))
+              ;; Don't mix in LAYOUT (if it takes a slot) because it was the seed value.
+              (i sb-vm:instance-data-start))
+          (declare (index i max-iterations))
+          (if (/= (layout-bitmap layout) +layout-all-tagged+)
+              (let ((slots (dd-slots (layout-info layout))))
+                (loop (unless slots (return))
+                      (let* ((slot (pop slots))
+                             (rsd-index+1 (rsd-index+1 slot))
+                             (i (dsd-index slot)))
+                        (cond ((= rsd-index+1 0) ; non-raw
+                               (mixf result (psxhash (%instance-ref key i) depthoid))
+                               (decf max-iterations))
+                              (t
+                               ;; Don't decrement MAX-ITERATIONS.
+                               ;; These can't cause unbounded work.
+                               (raw-cases))))
+                      (incf i)
+                      (if (zerop max-iterations) (return))))
+              (loop (when (>= i len) (return))
+                    (mixf result (psxhash (%instance-ref key i) depthoid))
+                    (incf i)
+                    (if (zerop (decf max-iterations)) (return))))))
+      result)))
 
 (defun list-psxhash (key depthoid)
   (declare (optimize speed))

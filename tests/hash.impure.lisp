@@ -445,4 +445,31 @@
     (assert (= 5 (gethash 1 table)))
     (assert (eq '= (hash-table-test table)))))
 
+(defstruct rslotty a
+  (uword 0 :type word)
+  (sword 0 :type sb-vm:signed-word)
+  (sf 0s0 :type single-float)
+  (df 0d0 :type double-float)
+  (csf #c(0s0 0s0) :type (complex single-float))
+  (cdf #c(0d0 0d0) :type (complex double-float)))
+
+(import 'sb-impl::psxhash)
+(with-test (:name :psxhash-raw-slots)
+  (let ((empty (psxhash (make-rslotty))))
+    ;; unequalp values produce unequal hashes
+    (assert (/= empty (psxhash (make-rslotty :uword 32))))
+    (assert (/= empty (psxhash (make-rslotty :sword -1800))))
+    (assert (/= empty (psxhash (make-rslotty :sf 1s0))))
+    (assert (/= empty (psxhash (make-rslotty :df 1d0))))
+    (assert (/= empty (psxhash (make-rslotty :csf #c(1s0 1s0)))))
+    (assert (/= empty (psxhash (make-rslotty :cdf #c(1d0 1d0)))))
+    ;; equalp values produce equal hashes
+    (assert (= empty (psxhash (make-rslotty :sf -0s0 :df -0d0))))
+    (assert (= empty (psxhash (make-rslotty :csf #c(-0s0 -0s0)))))
+    (assert (= empty (psxhash (make-rslotty :csf #c(0s0 -0s0)))))
+    (assert (= empty (psxhash (make-rslotty :csf #c(-0s0 0s0)))))
+    (assert (= empty (psxhash (make-rslotty :cdf #c(-0d0 -0d0)))))
+    (assert (= empty (psxhash (make-rslotty :cdf #c(0d0 -0d0)))))
+    (assert (= empty (psxhash (make-rslotty :cdf #c(-0d0 0d0)))))))
+
 ;;; success
