@@ -283,7 +283,7 @@
  ("src/code/sc-offset" :c-headers)
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
- ("src/compiler/node" :c-headers)
+ ("src/compiler/node" :c-headers :block-compile)
  ;; RECONSTRUCT-LEXENV needs types GLOBAL-VAR and DEFINED-FUN
  ("src/compiler/lexenv")
 
@@ -292,8 +292,7 @@
  ("src/compiler/early-assem")
 
  ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
- ("src/compiler/vop" :c-headers)
- ("src/compiler/constant-leaf")
+ ("src/compiler/vop" :c-headers :block-compile)
 
  ;; needed by "vm" and "primtype"
  ("src/compiler/backend" :c-headers)

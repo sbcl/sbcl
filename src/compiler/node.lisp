@@ -20,21 +20,8 @@
 ;;; blocks -- with BLOCK-SUCC/BLOCK-PRED lists; data transfers are
 ;;; represented with LVARs.
 
-;;; FIXME: this file contains a ton of DEF!STRUCT definitions most of which
-;;; could be DEFSTRUCT, except for the fact that we use def!struct as
-;;; a workaround for the compiler's inability to cope with mutally referential
-;;; structures, even ones within the same file. The IR1 structures are tightly
-;;; knitted together - for example, starting from a CRETURN, you can reach
-;;; at least 15 other structure objects, not counting some like HASH-TABLE
-;;; which are fundamental. e.g. we have:
-;;;  CRETURN -> {NODE,CTRAN,CLAMBDA,LVAR}
-;;;  CTRAN -> {BLOCK},
-;;;  CLAMBDA -> {FUNCTIONAL,COMBINATION,BIND,PHYSENV,OPTIONAL-DISPATCH}
-;;; and so on.  DEF!STRUCT solves this problem by way of a terrible hack
-;;; that works only for compiling the compiler.
-
 ;;; "Lead-in" Control TRANsfer [to some node]
-(def!struct (ctran (:constructor make-ctran) (:copier nil))
+(defstruct (ctran (:constructor make-ctran) (:copier nil))
   ;; an indication of the way that this continuation is currently used
   ;;
   ;; :UNUSED
@@ -129,13 +116,13 @@
                                        proper-or-circular-list proper-or-dotted-list)))
 
 (defstruct (lvar-dependent-annotation
-             (:include lvar-annotation)
-             (:copier nil))
+            (:include lvar-annotation)
+            (:copier nil))
     (deps nil :type list))
 
 (defstruct (lvar-function-designator-annotation
-             (:include lvar-dependent-annotation)
-             (:copier nil))
+            (:include lvar-dependent-annotation)
+            (:copier nil))
   (caller nil :type symbol)
   (arg-specs nil :type list)
   (result-specs nil :type list)
@@ -172,11 +159,11 @@
       (setf (lvar-%derived-type lvar)
             (%lvar-derived-type lvar))))
 
-(def!struct (node (:constructor nil)
-                  (:include sset-element
-                            (number (when (boundp '*compilation*)
-                                      (incf (sset-counter *compilation*)))))
-                  (:copier nil))
+(defstruct (node (:constructor nil)
+                 (:include sset-element
+                           (number (when (boundp '*compilation*)
+                                     (incf (sset-counter *compilation*)))))
+                 (:copier nil))
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of an lvar whose DEST
   ;; is this node.
@@ -237,10 +224,10 @@
     (aver-live-component *current-component*)
     (funcall fun)))
 
-(def!struct (valued-node (:conc-name node-)
-                         (:include node)
-                         (:constructor nil)
-                         (:copier nil))
+(defstruct (valued-node (:conc-name node-)
+                        (:include node)
+                        (:constructor nil)
+                        (:copier nil))
   ;; the bottom-up derived type for this node.
   (derived-type *wild-type* :type ctype)
   ;; Lvar, receiving the values, produced by this node. May be NIL if
@@ -281,10 +268,10 @@
   (defattr block-type-check)
   (defattr block-delete-p))
 
-(def!struct (cloop (:conc-name loop-)
-                   (:predicate loop-p)
-                   (:constructor make-loop)
-                   (:copier nil))
+(defstruct (cloop (:conc-name loop-)
+                  (:predicate loop-p)
+                  (:constructor make-loop)
+                  (:copier nil))
   ;; The kind of loop that this is.  These values are legal:
   ;;
   ;;    :OUTER
@@ -330,12 +317,12 @@
 ;;; order. This latter numbering also forms the basis of the block
 ;;; numbering in the debug-info (though that is relative to the start
 ;;; of the function.)
-(def!struct (cblock (:include sset-element)
-                    (:constructor make-block (start))
-                    (:constructor make-block-key)
-                    (:copier nil)
-                    (:conc-name block-)
-                    (:predicate block-p))
+(defstruct (cblock (:include sset-element)
+                   (:constructor make-block (start))
+                   (:constructor make-block-key)
+                   (:copier nil)
+                   (:conc-name block-)
+                   (:predicate block-p))
     ;; a list of all the blocks that are predecessors/successors of this
     ;; block. In well-formed IR1, most blocks will have one successor.
     ;; The only exceptions are:
@@ -402,8 +389,8 @@
 ;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
 ;;; different BLOCK-INFO annotation structures so that code
 ;;; (specifically control analysis) can be shared.
-(def!struct (block-annotation (:constructor nil)
-                              (:copier nil))
+(defstruct (block-annotation (:constructor nil)
+                             (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
   (block (missing-arg) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
@@ -431,15 +418,14 @@
   ;; During make-host-2, the solution to this is the same hack
   ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
   #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions style-warning))
-(def!struct (component (:copier nil)
-                       (:constructor
-                        make-component
-                        (head
-                         tail &aux
-                         (last-block tail)
-                         (outer-loop (make-loop :kind :outer
-                                                :head head
-                                                :tail (list tail))))))
+(defstruct (component (:copier nil)
+                      (:constructor make-component
+                       (head
+                        tail &aux
+                        (last-block tail)
+                        (outer-loop (make-loop :kind :outer
+                                               :head head
+                                               :tail (list tail))))))
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -576,7 +562,7 @@
 ;;; boundaries by requiring that the exit ctrans initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
-(def!struct (cleanup (:copier nil))
+(defstruct (cleanup (:copier nil))
   ;; the kind of thing that has to be cleaned up
   (kind (missing-arg)
         :type (member :special-bind :catch :unwind-protect
@@ -627,7 +613,7 @@
 ;;; structure is attached to INFO and used to keep track of
 ;;; associations between these names and less-abstract things (like
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
-(def!struct (physenv (:copier nil))
+(defstruct (physenv (:copier nil))
   ;; the function that allocates this physical environment
   (lambda (missing-arg) :type clambda :read-only t)
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
@@ -661,7 +647,7 @@
 ;;; The tail set is somewhat approximate, because it is too early to
 ;;; be sure which calls will be tail-recursive. Any call that *might*
 ;;; end up tail-recursive causes TAIL-SET merging.
-(def!struct (tail-set)
+(defstruct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
   (funs nil :type list)
   ;; our current best guess of the type returned by these functions.
@@ -725,11 +711,11 @@
 ;;; structures. A reference to a LEAF is indicated by a REF node. This
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
-(def!struct (leaf (:include sset-element
-                            (number (when (boundp '*compilation*)
-                                      (incf (sset-counter *compilation*)))))
-                  (:copier nil)
-                  (:constructor nil))
+(defstruct (leaf (:include sset-element
+                           (number (when (boundp '*compilation*)
+                                     (incf (sset-counter *compilation*)))))
+                 (:copier nil)
+                 (:constructor nil))
   ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
   ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
@@ -791,17 +777,32 @@
   (aver (leaf-has-source-name-p leaf))
   (leaf-%source-name leaf))
 
+;;; The CONSTANT structure is used to represent known constant values.
+;;; Since the same constant leaf may be shared between named and anonymous
+;;; constants, %SOURCE-NAME is never used.
+(defstruct (constant (:constructor make-constant (value
+                                                  &aux
+                                                  (type (ctype-of value))
+                                                  (%source-name '.anonymous.)
+                                                  (where-from :defined)))
+                     (:copier nil)
+                     (:include leaf))
+  ;; the value of the constant
+  (value (missing-arg) :type t))
+(defprinter (constant :identity t)
+  value)
+
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
-(def!struct (basic-var (:include leaf)
-                       (:copier nil)
-                       (:constructor nil))
+(defstruct (basic-var (:include leaf)
+                      (:copier nil)
+                      (:constructor nil))
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
 
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
 ;;; NAME.
-(def!struct (global-var (:include basic-var) (:copier nil))
+(defstruct (global-var (:include basic-var) (:copier nil))
   ;; kind of variable described
   (kind (missing-arg)
         :type (member :special :global-function :global :unknown)))
@@ -837,10 +838,10 @@
 ;;; non-NIL INLINEP value. Whenever we change the INLINEP state (i.e.
 ;;; an inline proclamation) we copy the structure so that former
 ;;; INLINEP values are preserved.
-(def!struct (defined-fun (:include global-var
-                                   (where-from :defined)
-                                   (kind :global-function))
-                         (:copier nil))
+(defstruct (defined-fun (:include global-var
+                                  (where-from :defined)
+                                  (kind :global-function))
+                        (:copier nil))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
   (inlinep nil :type inlinep)
@@ -861,11 +862,11 @@
 ;;; We default the WHERE-FROM and TYPE slots to :DEFINED and FUNCTION.
 ;;; We don't normally manipulate function types for defined functions,
 ;;; but if someone wants to know, an approximation is there.
-(def!struct (functional (:include leaf
-                                  (%source-name '.anonymous.)
-                                  (where-from :defined)
-                                  (type (specifier-type 'function)))
-                        (:copier nil))
+(defstruct (functional (:include leaf
+                                 (%source-name '.anonymous.)
+                                 (where-from :defined)
+                                 (type (specifier-type 'function)))
+                       (:copier nil))
   ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
   ;;
   ;; the name of FUNCTIONAL for debugging purposes, or NIL if we
@@ -1077,11 +1078,11 @@
 ;;; The CLAMBDA only deals with required lexical arguments. Special,
 ;;; optional, keyword and rest arguments are handled by transforming
 ;;; into simpler stuff.
-(def!struct (clambda (:include functional)
-                     (:conc-name lambda-)
-                     (:predicate lambda-p)
-                     (:constructor make-lambda)
-                     (:copier nil))
+(defstruct (clambda (:include functional)
+                    (:conc-name lambda-)
+                    (:predicate lambda-p)
+                    (:constructor make-lambda)
+                    (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list)
   ;; If this function was ever a :OPTIONAL function (an entry-point
@@ -1191,7 +1192,7 @@
 ;;; arguments into a direct call to the appropriate entry-point
 ;;; function, so functions that are compiled together can avoid doing
 ;;; the dispatch.
-(def!struct (optional-dispatch (:include functional) (:copier nil))
+(defstruct (optional-dispatch (:include functional) (:copier nil))
   ;; the original parsed argument list, for anyone who cares
   (arglist nil :type list)
   ;; true if &ALLOW-OTHER-KEYS was supplied
@@ -1241,7 +1242,7 @@
 ;;; LAMBDA-VARs during IR1 conversion. If we use one of these things,
 ;;; then the var will have to be massaged a bit before it is simple
 ;;; and lexical.
-(def!struct (arg-info (:copier nil))
+(defstruct (arg-info (:copier nil))
   ;; true if this arg is to be specially bound
   (specialp nil :type boolean)
   ;; the kind of argument being described. Required args only have arg
@@ -1300,7 +1301,7 @@
   explicit-value-cell
   )
 
-(def!struct (lambda-var (:include basic-var) (:copier nil))
+(defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
          :type attributes)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
@@ -1357,14 +1358,14 @@
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(def!struct (ref (:include valued-node (reoptimize nil))
-                 (:constructor make-ref
-                               (leaf
-                                &optional (%source-name '.anonymous.)
-                                &aux (leaf-type (leaf-type leaf))
-                                (derived-type
-                                 (make-single-value-type leaf-type))))
-                 (:copier nil))
+(defstruct (ref (:include valued-node (reoptimize nil))
+                (:constructor make-ref
+                              (leaf
+                               &optional (%source-name '.anonymous.)
+                               &aux (leaf-type (leaf-type leaf))
+                                    (derived-type
+                                     (make-single-value-type leaf-type))))
+                (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
   ;; CONSTANT nodes are always anonymous, since we wish to coalesce named and
@@ -1378,11 +1379,11 @@
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
-(def!struct (cif (:include node)
-                 (:conc-name if-)
-                 (:predicate if-p)
-                 (:constructor make-if)
-                 (:copier nil))
+(defstruct (cif (:include node)
+                (:conc-name if-)
+                (:predicate if-p)
+                (:constructor make-if)
+                (:copier nil))
   ;; LVAR for the predicate
   (test (missing-arg) :type lvar)
   ;; the blocks that we execute next in true and false case,
@@ -1396,13 +1397,13 @@
   consequent
   alternative)
 
-(def!struct (cset (:include valued-node
+(defstruct (cset (:include valued-node
                            (derived-type (make-single-value-type
                                           *universal-type*)))
-                  (:conc-name set-)
-                  (:predicate set-p)
-                  (:constructor make-set)
-                  (:copier nil))
+                 (:conc-name set-)
+                 (:predicate set-p)
+                 (:constructor make-set)
+                 (:copier nil))
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
@@ -1423,9 +1424,9 @@
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
 ;;; function appears as the successor; the NODE-LVAR is null.
-(def!struct (basic-combination (:include valued-node)
-                               (:constructor nil)
-                               (:copier nil))
+(defstruct (basic-combination (:include valued-node)
+                              (:constructor nil)
+                              (:copier nil))
     ;; LVAR for the function
     (fun (missing-arg) :type lvar)
   ;; list of LVARs for the args. In a local call, an argument lvar may
@@ -1457,9 +1458,9 @@
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
-(def!struct (combination (:include basic-combination)
-                         (:constructor make-combination (fun))
-                         (:copier nil)))
+(defstruct (combination (:include basic-combination)
+                        (:constructor make-combination (fun))
+                        (:copier nil)))
 (defprinter (combination :identity t)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
@@ -1471,17 +1472,17 @@
 ;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
-(def!struct (mv-combination (:include basic-combination)
-                            (:constructor make-mv-combination (fun))
-                            (:copier nil)))
+(defstruct (mv-combination (:include basic-combination)
+                           (:constructor make-mv-combination (fun))
+                           (:copier nil)))
 (defprinter (mv-combination)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar #'lvar-uses args)))
 
 ;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
-(def!struct (bind (:include node)
-                  (:copier nil))
+(defstruct (bind (:include node)
+                 (:copier nil))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
   (lambda nil :type (or clambda null)))
@@ -1492,11 +1493,11 @@
 ;;; return values and represents the control transfer on return. This
 ;;; is also where we stick information used for TAIL-SET type
 ;;; inference.
-(def!struct (creturn (:include node)
-                     (:conc-name return-)
-                     (:predicate return-p)
-                     (:constructor make-return)
-                     (:copier nil))
+(defstruct (creturn (:include node)
+                    (:conc-name return-)
+                    (:predicate return-p)
+                    (:constructor make-return)
+                    (:copier nil))
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
@@ -1514,9 +1515,9 @@
 ;;; The CAST node represents type assertions. The check for
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
-(def!struct (cast (:include valued-node)
-                  (:copier nil)
-                  (:constructor %make-cast))
+(defstruct (cast (:include valued-node)
+                 (:copier nil)
+                 (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
   ;; an indication of what we have proven about how this type
@@ -1544,11 +1545,11 @@
   type-to-check)
 
 ;;; A filter to help order the value semantics of MULTIPLE-VALUE-PROG1
-(def!struct (vestigial-exit-cast (:include cast
-                                           (%type-check nil)
-                                           (asserted-type *wild-type*)
-                                           (type-to-check *wild-type*))
-                                 (:copier nil)))
+(defstruct (vestigial-exit-cast (:include cast
+                                          (%type-check nil)
+                                          (asserted-type *wild-type*)
+                                          (type-to-check *wild-type*))
+                                (:copier nil)))
 
 ;;; A cast that always follows %check-bound and they are deleted together.
 ;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.
@@ -1556,8 +1557,8 @@
 ;;; DELETE-CAST deletes BOUND-CAST-CHECK
 ;;; GENERATE-TYPE-CHECKS ignores it, it never translates to a type check,
 ;;; %CHECK-BOUND does all the checking.
-(def!struct (bound-cast (:include cast (%type-check nil))
-                        (:copier nil))
+(defstruct (bound-cast (:include cast (%type-check nil))
+                       (:copier nil))
   ;; %check-bound combination before the cast
   (check (missing-arg) :type (or null combination))
   ;; Tells whether the type information is in a state where it can be
@@ -1567,7 +1568,7 @@
   (bound (missing-arg) :type lvar))
 
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
-(def!struct (array-index-cast (:include cast) (:copier nil)))
+(defstruct (array-index-cast (:include cast) (:copier nil)))
 
 ;;;; non-local exit support
 ;;;;
@@ -1577,8 +1578,8 @@
 ;;; The ENTRY node serves to mark the start of the dynamic extent of a
 ;;; lexical exit. It is the mess-up node for the corresponding :ENTRY
 ;;; cleanup.
-(def!struct (entry (:include node)
-                   (:copier nil))
+(defstruct (entry (:include node)
+                  (:copier nil))
   ;; All of the EXIT nodes for potential non-local exits to this point.
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
@@ -1592,8 +1593,8 @@
 ;;; continuation, it is delivered to our VALUE lvar. The original exit
 ;;; lvar is the exit node's LVAR; physenv analysis also makes it the
 ;;; lvar of %NLX-ENTRY call.
-(def!struct (exit (:include valued-node)
-                  (:copier nil))
+(defstruct (exit (:include valued-node)
+                 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
@@ -1607,8 +1608,8 @@
   (entry :test entry)
   (value :test value))
 
-(def!struct (no-op (:include node)
-                   (:copier nil)))
+(defstruct (no-op (:include node)
+                  (:copier nil)))
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
@@ -1643,4 +1644,4 @@
 ;; at load-time of the cross-compiler. SB-XC:PROCLAIM would likely work here.
 #-sb-fluid
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      physenv tail-set nlx-info))
+                      physenv tail-set nlx-info leaf))

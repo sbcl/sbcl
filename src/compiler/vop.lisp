@@ -100,7 +100,7 @@
 ;;; done on the basis of the primitive types of the operands, and the
 ;;; primitive type of a value is used to constrain the possible
 ;;; representations of that value.
-(def!struct (primitive-type (:copier nil))
+(defstruct (primitive-type (:copier nil))
   ;; the name of this PRIMITIVE-TYPE
   (name nil :type symbol :read-only t)
   ;; a list of the SC numbers for all the SCs that a TN of this type
@@ -517,8 +517,8 @@
 
 ;;; A VOP is a Virtual Operation. It represents an operation and the
 ;;; operands to the operation.
-(def!struct (vop (:constructor make-vop (block node info args results))
-                 (:copier nil))
+(defstruct (vop (:constructor make-vop (block node info args results))
+                (:copier nil))
   ;; VOP-INFO structure containing static info about the operation
   (info nil :type vop-info)
   ;; the IR2-BLOCK this VOP is in
@@ -552,8 +552,8 @@
 ;;; A TN-REF object contains information about a particular reference
 ;;; to a TN. The information in TN-REFs largely determines how TNs are
 ;;; packed.
-(def!struct (tn-ref (:constructor make-tn-ref (tn write-p))
-                    (:copier nil))
+(defstruct (tn-ref (:constructor make-tn-ref (tn write-p))
+                   (:copier nil))
   ;; the TN referenced
   (tn (missing-arg) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
@@ -581,9 +581,10 @@
 
 ;;; A TEMPLATE object represents a particular IR2 coding strategy for
 ;;; a known function.
-(def!struct (template (:constructor nil)
-                      (:copier nil)
-                      (:pure t))
+(defstruct (template (:constructor nil)
+                     (:copier nil)
+                     #-sb-xc-host
+                     (:pure t))
   ;; the symbol name of this VOP. This is used when printing the VOP
   ;; and is also used to provide a handle for definition and
   ;; translation.
@@ -655,7 +656,7 @@
 ;;; A VOP-INFO object holds the constant information for a given
 ;;; virtual operation. We include TEMPLATE so that functions with a
 ;;; direct VOP equivalent can be translated easily.
-(def!struct (vop-info (:include template) (:copier nil))
+(defstruct (vop-info (:include template) (:copier nil))
   ;; If true, causes special casing of TNs live after this VOP that
   ;; aren't results:
   ;; -- If T, all such TNs that are allocated in a SC with a defined
@@ -791,7 +792,7 @@
 
 ;;; The SB structure represents the global information associated with
 ;;; a storage base.
-(def!struct (storage-base (:copier nil) (:conc-name sb-))
+(defstruct (storage-base (:copier nil) (:conc-name sb-))
   ;; name, for printing and reference
   (name nil :type symbol :read-only t)
   ;; the kind of storage base (which determines the packing
@@ -876,7 +877,7 @@
 
 ;;; the STORAGE-CLASS structure holds the storage base that storage is allocated
 ;;; in and information used to select locations within the SB
-(def!struct (storage-class (:conc-name "SC-") (:copier nil) (:predicate nil))
+(defstruct (storage-class (:conc-name "SC-") (:copier nil) (:predicate nil))
   ;; name, for printing and reference
   (name nil :type symbol)
   ;; the number used to index SC cost vectors
@@ -951,7 +952,7 @@
 
 ;;;; TNs
 
-(def!struct (tn (:include sset-element)
+(defstruct (tn (:include sset-element)
                (:constructor make-random-tn)
                (:constructor make-tn (number kind primitive-type sc))
                (:copier nil))
@@ -1104,7 +1105,7 @@
 ;;; lifetime analysis, the global conflicts structure is used during
 ;;; lifetime analysis to represent the set of TNs live at the start of
 ;;; the IR2 block.
-(def!struct (global-conflicts
+(defstruct (global-conflicts
             (:constructor make-global-conflicts (kind tn block number))
             (:copier nil))
   ;; the IR2-BLOCK that this structure represents the conflicts for

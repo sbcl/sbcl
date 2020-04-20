@@ -590,7 +590,19 @@
                           ;; if tracing, also show high-level progress
                           :trace-file trace-file
                           :print trace-file
-                          :block-compile block-compile
+                          :block-compile (and block-compile
+                                              ;; Block compilation was
+                                              ;; completely broken
+                                              ;; from the beginning of
+                                              ;; SBCL history until
+                                              ;; version 2.0.2.
+                                              #+sbcl
+                                              (or (eq mode :target-compile)
+                                                  (and (find-symbol "SPLIT-VERSION-STRING" "SB-C")
+                                                       (funcall (find-symbol "VERSION>=" "SB-C")
+                                                                (funcall (find-symbol "SPLIT-VERSION-STRING" "SB-C")
+                                                                         (lisp-implementation-version))
+                                                                '(2 0 2)))))
                           :allow-other-keys t)
                (recompile ()
                  :report report-recompile-restart
