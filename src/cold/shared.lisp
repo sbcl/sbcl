@@ -362,6 +362,11 @@
     ;; of exciting low-level information about representation selection,
     ;; VOPs used by the compiler, and bits of assembly.
     :trace-file
+    ;; meaning: The #'COMPILE-STEM argument :BLOCK-COMPILE should be
+    ;; T. That is, the entire file will be block compiled. Like
+    ;; :TRACE-FILE, this applies to all COMPILE-FILEs which support
+    ;; something like :BLOCK-COMPILE.
+    :block-compile
     ;; meaning: This file is to be processed with the SBCL assembler,
     ;; not COMPILE-FILE. (Note that this doesn't make sense unless
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
@@ -529,6 +534,7 @@
                                               *target-assemble-file*
                                               *target-compile-file*))))
          (trace-file (find :trace-file flags))
+         (block-compile (if (find :block-compile flags) t nil))
          (ignore-failure-p (find :ignore-failure-p flags)))
     (declare (type function compile-file))
 
@@ -580,11 +586,12 @@
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
              (restart-case
-                 (if trace-file
-                     (funcall compile-file src :output-file tmp-obj
-                              ;; if tracing, also show high-level progress
-                              :trace-file t :print t :allow-other-keys t)
-                     (funcall compile-file src :output-file tmp-obj))
+                 (funcall compile-file src :output-file tmp-obj
+                          ;; if tracing, also show high-level progress
+                          :trace-file trace-file
+                          :print trace-file
+                          :block-compile block-compile
+                          :allow-other-keys t)
                (recompile ()
                  :report report-recompile-restart
                  (go retry-compile-file)))
