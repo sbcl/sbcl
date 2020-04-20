@@ -23,7 +23,9 @@
 
 (defstruct package-data name doc shadow export reexport import-from use)
 (export 'package-data)
-(dolist (data (with-open-file (f "package-data-list.lisp-expr") (read f)))
+(dolist (data (with-open-file (f (merge-pathnames "../../package-data-list.lisp-expr"
+                                                  *load-pathname*))
+                (read f)))
   (labels ((flatten (tree)
              (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
                      tree)))
