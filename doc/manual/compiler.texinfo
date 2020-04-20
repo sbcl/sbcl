@@ -1143,5 +1143,5 @@ convention. We do not currently support the @code{start-block} and
 to @code{compile-file} regarding block compilation.
 
 Unlike CMUCL, SBCL is able to open-code forward-referenced type tests
-while block compiling. This helps for mutually referential defstructs in
-particular.
+while block compiling. This helps for mutually referential
+@code{defstruct}s in particular.
