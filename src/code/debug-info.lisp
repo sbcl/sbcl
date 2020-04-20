@@ -475,10 +475,7 @@
   ;; the "&OPTIONAL and &KEY" warning is quite annoying to see repeated.
   ;; And I doubt it changes anyone's mind about coding style anyway.
   ;; Typically this matters for DEFTYPE and DEFMACRO.
-  (style-warning-tracker nil :type list)
-  ;; A list of forms that are pending compilation. Delaying compilation helps
-  ;; with defstruct constructors that involve type dependency cycles.
-  (queued-tlfs nil))
+  (style-warning-tracker nil :type list))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.

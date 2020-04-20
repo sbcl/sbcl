@@ -237,7 +237,11 @@
                       (t
                        (uncertain))))
               (unimplemented)))))
-    (when (and (not certain) *xtypep-uncertainty-action*)
+    (when (and (not certain) *xtypep-uncertainty-action*
+               ;; KLUDGE: Allow some slack while block compiling, as we are
+               ;; hoping that forward referenced types get resolved.
+               (not (and (boundp 'sb-c::*compilation*)
+                         (sb-c::block-compile sb-c::*compilation*))))
       ;; can't even backtrace if the printing of a something involving
       ;; uncertainty involves uncertainty.
       (let* ((action *xtypep-uncertainty-action*)
@@ -291,7 +295,10 @@
                                      (typep (hairy-type-specifier type)
                                             '(cons (eql satisfies))))
                             (return-from contains-satisfies t)))
-                        ctype)))
+                        ctype))
+            ;; KLUDGE: Allow uncertainty while block compiling.
+            (and (boundp 'sb-c::*compilation*)
+                 (sb-c::block-compile sb-c::*compilation*)))
         (values answer certain)
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 

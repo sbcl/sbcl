@@ -6,7 +6,12 @@ changes relative to sbcl-2.0.3:
     is entirely shared with 64-bit RISC-V.
     ** native threads are now supported on RISC-V.
   * enchancement: forward-referenced type tests can now be open-coded by using
-    block compilation.
+    block compilation. The result is that mutually referential defstructs are
+    now efficiently compiled in block compilation mode, superseding a lighter
+    mechanism that worked in fewer contexts. However, that lighter mechanism
+    has been removed, so for now, users who want to efficiently compile
+    mutually referential defstructs must explicitly opt-in using block
+    compilation.
   * bug fix: defstructs with empty initforms in the sbcl source are now
     explicitly intiialized with NIL, as that is undefined behavior under
     ANSI. This helps cross compilation hosts which do not implicitly

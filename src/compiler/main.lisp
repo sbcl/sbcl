@@ -975,109 +975,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                               ,@body)
                             ,info ,on-error))))
 
-;;; To allow proper optimization of the type-checks in defstruct constructors
-;;; and slot setters in circular defstructs, compiling of out-of-line defuns
-;;; can be deferred until after more than 1 defstruct form is seen, a la:
-;;;  (defstruct foo (x nil :type (or null foo bar)))
-;;;  (defstruct bar (x nil :type (or null bar foo)))
-;;;
-;;; A trivial example shows why only a very small set of compile-time-too forms
-;;; are allowed - this defun of F1 can not be deferred past the second EVAL-WHEN.
-;;;
-;;;  (eval-when (:compile-toplevel) (defvar *myvar* t))
-;;;  (defmacro foo (x) (if *myvar* `(list ,x) `(car ,x)))
-;;;  (defun f1 (x) (foo x))
-;;;  (eval-when (:compile-toplevel) (setq *myvar* nil))
-;;;  (defun f2 (x) (foo x))
-;;;
-;;; Additionally, it is important to preserve the relative order
-;;; of arbitrary defuns for cases such as this:
-;;;  (defun thing () ...)
-;;;  (defun use-it () (... (load-time-value (thing))))
-
-;;; Defstruct slot setters and constructors should be deferred.
-;;; Readers, copiers, and predicates needn't be, but the implementation
-;;; of the deferral mechanism is simplified by lumping defstruct-defined
-;;; functions together in the deferral queue.
-;;; We could try to queue up all DEFUNs until we see an unrecognized form
-;;; (non-whitelisted) appears, but I'm insufficiently convinced of the
-;;; correctness of the approach to blindly allow any DEFUN whatsoever.
-(defglobal *debug-tlf-queueing* nil)
-(defun deferrable-tlf-p (form)
-  (unless (consp form)
-    (return-from deferrable-tlf-p nil))
-  (cond ((or (and (eq (car form) 'sb-impl::%defun)
-                  (typep (second form) '(cons (eql quote) (cons t null)))
-                  ;; (%DEFUN 'THING #<lambda> INLINE-LAMBDA EXTRA-INFO)
-                  (member (fifth form) '(:copier :predicate :accessor :constructor)))
-             ;; Also defer %target-defstruct until after the readers/writers are made,
-             ;; or else CLOS garbage hits sb-pcl::uninitialized-accessor-function.
-             (and (eq (car form) 'sb-kernel::%target-defstruct)))
-         (when *debug-tlf-queueing*
-           (let ((*print-pretty* nil)) (format t "~&Enqueue: ~A~%" form)))
-         t)
-        (t
-         nil)))
-
-(defun whitelisted-compile-time-form-p (form)
-  (let ((answer
-         (typecase form
-          ((cons (member sb-c:%compiler-defun
-                         sb-c::warn-if-setf-macro
-                         sb-kernel::%defstruct-package-locks
-                         sb-kernel::%compiler-defstruct
-                         sb-pcl::compile-or-load-defgeneric))
-           t)
-          ((or cons symbol) nil)
-          (t t))))
-    (when *debug-tlf-queueing*
-      (let ((*print-pretty* nil) (*print-level* 2))
-        (format t "~&CT whitelist ~A => ~A~%" form answer)))
-    (not (null answer))))
-
-(defun whitelisted-load-time-form-p (form)
-  (let ((answer (typecase form
-                 ((cons (member sb-pcl::load-defmethod
-                                #+sb-xc-host sb-pcl::!trivial-defmethod))
-                  (typep (third form) '(cons (eql quote) (cons (eql print-object) null))))
-                 ((cons (member sb-kernel::%defstruct-package-locks
-                                sb-kernel::%defstruct
-                                sb-kernel::%compiler-defstruct
-                                quote))
-                  t)
-                 ((or cons symbol) nil)
-                 (t t))))
-    (when *debug-tlf-queueing*
-      (let ((*print-pretty* nil) (*print-level* 2))
-        (format t "~&LT whitelist ~A => ~A~%" form answer)))
-    (not (null answer))))
-
-(defmacro queued-tlfs ()
-  '(file-info-queued-tlfs (source-info-file-info *source-info*)))
-(defun process-queued-tlfs ()
-  (let ((list (nreverse (queued-tlfs))))
-    (setf (queued-tlfs) nil)
-    (dolist (item list)
-      (declare (type (simple-vector 7) item))
-      (let* ((*source-paths* (elt item 0))
-            (*policy* (elt item 1))
-            (*handled-conditions* (elt item 2))
-            (*disabled-package-locks* (elt item 3))
-            (*lexenv* (elt item 4))
-            (form (elt item 5))
-            (path (elt item 6))
-            (*top-level-form-p*)
-            ;; binding *T-L-F-NOTED* to this form suppresses "; compiling (%DEFUN ...)"
-            (*top-level-form-noted* form)
-            (sb-xc:*gensym-counter* 0))
-         (when *debug-tlf-queueing*
-           (let ((*print-pretty* nil)) (format t "~&Dequeue: ~A~%" form)))
-        ;; *SOURCE-PATHS* have been cleared. This is only a problem only if we
-        ;; need to report an error. Probably should store the original form
-        ;; and recompute paths, or just snapshot the hash-table.
-        ;; (aver (plusp (hash-table-count *source-paths*)))
-        (convert-and-maybe-compile form path nil)))))
-
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
 (defun find-source-root (index info)
@@ -1097,9 +994,6 @@ necessary, since type inference may take arbitrarily long to converge.")
   #+sb-xc-host
   (when sb-cold::*compile-for-effect-only*
     (return-from convert-and-maybe-compile))
-  (when *debug-tlf-queueing*
-    (let ((*print-pretty* nil) (*print-level* 2))
-      (format t "~&c/c ~A~%" form)))
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
@@ -1368,8 +1262,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; compilation. Normally just evaluate in the appropriate
 ;;; environment, but also compile if outputting a CFASL.
 (defun eval-compile-toplevel (body path)
-  (when (and (queued-tlfs) (notevery #'whitelisted-compile-time-form-p body))
-    (process-queued-tlfs))
   (let ((*compile-time-eval* t))
     (flet ((frob ()
              (eval-tlf `(progn ,@body) (source-path-tlf-number path) *lexenv*)
@@ -1474,17 +1366,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (t
                   (when compile-time-too
                     (eval-compile-toplevel (list form) path))
-                  (cond ((deferrable-tlf-p form)
-                         (push (vector (copy-hash-table *source-paths*)
-                                       *policy* *handled-conditions*
-                                       *disabled-package-locks* *lexenv* form path)
-                               (queued-tlfs)))
-                        (t
-                         (when (and (queued-tlfs)
-                                    (not (whitelisted-load-time-form-p form)))
-                           (process-queued-tlfs))
-                         (let (*top-level-form-p*)
-                           (convert-and-maybe-compile form path)))))))))))
+                  (let (*top-level-form-p*)
+                    (convert-and-maybe-compile form path)))))))))
 
   (values))
 
@@ -1769,8 +1652,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                         (process-toplevel-form
                          form `(original-source-start 0 ,current-index) nil))))
                   (let ((*source-info* info))
-                    (finish-block-compilation)
-                    (process-queued-tlfs)))
+                    (finish-block-compilation)))
                 (let ((code-coverage-records
                        (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))
