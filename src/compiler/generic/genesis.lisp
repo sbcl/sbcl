@@ -2592,6 +2592,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;;; cold fops for loading code objects and functions
 
+(define-cold-fop (fop-fset)
+  (let ((fn (pop-stack))
+        (name (pop-stack)))
+    (cold-fset name fn)))
+
 (define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 

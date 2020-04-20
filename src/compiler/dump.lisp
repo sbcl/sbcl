@@ -1070,6 +1070,19 @@
       (dump-push code-handle file)
       (dump-fop 'fop-fun-entry file (decf fun-index))
       (let ((entry-handle (dump-pop file)))
+        ;; When cross compiling, if the entry is a DEFUN, then we also
+        ;; dump a FOP-FSET so that the cold loader can instantiate the
+        ;; definition at cold-load time, allowing forward references
+        ;; to functions in top-level forms.
+        #+sb-xc-host
+        (let ((name (sb-c::entry-info-name entry)))
+          ;; At the moment, we rely on the fopcompiler to do linking
+          ;; for DEFUNs that are not block compiled.
+          (when (and (sb-c::block-compile sb-c::*compilation*)
+                     (sb-c::legal-fun-name-p name))
+            (dump-object name file)
+            (dump-push entry-handle file)
+            (dump-fop 'fop-fset file)))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)
         (let ((old (gethash entry (fasl-output-patch-table file))))
           (when old
