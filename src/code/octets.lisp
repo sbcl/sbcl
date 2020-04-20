@@ -408,21 +408,6 @@ STRING (or the subsequence bounded by START and END)."
 (defun use-unicode-replacement-char (condition)
   (use-value +unicode-replacement-character+ condition))
 
-;;; Utilities that maybe should be exported
-
-#+sb-unicode
-(defmacro with-standard-replacement-character (&body body)
-  `(handler-bind ((octet-encoding-error #'use-unicode-replacement-char))
-    ,@body))
-
-(defmacro with-default-decoding-replacement ((c) &body body)
-  (let ((cname (gensym)))
-  `(let ((,cname ,c))
-    (handler-bind
-        ((octet-decoding-error (lambda (c)
-                                 (use-value ,cname c))))
-      ,@body))))
-
 ;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
 ;;; by one or more keyword symbols. The mapping from symbol to index into this
 ;;; vector is memoized into the symbol's :EXTERNAL-FORMAT property.
