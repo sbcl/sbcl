@@ -410,42 +410,46 @@
 
 ;;;; raw instance slot accessors
 
-(define-vop (raw-instance-ref/word)
-  (:translate %raw-instance-ref/word)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types * positive-fixnum)
-  (:results (value :scs (unsigned-reg)))
-  (:temporary (:scs (interior-reg)) lip)
-  (:result-types unsigned-num)
-  (:generator 5
-    (inst addq object index lip)
-    (inst ldl
-          value
-          (- (* instance-slots-offset n-word-bytes)
-             instance-pointer-lowtag)
-          lip)
-    (inst mskll value 4 value)))
+(macrolet ((def (signedp sc result-type)
+             `(progn
+               (define-vop ()
+                 (:translate ,(symbolicate "%RAW-INSTANCE-REF/" signedp "WORD"))
+                 (:policy :fast-safe)
+                 (:args (object :scs (descriptor-reg))
+                        (index :scs (any-reg)))
+                 (:arg-types * positive-fixnum)
+                 (:results (value :scs (,sc)))
+                 (:temporary (:scs (interior-reg)) lip)
+                 (:result-types ,result-type)
+                 (:generator 5
+                   (inst addq object index lip)
+                   (inst ldl
+                         value
+                         (- (* instance-slots-offset n-word-bytes)
+                            instance-pointer-lowtag)
+                         lip)
+                   (inst mskll value 4 value)))
 
-(define-vop (raw-instance-set/word)
-  (:translate %raw-instance-set/word)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (unsigned-reg)))
-  (:arg-types * positive-fixnum unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:temporary (:scs (interior-reg)) lip)
-  (:result-types unsigned-num)
-  (:generator 5
-    (inst addq object index lip)
-    (inst stl
-          value
-          (- (* instance-slots-offset n-word-bytes)
-             instance-pointer-lowtag)
-          lip)
-    (move value result)))
+               (define-vop (raw-instance-set/word)
+                 (:translate ,(symbolicate "%RAW-INSTANCE-SET/" signedp "WORD"))
+                 (:policy :fast-safe)
+                 (:args (object :scs (descriptor-reg))
+                        (index :scs (any-reg))
+                        (value :scs (,sc)))
+                 (:arg-types * positive-fixnum ,result-type)
+                 (:results (result :scs (,sc)))
+                 (:temporary (:scs (interior-reg)) lip)
+                 (:result-types ,result-type)
+                 (:generator 5
+                   (inst addq object index lip)
+                   (inst stl
+                         value
+                         (- (* instance-slots-offset n-word-bytes)
+                            instance-pointer-lowtag)
+                         lip)
+                   (move value result))))))
+  (def "" unsigned-reg unsigned-num)
+  (def "SIGNED-" signed-reg signed-num))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)
