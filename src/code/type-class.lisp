@@ -397,26 +397,6 @@
                   (cons method more-methods)))
        ',name)))
 
-(defmacro get-dsd-index (type-name slot-name)
-  ;; Declare DD-SLOTS explicitly notinline, to avoid a warning, as its source
-  ;; appears later, in early-classoid. However CCL would warn that this
-  ;; declaration pertains to an unknown function, so only do this for us.
-  ;; You'd think we should also warn about DSD-INDEX, but the comment near
-  ;; that function says that it can't be inlined due to reasons.
-  ;; In make-host-2 everything is fine, because of DEF!STRUCT magic.
-  ;; And finally, we are prevented from writing "#+sbcl" here, for reasons.
-  #+host-quirks-sbcl (declare (notinline dd-slots)) ; forward reference
-  (dsd-index (find slot-name
-                   (dd-slots (find-defstruct-description type-name))
-                   :key #'dsd-name)))
-
-;;; Compute a SAP to the specified slot in INSTANCE.
-(defmacro struct-slot-sap (instance type-name slot-name)
-  `(sap+ (int-sap (get-lisp-obj-address ,instance))
-         (- (ash (+ (get-dsd-index ,type-name ,slot-name) sb-vm:instance-slots-offset)
-                 sb-vm:word-shift)
-            sb-vm:instance-pointer-lowtag)))
-
 (defmacro define-type-class (name &key inherits
                                      (enumerable (unless inherits (missing-arg))
                                                  enumerable-supplied-p)

@@ -77,6 +77,13 @@
            (type funcallable-instance fin))
   (setf (%funcallable-instance-fun fin) new-value))
 
+(eval-when (:compile-toplevel)
+  (setf (sb-xc:macro-function 'get-dsd-index)
+        (lambda (form env)
+          ;; Don't pass target lexenv through to the host's macro-function
+          (declare (ignore env))
+          (funcall (cl:macro-function 'get-dsd-index) form nil))))
+
 ;;; FIXME: these macros should just go away.  It's not clear whether
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
