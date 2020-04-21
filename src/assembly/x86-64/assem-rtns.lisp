@@ -360,6 +360,8 @@
   (loadw block uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value block *current-catch-block*)
 
+  ;; Go to uwp-entry, it can fetch the pushed above values if it needs
+  ;; to.
   (inst call (ea (* unwind-block-entry-pc-slot n-word-bytes) uwp))
   (inst pop count)
   (inst pop start)
@@ -375,10 +377,7 @@
   (loadw uwp block unwind-block-current-catch-slot)
   (store-tl-symbol-value uwp *current-catch-block*)
 
-  ;; Uwp-entry expects some things in known locations so that they can
-  ;; be saved on the stack: the block in rdx-tn, start in rbx-tn, and
-  ;; count in rcx-tn.
-
+  ;; nlx-entry expects start in RBX and count in RCX
   (inst jmp (ea (* unwind-block-entry-pc-slot n-word-bytes) block)))
 
 #+sb-assembling
