@@ -458,9 +458,8 @@
                            (ldb (byte 3 0) (sb-kernel::dsd-bits ,dsd))))
              (raw-cases ()
                (flet ((1+index-of (type)
-                        (or (1+ (position type sb-kernel::*raw-slot-data*
-                                          :key #'sb-kernel::raw-slot-data-raw-type))
-                            (error "Bad rsd spec ~s" type)))
+                        (1+ (position type sb-kernel::*raw-slot-data*
+                                      :key #'sb-kernel::raw-slot-data-raw-type)))
                       (mix-float (val zero)
                         `(let ((x ,val))
                            (mixf result (sxhash (if (= x ,zero) ,zero x))))))
@@ -488,11 +487,8 @@
       (declare (type fixnum result))
       (when (plusp depthoid)
         (let ((max-iterations depthoid)
-              (depthoid (1- depthoid))
-              (len (%instance-length key))
-              ;; Don't mix in LAYOUT (if it takes a slot) because it was the seed value.
-              (i sb-vm:instance-data-start))
-          (declare (index i max-iterations))
+              (depthoid (1- depthoid)))
+          (declare (index max-iterations))
           (if (/= (layout-bitmap layout) +layout-all-tagged+)
               (let ((slots (dd-slots (layout-info layout))))
                 (loop (unless slots (return))
@@ -501,17 +497,19 @@
                              (i (dsd-index slot)))
                         (cond ((= rsd-index+1 0) ; non-raw
                                (mixf result (psxhash (%instance-ref key i) depthoid))
-                               (decf max-iterations))
+                               (if (zerop (decf max-iterations)) (return)))
                               (t
                                ;; Don't decrement MAX-ITERATIONS.
                                ;; These can't cause unbounded work.
-                               (raw-cases))))
+                               (raw-cases))))))
+              (let ((len (%instance-length key))
+                    ;; Don't mix in LAYOUT (if it takes a slot) because it was the seed value.
+                    (i sb-vm:instance-data-start))
+                (declare (index i))
+                (loop (when (>= i len) (return))
+                      (mixf result (psxhash (%instance-ref key i) depthoid))
                       (incf i)
-                      (if (zerop max-iterations) (return))))
-              (loop (when (>= i len) (return))
-                    (mixf result (psxhash (%instance-ref key i) depthoid))
-                    (incf i)
-                    (if (zerop (decf max-iterations)) (return))))))
+                      (if (zerop (decf max-iterations)) (return)))))))
       result)))
 
 (defun list-psxhash (key depthoid)
