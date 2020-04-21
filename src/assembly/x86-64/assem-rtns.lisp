@@ -324,7 +324,6 @@
                           (:temp symbol unsigned-reg r9-offset)
                           (:temp value unsigned-reg r10-offset)
                           (:temp zero complex-double-reg float0-offset))
-  (declare (ignore start count))
   AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst test block block)             ; check for NULL pointer
