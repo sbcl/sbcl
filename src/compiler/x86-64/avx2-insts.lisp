@@ -55,6 +55,18 @@
 (define-arg-type vex-b
   :prefilter  (lambda (dstate value)
                 (dstate-setprop dstate (if (plusp value) 0 +rex-b+))))
+
+(defconstant-eqx +avx-conditions+
+    #(:eq :lt :le :unord :neq :nlt :nle :ord :eq_uq
+      :nge :ngt :false :neq_oq :ge :gt :true :eq_os :lt_oq
+      :le_oq :unord_s :neq_us :nlt_uq :nle_uq :ord_s :eq_us
+      :nge_uq :ngt_uq :false_os :neq_os :ge_oq :gt_oq :true_us)
+  #'equalp)
+
+(define-arg-type avx-condition-code
+  :type 'imm-byte
+  :printer +avx-conditions+)
+
 
 (define-instruction-format (vex2 16)
                            (vex :field (byte 8 0) :value #xC5)
@@ -580,6 +592,25 @@
   (def-two vpcmpistri #x66 #x63)
 
   (def-two vaeskeygenassist #x66 #xdf))
+
+(macrolet ((def (name prefix opcode
+                 name-suffix)
+             `(define-instruction ,name (segment condition dst src src2)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
+                                          :more-fields `((imm nil :type 'avx-condition-code))
+                                          :printer `("VCMP" imm ,name-suffix
+                                                            :tab reg ", " vvvv ", " reg/mem))
+                (:emitter
+                 (emit-avx2-inst segment src2 dst ,prefix ,opcode
+                                 :vvvv src)
+                 (emit-byte segment (or (position condition +avx-conditions+)
+                                        (error "~s not one of ~s"
+                                               condition
+                                               +avx-conditions+)))))))
+  (def vcmppd #x66 #xc2 "PD")
+  (def vcmpps nil  #xc2 "PS")
+  (def vcmpsd #xf2 #xc2 "SD")
+  (def vcmpss #xf3 #xc2 "SS"))
 
 (macrolet ((def (name prefix op)
              `(define-instruction ,name (segment dst src src2 mask)
