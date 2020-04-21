@@ -31,9 +31,9 @@
   "tests/symbol-macrolet-test.lisp"
   "tests/block-compile-test.lisp"
   "tests/block-compile-test-2.lisp"
-  "tests/block-compile-test-3.lisp"
-  "tests/block-compile-defstruct-test.lisp")
+  "tests/block-compile-test-3.lisp")
  ("debug.impure.lisp" "tests/bug-414.lisp")
+ ("defstruct.impure-cload.lisp" "tests/block-compile-defstruct-test.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
