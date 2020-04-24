@@ -233,10 +233,12 @@
                  ((xmm-register-p r)
                   0))))
     (let ((l (cond (l)
-                   ((xmm-register-p thing) ;; FIXME: provide some sort of checking for mismatched sizes
+                   (reg
+                    (xmm-size reg))
+                   ((xmm-register-p thing)
                     (xmm-size thing))
                    (t
-                    (xmm-size reg))))
+                    0)))
           (r (if (null reg)
                  0
                  (reg-7-p (reg-id reg))))
@@ -909,12 +911,9 @@
                                           :xmmreg-mem-size mem-size
                                           :w 0 :l l)
                 (:emitter
-                   (emit-avx2-inst segment src dst #x66 ,opcode
+                 (emit-avx2-inst segment src dst #x66 ,opcode
                                  :opcode-prefix #x0f38
-                                 :w 0 :l ,(or l
-                                              `(if (is-avx2-id-p (reg-id dst))
-                                                   1
-                                                   0)))))))
+                                 :w 0 :l ,l)))))
   (def vbroadcastss #x18 nil :dword)
   (def vbroadcastsd #x19 1)
   (def vbroadcastf128 #x1a 1)
@@ -1189,9 +1188,6 @@
   (:emitter
    (emit-avx2-inst segment src dst #x66 #x13
                    :opcode-prefix #x0f38
-                   :l (if (is-avx2-id-p (reg-id dst))
-                          1
-                          0)
                    :w 0))
   . #.(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x13
                               :w 0
@@ -1201,9 +1197,6 @@
   (:emitter
    (emit-avx2-inst segment dst src #x66 #x1d
                    :opcode-prefix #x0f3a
-                   :l (if (is-avx2-id-p (reg-id src))
-                          1
-                          0)
                    :w 0
                    :remaining-bytes 1)
    (emit-byte segment imm))
