@@ -39,3 +39,27 @@
 (defun print-vmx (value stream dstate)
   (print-mem-ref :ref value :qword stream dstate
                  :index-reg-printer #'print-xmmreg))
+
+(defun print-xmmreg/mem-with-width (value width sized-p stream dstate)
+  (declare (type (member :byte :word :dword :qword) width)
+           (type boolean sized-p))
+  (if (machine-ea-p value)
+      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)
+      (print-xmmreg value stream dstate)))
+
+(defun print-sized-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width
+   value (inst-operand-size dstate) t stream dstate))
+
+(defun print-sized-byte-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :byte t stream dstate))
+
+(defun print-sized-word-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :word t stream dstate))
+
+(defun print-sized-dword-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :dword t stream dstate))
+
+(defun print-sized-xmmreg/mem-default-qword (value stream dstate)
+  (print-xmmreg/mem-with-width
+   value (inst-operand-size-default-qword dstate) t stream dstate))
