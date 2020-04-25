@@ -533,7 +533,7 @@
                          (:target-compile (if (find :assem flags)
                                               *target-assemble-file*
                                               *target-compile-file*))))
-         (trace-file (find :trace-file flags))
+         (trace-file (if (find :trace-file flags) t nil))
          (block-compile (if (find :block-compile flags) t nil))
          (ignore-failure-p (find :ignore-failure-p flags)))
     (declare (type function compile-file))
