@@ -2843,3 +2843,11 @@
                           (return-from %f2 (%f1)))))))
         (%f1)))
    (() nil)))
+
+(with-test (:name :references-to-inline-funs-copied)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (and (inline-fun-arg-mismatch t)
+              #'inline-fun-arg-mismatch))
+    (() #'inline-fun-arg-mismatch)))

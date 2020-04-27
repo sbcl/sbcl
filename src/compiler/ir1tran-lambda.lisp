@@ -1045,7 +1045,8 @@
                                           :maybe-add-debug-catch t
                                           :source-name name))
                  (info (info :function :info name)))
-             (setf (functional-inlinep res) (info :function :inlinep name))
+             (setf (functional-inlinep res) (info :function :inlinep name)
+                   (defined-fun-named-lambda-p defined-fun-res) t)
              (when (has-toplevelness-decl lambda-expression)
                (setf (functional-top-level-defun-p res) t))
              ;; FIXME: Should non-entry block compiled defuns have

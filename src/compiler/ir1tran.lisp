@@ -629,7 +629,11 @@
   (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
-                        (not (eq (defined-fun-inlinep leaf) 'notinline))
+                        (neq (defined-fun-inlinep leaf) 'notinline)
+                        ;; Only reference defined functionals from named-lambda,
+                        ;; everything else should do this through recognize-known-call,
+                        ;; avoiding copying references to global functions
+                        (defined-fun-named-lambda-p leaf)
                         (let ((functional (defined-fun-functional leaf)))
                           (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))

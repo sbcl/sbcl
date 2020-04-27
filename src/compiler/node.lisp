@@ -850,7 +850,8 @@
   ;; conversion of a NAMED-LAMBDA, or from inline-expansion (see
   ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
   ;; which the function is used.
-  (functionals nil :type list))
+  (functionals nil :type list)
+  (named-lambda-p nil))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
