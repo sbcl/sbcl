@@ -749,7 +749,8 @@
                       'complex-single-float)))
                  (basher-name (if (eq with 'word)
                                   (format nil "UB~D-BASH-FILL" n-bits)
-                                  (format nil "UB~D-BASH-FILL-WITH-~A" n-bits with))))
+                                  (format nil "UB~D-BASH-FILL-WITH-~A"
+                                          n-bits (string with)))))
             (values
              (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
                  (abort-ir1-transform

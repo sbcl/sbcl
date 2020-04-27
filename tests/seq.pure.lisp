@@ -525,3 +525,12 @@
             '(lambda (x)
               (fill (the (simple-array (unsigned-byte 32) (*)) x) 0))))
           '(FUNCTION (T) (VALUES (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)) &OPTIONAL)))))
+
+
+(with-test (:name :fill-transform-print-case)
+  (let ((*print-case* :downcase))
+    (checked-compile-and-assert
+        ()
+        `(lambda (x)
+           (make-array 3 :element-type 'fixnum :initial-element x))
+      ((1) #(1 1 1) :test #'equalp))))
