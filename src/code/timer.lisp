@@ -469,8 +469,8 @@ triggers."
                    (push timer timers)))
         (run-timers)))))
 
-(defun timeout-cerror ()
-  (cerror "Continue" 'timeout))
+(defun timeout-cerror (&optional seconds)
+  (cerror "Continue" 'timeout :seconds seconds))
 
 (defmacro with-timeout (expires &body body)
   "Execute the body, asynchronously interrupting it and signalling a TIMEOUT
@@ -498,7 +498,7 @@ the system uninterruptible."
        ;; FIXME: a temporary compatibility workaround for CLX, if unsafe
        ;; unwinds are handled revisit it.
        (if (> expires 0)
-           (let ((timer (make-timer #'timeout-cerror)))
+           (let ((timer (make-timer (lambda () (timeout-cerror expires)))))
              (schedule-timer timer expires)
              (unwind-protect (timeout-body)
                (unschedule-timer timer)))
