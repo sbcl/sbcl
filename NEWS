@@ -3,35 +3,42 @@
 changes relative to sbcl-2.0.3:
   * platform support:
     ** 32-bit RISC-V is now fully supported. Unlike other ports, its backend
-    is entirely shared with 64-bit RISC-V.
+       is entirely shared with 64-bit RISC-V.
     ** native threads are now supported on RISC-V.
-  * enchancement: forward-referenced type tests can now be open-coded by using
+    ** fix and add some x86-64 vector instructions.  (reported by Shubhamkar
+       Ayare)
+    ** improve pointer representation on ppc64 for low-level performance
+       improvement.
+    ** threads are more stable on big-endian ppc64
+  * enhancement: forward-referenced type tests can now be open-coded by using
     block compilation. The result is that mutually referential defstructs are
     now efficiently compiled in block compilation mode, superseding a lighter
-    mechanism that worked in fewer contexts. However, that lighter mechanism
+    mechanism that worked in fewer contexts.  However, that lighter mechanism
     has been removed, so for now, users who want to efficiently compile
     mutually referential defstructs must explicitly opt-in using block
     compilation.
   * bug fix: defstructs with empty initforms in the sbcl source are now
     explicitly intiialized with NIL, as that is undefined behavior under
-    ANSI. This helps cross compilation hosts which do not implicitly
-    initialize empty initform slots to NIL. (Thanks to Karsten Poeck)
+    ANSI.  This helps cross compilation hosts which do not implicitly
+    initialize empty initform slots to NIL.  (Thanks to Karsten Poeck)
   * bug fix: backtracing through assembly routines now works properly on
     RISC-V.
   * bug fix: ASH no longer gets miscompiled in certain edge cases on RISC-V.
-  * bug fix: more args have been slightly optimized and are more correct on
+  * bug fix: &MORE args have been slightly optimized and are more correct on
     RISC-V.
-  * bug fix: unused local functions with &rest/&key/&optional now also issue a
+  * bug fix: unused local functions with &REST/&KEY/&OPTIONAL now also issue a
     deletion note.
   * bug fix: APPLY on a large list ("large" being in excess of 2k to 16k items
     depending on the platform) can no longer crash the gencgc collector.
-  * bug fix: sb-concurrency FRLOCK algorithm has been corrected. (lp#1087955)
+  * bug fix: sb-concurrency FRLOCK algorithm has been corrected.  (lp#1087955)
   * bug fix: block compilation now respects inlining declarations better (like
     CMUCL).
+  * optimization: hashing of structures with raw slots for EQUALP hash tables
+    has been improved.
 
 changes in sbcl-2.0.3 relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
-    affected by LANG. sb-ext:*default-external-format* is now the only way to
+    affected by LANG.  SB-EXT:*DEFAULT-EXTERNAL-FORMAT* is now the only way to
     change it.
   * minor incompatible change: the undocumented :EPHEMERAL argument to
     MAKE-THREAD has been removed.
