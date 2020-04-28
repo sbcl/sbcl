@@ -496,14 +496,7 @@
          (result-return (lambda-return result-lambda)))
     (cond
       ((null (rest lambdas)))
-      ((and result-return
-            ;; KLUDGE: why is the node deleted but clambda still has a return?
-            ;; see a test-case for this in tests/merge-lambdas.lisp
-            ;; But now it can only be exercised with block
-            ;; compilation, which doesn't seem to work anyway.
-            (not (node-to-be-deleted-p
-                  (ctran-use (node-prev
-                              (lvar-uses (return-result result-return)))))))
+      (result-return
        ;; Make sure the result's return node starts a block so that we
        ;; can splice code in before it.
        (let ((prev (node-prev

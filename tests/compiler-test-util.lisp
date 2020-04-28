@@ -107,7 +107,8 @@
   `(check-consing t ',form (lambda () ,form) ,times))
 
 (defun file-compile (toplevel-forms &key load
-                                         before-load)
+                                         before-load
+                                         block-compile)
   (let* ((lisp (test-util:scratch-file-name "lisp"))
          (fasl (compile-file-pathname lisp))
          (error-stream (make-string-output-stream)))
@@ -120,7 +121,8 @@
                    (prin1 form f))))
            (multiple-value-bind (fasl warn fail)
                (let ((*error-output* error-stream))
-                 (compile-file lisp :print nil :verbose nil))
+                 (compile-file lisp :print nil :verbose nil
+                                    :block-compile block-compile))
              (when load
                (when before-load
                  (funcall before-load))
