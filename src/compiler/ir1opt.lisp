@@ -1299,7 +1299,10 @@
        (with-ir1-environment-from-node call
          (let ((fun (defined-fun-functional leaf)))
            (if (or (not fun)
-                   (and (eq inlinep 'inline) (functional-kind fun)))
+                   (and (eq inlinep 'inline) (functional-kind fun))
+                   ;; Referencing it again will break the invariant
+                   ;; for assignment functions.
+                   (eq (functional-kind fun) :assignment))
                ;; Convert.
                (let* ((name (leaf-source-name leaf))
                       (*inline-expansions*

@@ -1037,6 +1037,12 @@
     (assert (= 0 (ctu:count-full-calls "FOO-MAYBE-INLINE" fun)))
     (assert (= 1 (ctu:count-full-calls "QUUX-MARKER" fun)))))
 
+(with-test (:name :maybe-inline-let-calls)
+  (checked-compile `(lambda (x)
+                      (declare (optimize (space 0)))
+                      (foo-maybe-inline (let ((z #'foo-maybe-inline))
+                                          (funcall z x))))))
+
 (with-test (:name :bug-405)
   ;; These used to break with a TYPE-ERROR
   ;;     The value NIL is not of type SB-C::PHYSENV.
