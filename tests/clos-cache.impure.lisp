@@ -12,13 +12,15 @@
 ;;;; more information.
 
 (with-test (:name :probe-cache-smoke-test)
-  (let ((layout
-          (sb-kernel::make-layout (sb-kernel::hash-layout-name nil)
-                                  (sb-kernel::make-undefined-classoid 'x)))
-        (cache (sb-pcl::make-cache :key-count 1 :value t :size 10)))
-    (sb-pcl::try-update-cache cache (list layout) 'win)
-    (assert (eq (nth-value 1 (sb-pcl::probe-cache cache (list layout))) 'win))
-    (assert (eq (nth-value 1 (sb-pcl::probe-cache cache layout)) 'win))))
+  (let ((caches (sb-vm:list-allocated-objects :dynamic
+                                              :test #'sb-pcl::cache-p)))
+    (dolist (cache caches)
+      (sb-pcl::map-cache
+       (lambda (layouts value)
+         (multiple-value-bind (foundp found-value) (sb-pcl::probe-cache cache layouts)
+           (assert foundp)
+           (assert (eq value found-value))))
+       cache))))
 
 ;;; The code that CACHE-MIXER-EXPRESSION emits had better compute
 ;;; the same thing that COMPUTE-CACHE-INDEX does.

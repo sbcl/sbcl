@@ -63,8 +63,6 @@
 ;;;;
 ;;;; Subsequences of the cache vector are called cache lines.
 ;;;;
-;;;; The cache vector uses the symbol SB-PCL::..EMPTY.. as a sentinel
-;;;; value, to allow storing NILs in the vector as well.
 
 (defstruct (cache (:constructor %make-cache)
                   (:copier %copy-cache))
@@ -124,21 +122,18 @@
 (defun compute-limit (size)
   (ceiling (sqrt (sqrt size))))
 
-;;; Returns VALUE if it is not ..EMPTY.., otherwise executes ELSE:
-;;; TODO: use the ordinary unbound marker which might have a quicker test
-;;; than EQ against a symbol. (..EMPTY.. is not a static symbol)
+;;; Return VALUE if it is not the unbound marker, otherwise executes ELSE:
 (defmacro non-empty-or (value else)
   (with-unique-names (n-value)
     `(let ((,n-value ,value))
-       (if (eq ,n-value '..empty..)
+       (if (unbound-marker-p ,n-value)
            ,else
            ,n-value))))
 
 ;;; Fast way to check if a thing found at the position of a cache key is one:
-;;; it is always either a wrapper, or the ..EMPTY.. symbol.
+;;; it is always either a #<LAYOUT for thing {xxxx}> or the unbound marker.
 (declaim (inline cache-key-p))
-(defun cache-key-p (thing)
-  (not (symbolp thing)))
+(defun cache-key-p (thing) (%instancep thing))
 
 ;;; Atomically update the current probe depth of a cache.
 (defun note-cache-depth (cache depth)
@@ -150,6 +145,7 @@
 ;;; Compute the starting index of the next cache line in the cache vector.
 ;;; TODO: by adding at most LIMIT more cache lines on the right, we can avoid
 ;;; wraparound, thus removing the LOGAND from computation of the next index.
+;;; or is it LIMIT-1 lines? I could have understood MAX-PROBES
 (declaim (inline next-cache-index))
 (defun next-cache-index (mask index line-size)
   (declare (type word index line-size mask))
@@ -256,39 +252,45 @@
 ;;;
 ;;; Returns two values: a boolean indicating a hit or a miss, and a secondary
 ;;; value that is the value that was stored in the cache if any.
-(defun probe-cache (cache layouts)
+;;; If any input layout is is invalid, return failure regardless of
+;;; whether the layouts are present in the cache.
+;;; If a line key is matched and the cache holds values and the value is absent,
+;;; we keep probing. (This seems to be intended but it's not 100% clear why)
+(defun probe-cache (cache key)
   (declare (optimize speed))
   (let ((vector (cache-vector cache))
         (key-count (cache-key-count cache))
         (line-size (cache-line-size cache))
         (mask (cache-mask cache)))
-    (flet ((probe-line (base)
-             (declare (optimize (sb-c::type-check 0)))
-             (tagbody
-              ;; LAYOUTS can't be the empty list, because COMPUTE-CACHE-INDEX
-              ;; takes its CAR, and would have borked if that weren't a LAYOUT.
-              ;; But perhaps we should figure out when LAYOUTS get passed
-              ;; as an atom, and make it so that doesn't happen?
-                (loop for offset of-type index from 0 below key-count
-                      for layout = (if (listp layouts) (pop layouts) (shiftf layouts nil))
-                      then (pop layouts)
-                      unless (eq layout (svref vector (truly-the index (+ base offset))))
-                      do (go :miss))
-                ;; all layouts match!
-                (let ((value (when (cache-value cache)
-                               (non-empty-or (svref vector (truly-the index (+ base key-count)))
-                                             (go :miss)))))
-                  (return-from probe-cache (values t value)))
-              :miss
-                (return-from probe-line (next-cache-index mask base line-size)))))
-      (declare (ftype (sfunction (index) index) probe-line))
-      (let ((index (if (not (listp layouts))
-                       (let ((hash (layout-clos-hash layouts)))
-                         (unless (zerop hash) (logand hash mask)))
-                       (compute-cache-index cache layouts))))
-        (when index
-          (loop repeat (1+ (cache-depth cache))
-                do (setf index (probe-line index)))))))
+    (macrolet ((probe-loop (key-valid-p-expr)
+                 `(let (val)
+                    (dotimes (i (1+ (cache-depth cache)))
+                      (if (and ,key-valid-p-expr
+                               (if (cache-value cache)
+                                   (not (unbound-marker-p
+                                         (setq val (svref vector
+                                                          (truly-the index
+                                                                     (+ index key-count))))))
+                                   t))
+                          (return-from probe-cache (values t val))
+                          (setq index (next-cache-index mask index line-size)))))))
+      (case key-count
+       (1
+        (let* ((layout (if (%instancep key) key (car key)))
+               (hash (layout-clos-hash layout))
+               (index (logand hash mask)))
+          (unless (= hash 0)
+            (probe-loop (eq (svref vector (truly-the index index)) layout)))))
+       ;; Adding a case for 2 would allow >95% of all caches to be dealt with
+       ;; by one of the two fixed key-count cases. I'm not sure it matters.
+       (t
+        (flet ((matchp (base layout-list)
+                 (declare (optimize (sb-c::type-check 0)))
+                 (loop for offset of-type index from 0 below key-count
+                       always (eq (svref vector (truly-the index (+ base offset)))
+                                  (pop layout-list)))))
+          (binding* ((index (compute-cache-index cache key) :exit-if-null))
+            (probe-loop (matchp index key))))))))
   (values nil nil))
 
 ;;; Tries to write LAYOUTS and VALUE at the cache line starting at
@@ -301,14 +303,14 @@
     ;; cache line, but that is OK: next write using the same layouts
     ;; will fill it, and reads will treat an incomplete line as a
     ;; miss -- causing it to be filled.
-    (loop for old = (compare-and-swap (svref vector base) '..empty.. new)  do
+    (loop for old = (compare-and-swap (svref vector base) (make-unbound-marker) new)  do
           (when (and (cache-key-p old) (not (eq old new)))
             ;; The place was already taken, and doesn't match our key.
             (return-from try-update-cache-line nil))
           (unless layouts
             ;; All keys match or successfully saved, save our value --
             ;; just smash it in. Until the first time it is written
-            ;; there is ..EMPTY.. here, which probes look for, so we
+            ;; there is an unbound marker here, which probes look for, so we
             ;; don't get bogus hits. This is necessary because we want
             ;; to be able store arbitrary values here for use with
             ;; constant-value dispatch functions.
@@ -322,6 +324,7 @@
 ;;; true on success and false on failure, meaning the cache is too
 ;;; full.
 (defun try-update-cache (cache layouts value)
+  (aver (not (unbound-marker-p value)))
   (let ((index (or (compute-cache-index cache layouts)
                    ;; At least one of the layouts was invalid: just
                    ;; pretend we updated the cache, and let the next
@@ -336,6 +339,9 @@
             (return-from try-update-cache t))
           (setf index (next-cache-index mask index line-size)))))
 
+(defmacro make-cache-storage (length)
+  `(make-array ,length :initial-element (make-unbound-marker)))
+
 ;;; Constructs a new cache.
 (defun make-cache (&key (key-count (missing-arg)) (value (missing-arg))
                    (size 1))
@@ -345,9 +351,7 @@
     (if (<= length +cache-vector-max-length+)
         (%make-cache :key-count key-count
                      :line-size line-size
-                     ;; TODO: change to use unbound marker here.
-                     ;; It is more efficient to check for than a symbol on any backend.
-                     :vector (make-array length :initial-element '..empty..)
+                     :vector (make-cache-storage length)
                      :value value
                      :mask (compute-cache-mask length line-size)
                      :limit (compute-limit adjusted-size))
@@ -368,7 +372,7 @@
        ;; Blow way the old vector first, so a GC potentially triggered by
        ;; MAKE-ARRAY can collect it.
        (setf (cache-vector copy) #()
-             (cache-vector copy) (make-array length :initial-element '..empty..)
+             (cache-vector copy) (make-cache-storage length)
              (cache-depth copy) 0
              (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))
@@ -488,7 +492,7 @@
 ;;; ones.
 (defun copy-cache (cache)
   (let* ((vector (cache-vector cache))
-         (copy (make-array (length vector) :initial-element '..empty..))
+         (copy (make-cache-storage (length vector)))
          (line-size (cache-line-size cache))
          (key-count (cache-key-count cache))
          (valuep (cache-value cache))
@@ -564,19 +568,19 @@
          (line-size (cache-line-size cache))
          (total-lines (/ size line-size))
          (total-n-keys 0) ; a "key" is a tuple of layouts
-         (n-dirty 0) ; lines that have ..empty.. but are not wholly empty
+         (n-dirty 0) ; lines that have an unbound marker but are not wholly empty
          (n-obsolete 0) ; lines that need to be evicted due to 0 in a layout-clos-hash
          (histogram
            (when compute-histogram
              (make-array (1+ (cache-limit cache)) :initial-element 0))))
     (if compute-histogram ; this conses, so don't do it when just printing a cache
         (loop for i from 0 by line-size below size
-              unless (eq (svref vector i) '..empty..)
+              unless (unbound-marker-p (svref vector i))
               do (let* ((layouts (loop for j from 0 repeat (cache-key-count cache)
                                        collect (svref vector (+ i j))))
                         (index (compute-cache-index cache layouts))
                         (n-misses 0))
-                   (cond ((find '..empty.. layouts)
+                   (cond ((find-if-not #'cache-key-p layouts)
                           (incf n-dirty))
                          ((find 0 layouts :key #'layout-clos-hash)
                           (incf n-obsolete))
@@ -591,13 +595,13 @@
                                                           (cache-line-size cache))))
                           (incf (aref histogram n-misses))))))
         (loop for i from 0 by line-size below size
-              unless (eq (svref vector i) '..empty..)
+              when (cache-key-p (svref vector i))
               do (incf total-n-keys)))
     (values total-n-keys total-lines n-dirty n-obsolete histogram)))
 
 (defun summarize-cache-statistics (&optional show-all)
-  (format t "     Ct  Cap  Bad Probe Histogram~%")
-  (format t "   ---- ---- ---- ----- ---------~%")
+  (format t "     Ct  Cap Mask  Bad Probe Histogram~%")
+  (format t "   ---- ---- ---- ---- ----- ---------~%")
   (let* ((caches
            (mapcar (lambda (cache)
                      (multiple-value-bind (count capacity n-dirty n-obsolete histogram)
@@ -626,10 +630,11 @@
                  (avgprobes
                    (when (and (/= count 0) (/= total-n-probes 0))
                      (/ total-n-probes count))))
-            (format t "~A~A ~4d ~4d ~4d ~4,3f ~vA ~S~%"
+            (format t "~A~A ~4d ~4d ~4x ~4d ~4,3f ~vA ~S~%"
                     (if (plusp n-dirty) #\? #\space)
                     (if (plusp n-obsolete) #\! #\space)
-                    count capacity (+ n-dirty n-obsolete)
+                    count capacity (cache-mask cache)
+                    (+ n-dirty n-obsolete)
                     avgprobes
                     (+ histogram-column-width 2) histogram
                     cache)))))
