@@ -286,7 +286,7 @@
 
 ;;; An IR2-COMPONENT serves mostly to accumulate non-code information
 ;;; about the component being compiled.
-(def!struct (ir2-component (:copier nil))
+(defstruct (ir2-component (:copier nil))
   ;; the counter used to allocate global TN numbers
   (global-tn-counter 0 :type index)
   ;; NORMAL-TNS is the head of the list of all the normal TNs that

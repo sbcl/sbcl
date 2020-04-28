@@ -411,13 +411,6 @@
 ;;;   size of flow analysis problems, this allows back-end data
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
-(locally
-  ;; This is really taking the low road. I couldn't think of a way to
-  ;; avoid a style warning regarding IR2-COMPONENT other than to declare
-  ;; the INFO slot as :type (or (satisfies ir2-component-p) ...)
-  ;; During make-host-2, the solution to this is the same hack
-  ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
-  #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions style-warning))
 (defstruct (component (:copier nil)
                       (:constructor make-component
                        (head
@@ -501,13 +494,8 @@
   (reanalyze nil :type boolean)
   ;; some sort of name for the code in this component
   (name "<unknown>" :type t)
-  ;; When I am a child, this is :NO-IR2-YET.
-  ;; In my adulthood, IR2 stores notes to itself here.
-  ;; After I have left the great wheel and am staring into the GC, this
-  ;;   is set to :DEAD to indicate that it's a gruesome error to operate
-  ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
-  ;;   LAMBDAs onto my NEW-FUNCTIONALS, as in sbcl-0.pre7.115).
-  (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
+  ;; some kind of info used by the back end.
+  (info nil)
   ;; a map from combination nodes to things describing how an
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
@@ -527,7 +515,7 @@
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
   ;; The current sset index
-  (sset-number 0 :type fixnum)))
+  (sset-number 0 :type fixnum))
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
