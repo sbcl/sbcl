@@ -161,6 +161,25 @@
   (ltn-annotate-casts lvar)
   (values))
 
+#+call-symbol
+(defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node ltn-policy)
+  (declare (ignore ltn-policy))
+  (let ((dest (node-dest node)))
+    (cond ((and (basic-combination-p dest)
+                (eq (basic-combination-kind dest) :full)
+                (eq (lvar-uses (basic-combination-fun dest)) node)
+                ;; Everything else can't handle NIL, just don't
+                ;; bother optimizing it.
+                (not (and (constant-lvar-p fun)
+                          (null (lvar-value fun)))))
+           (setf (basic-combination-fun dest) fun
+                 (basic-combination-args node) '(nil)
+                 (node-lvar node) nil
+                 (lvar-info fun) (make-ir2-lvar (primitive-type (lvar-type fun))))
+           (annotate-1-value-lvar fun))
+          (t
+           (ltn-default-call node)))))
+
 ;;; If TAIL-P is true, then we check to see whether the call can
 ;;; really be a tail call by seeing if this function's return
 ;;; convention is :UNKNOWN. If so, we move the call block successor

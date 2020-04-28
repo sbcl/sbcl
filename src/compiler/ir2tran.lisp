@@ -1284,20 +1284,6 @@
     (when (consp fname)
       (aver (legal-fun-name-p fname))))) ;; FIXME: needless check?
 
-#+call-symbol
-(defun remove-%coerce-callable-for-call (call)
-  (let* ((fun (basic-combination-fun call))
-         (use (lvar-uses fun)))
-    (when (and (combination-p use)
-               (eq (lvar-fun-name (combination-fun use) t)
-                   '%coerce-callable-for-call))
-      (let ((callable (car (combination-args use))))
-        ;; Everything else can't handle NIL, just don't
-        ;; bother optimizing it.
-        (unless (and (constant-lvar-p callable)
-                     (null (lvar-value callable)))
-          (setf (basic-combination-fun call) callable))))))
-
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer
 ;;; values are desired, then use a single-value call, otherwise use a
@@ -1305,8 +1291,6 @@
 (defun ir2-convert-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (ponder-full-call node)
-  #+call-symbol
-  (remove-%coerce-callable-for-call node)
   (cond ((node-tail-p node)
          (ir2-convert-tail-full-call node block))
         ((let ((lvar (node-lvar node)))
@@ -1608,8 +1592,6 @@
 (defun ir2-convert-mv-call (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (aver (basic-combination-args node))
-  #+call-symbol
-  (remove-%coerce-callable-for-call node)
   (let* ((start-lvar (lvar-info (first (basic-combination-args node))))
          (start (first (ir2-lvar-locs start-lvar)))
          (tails (and (node-tail-p node)
@@ -1771,21 +1753,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
                 nil)
                ((reference-tn-list locs t))))))))
 
-;;; If ir2-convert-full-call gets to it first REMOVE-%COERCE-CALLABLE-FOR-CALL does the job.
 #+call-symbol
 (defoptimizer (%coerce-callable-for-call ir2-convert) ((fun) node block)
-  (let ((dest (node-dest node)))
-    (if (and (basic-combination-p dest)
-             (eq (basic-combination-kind dest) :full)
-             ;; Everything else can't handle NIL, just don't
-             ;; bother optimizing it.
-             (not (and (constant-lvar-p fun)
-                       (null (lvar-value fun))))
-             (let ((dest-fun (basic-combination-fun dest)))
-               (or (eq dest-fun fun) ;; already removed
-                   (eq (lvar-uses dest-fun) node))))
-        (setf (basic-combination-fun dest) fun)
-        (ir2-convert-full-call node block))))
+  (when fun
+    (ir2-convert-full-call node block)))
 
 ;;;; special binding
 
