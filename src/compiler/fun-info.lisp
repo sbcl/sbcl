@@ -91,8 +91,8 @@
   ;; constant, then the arguments will be swapped.
   commutative)
 
-(defstruct (fun-info (:pure t)
-                      (:copier nil))
+(defstruct (fun-info (:copier nil)
+                     #-sb-xc-host (:pure t))
   ;; boolean attributes of this function.
   (attributes (missing-arg) :type attributes)
   ;; TRANSFORM structures describing transforms for this function

@@ -59,7 +59,7 @@
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
 (defstruct (lvar (:constructor make-lvar (&optional dest))
-                  (:copier nil))
+                 (:copier nil))
   ;; The node which receives this value. NIL only temporarily.
   (dest nil :type (or node null))
   ;; cached type of this lvar's value. If NIL, then this must be
@@ -654,13 +654,9 @@
 ;;; continuation, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
 (defstruct (nlx-info
-             (:copier nil)
-             (:constructor make-nlx-info (cleanup
-                                          exit
-                                          &aux
-                                          (block
-                                           (first (block-succ
-                                                   (node-block exit)))))))
+            (:copier nil)
+            (:constructor make-nlx-info
+                (cleanup exit &aux (block (first (block-succ (node-block exit)))))))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
