@@ -110,3 +110,24 @@
     (unless (block-flag block)
       (delete-block-lazily block)))
   (find-dfo component))
+
+;;; Run before find-initial-dfo
+(defun initial-eliminate-dead-code (lambdas)
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (dolist (fun (component-lambdas component))
+          (when (lambda-externally-referenced-p fun)
+            (dce-analyze-one-fun fun))))
+
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (do-blocks (block component)
+          (unless (block-flag block)
+            (delete-block-lazily block))))
+
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (clear-flags component)))

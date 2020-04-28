@@ -398,6 +398,7 @@
            (clean-component component))))
      (unless did-something
        (return))))
+  (initial-eliminate-dead-code clambdas)
   (values))
 
 ;;; If policy is auspicious and CALL is not in an XEP and we don't seem

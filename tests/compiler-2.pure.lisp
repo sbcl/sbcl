@@ -2851,3 +2851,14 @@
          (and (inline-fun-arg-mismatch t)
               #'inline-fun-arg-mismatch))
     (() #'inline-fun-arg-mismatch)))
+
+(with-test (:name :eliminate-dead-code-before-initial-dfo)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (block nil
+          (flet ((f (&key (k1 (catch 'c)))
+                   (max 0
+                        (let ((v9 10))
+                          (return))))))))
+    (() nil)))
