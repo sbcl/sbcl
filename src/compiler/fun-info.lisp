@@ -91,7 +91,7 @@
   ;; constant, then the arguments will be swapped.
   commutative)
 
-(def!struct (fun-info (:pure t)
+(defstruct (fun-info (:pure t)
                       (:copier nil))
   ;; boolean attributes of this function.
   (attributes (missing-arg) :type attributes)

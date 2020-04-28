@@ -305,7 +305,7 @@
          (info (make-nlx-info cleanup exit))
          (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
-                                         `(%nlx-entry ',info)
+                                         `(%nlx-entry ,(opaquely-quote info))
                                          cleanup))
          (component (block-component new-block)))
     (unlink-blocks exit-block new-block)
@@ -363,7 +363,7 @@
       (mapc (lambda (x)
               (setf (node-derived-type x) *wild-type*))
             (leaf-refs exit-fun))
-      (substitute-leaf (find-constant info) exit-fun))
+      (substitute-leaf (find-constant (opaquely-quote info)) exit-fun))
     (when lvar
       (let ((node (block-last (nlx-info-target info))))
         (unless (node-lvar node)
@@ -468,16 +468,16 @@
             (:special-bind
              (code `(%special-unbind ',(lvar-value (car args)))))
             (:catch
-             (code `(%catch-breakup ,(car (cleanup-info cleanup)))))
+             (code `(%catch-breakup ,(opaquely-quote (car (cleanup-info cleanup))))))
             (:unwind-protect
-                 (code `(%unwind-protect-breakup ,(car (cleanup-info cleanup))))
-              (let ((fun (ref-leaf (lvar-uses (second args)))))
+             (code `(%unwind-protect-breakup ,(opaquely-quote (car (cleanup-info cleanup)))))
+             (let ((fun (ref-leaf (lvar-uses (second args)))))
                 (when (functional-p fun)
                   (reanalyze-funs fun)
                   (code `(%funcall ,fun)))))
             ((:block :tagbody)
              (dolist (nlx (cleanup-info cleanup))
-               (code `(%lexical-exit-breakup ',nlx))))
+               (code `(%lexical-exit-breakup ,(opaquely-quote nlx)))))
             (:dynamic-extent
              (when (cleanup-info cleanup)
                (code `(%cleanup-point))))

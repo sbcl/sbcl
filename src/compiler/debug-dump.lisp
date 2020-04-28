@@ -38,7 +38,7 @@
   ;; The VOP that emitted this location (for node, save-set, ir2-block, etc.)
   (vop nil :type vop))
 
-(def!struct (restart-location
+(defstruct (restart-location
             (:constructor make-restart-location (&optional label tn))
             (:copier nil))
   (label nil :type (or null label))

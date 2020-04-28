@@ -605,7 +605,7 @@
                     (case ,n-key ,@(tests))))))
 
             (unless allowp
-              (let ((location (make-restart-location)))
+              (let ((location (opaquely-quote (make-restart-location))))
                 (body `(if (and (not (unbound-marker-p ,n-lose))
                                 (not ,n-allowp))
                            (%unknown-key-arg-error ,n-lose ,location)

@@ -58,7 +58,7 @@
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
-(def!struct (lvar (:constructor make-lvar (&optional dest))
+(defstruct (lvar (:constructor make-lvar (&optional dest))
                   (:copier nil))
   ;; The node which receives this value. NIL only temporarily.
   (dest nil :type (or node null))
@@ -665,7 +665,7 @@
 ;;; non-local exits. This is effectively an annotation on the
 ;;; continuation, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
-(def!struct (nlx-info
+(defstruct (nlx-info
              (:copier nil)
              (:constructor make-nlx-info (cleanup
                                           exit
@@ -781,8 +781,9 @@
 ;;; Since the same constant leaf may be shared between named and anonymous
 ;;; constants, %SOURCE-NAME is never used.
 (defstruct (constant (:constructor make-constant (value
-                                                  &aux
+                                                  &optional
                                                   (type (ctype-of value))
+                                                  &aux
                                                   (%source-name '.anonymous.)
                                                   (where-from :defined)))
                      (:copier nil)

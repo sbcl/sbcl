@@ -2477,10 +2477,8 @@ is :ANY, the function name is not checked."
   ;; These things appear as literals in forms such as `(%POP-VALUES ,x)
   ;; acting as a magic mechanism for passing data along.
   (when (opaque-box-p object) ; quote an object without examining it
-    (return-from find-constant (make-constant (opaque-box-value object))))
-  (when (typep object '(or lvar nlx-info restart-location))
-    ;; implicitly opaque-boxed
-    (return-from find-constant (make-constant object)))
+    (return-from find-constant
+      (make-constant (opaque-box-value object) *universal-type*)))
   ;; Note that we haven't picked off LAYOUT yet for two reasons:
   ;;  1. layouts go in the hash-table so that a code component references
   ;;     any given layout at most once
