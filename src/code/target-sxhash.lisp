@@ -19,66 +19,6 @@
 ;;; a compound object.
 (defconstant +max-hash-depthoid+ 4)
 
-;;;; mixing hash values
-
-;;; a function for mixing hash values
-;;;
-;;; desiderata:
-;;;   * Non-commutativity keeps us from hashing e.g. #(1 5) to the
-;;;     same value as #(5 1), and ending up in real trouble in some
-;;;     special cases like bit vectors the way that CMUCL 18b SXHASH
-;;;     does. (Under CMUCL 18b, SXHASH of any bit vector is 1..)
-;;;   * We'd like to scatter our hash values over the entire possible range
-;;;     of values instead of hashing small or common key values (like
-;;;     2 and NIL and #\a) to small FIXNUMs the way that the CMUCL 18b
-;;;     SXHASH function does, again helping to avoid pathologies like
-;;;     hashing all bit vectors to 1.
-;;;   * We'd like this to be simple and fast, too.
-(declaim (ftype (sfunction ((and fixnum unsigned-byte)
-                            (and fixnum unsigned-byte))
-                           (and fixnum unsigned-byte))
-                mix))
-(declaim (inline mix))
-(defun mix (x y)
-  (declare (optimize (speed 3)))
-  (declare (type (and fixnum unsigned-byte) x y))
-  ;; the ideas here:
-  ;;   * Bits diffuse in both directions (shifted arbitrarily left by
-  ;;     the multiplication in the calculation of XY, and shifted
-  ;;     right by up to 5 places by the ASH).
-  ;;   * The #'+ and #'LOGXOR operations don't commute with each other,
-  ;;     so different bit patterns are mixed together as they shift
-  ;;     past each other.
-  ;;   * The arbitrary constant XOR used in the LOGXOR expression is
-  ;;     intended to help break up any weird anomalies we might
-  ;;     otherwise get when hashing highly regular patterns.
-  ;; (These are vaguely like the ideas used in many cryptographic
-  ;; algorithms, but we're not pushing them hard enough here for them
-  ;; to be cryptographically strong.)
-  ;;
-  ;; note: 3622009729038463111 is a 62-bit prime such that its low 61
-  ;; bits, low 60 bits and low 29 bits are all also primes, thus
-  ;; giving decent distributions no matter which of the possible
-  ;; values of most-positive-fixnum we have.  It is derived by simple
-  ;; search starting from 2^60*pi.  The multiplication should be
-  ;; efficient no matter what the platform thanks to modular
-  ;; arithmetic.
-  (let* ((mul (logand 3622009729038463111 sb-xc:most-positive-fixnum))
-         (xor (logand 608948948376289905 sb-xc:most-positive-fixnum))
-         (xy (logand (+ (* x mul) y) sb-xc:most-positive-fixnum)))
-    (logand (logxor xor xy (ash xy -5)) sb-xc:most-positive-fixnum)))
-
-;;; Same as above, but don't mask computations to n-positive-fixnum-bits.
-(declaim (inline word-mix))
-(defun word-mix (x y)
-  (declare (optimize (speed 3)))
-  (declare (type word x y))
-  (declare (muffle-conditions compiler-note))
-  (let* ((mul (logand 3622009729038463111 most-positive-word))
-         (xor (logand 608948948376289905 most-positive-word))
-         (xy (logand (+ (* x mul) y) most-positive-word)))
-    (logand (logxor xor xy (ash xy -5)) most-positive-word)))
-
 ;; Return a number that increments by 1 for each word-pair allocation,
 ;; barring complications such as exhaustion of the current page.
 ;; The result is guaranteed to be a positive fixnum.

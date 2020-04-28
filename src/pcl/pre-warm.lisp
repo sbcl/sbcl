@@ -114,13 +114,12 @@
        (classoid (sb-kernel::make-condition-classoid :name name))
        (cell (sb-kernel::make-classoid-cell name classoid))
        (layout (set-layout-valid
-                (make-layout
-                 (randomish-layout-clos-hash name)
-                 classoid
-                 :inherits (vector (find-layout 't))
-                 :depthoid 1
-                 :length (+ sb-vm:instance-data-start 2)
-                 :flags +condition-layout-flag+))))
+                (make-layout (hash-layout-name name)
+                             classoid
+                             :inherits (vector (find-layout 't))
+                             :depthoid 1
+                             :length (+ sb-vm:instance-data-start 2)
+                             :flags +condition-layout-flag+))))
   (setf (classoid-layout classoid) layout
         (info :type :classoid-cell name) cell
         (info :type :kind name) :instance))
@@ -131,12 +130,12 @@
                 (cell (sb-kernel::make-classoid-cell name classoid))
                 (layout
                  (set-layout-valid
-                  (make-layout
-                   (randomish-layout-clos-hash name) classoid
-                   :inherits (map 'vector #'find-layout
-                                  (cons t (if fun-p '(function))))
-                   :length 0 ; don't care
-                   :depthoid -1))))
+                  (make-layout (hash-layout-name name)
+                               classoid
+                               :inherits (map 'vector #'find-layout
+                                              (cons t (if fun-p '(function))))
+                               :length 0 ; don't care
+                               :depthoid -1))))
            (setf (classoid-layout classoid) layout
                  (info :type :classoid-cell name) cell
                  (info :type :kind name) :instance))))

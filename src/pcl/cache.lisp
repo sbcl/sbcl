@@ -125,6 +125,8 @@
   (ceiling (sqrt (sqrt size))))
 
 ;;; Returns VALUE if it is not ..EMPTY.., otherwise executes ELSE:
+;;; TODO: use the ordinary unbound marker which might have a quicker test
+;;; than EQ against a symbol. (..EMPTY.. is not a static symbol)
 (defmacro non-empty-or (value else)
   (with-unique-names (n-value)
     `(let ((,n-value ,value))
@@ -153,25 +155,42 @@
   (declare (type word index line-size mask))
   (logand mask (+ index line-size)))
 
-;;; Returns the hash-value for layout, or executes ELSE if the layout
-;;; is invalid.
-(defmacro hash-layout-or (layout else)
-  (with-unique-names (n-hash)
-    `(let ((,n-hash (layout-clos-hash ,layout)))
-       (if (zerop ,n-hash)
-           ,else
-           ,n-hash))))
-
 ;;; Compute cache index for the cache and a list of layouts.
+;;; TODO: Use a stronger mixing function. In the implementatino of CLOS itself
+;;; there are caches with 198/1024 lines filled and probe depth 6.
+;;; Perhaps we can dynamically optimize the mixing by picking bits that work
+;;; best for the set of keys in the cache.
 (declaim (inline compute-cache-index))
 (defun compute-cache-index (cache layouts)
-  (let ((index (hash-layout-or (car layouts)
-                               (return-from compute-cache-index nil))))
-    (declare (fixnum index))
-    (dolist (layout (cdr layouts))
-      (mixf index (hash-layout-or layout (return-from compute-cache-index nil))))
-    ;; align with cache lines
-    (logand index (cache-mask cache))))
+  (macrolet ((fetch-hash (x)
+               `(let ((hash (layout-clos-hash ,x)))
+                  (when (zerop hash) (return-from compute-cache-index nil))
+                  hash)))
+    (let ((index (fetch-hash (car layouts))))
+      (dolist (layout (cdr layouts))
+        (mixf index (fetch-hash layout)))
+      ;; align with cache lines
+      (logand index (cache-mask cache)))))
+
+;;; The hash values are specifically designed so that LOGAND of all hash
+;;; inputs is zero if and only if at least one hash is invalid.
+(defun cache-mixer-expression (operator operands associativep)
+  (named-let recurse ((operands operands))
+    (let ((n (length operands)))
+      (cond ((< n 2)
+             (first operands))
+            (associativep
+             ;; Though we could emit `(LOGAND ,@operands), theoretically better
+             ;; instruction-level parallelism comes from not making each intermediate
+             ;; result strictly depend on its prior intermediate result.
+             ;; This doesn't really affect much, since most GFs dispatch off
+             ;; one argument, hence most caches have 1 key. But still...
+             (let ((half-n (ceiling n 2)))
+               `(,operator ,(recurse (subseq operands 0 half-n))
+                           ,(recurse (subseq operands half-n)))))
+            (t
+             (recurse (cons `(,operator ,(first operands) ,(second operands))
+                            (cddr operands))))))))
 
 ;;; Emit code that does lookup in cache bound to CACHE-VAR using
 ;;; layouts bound to LAYOUT-VARS. Go to MISS-TAG on event of a miss or
@@ -186,6 +205,7 @@
   (with-unique-names (probe n-vector n-depth n-mask
                       MATCH-WRAPPERS EXIT-WITH-HIT)
     (let* ((num-keys (length layout-vars))
+           (hash-vars (make-gensym-list num-keys))
            (pointer
             ;; We don't need POINTER if the cache has 1 key and no value,
             ;; or if FOLD-INDEX-ADDRESSING is supported, in which case adding
@@ -193,19 +213,19 @@
             #-(or x86 x86-64)
             (when (or (> num-keys 1) value-var) (make-symbol "PTR")))
            (line-size (power-of-two-ceiling (+ num-keys (if value-var 1 0)))))
-      `(let ((,n-mask (cache-mask ,cache-var))
-             (,probe (hash-layout-or ,(car layout-vars) (go ,miss-tag))))
+      ;; Why not use PROG* ? are we expressly trying to avoid a new block?
+      `(let* (,@(mapcar (lambda (x y) `(,x (layout-clos-hash ,y))) hash-vars layout-vars)
+              (,n-mask (cache-mask ,cache-var))
+              (,probe (if (zerop ,(cache-mixer-expression 'logand hash-vars t))
+                          (go ,miss-tag)
+                          (logand ,(cache-mixer-expression 'mix hash-vars nil)
+                                  ,n-mask))) ; align to cache line
+              (,n-depth (cache-depth ,cache-var))
+              (,n-vector (cache-vector ,cache-var))
+              ,@(when pointer `((,pointer ,probe))))
          (declare (index ,probe))
-         ,@(mapcar (lambda (layout-var)
-                     `(mixf ,probe (hash-layout-or ,layout-var (go ,miss-tag))))
-                   (cdr layout-vars))
-         ;; align with cache lines
-         (setf ,probe (logand ,probe ,n-mask))
-         (let ((,n-depth (cache-depth ,cache-var))
-               (,n-vector (cache-vector ,cache-var))
-               ,@(when pointer `((,pointer ,probe))))
-           (declare (index ,n-depth ,@(when pointer (list pointer))))
-           (tagbody
+         (declare (index ,n-depth ,@(when pointer (list pointer))))
+         (tagbody
             ,MATCH-WRAPPERS
             (when (and ,@(loop for layout-var in layout-vars
                                for i from 0
@@ -230,7 +250,7 @@
             (setf ,probe (next-cache-index ,n-mask ,probe ,line-size))
             ,@(if pointer `((setf ,pointer ,probe)))
             (go ,MATCH-WRAPPERS)
-            ,EXIT-WITH-HIT))))))
+            ,EXIT-WITH-HIT)))))
 
 ;;; Probes CACHE for LAYOUTS.
 ;;;
@@ -616,3 +636,48 @@
     (format t "~d caches~@[, ~d not shown~]~%"
             n
             (if (> n n-shown) (- n n-shown)))))
+
+#|
+;; Checking for cache hit rate improvement:
+(dolist (x (sort (sb-vm::list-allocated-objects :all
+                  :type sb-vm:instance-widetag :test #'sb-pcl::cache-p)
+                 #'> :key #'cache-statistics))
+  (print x))
+
+Top 10:
+Before:
+#<CACHE 2 keys, value, 324/1024 lines (LF=31.640625%), depth 4/6 {1000F09073}>
+#<CACHE 2 keys, value, 198/512 lines (LF=38.671875%), depth 4/5 {1000F07A33}>
+#<CACHE 2 keys, value, 198/512 lines (LF=38.671875%), depth 4/5 {1000F08B13}>
+#<CACHE 3 keys, value, 198/1024 lines (LF=19.335938%), depth 6/6 {1000F0A333}>
+#<CACHE 3 keys, value, 189/1024 lines (LF=18.457031%), depth 5/6 {1000F09F93}>
+#<CACHE 2 keys, value, 121/256 lines (LF=47.265625%), depth 4/4 {1000F07B53}>
+#<CACHE 2 keys, value, 121/256 lines (LF=47.265625%), depth 4/4 {1000F08C33}>
+#<CACHE 2 keys, value, 121/256 lines (LF=47.265625%), depth 4/4 {1000F09453}>
+#<CACHE 2 keys, value, 121/256 lines (LF=47.265625%), depth 4/4 {1000F09593}>
+#<CACHE 1 key, value, 38/64 lines (LF=59.375%), depth 3/3 {1000F02BC3}>
+
+After, without additional fmix64:
+#<CACHE 2 keys, value, 324/1024 lines (LF=31.640625%), depth 3/6 {1000F09113}>
+#<CACHE 2 keys, value, 198/1024 lines (LF=19.335938%), depth 2/6 {1000F07AC3}>
+#<CACHE 2 keys, value, 198/1024 lines (LF=19.335938%), depth 2/6 {1000F08BB3}>
+#<CACHE 3 keys, value, 198/512 lines (LF=38.671875%), depth 5/5 {1000F0A3D3}>
+#<CACHE 3 keys, value, 189/512 lines (LF=36.914063%), depth 5/5 {1000F0A033}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 4/5 {1000F07BE3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 4/5 {1000F08CD3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 4/5 {1000F094F3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 4/5 {1000F09633}>
+#<CACHE 1 key, value, 38/128 lines (LF=29.6875%), depth 2/4 {1000F02C53}>
+
+After, with additional fmix64:
+#<CACHE 2 keys, value, 324/1024 lines (LF=31.640625%), depth 3/6 {1000F08FF3}>
+#<CACHE 2 keys, value, 198/512 lines (LF=38.671875%), depth 3/5 {1000F079D3}>
+#<CACHE 2 keys, value, 198/512 lines (LF=38.671875%), depth 3/5 {1000F08A93}>
+#<CACHE 3 keys, value, 198/512 lines (LF=38.671875%), depth 4/5 {1000F0A2B3}>
+#<CACHE 3 keys, value, 189/512 lines (LF=36.914063%), depth 4/5 {1000F09F13}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 3/5 {1000F07AF3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 3/5 {1000F08BB3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 3/5 {1000F093D3}>
+#<CACHE 2 keys, value, 121/512 lines (LF=23.632813%), depth 3/5 {1000F09513}>
+#<CACHE 1 key, value, 38/128 lines (LF=29.6875%), depth 2/4 {1000F02B63}>
+|#

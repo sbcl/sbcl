@@ -1141,7 +1141,7 @@ core and return a descriptor to it."
     ;; Set other slot values.
     ;; leave CLASSOID uninitialized for now
     (write-slots result *host-layout-of-layout*
-     :clos-hash (make-fixnum-descriptor (sb-impl::randomish-layout-clos-hash name))
+     :clos-hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))
      :invalid *nil-descriptor*
      :inherits inherits
      :info *nil-descriptor*

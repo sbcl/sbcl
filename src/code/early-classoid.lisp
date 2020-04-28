@@ -87,19 +87,6 @@
 
 ;;;; basic LAYOUT stuff
 
-;;; Note: This bound is set somewhat less than MOST-POSITIVE-FIXNUM
-;;; in order to guarantee that several hash values can be added without
-;;; overflowing into a bignum.
-(defconstant layout-clos-hash-limit (1+ (ash sb-xc:most-positive-fixnum -3))
-  "the exclusive upper bound on LAYOUT-CLOS-HASH values")
-;; This must be DEF!TYPE and not just DEFTYPE because access to slots
-;; of a layout occur "before" the structure definition is made in the
-;; run-the-xc pass, and the source-transform of a slot accessor
-;; wraps (TRULY-THE <type> ...) around %INSTANCE-REF,
-;; so <type> had best be defined at that point.
-(def!type layout-clos-hash () `(integer 0 ,layout-clos-hash-limit))
-(declaim (ftype (sfunction (t) layout-clos-hash) randomish-layout-clos-hash))
-
 ;;; Careful here: if you add more bits, then adjust the bit packing for
 ;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
 (defconstant +structure-layout-flag+         #b00000001)
@@ -161,8 +148,10 @@
   ;; a union of +something-LAYOUT-FLAG+ bits
   #-64-bit (flags 0 :type word :read-only nil)
 
-  ;; a pseudo-random hash value for use by CLOS.
-  (clos-hash (missing-arg) :type layout-clos-hash) ; this no longer defaults to a random number
+  ;; a quasi-random hash value for use by CLOS. Determine by class-name
+  ;; for classes named by a symbol, otherwise a pseudo-random value.
+  ;; Must be acceptable as an argument to SB-INT:MIX
+  (clos-hash (missing-arg) :type (and fixnum unsigned-byte))
   ;; the class that this is a layout for
   (classoid (missing-arg) :type classoid)
   ;; The value of this slot can be:
@@ -253,8 +242,12 @@
 (progn
   (defstruct (layout (:include structure!object)
                      (:constructor make-layout
-                         (clos-hash classoid &key depthoid length flags inherits info)))
-    (clos-hash nil :type layout-clos-hash) ; needed for cross-compiling some TYPECASE forms
+                                   (clos-hash classoid &key depthoid length flags inherits info)))
+    ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
+    ;; Theoretically we don't need this in the cross-compiler, because the
+    ;; layout has a classoid which has a name which has a known hash.
+    ;; But there's no harm in storing it.
+    (clos-hash nil :type (and sb-xc:fixnum unsigned-byte))
     (classoid nil :type classoid)
     (flags 0 :type word)
     (invalid :uninitialized :type (or cons (member nil t :uninitialized)))

@@ -44,7 +44,7 @@
         layout))
      (t
       (set-layout-valid
-       (make-layout (randomish-layout-clos-hash name)
+       (make-layout (hash-layout-name name)
                     (make-standard-classoid :name name :pcl-class class)
                     :length length
                     :flags +pcl-object-layout-flag+
@@ -75,7 +75,7 @@
                      (t
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
        (set-layout-valid
-        (make-layout (randomish-layout-clos-hash name)
+        (make-layout (hash-layout-name name)
                      classoid :length length :flags +pcl-object-layout-flag+))))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))

@@ -308,7 +308,7 @@
  ;;; TYPE-CLASS is an unevaluated argument
   (when (eq type-class 'classoid)
     (aver name))
-  (let ((hash (if name `(randomish-layout-clos-hash ,name) '(ctype-random))))
+  (let ((hash (if name `(hash-layout-name ,name) '(ctype-random))))
     `(logior (ash (memoized-type-class-name->id ,type-class) 27)
              (logand ,hash +type-hash-mask+)
              ;; NUMBER, MEMBER, and CLASSOID admit TYPE= optimization.

@@ -41,16 +41,6 @@
 ;;; cdr is the layout itself.
 (defvar *!initial-layouts*)
 
-;;; a generator for random values suitable for the CLOS-HASH slots of
-;;; LAYOUTs. We use our own RANDOM-STATE here because we'd like
-;;; pseudo-random values to come the same way in the target even when
-;;; we make minor changes to the system, in order to reduce the
-;;; mysteriousness of possible CLOS bugs.
-;;; However, we now try very hard to use deterministic hashes
-;;; based on the characters in the name of the class, if a symbol.
-(define-load-time-global *layout-clos-hash-random-state*
-    (make-random-state))
-
 ;;; a table mapping class names to layouts for classes we have
 ;;; referenced but not yet loaded. This is initialized from an alist
 ;;; created by genesis describing the layouts that genesis created at
@@ -65,7 +55,7 @@
                  (/show0 "processing *!INITIAL-LAYOUTS*")
                  (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
                  (dovector (x *!initial-layouts*)
-                   (let ((expected (randomish-layout-clos-hash (car x)))
+                   (let ((expected (hash-layout-name (car x)))
                          (actual (layout-clos-hash (cdr x))))
                      (unless (= actual expected)
                        (bug "XC layout hash calculation failed")))
@@ -85,26 +75,6 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun layout-proper-name (layout)
     (classoid-proper-name (layout-classoid layout))))
-
-;;;; support for the hash values used by CLOS when working with LAYOUTs
-
-(defun randomish-layout-clos-hash (name)
-  ;; A hash of 0 occurs with probability 1 in 2^25 for a 32-bit hash
-  ;; or 2^58 for a 64-bit hash. It must be changed to something else
-  ;; because 0 has means that the layout is invalid.
-  ;; See paper by Kiczales and Rodriguez, "Efficient Method Dispatch in PCL", 1990
-  (1+ (if (typep name '(and symbol (not null)))
-          (let ((package (sb-xc:symbol-package name)))
-            ;; TODO: We should use murmur_hash (in the C runtime)
-            ;; for better hashiness than our sxhash on strings.
-            (rem (logxor (sb-impl::%sxhash-simple-string
-                          (cond #+sb-xc ((eq package *cl-package*) "COMMON-LISP")
-                                ((not package) "uninterned")
-                                (t (package-name package))))
-                         (sb-impl::%sxhash-simple-string
-                          (symbol-name name)))
-                 (1- layout-clos-hash-limit)))
-          (random (1- layout-clos-hash-limit) *layout-clos-hash-random-state*))))
 
 ;;; If we can't find any existing layout, then we create a new one
 ;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
@@ -126,7 +96,7 @@
         (or (and classoid (classoid-layout classoid))
             (values (ensure-gethash name table
                                     (make-layout
-                                     (randomish-layout-clos-hash name)
+                                     (hash-layout-name name)
                                      (or classoid
                                          (make-undefined-classoid name))))))))))
 

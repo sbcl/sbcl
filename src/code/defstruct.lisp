@@ -735,7 +735,7 @@ unless :NAMED is also specified.")))
          (proto-classoid
           (if (dd-class-p dd)
               (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                     (layout (make-layout (randomish-layout-clos-hash (dd-name dd))
+                     (layout (make-layout (hash-layout-name (dd-name dd))
                                           classoid :inherits inherits)))
                 (setf (layout-invalid layout) nil
                       (classoid-layout classoid) layout)
@@ -1518,7 +1518,7 @@ or they must be declared locally notinline at each call site.~@:>"
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
               (populate-layout-ancestors
-               (make-layout (randomish-layout-clos-hash (dd-name info))
+               (make-layout (hash-layout-name (dd-name info))
                             classoid
                             :flags flags
                             :inherits inherits

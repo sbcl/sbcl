@@ -13,12 +13,32 @@
 
 (with-test (:name :probe-cache-smoke-test)
   (let ((layout
-          (sb-kernel::make-layout (sb-kernel::randomish-layout-clos-hash nil)
+          (sb-kernel::make-layout (sb-kernel::hash-layout-name nil)
                                   (sb-kernel::make-undefined-classoid 'x)))
         (cache (sb-pcl::make-cache :key-count 1 :value t :size 10)))
     (sb-pcl::try-update-cache cache (list layout) 'win)
     (assert (eq (nth-value 1 (sb-pcl::probe-cache cache (list layout))) 'win))
     (assert (eq (nth-value 1 (sb-pcl::probe-cache cache layout)) 'win))))
+
+;;; The code that CACHE-MIXER-EXPRESSION emits had better compute
+;;; the same thing that COMPUTE-CACHE-INDEX does.
+;;; (The expression would be wrong if it reduced in the wrong direction, e.g.)
+(with-test (:name :compute-index-optimization)
+  (macrolet ((optimized-way (a b c)
+               `(let ((a (sb-kernel:layout-clos-hash ,a))
+                      (b (sb-kernel:layout-clos-hash ,b))
+                      (c (sb-kernel:layout-clos-hash ,c)))
+                  ,(sb-pcl::cache-mixer-expression 'sb-int:mix '(a b c) nil))))
+    (let* ((l1 (sb-kernel:find-layout 'pathname))
+           (l2 (sb-kernel:find-layout 'cons))
+           (l3 (sb-kernel:find-layout 'integer))
+           (cache (sb-pcl::%make-cache :mask -1)))
+      (let ((safe-answer (sb-pcl::compute-cache-index cache (list l1 l2 l3)))
+            (optimized-answer (optimized-way l1 l2 l3)))
+        (assert (= safe-answer optimized-answer)))
+      (let ((safe-answer (sb-pcl::compute-cache-index cache (list l1 l3 l2)))
+            (optimized-answer (optimized-way l1 l3 l2)))
+        (assert (= safe-answer optimized-answer))))))
 
 ;;;; Make a GF, populate it with a ton of methods, and then hammer
 ;;;; it with multiple threads. On 1.0.6 this would have failed with
