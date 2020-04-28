@@ -189,6 +189,14 @@
                       ;; See if the host knows our DEF!STRUCT yet
                       (cl:subtypep spec 'structure!object))
                  (values (cl:typep obj spec) t))
+                ;; Sometimes we try to test a forward-referenced type
+                ;; that was unknown at the point of creation but has
+                ;; been resolved at the point of testing via block
+                ;; compilation. Retry with the now resolved type if
+                ;; this is the case.
+                ((and (symbolp spec)
+                      (not (unknown-type-p (specifier-type spec))))
+                 (cross-typep caller obj (specifier-type spec)))
                 ;; Special-case a few forward-referenced instance types.
                 ;; Some are picked off by the quick exit case in (DEFUN SB-XC:TYPEP)
                 ;; but a bunch of other cases arise within the type methods per se

@@ -279,8 +279,15 @@
     (alien-type-type
      (values (alien-typep obj (alien-type-type-alien-type type)) t))
     (hairy-type
+     ;; Parse it again to make sure it's really undefined.
+     ;; FIXME: This logic has appeared before in this file, and
+     ;; probably needs to happen in more places too.
      (if (unknown-type-p type)
-         (values nil nil)
+         (let* ((spec (unknown-type-specifier type))
+                (type (specifier-type spec)))
+           (if (unknown-type-p type)
+               (values nil nil)
+               (ctypep obj type)))
          ;; Now the tricky stuff.
          (let ((predicate (cadr (hairy-type-specifier type))))
            (case predicate

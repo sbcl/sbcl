@@ -23,7 +23,7 @@
 ;;; SSET-ELEMENT structure. We allow an initial value of NIL to mean
 ;;; that no ordering has been assigned yet (although an ordering must
 ;;; be assigned before doing set operations.)
-(def!struct (sset-element (:constructor nil)
+(defstruct (sset-element (:constructor nil)
                          (:copier nil))
   (number nil :type (or index null)))
 
