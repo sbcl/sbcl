@@ -397,7 +397,7 @@
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
-(sb-xc:defmacro sb-xc:define-modify-macro (name lambda-list function &optional doc-string)
+(sb-xc:defmacro define-modify-macro (name lambda-list function &optional doc-string)
   "Creates a new read-modify-write macro like PUSH or INCF."
   (check-designator name define-modify-macro)
   (binding* (((nil required optional rest)
@@ -417,48 +417,47 @@
 
 ;;;; DEFSETF
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;;; Assign SETF macro information for NAME, making all appropriate checks.
-  (defun %defsetf (name expander &optional doc)
-    (declare (ignorable doc))
-    (with-single-package-locked-error
-        (:symbol name "defining a setf-expander for ~A"))
-    (let ((setf-fn-name `(setf ,name)))
-      (multiple-value-bind (where-from present-p)
-          (info :function :where-from setf-fn-name)
-        ;; One might think that :DECLARED merits a style warning, but SBCL
-        ;; provides ~58 standard accessors as both (SETF F) and a macro.
-        ;; So allow the user to declaim an FTYPE and we'll hush up.
-        ;; What's good for the the goose is good for the gander.
-        (case where-from
-          (:assumed
-           ;; This indicates probable user error. Compilation assumed something
-           ;; to be functional; a macro says otherwise. Because :where-from's
-           ;; default can be :assumed, PRESENT-P disambiguates "defaulted" from
-           ;; "known" to have made an existence assumption.
-           (when present-p
-             (warn "defining setf macro for ~S when ~S was previously ~
+;;; Assign SETF macro information for NAME, making all appropriate checks.
+(defun %defsetf (name expander &optional doc)
+  (declare (ignorable doc))
+  (with-single-package-locked-error
+      (:symbol name "defining a setf-expander for ~A"))
+  (let ((setf-fn-name `(setf ,name)))
+    (multiple-value-bind (where-from present-p)
+        (info :function :where-from setf-fn-name)
+      ;; One might think that :DECLARED merits a style warning, but SBCL
+      ;; provides ~58 standard accessors as both (SETF F) and a macro.
+      ;; So allow the user to declaim an FTYPE and we'll hush up.
+      ;; What's good for the the goose is good for the gander.
+      (case where-from
+        (:assumed
+         ;; This indicates probable user error. Compilation assumed something
+         ;; to be functional; a macro says otherwise. Because :where-from's
+         ;; default can be :assumed, PRESENT-P disambiguates "defaulted" from
+         ;; "known" to have made an existence assumption.
+         (when present-p
+           (warn "defining setf macro for ~S when ~S was previously ~
              treated as a function" name setf-fn-name)))
-          ;; This is a useless and unavoidable warning during self-build.
-          ;; cf. similar disabling of warning in WARN-IF-SETF-MACRO.
-          #-sb-xc-host
-          (:defined
-           ;; Somebody defined (SETF F) but then also said F has a macro.
-           ;; A soft warning seems appropriate because in this case it's
-           ;; at least in theory not wrong to call the function.
-           ;; The user can declare an FTYPE if both things are intentional.
-           (style-warn "defining setf macro for ~S when ~S is also defined"
-                       name setf-fn-name)))))
-    (setf (info :setf :expander name) expander)
-    #-sb-xc-host
-    (when doc
-      (setf (documentation name 'setf) doc))
-    name))
+        ;; This is a useless and unavoidable warning during self-build.
+        ;; cf. similar disabling of warning in WARN-IF-SETF-MACRO.
+        #-sb-xc-host
+        (:defined
+         ;; Somebody defined (SETF F) but then also said F has a macro.
+         ;; A soft warning seems appropriate because in this case it's
+         ;; at least in theory not wrong to call the function.
+         ;; The user can declare an FTYPE if both things are intentional.
+         (style-warn "defining setf macro for ~S when ~S is also defined"
+                     name setf-fn-name)))))
+  (setf (info :setf :expander name) expander)
+  #-sb-xc-host
+  (when doc
+    (setf (documentation name 'setf) doc))
+  name)
 
 ;;; This is pretty broken if there are keyword arguments (lp#1452947)
 ;;; but the bug seems to be due to irreconcilable problems in the spec.
 ;;; Everybody seems to interpret the spec the way we do though.
-(sb-xc:defmacro sb-xc:defsetf (access-fn &rest rest)
+(sb-xc:defmacro defsetf (access-fn &rest rest)
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
   (check-designator access-fn defsetf "access-function")
@@ -575,7 +574,7 @@
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 
 ;;; DEFINE-SETF-EXPANDER is a lot like DEFMACRO.
-(sb-xc:defmacro sb-xc:define-setf-expander (access-fn lambda-list &body body)
+(sb-xc:defmacro define-setf-expander (access-fn lambda-list &body body)
   "Syntax like DEFMACRO, but creates a setf expander function. The body
   of the definition must be a form that returns five appropriate values."
   (check-designator access-fn define-setf-expander "access-function")
