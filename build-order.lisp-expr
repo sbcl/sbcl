@@ -147,8 +147,6 @@
  ;; Needed before the first use of WITH-SINGLE-PACKAGE-LOCKED-ERROR.
  ("src/code/early-package" :not-host)
 
- ("src/compiler/defconstant")
-
  ("src/code/early-raw-slots" :c-headers)
 
  ("src/code/funutils" :not-host)
