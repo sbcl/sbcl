@@ -7,7 +7,6 @@ tmpcore=$TEST_FILESTEM.core
 
 # This test has to do with incorrect GC of funcallable instances
 run_sbcl <<EOF
-  (require :asdf)
   (require :sb-bsd-sockets)
   (save-lisp-and-die "$tmpcore")
 EOF
