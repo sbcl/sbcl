@@ -162,7 +162,7 @@
   (values))
 
 #+call-symbol
-(defoptimizer (%coerce-callable-to-fun ltn-annotate) ((fun) node ltn-policy)
+(defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node ltn-policy)
   (declare (ignore ltn-policy))
   (let ((dest (node-dest node)))
     (cond ((and (basic-combination-p dest)
