@@ -2862,3 +2862,12 @@
                         (let ((v9 10))
                           (return))))))))
     (() nil)))
+
+(with-test (:name :%coerce-callable-to-fun-movement)
+  (checked-compile-and-assert
+   ()
+   `(lambda (y x)
+      (let ((x (sb-kernel:%coerce-callable-to-fun x)))
+        (when y
+          (funcall x))))
+   ((nil (make-symbol "UNDEF")) (condition 'undefined-function))))
