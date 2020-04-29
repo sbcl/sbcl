@@ -270,14 +270,15 @@
          (sharp-equal-wrapper-value tree))
         ((null (gethash tree circle-table))
          (setf (gethash tree circle-table) t)
-         (cond ((consp tree)
+         (typecase tree
+           (cons
                 (let ((a (circle-subst circle-table (car tree)))
                       (d (circle-subst circle-table (cdr tree))))
                   (unless (eq a (car tree))
                     (rplaca tree a))
                   (unless (eq d (cdr tree))
                     (rplacd tree d))))
-               ((arrayp tree)
+           (array
                 (with-array-data ((data tree) (start) (end))
                   (declare (fixnum start end))
                   (do ((i start (1+ i)))
@@ -286,21 +287,38 @@
                            (new (circle-subst circle-table old)))
                       (unless (eq old new)
                         (setf (aref data i) new))))))
-               ((typep tree 'instance)
-                ;; We don't grovel the layout.
-                (do-instance-tagged-slot (i tree)
-                  (let* ((old (%instance-ref tree i))
-                         (new (circle-subst circle-table old)))
-                    (unless (eq old new)
-                      (setf (%instance-ref tree i) new)))))
-               ((typep tree 'funcallable-instance)
-                (do ((i sb-vm:instance-data-start (1+ i))
-                     (end (- (1+ (get-closure-length tree)) sb-vm:funcallable-instance-info-offset)))
-                    ((= i end))
-                  (let* ((old (%funcallable-instance-info tree i))
-                         (new (circle-subst circle-table old)))
-                    (unless (eq old new)
-                      (setf (%funcallable-instance-info tree i) new))))))
+           (instance
+            (let ((dd (layout-info (%instance-layout tree))))
+              ;; Unclear which branch we should prefer for CONDITION subtypes.
+              ;; They have LAYOUT-INFO but it is not useful. Why do they have it?
+              (if dd
+                  (dolist (dsd (dd-slots dd))
+                    (when (eq (dsd-raw-type dsd) t)
+                      (let ((i (dsd-index dsd)))
+                        (let* ((old (%instance-ref tree i))
+                               (new (circle-subst circle-table old)))
+                          (unless (eq old new)
+                            (setf (%instance-ref tree i) new))))))
+                  (do ((len (%instance-length tree))
+                       (i sb-vm:instance-data-start (1+ i)))
+                      ((>= i len))
+                    (let* ((old (%instance-ref tree i))
+                           (new (circle-subst circle-table old)))
+                      (unless (eq old new)
+                        (setf (%instance-ref tree i) new)))))))
+           ;; It is not safe to iterate over %FUNCALLABLE-INSTANCE-INFO without knowing
+           ;; where the raw slots are, if any. We can safely process FSC-INSTANCE-SLOTS
+           ;; though, and that's the *only* slot to look at.
+           ;; No other funcallable structure (%METHOD-FUNCTION, INTERPRETED-FUNCTION, etc)
+           ;; has a reader syntax.
+           ;; ASSUMPTION: all funcallable structures have at least 1 slot beyond
+           ;; %FUNCALLABLE-INSTANCE-FUN (overlapping with FSC-INSTANCE-SLOTS)
+           ;; and that slot is never a raw slot.
+           (funcallable-instance
+            (let* ((old (sb-pcl::fsc-instance-slots tree))
+                   (new (circle-subst circle-table old)))
+              (unless (eq old new)
+                (setf (sb-pcl::fsc-instance-slots tree) new)))))
          tree)
         (t tree)))
 
