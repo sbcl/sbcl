@@ -222,10 +222,6 @@
     (function callable)
     (symbol (%coerce-name-to-fun callable symbol-fdefn t))))
 
-;;; Bevahes just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
-(%defun '%coerce-callable-for-call
-        #'%coerce-callable-to-fun)
-
 
 ;;;; definition encapsulation
 

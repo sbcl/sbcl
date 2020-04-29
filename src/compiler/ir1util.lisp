@@ -2790,8 +2790,9 @@ is :ANY, the function name is not checked."
     (or (eq kind :full)
         (eq kind :unknown-keys)
         ;; It has an ir2-converter, but needs to behave like a full call.
+        #+call-symbol
         (eq (lvar-fun-name (basic-combination-fun call) t)
-            '%coerce-callable-for-call)
+            '%coerce-callable-to-fun)
         (and (eq kind :known)
              (let ((info (basic-combination-fun-info call)))
                (and
@@ -3085,7 +3086,7 @@ is :ANY, the function name is not checked."
   (and (basic-combination-p node)
        (let ((fun (basic-combination-fun node)))
          (or (eq fun lvar)
-             (lvar-fun-is fun '(%coerce-callable-for-call))))))
+             (lvar-fun-is fun '(%coerce-callable-to-fun))))))
 
 
 (defun proper-or-circular-list-p (x)

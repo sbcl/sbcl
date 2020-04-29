@@ -622,17 +622,17 @@ be a lambda expression."
       (when (legal-fun-name-p name)
         name))))
 
-(defun ensure-source-fun-form (source &key (coercer '%coerce-callable-for-call) give-up)
+(defun ensure-source-fun-form (source &optional give-up)
   (let ((op (when (consp source) (car source))))
-    (cond ((memq op '(%coerce-callable-to-fun %coerce-callable-for-call))
-           (ensure-source-fun-form (second source) :coercer coercer))
+    (cond ((eq op '%coerce-callable-to-fun)
+           (ensure-source-fun-form (second source)))
           ((member op '(function global-function lambda named-lambda))
            (values source nil))
           (t
            (let ((cname (constant-global-fun-name source)))
              (if cname
                  (values `(global-function ,cname) nil)
-                 (values `(,coercer ,source) give-up)))))))
+                 (values `(%coerce-callable-to-fun ,source) give-up)))))))
 
 (defun source-variable-or-else (lvar fallback)
   (let ((uses (principal-lvar-use lvar)) leaf name)
@@ -644,8 +644,7 @@ be a lambda expression."
              name)
         fallback)))
 
-(defun ensure-lvar-fun-form (lvar lvar-name &key (coercer '%coerce-callable-to-fun)
-                                                 give-up)
+(defun ensure-lvar-fun-form (lvar lvar-name &optional give-up)
   (aver (and lvar-name (symbolp lvar-name)))
   (if (csubtypep (lvar-type lvar) (specifier-type 'function))
       lvar-name
@@ -662,7 +661,7 @@ be a lambda expression."
                 ;; LVAR-NAME is not what to show - if only it were that easy.
                 (source-variable-or-else lvar "callable expression")))
               (t
-               `(,coercer ,lvar-name))))))
+               `(%coerce-callable-to-fun ,lvar-name))))))
 
 ;;;; FUNCALL
 (def-ir1-translator %funcall ((function &rest args) start next result)
@@ -688,20 +687,14 @@ be a lambda expression."
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
 (define-source-transform funcall (function &rest args)
-  `(%funcall ,(ensure-source-fun-form function :coercer '%coerce-callable-for-call) ,@args))
+  `(%funcall ,(ensure-source-fun-form function) ,@args))
 
 (deftransform %coerce-callable-to-fun ((thing) * * :node node)
   "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t))
-
-;;; Bevahes just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
-(deftransform %coerce-callable-for-call ((thing) * * :node node)
-  "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
+  (ensure-lvar-fun-form thing 'thing t))
 
 (define-source-transform %coerce-callable-to-fun (thing)
-  (ensure-source-fun-form thing :give-up t))
-
+  (ensure-source-fun-form thing t))
 
 ;;;; LET and LET*
 ;;;;
@@ -1436,7 +1429,7 @@ values from the first VALUES-FORM making up the first argument, etc."
                    ;; important for simplifying compilation of
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
-    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun :coercer '%coerce-callable-for-call))
+    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))

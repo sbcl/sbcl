@@ -1754,7 +1754,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                ((reference-tn-list locs t))))))))
 
 #+call-symbol
-(defoptimizer (%coerce-callable-for-call ir2-convert) ((fun) node block)
+(defoptimizer (%coerce-callable-to-fun ir2-convert) ((fun) node block)
   (when fun
     (ir2-convert-full-call node block)))
 
