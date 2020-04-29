@@ -23,9 +23,8 @@
                 (loop repeat 50 collect (sb-thread:make-mutex))))
             :stream nil)))
     (assert (= nbytes
-                (+ (* 51 2 sb-vm:n-word-bytes) ; list (extra for dummy head)
-                   (* 50 (sb-vm::primitive-object-size
-                          (sb-thread:make-mutex))))))))
+               (* 50 (+ (sb-vm::primitive-object-size (sb-thread:make-mutex))
+                        (* 2 sb-vm:n-word-bytes))))))) ; cons cells
 
 (with-test (:name :aprof-smoketest-non-constant-size-vector
             :broken-on :win32)

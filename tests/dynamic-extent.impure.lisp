@@ -666,6 +666,7 @@
 
 ;;; mapfoo should make the initial cons dx
 
+(defun loop-collect-negate (x) (loop for item in x collect (- x)))
 (defun mapcar-negate (x) (mapcar #'- x))
 (defun mapcan-reverse (x) (mapcan #'reverse x))
 
@@ -718,6 +719,7 @@
   (assert-no-consing (nested-dx-lists))
   (assert-consing (nested-dx-not-used *a-cons*))
   (assert-no-consing (nested-evil-dx-used *a-cons*))
+  (assert-no-consing (loop-collect-negate nil))
   (assert-no-consing (mapcar-negate nil))
   (assert-no-consing (mapcan-reverse nil))
   (assert-no-consing (list-delete-some-stuff))
