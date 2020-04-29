@@ -44,7 +44,7 @@
           (cond ((%instancep x) (%instance-layout x))
                 ((funcallable-instance-p x) (%funcallable-instance-layout x))
                 (t (return-from extended-sequence-p nil)))))
-    (when (layout-invalid layout)
+    (when (zerop (layout-clos-hash layout))
       (setq layout (update-object-layout-or-invalid x slayout)))
     ;; It's _nearly_ impossible to create an instance which is exactly
     ;; of type SEQUENCE. To wit: (make-instance 'sequence) =>

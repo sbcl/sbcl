@@ -1201,6 +1201,9 @@ between the ~A definition and the ~A definition"
   #+sb-xc-host (warn "Why are we invalidating layout ~S?" layout)
   (setf (layout-invalid layout) t)
   (assign-layout-slots layout :depthoid -1)
+  ;; Ensure that the INVALID slot conveying ancillary data describing the
+  ;; invalidity reason is published before causing the invalid layout trap.
+  (sb-thread:barrier (:write))
   (setf (layout-clos-hash layout) 0)
   (let ((inherits (layout-inherits layout))
         (classoid (layout-classoid layout)))

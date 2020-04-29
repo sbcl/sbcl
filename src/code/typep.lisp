@@ -227,7 +227,7 @@
            (values obj-layout layout))
         (aver (< i 2))
         (%ensure-classoid-valid classoid layout "typep")
-        (when (layout-invalid obj-layout)
+        (when (zerop (layout-clos-hash obj-layout))
           (setq obj-layout (update-object-layout-or-invalid object layout))))
     (or (eq obj-layout layout)
         (let ((obj-inherits (layout-inherits obj-layout)))

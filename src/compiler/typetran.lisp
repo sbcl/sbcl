@@ -983,7 +983,7 @@
             (let* ((depthoid (layout-depthoid layout))
                    (n-inherits (gensym))
                    (guts
-                     `((when (layout-invalid ,n-layout)
+                     `((when (zerop (layout-clos-hash ,n-layout))
                          (setq ,n-layout (update-object-layout-or-invalid
                                           object ',layout)))
                        (let ((,n-inherits (layout-inherits

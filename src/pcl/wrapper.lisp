@@ -116,6 +116,15 @@
 ;;; SLOT-VALUE-USING-CLASS check the wrapper validity as well. This is
 ;;; done by calling CHECK-WRAPPER-VALIDITY.
 
+;;; This "simple" function hides a horrible inconsistency: we don't have a single
+;;; canonical atomically checkable validity indicator. We carry around invalid layouts
+;;; with nonzero hashes. Why else would there be so may places that can do:
+;;;   (setf (layout-invalid layout) nil
+;;; whilst the layout in question already has a "valid" hash?
+;;; It's hard to know what the right thing is, but since internal code uses
+;;; this test to decide how to handle layouts that have been invalidated,
+;;; I don't think we can just change it to examine the hash value
+;;; even though logically that *should* be the canonical test.
 (declaim (inline invalid-wrapper-p))
 (defun invalid-wrapper-p (wrapper)
   (not (null (layout-invalid wrapper))))
@@ -197,10 +206,13 @@
 
     ;; FIXME: We are here inside PCL lock, but might someone be
     ;; accessing the wrapper at the same time from outside the lock?
-    (setf (layout-clos-hash owrapper) 0)
-    ;; And shouldn't these assignments be flipped, so that if an observer
-    ;; sees a 0 hash in owrapper, it can find the new layout?
+    ;; Inform readers of the reason for wrapper invalidity before marking
+    ;; the wrapper as invalid.
     (setf (layout-invalid owrapper) new-state)
+    ;; Ensure that the INVALID slot conveying ancillary data describing the
+    ;; invalidity reason is published before causing the invalid layout trap.
+    (sb-thread:barrier (:write))
+    (setf (layout-clos-hash owrapper) 0)
     (push (make-weak-pointer owrapper) new-previous)
     ;; This function is called for effect; return value is arbitrary.
     (setf  (sb-kernel::standard-classoid-old-layouts classoid)
