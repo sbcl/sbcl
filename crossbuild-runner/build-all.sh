@@ -9,7 +9,7 @@ set -e
 # or a host machine on which to run its native compiler.
 
 if [ -z "$*" ]; then
-    targets="alpha arm arm64 hppa mips ppc ppc64 sparc x86 x86-64 riscv"
+    targets="alpha arm arm64 hppa mips ppc ppc64 riscv sparc x86 x86-64"
 else
     targets="$@"
 fi
