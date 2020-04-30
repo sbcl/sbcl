@@ -180,7 +180,7 @@
 
   (let ((*compile-print* nil))
     (dolist (group sources)
-      (handler-bind ((warning
+      (handler-bind ((#+x86-64 warning #-x86-64 simple-warning
                       (lambda (c)
                         ;; escalate "undefined variable" warnings to errors.
                         ;; There's no reason to allow them in our code.
