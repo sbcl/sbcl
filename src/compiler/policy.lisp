@@ -12,7 +12,7 @@
 (in-package "SB-C")
 
 ;;; a value for an optimization declaration
-(def!type policy-quality () '(integer 0 3))
+(deftype policy-quality () '(integer 0 3))
 
 (defvar *macro-policy* nil)
 ;;; global policy restrictions as a POLICY object or nil

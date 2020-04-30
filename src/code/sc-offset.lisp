@@ -19,7 +19,7 @@
 ;;;; +SC+OFFSET-OFFSET-BYTES+ and exported to sc-offset.h during
 ;;;; genesis for use by the runtime.
 
-(def!type sc+offset ()
+(deftype sc+offset ()
   `(unsigned-byte ,(+ sb-vm:sc-number-bits sb-vm:sc-offset-bits)))
 
 (defconstant-eqx +sc+offset-scn-bytes+

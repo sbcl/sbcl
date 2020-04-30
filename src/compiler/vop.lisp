@@ -16,17 +16,17 @@
 ;;; in any block
 (defconstant local-tn-limit 64)
 
-(def!type local-tn-number () `(integer 0 (,local-tn-limit)))
+(deftype local-tn-number () `(integer 0 (,local-tn-limit)))
 (deftype local-tn-count () `(integer 0 ,local-tn-limit))
 (deftype local-tn-vector () `(simple-vector ,local-tn-limit))
-(def!type local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
+(deftype local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
 
 ;;; vectors indexed by SC numbers
-(def!type sc-vector () `(simple-vector ,sb-vm:sc-number-limit))
+(deftype sc-vector () `(simple-vector ,sb-vm:sc-number-limit))
 (deftype sc-bit-vector () `(simple-bit-vector ,sb-vm:sc-number-limit))
 
 ;;; Bitset representation of a set of locations in a finite SC.
-(def!type sc-locations ()
+(deftype sc-locations ()
   `(unsigned-byte ,sb-vm:finite-sc-offset-limit))
 
 (defun make-sc-locations (locations)
@@ -90,7 +90,7 @@
            ,result)))))
 
 ;;; the different policies we can use to determine the coding strategy
-(def!type ltn-policy ()
+(deftype ltn-policy ()
   '(member :safe :small :small-safe :fast :fast-safe))
 
 ;;;; PRIMITIVE-TYPEs

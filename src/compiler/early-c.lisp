@@ -75,7 +75,7 @@
 ;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
 ;;;             instantiated once per component, INLINE - for all
 ;;;             references (even under #'without FUNCALL)."
-(def!type inlinep ()
+(deftype inlinep ()
   '(member inline maybe-inline notinline nil))
 
 (defstruct (dxable-args (:constructor make-dxable-args (list))

@@ -41,7 +41,7 @@
 ;;; is not seen by the "#." expression a few lines down.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant info-number-bits 6))
-(def!type info-number () `(unsigned-byte ,info-number-bits))
+(deftype info-number () `(unsigned-byte ,info-number-bits))
 
 ;;; A map from info-number to its META-INFO object.
 ;;; The reverse mapping is obtained by reading the META-INFO.
@@ -266,7 +266,7 @@
 ;;;; operations, we represent the attributes as bits in a fixnum.
 
 (in-package "SB-C")
-(def!type attributes () 'fixnum)
+(deftype attributes () 'fixnum)
 
 ;;; Given a list of attribute names and an alist that translates them
 ;;; to masks, return the OR of the masks.
