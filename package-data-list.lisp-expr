@@ -252,7 +252,6 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "*BACKEND-SUBFEATURES*"
                "*BACKEND-T-PRIMITIVE-TYPE*"
 
-               "*CODE-SEGMENT*"
                "*COMPILATION*"
                "*COMPILE-TO-MEMORY-SPACE*"
                "*ELSEWHERE*"
