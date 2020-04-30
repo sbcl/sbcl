@@ -279,8 +279,22 @@
     (alien-type-type
      (values (alien-typep obj (alien-type-type-alien-type type)) t))
     (hairy-type
+     ;; Parse it again to make sure it's really undefined.
+     ;; FIXME: This logic also appears in %%TYPEP, and probably needs
+     ;; to happen in more places too. (Like the array hairy type
+     ;; testing.)
      (if (unknown-type-p type)
-         (values nil nil)
+         (let ((spec (unknown-type-specifier type)))
+           ;; KLUDGE: Work around the fact that we load PCL after we
+           ;; type test certain things defined there. This is somewhat
+           ;; suboptimal because this is really only a concern during
+           ;; warm load.
+           (if (member spec '(class sb-pcl::condition-class))
+               (values nil nil)
+               (let ((type (specifier-type spec)))
+                 (if (unknown-type-p type)
+                     (values nil nil)
+                     (ctypep obj type)))))
          ;; Now the tricky stuff.
          (let ((predicate (cadr (hairy-type-specifier type))))
            (case predicate
