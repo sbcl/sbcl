@@ -1711,6 +1711,14 @@ core and return a descriptor to it."
                                   (cold-layout-descriptor (cdr pair))))
                      (sort-cold-layouts))))
 
+  (cold-set 'sb-c::*!initial-parsed-types*
+            (vector-in-core
+             (mapcar (lambda (x)
+                       (cold-cons (host-constant-to-core (car x)) ; specifier
+                                  (cdr x))) ; cold descriptor to ctype instance
+                     (sort (%hash-table-alist *ctype-cache*) #'<
+                           :key (lambda (x) (descriptor-bits (cdr x)))))))
+
   #+sb-thread
   (cold-set 'sb-vm::*free-tls-index*
             (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift)))

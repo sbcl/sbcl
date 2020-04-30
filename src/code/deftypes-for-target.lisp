@@ -120,11 +120,20 @@
 (sb-xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
 
-#-(or sb-eval sb-fasteval)
-(sb-xc:deftype compiled-function () 'function)
-
-;;; Stub type in case there are no interpreted functions
-#-(or sb-eval sb-fasteval) (sb-xc:deftype interpreted-function () nil)
+;;; We'd like tye COMPILED-FUNCTION type to be available as soon it can be,
+;;; because the :UNPARSE type-method on INTERSECTION wants to decide whether its arg
+;;; is TYPE= to one of the standardized types implemented as an intersection of
+;;; types, namely: RATIO, KEYWORD, COMPILED-FUNCTION, so that it can unparse
+;;; to an atom rather than an expression involving the AND and NOT combinators.
+;;; i.e. because unparsing any random thing might need those three, it's best
+;;; that they be defined, lest we work around the parse-unknown condition
+;;; which in general signifies suboptimal compination, if not an outright bug.
+;;; And it's unfortunate if the location of the definition of COMPILED-FUNCTION
+;;; depends on which (if either) of the evaluators is built in.
+;;; This definition just kicks the can down the road a little,
+;;; because we lack a definition of INTERPRETED-FUNCTION until later.
+(sb-xc:deftype compiled-function ()
+  '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 

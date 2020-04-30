@@ -33,9 +33,6 @@
  :metaclass-constructor make-static-classoid
  :dd-type funcallable-structure)
 
-(deftype compiled-function ()
-  '(and function (not interpreted-function)))
-
 (defun make-interpreted-function
       (&key name lambda-list env declarations documentation body source-location
             (debug-lambda-list lambda-list))

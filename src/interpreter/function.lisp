@@ -50,9 +50,6 @@
  :metaclass-constructor make-static-classoid
  :dd-type funcallable-structure)
 
-(deftype compiled-function ()
-  '(and function (not interpreted-function)))
-
 ;;; FIXME: alternate metaclass structures have dumb accessors
 ;;; whose transforms don't contain TRULY-THE like for regular structures
 ;;; because we don't have any way to declare types.
