@@ -180,12 +180,13 @@
 
   (let ((*compile-print* nil))
     (dolist (group sources)
-      (handler-bind ((simple-warning
+      (handler-bind ((warning
                       (lambda (c)
                         ;; escalate "undefined variable" warnings to errors.
                         ;; There's no reason to allow them in our code.
-                        (when (search "undefined variable"
-                                      (write-to-string c :escape nil))
+                        (when (and #-x86-64 ; Don't allow any warnings on x86-64.
+                                   (search "undefined variable"
+                                           (write-to-string c :escape nil)))
                           (cerror "Finish warm compile ignoring the problem" c)))))
         (with-compilation-unit () (do-srcs group)))))))
 
