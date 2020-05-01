@@ -999,7 +999,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                    ;; FOP-compiled code is harder to debug.
                    (or (< debug 2)
                        (> space debug)))
-               (not (block-compile *compilation*))
+               (not (eq (block-compile *compilation*) t))
                (fopcompilable-p form expand))
           (let ((*fopcompile-label-counter* 0))
             (fopcompile form path nil expand))
