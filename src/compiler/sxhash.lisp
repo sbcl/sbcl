@@ -216,14 +216,6 @@
                             * :important nil)
   `(symbol-hash* object 'non-null-symbol-p)) ; etc
 
-;;; These transforms are somehow needed when compiling ARRAY-PSXHASH and
-;;; then never again.  Can't we define the guts of it to not need them?
-(deftransform psxhash ((x &optional depthoid) (character &optional t))
-  `(char-code (char-upcase x)))
-
-(deftransform psxhash ((x &optional depthoid) (integer &optional t))
-  `(sxhash x))
-
 ;;; To define SB-XC:SXHASH compatibly without repeating the logic in the transforms
 ;;; that define the numeric cases, we do some monkey business involving #. to paste
 ;;; in the expressions that the transforms would return.
