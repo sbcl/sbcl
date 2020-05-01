@@ -534,7 +534,7 @@
                                               *target-assemble-file*
                                               *target-compile-file*))))
          (trace-file (if (find :trace-file flags) t nil))
-         (block-compile (if (find :block-compile flags) t nil))
+         (block-compile (if (find :block-compile flags) t :specified))
          (ignore-failure-p (find :ignore-failure-p flags)))
     (declare (type function compile-file))
 
@@ -590,8 +590,7 @@
                           ;; if tracing, also show high-level progress
                           :trace-file trace-file
                           :print trace-file
-                          :block-compile (and block-compile
-                                              ;; Block compilation was
+                          :block-compile (and ;; Block compilation was
                                               ;; completely broken
                                               ;; from the beginning of
                                               ;; SBCL history until
@@ -602,7 +601,8 @@
                                                        (funcall (find-symbol "VERSION>=" "SB-C")
                                                                 (funcall (find-symbol "SPLIT-VERSION-STRING" "SB-C")
                                                                          (lisp-implementation-version))
-                                                                '(2 0 2)))))
+                                                                '(2 0 2))))
+                                              block-compile)
                           :allow-other-keys t)
                (recompile ()
                  :report report-recompile-restart

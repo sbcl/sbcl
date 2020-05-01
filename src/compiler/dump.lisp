@@ -1078,7 +1078,7 @@
         (let ((name (sb-c::entry-info-name entry)))
           ;; At the moment, we rely on the fopcompiler to do linking
           ;; for DEFUNs that are not block compiled.
-          (when (and (sb-c::block-compile sb-c::*compilation*)
+          (when (and (eq (sb-c::block-compile sb-c::*compilation*) t)
                      (sb-c::legal-fun-name-p name))
             (dump-object name file)
             (dump-push entry-handle file)

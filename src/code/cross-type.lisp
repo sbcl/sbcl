@@ -249,7 +249,7 @@
                ;; KLUDGE: Allow some slack while block compiling, as we are
                ;; hoping that forward referenced types get resolved.
                (not (and (boundp 'sb-c::*compilation*)
-                         (sb-c::block-compile sb-c::*compilation*))))
+                         (eq (sb-c::block-compile sb-c::*compilation*) t))))
       ;; can't even backtrace if the printing of a something involving
       ;; uncertainty involves uncertainty.
       (let* ((action *xtypep-uncertainty-action*)
@@ -306,7 +306,7 @@
                         ctype))
             ;; KLUDGE: Allow uncertainty while block compiling.
             (and (boundp 'sb-c::*compilation*)
-                 (sb-c::block-compile sb-c::*compilation*)))
+                 (eq (sb-c::block-compile sb-c::*compilation*) t)))
         (values answer certain)
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
