@@ -1072,12 +1072,7 @@
                     (lambda (ref)
                       (policy ref (> recognize-self-calls 0)))
                     res defined-fun-res)))
-             (if (and (functional-top-level-defun-p res)
-                      (block-compilation-non-entry-point name))
-                 ;; Insert an empty lambda to get flushed instead, so
-                 ;; we don't confuse locall with a stray ref.
-                 (ir1-convert-lambda '(lambda ()))
-                 res))
+             res)
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
                                :debug-name

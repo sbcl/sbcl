@@ -571,6 +571,10 @@ Return VALUE without evaluating it."
     (t
      (compiler-error "~S is not a legal function name." thing))))
 
+(def-ir1-translator %fun-name-leaf ((thing) start next result)
+  (fun-name-leaf thing)
+  (ir1-convert start next result nil))
+
 (def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
   (aver (eq result 'nil))
   (let ((lambdas leaves))

@@ -110,7 +110,10 @@
            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
          ,(if (sb-c::block-compilation-non-entry-point name)
               `(progn
-                 ,named-lambda
+                 ;; Tell the compiler to convert the lambda without
+                 ;; referencing it, so no stray reference stays around
+                 ;; and find-initial-dfo works correctly.
+                 (sb-c::%fun-name-leaf ,named-lambda)
                  ',name)
               `(%defun ',name ,named-lambda
                        ,@(when (or inline-thing extra-info) `(,inline-thing))
