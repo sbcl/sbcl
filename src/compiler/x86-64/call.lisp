@@ -167,7 +167,7 @@
          (system-area-pointer sap-stack
                               ancestor-frame-ref/system-area-pointer
                               ancestor-frame-set/system-area-pointer))))
-(defvar *new* nil)
+
 (define-vop (xep-allocate-frame)
   (:info start-lab)
   (:generator 1
@@ -181,8 +181,7 @@
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (unless *new*
-     (popw rbp-tn (frame-word-offset return-pc-save-offset)))))
+    (popw rbp-tn (frame-word-offset return-pc-save-offset))))
 
 (defun emit-lea (target source disp)
   (if (eql disp 0)
