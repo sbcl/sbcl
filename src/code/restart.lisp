@@ -85,7 +85,8 @@
             (cons (list ,@(mapcar #'parse-binding bindings))
                   *restart-clusters*)))
        (declare (truly-dynamic-extent *restart-clusters*))
-       ,@forms)))
+       (progn
+         ,@forms))))
 
 ;;; Transform into WITH-SIMPLE-CONDITION-RESTARTS when appropriate.
 (eval-when (:compile-toplevel :load-toplevel :execute)
