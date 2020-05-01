@@ -701,6 +701,9 @@ necessary, since type inference may take arbitrarily long to converge.")
     (aver (eql (node-component (lambda-bind lambda)) component)))
 
   (let* ((*component-being-compiled* component))
+    (when sb-xc:*compile-print*
+      (with-compiler-io-syntax
+        (compiler-mumble "~&; compiling ~A" (component-name component))))
 
     ;; Record xref information before optimization. This way the
     ;; stored xref data reflects the real source as closely as
@@ -1235,11 +1238,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (*print-level* 2)
                  (*print-pretty* nil))
              (with-compiler-io-syntax
-                 (compiler-mumble
-                  #-sb-xc-host "~&; ~:[compiling~;converting~] ~S"
-                  #+sb-xc-host "~&; ~:[x-compiling~;x-converting~] ~S"
-                  (block-compile *compilation*) form)))
-             form)
+               (compiler-mumble "~&; processing ~S" form)))
+           form)
           ((and finalp
                 (eq :top-level-forms sb-xc:*compile-print*)
                 (neq form *top-level-form-noted*))
@@ -1247,7 +1247,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (*print-level* 1)
                  (*print-pretty* nil))
              (with-compiler-io-syntax
-                 (compiler-mumble "~&; ... top level ~S" form)))
+               (compiler-mumble "~&; ... top level ~S" form)))
            form)
           (t
            *top-level-form-noted*))))
@@ -1529,8 +1529,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun finish-block-compilation ()
   (let ((compilation *compilation*))
     (when (block-compile compilation)
-      (when sb-xc:*compile-print*
-        (compiler-mumble "~&; block compiling converted top level forms..."))
       (when (toplevel-lambdas compilation)
         ;; FIXME: Use the source information from the initial
         ;; conversion. CMUCL does this right.

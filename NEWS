@@ -1,8 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.4:
-  * enchancement: CMUCL-style START-BLOCK and END-BLOCK declarations are now
+  * enhancement: CMUCL-style START-BLOCK and END-BLOCK declarations are now
     supported for block compiling forms at a sub-file granularity.
+  * minor change: *compile-print* now makes it more clear what block
+    compilation is actually doing. The default output is now slightly more
+    verbose as a result.
 
 changes in sbcl-2.0.4 relative to sbcl-2.0.3:
   * platform support:
