@@ -526,5 +526,15 @@
   (assert
    (nth-value 5
               (checked-compile
+               `(lambda (x y) (print-unreadable-object (x y) (declare (optimize))))
+               :allow-failure t)))
+  (assert
+   (nth-value 5
+              (checked-compile
                `(lambda () (restart-bind () (declare (optimize)) 42))
+               :allow-failure t)))
+  (assert
+   (nth-value 5
+              (checked-compile
+               `(lambda () (prog1 10 (declare (optimize))))
                :allow-failure t))))

@@ -337,8 +337,9 @@ evaluated as a PROGN."
 (sb-xc:defmacro prog1 (result &body body)
   (let ((n-result (gensym)))
     `(let ((,n-result ,result))
-       ,@body
-       ,n-result)))
+       (progn
+         ,@body
+         ,n-result))))
 
 (sb-xc:defmacro prog2 (form1 result &body body)
   `(prog1 (progn ,form1 ,result) ,@body))
@@ -1766,7 +1767,7 @@ symbol-case giving up: case=((V U) (F))
                 ,object ,stream (logior (if ,type 1 0) (if ,identity 2 0)))))
     (if body
         (let ((fun (make-symbol "THUNK")))
-          `(dx-flet ((,fun () ,@body)) (,@call #',fun)))
+          `(dx-flet ((,fun () (progn ,@body))) (,@call #',fun)))
         call)))
 
 ;; A macroexpander helper. Not sure where else to put this.
