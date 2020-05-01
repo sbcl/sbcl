@@ -547,7 +547,7 @@
                       (let ((def (cdr spec)))
                         (when (and def (not remove-defaults))
                           (list (car def))))) ; Remove any supplied-p var.
-                    (recurse (x) (unparse-ds-lambda-list x :cache cache))
+                    (recurse (x) (unparse-ds-lambda-list x :cache cache :remove-defaults remove-defaults))
                     (memoize (input output)
                       (when cache (push (cons input output) (cdr cache)))
                       output))

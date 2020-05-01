@@ -458,4 +458,8 @@
   (assert-no-signal
    (sb-int:parse-lambda-list
     '(sb-pcl::.pv. sb-pcl::.next-method-call. self &optional o &key k
-       &allow-other-keys))))
+      &allow-other-keys))))
+
+(with-test (:name :macro-nested-&key-defaults)
+  (assert (equal (sb-kernel:%fun-lambda-list (macro-function (eval `(defmacro ,(gensym) ((&key (x 7))) x))))
+                 '((&key (x 7))))))
