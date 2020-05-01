@@ -851,7 +851,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; extended declarations..
                "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
-               "MAYBE-INLINE"
+               "MAYBE-INLINE" "START-BLOCK" "END-BLOCK"
 
                ;; ..and variables to control compiler policy
                "*INLINE-EXPANSION-LIMIT*"

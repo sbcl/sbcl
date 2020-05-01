@@ -3024,6 +3024,16 @@
         (frob #'bar2))
       (assert (= (length components) 4)))))
 
+(with-test (:name (:block-compile :start-block/end-block))
+  (with-scratch-file (fasl "fasl")
+    (compile-file "block-compile-test-4.lisp" :output-file fasl :block-compile :specified)
+    (load fasl)
+    (assert (eq (sb-kernel::fun-code-header #'fun1)
+                (sb-kernel::fun-code-header #'fun3)))
+    (assert (not (eq (sb-kernel::fun-code-header #'fun1)
+                     (sb-kernel::fun-code-header #'fun4))))
+    (assert (not (fboundp 'fun2)))))
+
 (with-test (:name :symbol-value-constant)
   (let* ((package-name (gensym "SYMBOL-VALUE-CONSTANT-TEST"))
          (*package* (make-package package-name :use '(cl))))

@@ -16,12 +16,6 @@
 (defvar *block-compile-default* nil
   "The default value for the :Block-Compile argument to COMPILE-FILE.")
 
-;;; *BLOCK-COMPILE-ARGUMENT* holds the original value of the :BLOCK-COMPILE
-;;; argument, which overrides any internal declarations.
-(defvar *block-compile-argument*)
-(declaim (type (member nil t :specified)
-               *block-compile-default* *block-compile-argument*))
-;;; Ditto.
 (defvar *entry-points-argument*)
 (declaim (type list *entry-points-argument*))
 
@@ -1533,19 +1527,20 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Actually compile any stuff that has been queued up for block
 ;;; compilation.
 (defun finish-block-compilation ()
-  (when (block-compile *compilation*)
-    (when sb-xc:*compile-print*
-      (compiler-mumble "~&; block compiling converted top level forms..."))
-    (when (toplevel-lambdas *compilation*)
-      ;; FIXME: Use the source information from the initial
-      ;; conversion. CMUCL does this right.
-      (with-source-paths
-        (compile-toplevel (nreverse (toplevel-lambdas *compilation*)) nil))
-      (setf (toplevel-lambdas *compilation*) nil))
-    ;; CMUCL always reverts this to :SPECIFIED. But we probably want
-    ;; to restore it to the user default.
-    (setf (block-compile *compilation*) *block-compile-default*)
-    (setf (entry-points *compilation*) nil)))
+  (let ((compilation *compilation*))
+    (when (block-compile compilation)
+      (when sb-xc:*compile-print*
+        (compiler-mumble "~&; block compiling converted top level forms..."))
+      (when (toplevel-lambdas compilation)
+        ;; FIXME: Use the source information from the initial
+        ;; conversion. CMUCL does this right.
+        (with-source-paths
+            (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil))
+        (setf (toplevel-lambdas compilation) nil))
+      ;; CMUCL always reverts this to :SPECIFIED. But we probably want
+      ;; to restore it to the user default.
+      (setf (block-compile compilation) *block-compile-argument*)
+      (setf (entry-points compilation) nil))))
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()
@@ -1784,8 +1779,6 @@ returning its filename.
      compilation.  A value of T indicates that all forms in the file(s) should
      be compiled as a unit.  The default is the value of
      SB-EXT:*BLOCK-COMPILE-DEFAULT*, which is initially NIL.
-     (Note: We currently do not support START-BLOCK or END-BLOCK as the behavior
-     of these proclamations are not ANSI.)
 
   :ENTRY-POINTS
      This specifies a list of function names for functions in the file(s) that

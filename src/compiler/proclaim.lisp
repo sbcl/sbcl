@@ -222,6 +222,16 @@
   (warn-if-inline-failed/proclaim name kind)
   (setf (info :function :inlinep name) kind))
 
+(defun process-block-compile-declaration (entries kind)
+  (ecase kind
+    (start-block
+     (finish-block-compilation)
+     (let ((compilation *compilation*))
+       (setf (block-compile compilation) t)
+       (setf (entry-points compilation) entries)))
+    (end-block
+     (finish-block-compilation))))
+
 (defun check-deprecation-declaration (state since form)
   (unless (typep state 'deprecation-state)
     (error 'simple-type-error
@@ -331,6 +341,13 @@
              (push raw-form *queued-proclaims*)))
         (freeze-type
          (map-args #'process-freeze-type-declaration))
+        ((start-block end-block)
+         (when (and *compile-time-eval* (boundp '*compilation*))
+           (if (eq *block-compile-argument* :specified)
+               (process-block-compile-declaration args kind)
+               (compiler-notify "ignoring ~S declaration since ~
+                                :BLOCK-COMPILE is not :SPECIFIED"
+                                kind))))
         (optimize
          (multiple-value-bind (new-policy specified-qualities)
              (process-optimize-decl form *policy*)

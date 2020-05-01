@@ -18,9 +18,9 @@
 
 (declaim (declaration truly-dynamic-extent))
 
-;;; MAYBE-INLINE and FREEZE-TYPE declarations can be safely ignored
+;;; MAYBE-INLINE, FREEZE-TYPE, and block compilation declarations can be safely ignored
 ;;; (possibly at some cost in efficiency).
-(declaim (declaration freeze-type maybe-inline))
+(declaim (declaration freeze-type maybe-inline start-block end-block))
 
 ;;; SB-C::LAMBDA-LIST declarations can be ignored.
 ;;; Cross-compilation does not rely on introspection for anything.
