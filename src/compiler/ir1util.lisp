@@ -1761,7 +1761,12 @@
              (eq (leaf-source-name fun) (functional-debug-name fun)))
     (let* ((name (leaf-source-name fun))
            (defined-fun (gethash name free-funs)))
-      (when (defined-fun-p defined-fun)
+      (when (and (defined-fun-p defined-fun)
+                 ;; KLUDGE: We must not blow away the free-fun entry
+                 ;; while block compiling. It would be better to get
+                 ;; rid of this function entirely and untangle this
+                 ;; mess, since this is really a workaround.
+                 (not (eq (block-compile *compilation*) t)))
         (remhash name free-funs)))))
 
 ;;; Return functional for DEFINED-FUN which has been converted in policy

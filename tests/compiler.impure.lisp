@@ -3034,6 +3034,14 @@
                      (sb-kernel::fun-code-header #'fun4))))
     (assert (not (fboundp 'fun2)))))
 
+(with-test (:name (:block-compile :inlined-functions-local-call))
+  (with-scratch-file (fasl "fasl")
+    (compile-file "block-compile-test-5.lisp" :output-file fasl :block-compile :specified)
+    (load fasl)
+    (assert (not (fboundp 'zeta1)))
+    (assert (not (fboundp 'zeta2)))
+    (assert (= (gamma1 4) 10))))
+
 (with-test (:name :symbol-value-constant)
   (let* ((package-name (gensym "SYMBOL-VALUE-CONSTANT-TEST"))
          (*package* (make-package package-name :use '(cl))))
