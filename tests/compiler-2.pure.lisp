@@ -2870,4 +2870,19 @@
       (let ((x (sb-kernel:%coerce-callable-to-fun x)))
         (when y
           (funcall x))))
-   ((nil (make-symbol "UNDEF")) (condition 'undefined-function))))
+    ((nil (make-symbol "UNDEF")) (condition 'undefined-function))))
+
+(with-test (:name :jump-table-use-labels)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x m)
+      (case x
+        ((a b c)
+         (if m
+             (error ""))
+         x)
+        ((d e f)
+         (eval 10)
+         x)))
+    (('a nil) 'a)
+    (('d 30) 'd)))

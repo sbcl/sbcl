@@ -769,6 +769,8 @@
                     (when (eql max (1- (numeric-type-high key-derived-type)))
                       (setf keys (nconc keys (list (numeric-type-high key-derived-type))))
                       (setf labels (nconc labels (list otherwise)))))))
+              (dolist (label labels)
+                (setf (label-usedp label) t))
               (emit-and-insert-vop node 2block
                                    (template-or-lose 'multiway-branch-if-eq)
                                    (reference-tn (tn-ref-tn src-ref) nil) nil nil
