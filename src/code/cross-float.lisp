@@ -883,6 +883,8 @@
         ((eql x $10.0d0) nil)
         ((eql x #.(make-flonum #x3FE62E42FEFA39EF 'double-float))
          nil)
+        ((eql x #.(make-flonum #x49742400 'single-float))
+         nil)
         (t (error "MAYBE-EXACT-RECIPROCAL: didn't expect ~S" x))))
 
 ;;; This is a convenient utility to have - we use it within this file and

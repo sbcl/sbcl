@@ -9,6 +9,8 @@
 
 (in-package "SB-KERNEL")
 
+(declaim (start-block))
+
 ;;; (Note that when cross-compiling, SB-XC:TYPEP is interpreted as a
 ;;; test that the host Lisp object OBJECT translates to a target SBCL
 ;;; type TYPE. This behavior is needed e.g. to test for the validity
@@ -234,6 +236,8 @@
           (dotimes (i (length obj-inherits) nil)
             (when (eq (svref obj-inherits i) layout)
               (return t)))))))
+
+(declaim (end-block))
 
 ;;; If TYPE is a type that we can do a compile-time test on, then
 ;;; return whether the object is of that type as the first value and

@@ -370,6 +370,8 @@
 
 ;;;; IR1-OPTIMIZE
 
+(declaim (start-block ir1-optimize ir1-optimize-last-effort))
+
 ;;; Do one forward pass over COMPONENT, deleting unreachable blocks
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
 ;;; have the REOPTIMIZE flag set. If COMPONENT-REOPTIMIZE is true when
@@ -578,6 +580,9 @@
                             (bound-cast-check node)))
              (flush-dest (cast-value node))
              (unlink-node node)))))))
+
+(declaim (end-block))
+
 
 ;;;; local call return type propagation
 
@@ -662,6 +667,8 @@
   (values))
 
 ;;;; IF optimization
+
+(declaim (start-block ir1-optimize-if))
 
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
@@ -909,6 +916,9 @@
       (reoptimize-lvar new-lvar)
       (setf (component-reanalyze *current-component*) t)))
   (values))
+
+(declaim (end-block))
+
 
 ;;;; exit IR1 optimization
 
@@ -941,6 +951,9 @@
 
 
 ;;;; combination IR1 optimization
+
+(declaim (start-block ir1-optimize-combination maybe-terminate-block
+                      validate-call-type))
 
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
@@ -1232,16 +1245,6 @@
                      (mark-for-deletion succ)))))
         t))))
 
-(defun register-inline-expansion (leaf call)
-  (let* ((name (leaf-%source-name leaf))
-         (calls (basic-combination-inline-expansions call))
-         (recursive (memq name calls)))
-    (cond (recursive
-           (incf (cadr recursive))
-           calls)
-          (t
-           (list* name 1 calls)))))
-
 ;;; This is called both by IR1 conversion and IR1 optimization when
 ;;; they have verified the type signature for the call, and are
 ;;; wondering if something should be done to special-case the call. If
@@ -1511,6 +1514,8 @@
           (t
            t))))
 
+(declaim (end-block))
+
 ;;; When we don't like an IR1 transform, we throw the severity/reason
 ;;; and args.
 ;;;
@@ -1778,6 +1783,11 @@
 
 ;;;; local call optimization
 
+(declaim (start-block ir1-optimize-set constant-reference-p delete-let
+                      propagate-let-args propagate-local-call-args
+                      propagate-to-refs propagate-from-sets
+                      ir1-optimize-mv-combination))
+
 ;;; Propagate TYPE to LEAF and its REFS, marking things changed.
 ;;;
 ;;; If the leaf type is a function type, then just leave it alone, since TYPE
@@ -1985,15 +1995,6 @@
             (or (eq (sb-xc:symbol-package (fun-name-block-name name))
                     *cl-package*)
                 (info :function :info name)))))))))
-
-(defun let-var-immediately-used-p (ref var lvar)
-  (let ((bind (lambda-bind (lambda-var-home var))))
-    (when bind
-      (let* ((next-ctran (node-next bind))
-             (next-node (and next-ctran
-                             (ctran-next next-ctran))))
-        (and (eq next-node ref)
-             (lvar-almost-immediately-used-p lvar))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's LVAR with the arg lvar.
@@ -2288,6 +2289,8 @@
         (:error))))
 
   (values))
+
+(declaim (end-block))
 
 (defun count-values (call &optional min)
   (loop for arg in (basic-combination-args call)

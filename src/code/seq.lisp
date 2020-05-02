@@ -1245,6 +1245,9 @@ many elements are copied."
                     (progn
                       (setf (car in-apply-args) (funcall elt s state))
                       (setf (caar in-iters) (funcall step s state from-end)))))))))))))
+
+(declaim (start-block map %map))
+
 (defun %map-to-list (fun sequences)
   (declare (type function fun)
            (type list sequences))
@@ -1344,6 +1347,8 @@ many elements are copied."
                :datum result
                :expected-type result-type
                :format-arguments (list result result-type)))))
+
+(declaim (end-block))
 
 ;;;; MAP-INTO
 

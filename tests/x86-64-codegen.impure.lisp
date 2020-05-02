@@ -671,6 +671,9 @@ sb-vm::(define-vop (cl-user::test)
   ;; Expect to reference the CTYPE layout because %%TYPEP declares its argument
   ;; to be that.  Expect to reference the UNKNOWN-TYPE layout because of an
   ;; explicit call to UNKNOWN-TYPE-P; same for FUN-DESIGNATOR-TYPE-P.
+
+  ;; The other types are referenced from other functions in the code
+  ;; component.
   (let ((names
           (mapcar (lambda (x)
                     (sb-kernel:classoid-name (sb-kernel:layout-classoid x)))
@@ -679,6 +682,10 @@ sb-vm::(define-vop (cl-user::test)
                                   '(sb-kernel:ctype
                                     sb-kernel:unknown-type
                                     sb-kernel:fun-designator-type
+                                    sb-c::abstract-lexenv
+                                    sb-kernel::classoid-cell
+                                    sb-kernel:layout
+                                    sb-kernel:classoid
                                     #-immobile-space null))))))
 
 ;; lp#1857861

@@ -2021,3 +2021,11 @@ returning its filename.
                  (setf (cdr circular-ref)
                        (append (cdr circular-ref) (cdr info)))))))
          nil)))))
+
+;;; FIXME: find a better place for this.
+(defun always-boundp (name)
+  (case (info :variable :always-bound name)
+    (:always-bound t)
+    ;; Compiling to fasl considers a symbol always-bound if its
+    ;; :always-bound info value is now T or will eventually be T.
+    (:eventually (producing-fasl-file))))

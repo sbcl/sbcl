@@ -192,6 +192,8 @@
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
 
+(declaim (start-block wait-until-fd-usable serve-event serve-all-events compute-pollfds))
+
 ;;; When a *periodic-polling-function* is defined the server will not
 ;;; block for more than the maximum event timeout and will call the
 ;;; polling function if it does time out.

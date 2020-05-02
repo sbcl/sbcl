@@ -111,6 +111,10 @@
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
+(declaim (start-block find-free-fun find-lexically-apparent-fun
+                      ;; needed by with-fun-name-leaf
+                      find-global-fun))
+
 (defun maybe-defined-here (name where)
   (if (and (eq :defined where)
            (boundp '*compilation*)
@@ -253,6 +257,8 @@
            var)
           (t
            (find-free-fun name context)))))
+
+(declaim (end-block))
 
 (defun maybe-find-free-var (name)
   (let ((found (gethash name (free-vars *ir1-namespace*))))
@@ -546,6 +552,12 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
+(declaim (start-block ir1-convert ir1-convert-progn-body
+                      ir1-convert-combination-args reference-leaf
+                      reference-constant
+                      expand-compiler-macro
+                      instrument-coverage))
+
 (declaim (ftype (sfunction (ctran ctran (or lvar null) t)
                            (values))
                 ir1-convert))
@@ -661,13 +673,6 @@
                   (link-node-to-previous-ctran cast ref-ctran)
                   (use-continuation cast next result)))
           (t (use-continuation ref next result)))))
-
-(defun always-boundp (name)
-  (case (info :variable :always-bound name)
-    (:always-bound t)
-    ;; Compiling to fasl considers a symbol always-bound if its
-    ;; :always-bound info value is now T or will eventually be T.
-    (:eventually (producing-fasl-file))))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARS we use that definition,
@@ -1158,6 +1163,11 @@
 
 ;;;; PROCESS-DECLS
 
+(declaim (start-block process-decls make-new-inlinep
+                      find-in-bindings
+                      process-muffle-decls
+                      %processing-decls))
+
 ;;; Given a list of LAMBDA-VARs and a variable name, return the
 ;;; LAMBDA-VAR for that name, or NIL if it isn't found. We return the
 ;;; *last* variable with that name, since LET* bindings may be
@@ -1611,6 +1621,17 @@
               res))))
      optimize-qualities)))
 
+(defun process-muffle-decls (decls lexenv)
+  (flet ((process-it (spec)
+           (cond ((atom spec))
+                 ((member (car spec) '(muffle-conditions unmuffle-conditions))
+                  (setq lexenv
+                        (process-1-decl spec lexenv nil nil nil nil))))))
+    (dolist (decl decls)
+      (dolist (spec (rest decl))
+        (process-it spec))))
+  lexenv)
+
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
 ;;; filling in slots in the leaf structures, we return a new LEXENV,
@@ -1692,17 +1713,6 @@
     (values lexenv result-type (cdr post-binding-lexenv)
             lambda-list explicit-check source-form)))
 
-(defun process-muffle-decls (decls lexenv)
-  (flet ((process-it (spec)
-           (cond ((atom spec))
-                 ((member (car spec) '(muffle-conditions unmuffle-conditions))
-                  (setq lexenv
-                        (process-1-decl spec lexenv nil nil nil nil))))))
-    (dolist (decl decls)
-      (dolist (spec (rest decl))
-        (process-it spec))))
-  lexenv)
-
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
       (process-decls decls vars fvars :binding-form-p binding-form-p)
@@ -1751,3 +1761,5 @@
          (make-global-var :kind :special
                           :%source-name name
                           :where-from :declared))))
+
+(declaim (end-block))

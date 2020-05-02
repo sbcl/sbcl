@@ -620,7 +620,6 @@
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
  ("src/code/final" :not-host)
- ("src/code/pprint-classes" :not-host :block-compile)
  ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)

@@ -71,6 +71,14 @@
               (examine var keyword))))
         (nreverse caller-dxable)))))
 
+(defun block-compilation-non-entry-point (name)
+  (and (boundp 'sb-c:*compilation*)
+       (let* ((compilation sb-c:*compilation*)
+              (entry-points (sb-c::entry-points compilation)))
+         (and (sb-c::block-compile compilation)
+              entry-points
+              (not (member name entry-points :test #'equal))))))
+
 (flet ((defun-expander (env name lambda-list body snippet)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
@@ -108,7 +116,7 @@
       `(progn
          (eval-when (:compile-toplevel)
            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
-         ,(if (sb-c::block-compilation-non-entry-point name)
+         ,(if (block-compilation-non-entry-point name)
               `(progn
                  ;; Tell the compiler to convert the lambda without
                  ;; referencing it, so no stray reference stays around

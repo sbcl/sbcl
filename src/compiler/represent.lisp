@@ -217,6 +217,8 @@
 (defconstant-eqx ignore-cost-vops '(set type-check-error) #'equal)
 (defconstant-eqx suppress-note-vops '(type-check-error) #'equal)
 
+(declaim (start-block select-tn-representation))
+
 ;;; We special-case the move VOP, since using this costs for the
 ;;; normal MOVE would spuriously encourage descriptor representations.
 ;;; We won't actually need to coerce to descriptor and back, since we
@@ -304,6 +306,8 @@
                (setq min-scn scn)
                (setq unique t)))))
     (values min-scn unique)))
+
+(declaim (end-block))
 
 ;;; Prepare for the possibility of a TN being allocated on the number
 ;;; stack by setting NUMBER-STACK-P in all functions that TN is

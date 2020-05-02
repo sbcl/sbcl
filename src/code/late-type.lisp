@@ -986,6 +986,15 @@
       (values t t)
       (csubtypep (specifier-type type1) (specifier-type type2))))
 
+(declaim (inline ctype-eq-comparable))
+(defun ctype-eq-comparable (ctype)
+  (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
+
+(defun ctype-interned-p (ctype)
+  (logtest (type-hash-value ctype) +type-internedp+))
+
+(declaim (start-block))
+
 ;;; If two types are definitely equivalent, return true. The second
 ;;; value indicates whether the first value is definitely correct.
 ;;; This should only fail in the presence of HAIRY types.
@@ -1009,13 +1018,6 @@
         (t
          (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
 
-(declaim (inline ctype-eq-comparable))
-(defun ctype-eq-comparable (ctype)
-  (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
-
-(defun ctype-interned-p (ctype)
-  (logtest (type-hash-value ctype) +type-internedp+))
-
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
 ;;; the conservative assumption is =.
@@ -1025,6 +1027,8 @@
     (if win
         (values (not res) t)
         (values nil nil))))
+
+(declaim (end-block))
 
 ;;; the type method dispatch case of TYPE-UNION2
 (defun %type-union2 (type1 type2)

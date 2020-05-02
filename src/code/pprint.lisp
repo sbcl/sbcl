@@ -11,6 +11,26 @@
 
 (in-package "SB-PRETTY")
 
+;;; Ancestral types
+(defstruct (queued-op (:constructor nil) (:copier nil))
+  (posn 0 :type posn))
+
+(defstruct (block-end (:include queued-op) (:copier nil))
+  (suffix nil :type (or null simple-string)))
+
+(declaim (start-block))
+(defstruct (section-start (:include queued-op)
+                          (:constructor nil)
+                          (:copier nil))
+  (depth 0 :type index)
+  (section-end nil :type (or null newline block-end)))
+
+(defstruct (newline (:include section-start) (:copier nil))
+  (kind (missing-arg)
+        :type (member :linear :fill :miser :literal :mandatory)))
+(declaim (freeze-type newline)
+         (end-block))
+
 #-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
   (declare (type index index) (type pretty-stream stream)
@@ -224,8 +244,21 @@
         (setf (section-start-section-end entry) newline))))
   (maybe-output stream (or (eq kind :literal) (eq kind :mandatory))))
 
+(defstruct (indentation (:include queued-op)
+                        (:copier nil))
+  (kind (missing-arg) :type (member :block :current))
+  (amount 0 :type fixnum))
+(declaim (freeze-type indentation))
+
 (defun enqueue-indent (stream kind amount)
   (enqueue stream indentation :kind kind :amount amount))
+
+(defstruct (block-start (:include section-start)
+                        (:copier nil))
+  (block-end nil :type (or null block-end))
+  (prefix nil :type (or null simple-string))
+  (suffix nil :type (or null simple-string)))
+(declaim (freeze-type block-start))
 
 (defun start-logical-block (stream prefix per-line-p suffix)
   ;; (In the PPRINT-LOGICAL-BLOCK form which calls us,
@@ -256,6 +289,14 @@
     (when suffix
       (pretty-sout stream suffix 0 (length suffix)))
     (setf (block-start-block-end start) end)))
+
+(defstruct (tab (:include queued-op)
+                (:copier nil))
+  (sectionp nil :type (member t nil))
+  (relativep nil :type (member t nil))
+  (colnum 0 :type column)
+  (colinc 0 :type column))
+(declaim (freeze-type queued-op)) ; and all subtypes
 
 (defun enqueue-tab (stream kind colnum colinc)
   (multiple-value-bind (sectionp relativep)

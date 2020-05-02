@@ -272,6 +272,16 @@
                  (or (not (cast-p use))
                      (lvar-almost-immediately-used-p (cast-value use))))
       (return))))
+
+(defun let-var-immediately-used-p (ref var lvar)
+  (let ((bind (lambda-bind (lambda-var-home var))))
+    (when bind
+      (let* ((next-ctran (node-next bind))
+             (next-node (and next-ctran
+                             (ctran-next next-ctran))))
+        (and (eq next-node ref)
+             (lvar-almost-immediately-used-p lvar))))))
+
 
 ;;;; BLOCK UTILS
 
@@ -1550,8 +1560,31 @@
             ((not ctran))
           (setf (ctran-block ctran) new-block))
         new-block))))
+
+;;; This is called by locall-analyze-fun-1 after it convers a call to
+;;; FUN into a local call.
+;;; Presumably, the function can be no longer reused by new calls to
+;;; FUN, so the whole thing has to be removed from (FREE-FUN *IR1-NAMESPACE*).
+(defun note-local-functional (fun &aux (free-funs (free-funs *ir1-namespace*)))
+  (declare (type functional fun))
+  (when (and (leaf-has-source-name-p fun)
+             (eq (leaf-source-name fun) (functional-debug-name fun)))
+    (let* ((name (leaf-source-name fun))
+           (defined-fun (gethash name free-funs)))
+      (when (and (defined-fun-p defined-fun)
+                 ;; KLUDGE: We must not blow away the free-fun entry
+                 ;; while block compiling. It would be better to get
+                 ;; rid of this function entirely and untangle this
+                 ;; mess, since this is really a workaround.
+                 (not (eq (block-compile *compilation*) t)))
+        (remhash name free-funs)))))
+
 
 ;;;; deleting stuff
+
+(declaim (start-block delete-ref delete-functional flush-node flush-dest
+                      delete-lvar delete-block delete-block-lazily delete-lambda
+                      mark-for-deletion))
 
 ;;; Deal with deleting the last (read) reference to a LAMBDA-VAR.
 (defun delete-lambda-var (leaf)
@@ -1592,22 +1625,6 @@
   (dolist (set (lambda-var-sets leaf))
     (setf (block-flush-p (node-block set)) t))
 
-  (values))
-
-;;; Note that something interesting has happened to VAR.
-(defun reoptimize-lambda-var (var)
-  (declare (type lambda-var var))
-  (let ((fun (lambda-var-home var)))
-    ;; We only deal with LET variables, marking the corresponding
-    ;; initial value arg as needing to be reoptimized.
-    (when (and (eq (functional-kind fun) :let)
-               (leaf-refs var))
-      (do ((args (basic-combination-args
-                  (lvar-dest (node-lvar (first (leaf-refs fun)))))
-                 (cdr args))
-           (vars (lambda-vars fun) (cdr vars)))
-          ((eq (car vars) var)
-           (reoptimize-lvar (car args))))))
   (values))
 
 ;;; Delete a function that has no references. This need only be called
@@ -1750,65 +1767,6 @@
             (frob main))))))
 
   (values))
-
-;;; This is called by locall-analyze-fun-1 after it convers a call to
-;;; FUN into a local call.
-;;; Presumably, the function can be no longer reused by new calls to
-;;; FUN, so the whole thing has to be removed from (FREE-FUN *IR1-NAMESPACE*).
-(defun note-local-functional (fun &aux (free-funs (free-funs *ir1-namespace*)))
-  (declare (type functional fun))
-  (when (and (leaf-has-source-name-p fun)
-             (eq (leaf-source-name fun) (functional-debug-name fun)))
-    (let* ((name (leaf-source-name fun))
-           (defined-fun (gethash name free-funs)))
-      (when (and (defined-fun-p defined-fun)
-                 ;; KLUDGE: We must not blow away the free-fun entry
-                 ;; while block compiling. It would be better to get
-                 ;; rid of this function entirely and untangle this
-                 ;; mess, since this is really a workaround.
-                 (not (eq (block-compile *compilation*) t)))
-        (remhash name free-funs)))))
-
-;;; Return functional for DEFINED-FUN which has been converted in policy
-;;; corresponding to the current one, or NIL if no such functional exists.
-;;;
-;;; Also check that the parent of the functional is visible in the current
-;;; environment and is in the current component.
-(defun defined-fun-functional (defined-fun)
-  (let ((functionals (defined-fun-functionals defined-fun)))
-    ;; FIXME: If we are block compiling, forget about finding the
-    ;; right functional. Just pick the first one we see and hope
-    ;; people don't mix inlined functions and policy with block
-    ;; compiling. (For now)
-    (when (block-compile *compilation*)
-      (return-from defined-fun-functional (first functionals)))
-    (when functionals
-      (let* ((sample (car functionals))
-             (there (lambda-parent (if (lambda-p sample)
-                                       sample
-                                       (optional-dispatch-main-entry sample)))))
-        (when there
-          (labels ((lookup (here)
-                     (unless (eq here there)
-                       (if here
-                           (lookup (lambda-parent here))
-                           ;; We looked up all the way up, and didn't find the parent
-                           ;; of the functional -- therefore it is nested in a lambda
-                           ;; we don't see, so return nil.
-                           (return-from defined-fun-functional nil)))))
-            (lookup (lexenv-lambda *lexenv*)))))
-      ;; Now find a functional whose policy matches the current one, if we already
-      ;; have one.
-      (let ((policy (lexenv-%policy *lexenv*)))
-        (dolist (functional functionals)
-          (when (and (not (memq (functional-kind functional) '(:deleted :zombie)))
-                     (policy= policy (lexenv-%policy (functional-lexenv functional)))
-                     ;; Is it in the same component
-                     (let ((home-lambda (lambda-home (main-entry functional))))
-                       (and (not (memq (functional-kind home-lambda) '(:deleted :zombie)))
-                            (eq (lambda-component home-lambda)
-                                *current-component*))))
-            (return functional)))))))
 
 ;;; Do stuff to delete the semantic attachments of a REF node. When
 ;;; this leaves zero or one reference, we do a type dispatch off of
@@ -1991,6 +1949,8 @@
   (remove-from-dfo block)
   (values))
 
+(declaim (end-block))
+
 ;;; Do stuff to indicate that the return node NODE is being deleted.
 (defun delete-return (node)
   (declare (type creturn node))
@@ -2028,6 +1988,22 @@
   (let ((*compiler-error-context* (lambda-bind fun)))
     (note-unreferenced-vars (lambda-vars fun)
                             *compiler-error-context*))
+  (values))
+
+;;; Note that something interesting has happened to VAR.
+(defun reoptimize-lambda-var (var)
+  (declare (type lambda-var var))
+  (let ((fun (lambda-var-home var)))
+    ;; We only deal with LET variables, marking the corresponding
+    ;; initial value arg as needing to be reoptimized.
+    (when (and (eq (functional-kind fun) :let)
+               (leaf-refs var))
+      (do ((args (basic-combination-args
+                  (lvar-dest (node-lvar (first (leaf-refs fun)))))
+                 (cdr args))
+           (vars (lambda-vars fun) (cdr vars)))
+          ((eq (car vars) var)
+           (reoptimize-lvar (car args))))))
   (values))
 
 ;;; Return true if we can find OBJ in FORM, NIL otherwise. We bound
@@ -2748,6 +2724,16 @@ is :ANY, the function name is not checked."
   (aver (eq (basic-combination-kind call) :local))
   (ref-leaf (lvar-uses (basic-combination-fun call))))
 
+(defun register-inline-expansion (leaf call)
+  (let* ((name (leaf-%source-name leaf))
+         (calls (basic-combination-inline-expansions call))
+         (recursive (memq name calls)))
+    (cond (recursive
+           (incf (cadr recursive))
+           calls)
+          (t
+           (list* name 1 calls)))))
+
 ;;; Check whether NODE's component has exceeded its inline expansion
 ;;; limit, and warn if so, returning NIL.
 (defun inline-expansion-ok (combination leaf)
@@ -3363,3 +3349,44 @@ is :ANY, the function name is not checked."
                  (node-lexenv (lvar-dest lvar)))
                 *lexenv*)))
     t))
+
+;;; Return functional for DEFINED-FUN which has been converted in policy
+;;; corresponding to the current one, or NIL if no such functional exists.
+;;;
+;;; Also check that the parent of the functional is visible in the current
+;;; environment and is in the current component.
+(defun defined-fun-functional (defined-fun)
+  (let ((functionals (defined-fun-functionals defined-fun)))
+    ;; FIXME: If we are block compiling, forget about finding the
+    ;; right functional. Just pick the first one we see and hope
+    ;; people don't mix inlined functions and policy with block
+    ;; compiling. (For now)
+    (when (block-compile *compilation*)
+      (return-from defined-fun-functional (first functionals)))
+    (when functionals
+      (let* ((sample (car functionals))
+             (there (lambda-parent (if (lambda-p sample)
+                                       sample
+                                       (optional-dispatch-main-entry sample)))))
+        (when there
+          (labels ((lookup (here)
+                     (unless (eq here there)
+                       (if here
+                           (lookup (lambda-parent here))
+                           ;; We looked up all the way up, and didn't find the parent
+                           ;; of the functional -- therefore it is nested in a lambda
+                           ;; we don't see, so return nil.
+                           (return-from defined-fun-functional nil)))))
+            (lookup (lexenv-lambda *lexenv*)))))
+      ;; Now find a functional whose policy matches the current one, if we already
+      ;; have one.
+      (let ((policy (lexenv-%policy *lexenv*)))
+        (dolist (functional functionals)
+          (when (and (not (memq (functional-kind functional) '(:deleted :zombie)))
+                     (policy= policy (lexenv-%policy (functional-lexenv functional)))
+                     ;; Is it in the same component
+                     (let ((home-lambda (lambda-home (main-entry functional))))
+                       (and (not (memq (functional-kind home-lambda) '(:deleted :zombie)))
+                            (eq (lambda-component home-lambda)
+                                *current-component*))))
+            (return functional)))))))

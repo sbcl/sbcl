@@ -245,7 +245,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
-#-sb-fluid (declaim (inline random-chunk))
+
 ;;; portable implementation
 #-x86
 (defun random-mt19937-update (state)
@@ -274,6 +274,12 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
           (logxor (aref state (+ 3 (1- mt19937-m)))
                   (ash y -1) (aref state (logand y 1)))))
   (values))
+
+
+(declaim (start-block random %random-single-float %random-double-float
+                      random-chunk big-random-chunk))
+
+#-sb-fluid (declaim (inline random-chunk))
 #-x86
 (defun random-chunk (state)
   (declare (type random-state state))

@@ -420,6 +420,9 @@
 
 ;;;; register saving
 
+(declaim (start-block optimized-emit-saves emit-saves assign-tn-costs
+                      pack-save-tn))
+
 ;;; Do stuff to note that TN is spilled at VOP for the debugger's benefit.
 (defun note-spilled-tn (tn vop)
   (when (and (tn-leaf tn) (vop-save-set vop))
@@ -825,8 +828,22 @@
               ;; race conditions in the debugger involving
               ;; backtraces from asynchronous interrupts.
               (setf (tn-sc tn) (tn-sc save-tn)))))))))
+
+(declaim (end-block))
+
+;; Misc. utilities
+(declaim (inline unbounded-sc-p))
+(defun unbounded-sc-p (sc)
+  (eq (sb-kind (sc-sb sc)) :unbounded))
+
+(defun unbounded-tn-p (tn)
+  (unbounded-sc-p (tn-sc tn)))
+(declaim (notinline unbounded-sc-p))
+
 
 ;;;; load TN packing
+
+(declaim (start-block pack-load-tns load-tn-conflicts-in-sc))
 
 ;;; These variables indicate the last location at which we computed
 ;;; the Live-TNs. They hold the BLOCK and VOP values that were passed
@@ -1243,6 +1260,10 @@
 
 ;;;; targeting
 
+(declaim (start-block pack pack-tn target-if-desirable
+                      ;; needed for pack-iterative
+                      pack-wired-tn))
+
 ;;; Link the TN-REFS READ and WRITE together using the TN-REF-TARGET
 ;;; when this seems like a good idea. Currently we always do, as this
 ;;; increases the success of load-TN targeting.
@@ -1384,15 +1405,6 @@
       tn))
 
 ;;;; pack interface
-
-;; Misc. utilities
-(declaim (inline unbounded-sc-p))
-(defun unbounded-sc-p (sc)
-  (eq (sb-kind (sc-sb sc)) :unbounded))
-
-(defun unbounded-tn-p (tn)
-  (unbounded-sc-p (tn-sc tn)))
-(declaim (notinline unbounded-sc-p))
 
 ;;; Attempt to pack TN in all possible SCs, first in the SC chosen by
 ;;; representation selection, then in the alternate SCs in the order

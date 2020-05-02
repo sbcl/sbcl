@@ -1224,3 +1224,52 @@
          ;; It is harmful to the space-saving effect of this function
          ;; if reconstituting the list results in an unnecessary copy.
          (if (equal new lambda-list) lambda-list new))))))
+
+(declaim (ftype (sfunction * function) make-repeated-name-check))
+(defun make-repeated-name-check (&key
+                                   (kind "variable")
+                                   (context "lambda list")
+                                   (signal-via #'compiler-error))
+  (let ((seen '()))
+    (lambda (name)
+      (when (member name seen :test #'eq)
+        (funcall signal-via "~@<The ~A ~S occurs more than once in ~
+                             the ~A.~@:>"
+                 kind name context))
+      (push name seen)
+      name)))
+
+;;; Verify that NAME is a legal name for a variable.
+(declaim (ftype (function (t &key
+                             (:context t) (:allow-special t) (:allow-symbol-macro t)
+                             (:signal-via (or symbol function)))
+                          (values symbol keyword))
+                check-variable-name-for-binding))
+(defun check-variable-name-for-binding (name
+                                        &key
+                                          context
+                                          (allow-special t)
+                                          (allow-symbol-macro t)
+                                          (signal-via #'compiler-error))
+  (check-variable-name name :signal-via signal-via)
+  (flet ((lose (kind)
+           (funcall signal-via
+                    (sb-format:tokens "~@<~/sb-ext:print-symbol-with-prefix/ names a ~
+                               ~A, and cannot be used in ~A.~:@>")
+                    name kind context)))
+    (let ((kind (info :variable :kind name)))
+      (case kind
+        (:macro
+         (unless allow-symbol-macro
+           (program-assert-symbol-home-package-unlocked
+            :compile name (format nil "lexically binding global ~
+                                       symbol-macro ~~A in ~A"
+                                  context))))
+        ((:constant)
+         (lose "defined constant"))
+        ((:global)
+         (lose "global lexical variable"))
+        (:special
+         (unless allow-special
+           (lose "special variable"))))
+      (values name kind))))
