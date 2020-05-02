@@ -271,8 +271,8 @@ variable: an unreadable object representing the error is printed instead.")
                    (write-char #\space stream))
                  ;; Nor here.
                  (write-char #\{ stream)
-                 (write (get-lisp-obj-address object) :stream stream
-                                                      :radix nil :base 16)
+                 (%output-reasonable-integer-in-base (get-lisp-obj-address object)
+                                                     16 stream)
                  (write-char #\} stream))))
         (cond ((print-pretty-on-stream-p stream)
                ;; Since we're printing prettily on STREAM, format the
