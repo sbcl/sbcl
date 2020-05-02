@@ -857,3 +857,14 @@ there"))))
       (assert (eql (search "#S(DEFINITION-SOURCE-LOCATION" str) 0)))
     (let ((str (write-to-string s :escape nil :pretty nil)))
       (assert (eql (search "#S(DEFINITION-SOURCE-LOCATION" str) 0)))))
+
+(with-test (:name :print-layoutless-instance)
+  (let ((x (sb-kernel:%make-instance 5)))
+    (let ((str (write-to-string x :pretty nil)))
+      (assert (search "#<SB-KERNEL:INSTANCE {" str)))
+    ;; pretty goes through the non-pretty function unless you've
+    ;; modified the pprint-dispatch table, in which case this crashes.
+    ;; The unmodified dispatch table never attempts to handle a subtype of INSTANCE.
+    (let ((str (with-standard-io-syntax
+                 (write-to-string x :pretty t :readably nil))))
+      (assert (search "#<SB-KERNEL:INSTANCE {" str)))))

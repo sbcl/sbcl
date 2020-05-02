@@ -371,18 +371,23 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; just not for OBJECT itself.
 (defun output-ugly-object (stream object)
   (when (%instancep object)
-    (let* ((layout (layout-of object))
-           (classoid (layout-classoid layout)))
-      ;; If an instance has no layout, it has no PRINT-OBJECT method.
-      ;; Additionally, if the object is an obsolete CONDITION, don't crash.
-      ;; (There is no update-instance protocol for conditions)
-      (when (or (sb-kernel::undefined-classoid-p classoid)
-                (and (layout-invalid layout)
-                     (logtest (layout-flags layout) +condition-layout-flag+)))
-        ;; not only is this unreadable, it's unprintable too.
+    (let ((layout (%instance-layout object)))
+      ;; If an instance has no layout, do something sensible. Can't compare layout
+      ;; to 0 using EQ or EQL because that would be tautologically NIL as per fndb.
+      ;; This is better than declaring EQ or %INSTANCE-LAYOUT notinline.
+      (unless (logtest (get-lisp-obj-address layout) sb-vm:widetag-mask)
         (return-from output-ugly-object
           (print-unreadable-object (object stream :identity t)
-            (format stream "UNPRINTABLE instance of ~W" classoid))))))
+            (prin1 'instance stream))))
+      (let ((classoid (layout-classoid layout)))
+        ;; Additionally, if the object is an obsolete CONDITION, don't crash.
+        ;; (There is no update-instance protocol for conditions)
+        (when (or (sb-kernel::undefined-classoid-p classoid)
+                  (and (layout-invalid layout)
+                       (logtest (layout-flags layout) +condition-layout-flag+)))
+          (return-from output-ugly-object
+            (print-unreadable-object (object stream :identity t)
+              (format stream "UNPRINTABLE instance of ~W" classoid)))))))
   (print-object object stream))
 
 ;;;; symbols
