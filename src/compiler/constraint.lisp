@@ -909,28 +909,28 @@
     t)))
 
 (defun contiguous-numeric-set-type (xset)
-  (let ((members (xset-members xset)))
-    (cond ((null members)
-           nil)
-          ((null (cdr members))
-           (ctype-of (car members)))
-          (t
-           (let* ((zerop (xset-member-p 0 xset))
-                  (sorted (and (every #'integerp members)
-                               (sort (copy-seq (xset-members xset)) #'<)))
-                  (first (car sorted)))
-             (cond ((and first
-                         (= (length sorted) 15)
-                         (loop for prev = first then x
-                               for x in (cdr sorted)
-                               always (eql x (1+ prev))))
-                    (make-numeric-type :class 'integer :low first
-                                       :high (car (last sorted))))
-                   ;; ;; It's useful to know when something is not zero
-                   (zerop
-                    (make-numeric-type :class 'integer
-                                       :low 0
-                                       :high 0))))))))
+  (cond ((xset-empty-p xset)
+         nil)
+        ;; Is XSET a contiguous integer range?
+        ((block nil
+           (let ((count 0)
+                 (min nil)
+                 (max nil))
+             (declare (type fixnum count))
+             (map-xset (lambda (value)
+                         (unless (integerp value)
+                           (return))
+                         (incf count)
+                         (when (or (null min) (< value min))
+                           (setf min value))
+                         (when (or (null max) (> value max))
+                           (setf max value)))
+                       xset)
+             (when (= (- max min) (1- count))
+               (make-numeric-type :class 'integer :low min :high max)))))
+        ;; It's useful to know when something is not zero
+        ((xset-member-p 0 xset)
+         (make-numeric-type :class 'integer :low 0 :high 0))))
 
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF

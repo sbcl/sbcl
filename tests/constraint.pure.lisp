@@ -95,5 +95,6 @@
                      (declare ((integer 0) i))
                      (cond
                        ((= i 0) 3)
+                       ((= i 1) 3)
                        (t i))))))
-          '(values (integer 1) &optional))))
+          '(values (integer 2) &optional))))
