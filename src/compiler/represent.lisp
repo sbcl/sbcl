@@ -214,8 +214,8 @@
 ;;; ignore TYPE-CHECK-ERROR because we don't want the possibility of
 ;;; error to bias the result. Notes are suppressed for T-C-E as well,
 ;;; since we don't need to worry about the efficiency of that case.
-(define-load-time-global *ignore-cost-vops* '(set type-check-error))
-(define-load-time-global *suppress-note-vops* '(type-check-error))
+(defconstant-eqx ignore-cost-vops '(set type-check-error) #'equal)
+(defconstant-eqx suppress-note-vops '(type-check-error) #'equal)
 
 ;;; We special-case the move VOP, since using this costs for the
 ;;; normal MOVE would spuriously encourage descriptor representations.
@@ -239,7 +239,7 @@
       (let* ((vop (tn-ref-vop ref))
              (info (vop-info vop)))
         (unless (and (neq (tn-kind tn) :constant)
-                     (find (vop-info-name info) *ignore-cost-vops*))
+                     (find (vop-info-name info) ignore-cost-vops))
           (case (vop-info-name info)
             (move
              (let ((rep (tn-sc
@@ -359,7 +359,7 @@
     (cond ((eq (tn-kind op-tn) :constant))
           ((policy op-node (and (<= speed inhibit-warnings)
                                 (<= space inhibit-warnings))))
-          ((member (template-name (vop-info op-vop)) *suppress-note-vops*))
+          ((member (template-name (vop-info op-vop)) suppress-note-vops))
           ((null dest-tn)
            (let* ((op-info (vop-info op-vop))
                   (op-note (or (template-note op-info)
