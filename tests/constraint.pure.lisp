@@ -86,3 +86,14 @@
              t))
     ((0 1) 2)
     ((1 1) 1)))
+
+(with-test (:name :eql-constant)
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (i)
+                     (declare ((integer 0) i))
+                     (cond
+                       ((= i 0) 3)
+                       (t i))))))
+          '(values (integer 1) &optional))))

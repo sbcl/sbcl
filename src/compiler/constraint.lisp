@@ -908,6 +908,30 @@
     ;; Assume everything else is globally visible.
     t)))
 
+(defun contiguous-numeric-set-type (xset)
+  (let ((members (xset-members xset)))
+    (cond ((null members)
+           nil)
+          ((null (cdr members))
+           (ctype-of (car members)))
+          (t
+           (let* ((zerop (xset-member-p 0 xset))
+                  (sorted (and (every #'integerp members)
+                               (sort (copy-seq (xset-members xset)) #'<)))
+                  (first (car sorted)))
+             (cond ((and first
+                         (= (length sorted) 15)
+                         (loop for prev = first then x
+                               for x in (cdr sorted)
+                               always (eql x (1+ prev))))
+                    (make-numeric-type :class 'integer :low first
+                                       :high (car (last sorted))))
+                   ;; ;; It's useful to know when something is not zero
+                   (zerop
+                    (make-numeric-type :class 'integer
+                                       :low 0
+                                       :high 0))))))))
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
@@ -926,6 +950,7 @@
   (let ((res (single-value-type (node-derived-type ref)))
         (constrain-symbols (policy ref (> speed compilation-speed)))
         (not-set (alloc-xset))
+        (not-numeric (alloc-xset))
         (not-fpz nil)
         (not-res *empty-type*)
         (leaf (ref-leaf ref)))
@@ -963,9 +988,15 @@
             (eql
              (let ((other-type (leaf-type other)))
                (if not-p
-                   (when (and (constant-p other)
-                              (member-type-p other-type))
-                     (note-not (constant-value other)))
+                   (when (constant-p other)
+                     (cond ((member-type-p other-type)
+                            (note-not (constant-value other)))
+                           ;; Numeric types will produce interesting
+                           ;; negations, other than just "not equal"
+                           ;; which can be handled by the equality
+                           ;; constraints.
+                           ((numeric-type-p other-type)
+                            (add-to-xset (constant-value other) not-numeric))))
                    (let ((leaf-type (leaf-type leaf)))
                      (cond
                        ((or (constant-p other)
@@ -1011,9 +1042,14 @@
            (setf (node-derived-type ref) *wild-type*)
            (change-ref-leaf ref (find-constant t)))
           (t
-           (let ((type (type-difference res
-                                        (type-union not-res
-                                                    (make-member-type not-set not-fpz)))))
+           (let* ((union
+                    (type-union not-res
+                                (make-member-type not-set not-fpz)))
+                  (numeric (contiguous-numeric-set-type not-numeric))
+                  (type (type-difference res
+                                         (if  numeric
+                                              (type-union union numeric)
+                                             union))))
              ;; CHANGE-CLASS can change the type, lower down to standard-object,
              ;; type propagation for classes is not as important anyway.
              (cond #-sb-xc-host
