@@ -55,8 +55,8 @@
                            (:predicate pathnamep))
   (namestring nil) ; computed on demand
   ;; support for pathname interning and hashing.
-  (dir-hash nil :type fixnum :read-only t)
-  (stem-hash nil :type fixnum :read-only t) ; name hash and type hash mixed
+  (dir-hash nil :type hash-code :read-only t)
+  (stem-hash nil :type hash-code :read-only t) ; name hash and type hash mixed
   ;; the host (at present either a UNIX or logical host)
   (host nil :type (or host null) :read-only t)
   ;; the name of a logical or physical device holding files
