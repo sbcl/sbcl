@@ -631,9 +631,6 @@ exist or if is a file or a symbolic link."
           (delete-dir physical)))))
 
 
-;;; KLUDGE: now it includes contrib/ as ASDF sets up some translations
-;;; for contribs but doesn't actually restrict them to the contrib
-;;; directory.
 (defun sbcl-homedir-pathname ()
   sb-sys::*sbcl-homedir-pathname*)
 
@@ -648,7 +645,7 @@ exist or if is a file or a symbolic link."
            (probe (path)
              (let ((contrib (merge-pathnames "contrib/" path)))
                (when (probe-file contrib)
-                 contrib)))
+                 path)))
            (try-runtime-home (path)
              (or (probe path)
                  (probe (merge-pathnames "../lib/sbcl/" path)))))
