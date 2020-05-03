@@ -111,6 +111,7 @@
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
+#-sb-devel
 (declaim (start-block find-free-fun find-lexically-apparent-fun
                       ;; needed by with-fun-name-leaf
                       find-global-fun))
@@ -552,6 +553,7 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
+#-sb-devel
 (declaim (start-block ir1-convert ir1-convert-progn-body
                       ir1-convert-combination-args reference-leaf
                       reference-constant
@@ -1163,6 +1165,7 @@
 
 ;;;; PROCESS-DECLS
 
+#-sb-devel
 (declaim (start-block process-decls make-new-inlinep
                       find-in-bindings
                       process-muffle-decls

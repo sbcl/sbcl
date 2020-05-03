@@ -1245,7 +1245,7 @@ many elements are copied."
                     (progn
                       (setf (car in-apply-args) (funcall elt s state))
                       (setf (caar in-iters) (funcall step s state from-end)))))))))))))
-
+#-sb-devel
 (declaim (start-block map %map))
 
 (defun %map-to-list (fun sequences)

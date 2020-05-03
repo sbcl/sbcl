@@ -217,6 +217,7 @@
 (defconstant-eqx ignore-cost-vops '(set type-check-error) #'equal)
 (defconstant-eqx suppress-note-vops '(type-check-error) #'equal)
 
+#-sb-devel
 (declaim (start-block select-tn-representation))
 
 ;;; We special-case the move VOP, since using this costs for the

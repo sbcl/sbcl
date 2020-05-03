@@ -1582,6 +1582,7 @@
 
 ;;;; deleting stuff
 
+#-sb-devel
 (declaim (start-block delete-ref delete-functional flush-node flush-dest
                       delete-lvar delete-block delete-block-lazily delete-lambda
                       mark-for-deletion))
