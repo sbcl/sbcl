@@ -1285,7 +1285,8 @@
   ;; that refer to it are not dynamic-extent.  Note that both
   ;; attributes must be set for the value-cell object to be created.
   explicit-value-cell
-  )
+  ;; Do not propagate constraints for this var
+  no-constraints)
 
 (defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
@@ -1338,6 +1339,8 @@
   `(lambda-var-attributep (lambda-var-flags ,var) deleted))
 (defmacro lambda-var-explicit-value-cell (var)
   `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
+(defmacro lambda-var-no-constarints (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) no-constraints))
 
 ;;;; basic node types
 

@@ -1261,11 +1261,13 @@ symbol-case giving up: case=((V U) (F))
              (block ,block
                (when ,is-hashable
                  (let ((,hash ,calc-hash))
+                   (declare (sb-c::no-constraints ,hash))
                    ;; At most two probes are required, and usually just 1
                    (when ,(ecase maxprobes
                             (1 `(eq (svref ,symbol-vector ,hash) ,symbol))
                             (2 `(let ((,vector ,symbol-vector)
                                       (,hash (ash ,hash 1)))
+                                  (declare (sb-c::no-constraints ,hash))
                                   (or (eq (svref ,vector ,hash) ,symbol)
                                       (eq (svref ,vector (1+ ,hash)) ,symbol)))))
                      (return-from ,block
