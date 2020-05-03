@@ -3063,6 +3063,6 @@
    :block-compile t))
 
 
-(with-test (:name :block-compile-merge-lambdas)
+(with-test (:name :fopcompile-specials)
   (ctu:file-compile
    "(locally (declare (special foo)) (print foo))"))
