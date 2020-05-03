@@ -3057,9 +3057,12 @@
                     (setf *package* (make-package package-name :use '(cl)))))))
 
 (with-test (:name :block-compile-merge-lambdas)
-  (let* ((package-name (gensym "BLOCK-COMPILE-MERGE-LAMBDAS"))
-         (*package* (make-package package-name :use '(cl))))
-    (ctu:file-compile
-     "(let (f) (when f (funcall f)))
+  (ctu:file-compile
+   "(let (f) (when f (funcall f)))
       (let ())"
-     :block-compile t)))
+   :block-compile t))
+
+
+(with-test (:name :block-compile-merge-lambdas)
+  (ctu:file-compile
+   "(locally (declare (special foo)) (print foo))"))
