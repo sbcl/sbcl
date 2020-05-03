@@ -1517,7 +1517,7 @@ or they must be declared locally notinline at each call site.~@:>"
            (flags (if (dd-alternate-metaclass info) 0 +structure-layout-flag+))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
-              (populate-layout-ancestors
+              (set-layout-inherits
                (make-layout (hash-layout-name (dd-name info))
                             classoid
                             :flags flags

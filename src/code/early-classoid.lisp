@@ -137,9 +137,9 @@
 (sb-xc:defstruct (layout
              ;; Accept a specific subset of keywords
              #+64-bit (:constructor %make-layout
-                          (clos-hash classoid flags inherits info bitmap))
+                          (clos-hash classoid flags info bitmap))
              #-64-bit (:constructor %make-layout
-                          (clos-hash classoid depthoid length flags inherits info bitmap))
+                          (clos-hash classoid depthoid length flags info bitmap))
              (:copier nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
@@ -217,16 +217,40 @@
            (ash ,(or length 0) 16)
            ,(or flags 0)))
 
+(defmacro set-layout-inherits (layout inherits &optional depthoid)
+  `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
+     (declare (ignorable i d))
+     ;; I tried putting a /SHOW here for debugging, but it's just too broken
+     ;; because layouts affect the printer dispatch mechanism.
+     #+nil
+     (let ((*print-pretty* nil))
+       (fresh-line)
+       (write-string "SET-INHERITS ")
+       (write (layout-classoid-name l))
+       (write-string " ")
+       (write (map 'list #'layout-classoid-name i))
+       (terpri))
+     (setf (layout-inherits l) i)
+     #-sb-xc-host
+     (setf (layout-ancestor_2 l) (if (> d 2) (svref i 2) 0)
+           (layout-ancestor_3 l) (if (> d 3) (svref i 3) 0)
+           (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
+           (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
+     l))
+
 #-sb-xc-host
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
-                         (inherits #())
+                         (inherits #() inheritsp)
                          (info nil)
                          (bitmap (if info (dd-bitmap info) +layout-all-tagged+)))
-  (%make-layout clos-hash classoid
-                #+64-bit (pack-layout-flags depthoid length flags)
-                #-64-bit depthoid #-64-bit length #-64-bit flags
-                inherits info bitmap))
+  (let ((layout (%make-layout clos-hash classoid
+                              #+64-bit (pack-layout-flags depthoid length flags)
+                              #-64-bit depthoid #-64-bit length #-64-bit flags
+                              info bitmap)))
+    (when inheritsp
+      (set-layout-inherits layout inherits))
+    layout))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-MAPMAP (LAYOUT-INFO layout)).
@@ -258,15 +282,6 @@
   (defun layout-bitmap (layout)
     (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 
-(defmacro populate-layout-ancestors (layout inherits &optional depthoid)
-  `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
-     (declare (ignorable i d))
-     #-sb-xc-host
-     (setf (layout-ancestor_2 l) (if (> d 2) (svref i 2) 0)
-           (layout-ancestor_3 l) (if (> d 3) (svref i 3) 0)
-           (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
-           (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
-     l))
 (defmacro sb-c::layout-nth-ancestor-slot (n)
   `(case ,n
      (2 'layout-ancestor_2)

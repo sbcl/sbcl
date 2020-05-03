@@ -538,10 +538,10 @@
             (let ((layout (make-wrapper 0 class)))
               (setf (slot-value class 'wrapper) layout)
               (let ((cpl (compute-preliminary-cpl class)))
-                (setf (layout-inherits layout)
-                      (order-layout-inherits
-                       (map 'simple-vector #'class-wrapper
-                            (reverse (rest cpl))))))
+                (set-layout-inherits layout
+                                     (order-layout-inherits
+                                      (map 'simple-vector #'class-wrapper
+                                           (reverse (rest cpl))))))
               (register-layout layout :invalidate t))))
         (mapc #'make-preliminary-layout (class-direct-subclasses class))))))
 

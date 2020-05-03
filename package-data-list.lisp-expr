@@ -2250,6 +2250,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "PROCLAIM-AS-FUN-NAME" "BECOME-DEFINED-FUN-NAME"
                "%NUMERATOR" "CLASSOID-TYPEP" "DSD-READ-ONLY"
                "DSD-DEFAULT" "LAYOUT-INHERITS" "DD-LENGTH"
+               "SET-LAYOUT-INHERITS"
                "%CODE-ENTRY-POINT"
                "%CODE-FUN-OFFSET"
                "CODE-ENTRY-POINTS" ; new accessor - returns a vector

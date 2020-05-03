@@ -662,10 +662,10 @@
   ;; Protected by *world-lock* in callers.
   (let ((classoid (layout-classoid layout)))
     (unless (eq (classoid-layout classoid) layout)
-      (setf (layout-inherits layout)
-            (order-layout-inherits
-             (map 'simple-vector #'class-wrapper
-                  (reverse (rest (class-precedence-list class))))))
+      (set-layout-inherits layout
+                           (order-layout-inherits
+                            (map 'simple-vector #'class-wrapper
+                                 (reverse (rest (class-precedence-list class))))))
       (register-layout layout :invalidate t)
 
       ;; FIXME: I don't think this should be necessary, but without it

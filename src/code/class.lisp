@@ -119,14 +119,13 @@
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
-         (setf (layout-inherits layout) inherits
-               (layout-classoid layout) classoid)
+         (setf (layout-classoid layout) classoid)
+         (set-layout-inherits layout inherits)
          (assign-layout-slots layout :depthoid depthoid :length length :flags flags)
          #-sb-xc-host ; Assign target-only slots
          (when (logtest +structure-layout-flag+ flags)
            ;; STRING-STREAM and FILE-STREAM have depthoid=4 but are not structure types
-           (setf (layout-bitmap layout) bitmap)
-           (populate-layout-ancestors layout inherits depthoid))
+           (setf (layout-bitmap layout) bitmap))
          ;; Finally, make it valid.
          (setf (layout-invalid layout) nil))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
@@ -335,10 +334,9 @@ between the ~A definition and the ~A definition"
             #-64-bit (setf (layout-depthoid destruct-layout) (layout-depthoid layout)
                            (layout-length destruct-layout) (layout-length layout))
             (setf (layout-flags destruct-layout) (layout-flags layout)
-                  (layout-inherits destruct-layout) inherits
                   (layout-info destruct-layout) (layout-info layout)
                   (layout-bitmap destruct-layout) (layout-bitmap layout))
-            (populate-layout-ancestors destruct-layout inherits)
+            (set-layout-inherits destruct-layout inherits)
             (setf (layout-invalid destruct-layout) nil
                   (classoid-layout classoid) destruct-layout))
           (setf (layout-invalid layout) nil
