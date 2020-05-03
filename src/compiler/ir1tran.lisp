@@ -1365,7 +1365,7 @@
         ((not var)
          (warn "No ~s variable" name))
         (t
-         (setf (lambda-var-no-constarints var) t))))))
+         (setf (lambda-var-no-constraints var) t))))))
 
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
 ;;; (and TYPE if notinline), plus type-restrictions from the lexenv.

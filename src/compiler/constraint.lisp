@@ -1244,7 +1244,7 @@
     (flet ((frob (x)
              (dolist (var (lambda-vars x))
                (unless (or (lambda-var-constraints var)
-                           (lambda-var-no-constarints var))
+                           (lambda-var-no-constraints var))
                  (when (or (null (lambda-var-sets var))
                            (not (closure-var-p var)))
                    (setf (lambda-var-constraints var) (make-conset)))))))
