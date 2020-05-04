@@ -1104,7 +1104,7 @@
          (body (if lambda-with-lexenv-p
                    `(lambda ,@(cddr fun))
                    fun))
-         (lexenv-lamba (lexenv-lambda *lexenv*))
+         (lexenv-lambda (lexenv-lambda *lexenv*))
          (*lexenv*
            (if lambda-with-lexenv-p
                (make-lexenv
@@ -1112,7 +1112,7 @@
                 :handled-conditions (lexenv-handled-conditions *lexenv*)
                 :policy policy
                 :flushable (lexenv-flushable *lexenv*)
-                :lambda lexenv-lamba
+                :lambda lexenv-lambda
                 :parent *lexenv*)
                (make-almost-null-lexenv
                 policy
@@ -1121,7 +1121,7 @@
                 ;; like a much more common case.
                 (lexenv-handled-conditions *lexenv*)
                 (lexenv-flushable *lexenv*)
-                lexenv-lamba
+                lexenv-lambda
                 *lexenv*)))
          (clambda (ir1-convert-lambda body
                                       :source-name source-name
