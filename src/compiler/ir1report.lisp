@@ -53,8 +53,8 @@
   initialized
   ;; the original source part of the source path
   (original-source-path nil :type list)
-  ;; the lexenv active at the time
-  (lexenv nil :type (or null lexenv)))
+  ;; lexenv-handled-conditions of the lexenv active at the time
+  (handled-conditions nil))
 (declaim (freeze-type compiler-error-context))
 
 ;;; Delay computing some source information, since it may not actually be ever used
@@ -265,12 +265,15 @@
                       (nth-value 1 (find-source-root tlf *source-info*))
                       :path path
                       :original-source-path (source-path-original-source path)
-                      :lexenv (cond ((node-p context)
-                                     (node-lexenv context))
-                                    ((lvar-annotation-p context)
-                                     (lvar-annotation-lexenv context))
-                                    ((boundp '*lexenv*)
-                                     *lexenv*)))
+                      :handled-conditions
+                      (let ((lexenv (cond ((node-p context)
+                                           (node-lexenv context))
+                                          ((lvar-annotation-p context)
+                                           (lvar-annotation-lexenv context))
+                                          ((boundp '*lexenv*)
+                                           *lexenv*))))
+                        (and lexenv
+                             (lexenv-handled-conditions lexenv))))
                      nil)))))))))
 
 ;;;; printing error messages

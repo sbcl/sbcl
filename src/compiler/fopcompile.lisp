@@ -468,7 +468,8 @@
                                      :file-position
                                      (nth-value 1 (find-source-root tlf *source-info*))
                                      :original-source-path (source-path-original-source path)
-                                     :lexenv *lexenv*)))
+                                     :handled-conditions
+                                     (lexenv-handled-conditions *lexenv*))))
                              (note-unreferenced-vars vars *policy*)))))
                       ;; Otherwise it must be an ordinary funcall.
                       (otherwise
