@@ -158,7 +158,7 @@
                          (typecase object
                            (instance (%instance-layout object))
                            (funcallable-instance
-                            (%funcallable-instance-layout object))
+                            (%fun-layout object))
                            (t (return)))
                          (cdr (truly-the cons cache))
                          object)))
@@ -174,7 +174,7 @@
 (defun classoid-cell-typep (cell object)
   (let ((layout (typecase object
                   (instance (%instance-layout object))
-                  (funcallable-instance (%funcallable-instance-layout object))
+                  (funcallable-instance (%fun-layout object))
                   (t (return-from classoid-cell-typep))))
         (classoid (classoid-cell-classoid cell)))
     (unless classoid

@@ -799,7 +799,7 @@ We could try a few things to mitigate this:
                  (eql type funcallable-instance-widetag))
          (incf total-objects)
          (let* ((layout (if (eql type funcallable-instance-widetag)
-                            (%funcallable-instance-layout obj)
+                            (%fun-layout obj)
                             (%instance-layout obj)))
                 (classoid (layout-classoid layout))
                 (found (ensure-gethash classoid totals (cons 0 0)))
@@ -1093,9 +1093,9 @@ We could try a few things to mitigate this:
                   ;; if functoid is a macro that does nothing.
                   (,functoid .o. ,@more)))
             ,.(make-case* 'funcallable-instance
-               `(let ((.l. (%funcallable-instance-layout ,obj)))
+               `(let ((.l. (%fun-layout ,obj)))
                   ;; As for INSTANCE, allow the functoid to see the access form
-                  (,functoid (%funcallable-instance-layout ,obj) ,@more)
+                  (,functoid (%fun-layout ,obj) ,@more)
                   (,functoid (%funcallable-instance-fun ,obj) ,@more)
                   (ecase (layout-bitmap .l.)
                     (#.sb-kernel:+layout-all-tagged+

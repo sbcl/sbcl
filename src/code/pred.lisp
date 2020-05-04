@@ -184,7 +184,7 @@
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
   (cond ((%instancep x) (%instance-layout x))
-        ((funcallable-instance-p x) (%funcallable-instance-layout x))
+        ((funcallable-instance-p x) (%fun-layout x))
         ;; Compiler can dump literal layouts, which handily sidesteps
         ;; the question of when cold-init runs L-T-V forms.
         ((null x) #.(find-layout 'null))

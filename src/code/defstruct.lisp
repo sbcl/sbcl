@@ -65,7 +65,7 @@
     (values
      (compile nil `(lambda ()
                      (let ((,nobject (%make-funcallable-instance ,length)))
-                       (setf (%funcallable-instance-layout ,nobject)
+                       (setf (%fun-layout ,nobject)
                              (%delayed-get-compiler-layout ,name))
                        ,nobject))))))
 
@@ -2010,8 +2010,7 @@ or they must be declared locally notinline at each call site.~@:>"
                            ;; a type check on the next SETF. Why???
                            (truly-the funcallable-instance
                             (%make-funcallable-instance ,(dd-length dd)))))
-                      (setf (%funcallable-instance-layout object)
-                            ,delayed-layout-form)
+                      (setf (%fun-layout object) ,delayed-layout-form)
                       object)))))
     `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)

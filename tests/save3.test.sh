@@ -35,9 +35,8 @@ run_sbcl <<EOF
     (defclass subgf (standard-generic-function) (a) ; remove a slot
       (:metaclass sb-mop:funcallable-standard-class))
     (let ((nl (sb-kernel:find-layout 'subgf))) ; new layout
-      (assert (not (eq (sb-kernel:%funcallable-instance-layout #'myfun)
-                       nl)))
-      (setf (sb-kernel:%funcallable-instance-layout #'myfun) nl)
+      (assert (not (eq (sb-kernel:%fun-layout #'myfun) nl)))
+      (setf (sb-kernel:%fun-layout #'myfun) nl)
       (gc)))
   (save-lisp-and-die "$tmpcore" :toplevel #'assign-layout)
 EOF

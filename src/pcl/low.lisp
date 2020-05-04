@@ -169,10 +169,9 @@
 ;;; because nothing else could possibly return T.
 (declaim (inline %pcl-instance-p))
 (defun %pcl-instance-p (x)
-  (layout-for-std-class-p
-   (cond ((%instancep x) (%instance-layout x))
-         ((funcallable-instance-p x) (%funcallable-instance-layout x))
-         (t (return-from %pcl-instance-p nil)))))
+  (layout-for-std-class-p (cond ((%instancep x) (%instance-layout x))
+                                ((function-with-layout-p x) (%fun-layout x))
+                                (t (return-from %pcl-instance-p nil)))))
 
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))

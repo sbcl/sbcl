@@ -272,7 +272,7 @@
                   (cond ((std-instance-p instance)
                          (setf (%instance-layout instance) new))
                         ((fsc-instance-p instance)
-                         (setf (%funcallable-instance-layout instance) new))
+                         (setf (%fun-layout instance) new))
                         (t
                          (bug "unrecognized instance type")))))
                (:obsolete

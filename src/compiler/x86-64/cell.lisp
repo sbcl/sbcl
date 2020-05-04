@@ -709,24 +709,21 @@
    (:args (object :scs (descriptor-reg))
           (value :scs (any-reg descriptor-reg) :target res))
    (:results (res :scs (any-reg descriptor-reg)))
-   (:variant-vars lowtag)
-   (:variant instance-pointer-lowtag)
    (:vop-var vop)
-   (:generator 2 ; underestimates cost, but irrelevant as there's no choice
-    (cond ((= lowtag fun-pointer-lowtag)
-           (pseudo-atomic ()
-             (inst push object)
-             (invoke-asm-routine 'call 'touch-gc-card vop)
-             (inst mov :dword (ea (- 4 lowtag) object) value)))
-          (t
-           (inst mov :dword (ea (- 4 lowtag) object) value)))
-    (move res value)))
- (define-vop (%funcallable-instance-layout %instance-layout)
-   (:translate %funcallable-instance-layout)
+   (:generator 1
+     (inst mov :dword (ea (- 4 instance-pointer-lowtag) object) value)
+     (move res value)))
+ (define-vop (%fun-layout %instance-layout)
+   (:translate %fun-layout)
    (:variant fun-pointer-lowtag))
  (define-vop (%set-funcallable-instance-layout %set-instance-layout)
    (:translate %set-funcallable-instance-layout)
-   (:variant fun-pointer-lowtag)))
+   (:generator 50
+     (pseudo-atomic ()
+       (inst push object)
+       (invoke-asm-routine 'call 'touch-gc-card vop)
+       (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value))
+     (move res value))))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)

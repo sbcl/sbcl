@@ -61,7 +61,7 @@
                                          (%make-standard-funcallable-instance
                                           slots
                                           #-compact-instance-header hash))))
-                       (setf (%funcallable-instance-layout f) wrapper)
+                       (setf (%fun-layout f) wrapper)
                        f)))))
     ;; Compact-instance-header uses the high 32 bits of the slot vector's
     ;; header word. Mix down the full hash, then shift left 24 bits

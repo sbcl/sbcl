@@ -49,7 +49,9 @@
 
 (defsetf %instance-layout %set-instance-layout)
 (defsetf %funcallable-instance-info %set-funcallable-instance-info)
-(defsetf %funcallable-instance-layout %set-funcallable-instance-layout)
+;;; The writer is named after the reader, but only operates on FUNCALLABLE-INSTANCE
+;;; even if the reader operates on any FUNCTION.
+(defsetf %fun-layout %set-funcallable-instance-layout)
 
 ;;; from early-setf.lisp
 

@@ -224,7 +224,7 @@
                                ,@(unless class-slot-p
                                    `((setq slots
                                            (fsc-instance-slots ,instance))))
-                               (%funcallable-instance-layout ,instance)))))
+                               (%fun-layout ,instance)))))
         (block access
           (when (and wrapper
                      (not (zerop (layout-clos-hash wrapper)))
@@ -392,11 +392,11 @@
                     `(%instance-layout ,argument)))
               ((fsc-instance-p ,argument)
                ,(if slots-var
-                    `(let ((,wrapper (%funcallable-instance-layout ,argument)))
+                    `(let ((,wrapper (%fun-layout ,argument)))
                        (when (layout-for-std-class-p ,wrapper)
                          (setq ,slots-var (fsc-instance-slots ,argument)))
                        ,wrapper)
-                    `(%funcallable-instance-layout ,argument)))
+                    `(%fun-layout ,argument)))
                (t (go ,miss-tag)))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL

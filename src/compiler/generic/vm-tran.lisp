@@ -145,13 +145,17 @@
 ;;; The layout is stored in slot 0.
 ;;; *** These next two transforms should be the only code, aside from
 ;;;     some parts of the C runtime, with knowledge of the layout index.
+#+compact-instance-header
+(define-source-transform function-with-layout-p (x) `(functionp ,x))
 #-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
     `(truly-the layout (%instance-ref ,x 0)))
   (define-source-transform %set-instance-layout (x val)
     `(%instance-set ,x 0 (the layout ,val)))
-  (define-source-transform %funcallable-instance-layout (x)
+  (define-source-transform function-with-layout-p (x)
+    `(funcallable-instance-p ,x))
+  (define-source-transform %fun-layout (x)
     `(truly-the layout (%funcallable-instance-info ,x 0)))
   (define-source-transform %set-funcallable-instance-layout (x val)
     `(setf (%funcallable-instance-info ,x 0) (the layout ,val))))

@@ -1571,8 +1571,7 @@
                              (+ core-offs n-word-bytes)
                              word)))
               (when (eq widetag funcallable-instance-widetag)
-                (let ((layout (truly-the layout
-                               (translate (%funcallable-instance-layout obj) spaces))))
+                (let ((layout (truly-the layout (translate (%fun-layout obj) spaces))))
                   (unless (fixnump (layout-bitmap layout))
                     (error "Can't process bignum bitmap"))
                   (let ((bitmap (layout-bitmap layout)))

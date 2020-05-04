@@ -70,6 +70,7 @@
            simple-fun-p
            closurep
            funcallable-instance-p
+           function-with-layout-p
            non-null-symbol-p)
     (t) boolean (movable foldable flushable))
 
@@ -199,7 +200,10 @@
   () :result-arg 0)
 (defknown %instance-layout (instance) layout
   (foldable flushable))
-(defknown %funcallable-instance-layout (funcallable-instance) layout
+;;; %FUN-LAYOUT is to %INSTANCE-LAYOUT as FUN-POINTER-LOWTAG is to INSTANCE-POINTER-LOWTAG
+(defknown %fun-layout (#-compact-instance-header funcallable-instance
+                       #+compact-instance-header function)
+  layout
   (foldable flushable))
 (defknown %set-instance-layout (instance layout) layout
   ())

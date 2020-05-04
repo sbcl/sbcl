@@ -217,7 +217,7 @@
   (let ((kind (fun-subtype fun)))
     (or (and (eql kind sb-vm:funcallable-instance-widetag)
              ;; if the FIN has no raw words then it has no internal trampoline
-             (eql (layout-bitmap (%funcallable-instance-layout fun))
+             (eql (layout-bitmap (%fun-layout fun))
                   sb-kernel:+layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
 
@@ -266,7 +266,7 @@
     ;; Assert that raw bytes will not cause GC invariant lossage
     (aver (/= (layout-bitmap layout) +layout-all-tagged+))
     ;; Set layout prior to writing raw slots
-    (setf (%funcallable-instance-layout gf) layout)
+    (setf (%fun-layout gf) layout)
     ;; just being pedantic - liveness is preserved by the stack reference.
     (with-pinned-objects (gf)
       (let* ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask))

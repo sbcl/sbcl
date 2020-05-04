@@ -839,8 +839,8 @@
                  (when (and res (not (layout-invalid res))) res)))
        ((primtype-predicate slot-reader)
         (cond ((csubtypep classoid (specifier-type 'funcallable-instance))
-               (values '(funcallable-instance-p object)
-                       '(%funcallable-instance-layout object)))
+               (values '(function-with-layout-p object)
+                       '(%fun-layout object)))
               ((or (csubtypep classoid (specifier-type 'instance))
                    ;; CONDITION can't be a funcallable-instance
                    (csubtypep classoid (specifier-type 'condition)))
@@ -859,7 +859,7 @@
             ;; funcallable streams. As a countermeasure, it would be possible to emit
             ;; slightly better code in a vop.
             `(cond ((%instancep object) (%instance-layout object))
-                   ((funcallable-instance-p object) (%funcallable-instance-layout object))
+                   ((function-with-layout-p object) (%fun-layout object))
                    (t (return-from typep nil)))))
        (depthoid (if layout (layout-depthoid layout) -1))
        (n-layout (gensym))

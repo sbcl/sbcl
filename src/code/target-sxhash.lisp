@@ -294,8 +294,7 @@
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                (funcallable-instance
-                (if (layout-for-std-class-p
-                     (%funcallable-instance-layout x))
+                (if (layout-for-std-class-p (%fun-layout x))
                     (fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
                     9550684))
