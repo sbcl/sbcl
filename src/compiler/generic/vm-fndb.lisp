@@ -219,6 +219,7 @@
   (always-translatable)
   :derive-type #'result-type-last-arg)
 (defknown %layout-invalid-error (t layout) nil)
+(defknown update-object-layout-or-invalid (t layout) layout)
 
 #+(or x86 x86-64 riscv)
 (defknown %raw-instance-cas/word (instance index sb-vm:word sb-vm:word)

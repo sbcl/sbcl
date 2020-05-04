@@ -133,3 +133,23 @@
     ()
   (loadw rax-tn rax-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
+
+(define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
+  #+avx2
+  (progn
+    (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
+    (inst test :byte (ea temp-reg-tn) 1)
+    (inst jmp :z call-preserving-xmm-only)
+    (with-registers-preserved (ymm :except r11-tn)
+      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
+      (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
+      (call-static-fun 'update-object-layout-or-invalid 2)
+      (inst mov (ea 24 rbp-tn) rdx-tn)) ; result to arg passing loc
+    (inst ret 8)) ; remove 1 arg. Caller pops the result
+  call-preserving-xmm-only
+  (with-registers-preserved (xmm :except r11-tn)
+    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
+    (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
+    (call-static-fun 'update-object-layout-or-invalid 2)
+    (inst mov (ea 24 rbp-tn) rdx-tn)) ; result to arg passing loc
+  (inst ret 8)) ; remove 1 arg. Caller pops the result

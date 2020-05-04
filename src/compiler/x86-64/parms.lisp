@@ -187,8 +187,6 @@
     *cpuid-fn1-ecx*)
   #'equalp)
 
-;;; FIXME: with #+immobile-space, this should be the empty list,
-;;; because *all* fdefns are permanently placed.
 (defconstant-eqx +static-fdefns+
   #(length
     two-arg-+
@@ -205,6 +203,7 @@
     two-arg-xor
     two-arg-gcd
     two-arg-lcm
+    update-object-layout-or-invalid
     %coerce-callable-to-fun)
   #'equalp)
 

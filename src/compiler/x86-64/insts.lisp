@@ -212,7 +212,7 @@
                    ;; there is another tactic we could use: only consider something a pointer
                    ;; if it is in a location corresponding to an absolute code fixup.
                    (if (and (memq size '(:dword :qword))
-                            (memq opcode '(mov cmp))
+                            (memq opcode '(mov cmp push))
                             (maybe-note-static-symbol value dstate))
                        (princ16 value stream)
                        (princ value stream))))))
@@ -226,6 +226,7 @@
 ;;; The only instruction of this kind having a variant with an immediate
 ;;; argument is PUSH.
 (define-arg-type signed-imm-data-default-qword
+  :type 'signed-imm-data ; to get the :printer
   :prefilter (lambda (dstate)
                (let ((nbits (* (size-nbyte (inst-operand-size-default-qword dstate))
                                n-byte-bits)))

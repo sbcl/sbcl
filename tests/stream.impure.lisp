@@ -23,6 +23,24 @@
             #P"/tmp/")))
 (require :sb-posix)
 
+;;; Believe it or not the x86-64-specific trap routine for UPDATE-OBJECT-LAYOUT-OR-INVALID
+;;; could fail to return the correct layout after calling from assembly code into lisp,
+;;; back to assembly code, back to the vop, and not a single regressoin test failed.
+(defclass astream (fundamental-output-stream) ())
+(defvar *str* (make-instance 'astream))
+(assert (streamp *str*))
+(defclass astream (fundamental-output-stream) (x y))
+(with-test (:name :update-stream-layout)
+  (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
+  (assert (streamp *str*))
+  (assert (/= (sb-kernel:layout-clos-hash (sb-kernel:%instance-layout *str*))))
+  (defclass astream () (x y))
+  (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
+  (assert (not (streamp *str*)))
+  (defclass astream (fundamental-output-stream) (x y))
+  (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
+  (assert (streamp *str*)))
+
 ;;; type errors for inappropriate stream arguments, fixed in
 ;;; sbcl-0.7.8.19
 (with-test (:name (make-two-way-stream type-error))
