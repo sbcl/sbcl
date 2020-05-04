@@ -109,6 +109,12 @@
 ;;; and normal instances, so we can return true on structures also. A
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
 ;;; PCL-INSTANCE-P.
+;;; FIXME: this fuction seriously needs to die.  Sometimes "STD-" means things
+;;; that are STANDARD-OBJECT including possibly FUNCALLABLE-STANDARD-OBJECT,
+;;; but here it means something which is expressly not FUNCALLABLE-STANDARD-OBJECT.
+;;; The converse of this is FSC-INSTANCE-P, meaning not STD-INSTANCE-P.
+;;; I'm less bothered by that one since "funcallable standard class instance" mostly says
+;;; what it means, whereas "standard" is virtually devoid of meaning within this setting.
 (declaim (inline std-instance-p))
 (defun std-instance-p (x)
   (%instancep x))
@@ -172,6 +178,14 @@
   (layout-for-std-class-p (cond ((%instancep x) (%instance-layout x))
                                 ((function-with-layout-p x) (%fun-layout x))
                                 (t (return-from %pcl-instance-p nil)))))
+
+;;; Try to ensure that the object's layout is up-to-date only if it is an instance
+;;; or funcallable-instance of other than a static or structure classoid type.
+;;; LAYOUT is the *expected* type, not the the layout currently in OBJECT.
+(defun update-object-layout-or-invalid (object layout)
+  (if (%pcl-instance-p object)
+      (check-wrapper-validity object)
+      (sb-c::%layout-invalid-error object layout)))
 
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))

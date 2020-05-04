@@ -315,6 +315,8 @@
                (layout-length ,layout) ,length
                (layout-flags ,layout) ,flags))))
 
+;;; N.B.: this "-STD-CLASS-" is distinctly not the same "STD-" as in STD-INSTANCE-P.
+;;; This one includes any class that mixes in STANDARD-OBJECT.
 (declaim (inline layout-for-std-class-p))
 (defun layout-for-std-class-p (x)
   (logtest (layout-flags x) +pcl-object-layout-flag+))

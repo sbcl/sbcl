@@ -700,13 +700,6 @@ between the ~A definition and the ~A definition"
                  (%ensure-classoid-valid class2 layout2 errorp))
       (return-from %ensure-both-classoids-valid nil))))
 
-#-sb-xc-host ; No such thing as LAYOUT-OF, never mind the rest
-(defun update-object-layout-or-invalid (object layout)
-  ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
-  (if (layout-for-std-class-p (layout-of object))
-      (sb-pcl::check-wrapper-validity object)
-      (sb-c::%layout-invalid-error object layout)))
-
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.
