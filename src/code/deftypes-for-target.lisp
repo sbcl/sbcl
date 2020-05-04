@@ -135,6 +135,10 @@
 (sb-xc:deftype compiled-function ()
   '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
 
+#-(or sb-eval sb-fasteval)
+(sb-xc:deftype interpreted-function ()
+  nil)
+
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 
 (sb-xc:deftype closure () '(satisfies closurep))
