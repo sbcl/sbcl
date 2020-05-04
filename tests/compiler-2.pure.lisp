@@ -147,7 +147,7 @@
 
 (with-test (:name (sb-vm:map-allocated-objects :no-consing)
             :serial t
-            :fails-on :cheneygc
+            :fails-on (or :cheneygc (not :sb-thread))
             :skipped-on :interpreter)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
