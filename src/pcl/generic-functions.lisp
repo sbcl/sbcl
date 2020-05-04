@@ -244,8 +244,6 @@
 (defgeneric specializer-method-holder (specializer &optional create))
 
 (defgeneric update-constructors (class))
-
-(defgeneric wrapper-fetcher (class))
 
 ;;;; 2 arguments
 

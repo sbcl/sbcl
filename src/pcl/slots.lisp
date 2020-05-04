@@ -42,9 +42,6 @@
                          (cell-error-name condition)
                          (type-of (unbound-slot-instance condition))))))))
 
-(defmethod wrapper-fetcher ((class standard-class))
-  '%instance-layout)
-
 (defmethod slots-fetcher ((class standard-class))
   'std-instance-slots)
 
