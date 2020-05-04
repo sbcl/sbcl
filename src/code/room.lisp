@@ -500,7 +500,6 @@ We could try a few things to mitigate this:
        ;; prove to be an issue with concurrent systems, or with
        ;; spectacularly poor timing for closing an allocation region
        ;; in a single-threaded system.
-       #+sb-thread
        (close-current-gc-region)
        (do ((initial-next-free-page next-free-page)
             ;; This is a "funny" fixnum - essentially the bit cast of a pointer
@@ -574,7 +573,6 @@ We could try a few things to mitigate this:
         (without-gcing (do-1-space space))
         (do-1-space space)))))
 
-#+(and sb-thread gencgc)
 ;; Start with a Lisp rendition of ensure_region_closed() on the active
 ;; thread's region, since users are often surprised to learn that a
 ;; just-consed object can't necessarily be seen by MAP-ALLOCATED-OBJECTS.
@@ -584,15 +582,19 @@ We could try a few things to mitigate this:
 ;; by doing that.
 ;; (And seeing small consing by other threads is hopeless either way)
 (defun close-current-gc-region ()
-  (unless (eql (sap-int (current-thread-offset-sap
-                         (+ thread-alloc-region-slot 3)))
-               0)                       ; start_addr
-    (alien-funcall
-     (extern-alien "gc_close_region" (function void unsigned int))
-     (truly-the word
-                (+ (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
-                   (ash thread-alloc-region-slot word-shift)))
-     1)))
+  #+gencgc
+  (let ((region-struct
+          #+sb-thread (sap+ (sb-thread::current-thread-sap)
+                            (ash thread-alloc-region-slot word-shift))
+          ;; If no threads, the region structure is 2 words past the static space start,
+          ;; embedded in an unboxed array.
+          #-sb-thread (int-sap (+ static-space-start (* 2 n-word-bytes)))))
+    ;; The 'start_addr' field is at word index 3 of the structure (see gencgc-alloc-region.h).
+    (unless (eql (sap-ref-word region-struct (ash 3 word-shift)) 0)
+      (alien-funcall (extern-alien "gc_close_region" (function void system-area-pointer int))
+                     region-struct
+                     1))
+    nil))
 
 ;;;; MEMORY-USAGE
 
