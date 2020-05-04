@@ -25,7 +25,7 @@
 
 ;;; Believe it or not the x86-64-specific trap routine for UPDATE-OBJECT-LAYOUT-OR-INVALID
 ;;; could fail to return the correct layout after calling from assembly code into lisp,
-;;; back to assembly code, back to the vop, and not a single regressoin test failed.
+;;; back to assembly code, back to the vop, and not a single regression test failed.
 (defclass astream (fundamental-output-stream) ())
 (defvar *str* (make-instance 'astream))
 (assert (streamp *str*))
@@ -33,10 +33,12 @@
 (with-test (:name :update-stream-layout)
   (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
   (assert (streamp *str*))
-  (assert (/= (sb-kernel:layout-clos-hash (sb-kernel:%instance-layout *str*))))
+  (assert (/= 0 (sb-kernel:layout-clos-hash (sb-kernel:%instance-layout *str*))))
   (defclass astream () (x y))
   (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
+  (assert (= 0 (sb-kernel:layout-clos-hash (sb-kernel:%instance-layout *str*))))
   (assert (not (streamp *str*)))
+  (assert (/= 0 (sb-kernel:layout-clos-hash (sb-kernel:%instance-layout *str*))))
   (defclass astream (fundamental-output-stream) (x y))
   (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout *str*)))
   (assert (streamp *str*)))
