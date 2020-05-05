@@ -701,7 +701,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (aver (eql (node-component (lambda-bind lambda)) component)))
 
   (let* ((*component-being-compiled* component))
-    (when sb-xc:*compile-print*
+    (when (and sb-xc:*compile-print* (block-compile *compilation*))
       (with-compiler-io-syntax
         (compiler-mumble "~&; compiling ~A" (component-name component))))
 
