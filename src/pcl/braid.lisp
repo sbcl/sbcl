@@ -54,24 +54,20 @@
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and immobile-code)
                     ((/= (layout-bitmap wrapper) +layout-all-tagged+)
-                     (truly-the funcallable-instance
-                                (sb-vm::make-immobile-funinstance wrapper slots)))
+                     (let ((f (truly-the funcallable-instance
+                                         (sb-vm::make-immobile-funinstance wrapper slots))))
+                       ;; set the upper 4 bytes of wordindex 5
+                       (sb-sys:with-pinned-objects (f)
+                         (setf (sb-sys:sap-ref-32 (sb-sys:int-sap (get-lisp-obj-address f))
+                                                  (- (+ (* 5 sb-vm:n-word-bytes) 4)
+                                                     sb-vm:fun-pointer-lowtag))
+                               (ldb (byte 32 0) hash)))
+                       f))
                     (t
                      (let ((f (truly-the funcallable-instance
-                                         (%make-standard-funcallable-instance
-                                          slots
-                                          #-compact-instance-header hash))))
+                                         (%make-standard-funcallable-instance slots hash))))
                        (setf (%fun-layout f) wrapper)
                        f)))))
-    ;; Compact-instance-header uses the high 32 bits of the slot vector's
-    ;; header word. Mix down the full hash, then shift left 24 bits
-    ;; which when shifted by N-WIDETAG-BITS puts it in the upper 32.
-    ;; The contraint on size is that we must not touch the byte for immobile
-    ;; GC's generation. But, you might say, vector's don't go in immobile
-    ;; space. That's true for the time being, but might not be true always.
-    #+compact-instance-header
-    (set-header-data slots (ash (ldb (byte 32 0) (logxor (ash hash -32) hash))
-                                24))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)

@@ -135,20 +135,6 @@
           (let ((old (cas (sb-pcl::standard-instance-hash-code instance) 0 new)))
             (if (eql old 0) new old)))))))
 
-;; These are also random numbers, but not lazily computed.
-(declaim (inline fsc-instance-hash))
-(defun fsc-instance-hash (fin)
-  ;; As above, we care that the object is of primitive type FUNCTION, but not
-  ;; whether it is STANDARD-FUNCALLABLE-INSTANCE. Let's assume it is.
-  (declare (function fin))
-  (locally
-   (declare (optimize (sb-c::type-check 0)))
-   #+compact-instance-header
-   (sb-vm::get-header-data-high
-    (sb-pcl::standard-funcallable-instance-clos-slots fin))
-   #-compact-instance-header
-   (sb-pcl::standard-funcallable-instance-hash-code fin)))
-
 (declaim (inline integer-sxhash))
 (defun integer-sxhash (x)
   (if (fixnump x) (sxhash (truly-the fixnum x)) (sb-bignum:sxhash-bignum x)))
@@ -295,7 +281,8 @@
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                (funcallable-instance
                 (if (layout-for-std-class-p (%fun-layout x))
-                    (fsc-instance-hash x)
+                    ;; We have a hash code, so might as well use it.
+                    (sb-pcl::fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
                     9550684))
                (t 42))))

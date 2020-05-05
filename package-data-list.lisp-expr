@@ -3513,7 +3513,8 @@ SBCL itself"
   sb-pcl::compute-gf-ftype
   sb-pcl::definition-source
   sb-pcl::ensure-accessor
-  sb-pcl:ensure-class-finalized)
+  sb-pcl:ensure-class-finalized
+  sb-pcl::fsc-instance-hash)
  ;; CLOS-based packages
  (sb-gray:stream-clear-input
   sb-gray:stream-clear-output

@@ -86,7 +86,7 @@
 ;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.
 (sb-kernel:!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots #-compact-instance-header hash-code)
+  :slot-names (clos-slots hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid

@@ -247,7 +247,7 @@
         ;; (and classes do too), but instances in general don't, if you stay away
         ;; from anonymous objects, reproducibility is an attainable goal.
         ((std-instance-p x) (sb-impl::std-instance-hash x))
-        ((fsc-instance-p x) (sb-impl::fsc-instance-hash x))
+        ((fsc-instance-p x) (fsc-instance-hash x))
         (t
          (bug "Something strange where symbol or class expected."))))
 
