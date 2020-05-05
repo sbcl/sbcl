@@ -685,3 +685,7 @@
                  (cons (or (and (not vector) array) (and (not integer) number)) number))))
    ((10) nil)
    (((cons 1 2)) t)))
+
+(with-test (:name :pathnamep-flag-bit)
+  (let ((f (compile nil '(lambda (x) (pathnamep x)))))
+    (assert (not (ctu:find-code-constants f)))))

@@ -885,14 +885,23 @@
        ;; slot, because the layout has some number of ancestor layouts directly in it.
        (ancestor-slot (layout-nth-ancestor-slot depthoid)))
 
-    (cond  ((and (eq (classoid-state classoid) :sealed) layout
+    ;; Easiest case first: single bit test.
+    (cond ((member name '(condition pathname structure-object))
+           `(and (%instancep object)
+                 (logtest (layout-flags (%instance-layout object))
+                          ,(case name
+                             (condition +condition-layout-flag+)
+                             (pathname  +pathname-layout-flag+)
+                             (t         +structure-layout-flag+)))))
+
+          ;; Next easiest: Sealed and at most one subclass.
+          ((and (eq (classoid-state classoid) :sealed) layout
                  (or (not (classoid-subclasses classoid))
                      (eql (hash-table-count (classoid-subclasses classoid))
                           1)))
             ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
             ;; though probably extremely weird. Also the PRED should be set in
             ;; that event, but it isn't.
-            ;; Sealed and at most one subclass.
             ;; The crummy dual expressions for the same result are because
             ;; (BLOCK (RETURN ...)) seems to emit a forward branch in the
             ;; passing case, but AND emits a forward branch in the failing
@@ -919,7 +928,8 @@
                     `(and ,primtype-predicate ,(check-layout slot-reader))
                     `(block typep ,(check-layout get-layout-or-return-false))))))
 
-           ((and (typep classoid 'structure-classoid) layout)
+          ;; All other structure types
+          ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
             (aver (equal primtype-predicate '(%instancep object)))
             ;; we used to check for invalid layouts here, but in fact that's both unnecessary and
@@ -927,16 +937,10 @@
             ;; because it is quite legitimate to pass an object with an invalid layout
             ;; to a structure type test.
             `(and (%instancep object)
-                  ,(case name
-                    (structure-object
-                     `(logtest (layout-flags (%instance-layout object)) +structure-layout-flag+))
-                    (pathname
-                     `(logtest (layout-flags (%instance-layout object)) +pathname-layout-flag+))
                     ;; If we allowed structure classes to be mixed in to standard-object,
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
-                    (t
-                     `(let ((,n-layout (%instance-layout object)))
+                    (let ((,n-layout (%instance-layout object)))
                         ,(cond ((<= 2 depthoid layout-inherits-max-optimized-depth)
                                 `(or (eq (,ancestor-slot ,n-layout) ,layout)
                                      (eq ,n-layout ,layout)))
@@ -946,9 +950,10 @@
                                (t ; abstract base type deeper than optimized max.
                                 ;; Assume that no layout is EQ to the base layout,
                                 ;; and unconditionally fetch and dereference layout-inherits.
-                                `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout))))))))
+                                `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout))))))
 
-           ((> depthoid 0)
+          ((> depthoid 0) ; fixed-depth ancestors of non-structure types: STREAM, FILE-STREAM,
+           ;; SEQUENCE, CONDITION; all are abstract base types.
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
                            (bug "Non-frozen static classoids?"))
@@ -974,7 +979,7 @@
                   `(block typep
                      (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
 
-           (t
+          (t
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
                                   object)))))
 
