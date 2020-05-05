@@ -366,6 +366,25 @@
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst and res (lognot fixnum-tag-mask))))
 
+;;; Combine SYMBOL-HASH and the lisp fallback code into one vop.
+(define-vop ()
+  (:policy :fast-safe)
+  (:translate ensure-symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:vop-var vop)
+  (:generator 5
+    (when (location= res symbol) (move temp-reg-tn symbol)) ; save a backup
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst test :dword res res)
+    (inst jmp :ne good)
+    (inst push (if (location= res symbol) temp-reg-tn symbol))
+    (invoke-asm-routine 'call 'ensure-symbol-hash vop)
+    (inst pop res)
+    GOOD
+    (inst and res (lognot fixnum-tag-mask)))) ; redundant (but ok) if asm routine used
+
 (eval-when (:compile-toplevel)
   ;; assumption: any object can be read 1 word past its base pointer
   (assert (= sb-vm:symbol-hash-slot 1)))

@@ -134,6 +134,7 @@
   (def stack-ref (s n))
   (def %set-stack-ref (s n value))
   (def fun-code-header)
+  (def symbol-hash)
   (def sb-vm::symbol-extra)
   #+sb-thread (def symbol-tls-index)
   #.(if (fboundp 'symbol-info-vector) (values) '(def symbol-info-vector))

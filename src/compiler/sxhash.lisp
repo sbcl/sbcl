@@ -176,13 +176,6 @@
 
 ;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in
 ;;; order to avoid having to do TYPECASE at runtime.
-;;;
-;;; We also take the opportunity to handle the cases of constant
-;;; strings, and of symbols whose names are known at compile time;
-;;; except that since SXHASH on the cross-compilation host is not in
-;;; general compatible with SXHASH on the target SBCL, we can't so
-;;; easily do this optimization in the cross-compiler - the SB-XC:SXHASH
-;;; operation will catch any attempt to call it on strings.
 (deftransform sxhash ((x) (string))
   (cond ((csubtypep (lvar-type x) (specifier-type 'simple-string))
          '(%sxhash-simple-string x))
@@ -195,10 +188,13 @@
          ;; be interned, but we *can* test for the specific case of keywords.
          ;; Even if it gets uninterned, this shortcut remains valid.
          `(symbol-hash x)) ; Never need to lazily compute and memoize
+        ((gethash 'ensure-symbol-hash *backend-parsed-vops*)
+         ;; A vop might emit slightly better code than the expression below
+         `(ensure-symbol-hash x))
         (t
-          ;; Cache the value of the symbol's sxhash in the symbol-hash
-          ;; slot.
-          '(let ((result (symbol-hash x)))
+         ;; Cache the value of the symbol's sxhash in the symbol-hash
+         ;; slot.
+         '(let ((result (symbol-hash x)))
             ;; 0 marks uninitialized slot. We can't use negative
             ;; values for the uninitialized slots since NIL might be
             ;; located so high in memory on some platforms that its
@@ -225,14 +221,15 @@
   (defun sxhash (x)
     (let ((answer
            (etypecase x ; croak on anything but these
-            (null (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
             (symbol
              (cond ((string= x "NIL") ; :NIL must hash the same as NIL
                     (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
                    (t
                     ;; (STRING X) could be a non-simple string, it's OK.
-                    (let ((string-hash (sb-impl::%sxhash-simple-string (string x))))
-                      (logand (lognot string-hash) sb-xc:most-positive-fixnum)))))
+                    (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
+                                        sb-xc:most-positive-fixnum)))
+                      (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
+                      hash))))
             (sb-xc:fixnum #.+sxhash-fixnum-expr+)
             (single-float #.+sxhash-single-float-expr+)
             (double-float #.+sxhash-double-float-expr+))))

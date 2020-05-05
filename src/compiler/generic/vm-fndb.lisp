@@ -112,7 +112,7 @@
 (defknown (compute-symbol-hash) (simple-string index) hash-code
   (foldable flushable))
 
-(defknown symbol-hash (symbol) hash-code
+(defknown (symbol-hash ensure-symbol-hash) (symbol) hash-code
   (flushable movable))
 ;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
 ;;; object, not only symbols. The result is meaningful only if the object

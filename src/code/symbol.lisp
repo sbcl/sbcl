@@ -87,9 +87,13 @@ distinct from the global value. Can also be SETF."
                    (char= (schar string 2) #\L)))))
       (return-from compute-symbol-hash (sxhash nil)))
   ;; And make a symbol's hash not the same as (sxhash name) in general.
-  (let ((sxhash (logand (lognot (%sxhash-simple-substring string 0 length))
+  (let ((sxhash (logxor (%sxhash-simple-substring string 0 length)
                         sb-xc:most-positive-fixnum)))
-    (if (zerop sxhash) #x55AA sxhash))) ; arbitrary substitute for 0
+    ;; The low 32 bits of the word in memory should have at least a 1 bit somewhere.
+    ;; If not, OR in a constant value.
+    (if (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) sxhash)
+        sxhash
+        (logior sxhash #x55AA)))) ; arbitrary
 
 ;; Return SYMBOL's hash, a strictly positive fixnum, computing it if not stored.
 ;; The inlined code for (SXHASH symbol) only calls ENSURE-SYMBOL-HASH if
@@ -100,10 +104,6 @@ distinct from the global value. Can also be SETF."
         (let ((name (symbol-name symbol)))
           (%set-symbol-hash symbol (compute-symbol-hash name (length name))))
       hash)))
-
-;;; Interpreter stub: Return whatever is in the SYMBOL-HASH slot of SYMBOL.
-(defun symbol-hash (symbol)
-  (symbol-hash symbol))
 
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."

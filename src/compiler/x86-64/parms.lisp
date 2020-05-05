@@ -203,6 +203,7 @@
     two-arg-xor
     two-arg-gcd
     two-arg-lcm
+    ensure-symbol-hash
     update-object-layout-or-invalid
     %coerce-callable-to-fun)
   #'equalp)

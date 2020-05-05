@@ -257,10 +257,16 @@
                  (push-fop-table (%intern name length package elt-type t)
                                  fasl-input))))
          (ensure-hashed (symbol)
+           ;; ENSURE-SYMBOL-HASH when vop-translated is flushable since it is
+           ;; conceptually just a slot reader, however its actual effect is to fill in
+           ;; the hash if absent, so it's not quite flushable when called expressly
+           ;; to fill in the slot. In this case we need a full call to ENSURE-SYMBOL-HASH
+           ;; to ensure the side-effect happens.
+           ;; Careful if changing this again. There'a regression test thank goodness.
+           (declare (notinline ensure-symbol-hash))
            (ensure-symbol-hash symbol)
            symbol))
 
-  #-sb-xc-host (declare (inline ensure-hashed))
   (define-fop 77 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *cl-package* (fasl-input)))
   (define-fop 78 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
