@@ -178,6 +178,10 @@
 
 (clear-info :function :inlinep 'integer-sxhash)
 
+;;; To avoid "note: Return type not fixed values ..."
+(declaim (ftype (sfunction (t) hash-code) sb-pcl::fsc-instance-hash
+                                          pathname-sxhash))
+
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
@@ -226,19 +230,7 @@
                   (cond
                    ((logtest flags +structure-layout-flag+)
                     (cond ((logtest flags +pathname-layout-flag+)
-                           ;; Pathnames are EQUAL if all the components are EQUAL, so
-                           ;; we hash all of the components of a pathname together.
-                           (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
-                             (mixf hash (sxhash-recurse (pathname-device x) depthoid))
-                             (mixf hash (%pathname-dir-hash x))
-                             (mixf hash (%pathname-stem-hash x))
-                             ;; Hash :NEWEST the same as NIL because EQUAL for
-                             ;; pathnames assumes that :newest and nil are equal.
-                             (let ((version (%pathname-version x)))
-                               (mixf hash (sxhash-recurse (if (eq version :newest)
-                                                              nil
-                                                            version)
-                                                          depthoid)))))
+                           (pathname-sxhash x))
                           ((logtest flags sb-vm:layout-layout-flag)
                            (layout-clos-hash x))
                           (t
@@ -429,7 +421,7 @@
                  ;; vector would incorrectly take insertion order into account.
                  (mix (mix 103924836 (hash-table-count key))
                       (sxhash (hash-table-test key))))
-                ((pathnamep key) (sxhash key))
+                ((pathnamep key) (pathname-sxhash key))
                 (t
                  (structure-object-psxhash key depthoid))))
          (list
@@ -449,6 +441,7 @@
 
 (defun number-psxhash (key)
   (declare (type number key)
+           (explicit-check)
            (muffle-conditions compiler-note)
            (optimize speed))
   (flet ((sxhash-double-float (val)

@@ -252,6 +252,22 @@
   (let ((hash (sxhash (car directory))))
     (dolist (piece (cdr directory) hash)
       (mixf hash (sxhash piece)))))
+;;; Pathname hashing used to be nested inside SXHASH so that it could utilize
+;;; the depth cutoff to avoid performing unbounded work. We don't need that any more,
+;;; as the parts of the pathname that invoke SXHASH (host, device, version) are atoms
+;;; and hence they entail bounded computation.
+(defun pathname-sxhash (x)
+  (declare (pathname x))
+  ;; Pathnames are EQUAL if all the components are EQUAL, so
+  ;; we hash all of the components of a pathname together.
+  (let ((hash (sxhash (pathname-host x))))
+    (mixf hash (sxhash (pathname-device x)))
+    (mixf hash (logxor (%pathname-dir-hash x)
+                       (%pathname-stem-hash x)))
+    ;; Hash :NEWEST the same as NIL because EQUAL for
+    ;; pathnames assumes that :newest and nil are equal.
+    (let ((version (%pathname-version x)))
+      (mixf hash (sxhash (if (eq version :newest) nil version))))))
 
 (defmethod print-object ((pathname pathname) stream)
   (let ((namestring (handler-case (namestring pathname)
