@@ -228,8 +228,7 @@
                        ;; Other things (symbol, value-cell, etc)
                        ;; don't have a sizer, so use GET-HEADER-DATA
                        (1+ (logand (get-header-data object)
-                                   (logand (get-header-data object)
-                                           (room-info-mask room-info))))))))))
+                                   (room-info-mask room-info)))))))))
         (* (align-up words 2) n-word-bytes))
       0))
 
