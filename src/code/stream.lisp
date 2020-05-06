@@ -173,7 +173,7 @@
 (declaim (inline ansi-stream-close))
 (defun ansi-stream-close (stream abort)
   (declare (type ansi-stream stream))
-  (when (open-stream-p stream)
+  (when (ansi-stream-open-stream-p stream)
     (funcall (ansi-stream-misc stream) stream :close abort))
   t)
 
