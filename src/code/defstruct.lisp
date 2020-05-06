@@ -2215,9 +2215,6 @@ or they must be declared locally notinline at each call site.~@:>"
             (t
              (values creation-form init-form))))))
 
-;;; Demote from toplevel so that make-host-2 doesn't redefine.
-;;; It gets a usable compile-time definition from src/pcl/low.
-(let ()
 (defmacro get-dsd-index (type-name slot-name)
   ;; Without the NOTINLINE we get:
   ; caught STYLE-WARNING:
@@ -2228,7 +2225,7 @@ or they must be declared locally notinline at each call site.~@:>"
   (declare (notinline find dsd-bits))
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
-                   :key #'dsd-name))))
+                   :key #'dsd-name)))
 
 ;;; Compute a SAP to the specified slot in INSTANCE.
 ;;; This looks mildly redundant with DEFINE-STRUCTURE-SLOT-ADDRESSOR,

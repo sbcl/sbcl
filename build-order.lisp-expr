@@ -336,7 +336,6 @@
  ;; around the compilation of "code/class". Why?
  ("src/code/class" :c-headers)
  ("src/pcl/pre-warm")
- ("src/pcl/low" :not-host)
 
  ("src/code/debug-info" :c-headers
   #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
@@ -746,7 +745,8 @@
  ;; (arbitrary) linearization of the declared build
  ;; order dependencies from the old PCL defsys.lisp
  ;; dependency database.
- ("src/pcl/macros"
+ ("src/pcl/low"
+  "src/pcl/macros"
   "src/pcl/compiler-support"
   "src/pcl/defclass"
   "src/pcl/defs"

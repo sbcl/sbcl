@@ -83,3 +83,29 @@
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
+
+;;; Needed to compile the #n# reader because apparently some people think it amusing
+;;; to create readable funcallable instances involving circularity and/or sharing.
+(defmacro fsc-instance-slots (fin)
+  `(truly-the simple-vector
+              (%funcallable-instance-info ,fin ,sb-vm:instance-data-start)))
+
+;;; Return true of any object which is either a funcallable-instance,
+;;; or an ordinary instance that is not a structure-object.
+;;; This used to be implemented as (LAYOUT-FOR-STD-CLASS-P (LAYOUT-OF x))
+;;; but LAYOUT-OF is more general than need be here. So this bails out
+;;; after the first two clauses of the equivalent COND in LAYOUT-OF
+;;; because nothing else could possibly return T.
+(declaim (inline %pcl-instance-p))
+(defun %pcl-instance-p (x)
+  (layout-for-std-class-p (cond ((%instancep x) (%instance-layout x))
+                                ((function-with-layout-p x) (%fun-layout x))
+                                (t (return-from %pcl-instance-p nil)))))
+
+;;; Try to ensure that the object's layout is up-to-date only if it is an instance
+;;; or funcallable-instance of other than a static or structure classoid type.
+;;; LAYOUT is the *expected* type, not the the layout currently in OBJECT.
+(defun update-object-layout-or-invalid (object layout)
+  (if (%pcl-instance-p object)
+      (check-wrapper-validity object)
+      (sb-c::%layout-invalid-error object layout)))

@@ -44,7 +44,7 @@
 
 (declaim (inline random-fixnum))
 (defun random-fixnum ()
-  (random (1+ sb-xc:most-positive-fixnum)))
+  (random (1+ most-positive-fixnum)))
 
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.
@@ -77,13 +77,6 @@
            (type funcallable-instance fin))
   (setf (%funcallable-instance-fun fin) new-value))
 
-(eval-when (:compile-toplevel)
-  (setf (sb-xc:macro-function 'get-dsd-index)
-        (lambda (form env)
-          ;; Don't pass target lexenv through to the host's macro-function
-          (declare (ignore env))
-          (funcall (cl:macro-function 'get-dsd-index) form nil))))
-
 ;;; FIXME: these macros should just go away.  It's not clear whether
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
@@ -91,10 +84,6 @@
 (declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
-(defmacro fsc-instance-slots (fin)
-  `(truly-the simple-vector
-              (%funcallable-instance-info
-               ,fin ,(get-dsd-index standard-funcallable-instance clos-slots))))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector t) t) clos-slots-ref))
@@ -167,26 +156,6 @@
      (precompile-dfun-constructors ,system)
      (precompile-ctors)))
 
-;;; Return true of any object which is either a funcallable-instance,
-;;; or an ordinary instance that is not a structure-object.
-;;; This used to be implemented as (LAYOUT-FOR-STD-CLASS-P (LAYOUT-OF x))
-;;; but LAYOUT-OF is more general than need be here. So this bails out
-;;; after the first two clauses of the equivalent COND in LAYOUT-OF
-;;; because nothing else could possibly return T.
-(declaim (inline %pcl-instance-p))
-(defun %pcl-instance-p (x)
-  (layout-for-std-class-p (cond ((%instancep x) (%instance-layout x))
-                                ((function-with-layout-p x) (%fun-layout x))
-                                (t (return-from %pcl-instance-p nil)))))
-
-;;; Try to ensure that the object's layout is up-to-date only if it is an instance
-;;; or funcallable-instance of other than a static or structure classoid type.
-;;; LAYOUT is the *expected* type, not the the layout currently in OBJECT.
-(defun update-object-layout-or-invalid (object layout)
-  (if (%pcl-instance-p object)
-      (check-wrapper-validity object)
-      (sb-c::%layout-invalid-error object layout)))
-
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
