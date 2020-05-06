@@ -109,7 +109,7 @@
                  ;; if not already so marked.
                  (unless (logbitp sb-vm:stable-hash-required-flag header-word)
                    #-sb-thread (setf (sap-ref-word (int-sap (get-lisp-obj-address instance))
-                                                   (- instance-pointer-lowtag))
+                                                   (- sb-vm:instance-pointer-lowtag))
                                      (logior (ash 1 sb-vm:stable-hash-required-flag)
                                              header-word))
                    #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
