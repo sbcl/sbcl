@@ -360,6 +360,11 @@
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
 
+;;; Object must be pinned to use this.
+(defmacro fsc-instance-trailer-hash (fin)
+  `(sb-sys:sap-ref-32 (sb-sys:int-sap (get-lisp-obj-address ,fin))
+                      (- (+ (* 5 sb-vm:n-word-bytes) 4) sb-vm:fun-pointer-lowtag)))
+
 ;;; Return a pseudorandom number that was assigned on allocation.
 ;;; FIN is a STANDARD-FUNCALLABLE-INSTANCE but we don't care to type-check it.
 ;;; You might rightly wonder - for what reason do we require good hash codes for
@@ -372,12 +377,10 @@
         ((= (logand (function-header-word (truly-the function fin)) #xFF00)
             (ash 5 sb-vm:n-widetag-bits)) ; KLUDGE: 5 data words implies 2 raw words
          ;; get the upper 4 bytes of wordindex 5
-         (sb-sys:with-pinned-objects (fin)
-           (sb-sys:sap-ref-32 (sb-sys:int-sap (get-lisp-obj-address fin))
-                              (- (+ (* 5 sb-vm:n-word-bytes) 4) sb-vm:fun-pointer-lowtag))))
+         (sb-sys:with-pinned-objects (fin) (fsc-instance-trailer-hash fin)))
         (t
-         (sb-pcl::standard-funcallable-instance-hash-code
-          (truly-the standard-funcallable-instance fin)))))
+         (truly-the hash-code (standard-funcallable-instance-hash-code
+                               (truly-the standard-funcallable-instance fin))))))
 
 (defun make-gf-hash-table ()
   (make-hash-table :test 'eq

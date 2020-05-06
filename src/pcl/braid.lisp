@@ -58,10 +58,7 @@
                                          (sb-vm::make-immobile-funinstance wrapper slots))))
                        ;; set the upper 4 bytes of wordindex 5
                        (sb-sys:with-pinned-objects (f)
-                         (setf (sb-sys:sap-ref-32 (sb-sys:int-sap (get-lisp-obj-address f))
-                                                  (- (+ (* 5 sb-vm:n-word-bytes) 4)
-                                                     sb-vm:fun-pointer-lowtag))
-                               (ldb (byte 32 0) hash)))
+                         (setf (fsc-instance-trailer-hash f) (ldb (byte 32 0) hash)))
                        f))
                     (t
                      (let ((f (truly-the funcallable-instance
