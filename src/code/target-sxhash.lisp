@@ -42,12 +42,12 @@
                  #.sb-vm::thread-alloc-region-slot))
        (- (1+ sb-vm:word-shift))))
 
-;; Return some bits that are dependent on the next address that will be
-;; allocated, mixed with the previous state (in case addresses get recycled).
-;; This algorithm, used for stuffing a hash-code into instances of CTYPE
-;; subtypes, is simpler than RANDOM, and a test of randomness won't
-;; measure up as well, but for the intended use, it doesn't matter.
-;; CLOS hashes could probably be made to use this.
+;;; Return some bits that are dependent on the next address that will be
+;;; allocated, mixed with the previous state (in case addresses get recycled).
+;;; This algorithm, used for stuffing a hash-code into instances of CTYPE
+;;; subtypes and generic functions, is simpler than RANDOM.
+;;; I don't know whether it is more random or less random than a PRNG,
+;;; but it's faster.
 (defun quasi-random-address-based-hash (state mask)
   (declare (type (simple-array (and fixnum unsigned-byte) (1)) state))
   ;; Ok with multiple threads - No harm, no foul.
@@ -74,66 +74,58 @@
 ;; simple cases
 (declaim (ftype (sfunction (integer) hash-code) sxhash-bignum))
 
-(defun new-instance-hash-code ()
-  ;; ANSI SXHASH wants us to make a good-faith effort to produce
-  ;; hash-codes that are well distributed within the range of
-  ;; non-negative fixnums, and this address-based operation does that.
-  ;; This is faster than calling RANDOM, and is random enough.
-  (loop
-   (let ((answer
-          (truly-the fixnum
-           (quasi-random-address-based-hash
-            (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte))
-                             t)
-            sb-xc:most-positive-fixnum))))
-     (when (plusp answer)
-       ;; Make sure we never return 0 (almost no chance of that anyway).
-       (return answer)))))
+;;; Return a stable address-based hash for instances, using a 2-bit status
+;;; indicator as to whether there was a hash slot appended by GC. States:
+;;;   #b00 = never hashed
+;;;   #b01 = hashed and not moved a/k/a "need stable hash"
+;;;   #b11 = hashed and moved a/k/a "has stable hash"
+;;;
+;;; When we need to take the address, there are a few ways to get a consistent
+;;; view of the object's hash status bits and its address:
+;;; * PSEUDO-ATOMIC (requires a vop)
+;;; * WITH-PINNED-OBJECTS
+;;; * a very lightweight lockless algorithm that detects object movement
+;;;   by copying the boxed register to an untagged register both
+;;;   before and after reading the header word.
+;;;   If the before and after values are the same and the header is marked
+;;;   as "need stable hash" then the hash can only be the object address.
+;;;   I'm not willing enough (or smart enough) to write a correctness proof.
+;;;   It sounds something like our 'frlock' algorithm.
+;;; Since WITH-PINNED-OBJECT costs nothing on conservative gencgc,
+;;; that's what I'm going with.
+;;;
+(defun %instance-sxhash (instance)
+  ;; to avoid consing in fmix
+  (declare (inline #+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32))
+  (let* ((layout (%instance-layout (truly-the instance instance)))
+         (flags (layout-flags layout)))
+    (when (logtest flags sb-vm:layout-layout-flag)
+      ;; This might be wrong if the clos-hash was clobbered to 0
+      (return-from %instance-sxhash (layout-clos-hash layout))))
+  ;; Non-simple cases: no hash slot, and either unhashed or hashed-not-moved.
+  (let* ((header-word (instance-header-word instance))
+         (addr (with-pinned-objects (instance)
+                 ;; First we have to indicate that a hash was taken from the address
+                 ;; if not already so marked.
+                 (unless (logbitp sb-vm:stable-hash-required-flag header-word)
+                   #-sb-thread (setf (sap-ref-word (int-sap (get-lisp-obj-address instance))
+                                                   (- instance-pointer-lowtag))
+                                     (logior (ash 1 sb-vm:stable-hash-required-flag)
+                                             header-word))
+                   #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
+                 (get-lisp-obj-address instance))))
+    ;; perturb the address
+    (logand (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 addr)
+            sb-xc:most-positive-fixnum)))
 
-(declaim (inline !condition-hash))
-(defun !condition-hash (instance)
-  (let ((hash (sb-kernel::condition-hash instance)))
-    (if (not (eql hash 0))
-        hash
-        (let ((new (new-instance-hash-code)))
-          ;; At most one thread will compute a random hash.
-          (let ((old (cas (sb-kernel::condition-hash instance) 0 new)))
-            (if (eql old 0) new old))))))
-
-#+(and compact-instance-header x86-64)
-(progn
-  (declaim (inline %std-instance-hash))
-  (defun %std-instance-hash (slots) ; return or compute the 32-bit hash
-    (let ((stored-hash (sb-vm::get-header-data-high slots)))
-      (if (eql stored-hash 0)
-          (let ((new (logand (new-instance-hash-code) #xFFFFFFFF)))
-            (let ((old (sb-vm::cas-header-data-high slots 0 new)))
-              (if (eql old 0) new old)))
-          stored-hash))))
-
-(defun std-instance-hash (instance)
-  ;; Apparently we care that the object is of primitive type INSTANCE, but not
-  ;; whether it is STANDARD-INSTANCE. It had better be, or we're in trouble.
-  (declare (instance instance))
-  #+(and compact-instance-header x86-64)
-  ;; The one logical slot (excluding layout) in the primitive object is index 0.
-  ;; That holds a vector of the clos slots, and its header holds the hash.
-  (let* ((slots (%instance-ref instance 0))
-         (hash (%std-instance-hash slots)))
-    ;; Simulate N-POSITIVE-FIXNUM-BITS of output for backward-compatibility,
-    ;; in case people use the high order bits.
-    ;; (There are only 32 bits of actual randomness, if even that)
-    (logxor (ash hash (- sb-vm:n-positive-fixnum-bits 32)) hash))
-  #-(and compact-instance-header x86-64)
-  (locally
-   (declare (optimize (sb-c::type-check 0)))
-   (let ((hash (sb-pcl::standard-instance-hash-code instance)))
-     (if (not (eql hash 0))
-         hash
-         (let ((new (new-instance-hash-code)))
-          ;; At most one thread will compute a random hash.
-          (let ((old (cas (sb-pcl::standard-instance-hash-code instance) 0 new)))
-            (if (eql old 0) new old)))))))
+(declaim (inline instance-sxhash))
+(defun instance-sxhash (instance)
+  (if (logbitp sb-vm:hash-slot-present-flag
+               (instance-header-word (truly-the instance instance)))
+      ;; easy case: 1 word beyond the apparent length is a word added
+      ;; by GC (which may have resized the object, but we don't need to know).
+      (%instance-ref instance (%instance-length instance))
+      (%instance-sxhash instance)))
 
 (declaim (inline integer-sxhash))
 (defun integer-sxhash (x)
@@ -226,21 +218,9 @@
                (symbol (sxhash x)) ; through DEFTRANSFORM
                (fixnum (sxhash x)) ; through DEFTRANSFORM
                (instance
-                (let ((flags (layout-flags (%instance-layout x))))
-                  (cond
-                   ((logtest flags +structure-layout-flag+)
-                    (cond ((logtest flags +pathname-layout-flag+)
-                           (pathname-sxhash x))
-                          ((logtest flags sb-vm:layout-layout-flag)
-                           (layout-clos-hash x))
-                          (t
-                           (logxor 422371266
-                                   (layout-clos-hash (%instance-layout x))))))
-                   ((logtest flags +condition-layout-flag+)
-                    (!condition-hash x))
-                   ((logtest flags +pcl-object-layout-flag+)
-                    (std-instance-hash x))
-                   (t 0)))) ; can't get here
+                (if (pathnamep x)
+                    (pathname-sxhash x)
+                    (instance-sxhash x)))
                (array
                 (typecase x
                   ;; If we could do something smart for widetag-based jump tables,
@@ -530,3 +510,20 @@
 
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
+
+(defun show-hashed-instances ()
+  (flet ((foo (legend pred)
+           (format t "~&Instances in ~a state:~%" legend)
+           (sb-vm:map-allocated-objects pred :all)))
+    (foo "HASHED+MOVED"
+         (lambda (obj type size)
+           (declare (ignore size))
+           (when (and (= type sb-vm:instance-widetag)
+                      (logbitp 9 (instance-header-word obj)))
+             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))
+    (foo "HASHED (unmoved)"
+         (lambda (obj type size)
+           (declare (ignore size))
+           (when (and (= type sb-vm:instance-widetag)
+                      (= (ldb (byte 2 8) (instance-header-word obj)) 1))
+             (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))))

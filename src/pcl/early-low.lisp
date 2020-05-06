@@ -73,8 +73,7 @@
 ;;;; PCL instances
 
 (sb-kernel:!defstruct-with-alternate-metaclass standard-instance
-  ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
-  :slot-names (slots #-(and compact-instance-header x86-64) hash-code)
+  :slot-names (slots)
   :constructor %make-standard-instance
   :superclass-name t
   :metaclass-name static-classoid

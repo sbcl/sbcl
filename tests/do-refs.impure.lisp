@@ -102,7 +102,6 @@
     (walk-slots-test instance
                      `(,(find-layout 'cfoo)
                        (c c format-control nil)
-                       ,(sxhash instance)
                        :a  ay :b bee :format-arguments "wat"))))
 
 (test-util:with-test (:name :walk-slots-pcl-ctor)

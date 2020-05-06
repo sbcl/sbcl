@@ -28,3 +28,13 @@
   (:policy :fast-safe)
   (:generator 4
     (storew value object offset lowtag)))
+
+;; Atomically set a bit of an instance header word
+(define-vop (set-instance-hashed)
+  (:args (x :scs (descriptor-reg)))
+  (:generator 1
+    (inst or (make-ea :byte :base x :disp (- 1 instance-pointer-lowtag))
+          ;; Bit index is 0-based. Subtract 8 since we're using the EA
+          ;; to select byte 1 of the header word.
+          (ash 1 (- stable-hash-required-flag 8))
+          :lock)))

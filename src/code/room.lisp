@@ -176,6 +176,16 @@
 (defun round-to-dualword (size)
   (logand (the word (+ size lowtag-mask)) (lognot lowtag-mask)))
 
+(defun instance-length (instance) ; excluding header, not aligned to even
+  ;; Add 1 if expressed length PLUS header (total number of words) would be
+  ;; an even number, and the hash state bits indicate hashed-and-moved.
+  ;; The preceding test is equivalent to the logical AND of bits 10 and 9.
+  ;; Bit 10 is the lsb of the size. If odd, then when added to the header
+  ;; word, the total is even. Bit 9 is the hashed-and-moved bit.
+  (let ((header (instance-header-word instance)))
+    (+ (logand (ash header -10) (ash header -9) 1)
+       (%instance-length instance))))
+
 ;;; Return the vector OBJ, its WIDETAG, and the number of octets
 ;;; required for its storage (including padding and alignment).
 (defun reconstitute-vector (obj saetp)
@@ -212,7 +222,7 @@
       (let ((words
               (typecase object
                 (cons 2)
-                (instance (1+ (%instance-length object)))
+                (instance (1+ (instance-length object)))
                 (function
                  (when (= (fun-subtype object) simple-fun-widetag)
                    (return-from primitive-object-size
@@ -280,8 +290,10 @@
            (values (tagged-object instance-pointer-lowtag)
                    widetag
                    (boxed-size
-                    (logand (ash header (- instance-length-shift))
-                            instance-length-mask))))
+                    ;; See INSTANCE-LENGTH for further details.
+                    (+ (logand (ash header -10) (ash header -9) 1)
+                       (logand (ash header (- instance-length-shift))
+                               instance-length-mask)))))
 
           (:closure ; also funcallable-instance
            (values (tagged-object fun-pointer-lowtag)

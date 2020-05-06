@@ -3325,6 +3325,8 @@ structure representations"
                "SLOT-SPECIAL"
                "SLOT-REST-P" "+STATIC-FDEFNS+" "STATIC-FUN-OFFSET"
                "%SPACE-BOUNDS" "SPACE-BYTES"
+               "STABLE-HASH-REQUIRED-FLAG"
+               "HASH-SLOT-PRESENT-FLAG"
                "STATIC-SYMBOL-OFFSET" "STATIC-SYMBOL-P"
                "*STATIC-SPACE-FREE-POINTER*" "+STATIC-SYMBOLS+"
                "SYMBOL-HASH-SLOT" "SYMBOL-WIDETAG" "SYMBOL-NAME-SLOT"
@@ -3492,6 +3494,7 @@ SBCL itself"
   compute-applicable-methods
   slot-makunbound
   make-load-form-saving-slots
+  sb-vm:map-allocated-objects
   sb-vm::primitive-object-size
   sb-vm::remove-static-links)
  ;; CLOS implementation

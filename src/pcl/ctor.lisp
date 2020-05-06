@@ -237,16 +237,7 @@
 (declaim (inline sxhash-symbol-or-class))
 (defun sxhash-symbol-or-class (x)
   (cond ((symbolp x) (sxhash x))
-        ;; FIXME: if we could ensure that metaobjects (or at least just CLASS
-        ;; metaobjects) always have a precomputed hash, then instead of calling
-        ;; STD-INSTANCE-HASH which might have to compute and install the hash,
-        ;; a faster variant of this can assume that the hash is definitely nonzero.
-        ;; We could go back to always computing hashes for all standard instances,
-        ;; but I don't like that, because it will cause great pain for trying
-        ;; to generate deterministic core images. Since GFs usually have names
-        ;; (and classes do too), but instances in general don't, if you stay away
-        ;; from anonymous objects, reproducibility is an attainable goal.
-        ((std-instance-p x) (sb-impl::std-instance-hash x))
+        ((std-instance-p x) (sb-impl::instance-sxhash x))
         ((fsc-instance-p x) (fsc-instance-hash x))
         (t
          (bug "Something strange where symbol or class expected."))))
@@ -791,7 +782,7 @@
          (allocation-function (raw-instance-allocator class))
          (slots-fetcher (slots-fetcher class)))
     (if (eq allocation-function 'allocate-standard-instance)
-        `(let ((.instance. (%make-standard-instance nil #-compact-instance-header 0))
+        `(let ((.instance. (%make-standard-instance nil))
                (.slots. (make-array
                          ,(layout-length wrapper)
                          ,@(when early-unbound-markers-p

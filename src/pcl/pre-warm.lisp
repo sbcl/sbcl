@@ -118,7 +118,7 @@
                              classoid
                              :inherits (vector (find-layout 't))
                              :depthoid 1
-                             :length (+ sb-vm:instance-data-start 2)
+                             :length (+ sb-vm:instance-data-start 1)
                              :flags +condition-layout-flag+))))
   (setf (classoid-layout classoid) layout
         (info :type :classoid-cell name) cell

@@ -141,20 +141,25 @@
 ;;; https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 ;;; Please excuse the C-like syle.
 #-64-bit
-(defun murmur-fmix32 (h)
+(progn
+(declaim (maybe-inline murmur3-fmix32))
+(defun murmur3-fmix32 (h)
   (declare (type (unsigned-byte 32) h))
   (setq h (logxor h (ash h -16)))
   (setq h (logand (* h #x85ebca6b) most-positive-word))
   (setq h (logxor h  (ash h -13)))
   (setq h (logand (* h #xc2b2ae35) most-positive-word))
-  (logxor h (ash h -16)))
+  (logxor h (ash h -16))))
+
 #+64-bit
-(defun murmur-fmix64 (k)
+(progn
+(declaim (maybe-inline murmur3-fmix64))
+(defun murmur3-fmix64 (k)
   (setq k (logxor k (ash k -33)))
   (setq k (logand (* k #xff51afd7ed558ccd) most-positive-word))
   (setq k (logxor k (ash k -33)))
   (setq k (logand (* k #xc4ceb9fe1a85ec53) most-positive-word))
-  (logxor k (ash k -33)))
+  (logxor k (ash k -33))))
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
@@ -185,7 +190,7 @@
     (declare (notinline random))
     (logior (if (typep name '(and symbol (not null)))
                 (flet ((improve-hash (x)
-                         (#+64-bit murmur-fmix64 #-64-bit murmur-fmix32 x)))
+                         (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 x)))
                   (mix (logand
                         (improve-hash (sb-impl::%sxhash-simple-string (symbol-name name)))
                         sb-xc:most-positive-fixnum)

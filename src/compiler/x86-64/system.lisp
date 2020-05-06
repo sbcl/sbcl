@@ -165,6 +165,8 @@
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)
     (move res x)))
+
+;;; These next 2 vops are for manipulating the flag bits of a vector header.
 (define-vop (set-header-bits)
   (:translate set-header-bits)
   (:policy :fast-safe)
@@ -186,34 +188,6 @@
         (inst and :byte (ea (- 1 other-pointer-lowtag) x) (lognot bits))
         (inst and :dword (ea (- other-pointer-lowtag) x)
               (lognot (ash bits n-widetag-bits))))))
-
-(define-vop (get-header-data-high)
-  (:translate get-header-data-high)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (inst mov :dword res (ea (- 4 other-pointer-lowtag) x))
-    (inst shl res n-fixnum-tag-bits)))
-
-;;; Swap the high half of the header word of an object
-;;; that has OTHER-POINTER-LOWTAG
-(define-vop (cas-header-data-high)
-  (:args (object :scs (descriptor-reg) :to :eval)
-         (old :scs (unsigned-reg) :target rax)
-         (new :scs (unsigned-reg)))
-  (:policy :fast-safe)
-  (:translate cas-header-data-high)
-  (:temporary (:sc descriptor-reg :offset rax-offset
-               :from (:argument 1) :to :result :target result) rax)
-  (:arg-types * unsigned-num unsigned-num)
-  (:results (result :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:generator 5
-     (move rax old)
-     (inst cmpxchg :dword (ea (- 4 other-pointer-lowtag) object) new :lock)
-     (inst lea result (ea nil rax (ash 1 n-fixnum-tag-bits)))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

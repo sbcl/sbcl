@@ -153,16 +153,6 @@
       ;; but in the EQUAL and EQUAL hash functions, we do that.
       (eq-hash key)))
 
-;;; TODO: add another bit that says that layout pertains to an object
-;;; which is STANDARD-OBJECT and not just PCL-OBJECT, in case a user of the MOP
-;;; decides to implement PCL objects that do not have a hash-code in the
-;;; standard location (either the primitive object or the high header bits
-;;; of the slot vector depending on the backend)
-(declaim (inline instance-with-hash-p))
-(defun instance-with-hash-p (x)
-  (and (%instancep x)
-       (logtest (layout-flags (%instance-layout x)) +pcl-object-layout-flag+)))
-
 #-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values fixnum (member t nil)))
@@ -175,13 +165,27 @@
     ;; And wow, typecase isn't enough to get use to use the transform
     ;; for (sxhash symbol) without an explicit THE form.
     (symbol (values (sxhash (the symbol key)) nil)) ; transformed
-    ((satisfies instance-with-hash-p) (values (std-instance-hash key) nil))
+    (instance (values (instance-sxhash key) nil))
     ;; Otherwise use an EQ hash, rather than SXHASH, since the values
     ;; of SXHASH will be extremely badly distributed due to the
     ;; requirements of the spec fitting badly with our implementation
     ;; strategy.
     (t
      (eq-hash key))))
+
+;;; Basically the same as EQUAL hash, but do not use the stable hash on instances
+;;; so that we do not cause all structures (in the worst case) to grow a new slot.
+;;; This is not for user consumption. I thought it might be needed for internals,
+;;; but EQUAL hashing of structures turned out to stem from a compiler bug in our dumping
+;;; of structure constants: we should never look in the similar constants table,
+;;; because either there is an EQ one or there isn't.
+;;; But maybe there are other use-cases where it is beneficial to store structures
+;;; in an EQUAL table without causing them to be extended by one slot.
+(defun equal-hash/unstable (key)
+  (declare (values fixnum (member t nil)))
+  (if (typep key '(or string cons number bit-vector pathname symbol))
+      (values (sxhash key) nil)
+      (eq-hash key)))
 
 (defun equalp-hash (key)
   (declare (values fixnum (member t nil)))
@@ -192,7 +196,9 @@
      (values (psxhash key) nil))
     ;; As with EQUAL-HASH, use memoized hashes when applicable.
     (symbol (values (sxhash (the symbol key)) nil)) ; transformed
-    ((satisfies instance-with-hash-p) (values (std-instance-hash key) nil))
+    ;; INSTANCE at this point means STANDARD-OBJECT and CONDITION,
+    ;; since STRUCTURE-OBJECT is recursed into by PSXHASH.
+    (instance (values (instance-sxhash key) nil))
     (t
      (eq-hash key))))
 
@@ -355,7 +361,7 @@ Examples:
                         (size #.+min-hash-table-size+)
                         (rehash-size #.default-rehash-size)
                         (rehash-threshold 1)
-                        (hash-function nil)
+                        (hash-function nil hash-function-suppliedp)
                         (weakness nil)
                         (synchronized))
   "Create and return a new hash table. The keywords are as follows:
@@ -423,7 +429,15 @@ Examples:
       (cond ((or (eq test #'eq) (eq test 'eq)) (values nil 'eq #'eq #'eq-hash))
             ((or (eq test #'eql) (eq test 'eql)) (values nil 'eql #'eql #'eql-hash))
             ((or (eq test #'equal) (eq test 'equal))
-             (values nil 'equal #'equal #'equal-hash))
+             (cond ((or (eq hash-function #'equal-hash/unstable)
+                        (eq hash-function 'equal-hash/unstable))
+                    ;; USERFUNP must remain NIL to permit address-based hashing.
+                    ;; Don't want to assign HASH-FUNCTION itself
+                    ;; because that prevents use of the argument's type assertion.
+                    (setq hash-function-suppliedp nil)
+                    (values nil 'equal #'equal #'equal-hash/unstable))
+                   (t
+                    (values nil 'equal #'equal #'equal-hash))))
             ((or (eq test #'equalp) (eq test 'equalp))
              (values nil 'equalp #'equalp #'equalp-hash))
             (t
@@ -440,7 +454,7 @@ Examples:
                (destructuring-bind (test-name test-fun hash-fun) info
                  (when (or (eq test test-name) (eq test test-fun))
                    (return (values t test-name test-fun hash-fun)))))))
-    (when hash-function
+    (when (and hash-function-suppliedp hash-function)
       (setf hash-fun (%coerce-callable-to-fun hash-function)
             ;; It is permitted to specify your own hash function with one of the
             ;; builtin predicates. This forces use of the general predicate.
@@ -896,14 +910,18 @@ if there is no such entry. Entries can be added using SETF."
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; macroexpander helper functions. These rely on a naming convention
   ;; to keep things simple so that we don't have to pass in the names
-  ;; of local variables to bind.
+  ;; of local variables to bind. (Being unhygienic on purpose)
 
   (defun ht-hash-setup (std-fn)
     (if std-fn
         `(((hash0 address-based-p)
            ;; so many warnings about generic SXHASH - who cares
            (locally (declare (muffle-conditions compiler-note))
-             (,(symbolicate std-fn "-HASH") key)))
+             ,(if (eq std-fn 'equal)
+                  `(if (eq (hash-table-hash-fun table) #'equal-hash)
+                       (equal-hash key) ; inlined
+                       (funcall (hash-table-hash-fun table) key))
+                  `(,(symbolicate std-fn "-HASH") key))))
           (hash (prefuzz-hash hash0)))
         '((hash0 (funcall (hash-table-hash-fun hash-table) key))
           (address-based-p nil)

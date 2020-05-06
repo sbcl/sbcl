@@ -344,6 +344,11 @@
 ;;; Note also that sb-fasteval uses 2 bits of the symbol header.
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
+;;; Bit indices of the status bits in an INSTANCE header
+;;; that implement lazily computed stable hash codes.
+(defconstant stable-hash-required-flag 8)
+(defconstant hash-slot-present-flag    9)
+
 #+immobile-space
 (progn
   ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the

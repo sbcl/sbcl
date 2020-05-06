@@ -1460,6 +1460,10 @@ or they must be declared locally notinline at each call site.~@:>"
     (dolist (slot (dd-slots dd))
       (when (eql t (dsd-raw-type slot))
         (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))
+    ;; The garbage collector can add one more word, but it doesn't need
+    ;; to be accounted for in the bitmap.
+    ;; If the bitmap is -1 ("all tagged"), we leave it alone; if a positive
+    ;; number, the added trailing slot can be regarded as untagged.
     (let* ((length (dd-length dd))
            (n-bits (logior length 1)))
       (when (evenp length) ; Add padding word if necessary.

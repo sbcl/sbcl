@@ -34,8 +34,7 @@
 (defun allocate-standard-instance (wrapper)
   (let ((instance (%make-standard-instance
                    (make-array (layout-length wrapper)
-                               :initial-element +slot-unbound+)
-                   #-compact-instance-header 0)))
+                               :initial-element +slot-unbound+))))
     (setf (%instance-layout instance) wrapper)
     instance))
 
@@ -50,7 +49,9 @@
   (declare (layout wrapper))
   (let* ((hash (if name
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
-                   (sb-impl::new-instance-hash-code)))
+                   (sb-impl::quasi-random-address-based-hash
+                    (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
+                    most-positive-fixnum)))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and immobile-code)
                     ((/= (layout-bitmap wrapper) +layout-all-tagged+)

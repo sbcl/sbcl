@@ -55,3 +55,22 @@
     (dotimes (i 14) (setf (gethash (list (gensym)) h) i))
     (setf (gethash (cons 1 2) h) 'foolz))
   (assert (= *rehash+gc-count* 1)))
+
+(defstruct this x)
+(defstruct that x)
+(with-test (:name :struct-in-list-equal-hash)
+  (let ((ht (make-hash-table :test 'equal)))
+    (dotimes (i 100)
+      (let ((key (cons (make-this :x i) (make-that :x i))))
+        (setf (gethash key ht)  i)))
+    ;; This used to degenerate the hash table into a linked list,
+    ;; because all instances of THIS hashed to the same random fixnum
+    ;; and all instances of THAT hashed to the same random fixnum
+    ;; (different from THIS, not that it mattered), and the hash
+    ;; of the cons was therefore the same.
+    (let ((bins-used
+            (count-if #'plusp (sb-impl::hash-table-index-vector ht))))
+      ;; It's probably even better spread out than this many bins,
+      ;; but let's not be too sensitive to the exact bin count in use.
+      ;; It's a heck of a lot better than everything in 1 bin.
+      (assert (> bins-used 40)))))

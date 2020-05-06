@@ -117,3 +117,16 @@
     (inst bne LOOP)
     EXIT
     (inst isync)))
+
+(define-vop (set-instance-hashed)
+  (:args (object :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg) baseptr header)
+  (:generator 5
+    (inst addi baseptr object (- instance-pointer-lowtag))
+    (inst sync)
+    LOOP
+    (inst lwarx header 0 baseptr)
+    (inst ori header header (ash 1 stable-hash-required-flag))
+    (inst stwcx. header 0 baseptr)
+    (inst bne LOOP)
+    (inst isync)))

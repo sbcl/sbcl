@@ -28,3 +28,11 @@
   (:variant-vars offset lowtag)
   (:generator 4
     (storew value object offset lowtag)))
+
+(define-vop (set-instance-hashed)
+  (:args (object :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg) baseptr bit)
+  (:generator 5
+    (inst addi baseptr object (- instance-pointer-lowtag))
+    (inst li bit (ash 1 stable-hash-required-flag))
+    (inst amoor temp bit baseptr :aq :rl)))

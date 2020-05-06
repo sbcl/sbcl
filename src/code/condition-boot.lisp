@@ -10,7 +10,7 @@
 (in-package "SB-KERNEL")
 
 (!defstruct-with-alternate-metaclass condition
-  :slot-names (assigned-slots hash)
+  :slot-names (assigned-slots)
   :constructor nil
   :superclass-name t
   :metaclass-name condition-classoid
@@ -31,8 +31,8 @@
                    :flags +condition-layout-flag+
                    :inherits (map 'vector #'find-layout (cons t inherits))
                    :depthoid -1
-                   ;; 2 declared slots, plus the layout if it takes a slot
-                   :length (+ sb-vm:instance-data-start 2))
+                   ;; 1 declared slot, plus the layout if it takes a slot
+                   :length (+ sb-vm:instance-data-start 1))
                  nil nil))))
   ;; These are grotesquely OAOO-violating, but on the bright side,
   ;; compilation will fail if the subsequent real definition differs,

@@ -24,5 +24,9 @@
 
 /* compute the hash of key (length len) */
 uint32_t gpr_murmur_hash3(const void* key, size_t len, uint32_t seed);
+uint32_t murmur3_fmix32(uint32_t);
+#ifdef LISP_FEATURE_64_BIT
+uint64_t murmur3_fmix64(uint64_t);
+#endif
 
 #endif /* GRPC_CORE_LIB_SUPPORT_MURMUR_HASH_H */

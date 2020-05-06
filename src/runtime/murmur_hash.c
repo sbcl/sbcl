@@ -16,6 +16,7 @@
  *
  */
 
+#include "genesis/config.h"
 #include "murmur_hash.h"
 #include <string.h>
 
@@ -76,3 +77,18 @@ uint32_t gpr_murmur_hash3(const void* key, size_t len, uint32_t seed) {
   FMIX32(h1);
   return h1;
 }
+
+uint32_t murmur3_fmix32(uint32_t k) {
+    FMIX32(k);
+    return k;
+}
+#ifdef LISP_FEATURE_64_BIT
+uint64_t murmur3_fmix64(uint64_t k) {
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccdULL;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53ULL;
+    k ^= k >> 33;
+    return k;
+}
+#endif

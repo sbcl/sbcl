@@ -170,11 +170,6 @@
 (defknown (set-header-bits unset-header-bits)
   (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (values)
   ())
-#+64-bit
-(progn
-(defknown sb-vm::get-header-data-high (t) (unsigned-byte 32) (flushable))
-(defknown sb-vm::cas-header-data-high
-    (t (unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)))
 
 (defknown %array-dimension (array index) index
   (flushable))
@@ -209,6 +204,8 @@
   ())
 (defknown %set-funcallable-instance-layout (funcallable-instance layout) layout
   ())
+;;; Caution: This is not exactly the same as instance_length() in C.
+;;; The C one is the same as SB-VM::INSTANCE-LENGTH.
 (defknown %instance-length (instance) (unsigned-byte 14) (foldable flushable))
 (defknown %instance-cas (instance index t t) t ())
 (defknown %instance-ref (instance index) t

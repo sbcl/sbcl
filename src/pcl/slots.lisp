@@ -57,13 +57,6 @@
 
 (defun %swap-wrappers-and-slots (i1 i2) ; old -> new
   (cond ((std-instance-p i1)
-         #+(and compact-instance-header x86-64)
-         (let ((oslots (std-instance-slots i1))
-               (nslots (std-instance-slots i2)))
-           ;; The hash val is in the header of the slots. Copying is race-free
-           ;; because it is immutable once memoized by STD-INSTANCE-HASH.
-           (sb-vm::cas-header-data-high
-            nslots 0 (sb-impl::%std-instance-hash oslots)))
          ;; FIXME: If a backend supports two-word primitive instances
          ;; and double-wide CAS, it's probably best to use that.
          ;; Maybe we're inside a mutex here anyway though?

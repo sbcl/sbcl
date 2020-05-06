@@ -295,15 +295,24 @@ static inline int simple_vector_p(lispobj obj) {
            widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
 
+/* This is NOT the same value that lisp's %INSTANCE-LENGTH returns.
+ * Lisp always uses the logical length (as originally allocated),
+ * except when heap-walking which requires exact physical sizes */
 static inline int instance_length(lispobj header)
 {
-    // Byte 3 of an instance header word holds the immobile gen# and visited bit,
-    // so those have to be masked off.
-    // Additionally, 'fullcgc' uses bit index 31 as a mark bit, so that has to
-    // be cleared. Lisp does not have to clear bit 31 because fullcgc does not
-    // operate concurrently.
-    // 64-bit machines do not need to do an 8-byte right-shift, so truncate to int.
-    return ((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF;
+    // * Byte 3 of an instance header word holds the immobile gen# and visited bit,
+    //   so those have to be masked off.
+    // * fullcgc uses bit index 31 as a mark bit, so that has to
+    //   be cleared. Lisp does not have to clear bit 31 because fullcgc does not
+    //   operate concurrently.
+    // * If the object is in hashed-and-moved state and the original instance payload
+    //   length was odd (total object length was even), then add 1.
+    //   This can be detected by ANDing some bits, bit 10 being the least-significant
+    //   bit of the original size, and bit 9 being the 'hashed+moved' bit.
+    // * 64-bit machines do not need 'long' right-shifts, so truncate to int.
+
+    int extra = ((unsigned int)header >> 10) & ((unsigned int)header >> 9) & 1;
+    return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
 }
 
 /* Define an assignable instance_layout() macro taking a native pointer */

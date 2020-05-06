@@ -176,3 +176,13 @@
   (def-atomic %atomic-inc-cdr cell-xadd cons-cdr-slot)
   (def-atomic %atomic-dec-car cell-xsub cons-car-slot)
   (def-atomic %atomic-dec-cdr cell-xsub cons-cdr-slot))
+
+;; Atomically set a bit of an instance header word
+(define-vop (set-instance-hashed)
+  (:args (x :scs (descriptor-reg)))
+  (:generator 1
+    (inst or :byte (ea (- 1 instance-pointer-lowtag) x)
+          ;; Bit index is 0-based. Subtract 8 since we're using the EA
+          ;; to select byte 1 of the header word.
+          (ash 1 (- stable-hash-required-flag 8))
+          :lock)))

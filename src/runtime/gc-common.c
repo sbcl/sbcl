@@ -50,6 +50,7 @@
 #include "forwarding-ptr.h"
 #include "var-io.h"
 #include "search.h"
+#include "murmur_hash.h"
 
 #ifdef LISP_FEATURE_SPARC
 #define LONG_FLOAT_SIZE 4
@@ -436,7 +437,43 @@ static inline lispobj copy_instance(lispobj object)
 {
     // Object is an un-forwarded object in from_space
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
-    lispobj copy = copy_object(object, 1 + (instance_length(header)|1));
+    int original_length = instance_length(header);
+    lispobj copy;
+    // KLUDGE: reading both flags at once doesn't really work
+    // unless either we know what the opaque values are:
+    //  8 = stable-hash-required-flag
+    //  9 = hash-slot-present-flag
+    // Maybe the C compiler is sufficiently smart to turn a boolean expression
+    // involving "&&" into this simple expression?
+    if (((header >> 8) & 3) == 1) { // state = hashed + not moved
+        /* If odd, add 1 (making even). Rounding that to odd and then
+         * adding 1 for the header will effectively add 2 words.
+         * Otherwise, don't add anything because a padding slot exists */
+        int new_length = original_length + (original_length & 1);
+        copy = gc_copy_object_resizing(object, 1 + (new_length|1), BOXED_PAGE_FLAG,
+                                       1 + (original_length|1));
+        lispobj *base = native_pointer(copy);
+        /* store the old address as the hash value */
+#ifdef LISP_FEATURE_64_BIT
+        uint64_t hash = murmur3_fmix64(object);
+#else
+        uint32_t hash = murmur3_fmix32(object);
+#endif
+        hash = (hash << (N_FIXNUM_TAG_BITS+1)) >> 1;
+        base[original_length+1] = hash;
+        /* If the object was enlarged by 2 words, then clear the final word.
+         * Git rev 5f435a2b66 removed prezeroizing during GC, and that
+         * last word was not the target of a memcpy */
+        if (original_length & 1) base[original_length+2] = 0;
+        *base |= (1<<9); /* state <- hashed-and-moved */
+#if 0
+        printf("stable hash: obj=%p L=%d -> %p L=%d (recalc=%d)\n",
+               (void*)object, original_length, (void*)copy, new_length,
+               instance_length(*base));
+#endif
+    } else {
+        copy = copy_object(object, 1 + (original_length|1));
+    }
     set_forwarding_pointer(native_pointer(object), copy);
     return copy;
 }

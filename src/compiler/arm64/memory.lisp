@@ -49,6 +49,7 @@
 
     (inst dsb)
     LOOP
+    ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
     (inst ldxr result lip)
     (inst cmp result old-value)
     (inst b :ne EXIT)
@@ -57,3 +58,15 @@
     EXIT
     (inst clrex)
     (inst dmb)))
+
+(define-vop (set-instance-hashed)
+  (:args (object :scs (descriptor-reg)))
+  ;; oject must be pinned to mark it, so temp reg needn't be the LIP register
+  (:temporary (:sc unsigned-reg) baseptr header)
+  (:generator 5
+    (inst sub baseptr object instance-pointer-lowtag)
+    LOOP
+    (inst ldaxr header baseptr)
+    (inst orr header header (ash 1 stable-hash-required-flag))
+    (inst stlxr tmp-tn header baseptr)
+    (inst cbnz (32-bit-reg tmp-tn) LOOP)))
