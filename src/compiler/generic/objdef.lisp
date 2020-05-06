@@ -390,6 +390,12 @@ during backtrace.
   ;; For the 32-bit architectures, reading this slot as a descriptor
   ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
   ;; so there's a transform on SYMBOL-TLS-INDEX to make it sane.
+  ;; The issue with not having this in the header - supposing we used
+  ;; the high 2 bytes for it - is that NIL's 0th word would suggest
+  ;; that it has a nonzero TLS index, namely:
+  ;; * (sb-vm:hexdump nil)
+  ;;   1100008: 0110000B = NIL ; looks like NIL's TLS index is 0x110
+  ;;   110000C: 0110000B = NIL
   #+(and sb-thread (not 64-bit))
   (tls-index :type (and fixnum unsigned-byte) ; too generous still?
              :ref-known (flushable)

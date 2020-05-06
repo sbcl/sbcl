@@ -195,6 +195,17 @@
             (round-to-dualword (+ (* vector-data-offset n-word-bytes)
                                   n-data-octets)))))
 
+;;; * If symbols are 7 words incl header, as they are on 32-bit w/threads,
+;;;   then the part of NIL that manifests as symbol slots consumes 7 words
+;;;   (minus the header) because NIL's symbol widetag precedes it by 1 word.
+;;;   So, there are 6 post-header words and 2 pre-header: one containing
+;;;   the widetag (not that it is ever read), and one 0 word.
+;;; * If symbols are 6 words incl header, as they are on 64-bit and
+;;;   32-bit w/o threads, then the symbol-like part of NIL is 5 words,
+;;;   which aligns up to 6, plus the two pre-header words.
+;;; So either way, it comes out to 8 words in total.
+(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
+
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (if (is-lisp-pointer (get-lisp-obj-address object))
@@ -207,10 +218,7 @@
                    (return-from primitive-object-size
                      (primitive-object-size (fun-code-header object))))
                  (1+ (get-closure-length object)))
-                ;; NIL is larger than a symbol. I don't care to think about
-                ;; why these fudge factors are right, but they make the result
-                ;; equal to what MAP-ALLOCATED-OBJECTS reports.
-                (null (+ symbol-size 1 #+64-bit 1))
+                (null sizeof-nil-in-words)
                 (code-component
                  (return-from primitive-object-size (code-object-size object)))
                 (fdefn 4) ; no length stored in the header
@@ -441,14 +449,9 @@ We could try a few things to mitigate this:
        ;; handling, as the header and alignment are slightly off.
        (multiple-value-bind (start end) (%space-bounds space)
          (declare (ignore start))
-         ;; This "8" is very magical. It happens to work for both
-         ;; word sizes, even though symbols differ in length
-         ;; (they can be either 6 or 7 words).
-         (funcall fun nil symbol-widetag (* 8 n-word-bytes))
-         ;; more magic: go to the next object following NIL, which works
-         ;; regardless of whether there is an object before NIL.
+         (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
          (let ((start (+ (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
-                         (ash 6 sb-vm:word-shift))))
+                         (ash (- sizeof-nil-in-words 2) sb-vm:word-shift))))
            (map-objects-in-range fun
                                  (ash start (- sb-vm:n-fixnum-tag-bits))
                                  end))))
