@@ -315,15 +315,15 @@
                (layout-length ,layout) ,length
                (layout-flags ,layout) ,flags))))
 
-;;; N.B.: this "-STD-CLASS-" is distinctly not the same "STD-" as in STD-INSTANCE-P.
+;;; True of STANDARD-OBJECT, which include generic functions.
 ;;; This one includes any class that mixes in STANDARD-OBJECT.
-(declaim (inline layout-for-std-class-p))
-(defun layout-for-std-class-p (x)
+(declaim (inline layout-for-pcl-obj-p))
+(defun layout-for-pcl-obj-p (x)
   (logtest (layout-flags x) +pcl-object-layout-flag+))
 
 (declaim (inline sb-fasl:dumpable-layout-p))
 (defun sb-fasl:dumpable-layout-p (x)
-  (and (typep x 'layout) (not (layout-for-std-class-p x))))
+  (and (typep x 'layout) (not (layout-for-pcl-obj-p x))))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type

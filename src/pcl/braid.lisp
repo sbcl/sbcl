@@ -119,7 +119,7 @@
                           (find-class ',class) ,class)))
                classes)))
 
-(defun !wrapper-p (x) (and (sb-kernel::layout-p x) (layout-for-std-class-p x)))
+(defun !wrapper-p (x) (and (sb-kernel::layout-p x) (layout-for-pcl-obj-p x)))
 
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)

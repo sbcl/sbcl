@@ -252,7 +252,7 @@
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                (funcallable-instance
-                (if (layout-for-std-class-p (%fun-layout x))
+                (if (layout-for-pcl-obj-p (%fun-layout x))
                     ;; We have a hash code, so might as well use it.
                     (sb-pcl::fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object

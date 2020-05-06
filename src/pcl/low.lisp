@@ -190,7 +190,7 @@
 (defmacro get-wrapper (inst)
   (once-only ((wrapper `(layout-of ,inst)))
     `(progn
-       (aver (layout-for-std-class-p ,wrapper))
+       (aver (layout-for-pcl-obj-p ,wrapper))
        ,wrapper)))
 
 ;;;; structure-instance stuff

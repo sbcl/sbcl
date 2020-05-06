@@ -1546,7 +1546,7 @@
 
 (defun %obsolete-instance-trap (owrapper nwrapper instance)
   (cond
-    ((layout-for-std-class-p owrapper)
+    ((layout-for-pcl-obj-p owrapper)
      (binding* ((class (wrapper-class* nwrapper))
                 (copy (allocate-instance class)) ;??? allocate-instance ???
                 (oslots (get-slots instance))

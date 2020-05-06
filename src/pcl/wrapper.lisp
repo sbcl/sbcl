@@ -228,7 +228,7 @@
       (aver (not (eq state :uninitialized)))
       (cond ((not state)
              owrapper)
-            ((not (layout-for-std-class-p owrapper))
+            ((not (layout-for-pcl-obj-p owrapper))
              ;; Obsolete structure trap.
              (%obsolete-instance-trap owrapper nil instance))
             ((eq t state)

@@ -386,14 +386,14 @@
        `(cond ((std-instance-p ,argument)
                ,(if slots-var
                     `(let ((,wrapper (%instance-layout ,argument)))
-                       (when (layout-for-std-class-p ,wrapper)
+                       (when (layout-for-pcl-obj-p ,wrapper)
                          (setq ,slots-var (std-instance-slots ,argument)))
                        ,wrapper)
                     `(%instance-layout ,argument)))
               ((fsc-instance-p ,argument)
                ,(if slots-var
                     `(let ((,wrapper (%fun-layout ,argument)))
-                       (when (layout-for-std-class-p ,wrapper)
+                       (when (layout-for-pcl-obj-p ,wrapper)
                          (setq ,slots-var (fsc-instance-slots ,argument)))
                        ,wrapper)
                     `(%fun-layout ,argument)))

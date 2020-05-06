@@ -2018,12 +2018,12 @@
   (assert (eql 13 (slot-value 'foobar *magic-symbol*))))
 
 ;;;; Built-in structure and condition layouts should have NIL in
-;;;; LAYOUT-FOR-STD-CLASS-P, and classes should have T.
+;;;; LAYOUT-FOR-PCL-OBJ-P, and classes should have T.
 
-(with-test (:name (sb-pcl::layout-for-std-class-p :builtin))
-  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
-  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
-  (assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object)))))
+(with-test (:name (sb-pcl::layout-for-pcl-obj-p :builtin))
+  (assert (not (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'warning))))
+  (assert (not (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'hash-table))))
+  (assert (eq t (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'standard-object)))))
 
 ;;;; bug 402: PCL used to warn about non-standard declarations
 (declaim (declaration bug-402-d))

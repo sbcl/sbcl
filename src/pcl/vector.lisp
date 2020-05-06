@@ -96,7 +96,7 @@
       (dolist (slot-names slot-name-lists)
         (when slot-names
           (let* ((wrapper (pop wrappers))
-                 (std-p (layout-for-std-class-p wrapper))
+                 (std-p (layout-for-pcl-obj-p wrapper))
                  (class (wrapper-class* wrapper)))
             (dolist (slot-name slot-names)
               (destructuring-bind (location . info)
