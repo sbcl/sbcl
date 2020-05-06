@@ -316,7 +316,6 @@
 
                           (:res res descriptor-reg a0-offset)
 
-                          (:temp lra descriptor-reg lra-offset)
                           (:temp lip interior-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
