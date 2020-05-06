@@ -70,15 +70,7 @@
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
 
-;;;; PCL instances
-
-(sb-kernel:!defstruct-with-alternate-metaclass standard-instance
-  :slot-names (slots)
-  :constructor %make-standard-instance
-  :superclass-name t
-  :metaclass-name static-classoid
-  :metaclass-constructor make-static-classoid
-  :dd-type structure)
+;;;; PCL funcallable instances
 
 ;;; Note: for x8-64 with #+immobile-code there are 2 additional raw slots which
 ;;; hold machine instructions to load the funcallable-instance-fun and jump to

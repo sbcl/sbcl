@@ -195,7 +195,7 @@
 ;;; FIXME: what does the preceding comment mean? You can't use instance-slots
 ;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x)
-  `(truly-the simple-vector (%instance-ref ,x ,(get-dsd-index standard-instance slots))))
+  `(truly-the simple-vector (%instance-ref ,x ,sb-vm:instance-data-start)))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth

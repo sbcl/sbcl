@@ -32,10 +32,10 @@
 (in-package "SB-PCL")
 
 (defun allocate-standard-instance (wrapper)
-  (let ((instance (%make-standard-instance
-                   (make-array (layout-length wrapper)
-                               :initial-element +slot-unbound+))))
+  (let* ((instance (%make-instance (1+ sb-vm:instance-data-start)))
+         (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+)))
     (setf (%instance-layout instance) wrapper)
+    (setf (std-instance-slots instance) slots)
     instance))
 
 (define-condition unset-funcallable-instance-function
