@@ -227,11 +227,7 @@
 
 (defgeneric method-specializers (m))
 
-(defgeneric raw-instance-allocator (class))
-
 (defgeneric slot-definition-allocation (slotd))
-
-(defgeneric slots-fetcher (class))
 
 (defgeneric specializer-class (specializer))
 

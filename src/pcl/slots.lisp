@@ -42,12 +42,6 @@
                          (cell-error-name condition)
                          (type-of (unbound-slot-instance condition))))))))
 
-(defmethod slots-fetcher ((class standard-class))
-  'std-instance-slots)
-
-(defmethod raw-instance-allocator ((class standard-class))
-  'allocate-standard-instance)
-
 ;;; These three functions work on std-instances and fsc-instances. These are
 ;;; instances for which it is possible to change the wrapper and the slots.
 ;;;

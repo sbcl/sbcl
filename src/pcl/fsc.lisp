@@ -33,12 +33,6 @@
 
 (in-package "SB-PCL")
 
-(defmethod slots-fetcher ((class funcallable-standard-class))
-  'fsc-instance-slots)
-
-(defmethod raw-instance-allocator ((class funcallable-standard-class))
-  'allocate-standard-funcallable-instance)
-
 (defmethod allocate-instance ((class funcallable-standard-class) &rest initargs)
   (declare (inline ensure-class-finalized))
   (allocate-standard-funcallable-instance

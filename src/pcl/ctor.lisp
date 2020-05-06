@@ -778,10 +778,9 @@
 ;;; the instance, and .SLOTS. to the instance's slot vector around BODY.
 (defun wrap-in-allocate-forms (ctor body early-unbound-markers-p)
   (let* ((class (ctor-class ctor))
-         (wrapper (class-wrapper class))
-         (allocation-function (raw-instance-allocator class))
-         (slots-fetcher (slots-fetcher class)))
-    (if (eq allocation-function 'allocate-standard-instance)
+         (wrapper (class-wrapper class)))
+    (etypecase class
+      (standard-class
         `(let ((.instance. (%make-instance (1+ sb-vm:instance-data-start)))
                (.slots. (make-array
                          ,(layout-length wrapper)
@@ -790,12 +789,10 @@
            (setf (%instance-layout .instance.) ,wrapper)
            (setf (std-instance-slots .instance.) .slots.)
            ,body
-           .instance.)
-        (let ((more
-               (when (member allocation-function '(allocate-standard-funcallable-instance))
-                 '(nil))))
-          `(let* ((.instance. (,allocation-function ,wrapper ,@more))
-                  (.slots. (,slots-fetcher .instance.)))
+           .instance.))
+      (funcallable-standard-class
+        `(let* ((.instance. (allocate-standard-funcallable-instance ,wrapper nil))
+                (.slots. (fsc-instance-slots .instance.)))
              (declare (ignorable .slots.))
              ,body
              .instance.)))))
