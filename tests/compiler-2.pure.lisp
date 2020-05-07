@@ -2886,3 +2886,13 @@
          x)))
     (('a nil) 'a)
     (('d 30) 'd)))
+
+(with-test (:name :dfo-deleted-lambda-home)
+  (assert
+   (nth-value 5 (checked-compile
+                 `(lambda (c)
+                    (flet ((f (&optional (o c))
+                             (lambda (&key)
+                               (+ (restart-bind nil (go missing-tag))
+                                  (progv nil nil o)))))))
+                 :allow-failure t))))

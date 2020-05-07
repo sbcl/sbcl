@@ -266,7 +266,8 @@
                          (dfo-scavenge-dependency-graph (lambda-home clambda)
                                                         res)))
                  (scavenge-possibly-deleted-lambda (clambda)
-                   (unless (eql (lambda-kind clambda) :deleted)
+                   (unless (or (eql (lambda-kind clambda) :deleted)
+                               (eql (lambda-kind (lambda-home clambda)) :deleted))
                      (scavenge-lambda clambda)))
                  ;; Scavenge call relationship.
                  (scavenge-call (called-lambda)
@@ -281,7 +282,7 @@
                  ;; closed-over variable was unused and thus delete
                  ;; it. See e.g. cmucl-imp 2001-11-29.)
                  (scavenge-closure-var (var)
-                   (unless (null (lambda-var-refs var)) ; unless var deleted
+                   (when (lambda-var-refs var) ; unless var deleted
                      (let ((var-home-home (lambda-home (lambda-var-home var))))
                        (scavenge-possibly-deleted-lambda var-home-home))))
                  ;; Scavenge closure over an entry for nonlocal exit.
