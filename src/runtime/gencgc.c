@@ -4013,12 +4013,10 @@ static void gc_allocate_ptes()
      * size is large enough.  To further avoid touching each page structure
      * until first use, FREE_PAGE_FLAG must be 0, statically asserted here:
      */
-    {
-      /* Compile time assertion: If triggered, declares an array
-       * of dimension -1 forcing a syntax error. The intent of the
-       * assignment is to avoid an "unused variable" warning. */
-      char __attribute__((unused)) assert_free_page_flag_0[(FREE_PAGE_FLAG) ? -1 : 1];
-    }
+#if FREE_PAGE_FLAG != 0
+#error "FREE_PAGE_FLAG is not 0"
+#endif
+
     /* An extra struct exists as the end as a sentinel. Its 'scan_start_offset'
      * and 'bytes_used' must be zero.
      * Doing so avoids testing in page_ends_contiguous_block_p() whether the
