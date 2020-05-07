@@ -187,7 +187,8 @@ sufficiently motivated to do lengthy fixes."
   (declare (ignore purify) (ignorable root-structures))
   ;; If the toplevel function is not defined, this will signal an
   ;; error before saving, not at startup time.
-  (let ((toplevel (%coerce-callable-to-fun toplevel)))
+  (let ((toplevel (%coerce-callable-to-fun toplevel))
+        *streams-closed-by-slad*)
     #+sb-core-compression
     (check-type compression (or boolean (integer -1 9)))
     #-sb-core-compression
@@ -269,6 +270,7 @@ sufficiently motivated to do lengthy fixes."
 
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
+    (restore-fd-streams)
     (reinit)
     (error 'save-error)))
 
@@ -334,7 +336,6 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (finalizers-deinit)
   (fill *pathnames* nil)
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
@@ -347,6 +348,8 @@ sufficiently motivated to do lengthy fixes."
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)
+  (invalidate-fd-streams)
+  (finalizers-deinit)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
   (setf * nil ** nil *** nil

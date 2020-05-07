@@ -82,6 +82,9 @@
 (defun closed-flame (stream &rest ignore)
   (declare (ignore ignore))
   (error 'closed-stream-error :stream stream))
+(defun closed-flame-saved (stream &rest ignore)
+  (declare (ignore ignore))
+  (error 'closed-saved-stream-error :stream stream))
 (defun no-op-placeholder (&rest ignore)
   (declare (ignore ignore)))
 
@@ -188,6 +191,15 @@
   (setf (ansi-stream-bout stream) #'closed-flame)
   (setf (ansi-stream-sout stream) #'closed-flame)
   (setf (ansi-stream-misc stream) #'closed-flame))
+
+(defun set-closed-flame-by-slad (stream)
+  (setf (ansi-stream-in stream) #'closed-flame-saved)
+  (setf (ansi-stream-bin stream) #'closed-flame-saved)
+  (setf (ansi-stream-n-bin stream) #'closed-flame-saved)
+  (setf (ansi-stream-out stream) #'closed-flame-saved)
+  (setf (ansi-stream-bout stream) #'closed-flame-saved)
+  (setf (ansi-stream-sout stream) #'closed-flame-saved)
+  (setf (ansi-stream-misc stream) #'closed-flame-saved))
 
 ;;;; for file position and file length
 (defun external-format-char-size (external-format)

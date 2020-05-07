@@ -2595,6 +2595,19 @@
   ;; rightly complain that *AVAILABLE-BUFFERS* is proclaimed always bound.
   (%makunbound '*available-buffers*))
 
+(defvar *streams-closed-by-slad*)
+
+(defun restore-fd-streams ()
+  (loop for (stream in bin n-bin out bout sout misc) in *streams-closed-by-slad*
+        do
+        (setf (ansi-stream-in stream) in)
+        (setf (ansi-stream-bin stream) bin)
+        (setf (ansi-stream-n-bin stream) n-bin)
+        (setf (ansi-stream-out stream) out)
+        (setf (ansi-stream-bout stream) bout)
+        (setf (ansi-stream-sout stream) sout)
+        (setf (ansi-stream-misc stream) misc)))
+
 (defun stdstream-external-format (fd)
   #-win32 (declare (ignore fd))
   (let* ((keyword (cond #+(and win32 sb-unicode)

@@ -43,5 +43,7 @@
 ;;; have assigned *CURRENT-THREAD* into *FINALIZER-THREAD* until after
 ;;; FINALIZER-THREAD-STOP has returned. Therefore the test in DEINIT
 ;;; will see that thread in all threads, and will have to deal with it.
-(sb-impl::deinit)
-(sb-impl::reinit)
+(let (sb-impl::*streams-closed-by-slad*)
+  (sb-impl::deinit)
+  (sb-impl::restore-fd-streams)
+  (sb-impl::reinit))

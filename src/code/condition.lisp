@@ -601,6 +601,11 @@
    (lambda (condition stream)
      (format stream "~S is closed" (stream-error-stream condition)))))
 
+(define-condition closed-saved-stream-error (closed-stream-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~S was closed by SB-EXT:SAVE-LISP-AND-DIE" (stream-error-stream condition)))))
+
 (define-condition file-error (error)
   ((pathname :reader file-error-pathname :initarg :pathname))
   (:report

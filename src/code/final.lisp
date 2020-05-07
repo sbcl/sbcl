@@ -134,6 +134,25 @@ Examples:
                    (gethash object (finalizer-id-map store)) id)))))
   object)
 
+(defun invalidate-fd-streams ()
+  (with-finalizer-store (store)
+    (maphash (lambda (object id)
+               (declare (ignore id))
+               (when (fd-stream-p object)
+                 (push (list object
+                             (ansi-stream-in object)
+                             (ansi-stream-bin object)
+                             (ansi-stream-n-bin object)
+                             (ansi-stream-out object)
+                             (ansi-stream-bout object)
+                             (ansi-stream-sout object)
+                             (ansi-stream-misc object))
+                       *streams-closed-by-slad*)
+                 ;; Nobody asked us to actually close the fd,
+                 ;; so just make it unusable.
+                 (set-closed-flame-by-slad object)))
+             (finalizer-id-map store))))
+
 (defun finalizers-deinit ()
   ;; remove :dont-save finalizers
   ;; Renumber the ID range as well, but leave the array size as-is. We could
@@ -143,8 +162,8 @@ Examples:
   (with-finalizer-store (old-store)
     (without-gcing
       (let ((new-store
-             (make-finalizer-store (max (1+ (finalizer-max-id old-store))
-                                        +finalizers-initial-size+)))
+              (make-finalizer-store (max (1+ (finalizer-max-id old-store))
+                                         +finalizers-initial-size+)))
             (old-objects (finalizer-id-map old-store)))
         (maphash (lambda (object old-id &aux (old (svref old-store old-id)))
                    ;; OLD is either a vector of finalizers or a single finalizer.
@@ -154,7 +173,7 @@ Examples:
                    (awhen (cond ((simple-vector-p old)
                                  (let ((new (remove-if #'consp old)))
                                    (case (length new)
-                                     (0 nil) ; all deleted
+                                     (0 nil)           ; all deleted
                                      (1 (svref new 0)) ; reduced to singleton
                                      (t new))))
                                 ((atom old) old)) ; a single finalizer to be saved
