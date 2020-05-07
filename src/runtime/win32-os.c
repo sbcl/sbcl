@@ -1380,6 +1380,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     DWORD code = exception_record->ExceptionCode;
 
     if(code == 0x20474343 || /* GCC */
+       code == 0x406D1388 || /* MS_VC_EXCEPTION */
        code == 0xE06D7363 || /* Emsc */
        code == 0xE0434352)   /* ECCR */
         /* Do not handle G++, VC++ and .NET exceptions */
