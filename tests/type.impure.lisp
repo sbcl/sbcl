@@ -371,7 +371,7 @@
                                            condition
                                            sb-pcl::slot-object
                                            t))))
-
+    (sb-mop:finalize-inheritance (find-class 'fundamental-stream))
      ;; stream classes
      (assert (equal (sb-pcl:class-direct-superclasses (find-class
                                                        'fundamental-stream))
