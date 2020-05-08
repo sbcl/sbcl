@@ -167,27 +167,6 @@ futex_wake(int *lock_word, int n)
 #endif
 
 
-
-static void getuname(int *major_version, int* minor_version, int *patch_version)
-{
-    /* Conduct various version checks: do we have enough mmap(), is
-     * this a sparc running 2.2, can we do threads? */
-    struct utsname name;
-    char *p;
-    uname(&name);
-
-    p=name.release;
-    *major_version = atoi(p);
-    *minor_version = *patch_version = 0;
-    p=strchr(p,'.');
-    if (p != NULL) {
-            *minor_version = atoi(++p);
-            p=strchr(p,'.');
-            if (p != NULL)
-                    *patch_version = atoi(++p);
-    }
-}
-
 void os_init(char __attribute__((unused)) *argv[],
              char __attribute__((unused)) *envp[])
 {
@@ -212,8 +191,6 @@ void os_init(char __attribute__((unused)) *argv[],
 
 int os_preinit(char *argv[], char *envp[])
 {
-    int major_version, minor_version, patch_version;
-    getuname(&major_version, &minor_version, &patch_version);
 
 #if ALLOW_PERSONALITY_CHANGE
     if (getenv("SBCL_IS_RESTARTING")) {
@@ -232,53 +209,43 @@ int os_preinit(char *argv[], char *envp[])
         return 1; // indicate that we already allocated hardwired spaces
 
 #if ALLOW_PERSONALITY_CHANGE
-    /* KLUDGE: Disable memory randomization on new Linux kernels
-     * by setting a personality flag and re-executing. (We need
-     * to re-execute, since the memory maps that can conflict with
-     * the SBCL spaces have already been done at this point).
+    /* KLUDGE: Disable memory randomization by setting a personality
+     * flag and re-executing. (We need to re-execute, since the memory
+     * maps that can conflict with the SBCL spaces have already been
+     * done at this point).
      */
-    if ((major_version == 2
-         /* Some old kernels will apparently lose unsupported personality flags
-          * on exec() */
-         && ((minor_version == 6 && patch_version >= 11)
-             || (minor_version > 6)
-             /* This is what RHEL 3 reports */
-             || (minor_version == 4 && patch_version > 20)))
-        || major_version >= 3)
-    {
-        int pers = personality(0xffffffffUL);
-        if (!(pers & ADDR_NO_RANDOMIZE)) {
-            int retval = personality(pers | ADDR_NO_RANDOMIZE);
-            /* Allegedly some Linux kernels (the reported case was
-             * "hardened Linux 2.6.7") won't set the new personality,
-             * but nor will they return -1 for an error. So as a
-             * workaround query the new personality...
-             */
-            int newpers = personality(0xffffffffUL);
-            /* ... and don't re-execute if either the setting resulted
-             * in an error or if the value didn't change. Otherwise
-             * this might result in an infinite loop.
-             */
+    int pers = personality(0xffffffffUL);
+    if (!(pers & ADDR_NO_RANDOMIZE)) {
+        int retval = personality(pers | ADDR_NO_RANDOMIZE);
+        /* Allegedly some Linux kernels (the reported case was
+         * "hardened Linux 2.6.7") won't set the new personality,
+         * but nor will they return -1 for an error. So as a
+         * workaround query the new personality...
+         */
+        int newpers = personality(0xffffffffUL);
+        /* ... and don't re-execute if either the setting resulted
+         * in an error or if the value didn't change. Otherwise
+         * this might result in an infinite loop.
+         */
 
-            if (!getenv("SBCL_IS_RESTARTING") &&
-                retval != -1 && newpers != pers) {
-                /* Use /proc/self/exe instead of trying to figure out
-                 * the executable path from PATH and argv[0], since
-                 * that's unreliable. We follow the symlink instead of
-                 * executing the file directly in order to prevent top
-                 * from displaying the name of the process as "exe". */
-                char runtime[PATH_MAX+1];
-                int i = readlink("/proc/self/exe", runtime, PATH_MAX);
-                if (i != -1) {
-                    environ = envp;
-                    setenv("SBCL_IS_RESTARTING", "T", 1);
-                    runtime[i] = '\0';
-                    execv(runtime, argv);
-                }
+        if (!getenv("SBCL_IS_RESTARTING") &&
+            retval != -1 && newpers != pers) {
+            /* Use /proc/self/exe instead of trying to figure out
+             * the executable path from PATH and argv[0], since
+             * that's unreliable. We follow the symlink instead of
+             * executing the file directly in order to prevent top
+             * from displaying the name of the process as "exe". */
+            char runtime[PATH_MAX+1];
+            int i = readlink("/proc/self/exe", runtime, PATH_MAX);
+            if (i != -1) {
+                environ = envp;
+                setenv("SBCL_IS_RESTARTING", "T", 1);
+                runtime[i] = '\0';
+                execv(runtime, argv);
             }
-            /* Either changing the personality or execve() failed.
-             * Just get on with life and hope for the best. */
         }
+        /* Either changing the personality or execve() failed.
+         * Just get on with life and hope for the best. */
     }
 #endif
     return 0;
