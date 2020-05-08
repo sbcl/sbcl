@@ -41,6 +41,14 @@
   ;; the EQ table.
   (similar-table (make-hash-table :test 'equal) :type hash-table)
   (eq-table (make-hash-table :test 'eq) :type hash-table)
+  ;; the CONS table is an additional EQ table, used for storing CDRs
+  ;; of dumped lists which will not have their own direct identity as
+  ;; a dumped constant, but which might nevertheless be EQ to some
+  ;; other dumped object (and require that EQness to be preserved).
+  ;; The hash table entry, if present, is a reference to its parent
+  ;; list object (which will have a direct entity as a dumped
+  ;; constant) along with an index of how many CDRs to take.
+  (cons-table (make-hash-table :test 'eq) :type hash-table)
   ;; Hashtable mapping a string to a list of fop-table indices of
   ;; symbols whose name is that string. For any name as compared
   ;; by STRING= there can be a symbol whose name is a base string
@@ -628,6 +636,31 @@
         (declare (type index n))
         (when (cdr-circularity l n)
           (return))
+
+        ;; if this CONS is EQ to some other object we have already
+        ;; dumped, dump a reference to that instead.
+        (let ((index (gethash l (fasl-output-eq-table file))))
+          (when index
+            (dump-push index file)
+            (terminate-dotted-list n file)
+            (return)))
+
+        ;; if this CONS is EQ to the Ith CDR of some other list we have
+        ;; already dumped, dump a reference to that instead.
+        (let ((list+i (gethash l (fasl-output-cons-table file))))
+          (when list+i
+            (destructuring-bind (list i) list+i
+              (aver (consp list))
+              (let ((index (gethash list (fasl-output-eq-table file))))
+                (dump-push index file)
+                (dump-fop 'fop-nthcdr file i)
+                (when (> n 0)
+                  (terminate-dotted-list n file))
+                (return)))))
+
+        ;; put an entry for this cons into the fasl output cons table,
+        ;; for the benefit of dumping later constants
+        (setf (gethash l (fasl-output-cons-table file)) (list list n))
 
         (setf (gethash l circ) list)
 

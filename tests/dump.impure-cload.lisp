@@ -448,3 +448,15 @@
       (assert (typep (second c4) 'sb-kernel:simple-character-string)))
     (assert (or (equal l1 l2)
                 (equal l1 (reverse l2))))))
+
+(defun cons-on-list-p (cons list)
+  (assert (consp cons))
+  (loop for cdr on list thereis (eq cons cdr)))
+
+(defun constant-folding-cdr-test-fun ()
+  (let ((list '(a b c)))
+    (dolist (x (list list (cdr list) (cddr list)))
+      (assert (cons-on-list-p x list)))))
+
+(with-test (:name (:cdr-eq-detection :lp1583753))
+  (constant-folding-cdr-test-fun))

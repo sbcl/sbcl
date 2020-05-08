@@ -6,6 +6,8 @@ changes relative to sbcl-2.0.4:
   * minor change: *compile-print* now makes it more clear what block
     compilation is actually doing. The default output is now slightly more
     verbose as a result.
+  * bug fix: EQness is better preserved given partial sharing of list contents
+    in the file compiler.  (lp#1583753, reported by Denis Budyak)
 
 changes in sbcl-2.0.4 relative to sbcl-2.0.3:
   * platform support:
