@@ -55,6 +55,8 @@
 # include <sys/timerfd.h>
 #endif
 
+int sb_GetTID() { return syscall(SYS_gettid); }
+
 #ifdef LISP_FEATURE_X86
 /* Prototype for personality(2). Done inline here since the header file
  * for this isn't available on old versions of glibc. */
@@ -99,8 +101,6 @@ static inline int sys_futex(void *futex, int op, int val, struct timespec *rel)
 {
     return syscall(SYS_futex, futex, op, val, rel);
 }
-
-int sb_GetTID() { return syscall(SYS_gettid); }
 
 static void
 futex_init()
