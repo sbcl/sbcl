@@ -79,8 +79,6 @@ int personality (unsigned long);
  * futexes when available.*/
 #define FUTEX_WAIT_PRIVATE (0+128)
 #define FUTEX_WAKE_PRIVATE (1+128)
-#define FUTEX_FD (2)
-#define FUTEX_REQUEUE (3)
 
 /* Not static so that Lisp may query it. */
 boolean futex_private_supported_p;
@@ -99,11 +97,10 @@ futex_wake_op()
 
 static inline int sys_futex(void *futex, int op, int val, struct timespec *rel)
 {
-#if defined LISP_FEATURE_64_BIT && defined LISP_FEATURE_BIG_ENDIAN
-    futex = (char*)futex + 4; // off by 4 because the slot is 64 bits
-#endif
     return syscall(SYS_futex, futex, op, val, rel);
 }
+
+int sb_GetTID() { return syscall(SYS_gettid); }
 
 static void
 futex_init()
@@ -129,16 +126,11 @@ futex_init()
 #include "genesis/vector.h"
 char* futex_name(int *lock_word)
 {
-    // If there is a Lisp string at lock_word-1 or -2, return that.
-    // Otherwise return NULL.
-    lispobj name = *(lock_word - 1);
-    struct vector* v = (struct vector*)native_pointer(name);
-    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(&v->header) == SIMPLE_BASE_STRING_WIDETAG)
-        return (char*)(v->data);
-    name = *(lock_word - 2);
-    v = (struct vector*)native_pointer(name);
-    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(&v->header) == SIMPLE_BASE_STRING_WIDETAG)
-        return (char*)(v->data);
+    // If there is a Lisp string at lock_word+1, return that, otherwise NULL.
+    lispobj name = ((lispobj*)lock_word)[1];
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG &&
+        header_widetag(VECTOR(name)->header) == SIMPLE_BASE_STRING_WIDETAG)
+        return (char*)VECTOR(name)->data;
     return 0;
 }
 

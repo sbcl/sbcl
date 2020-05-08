@@ -244,7 +244,7 @@
 
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
-(defmacro define-structure-slot-addressor (name &key structure slot)
+(defmacro define-structure-slot-addressor (name &key structure slot (byte-offset 0))
   (let* ((dd (find-defstruct-description structure t))
          (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
                     (error "Slot ~S not found in ~S." slot structure)))
@@ -256,6 +256,7 @@
          (truly-the
           word
           (+ (get-lisp-obj-address instance)
+             ,byte-offset
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))

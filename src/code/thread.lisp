@@ -19,10 +19,12 @@
                   (:copier nil))
   "Mutex type."
   ;; C code could (but doesn't currently) access the name
-  (name   nil :type (or null simple-string))
-  (%owner nil :type (or null thread))
   #+(and sb-thread sb-futex)
-  (state    0 :type fixnum))
+  (state    0 :type fixnum)
+  ;; If adding slots between STATE and NAME, please see futex_name() in linux_os.c
+  ;; which attempts to divine a string from a futex word address.
+  (name   nil :type (or null simple-string))
+  (%owner nil :type (or null thread)))
 
 (defstruct (thread (:constructor %make-thread (&key name %alive-p %ephemeral-p))
                    (:copier nil))
@@ -42,6 +44,8 @@ in future versions."
   ;; Yes, there are three different thread structures.
   (primitive-thread 0 :type sb-vm:word)
   (interruptions nil :type list)
+  ;; Gotta have half a dozen or more different ways to identify a thread.
+  #+linux (os-tid 0 :type (unsigned-byte 32))
   ;; On succesful execution of the thread's lambda a list of values.
   (result 0)
   (interruptions-lock

@@ -2442,6 +2442,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-ALIVE-P"
                "THREAD-EPHEMERAL-P"
                "THREAD-NAME"
+               "THREAD-OS-TID"
                "THREAD-YIELD"
                "FOREIGN-THREAD"
                #+(and sb-safepoint-strictly (not win32))

@@ -260,6 +260,11 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *initial-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
+(eval-when (:compile-toplevel :load-toplevel)
+  #+(and sb-thread sb-futex linux) (push :futex-use-tid sb-xc:*features*))
+
+#+linux (define-alien-routine "sb_GetTID" (unsigned 32))
+
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
   ;;; FIXME: is it purposeful or accidental that we recreate some of
@@ -268,6 +273,7 @@ created and old ones may exit at any time."
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread :name "main thread"
                               :%alive-p t)))
+    #+linux (setf (thread-os-tid thread) (sb-gettid))
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
@@ -382,7 +388,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     (declaim (inline futex-wait %futex-wait futex-wake))
 
     (define-alien-routine ("futex_wait" %futex-wait) int
-      (word unsigned) (old-value unsigned)
+      (word unsigned) (old-value #+linux (unsigned 32) #-linux unsigned)
       (to-sec long) (to-usec unsigned-long))
 
     (defun futex-wait (word old to-sec to-usec)
@@ -429,7 +435,8 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     ;; where we store state. This would be prettier if we had 32-bit raw slots.
     (define-structure-slot-addressor mutex-state-address
         :structure mutex
-        :slot state))
+        :slot state
+        :byte-offset (+ #+(and 64-bit big-endian) 4)))
   ;; Important: current code assumes these are fixnums or other
   ;; lisp objects that don't need pinning.
   (defconstant +lock-free+ 0)
@@ -450,9 +457,14 @@ HOLDING-MUTEX-P."
 #+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
-  (name nil :type (or null string))
   #+(and sb-thread sb-futex)
-  (token nil))
+  (token 0
+         ;; actually 32-bits, but it needs to be a raw slot and we don't have
+         ;; 32-bit raw slots on 64-bit machines.
+         #+futex-use-tid :type #+futex-use-tid sb-ext:word)
+  ;; If adding slots between TOKEN and NAME, please see futex_name() in linux_os.c
+  ;; which attempts to divine a string from a futex word address.
+  (name nil :type (or null string)))
 
 #+(and sb-thread (not sb-futex))
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
@@ -906,7 +918,8 @@ IF-NOT-OWNER is :FORCE)."
 (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (define-structure-slot-addressor waitqueue-token-address
       :structure waitqueue
-      :slot token))
+      :slot token
+      :byte-offset (+ #+(and 64-bit big-endian) 4)))
 
 (declaim (inline %condition-wait))
 (defun %condition-wait (queue mutex
@@ -941,8 +954,11 @@ IF-NOT-OWNER is :FORCE)."
                                (%%wait-for #'wakeup stop-sec stop-usec)))
                            :timeout)))
                #+sb-futex
-               (with-pinned-objects (queue me)
-                 (setf (waitqueue-token queue) me)
+               (with-pinned-objects (queue
+                                     ;; No point in pinning ME if not taking the adddress.
+                                     #-futex-use-tid me)
+                 (setf (waitqueue-token queue) #+futex-use-tid (thread-os-tid me)
+                                               #-futex-use-tid me)
                  (release-mutex mutex)
                  ;; Now we go to sleep using futex-wait. If anyone else
                  ;; manages to grab MUTEX and call CONDITION-NOTIFY during
@@ -952,7 +968,8 @@ IF-NOT-OWNER is :FORCE)."
                  (setf status
                        (case (allow-with-interrupts
                                (futex-wait (waitqueue-token-address queue)
-                                           (get-lisp-obj-address me)
+                                           #+futex-use-tid (thread-os-tid me)
+                                           #-futex-use-tid (get-lisp-obj-address me)
                                            ;; our way of saying "no
                                            ;; timeout":
                                            (or to-sec -1)
@@ -1087,12 +1104,14 @@ must be held by this thread during this call."
       ;; No problem if >1 thread notifies during the comment in condition-wait:
       ;; as long as the value in queue-data isn't the waiting thread's id, it
       ;; matters not what it is -- using the queue object itself is handy.
+      ;; But "handy" is not right (lp#1876825) if pointers are 64 bits,
+      ;; so then just use 0 which can not correspond to any thread.
       ;;
       ;; XXX we should do something to ensure that the result of this setf
       ;; is visible to all CPUs.
       ;;
       ;; ^-- surely futex_wake() involves a memory barrier?
-      (setf (waitqueue-token queue) queue)
+      (setf (waitqueue-token queue) #+futex-use-tid 0 #-futex-use-tid queue)
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n))
       nil)))
@@ -1350,8 +1369,7 @@ on this semaphore, then N of them is woken up."
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
-    (setf (thread-os-thread thread)
-          (ldb (byte sb-vm:n-word-bits 0) -1))
+    (setf (thread-os-thread thread) sb-ext:most-positive-word)
     (setq *all-threads* (avl-delete control-stack-start *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
@@ -1548,6 +1566,7 @@ session."
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
+  #+linux (setf (thread-os-tid thread) (sb-gettid))
   (with-mutex ((thread-result-lock thread))
     (with-all-threads-lock
         (let ((addr (get-lisp-obj-address sb-vm:*control-stack-start*)))
