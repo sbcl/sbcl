@@ -215,14 +215,6 @@ int os_preinit(char *argv[], char *envp[])
     int major_version, minor_version, patch_version;
     getuname(&major_version, &minor_version, &patch_version);
 
-    // Rev b44ca02cb963 conditionally enabled a workaround for a kernel 2.6 bug.
-    // Rev d4d6c4b16a36 moved the workaround check from compile-time to runtime.
-    // 14 years later we're still performing that check, which annoyingly adds
-    // signal-related junk to startup which must be ignored when debugging.
-    // Let's assume that major version 3 and later are fine.
-    extern void set_sigaction_nodefer_works();
-    if (major_version>=3) set_sigaction_nodefer_works();
-
 #if ALLOW_PERSONALITY_CHANGE
     if (getenv("SBCL_IS_RESTARTING")) {
         /* We restarted due to previously enabled ASLR.  Now,
