@@ -223,7 +223,7 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
 }
 
 #if INSTALL_SIG_MEMORY_FAULT_HANDLER && defined(THREAD_SANITIZER)
-/* Under TSAN, every signal blocks every other signal regardless of the
+/* Under TSAN, any delivered signal blocks all other signals regardless of the
  * 'sa_mask' given to sigaction(). This is courtesy of an interceptor -
  * https://github.com/llvm-mirror/compiler-rt/blob/bcc227ee4af1ef3e63033b35dcb1d5627a3b2941/lib/tsan/rtl/tsan_interceptors.cc#L1972
  *
