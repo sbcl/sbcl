@@ -80,6 +80,15 @@ static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char*
     return a[i] - b[i]; // same return convention as strcmp()
 }
 
+struct symbol_search {
+    char *name;
+    boolean ignore_case;
+};
+static uword_t search_symbol_aux(lispobj* start, lispobj* end, uword_t arg)
+{
+    struct symbol_search* ss = (struct symbol_search*)arg;
+    return (uword_t)search_for_symbol(ss->name, (lispobj)start, (lispobj)end, ss->ignore_case);
+}
 lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignore_case)
 {
     lispobj* where = (lispobj*)start;
@@ -87,6 +96,16 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
     struct symbol *symbol;
     lispobj namelen = make_fixnum(strlen(name));
 
+#ifdef LISP_FEATURE_GENCGC
+    // This function was never safe to use on pages that were dirtied with unboxed words.
+    // It has become even less safe now that don't prezero most pages during GC,
+    // because we will certainly encounter remnants of forwarding pointers etc.
+    // So if the specified range is all of dynamic space, defer to the space walker.
+    if (start == DYNAMIC_SPACE_START && end == (uword_t)get_alloc_pointer()) {
+        struct symbol_search ss = {name, ignore_case};
+        return (lispobj*)walk_generation(search_symbol_aux, -1, (uword_t)&ss);
+    }
+#endif
     while (where < limit) {
         lispobj word = *where;
         if (header_widetag(word) == SYMBOL_WIDETAG &&
