@@ -168,22 +168,6 @@ futex_wake(int *lock_word, int n)
 
 
 
-#ifdef LISP_FEATURE_SB_THREAD
-int
-isnptl (void)
-{
-  size_t n = confstr (_CS_GNU_LIBPTHREAD_VERSION, NULL, 0);
-  if (n > 0) {
-      char *buf = alloca (n);
-      confstr (_CS_GNU_LIBPTHREAD_VERSION, buf, n);
-      if (strstr (buf, "NPTL")) {
-          return 1;
-      }
-  }
-  return 0;
-}
-#endif
-
 static void getuname(int *major_version, int* minor_version, int *patch_version)
 {
     /* Conduct various version checks: do we have enough mmap(), is
@@ -207,15 +191,8 @@ static void getuname(int *major_version, int* minor_version, int *patch_version)
 void os_init(char __attribute__((unused)) *argv[],
              char __attribute__((unused)) *envp[])
 {
-#ifdef LISP_FEATURE_SB_THREAD
-#if defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
     futex_init();
-#endif
-    if(! isnptl()) {
-       lose("This version of SBCL only works correctly with the NPTL threading\n"
-            "library. Please use a newer glibc, use an older SBCL, or stop using\n"
-            "LD_ASSUME_KERNEL");
-    }
 #endif
 
 #ifdef LISP_FEATURE_X86
@@ -237,10 +214,7 @@ int os_preinit(char *argv[], char *envp[])
 {
     int major_version, minor_version, patch_version;
     getuname(&major_version, &minor_version, &patch_version);
-    if (major_version<2) {
-        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
-             major_version);
-    }
+
     // Rev b44ca02cb963 conditionally enabled a workaround for a kernel 2.6 bug.
     // Rev d4d6c4b16a36 moved the workaround check from compile-time to runtime.
     // 14 years later we're still performing that check, which annoyingly adds
