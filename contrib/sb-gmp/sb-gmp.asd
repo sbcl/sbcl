@@ -1,3 +1,6 @@
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-gmp"
   :name "SB-GMP"
   :version "0.1"

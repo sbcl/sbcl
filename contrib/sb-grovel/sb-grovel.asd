@@ -1,5 +1,8 @@
 ;;; -*-  Lisp -*-
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-grovel"
   :version "0.2"
   :depends-on ("asdf")

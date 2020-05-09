@@ -1,5 +1,8 @@
 ;;; -*-  Lisp -*-
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-rotate-byte"
   :version "0.1"
   #+sb-building-contrib :pathname

@@ -1,4 +1,6 @@
 ;;; -*-  Lisp -*-
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
 
 (defsystem "sb-bsd-sockets"
   :version "0.59"

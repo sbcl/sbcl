@@ -1,3 +1,6 @@
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-sprof"
   :description "A statistical profiler."
   #+sb-building-contrib :pathname

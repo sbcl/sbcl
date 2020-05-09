@@ -1,5 +1,8 @@
 ;;; -*- lisp -*-
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-simple-streams"
   :depends-on ("sb-bsd-sockets" "sb-posix")
   #+sb-building-contrib :pathname

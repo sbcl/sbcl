@@ -7,6 +7,9 @@
 ;;;; facility.
 ;;;;
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-md5"
   :description "The MD5 Message-Digest Algorithm RFC 1321"
   :author "Pierre R. Mai <pmai@pmsf.de>"
