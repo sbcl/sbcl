@@ -97,11 +97,11 @@
 (defun %instance-sxhash (instance)
   ;; to avoid consing in fmix
   (declare (inline #+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32))
-  (let* ((layout (%instance-layout (truly-the instance instance)))
-         (flags (layout-flags layout)))
-    (when (logtest flags sb-vm:layout-layout-flag)
-      ;; This might be wrong if the clos-hash was clobbered to 0
-      (return-from %instance-sxhash (layout-clos-hash layout))))
+  ;; FIXME: this special case might be removable, but there are callers
+  ;; of sxhash on layouts due to the expansion of TYPECASE.
+  (when (typep instance 'layout)
+    ;; This might be wrong if the clos-hash was clobbered to 0
+    (return-from %instance-sxhash (layout-clos-hash instance)))
   ;; Non-simple cases: no hash slot, and either unhashed or hashed-not-moved.
   (let* ((header-word (instance-header-word instance))
          (addr (with-pinned-objects (instance)

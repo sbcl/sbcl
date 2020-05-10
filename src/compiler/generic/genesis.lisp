@@ -1297,8 +1297,7 @@ core and return a descriptor to it."
                           (length inherits)))
              (make-cold-layout name
                                (layout-depthoid warm-layout)
-                               (logior (layout-flags warm-layout)
-                                       (if (eq name 'layout) sb-vm:layout-layout-flag 0))
+                               (layout-flags warm-layout)
                                (layout-length warm-layout)
                                (number-to-core (layout-bitmap warm-layout))
                                (vector-in-core inherits)))))
@@ -2338,23 +2337,20 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (let* ((inherits (pop-stack))
          (bitmap (pop-stack))
          (name (pop-stack))
-         (existing-layout (gethash name *cold-layouts*))
-         (flags
-          ;; This layout flag would have to plumbed all the way through
-          ;; DEFSTRUCT-WITH-ALTERNATE-METACLASS and ENSURE-STRUCTURE-CLASS
-          ;; in order to set it pedantically correctly for the root CONDITION
-          ;; type. Nothing tests the flag at cross-compile time, so it's ok to
-          ;; set it just-in-time in the cold core.
-          (if (eq name 'condition) +condition-layout-flag+ flags)))
+         (existing-layout (gethash name *cold-layouts*)))
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
     (setq flags
-          (logior flags (cond ((eq name 'layout) sb-vm:layout-layout-flag)
-                              ((member name '(pathname logical-pathname))
-                               sb-kernel:+pathname-layout-flag+)
-                              ((member 'ctype (getf (cdr (get name 'dd-proxy)) :inherits))
-                               sb-kernel:+ctype-layout-flag+)
-                              (t 0))))
+          ;; Nothing tests layout-flags at cross-compile time,
+          ;; so we can set them just-in-time for the cold core.
+          (logior flags
+                  (cond ((member name '(pathname logical-pathname))
+                         sb-kernel:+pathname-layout-flag+)
+                        ;; This layout flag would have to plumbed all the way through
+                        ;; DEFSTRUCT-WITH-ALTERNATE-METACLASS and ENSURE-STRUCTURE-CLASS
+                        ;; in order to set it for the root CONDITION type.
+                        ((eq name 'condition) +condition-layout-flag+)
+                        (t 0))))
     ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
     (when existing-layout
       (let ((old-flags (cold-layout-flags existing-layout))

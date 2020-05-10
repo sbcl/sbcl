@@ -3213,7 +3213,6 @@ structure representations"
                "INTERRUPTED-FLAG"
                "IS-LISP-POINTER"
                #+gencgc "LARGE-OBJECT-SIZE"
-               "LAYOUT-LAYOUT-FLAG"
                "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
                "LOCKFREE-LIST-NODE-FLAG"
                ;; FIXME: Possibly these other parameters (see

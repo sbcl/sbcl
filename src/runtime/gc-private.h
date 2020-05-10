@@ -342,6 +342,8 @@ static inline lispobj layout_of(lispobj* instance) { // native ptr
     return widetag_of(instance) == FUNCALLABLE_INSTANCE_WIDETAG
       ? funinstance_layout(instance) : instance_layout(instance);
 }
+
+extern lispobj layout_of_layout;
 /// Return true if 'thing' is a layout.
 static inline boolean layoutp(lispobj thing)
 {
@@ -349,7 +351,7 @@ static inline boolean layoutp(lispobj thing)
     lispobj layout;
     if ((base_ptr & LOWTAG_MASK) || !(layout = layout_of((lispobj*)base_ptr)))
         return 0;
-    return LAYOUT(layout)->flags & flag_LayoutLayout;
+    return layout == layout_of_layout;
 }
 
 static inline int lockfree_list_node_layout_p(struct layout* layout) {

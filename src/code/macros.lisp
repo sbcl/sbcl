@@ -854,6 +854,16 @@ symbol-case giving up: case=((V U) (F))
                     (values score1 answer1) ; not improved
                     (values score2 answer2))))))))) ; 2 bytes = better
 
+;;; TODO: see if it's possible to not use SXHASH on layouts here.
+;;;  (etypecase x
+;;;    ((or named-type numeric-type member-type classoid ..) something)
+;;; -> (SB-IMPL::%SEALED-STRUCT-TYPECASE-INDEX
+;;;     ((named-type numeric-type member-type classoid ...)CHARACTER-SET-TYPE
+;;; -> (LET* ((ARRAY
+;;;            #(4048 NIL NIL NIL NIL NIL
+;;;              ((#<LAYOUT for ALIEN-TYPE-TYPE {50202A03}> . 1)) NIL
+;;;              ((#<LAYOUT for NAMED-TYPE {50202503}> . 1)) NIL NIL
+;;;
 (defun build-sealed-struct-typecase-map (type-unions)
   (let* ((layout-lists
           (mapcar (lambda (x) (mapcar #'find-layout x)) type-unions))
