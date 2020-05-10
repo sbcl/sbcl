@@ -645,7 +645,6 @@ set_adjustment(struct heap_adjust* adj,
  * startup to avoid wasting time on all actions performed prior to re-exec.
  */
 
-lispobj layout_of_layout;
 static void
 process_directory(int count, struct ndir_entry *entry,
                   int fd, os_vm_offset_t file_offset,
@@ -958,11 +957,6 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space
 #endif
-    // Compute layout_of_layout from some structure instance by taking the layout
-    // of its layout. NIL's package serves as an exemplar structure.
-    lispobj* package = (lispobj*)(SYMBOL(NIL)->package - INSTANCE_POINTER_LOWTAG);
-    lispobj layout = instance_layout(package);
-    layout_of_layout = instance_layout(LAYOUT(layout));
 }
 
 #ifdef LISP_FEATURE_GENCGC

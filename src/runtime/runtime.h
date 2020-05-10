@@ -315,9 +315,9 @@ static inline int instance_length(lispobj header)
     return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
 }
 
-/* Define an assignable instance_layout() macro taking a native pointer */
+/// instance_layout() macro takes a lispobj* and is an lvalue
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-# define instance_layout(instance_ptr) (instance_ptr)[1]
+# define instance_layout(instance_ptr) ((lispobj*)instance_ptr)[1]
 #elif defined(LISP_FEATURE_64_BIT) && defined(LISP_FEATURE_LITTLE_ENDIAN)
   // so that this stays an lvalue, it can't be cast to lispobj
 # define instance_layout(instance_ptr) ((uint32_t*)(instance_ptr))[1]
