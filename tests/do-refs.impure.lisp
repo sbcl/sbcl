@@ -85,16 +85,9 @@
   (let ((o (make-instance 'mystdinst)))
     (walk-slots-test* o
                       (lambda (slots)
-                        (if (= (length slots) 3)
-                            (destructuring-bind (layout vect hash) slots
-                              (and (eq layout (%instance-layout o))
-                                   (equalp vect #(1 2 3 4 5))
-                                   (integerp hash)))
-                            ;; hash code in the upper half of the vector header word
-                            (destructuring-bind (layout vect) slots
-                              (and (eq layout (%instance-layout o))
-                                   (equalp vect #(1 2 3 4 5)))))))))
-
+                        (destructuring-bind (layout clos-slots) slots
+                          (and (eq layout (%instance-layout o))
+                               (eq clos-slots (sb-pcl::std-instance-slots o))))))))
 
 (define-condition cfoo (simple-condition) ((a :initarg :a) (b :initarg :b) (c :initform 'c)))
 (test-util:with-test (:name :walk-slots-condition-instance)
