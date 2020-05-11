@@ -465,7 +465,7 @@ static inline lispobj copy_instance(lispobj object)
          * Git rev 5f435a2b66 removed prezeroizing during GC, and that
          * last word was not the target of a memcpy */
         if (original_length & 1) base[original_length+2] = 0;
-        *base |= (1<<9); /* state <- hashed-and-moved */
+        *base |= 1 << flag_HashSlotPresent;
 #if 0
         printf("stable hash: obj=%p L=%d -> %p L=%d (recalc=%d)\n",
                (void*)object, original_length, (void*)copy, new_length,

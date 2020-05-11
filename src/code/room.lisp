@@ -179,12 +179,18 @@
 (defun instance-length (instance) ; excluding header, not aligned to even
   ;; Add 1 if expressed length PLUS header (total number of words) would be
   ;; an even number, and the hash state bits indicate hashed-and-moved.
-  ;; The preceding test is equivalent to the logical AND of bits 10 and 9.
-  ;; Bit 10 is the lsb of the size. If odd, then when added to the header
-  ;; word, the total is even. Bit 9 is the hashed-and-moved bit.
-  (let ((header (instance-header-word instance)))
-    (+ (logand (ash header -10) (ash header -9) 1)
-       (%instance-length instance))))
+  (+ (%instance-length instance)
+     ;; Compute 1 or 0 depending whether the instance was physically extended
+     ;; by one word for the stable hash value. Extension occurs when and only when
+     ;; the hash state is hashed-and-moved, and the apparent total number of words
+     ;; inclusive of header (and exclusive of extension) is even. ANDing the least
+     ;; significant bit of the payload size with HASH-SLOT-PRESENT arrives at the
+     ;; desired boolean value. If apparent size is odd in hashed-and-moved state,
+     ;; the physical size undergoes no change.
+     (let ((header-word (instance-header-word instance)))
+       (logand (ash header-word (- instance-length-shift))
+               (ash header-word (- hash-slot-present-flag))
+               1))))
 
 ;;; Return the vector OBJ, its WIDETAG, and the number of octets
 ;;; required for its storage (including padding and alignment).
@@ -287,13 +293,10 @@
                    (* 2 n-word-bytes)))
 
           (:instance
-           (values (tagged-object instance-pointer-lowtag)
-                   widetag
-                   (boxed-size
-                    ;; See INSTANCE-LENGTH for further details.
-                    (+ (logand (ash header -10) (ash header -9) 1)
-                       (logand (ash header (- instance-length-shift))
-                               instance-length-mask)))))
+           (let ((instance (tagged-object instance-pointer-lowtag)))
+             (values instance
+                     widetag
+                     (boxed-size (instance-length instance)))))
 
           (:closure ; also funcallable-instance
            (values (tagged-object fun-pointer-lowtag)
