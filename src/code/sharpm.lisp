@@ -278,7 +278,7 @@
                     (rplaca tree a))
                   (unless (eq d (cdr tree))
                     (rplacd tree d))))
-           (array
+           ((array t)
                 (with-array-data ((data tree) (start) (end))
                   (declare (fixnum start end))
                   (do ((i start (1+ i)))
@@ -288,24 +288,24 @@
                       (unless (eq old new)
                         (setf (aref data i) new))))))
            (instance
-            (let ((dd (layout-info (%instance-layout tree))))
-              ;; Unclear which branch we should prefer for CONDITION subtypes.
-              ;; They have LAYOUT-INFO but it is not useful. Why do they have it?
-              (if dd
+            ;; Don't refer to the DD-SLOTS unless there is reason to,
+            ;; that is, unless some slot might be raw.
+            (if (/= +layout-all-tagged+ (layout-bitmap (%instance-layout tree)))
+                (let ((dd (layout-info (%instance-layout tree))))
                   (dolist (dsd (dd-slots dd))
                     (when (eq (dsd-raw-type dsd) t)
                       (let ((i (dsd-index dsd)))
                         (let* ((old (%instance-ref tree i))
                                (new (circle-subst circle-table old)))
                           (unless (eq old new)
-                            (setf (%instance-ref tree i) new))))))
+                            (setf (%instance-ref tree i) new)))))))
                   (do ((len (%instance-length tree))
                        (i sb-vm:instance-data-start (1+ i)))
                       ((>= i len))
                     (let* ((old (%instance-ref tree i))
                            (new (circle-subst circle-table old)))
                       (unless (eq old new)
-                        (setf (%instance-ref tree i) new)))))))
+                        (setf (%instance-ref tree i) new))))))
            ;; It is not safe to iterate over %FUNCALLABLE-INSTANCE-INFO without knowing
            ;; where the raw slots are, if any. We can safely process FSC-INSTANCE-SLOTS
            ;; though, and that's the *only* slot to look at.
