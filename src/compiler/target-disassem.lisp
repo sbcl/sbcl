@@ -2064,7 +2064,7 @@
                                  ((sb-pcl::method-p thing)
                                   (sb-mop:method-function thing))
                                  (t thing))))
-    (typecase fun
+    (etypecase fun
       ((or (cons (member lambda named-lambda)) interpreted-function)
        (awhen (compile nil fun)
          (list it)))
