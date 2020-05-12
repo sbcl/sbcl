@@ -212,14 +212,14 @@
                                   n-data-octets)))))
 
 ;;; * If symbols are 7 words incl header, as they are on 32-bit w/threads,
-;;;   then the part of NIL that manifests as symbol slots consumes 7 words
-;;;   (minus the header) because NIL's symbol widetag precedes it by 1 word.
+;;;   then the part of NIL that manifests as symbol slots consumes 6 words
+;;;   (less the header) because NIL's symbol widetag precedes it by 1 word.
 ;;;   So, there are 6 post-header words and 2 pre-header: one containing
 ;;;   the widetag (not that it is ever read), and one 0 word.
 ;;; * If symbols are 6 words incl header, as they are on 64-bit and
 ;;;   32-bit w/o threads, then the symbol-like part of NIL is 5 words,
 ;;;   which aligns up to 6, plus the two pre-header words.
-;;; So either way, it comes out to 8 words in total.
+;;; So either way, NIL's alignment padding makes it come out to 8 words in total.
 (defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
 
 (defun primitive-object-size (object)

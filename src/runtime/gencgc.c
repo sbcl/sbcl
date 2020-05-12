@@ -3281,8 +3281,11 @@ lispobj layout_of_layout;
 void compute_layout_of_layout()
 {
     // Compute layout_of_layout from some structure instance by taking the layout
-    // of its layout. NIL's package serves as an exemplar structure.
-    lispobj* package = (lispobj*)(SYMBOL(NIL)->package - INSTANCE_POINTER_LOWTAG);
+    // of its layout. T's package serves as an exemplar structure.
+    // If you use NIL, then you can't use the convenient casting macro SYMBOL
+    // which subtracts the wrong lowtag for ppc64 since NIL is primarily a list
+    // and only coincidentally a symbol if the lowtags work out right.
+    lispobj* package = (lispobj*)(SYMBOL(T)->package - INSTANCE_POINTER_LOWTAG);
     lispobj layout = instance_layout(package);
     layout_of_layout = instance_layout(LAYOUT(layout));
 }
