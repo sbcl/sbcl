@@ -81,6 +81,8 @@
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
 ;;; be; ordinary defstruct accessors are defined as source transforms.
+;;; Another thing: if weakening STD-INSTANCE-P to %INSTANCEP is legal within
+;;; PCL code, wouldn't it be legal to weaken FSC-INSTANCE-P to FUNCTIONP?
 (declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
@@ -182,8 +184,11 @@
   ;; integrating PCL more with the compiler, would remove the need for
   ;; this icky stuff.
   (declare (optimize (inhibit-warnings 3)))
-  (when (pcl-instance-p instance)
-    (get-slots instance)))
+  ;; Was: (WHEN (PCL-INSTANCE-P INSTANCE) (GET-SLOTS INSTANCE))
+  ;; but we can do better then to perform STD-/FSC- discrimination twice
+  ;; (once in the test of PCL-INSTANCE-P and once in GET-SLOTS).
+  (cond ((std-instance-p instance) (std-instance-slots instance))
+        ((fsc-instance-p instance) (fsc-instance-slots instance))))
 
 ;; This macro is used only by %CHANGE-CLASS. Can we just do this there?
 ;; [The code in 'fsc.lisp' which looks like it needs it is commented out]
