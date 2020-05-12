@@ -49,28 +49,6 @@
 ;;; structure protocol are promoted to the implementation-specific class
 ;;; std-class. Many of these methods call these four functions.
 
-(defun %swap-wrappers-and-slots (i1 i2) ; old -> new
-  (cond ((std-instance-p i1)
-         ;; FIXME: If a backend supports two-word primitive instances
-         ;; and double-wide CAS, it's probably best to use that.
-         ;; Maybe we're inside a mutex here anyway though?
-         (let ((w1 (%instance-layout i1))
-               (s1 (std-instance-slots i1)))
-           (setf (%instance-layout i1) (%instance-layout i2))
-           (setf (std-instance-slots i1) (std-instance-slots i2))
-           (setf (%instance-layout i2) w1)
-           (setf (std-instance-slots i2) s1)))
-        ((fsc-instance-p i1)
-         (let ((w1 (%fun-layout i1))
-               (w2 (%fun-layout i2))
-               (s1 (fsc-instance-slots i1)))
-           (aver (= (layout-bitmap w1) (layout-bitmap w2)))
-           (setf (%fun-layout i1) w2)
-           (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
-           (setf (%fun-layout i2) w1)
-           (setf (fsc-instance-slots i2) s1)))
-        (t
-         (error "unrecognized instance type"))))
 
 ;;;; STANDARD-INSTANCE-ACCESS
 

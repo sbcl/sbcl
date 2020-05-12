@@ -1548,9 +1548,17 @@
   (cond
     ((layout-for-pcl-obj-p owrapper)
      (binding* ((class (wrapper-class* nwrapper))
-                (copy (allocate-instance class)) ;??? allocate-instance ???
                 (oslots (get-slots instance))
-                (nslots (get-slots copy))
+                ((nslots nwrapper)
+                 ;; All we need is a new backing store, but I guess we have
+                 ;; to go through ALLOCATE-INSTANCE - is that per AMOP ?
+                 ;; Anyway, let's render the new instance unusable.
+                 (let ((copy (allocate-instance class)))
+                   (if (std-instance-p copy)
+                       (values (shiftf (%std-instance-slots copy) 0)
+                               (%instance-layout copy))
+                       (values (shiftf (%fsc-instance-slots copy) 0)
+                               (%fun-layout copy)))))
                 (added ())
                 (discarded ())
                 (plist ())
@@ -1627,7 +1635,11 @@
          (dolist (cell layout)
            (push (car cell) added)))
 
-       (%swap-wrappers-and-slots instance copy)
+       (if (std-instance-p instance)
+           (setf (%instance-layout instance) nwrapper
+                 (std-instance-slots instance) nslots)
+           (setf (%fun-layout instance) nwrapper
+                 (%fsc-instance-slots instance) nslots))
 
        (update-instance-for-redefined-class
         instance added discarded plist)
@@ -1644,8 +1656,11 @@
   (binding* ((old-wrapper (layout-of instance))
              (old-class (wrapper-class* old-wrapper))
              (copy (allocate-instance new-class))
-             (new-wrapper (layout-of copy))
-             (nil (aver (layout-for-pcl-obj-p new-wrapper)))
+             (new-wrapper (let ((layout (layout-of copy)))
+                            (aver (layout-for-pcl-obj-p layout))
+                            (aver (= (layout-bitmap old-wrapper)
+                                     (layout-bitmap layout)))
+                            layout))
              (old-slots (get-slots instance))
              (new-slots (get-slots copy))
              (safe (safe-p new-class))
@@ -1685,9 +1700,24 @@
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.
-    (%swap-wrappers-and-slots instance copy)
+    ;; All uses of %CHANGE-CLASS are under the world lock, but that doesn't
+    ;; preclude user code operating on the old slots + new layout or v.v.
+    ;; Users need to synchronize their own access when changing class.
+    (cond ((std-instance-p instance)
+           (rotatef (%instance-layout instance) (%instance-layout copy))
+           (rotatef (%std-instance-slots instance) (%std-instance-slots copy)))
+          (t
+           (rotatef (%fun-layout instance) (%fun-layout copy))
+           (rotatef (%fsc-instance-slots instance) (%fsc-instance-slots copy))))
 
     (apply #'update-instance-for-different-class copy instance initargs)
+    ;; If the user subsequently operates on COPY, crash and burn. As per CLHS:
+    ;;  "The first argument to update-instance-for-different-class, /previous/,
+    ;;  is that copy; it holds the old slot values temporarily. This argument has
+    ;;  dynamic extent within change-class; if it is referenced in any way once
+    ;;  update-instance-for-different-class returns, the results are undefined."
+    (cond ((std-instance-p copy) (setf (%std-instance-slots copy) 0))
+          ((fsc-instance-p copy) (setf (%fsc-instance-slots copy) 0)))
 
     instance))
 

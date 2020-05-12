@@ -201,8 +201,11 @@
 ;;;        (2) why isn't this named STANDARD-OBJECT-P?
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
+(defmacro %std-instance-slots (x)
+  `(%instance-ref ,x ,sb-vm:instance-data-start))
 (defmacro std-instance-slots (x)
-  `(truly-the simple-vector (%instance-ref ,x ,sb-vm:instance-data-start)))
+  `(truly-the simple-vector (%std-instance-slots ,x)))
+;; %fsc-instance-slots is defined in src/pcl/pre-warm
 (defmacro fsc-instance-slots (x)
   `(truly-the simple-vector (%fsc-instance-slots ,x)))
 
