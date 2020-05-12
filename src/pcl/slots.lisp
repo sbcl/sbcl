@@ -243,6 +243,11 @@
       (slot-value object slot-name)
       (load-time-value (make-unprintable-object "unbound slot") t)))
 
+(defmacro safely-get-slots (method-name x)
+  `(cond ((std-instance-p ,x) (std-instance-slots ,x))
+         ((fsc-instance-p ,x) (fsc-instance-slots ,x))
+         (t (bug "unrecognized instance type in ~S" ',method-name))))
+
 (defmethod slot-value-using-class ((class std-class)
                                    (object standard-object)
                                    (slotd standard-effective-slot-definition))
@@ -253,14 +258,8 @@
          (value
           (typecase location
             (fixnum
-             (cond ((std-instance-p object)
-                    (clos-slots-ref (std-instance-slots object)
-                                    location))
-                   ((fsc-instance-p object)
-                    (clos-slots-ref (fsc-instance-slots object)
-                                    location))
-                   (t (bug "unrecognized instance type in ~S"
-                           'slot-value-using-class))))
+             (clos-slots-ref (safely-get-slots slot-value-using-clas object)
+                             location))
             (cons
              (cdr location))
             (t
@@ -285,14 +284,9 @@
                         new-value)))
     (typecase location
       (fixnum
-       (cond ((std-instance-p object)
-              (setf (clos-slots-ref (std-instance-slots object) location)
-                    new-value))
-             ((fsc-instance-p object)
-              (setf (clos-slots-ref (fsc-instance-slots object) location)
-                    new-value))
-             (t (bug "unrecognized instance type in ~S"
-                     '(setf slot-value-using-class)))))
+       (setf (clos-slots-ref (safely-get-slots (setf slot-value-using-class) object)
+                             location)
+             new-value))
       (cons
        (setf (cdr location) new-value))
       (t
@@ -306,24 +300,17 @@
   ;; FIXME: Do we need this? SLOT-BOUNDP checks for obsolete
   ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
-  (let* ((location (slot-definition-location slotd))
-         (value
+  (let ((location (slot-definition-location slotd)))
+    (not (unbound-marker-p
           (typecase location
             (fixnum
-             (cond ((std-instance-p object)
-                          (clos-slots-ref (std-instance-slots object)
-                                          location))
-                   ((fsc-instance-p object)
-                    (clos-slots-ref (fsc-instance-slots object)
-                                    location))
-                   (t (bug "unrecognized instance type in ~S"
-                           'slot-boundp-using-class))))
+             (clos-slots-ref (safely-get-slots slot-boundp-using-class object)
+                             location))
             (cons
              (cdr location))
             (t
              (instance-structure-protocol-error slotd
-                                                'slot-boundp-using-class)))))
-    (not (unbound-marker-p value))))
+                                                'slot-boundp-using-class)))))))
 
 (defmethod slot-makunbound-using-class
            ((class std-class)
@@ -333,14 +320,9 @@
   (let ((location (slot-definition-location slotd)))
     (typecase location
       (fixnum
-       (cond ((std-instance-p object)
-              (setf (clos-slots-ref (std-instance-slots object) location)
-                    +slot-unbound+))
-             ((fsc-instance-p object)
-              (setf (clos-slots-ref (fsc-instance-slots object) location)
-                    +slot-unbound+))
-             (t (bug "unrecognized instance type in ~S"
-                     'slot-makunbound-using-class))))
+       (setf (clos-slots-ref (safely-get-slots slot-makunbound-using-class object)
+                             location)
+             +slot-unbound+))
       (cons
        (setf (cdr location) +slot-unbound+))
       (t

@@ -119,6 +119,8 @@
 ;;; be; ordinary defstruct accessors are defined as source transforms.
 ;;; Another thing: if weakening STD-INSTANCE-P to %INSTANCEP is legal within
 ;;; PCL code, wouldn't it be legal to weaken FSC-INSTANCE-P to FUNCTIONP?
+;;; And technically this weaker than the real constraint anyway, as it returns
+;;; T on funcallable instances lacking CLOS slots.
 (declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
