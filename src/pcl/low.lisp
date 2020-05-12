@@ -189,14 +189,6 @@
   ;; (once in the test of PCL-INSTANCE-P and once in GET-SLOTS).
   (cond ((std-instance-p instance) (std-instance-slots instance))
         ((fsc-instance-p instance) (fsc-instance-slots instance))))
-
-;; This macro is used only by %CHANGE-CLASS. Can we just do this there?
-;; [The code in 'fsc.lisp' which looks like it needs it is commented out]
-(defmacro get-wrapper (inst)
-  (once-only ((wrapper `(layout-of ,inst)))
-    `(progn
-       (aver (layout-for-pcl-obj-p ,wrapper))
-       ,wrapper)))
 
 ;;;; structure-instance stuff
 ;;;;

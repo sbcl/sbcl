@@ -46,25 +46,3 @@
 (defmethod make-writer-method-function ((class funcallable-standard-class)
                                         slot-name)
   (make-std-writer-method-function class slot-name))
-
-;;;; See the comment about reader-function--std and writer-function--sdt.
-;;;;
-;(define-function-template reader-function--fsc () '(slot-name)
-;  `(function
-;     (lambda (instance)
-;       (slot-value-using-class (wrapper-class (get-wrapper instance))
-;                              instance
-;                              slot-name))))
-;
-;(define-function-template writer-function--fsc () '(slot-name)
-;  `(function
-;     (lambda (nv instance)
-;       (setf
-;        (slot-value-using-class (wrapper-class (get-wrapper instance))
-;                                instance
-;                                slot-name)
-;        nv))))
-;
-;(eval-when (:load-toplevel)
-;  (pre-make-templated-function-constructor reader-function--fsc)
-;  (pre-make-templated-function-constructor writer-function--fsc))
