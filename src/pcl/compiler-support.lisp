@@ -37,12 +37,10 @@
 (deftransform sb-pcl::pcl-instance-p ((object))
   (let* ((otype (lvar-type object))
          (standard-object (specifier-type 'standard-object)))
-    (cond
-      ;; Flush tests whose result is known at compile time.
-      ((csubtypep otype standard-object) t)
-      ((not (types-equal-or-intersect otype standard-object)) nil)
-      (t
-       `(sb-pcl::%pcl-instance-p object)))))
+    ;; Flush tests whose result is known at compile time.
+    (cond ((csubtypep otype standard-object) t)
+          ((not (types-equal-or-intersect otype standard-object)) nil)
+          (t `(%pcl-instance-p object)))))
 
 (defun sb-pcl::safe-code-p (&optional env)
   (policy (or env (make-null-lexenv)) (eql safety 3)))
