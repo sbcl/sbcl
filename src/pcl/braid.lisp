@@ -59,7 +59,7 @@
                                          (sb-vm::make-immobile-funinstance wrapper slots))))
                        ;; set the upper 4 bytes of wordindex 5
                        (sb-sys:with-pinned-objects (f)
-                         (setf (fsc-instance-trailer-hash f) (ldb (byte 32 0) hash)))
+                         (setf (sb-impl::fsc-instance-trailer-hash f) (ldb (byte 32 0) hash)))
                        f))
                     (t
                      (let ((f (truly-the funcallable-instance

@@ -202,8 +202,6 @@
  ("src/code/pred" :not-host)
  ("src/compiler/generic/pinned-objects" :not-host)
 
- ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
-
  ("src/code/list"   :not-host)
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
  ("src/code/coerce" :not-host)
@@ -335,6 +333,7 @@
  ;; around the compilation of "code/class". Why?
  ("src/code/class" :c-headers)
  ("src/pcl/pre-warm")
+ ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/debug-info" :c-headers
   #.(cl:if (and (cl:find :sb-xc-host cl:*features*)

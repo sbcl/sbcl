@@ -127,6 +127,29 @@
       (%instance-ref instance (%instance-length instance))
       (%instance-sxhash instance)))
 
+;;; Object must be pinned to use this.
+(defmacro fsc-instance-trailer-hash (fin)
+  `(sap-ref-32 (int-sap (get-lisp-obj-address ,fin))
+               (- (+ (* 5 sb-vm:n-word-bytes) 4) sb-vm:fun-pointer-lowtag)))
+
+;;; Return a pseudorandom number that was assigned on allocation.
+;;; FIN is a STANDARD-FUNCALLABLE-INSTANCE but we don't care to type-check it.
+;;; You might rightly wonder - for what reason do we require good hash codes for
+;;; funcallable instances, but not for all functions? I think the answer has to do
+;;; with inserting GFs into weak tables for tracking when we need to invalidate them
+;;; due to a change in the definition of a method-combination.
+(declaim (inline fsc-instance-hash))
+(defun fsc-instance-hash (fin)
+  (cond #+x86-64
+        ((= (logand (function-header-word (truly-the function fin)) #xFF00)
+            (ash 5 sb-vm:n-widetag-bits)) ; KLUDGE: 5 data words implies 2 raw words
+         ;; get the upper 4 bytes of wordindex 5
+         (with-pinned-objects (fin) (fsc-instance-trailer-hash fin)))
+        (t
+         (truly-the hash-code
+          (sb-pcl::standard-funcallable-instance-hash-code
+           (truly-the sb-pcl::standard-funcallable-instance fin))))))
+
 (declaim (inline integer-sxhash))
 (defun integer-sxhash (x)
   (if (fixnump x) (sxhash (truly-the fixnum x)) (sb-bignum:sxhash-bignum x)))
@@ -171,8 +194,7 @@
 (clear-info :function :inlinep 'integer-sxhash)
 
 ;;; To avoid "note: Return type not fixed values ..."
-(declaim (ftype (sfunction (t) hash-code) sb-pcl::fsc-instance-hash
-                                          pathname-sxhash))
+(declaim (ftype (sfunction (t) hash-code) pathname-sxhash))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
@@ -254,7 +276,7 @@
                (funcallable-instance
                 (if (layout-for-pcl-obj-p (%fun-layout x))
                     ;; We have a hash code, so might as well use it.
-                    (sb-pcl::fsc-instance-hash x)
+                    (fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
                     9550684))
                (t 42))))

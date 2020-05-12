@@ -1825,6 +1825,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "FLOAT-SIGN-BIT"
                "FLOATING-POINT-EXCEPTION" "FORM" "FORMAT-CONTROL"
                "*FREE-INTERRUPT-CONTEXT-INDEX*" "FUNCALLABLE-INSTANCE-P"
+               "FSC-INSTANCE-HASH"
                "%FUN-CODE-OFFSET" "FUN-CODE-HEADER"
                "FUN-DESIGNATOR-TYPE" "FUN-DESIGNATOR-TYPE-P"
                "FUN-TYPE" "FUN-TYPE-ALLOWP"
@@ -3518,8 +3519,7 @@ SBCL itself"
   sb-pcl::compute-gf-ftype
   sb-pcl::definition-source
   sb-pcl::ensure-accessor
-  sb-pcl:ensure-class-finalized
-  sb-pcl::fsc-instance-hash)
+  sb-pcl:ensure-class-finalized)
  ;; CLOS-based packages
  (sb-gray:stream-clear-input
   sb-gray:stream-clear-output
