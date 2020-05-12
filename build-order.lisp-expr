@@ -199,7 +199,6 @@
  ("src/code/misc-aliens" :not-host)
 
  ("src/code/early-float")
- ("src/pcl/early-low" :not-host)
  ("src/code/pred" :not-host)
  ("src/compiler/generic/pinned-objects" :not-host)
 

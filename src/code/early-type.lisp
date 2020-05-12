@@ -860,6 +860,11 @@
     (let ((weakness #+(or (not sb-xc-host) host-quirks-sbcl) '(:weakness :value)))
       (apply #'make-hash-table :test 'eq weakness)))
 
+#-sb-xc-host
+(progn (declaim (inline class-classoid))
+       (defun class-classoid (class)
+         (layout-classoid (sb-pcl::class-wrapper class))))
+
 ;;; Parsing of type specifiers comes in many variations:
 ;;;  SINGLE-VALUE-SPECIFIER-TYPE:
 ;;;    disallow VALUES even if single value, but allow *

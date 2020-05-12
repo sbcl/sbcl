@@ -315,10 +315,10 @@
            ;; %FUNCALLABLE-INSTANCE-FUN (overlapping with FSC-INSTANCE-SLOTS)
            ;; and that slot is never a raw slot.
            (funcallable-instance
-            (let* ((old (sb-pcl::fsc-instance-slots tree))
+            (let* ((old (sb-pcl::%fsc-instance-slots tree))
                    (new (circle-subst circle-table old)))
               (unless (eq old new)
-                (setf (sb-pcl::fsc-instance-slots tree) new)))))
+                (setf (sb-pcl::%fsc-instance-slots tree) new)))))
          tree)
         (t tree)))
 

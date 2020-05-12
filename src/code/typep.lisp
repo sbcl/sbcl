@@ -182,6 +182,23 @@
              (classoid-cell-name cell)))
     (classoid-typep layout classoid object)))
 
+;;; Return true of any object which is either a funcallable-instance,
+;;; or an ordinary instance that is not a structure-object.
+(declaim (inline %pcl-instance-p))
+(defun %pcl-instance-p (x)
+  ;; The COND is more efficient than LAYOUT-OF.
+  (layout-for-pcl-obj-p (cond ((%instancep x) (%instance-layout x))
+                              ((function-with-layout-p x) (%fun-layout x))
+                              (t (return-from %pcl-instance-p nil)))))
+
+;;; Try to ensure that the object's layout is up-to-date only if it is an instance
+;;; or funcallable-instance of other than a static or structure classoid type.
+;;; LAYOUT is the *expected* type, not the the layout currently in OBJECT.
+(defun update-object-layout-or-invalid (object layout)
+  (if (%pcl-instance-p object)
+      (sb-pcl::check-wrapper-validity object)
+      (sb-c::%layout-invalid-error object layout)))
+
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 
 ;;; IMPORTANT: If none of the classes involved (directly or indirectly)

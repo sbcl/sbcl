@@ -37,6 +37,42 @@
 
 (in-package "SB-PCL")
 
+;;; The PCL package is internal and is used by code in potential
+;;; bottlenecks. And since it's internal, no one should be
+;;; doing things like deleting and recreating it in a running target Lisp.
+(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
+
+(declaim (inline defstruct-classoid-p))
+(defun defstruct-classoid-p (classoid)
+  ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
+  ;; work instead of this. -- NS 2008-03-14
+  (typep (layout-info (classoid-layout classoid)) 'defstruct-description))
+
+;;; This excludes structure types created with the :TYPE option to
+;;; DEFSTRUCT. It also doesn't try to deal with types created by
+;;; hairy DEFTYPEs, e.g.
+;;;   (DEFTYPE CACHE-STRUCTURE (SIZE)
+;;;     (IF (> SIZE 11) 'BIG-CS 'SMALL-CS)).
+;;; KLUDGE: In fact, it doesn't seem to deal with DEFTYPEs at all. Perhaps
+;;; it needs a more mnemonic name. -- WHN 19991204
+(defun structure-type-p (type)
+  (and (symbolp type)
+       (let ((classoid (find-classoid type nil)))
+         (and classoid
+              (not (condition-classoid-p classoid))
+              (defstruct-classoid-p classoid)))))
+
+;;; Symbol contruction utilities
+(defun format-symbol (package format-string &rest format-arguments)
+  (without-package-locks
+   (intern (possibly-base-stringize
+            (apply #'format nil format-string format-arguments))
+           package)))
+
+(defun condition-type-p (type)
+  (and (symbolp type)
+       (condition-classoid-p (find-classoid type nil))))
+
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
@@ -159,14 +195,14 @@
      (precompile-ctors)))
 
 ;;; This definition is for interpreted code.
+;;; FIXME: (1) is EXPLICIT-CHECK really doing anything here?
+;;;        (2) why isn't this named STANDARD-OBJECT-P?
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
-;;; Both of these operations "work" on structures, which allows the above
-;;; weakening of STD-INSTANCE-P.
-;;; FIXME: what does the preceding comment mean? You can't use instance-slots
-;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x)
   `(truly-the simple-vector (%instance-ref ,x ,sb-vm:instance-data-start)))
+(defmacro fsc-instance-slots (x)
+  `(truly-the simple-vector (%fsc-instance-slots ,x)))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
