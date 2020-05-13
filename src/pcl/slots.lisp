@@ -236,7 +236,7 @@
          (value
           (typecase location
             (fixnum
-             (clos-slots-ref (safely-get-slots slot-value-using-clas object)
+             (clos-slots-ref (safely-get-slots slot-value-using-class object)
                              location))
             (cons
              (cdr location))
