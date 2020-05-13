@@ -1275,16 +1275,6 @@
            (setf (string-input-stream-current stream) (1+ index))
            (char string index)))))
 
-(defun string-binch (stream eof-error-p eof-value)
-  (declare (type string-input-stream stream))
-  (let ((string (string-input-stream-string stream))
-        (index (string-input-stream-current stream)))
-    (cond ((>= index (the index (string-input-stream-end stream)))
-           (eof-or-lose stream eof-error-p eof-value))
-          (t
-           (setf (string-input-stream-current stream) (1+ index))
-           (char-code (char string index))))))
-
 (defun string-stream-read-n-bytes (stream buffer start requested eof-error-p)
   (declare (type string-input-stream stream)
            (type index start requested))
