@@ -519,21 +519,6 @@
          (acond ((and (< i (length exceptions)) (aref exceptions i))
                  (write-string it stream))
                 (t
-                 #+nil
-                 (let ((len
-                        ;; output-reasonable-integer-in-base is so slow comparated
-                        ;; to printf() that the second-most amount of time spent
-                        ;; writing the asm file occurs in that function.
-                        ;; Unbelievable that we can't do better than that.
-                        (with-pinned-objects (string-buffer fmt)
-                          (alien-funcall
-                           (extern-alien "snprintf"
-                            (function int system-area-pointer unsigned system-area-pointer unsigned))
-                           (vector-sap string-buffer)
-                           (length string-buffer)
-                           (vector-sap fmt)
-                           (sap-ref-word sap (* i n-word-bytes))))))
-                   (write-string string-buffer stream :end len))
                  (write-string "0x" stream)
                  (write (sap-ref-word sap (* i n-word-bytes)) :stream stream)))
          (when (and (= (incf per-line) 16) (< (1+ i) count))

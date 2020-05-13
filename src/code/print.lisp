@@ -271,8 +271,7 @@ variable: an unreadable object representing the error is printed instead.")
                    (write-char #\space stream))
                  ;; Nor here.
                  (write-char #\{ stream)
-                 (%output-reasonable-integer-in-base (get-lisp-obj-address object)
-                                                     16 stream)
+                 (%output-integer-in-base (get-lisp-obj-address object) 16 stream)
                  (write-char #\} stream))))
         (cond ((print-pretty-on-stream-p stream)
                ;; Since we're printing prettily on STREAM, format the
@@ -977,23 +976,8 @@ variable: an unreadable object representing the error is printed instead.")
                 (2 #\b)
                 (8 #\o)
                 (16 #\x)
-                (t (%output-reasonable-integer-in-base base 10 stream)
-                   #\r))
+                (t (%output-integer-in-base base 10 stream) #\r))
               stream))
-
-(defun %output-reasonable-integer-in-base (n base stream)
-  (multiple-value-bind (q r)
-      (truncate n base)
-    ;; Recurse until you have all the digits pushed on
-    ;; the stack.
-    (unless (zerop q)
-      (%output-reasonable-integer-in-base q base stream))
-    ;; Then as each recursive call unwinds, turn the
-    ;; digit (in remainder) into a character and output
-    ;; the character.
-    (write-char
-     (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" r)
-     stream)))
 
 ;;; *POWER-CACHE* is an alist mapping bases to power-vectors. It is
 ;;; filled and probed by POWERS-FOR-BASE. SCRUB-POWER-CACHE is called
@@ -1076,17 +1060,111 @@ variable: an unreadable object representing the error is printed instead.")
                         (bisect r k (or exactp (plusp q))))))))
       (bisect n k-start nil))))
 
+;;; Not all architectures can stack-allocate lisp strings,
+;;; but we can fake it using aliens.
+;;; %output-integer-in-base always needs 8 lispwords:
+;;;  if n-word-bytes = 4 then 8 * 4 = 32 characters
+;;;  if n-word-bytes = 8 then 8 * 8 = 64 characters
+;;; This allows for output in base 2 worst case.
+;;; We don't need a trailing null.
+(defmacro with-lisp-string-on-alien-stack ((string size-in-chars) &body body)
+  (let ((size-in-lispwords ; +2 words for lisp string header
+          (+ 2 (align-up (ceiling (symbol-value size-in-chars) sb-vm:n-word-bytes)
+                         2)))
+        (alien '#:a)
+        (sap '#:sap))
+    ;; +1 is for alignment if needed
+    `(with-alien ((,alien (array unsigned ,(1+ size-in-lispwords))))
+       (let ((,sap (alien-sap ,alien)))
+         (when (logtest (sap-int ,sap) sb-vm:lowtag-mask)
+           (setq ,sap (sap+ ,sap sb-vm:n-word-bytes)))
+         (setf (sap-ref-word ,sap 0) sb-vm:simple-base-string-widetag
+               (sap-ref-word ,sap sb-vm:n-word-bytes) (ash sb-vm:n-word-bits
+                                                           sb-vm:n-fixnum-tag-bits))
+         (let ((,string
+                (truly-the simple-base-string
+                           (%make-lisp-obj (logior (sap-int ,sap)
+                                                   sb-vm:other-pointer-lowtag)))))
+           ,@body)))))
+
+;;; Using specialized routines for the various cases seems to work nicely.
+;;;
+;;; Testing with 100,000 random integers, output to a sink stream, x86-64:
+;;; word-sized integers, base >= 10
+;;;   old=.062 sec, 4MiB consed; new=.031 sec, 0 bytes consed
+;;; word-sized integers, base < 10
+;;;   old=.104 sec, 4MiB consed; new=.075 sec, 0 bytes consed
+;;; bignums in base 16:
+;;;   old=.125 sec, 20 MiB consed; new=.08 sec, 0 bytes consed
+;;;
+;;; Not sure why this didn't reduce consing on ppc64 when I tried it.
 (defun %output-integer-in-base (integer base stream)
+  (declare (type (integer 2 36) base))
   (when (minusp integer)
     (write-char #\- stream)
     (setf integer (- integer)))
-  ;; The ideal cutoff point between these two algorithms is almost
-  ;; certainly quite platform dependent: this gives 87 for 32 bit
-  ;; SBCL, which is about right at least for x86/Darwin.
-  (if (or (fixnump integer)
-          (< (integer-length integer) (* 3 sb-vm:n-positive-fixnum-bits)))
-      (%output-reasonable-integer-in-base integer base stream)
-      (%output-huge-integer-in-base integer base stream)))
+  ;; Grrr - a LET binding here causes a constant-folding problem
+  ;;   "The function SB-KERNEL:SIMPLE-CHARACTER-STRING-P is undefined."
+  ;; but a symbol-macrolet is ok. This is a FIXME except I don't care.
+  (symbol-macrolet ((chars "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    (declare (optimize (sb-c::insert-array-bounds-checks 0) speed))
+    (macrolet ((iterative-algorithm ()
+                 `(loop (multiple-value-bind (q r)
+                            (truncate (truly-the word integer) base)
+                          (decf ptr)
+                          (setf (aref buffer ptr) (schar chars r))
+                          (when (zerop (setq integer q)) (return)))))
+               (recursive-algorithm (dividend-type)
+                 `(named-let recurse ((n integer))
+                    (multiple-value-bind (q r) (truncate (truly-the ,dividend-type n) base)
+                      ;; Recurse until you have all the digits pushed on
+                      ;; the stack.
+                      (unless (zerop q) (recurse q))
+                      ;; Then as each recursive call unwinds, turn the
+                      ;; digit (in remainder) into a character and output
+                      ;; the character.
+                      (write-char (schar chars r) stream)))))
+      (cond ((typep integer 'word) ; Division vops can handle this all inline.
+             #+(and gencgc c-stack-is-control-stack) ; strings can be DX
+             ;; For bases exceeding 10 we know how many characters (at most)
+             ;; will be output. This allows for a single %WRITE-STRING call.
+             ;; There's diminishing payback for other bases because the fixed array
+             ;; size increases, and we don't have a way to elide initial 0-fill.
+             ;; Calling APPROX-CHARS-IN-REPL doesn't help much - we still 0-fill.
+             (if (< base 10)
+                 (recursive-algorithm word)
+                 (let* ((ptr #.(length (write-to-string sb-ext:most-positive-word
+                                                        :base 10)))
+                        (buffer (make-array ptr :element-type 'base-char)))
+                   (declare (truly-dynamic-extent buffer))
+                   (iterative-algorithm)
+                   (%write-string buffer stream ptr (length buffer))))
+             #-(and gencgc c-stack-is-control-stack) ; strings can not be DX
+             ;; Use the alien stack, which is not as fast as using the control stack
+             ;; (when we can). Even the absence of 0-fill doesn't make up for it.
+             ;; Since we've no choice in the matter, might as well allow
+             ;; any value of BASE - it's just a few more words of storage.
+             (let ((ptr sb-vm:n-word-bits))
+               (with-lisp-string-on-alien-stack (buffer sb-vm:n-word-bits)
+                 (iterative-algorithm)
+                 (%write-string buffer stream ptr sb-vm:n-word-bits))))
+            ((eql base 16)
+             ;; No division is involved at all.
+             ;; could also specialize for bases 32, 8, 4, and 2 if desired
+             (loop for pos from (* 4 (1- (ceiling (integer-length integer) 4)))
+                   downto 0 by 4
+                   do (write-char (schar chars (sb-bignum::ldb-bignum=>fixnum 4 pos
+                                                                              integer))
+                                  stream)))
+            ;; The ideal cutoff point between this and the "huge" algorithm
+            ;; might be platform-specific, and it also could depend on the output base.
+            ;; Nobody has cared to tweak it in so many years that I think we can
+            ;; arbitrarily say 3 bigdigits is fine.
+            ((<= (sb-bignum:%bignum-length (truly-the bignum integer)) 3)
+             (recursive-algorithm integer))
+            (t
+             (%output-huge-integer-in-base integer base stream)))))
+  nil)
 
 ;;; This gets both a method and a specifically named function
 ;;; since the latter is called from a few places.

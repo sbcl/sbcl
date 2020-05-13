@@ -1511,13 +1511,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (t
            (error "~S is not a subtype of CHARACTER" element-type)))))
 
-;;; This stream has no SOUT method.
 ;;; Now that we support base-char string-output streams, it may be possible to eliminate
 ;;; this, though the other benefit it confers is that the buffer never needs to extend,
 ;;; and we merely shrink it to the proper size when done writing.
 (defstruct (finite-base-string-output-stream
             (:include ansi-stream
                       (out #'finite-base-string-ouch)
+                      (sout #'finite-base-string-sout)
                       (misc #'finite-base-string-out-misc))
             (:constructor %make-finite-base-string-output-stream (buffer))
             (:copier nil)
@@ -1818,6 +1818,23 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (setf (char buffer pointer) (truly-the base-char character)
                  (finite-base-string-output-stream-pointer stream)
                  (truly-the index (1+ pointer)))))))
+
+(defun finite-base-string-sout (stream string start end)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (let* ((pointer (finite-base-string-output-stream-pointer stream))
+         (buffer (finite-base-string-output-stream-buffer stream))
+         (length (- end start))
+         (new-pointer (+ pointer length)))
+    (cond ((> new-pointer (length buffer))
+           (bug "Should not happen"))
+          #+sb-unicode
+          ((typep string 'simple-character-string)
+           (replace buffer string
+                    :start1 pointer :start2 start :end2 end))
+          (t
+           (replace buffer (the simple-base-string string)
+                    :start1 pointer :start2 start :end2 end)))
+    (setf (finite-base-string-output-stream-pointer stream) new-pointer)))
 
 (defun finite-base-string-out-misc (stream operation &optional arg1 arg2)
   (declare (ignore stream operation arg1 arg2))
