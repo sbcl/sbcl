@@ -4,7 +4,12 @@
   ;; Return the _ordinary_ compilation policy as a sexpr.
   ;; You can't detect the macro policy from a lexenv because the macro's ENV arg
   ;; is the policy for compiling target code, not for compiling the macro.
-  (list 'quote (sb-c::policy-to-decl-spec (sb-c::lexenv-policy env))))
+  (list 'quote
+        ;; Test should pass irrespective of whether the baseline policy
+        ;; asks for allocation profiling.
+        (remove 'sb-c::instrument-consing
+                (sb-c::policy-to-decl-spec (sb-c::lexenv-policy env))
+                :key 'car)))
 
 (declaim (optimize (speed 2) sb-c:store-coverage-data))
 
