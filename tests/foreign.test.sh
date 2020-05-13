@@ -145,6 +145,28 @@ echo 'int late_foo = 43;' > $TEST_FILESTEM-c.c
 echo 'int late_bar() { return 14; }' >> $TEST_FILESTEM-c.c
 build_so $TEST_FILESTEM-c
 
+cat > $TEST_FILESTEM-noop-dlclose-test.c <<EOF
+#include <dlfcn.h>
+#include <stddef.h>
+
+int dlclose_is_noop () {
+    void * handle = dlopen("./$TEST_FILESTEM-noop-dlclose-test-helper.so", RTLD_NOW | RTLD_GLOBAL);
+    dlclose(handle);
+
+    handle = dlopen("./$TEST_FILESTEM-noop-dlclose-test-helper.so", RTLD_NOW | RTLD_NOLOAD);
+    if (handle != NULL) {
+        return 1;
+    }
+    return 0;
+}
+EOF
+build_so $TEST_FILESTEM-noop-dlclose-test
+
+cat > $TEST_FILESTEM-noop-dlclose-test-helper.c <<EOF
+int sbcl_dlclose_test = 42;
+EOF
+build_so $TEST_FILESTEM-noop-dlclose-test-helper
+
 ## Foreign definitions & load
 
 cat > $TEST_FILESTEM.base.lisp <<EOF
@@ -251,20 +273,28 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
 
   (note "/initial assertions ok")
 
+  ;; determine if dlclose is a noop.
+  (load-shared-object (truename "$TEST_FILESTEM-noop-dlclose-test.so"))
+  (define-alien-routine dlclose-is-noop int)
+  (defparameter *dlclose-noop-p* (plusp (dlclose-is-noop)))
+
   ;; test reloading object file with new definitions
   (assert (= 13 foo))
   (assert (= 42 (bar)))
   (note "/original definitions ok")
-  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
-  (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
-  (load-shared-object (truename "$TEST_FILESTEM-b.so"))
-  (note "/reloading ok")
-  (assert (= 42 foo))
-  (assert (= 13 (bar)))
-  (note "/redefined versions ok")
-  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b2.so")
-  (rename-file "$TEST_FILESTEM-b.bak" "$TEST_FILESTEM-b.so")
-  (note "/renamed back to originals")
+  (if *dlclose-noop-p*
+      (note "/skipping reloading tests")
+      (progn
+        (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
+        (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
+        (load-shared-object (truename "$TEST_FILESTEM-b.so"))
+        (note "/reloading ok")
+        (assert (= 42 foo))
+        (assert (= 13 (bar)))
+        (note "/redefined versions ok")
+        (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b2.so")
+        (rename-file "$TEST_FILESTEM-b.bak" "$TEST_FILESTEM-b.so")
+        (note "/renamed back to originals")))
 
   ;; test late resolution
   (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -282,13 +312,16 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
     (load-shared-object (truename "$TEST_FILESTEM-c.so"))
     (assert (= 43 late-foo))
     (assert (= 14 (late-bar)))
-    (unload-shared-object (truename "$TEST_FILESTEM-c.so"))
-    (multiple-value-bind (val err) (ignore-errors late-foo)
-      (assert (not val))
-      (assert (typep err 'undefined-alien-error)))
-    (multiple-value-bind (val err) (ignore-errors (late-bar))
-      (assert (not val))
-      (assert (typep err 'undefined-alien-error)))
+    (if *dlclose-noop-p*
+        (note "/skipping linkage table unloading tests")
+        (progn
+          (unload-shared-object (truename "$TEST_FILESTEM-c.so"))
+          (multiple-value-bind (val err) (ignore-errors late-foo)
+            (assert (not val))
+            (assert (typep err 'undefined-alien-error)))
+          (multiple-value-bind (val err) (ignore-errors (late-bar))
+            (assert (not val))
+            (assert (typep err 'undefined-alien-error)))))
     (note "/linkage table ok"))
 
   (sb-ext:exit :code $EXIT_LISP_WIN) ; success convention for Lisp program

@@ -47,7 +47,7 @@ EQUAL to the designated pathname of a previous call will replace the old
 definitions; if a symbol was previously referenced through the object and
 is not present in the reloaded version an error will be signalled. Reloading
 may not work as expected if user or library-code has called dlopen(3) on the
-same shared object.
+same shared object or running on a system where dlclose(3) is a noop.
 
 LOAD-SHARED-OBJECT interacts with SB-EXT:SAVE-LISP-AND-DIE:
 
