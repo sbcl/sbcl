@@ -303,3 +303,8 @@
   (dolist (x '(pathname cons array))
     (let ((l (sb-kernel:find-layout x)))
       (assert (= (sxhash l) (sb-kernel::layout-clos-hash l))))))
+
+(with-test (:name :equalp-table-fixnum-equal-to-float)
+  (let ((table (make-hash-table :test #'equalp)))
+    (assert (eql (setf (gethash 3d0 table) 1)
+                 (gethash 3   table)))))

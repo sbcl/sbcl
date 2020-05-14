@@ -961,8 +961,10 @@ if there is no such entry. Entries can be added using SETF."
       ;; and SYMBOLP uses more instructions. This is similar in philosophy to the
       ;; EQL branch where I don't care whether single float (on 64-bit) is or isn't
       ;; handled by the EQ comparator.
-      ((equal equalp)
+      (equal
        '(or address-based-p (fixnump key) (non-null-symbol-p key)))
+      (equalp
+       '(or address-based-p (non-null-symbol-p key)))
       ((nil)
        ;; If the hash-function is nonstandard, it's nonetheless possible
        ;; to use EQ as the comparator.
