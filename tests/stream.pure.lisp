@@ -481,3 +481,12 @@
       ;; result type reverts back to simple-base-string after get-output-stream-string
       (assert (equal (type-of (get-output-stream-string s))
                      '(simple-base-string 1))))))
+
+(with-test (:name :with-input-from-string-declarations)
+  (checked-compile-and-assert
+      ()
+      `(lambda (string)
+         (with-input-from-string (x string)
+           (declare (optimize safety))
+           (read-char x)))
+    (("a") #\a)))

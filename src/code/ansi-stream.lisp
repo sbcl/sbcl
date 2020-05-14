@@ -214,11 +214,13 @@
                  `(progn ,@forms)))) ; don't bother closing
       `(,bind ((,dummy (%make-instance ,(dd-length (find-defstruct-description
                                                     'string-input-stream)))))
-         ,(if index
-              (multiple-value-bind (forms decls) (parse-body forms-decls nil)
-                `(multiple-value-bind (,var ,offset) ,ctor
-                   ,@decls
-                   (multiple-value-prog1 ,(uwp forms)
-                   (setq ,index (- (string-input-stream-index ,var) ,offset)))))
-            `(let ((,var ,ctor)) ,(uwp forms-decls))))))) ; easy way
+              ,(multiple-value-bind (forms decls) (parse-body forms-decls nil)
+                 (if index
+                     `(multiple-value-bind (,var ,offset) ,ctor
+                        ,@decls
+                        (multiple-value-prog1 ,(uwp forms)
+                          (setq ,index (- (string-input-stream-index ,var) ,offset))))
+                     `(let ((,var ,ctor))
+                        ,@decls
+                        ,(uwp forms)))))))) ; easy way
 
