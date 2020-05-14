@@ -219,7 +219,7 @@
                      `(multiple-value-bind (,var ,offset) ,ctor
                         ,@decls
                         (multiple-value-prog1 ,(uwp forms)
-                          (setq ,index (- (string-input-stream-index ,var) ,offset))))
+                          (setf ,index (- (string-input-stream-index ,var) ,offset))))
                      `(let ((,var ,ctor))
                         ,@decls
                         ,(uwp forms)))))))) ; easy way
