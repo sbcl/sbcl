@@ -1566,25 +1566,6 @@ symbol-case giving up: case=((V U) (F))
            (when ,stream
              (close ,stream :abort ,abortp)))))))
 
-(sb-xc:defmacro with-input-from-string ((var string &key index start end)
-                                            &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
-    `(let ((,var
-            ;; Should (WITH-INPUT-FROM-STRING (stream str :start nil :end 5))
-            ;; pass the explicit NIL, and thus get an error? It's logical
-            ;; because an explicit NIL does not mean "default" in any other
-            ;; string operation. So why does it here?
-            ,(if (null end)
-                 `(make-string-input-stream ,string ,@(if start (list start)))
-                 `(make-string-input-stream ,string ,(or start 0) ,end))))
-         ,@decls
-         (multiple-value-prog1
-             (unwind-protect
-                  (progn ,@forms)
-               (close ,var))
-           ,@(when index
-               `((setf ,index (string-input-stream-current ,var))))))))
-
 (sb-xc:defmacro with-output-to-string
     ((var &optional string &key (element-type ''character))
      &body forms-decls)

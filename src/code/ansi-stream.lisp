@@ -178,3 +178,47 @@
   (let ((name (make-symbol "THUNK")))
     `(dx-flet ((,name () ,@body))
        (%with-standard-io-syntax #',name))))
+
+;;; Note that this macro may display problems (as do most) with out-of-order
+;;; evaluation of keyword args if passed in a different order from listed,
+;;; in situations where evaluation order matters.
+(defmacro with-input-from-string ((var string &key index
+                                                   (start 0 start-suppliedp)
+                                                   end)
+                                  &body forms-decls
+                                  &environment env)
+  (let* ((dummy '#:stream) ; in case VAR is declared special
+         (offset '#:offset)
+         ;; CLHS says in WITH-INPUT-FROM-STRING:
+         ;;  "The input string stream is automatically closed on exit from with-input-from-string,
+         ;;   no matter whether the exit is normal or abnormal. The input string stream to which
+         ;;   the variable var is bound has dynamic extent; its extent ends when the form is exited."
+         ;; In light of the second point, we need not close the stream if the object is
+         ;; stack-allocated, because any attempt to access it after the forms exit will surely
+         ;; crash, and there are otherwise no observable effects from closing the stream.
+         ;; The choice to avoid DX-LET in safe code is strictly unecessary, because it is
+         ;; *always* undefined behavior to use the DX object after its extent ends,
+         ;; however it might help expose user code bugs by keeping the stream accessible
+         ;; but closed.
+         (bind (if (sb-c:policy env (= safety 3)) 'let 'dx-let))
+         (ctor `(%init-string-input-stream
+                 ,dummy ,string
+                 ;; not (OR START 0), because ":START NIL" should err
+                 ,@(cond (start-suppliedp (list start)) (end '(0)))
+                 ,@(when end (list end)))))
+    (flet ((uwp (forms)
+             (if (eq bind 'let)
+                 ;; "The consequences are undefined if an attempt is made to assign
+                 ;;  the variable var." - so we can read it here with impunity.
+                 `(unwind-protect (progn ,@forms) (close ,var))
+                 `(progn ,@forms)))) ; don't bother closing
+      `(,bind ((,dummy (%make-instance ,(dd-length (find-defstruct-description
+                                                    'string-input-stream)))))
+         ,(if index
+              (multiple-value-bind (forms decls) (parse-body forms-decls nil)
+                `(multiple-value-bind (,var ,offset) ,ctor
+                   ,@decls
+                   (multiple-value-prog1 ,(uwp forms)
+                   (setq ,index (- (string-input-stream-index ,var) ,offset)))))
+            `(let ((,var ,ctor)) ,(uwp forms-decls))))))) ; easy way
+

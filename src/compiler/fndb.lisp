@@ -1247,6 +1247,9 @@
 (defknown make-string-input-stream (string &optional index sequence-end)
   sb-impl::string-input-stream
   (flushable))
+(defknown sb-impl::%init-string-input-stream (instance string &optional index sequence-end)
+  (values sb-impl::string-input-stream index &optional)
+  (flushable))
 (defknown make-string-output-stream (&key (:element-type type-specifier))
   sb-impl::string-output-stream
   (flushable))

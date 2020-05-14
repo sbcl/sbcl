@@ -1832,17 +1832,25 @@ extended <package-name>::<form-in-package> syntax."
 ;;;; READ-FROM-STRING
 
 (declaim (ftype (sfunction (string t t index (or null index) t) (values t index))
-                %read-from-string))
+                %read-from-string
+                %read-from-string/safe))
 (defun %read-from-string (string eof-error-p eof-value start end preserve-whitespace)
-  (with-array-data ((string string :offset-var offset)
-                    (start start)
-                    (end end)
-                    :check-fill-pointer t)
-    (let ((stream (make-string-input-stream string start end)))
-      (values (if preserve-whitespace
-                  (%read-preserving-whitespace stream eof-error-p eof-value nil)
-                  (read stream eof-error-p eof-value))
-              (- (string-input-stream-current stream) offset)))))
+  (let* ((index)
+         (thing
+          (with-input-from-string (stream string :start start :end end :index index)
+            (if preserve-whitespace
+                (%read-preserving-whitespace stream eof-error-p eof-value nil)
+                (read stream eof-error-p eof-value)))))
+    (values thing index)))
+(defun %read-from-string/safe (string eof-error-p eof-value start end preserve-whitespace)
+  (declare (optimize safety)) ; make a stream with indefinite extent
+  (let* ((index)
+         (thing
+          (with-input-from-string (stream string :start start :end end :index index)
+            (if preserve-whitespace
+                (%read-preserving-whitespace stream eof-error-p eof-value nil)
+                (read stream eof-error-p eof-value)))))
+    (values thing index)))
 
 (locally
 (declare (muffle-conditions style-warning))
@@ -1853,7 +1861,7 @@ extended <package-name>::<form-in-package> syntax."
    will take effect."
   (declare (string string))
   (maybe-note-read-from-string-signature-issue eof-error-p)
-  (%read-from-string string eof-error-p eof-value start end preserve-whitespace)))
+  (%read-from-string/safe string eof-error-p eof-value start end preserve-whitespace)))
 
 ;;;; PARSE-INTEGER
 

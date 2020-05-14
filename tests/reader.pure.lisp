@@ -367,7 +367,14 @@
              (ctu:assert-no-consing
               (progn (file-position s 0)
                      (read s))
-              40000))))
+              40000))
+           ;; WITH-INPUT-FROM-STRING doesn't heap-allocate a stream
+           (ctu:assert-no-consing
+            (with-input-from-string (s string)
+              (opaque-identity s)))
+           ;; READ-FROM-STRING doesn't heap-allocate a stream
+           (ctu:assert-no-consing
+            (read-from-string string))))
     ;; These each used to produce at least 20 MB of garbage,
     ;; a result of using 128-character (= 512 bytes for Unicode) buffers.
     ;; Now we use exactly one buffer, or maybe two for package + symbol-name.

@@ -300,6 +300,9 @@
 ;; should still work, but the stream information will not be printed.
 (with-test (:name (reader-error :stream-error-position-info :closed-stream
                                 :bug-1264902))
+  ;; This test operates on a closed stream that has dynamic extent (theoretically).
+  ;; SAFETY 3 prevents a memory fault by not actually stack-allocating it.
+  (declare (optimize (safety 3)))
   (assert
    (search
     "Package NO-SUCH-PACKAGE does not exist"

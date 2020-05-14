@@ -1252,53 +1252,19 @@
 ;;;; STRING-INPUT-STREAM stuff
 
 (defstruct (string-input-stream
-             (:include ansi-stream
-                       (in #'string-inch)
-                       (misc #'string-in-misc))
-             (:constructor %make-string-input-stream
-                           (string current end))
+             (:include ansi-stream (misc #'string-in-misc))
+             (:constructor nil)
              (:copier nil)
              (:predicate nil))
-  (string (missing-arg) :type simple-string :read-only t)
-  (current (missing-arg) :type index)
-  (end (missing-arg) :type index))
+  ;; Indices into STRING
+  (index nil :type index)
+  (limit nil :type index :read-only t)
+  ;; Backing string after following displaced array chain
+  (string nil :type simple-string :read-only t)
+  ;; So that we know what string index FILE-POSITION 0 correponds to
+  (start nil :type index :read-only t))
 
 (declaim (freeze-type string-input-stream))
-
-(defun string-inch (stream eof-error-p eof-value)
-  (declare (type string-input-stream stream))
-  (let ((string (string-input-stream-string stream))
-        (index (string-input-stream-current stream)))
-    (cond ((>= index (the index (string-input-stream-end stream)))
-           (eof-or-lose stream eof-error-p eof-value))
-          (t
-           (setf (string-input-stream-current stream) (1+ index))
-           (char string index)))))
-
-(defun string-stream-read-n-bytes (stream buffer start requested eof-error-p)
-  (declare (type string-input-stream stream)
-           (type index start requested))
-  (let* ((string (string-input-stream-string stream))
-         (index (string-input-stream-current stream))
-         (available (- (string-input-stream-end stream) index))
-         (copy (min available requested)))
-    (declare (type simple-string string))
-    (when (plusp copy)
-      (setf (string-input-stream-current stream)
-            (truly-the index (+ index copy)))
-      ;; FIXME: why are we VECTOR-SAP'ing things here?  what's the point?
-      ;; and are there SB-UNICODE issues here as well?  --njf, 2005-03-24
-      (with-pinned-objects (string buffer)
-        (system-area-ub8-copy (vector-sap string)
-                              index
-                              (if (typep buffer 'system-area-pointer)
-                                  buffer
-                                  (vector-sap buffer))
-                              start
-                              copy)))
-    (if (and (> requested copy) eof-error-p)
-        (error 'end-of-file :stream stream)
-        copy)))
 
 (defun string-in-misc (stream operation &optional arg1 arg2)
   (declare (type string-input-stream stream)
@@ -1306,47 +1272,95 @@
   (case operation
     (:file-position
      (if arg1
-         (setf (string-input-stream-current stream)
+         (setf (string-input-stream-index stream)
                (case arg1
-                 (:start 0)
-                 (:end (string-input-stream-end stream))
+                 (:start (string-input-stream-start stream))
+                 (:end (string-input-stream-limit stream))
                  ;; We allow moving position beyond EOF. Errors happen
                  ;; on read, not move.
-                 (t arg1)))
-         (string-input-stream-current stream)))
+                 (t (+ (string-input-stream-start stream) arg1))))
+         (- (string-input-stream-index stream)
+            (string-input-stream-start stream))))
     ;; According to ANSI: "Should signal an error of type type-error
     ;; if stream is not a stream associated with a file."
     ;; This is checked by FILE-LENGTH, so no need to do it here either.
     ;; (:file-length (length (string-input-stream-string stream)))
-    (:unread (decf (string-input-stream-current stream)))
+    (:unread (setf (string-input-stream-index stream)
+                   ;; silently ignore attempts to go backwards too far
+                   (max (1- (string-input-stream-index stream))
+                        (string-input-stream-start stream))))
     (:close (set-closed-flame stream))
-    (:listen (or (/= (the index (string-input-stream-current stream))
-                     (the index (string-input-stream-end stream)))
-                 :eof))
+    (:listen (if (< (string-input-stream-index stream)
+                    (string-input-stream-limit stream))
+                 t :eof))
     (:element-type (array-element-type (string-input-stream-string stream)))
     (:element-mode 'character)))
 
+;;; Since we don't want to insert ~300 bytes of code at every site
+;;; of WITH-INPUT-FROM-STRING, and we lack a way to perform partial inline
+;;; dx allocation of structures, this'll have to do.
+(defun %init-string-input-stream (stream string &optional (start 0) end)
+  (declare (string string))
+  (setf (%instance-layout (truly-the instance stream))
+        #.(find-layout 'string-input-stream))
+  (macrolet ((initforms ()
+               `(setf
+                 ,@(mapcan (lambda (dsd)
+                             (list `(%instance-ref stream ,(dsd-index dsd))
+                                   (case (dsd-name dsd)
+                                     ((index start) 'start)
+                                     (limit 'end)
+                                     (string 'simple-string)
+                                     (in 'input-routine)
+                                     (misc '#'string-in-misc)
+                                     (t (dsd-default dsd)))))
+                           (dd-slots
+                            (find-defstruct-description 'string-input-stream)))))
+             (char-in (element-type)
+               `(let ((index (string-input-stream-index
+                              (truly-the string-input-stream stream)))
+                      (string (truly-the (simple-array ,element-type (*))
+                                         (string-input-stream-string stream))))
+                  (cond ((>= index (string-input-stream-limit stream))
+                         (eof-or-lose stream eof-error-p eof-value))
+                        (t
+                         (setf (string-input-stream-index stream) (1+ index))
+                         (char string index))))))
+  (flet ((base-char-in (stream eof-error-p eof-value)
+           (declare (optimize (sb-c::verify-arg-count 0)
+                              (sb-c::insert-array-bounds-checks 0)))
+           (char-in base-char))
+         (character-in (stream eof-error-p eof-value)
+           (declare (optimize (sb-c::verify-arg-count 0)
+                              (sb-c::insert-array-bounds-checks 0)))
+           (char-in character))
+         (nil-in (stream eof-error-p eof-value)
+           (if (>= (string-input-stream-index stream)
+                   (string-input-stream-limit stream))
+               (eof-or-lose stream eof-error-p eof-value)
+               (error "Attempt to read from stream with NIL element type"))))
+    (let ((input-routine
+            (typecase string
+              #+sb-unicode (sb-kernel::character-string #'character-in)
+              (base-string #'base-char-in)
+              (t #'nil-in))))
+      (with-array-data ((simple-string string :offset-var offset)
+                        (start start)
+                        (end end)
+                        :check-fill-pointer t)
+        (initforms)
+        (values (truly-the string-input-stream stream)
+                offset))))))
+
+;;; It's debatable whether we should try to convert
+;;;  (let ((s (make-string-input-stream))) (declare (dynamic-extent s)) ...)
+;;; into the thing that WITH-INPUT-FROM-STRING does. That's what the macro is for.
 (defun make-string-input-stream (string &optional (start 0) end)
   "Return an input stream which will supply the characters of STRING between
   START and END in order."
-  (declare (type string string)
-           (type index start)
-           (type (or index null) end))
-  ;; FIXME: very inefficient if the input string is, say a 100000-character
-  ;; adjustable string but (- END START) is 100 characters. We should use
-  ;; SUBSEQ instead of coercing the whole string. And if STRING is non-simple
-  ;; but has element type CHARACTER, wouldn't it work to just use the
-  ;; underlying simple-string since %MAKE-STRING-INPUT-STREAM accepts bounding
-  ;; indices that can be fudged to deal with any offset?
-  ;; And (for unicode builds) if the input is BASE-STRING, we should use
-  ;; MAKE-ARRAY and REPLACE to coerce just the specified piece.
-  (let* ((string (coerce string '(simple-array character (*)))))
-    ;; Why WITH-ARRAY-DATA, since the array is already simple?
-    ;; because it's a nice abstract way to check the START and END.
-    (with-array-data ((string string) (start start) (end end))
-      (%make-string-input-stream
-       string ;; now simple
-       start end))))
+  (macrolet ((nwords () (dd-length (find-defstruct-description 'string-input-stream))))
+    ;; kill the secondary value
+    (values (%init-string-input-stream (%make-instance (nwords)) string start end))))
 
 ;;;; STRING-OUTPUT-STREAM stuff
 ;;;;
