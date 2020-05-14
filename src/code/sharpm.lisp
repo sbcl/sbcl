@@ -262,65 +262,58 @@
 (declaim (freeze-type sharp-equal-wrapper))
 
 ;; This function is kind of like NSUBLIS, but checks for circularities and
-;; substitutes in arrays and structures as well as lists. The first arg is an
-;; alist of the things to be replaced assoc'd with the things to replace them.
-(defun circle-subst (circle-table tree)
-  (cond ((and (sharp-equal-wrapper-p tree)
-              (not (eq (sharp-equal-wrapper-value tree) +sharp-equal-marker+)))
-         (sharp-equal-wrapper-value tree))
-        ((null (gethash tree circle-table))
-         (setf (gethash tree circle-table) t)
-         (typecase tree
-           (cons
-                (let ((a (circle-subst circle-table (car tree)))
-                      (d (circle-subst circle-table (cdr tree))))
-                  (unless (eq a (car tree))
-                    (rplaca tree a))
-                  (unless (eq d (cdr tree))
-                    (rplacd tree d))))
-           ((array t)
-                (with-array-data ((data tree) (start) (end))
-                  (declare (fixnum start end))
-                  (do ((i start (1+ i)))
-                      ((>= i end))
-                    (let* ((old (aref data i))
-                           (new (circle-subst circle-table old)))
-                      (unless (eq old new)
-                        (setf (aref data i) new))))))
-           (instance
-            ;; Don't refer to the DD-SLOTS unless there is reason to,
-            ;; that is, unless some slot might be raw.
-            (if (/= +layout-all-tagged+ (layout-bitmap (%instance-layout tree)))
-                (let ((dd (layout-info (%instance-layout tree))))
-                  (dolist (dsd (dd-slots dd))
-                    (when (eq (dsd-raw-type dsd) t)
-                      (let ((i (dsd-index dsd)))
-                        (let* ((old (%instance-ref tree i))
-                               (new (circle-subst circle-table old)))
-                          (unless (eq old new)
-                            (setf (%instance-ref tree i) new)))))))
-                  (do ((len (%instance-length tree))
-                       (i sb-vm:instance-data-start (1+ i)))
-                      ((>= i len))
-                    (let* ((old (%instance-ref tree i))
-                           (new (circle-subst circle-table old)))
-                      (unless (eq old new)
-                        (setf (%instance-ref tree i) new))))))
-           ;; It is not safe to iterate over %FUNCALLABLE-INSTANCE-INFO without knowing
-           ;; where the raw slots are, if any. We can safely process FSC-INSTANCE-SLOTS
-           ;; though, and that's the *only* slot to look at.
-           ;; No other funcallable structure (%METHOD-FUNCTION, INTERPRETED-FUNCTION, etc)
-           ;; has a reader syntax.
-           ;; ASSUMPTION: all funcallable structures have at least 1 slot beyond
-           ;; %FUNCALLABLE-INSTANCE-FUN (overlapping with FSC-INSTANCE-SLOTS)
-           ;; and that slot is never a raw slot.
-           (funcallable-instance
-            (let* ((old (sb-pcl::%fsc-instance-slots tree))
-                   (new (circle-subst circle-table old)))
-              (unless (eq old new)
-                (setf (sb-pcl::%fsc-instance-slots tree) new)))))
-         tree)
-        (t tree)))
+;; substitutes in arrays and structures as well as lists.
+(defun circle-subst (tree)
+  (declare (inline alloc-xset))
+  (dx-let ((circle-table (alloc-xset)))
+    (named-let recurse ((tree tree))
+      (when (and (sharp-equal-wrapper-p tree)
+                 (neq (sharp-equal-wrapper-value tree) +sharp-equal-marker+))
+        (return-from recurse (sharp-equal-wrapper-value tree)))
+      ;; pick off types that never need to be sought in or added to the xset.
+      ;; (there are others, but these are common and quick to check)
+      (when (typep tree '(or number symbol))
+        (return-from recurse tree))
+      (unless (xset-member-p tree circle-table)
+        (add-to-xset tree circle-table)
+        (macrolet ((process (place)
+                     `(let* ((old ,place)
+                             (new (recurse old)))
+                        (unless (eq old new)
+                          (setf ,place new)))))
+          (typecase tree
+            (cons
+             (process (car tree))
+             (process (cdr tree)))
+            ((array t)
+             (with-array-data ((data tree) (start) (end))
+               (declare (fixnum start end))
+               (do ((i start (1+ i)))
+                   ((>= i end))
+                 (process (aref data i)))))
+            (instance
+             ;; Don't refer to the DD-SLOTS unless there is reason to,
+             ;; that is, unless some slot might be raw.
+             (if (/= +layout-all-tagged+ (layout-bitmap (%instance-layout tree)))
+                 (let ((dd (layout-info (%instance-layout tree))))
+                   (dolist (dsd (dd-slots dd))
+                     (when (eq (dsd-raw-type dsd) t)
+                       (process (%instance-ref tree (dsd-index dsd))))))
+                 (do ((len (%instance-length tree))
+                      (i sb-vm:instance-data-start (1+ i)))
+                     ((>= i len))
+                   (process (%instance-ref tree i)))))
+             ;; It is not safe to iterate over %FUNCALLABLE-INSTANCE-INFO without knowing
+             ;; where the raw slots are, if any. We can safely process FSC-INSTANCE-SLOTS
+             ;; though, and that's the *only* slot to look at.
+             ;; No other funcallable structure (%METHOD-FUNCTION, INTERPRETED-FUNCTION, etc)
+             ;; has a reader syntax.
+             ;; ASSUMPTION: all funcallable structures have at least 1 slot beyond
+             ;; %FUNCALLABLE-INSTANCE-FUN (overlapping with FSC-INSTANCE-SLOTS)
+             ;; and that slot is never a raw slot.
+            (funcallable-instance
+             (process (sb-pcl::%fsc-instance-slots tree))))))
+      tree)))
 
 ;;; Sharp-equal works as follows.
 ;;; When creating a new label a SHARP-EQUAL-WRAPPER is pushed onto
@@ -347,7 +340,7 @@
                            "Must label something more than just #~D#"
                            label))
     (setf (sharp-equal-wrapper-value wrapper) obj)
-    (circle-subst (make-hash-table :test 'eq) obj)))
+    (circle-subst obj)))
 
 (defun sharp-sharp (stream ignore label)
   (declare (ignore ignore))
