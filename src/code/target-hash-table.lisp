@@ -948,23 +948,40 @@ if there is no such entry. Entries can be added using SETF."
   (defun ht-probing-should-use-eq (std-fn)
     (ecase std-fn ; try to strength-reduce the test for this key
       (eq 't) ; always use EQ
-      ;; EQL vs EQ only matters for numbers which aren't immediate.
-      ;; Not worth the trouble to get single-float in here for 64-bit.
-      (eql '(or address-based-p (typep key '(or (not number) fixnum))))
-      ;; EQUAL and EQUALP hash function say that symbols are NOT address-sensitive
-      ;; - which they aren't, as they use the SYMBOL-HASH slot, unlike EQ-HASH
-      ;; which takes the address - but we want to compare symbols by EQ.
-      ;; There is diminishing payoff from listing other types here, though we might
-      ;; want EQUAL comparison on instances to reduce to EQ as long as KEY isn't
-      ;; a pathname.  As to NON-NULL-SYMBOL, I'm just being slightly more efficient
-      ;; by not checking for NIL, precisely because it's not an important case,
-      ;; and SYMBOLP uses more instructions. This is similar in philosophy to the
-      ;; EQL branch where I don't care whether single float (on 64-bit) is or isn't
-      ;; handled by the EQ comparator.
+      (eql
+       ;; EQL vs EQ only matters for numbers which aren't immediate.
+       ;; Not worth the trouble to get single-float in here for 64-bit.
+       '(or address-based-p (typep key '(or (not number) fixnum))))
       (equal
-       '(or address-based-p (fixnump key) (non-null-symbol-p key)))
+       ;; EQUAL and EQUALP hash function say that symbols are NOT address-sensitive
+       ;; - which they aren't, as they use the SYMBOL-HASH slot, unlike EQ-HASH
+       ;; which takes the address - but we want to compare symbols by EQ.
+       ;; As to NON-NULL-SYMBOL, it's just slightly quicker than also testing for NIL,
+       ;; because it's not an important case and SYMBOLP uses more instructions.
+       ;; This is similar in philosophy to the EQL branch where I don't care whether
+       ;; single float (on 64-bit) is or isn't compared by EQ.
+       ;; A more thorough test of whether EQUALP strength-reduces to EQ
+       ;; would be something like
+       ;; (or (fixnump key)
+       ;;     (not (typep key '(or cons string pathname bit-vector number)))))
+       ;; but it's unclear to me whether we should spend time up front deciding
+       ;; to reduce everything to EQ that could be reduced. The test here
+       ;; is about half as much code as the (not (typep ...)) expression.
+       ;; There is diminishing payoff from listing other types.
+       '(or address-based-p
+            (fixnump key)
+            (non-null-symbol-p key)
+            (and (%instancep key)
+                 ;; Pathnames are descended into by EQUAL.
+                 (not (logtest (layout-flags (%instance-layout key))
+                               +pathname-layout-flag+)))))
       (equalp
-       '(or address-based-p (non-null-symbol-p key)))
+       '(or address-based-p
+            (non-null-symbol-p key)
+            (and (%instancep key)
+                 ;; Structures incl. PATHNAME and HASH-TABLE are descended into.
+                 (not (logtest (layout-flags (%instance-layout key))
+                               +structure-layout-flag+)))))
       ((nil)
        ;; If the hash-function is nonstandard, it's nonetheless possible
        ;; to use EQ as the comparator.

@@ -358,6 +358,11 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                          (equal-aux (cdr x) (cdr y))))
                    ((stringp x)
                     (and (stringp y) (string= x y)))
+                   ;; We could remove this case by ensuring that MAKE-PATHNAME,
+                   ;; PARSE-NAMESTRING, MERGE-PATHNAME, etc look in a weak hash-based
+                   ;; thing first for an EQUAL pathname, ensuring that if two pathnames
+                   ;; are EQUAL then they are EQ. That would elide this test at the
+                   ;; expense of pathname construction which seems like a good tradeoff.
                    ((pathnamep x)
                     (and (pathnamep y) (pathname= x y)))
                    ((bit-vector-p x)
