@@ -52,7 +52,7 @@ INSTALLING SBCL
 
     * In the directory ../lib/sbcl relative to the executable.
 
-    * In the current directorty.
+    * In the current directory.
 
     * By environment variable, in the directory named by the
        environment variable "SBCL_HOME". Example:
