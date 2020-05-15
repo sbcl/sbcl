@@ -123,10 +123,6 @@
                            (compute-temp t)
                            value-tn-ref)
   (let* ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
-         (perform-lowtag-check
-          (not (and (eq lowtag other-pointer-lowtag)
-                    value-tn-ref
-                    (other-pointer-tn-ref-p value-tn-ref))))
          ;; It is preferable (smaller and faster code) to directly
          ;; compare the value in memory instead of loading it into
          ;; a register first. Find out if this is possible and set
@@ -151,16 +147,30 @@
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
 
-      (when perform-lowtag-check
-        ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
-        ;; an untagged ptr to VALUE if the lowtag test passes.
-        (setq untagged (ea temp))
-        (when (ea-p widetag-tn)
-          (setq widetag-tn untagged))
-        (when compute-temp
-          (%lea-for-lowtag-test temp value lowtag :qword))
-        (inst test :byte temp lowtag-mask)
-        (inst jmp :nz when-false))
+      (cond ((and value-tn-ref
+                  (eq lowtag other-pointer-lowtag)
+                  (other-pointer-tn-ref-p value-tn-ref))) ; best case: lowtag is right
+            ((and (notany #'listp headers)
+                  value-tn-ref
+                  (pointer-tn-ref-p value-tn-ref)) ; middle case: any pointer
+             ;; Emit one fewer conditional jump than the general case,
+             ;; but it doesn't work if HEDERS contains any ranges- suppose the pointer
+             ;; is a a list pointer and the CAR has a random fixnum that matches.
+             (inst mov temp value)
+             (inst and temp (lognot lowtag-mask))
+             (if (ea-p widetag-tn)
+                 (setq widetag-tn (ea temp))
+                 (setq untagged (ea temp))))
+            (t
+             ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
+             ;; an untagged ptr to VALUE if the lowtag test passes.
+             (setq untagged (ea temp))
+             (when (ea-p widetag-tn)
+               (setq widetag-tn untagged))
+             (when compute-temp
+               (%lea-for-lowtag-test temp value lowtag :qword))
+             (inst test :byte temp lowtag-mask)
+             (inst jmp :nz when-false)))
 
       (when (eq widetag-tn temp)
         (inst mov :dword temp (or untagged (ea (- lowtag) value))))
