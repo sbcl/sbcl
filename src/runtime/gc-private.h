@@ -19,8 +19,6 @@
 #include "immobile-space.h"
 #include "code.h"
 
-#define CUSTOM_GC_SCAVENGE_FLAG 0x800000
-
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 static inline void *
