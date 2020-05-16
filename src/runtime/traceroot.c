@@ -655,10 +655,11 @@ static void record_ptr(lispobj* source, lispobj target,
     uint32_t* next = new_cell + 2;
     gc_assert((char*)next <= ss->scratchpad.end);
     ss->scratchpad.free = (char*)next;
+    if (ss->scratchpad.free > ss->scratchpad.end) lose("undersized scratchpad");
     new_cell[0] = encode_pointer((lispobj)source);
-    new_cell[1] = hopscotch_get(&ss->inverted_heap, target, 0);
-    hopscotch_put(&ss->inverted_heap, target,
-                  (sword_t)((char*)new_cell - ss->scratchpad.base));
+    uint32_t* valref = hopscotch_get_ref(&ss->inverted_heap, target);
+    new_cell[1] = *valref;
+    *valref = (uint32_t)((char*)new_cell - ss->scratchpad.base);
 }
 
 #define relevant_ptr_p(x) find_page_index(x)>=0||immobile_space_p((lispobj)x)
@@ -771,15 +772,27 @@ static uword_t build_refs(lispobj* where, lispobj* end,
 }
 #undef check_ptr
 
+#define show_tally(b,a) /* "before" and "after" */   \
+  if(heap_trace_verbose && !ss->record_ptrs) \
+    fprintf(stderr, "%ld objs, %ld ptrs, %ld immediates\n", \
+            a->n_objects - b.n_objects, a->n_pointers - b.n_pointers, \
+            (a->n_scanned_words - a->n_pointers) - (b.n_scanned_words - b.n_pointers))
+
 static void scan_spaces(struct scan_state* ss)
 {
+    struct scan_state old = *ss;
     build_refs((lispobj*)STATIC_SPACE_START, static_space_free_pointer, ss);
+    show_tally(old, ss);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);
-    build_refs((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, ss);
+    old = *ss; build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);
+    show_tally(old, ss);
+    old = *ss; build_refs((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, ss);
+    show_tally(old, ss);
 #endif
+    old = *ss;
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))build_refs,
                     -1, (uword_t)ss);
+    show_tally(old, ss);
 }
 
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
@@ -789,15 +802,8 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
 {
     struct scan_state ss;
     memset(&ss, 0, sizeof ss);
-    if (heap_trace_verbose) {
-        fprintf(stderr, "Pass 1: Counting heap objects... ");
-    }
+    if (heap_trace_verbose) fprintf(stderr, "Pass 1: Counting heap objects...\n");
     scan_spaces(&ss);
-    if (heap_trace_verbose) {
-        fprintf(stderr, "%ld objs, %ld ptrs, %ld immediates\n",
-                ss.n_objects, ss.n_pointers,
-                ss.n_scanned_words - ss.n_pointers);
-    }
     // Guess at the initial size of ~ .5 million objects.
     int size = 1<<19; // flsl(tot_n_objects); this would work if you have it
     while (ss.n_objects > size) size <<= 1;

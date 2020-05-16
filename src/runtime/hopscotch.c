@@ -171,7 +171,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
  * which is why the length is specified again.
  * If returning it to the OS and not the cache, then don't bother 0-filling.
  */
-static void cached_deallocate(char* mem, int zero_fill_length)
+static void cached_deallocate(char* mem, uword_t zero_fill_length)
 {
     int line = 0;
     if (!cached_alloc[0]) {
@@ -223,7 +223,7 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
     // The last few logical cells in the key array can use physical cells
     // at indices greater than 'size'; there's no wrapping back to index 0.
     int n_keys = size + (hop_range - 1);
-    unsigned storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
+    uword_t storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
         + sizeof (int) * size; // hop bitmasks
 
     if (ht->keys)
@@ -676,6 +676,44 @@ found2: ++index;
 found1: ++index;
 found0:
     return get_val(ht, index);
+}
+
+/* Return the address of the value associated with 'key',
+   insert 'key' with value 0 if it was not found. */
+void* hopscotch_get_ref(tableptr ht, uword_t key)
+{
+    gc_dcheck(key);
+    int index = hash(ht, key) & ht->mask;
+    unsigned bits = get_hop_mask(ht, index);
+    int __attribute__((unused)) probes = 0;
+    if (ht->compare) // Custom comparator
+        for ( ; bits ; bits >>= 1, ++index ) {
+            if ((bits & 1) && ht->compare(ht->keys[index], key))
+                goto found0;
+        }
+    else for ( ; bits ; bits >>= 4, index += 4)
+        if (bits & 0xf) {
+            probe(1, index+0, goto found0);
+            probe(2, index+1, goto found1);
+            probe(4, index+2, goto found2);
+            probe(8, index+3, goto found3);
+        }
+    tally_miss(ht, probes);
+    hopscotch_insert(ht, key, 0);
+    return hopscotch_get_ref(ht, key);
+found3: ++index;
+found2: ++index;
+found1: ++index;
+found0:
+    switch(ht->value_size) {
+#ifdef LISP_FEATURE_64_BIT
+    case 8: return (int64_t*)ht->values + index;
+#endif
+    case 4: return (int32_t*)ht->values + index;
+    case 2: return (int16_t*)ht->values + index;
+    case 1: return (int8_t *)ht->values + index;
+    }
+    return 0;
 }
 
 /* Update or insert a key/value pair. Return nonzero if

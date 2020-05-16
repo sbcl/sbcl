@@ -235,6 +235,7 @@ Experimental: subject to change without prior notice."
            (setf gc-object-watcher 0))
           (t
            (sb-sys:without-gcing
+             (sb-vm::close-current-gc-region)
              (alien-funcall
               (extern-alien "prove_liveness" (function int unsigned int))
               (sb-kernel:get-lisp-obj-address param)
