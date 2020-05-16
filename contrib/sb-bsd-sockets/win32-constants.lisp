@@ -46,12 +46,6 @@
 
  (:integer tcp-nodelay "TCP_NODELAY")
 
- (:integer HOST-NOT-FOUND "HOST_NOT_FOUND" "Authoritative Answer Host not found.")
- (:integer TRY-AGAIN "TRY_AGAIN" "Non-Authoritative Host not found, or SERVERFAIL.")
- (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
- (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
- (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
-
  (:integer msg-oob "MSG_OOB")
  (:integer msg-peek "MSG_PEEK")
  (:integer msg-dontroute "MSG_DONTROUTE")
@@ -183,13 +177,6 @@
                     (flags int)
                     (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (socklen socklen-t)))
-
- (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
-
- (:function gethostbyaddr ("gethostbyaddr" (* hostent)
-                                           (addr (* t))
-                                           (len int)
-                                           (af int)))
 
 ;;; FIXME should be using getaddrinfo instead?
 

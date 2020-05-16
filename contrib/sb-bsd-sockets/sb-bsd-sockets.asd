@@ -6,10 +6,8 @@
 ;;; 1003.1-2003 defines an alternative API, which is specified in the
 ;;; RFC to be thread-safe. If it seems to be available, use it.
 
-#-win32
-(let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
-  (when addr
-    (pushnew :sb-bsd-sockets-addrinfo *features*)))
+(when (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")
+  (pushnew :sb-bsd-sockets-addrinfo *features*))
 
 (defsystem "sb-bsd-sockets"
   :version "0.59"
@@ -25,6 +23,12 @@
    (:file "win32-lib"     :if-feature :win32)
    (:sb-grovel-constants-file "win32-constants" :depends-on ("defpackage" "win32-lib")
                           :if-feature :win32
+                          :package :sockint)
+   (:sb-grovel-constants-file "addrinfo-constants" :depends-on ("defpackage")
+                          :if-feature :sb-bsd-sockets-addrinfo
+                          :package :sockint)
+   (:sb-grovel-constants-file "gethostbyname-constants" :depends-on ("defpackage")
+                          :if-feature (:not :sb-bsd-sockets-addrinfo)
                           :package :sockint)
 
    (:file "util"          :depends-on ("defpackage" "constants"))

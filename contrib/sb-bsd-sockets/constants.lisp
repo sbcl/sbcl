@@ -93,15 +93,6 @@
  (:integer EAFNOSUPPORT "EAFNOSUPPORT")
  (:integer EINPROGRESS "EINPROGRESS")
 
- (:integer NETDB-INTERNAL #+hpux "h_NETDB_INTERNAL" #-hpux "NETDB_INTERNAL" "See errno.")
- (:integer NETDB-SUCCESS #+hpux "h_NETDB_SUCCESS" #-hpux "NETDB_SUCCESS" "No problem.")
- (:integer HOST-NOT-FOUND "HOST_NOT_FOUND" "Authoritative Answer Host not found.")
- (:integer TRY-AGAIN "TRY_AGAIN" "Non-Authoritative Host not found, or SERVERFAIL.")
- (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
- (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
- (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
- #-(or hpux sunos) (:function h-strerror ("hstrerror" c-string (errno int)))
-
  (:integer O-NONBLOCK "O_NONBLOCK")
  (:integer f-getfl "F_GETFL")
  (:integer f-setfl "F_SETFL")
@@ -279,95 +270,6 @@
                                (socket int)
                                (msg (* msghdr))
                                (flags int)))
- (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
- #+darwin
- (:function gethostbyname2 ("gethostbyname2" (* hostent)
-                                             (name c-string)
-                                             (af int)))
- (:function gethostbyaddr ("gethostbyaddr" (* hostent)
-                                           (addr (* t))
-                                           (len int)
-                                           (af int)))
-
- ;; Re-entrant gethostbyname
-
- #+linux
- (:function gethostbyname-r ("gethostbyname_r"
-                             int
-                             (name c-string)
-                             (ret (* hostent))
-                             (buf (* char))
-                             (buflen long)
-                             (result (* (* hostent)))
-                             (h-errnop (* int))))
- ;; getaddrinfo / getnameinfo
-
- #+sb-bsd-sockets-addrinfo
- (:structure addrinfo ("struct addrinfo"
-                       (integer flags "int" "ai_flags")
-                       (integer family "int" "ai_family")
-                       (integer socktype "int" "ai_socktype")
-                       (integer protocol "int" "ai_protocol")
-                       ;; CLH 20070306 FIXME: ai_addrlen should really
-                       ;; be a socklen_t, but I'm not sure if this the
-                       ;; case on other platforms. I'm setting this to
-                       ;; socklen_t on darwin and hoping that other
-                       ;; platform maintainers will do the right thing
-                       ;; here.
-                       #+darwin (integer addrlen "socklen_t" "ai_addrlen")
-                       #-darwin (integer addrlen "size_t" "ai_addrlen")
-                       ;; This can be a void pointer since it has to
-                       ;; be cast to the respectively appropriate
-                       ;; address structure anyway.
-                       ((* t) addr "struct sockaddr*" "ai_addr")
-                       (c-string-pointer canonname "char *" "ai_canonname")
-                       ((* (struct addrinfo)) next "struct addrinfo*" "ai_next")))
-
- #+sb-bsd-sockets-addrinfo
- (:function getaddrinfo ("getaddrinfo"
-                         int
-                         (node c-string)
-                         (service c-string)
-                         (hints (* addrinfo))
-                         (res (* (* addrinfo)))))
-
- #+sb-bsd-sockets-addrinfo
- (:function freeaddrinfo ("freeaddrinfo"
-                          void
-                          (res (* addrinfo))))
-
- #+sb-bsd-sockets-addrinfo
- (:function gai-strerror ("gai_strerror"
-                         c-string
-                         (error-code int)))
-
- #+sb-bsd-sockets-addrinfo
- (:function getnameinfo ("getnameinfo"
-                         int
-                         ;; This can be a void pointer since it has to
-                         ;; be cast to the respectively appropriate
-                         ;; address structure anyway.
-                         (address (* t))
-                         (address-length size-t)
-                         (host (* char))
-                         (host-len size-t)
-                         (service (* char))
-                         (service-len size-t)
-                         (flags int)))
-
- (:integer EAI-FAMILY "EAI_FAMILY")
- (:integer EAI-SOCKTYPE "EAI_SOCKTYPE")
- (:integer EAI-BADFLAGS "EAI_BADFLAGS")
- (:integer EAI-NONAME "EAI_NONAME")
- (:integer EAI-SERVICE "EAI_SERVICE")
- #-(or freebsd dragonfly)
- (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
- (:integer EAI-MEMORY "EAI_MEMORY")
- (:integer EAI-FAIL "EAI_FAIL")
- (:integer EAI-AGAIN "EAI_AGAIN")
- (:integer EAI-SYSTEM "EAI_SYSTEM")
-
- (:integer NI-NAMEREQD "NI_NAMEREQD")
 
  ;; Socket options
 
