@@ -188,6 +188,12 @@
                                #+64-bit single-float
                                character))))))
 
+;;; Does the TN definitely hold any of the 3 non-list pointer types
+(defun headered-object-pointer-tn-ref-p (tn-ref)
+  (and (pointer-tn-ref-p tn-ref)
+       (not (types-equal-or-intersect (tn-ref-type tn-ref)
+                                      (specifier-type 'list)))))
+
 ;;; Does the TN definitely hold an OTHER pointer
 (defun other-pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)

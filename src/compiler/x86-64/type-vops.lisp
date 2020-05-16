@@ -150,12 +150,14 @@
       (cond ((and value-tn-ref
                   (eq lowtag other-pointer-lowtag)
                   (other-pointer-tn-ref-p value-tn-ref))) ; best case: lowtag is right
-            ((and (notany #'listp headers)
-                  value-tn-ref
-                  (pointer-tn-ref-p value-tn-ref)) ; middle case: any pointer
+            ((and value-tn-ref
+                  ;; If HEADERS contains a range, then list pointers have to be
+                  ;; disallowed - consider a list whose CAR has a fixnum that
+                  ;; spuriously matches the range test.
+                  (if (some #'listp headers)
+                      (headered-object-pointer-tn-ref-p value-tn-ref)
+                      (pointer-tn-ref-p value-tn-ref)))
              ;; Emit one fewer conditional jump than the general case,
-             ;; but it doesn't work if HEDERS contains any ranges- suppose the pointer
-             ;; is a a list pointer and the CAR has a random fixnum that matches.
              (inst mov temp value)
              (inst and temp (lognot lowtag-mask))
              (if (ea-p widetag-tn)
