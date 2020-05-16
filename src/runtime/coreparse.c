@@ -638,6 +638,57 @@ set_adjustment(struct heap_adjust* adj,
 #   define apply_pie_relocs(dummy1,dummy2,dummy3) (0)
 #endif
 
+/// Compute the bounds of the lisp assembly routine code object
+void calc_asm_routine_bounds()
+{
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    asm_routines_start = VARYOBJ_SPACE_START;
+#else
+    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
+        asm_routines_start = READ_ONLY_SPACE_START;
+    } else {
+        lispobj *where = (lispobj*)STATIC_SPACE_START;
+        for (; where < static_space_free_pointer; where += OBJECT_SIZE(*where, where))
+            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
+                asm_routines_start = (uword_t)where;
+                break;
+            }
+        if (!asm_routines_start) lose("Can't find asm routines");
+    }
+#endif
+    asm_routines_end = asm_routines_start +
+      N_WORD_BYTES * sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
+}
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+void calc_immobile_space_bounds()
+{
+    /* Suppose we have:
+     *   A               B                             C                D
+     *   | varyobj space | .... other random stuff ... | fixedobj space | ...
+     * then the lower bound is A, the upper bound is D,
+     * the max_offset is the distance from A to D,
+     * and the excluded middle is the range spanned by B to C.
+     */
+    struct range {
+        uword_t start, end;
+    };
+    struct range range1 =
+        {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
+    struct range range2 =
+        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + varyobj_space_size};
+    if (range2.start < range1.start) { // swap
+        struct range temp = range1;
+        range1 = range2;
+        range2 = temp;
+    }
+    immobile_space_lower_bound  = range1.start;
+    immobile_space_max_offset   = range2.end - range1.start;
+    immobile_range_1_max_offset = range1.end - range1.start;
+    immobile_range_2_min_offset = range2.start - range1.start;
+}
+#endif
+
 /* TODO: If static + readonly were mapped as desired without disabling ASLR
  * but one of the large spaces couldn't be mapped as desired, start over from
  * the top, disabling ASLR. This should help to avoid relocating the heap
@@ -877,27 +928,7 @@ process_directory(int count, struct ndir_entry *entry,
         }
     }
 
-    // Compute the bounds of the lisp assembly routines
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    asm_routines_start = VARYOBJ_SPACE_START;
-#else
-    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
-        asm_routines_start = READ_ONLY_SPACE_START;
-    } else {
-        lispobj *where = (lispobj*)STATIC_SPACE_START;
-        while (where < static_space_free_pointer) {
-            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
-                asm_routines_start = (uword_t)where;
-                break;
-            }
-            where += OBJECT_SIZE(*where, where);
-        }
-        if (!asm_routines_start) lose("Can't find asm routines");
-    }
-#endif
-    asm_routines_end = asm_routines_start +
-      N_WORD_BYTES * sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
-
+    calc_asm_routine_bounds();
 #  ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
@@ -930,29 +961,7 @@ process_directory(int count, struct ndir_entry *entry,
      * on what it's address should be, not what it was in the file */
     immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
                              spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
-    /* Suppose we have:
-     *   A               B                             C                D
-     *   | varyobj space | .... other random stuff ... | fixedobj space | ...
-     * then the lower bound is A, the upper bound is D,
-     * the max_offset is the distance from A to D,
-     * and the excluded middle is the range spanned by B to C.
-     */
-    struct range {
-        uword_t start, end;
-    };
-    struct range range1 =
-        {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
-    struct range range2 =
-        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + varyobj_space_size};
-    if (range2.start < range1.start) { // swap
-        struct range temp = range1;
-        range1 = range2;
-        range2 = temp;
-    }
-    immobile_space_lower_bound  = range1.start;
-    immobile_space_max_offset   = range2.end - range1.start;
-    immobile_range_1_max_offset = range1.end - range1.start;
-    immobile_range_2_min_offset = range2.start - range1.start;
+    calc_immobile_space_bounds();
 #endif
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space
