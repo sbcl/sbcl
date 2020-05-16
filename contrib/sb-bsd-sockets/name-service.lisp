@@ -108,7 +108,7 @@ weird stuff - see getaddrinfo(3) for the details."
                                           :type sockint::af-inet
                                           :aliases nil
                                           :addresses nil))
-		#-win32
+                #-win32
                 (host-ent6 (make-instance 'host-ent
                                           :name node
                                           :type sockint::af-inet6
@@ -129,7 +129,7 @@ weird stuff - see getaddrinfo(3) for the details."
                             (adjoin (naturalize-unsigned-byte-8-array address 4)
                                     (host-ent-addresses host-ent4)
                                     :test 'equalp))))
-		   #-win32
+                   #-win32
                    ((= (sockint::addrinfo-family info*) sockint::af-inet6)
                     (let ((address (sockint::sockaddr-in6-addr
                                     (sb-alien:cast
@@ -160,7 +160,7 @@ See gethostbyaddr(3) for details."
              (values sockaddr #'sockint::free-sockaddr-in
                      (sb-alien:alien-size sockint::sockaddr-in :bytes)
                      sockint::af-inet)))
-	  #-win32
+          #-win32
           ((vector (unsigned-byte 8) 16)
            (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in6)))
              (setf (sockint::sockaddr-in6-family sockaddr) sockint::af-inet6)
