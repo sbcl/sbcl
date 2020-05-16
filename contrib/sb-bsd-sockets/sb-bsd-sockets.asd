@@ -2,6 +2,15 @@
 #-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
+;;; gethostbyname/gethostbyaddr are generally not thread safe. POSIX
+;;; 1003.1-2003 defines an alternative API, which is specified in the
+;;; RFC to be thread-safe. If it seems to be available, use it.
+
+#-win32
+(let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
+  (when addr
+    (pushnew :sb-bsd-sockets-addrinfo *features*)))
+
 (defsystem "sb-bsd-sockets"
   :version "0.59"
   :defsystem-depends-on ("sb-grovel")

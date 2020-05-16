@@ -54,12 +54,3 @@ arguments to fit Lisp style more closely."))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf (sb-int:system-package-p (find-package "SB-BSD-SOCKETS-INTERNAL")) t
         (sb-int:system-package-p (find-package "SB-BSD-SOCKETS")) t))
-
-;;; gethostbyname/gethostbyaddr are generally not thread safe. POSIX
-;;; 1003.1-2003 defines an alternative API, which is specified in the
-;;; RFC to be thread-safe. If it seems to be available, use it.
-
-#-win32
-(let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
-  (when addr
-    (pushnew :sb-bsd-sockets-addrinfo *features*)))
