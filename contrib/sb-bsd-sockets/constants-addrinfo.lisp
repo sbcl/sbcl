@@ -58,11 +58,12 @@
  (:integer EAI-BADFLAGS "EAI_BADFLAGS")
  (:integer EAI-NONAME "EAI_NONAME")
  (:integer EAI-SERVICE "EAI_SERVICE")
- #-(or freebsd dragonfly)
+ #-(or freebsd dragonfly win32)
  (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
  (:integer EAI-MEMORY "EAI_MEMORY")
  (:integer EAI-FAIL "EAI_FAIL")
  (:integer EAI-AGAIN "EAI_AGAIN")
+ #-win32
  (:integer EAI-SYSTEM "EAI_SYSTEM")
 
  (:integer NI-NAMEREQD "NI_NAMEREQD"))

@@ -4,18 +4,15 @@
 ;;; name it thus to avoid having to mess with the clc lpn translations
 
 ;;; first, the headers necessary to find definitions of everything
-("sys/types.h" "sys/socket.h" "sys/stat.h" "unistd.h" "sys/un.h"
+#-win32 ("sys/types.h" "sys/socket.h" "sys/stat.h" "unistd.h" "sys/un.h"
  "netinet/in.h" "netinet/in_systm.h" "netinet/ip.h" "net/if.h"
  "arpa/inet.h" ; inet_{ntop,pton}
- "netdb.h" "errno.h" "netinet/tcp.h" "fcntl.h" )
+ "netdb.h" "errno.h" "netinet/tcp.h" "fcntl.h")
+#+win32 ("winsock2.h" "errno.h" "ws2tcpip.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
  (:integer af-unspec "AF_UNSPEC" "Unspecified")
- (:integer af-local
-           #+(or sunos solaris hpux) "AF_UNIX"
-           #-(or sunos solaris hpux) "AF_LOCAL"
-           "Local to host (pipes and file-domain).")
  (:integer af-inet6 "AF_INET6" "IP version 6")
  #+linux (:integer af-route "AF_NETLINK" "Alias to emulate 4.4BSD ")
 
@@ -66,48 +63,10 @@
 
  (:integer tcp-nodelay "TCP_NODELAY")
  #+linux (:integer so-bindtodevice "SO_BINDTODEVICE")
- (:integer ifnamsiz "IFNAMSIZ")
-
-;; socket shutdown flags
-(:integer SHUT_RD "SHUT_RD")
-(:integer SHUT_WR "SHUT_WR")
-(:integer SHUT_RDWR "SHUT_RDWR")
-
-;; errors
- (:integer EADDRINUSE "EADDRINUSE")
- (:integer EAGAIN "EAGAIN")
- (:integer EBADF "EBADF")
- (:integer ECONNREFUSED "ECONNREFUSED")
- (:integer ETIMEDOUT "ETIMEDOUT")
- (:integer EINTR "EINTR")
- (:integer EINVAL "EINVAL")
- (:integer ENOBUFS "ENOBUFS")
- (:integer ENOMEM "ENOMEM")
- (:integer EOPNOTSUPP "EOPNOTSUPP")
- (:integer EPERM "EPERM")
- (:integer EPROTONOSUPPORT "EPROTONOSUPPORT")
- (:integer ERANGE "ERANGE")
- (:integer ESOCKTNOSUPPORT "ESOCKTNOSUPPORT")
- (:integer ENETUNREACH "ENETUNREACH")
- (:integer ENOTCONN "ENOTCONN")
- (:integer EAFNOSUPPORT "EAFNOSUPPORT")
- (:integer EINPROGRESS "EINPROGRESS")
-
- (:integer O-NONBLOCK "O_NONBLOCK")
- (:integer f-getfl "F_GETFL")
- (:integer f-setfl "F_SETFL")
 
  (:integer msg-oob "MSG_OOB")
  (:integer msg-peek "MSG_PEEK")
- (:integer msg-trunc "MSG_TRUNC")
- (:integer msg-waitall "MSG_WAITALL")
- (:integer msg-eor "MSG_EOR")
  (:integer msg-dontroute "MSG_DONTROUTE")
- (:integer msg-dontwait "MSG_DONTWAIT")
- #+linux (:integer msg-nosignal "MSG_NOSIGNAL")
- #+linux (:integer msg-confirm "MSG_CONFIRM")
- #+linux (:integer msg-more "MSG_MORE")
-
  ;; for socket-receive
  (:type socklen-t "socklen_t")
 
@@ -177,9 +136,11 @@
                            ((array (unsigned 8)) flowinfo "u_int32_t" "sin6_flowinfo")
                            ((array (unsigned 8)) addr "struct in_addr6" "sin6_addr")
                            ((array (unsigned 8)) scope-id "u_int32_t" "sin6_scope_id")))
+ #-win32
  (:structure sockaddr-un ("struct sockaddr_un"
                           (integer family "sa_family_t" "sun_family")
                           (c-string path "char" "sun_path")))
+ #-win32
  (:structure sockaddr-un-abstract ("struct sockaddr_un"
                               (integer family "sa_family_t" "sun_family")
                               ((array (unsigned 8)) path "char" "sun_path")))
@@ -204,14 +165,7 @@
                       (integer type "int" "h_addrtype")
                       (integer length "int" "h_length")
                       ((* (* (unsigned 8))) addresses "char **" "h_addr_list")))
- (:structure msghdr ("struct msghdr"
-                      (c-string-pointer name "void *" "msg_name")
-                      (integer namelen "socklen_t" "msg_namelen")
-                      ((* t) iov "struct iovec" "msg_iov")
-                      (integer iovlen "size_t" "msg_iovlen")
-                      ((* t) control "void *" "msg_control")
-                      (integer controllen "socklen_t" "msg_controllen")
-                      (integer flags "int" "msg_flags")))
+
  (:function socket (#-netbsd "socket" #+netbsd "_socket" int
                     (domain int)
                     (type int)
@@ -239,7 +193,7 @@
                     (socket int)
                     (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (addrlen socklen-t)))
- (:function close ("close" int
+ (:function close (#-win32 "close" #+win32 "closesocket" int
                    (fd int)))
  (:function shutdown ("shutdown" int
                       (fd int) (how int)))
@@ -250,10 +204,7 @@
                                  (flags int)
                                  (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                                  (socklen (* socklen-t))))
- (:function recvmsg ("recvmsg" ssize-t
-                               (socket int)
-                               (msg (* msghdr))
-                               (flags int)))
+
  (:function send ("send" ssize-t
                          (socket int)
                          (buf (* t))
@@ -266,10 +217,7 @@
                              (flags int)
                              (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                              (socklen socklen-t)))
- (:function sendmsg ("sendmsg" int
-                               (socket int)
-                               (msg (* msghdr))
-                               (flags int)))
+
 
  ;; Socket options
 

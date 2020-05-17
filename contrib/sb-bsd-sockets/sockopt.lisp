@@ -62,8 +62,7 @@ Code for options that not every system has should be conditionalised:
                         (sockint::getsockopt (socket-file-descriptor socket)
                                              ,find-level ,number
                                              (sb-alien:addr buffer)
-                                             #+win32 size
-                                             #-win32 (sb-alien:addr size)))
+                                             (sb-alien:addr size)))
                        (,mangle-return buffer size))))
                `((declare (ignore socket))
                  (unsupported-socket-option ',lisp-name))))
