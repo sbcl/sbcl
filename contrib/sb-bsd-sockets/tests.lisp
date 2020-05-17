@@ -428,18 +428,18 @@
                         (stream (socket-make-stream r
                                                     :input t
                                                     :output t
-                                                    :buffering :none))
-                        (ok :ok))
+                                                    :buffering :none)))
                    (socket-close s)
                    (sb-thread:wait-on-semaphore sem)
                    (sleep 0.1)
                    (sb-thread:interrupt-thread client
-                                               (lambda () (throw 'stop ok)))
-                   (sb-ext:wait-for (null (sb-thread::thread-interruptions client)) :timeout 3)
-                   (setf ok :not-ok)
+                                               (lambda () (throw 'stop :ok)))
+                   (unless (sb-ext:wait-for (null (sb-thread::thread-interruptions client)) :timeout 5)
+                     (setf result :timeout))
                    (write-char #\x stream)
                    (close stream)
-                   (socket-close r))))))
+                   (socket-close r)
+                   (sb-thread:join-thread client :timeout 5))))))
         (server))
       result)
   :ok)
