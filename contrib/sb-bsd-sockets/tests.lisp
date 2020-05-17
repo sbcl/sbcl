@@ -18,13 +18,11 @@
   (equalp (make-inet-address "242.1.211.3")  #(242 1 211 3))
   t)
 
-#-win32
 (deftest make-inet6-address.1
     (equalp (make-inet6-address "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
             #(255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255))
   t)
 
-#-win32
 (deftest unparse-inet6-address
     (string= (sb-bsd-sockets::unparse-inet6-address
               (make-inet6-address "fe80::abcd:1234"))
@@ -110,7 +108,6 @@
       (:no-error nil))
   t)
 
-#-win32
 (deftest make-inet6-socket.smoke
   (handler-case
       (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
@@ -118,7 +115,6 @@
     ((or address-family-not-supported protocol-not-supported-error) () t))
   t)
 
-#-win32
 (deftest make-inet6-socket.keyword
   (handler-case
       (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
@@ -154,7 +150,6 @@
       (socket-close s2)))
   t)
 
-#-win32
 (deftest inet6-socket-bind
   (handler-case
       (let* ((tcp (get-protocol-by-name "tcp"))

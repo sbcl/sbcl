@@ -40,7 +40,7 @@
 
    (:file "inet")
    (:file "inet4")
-   (:file "inet6" :if-feature (:not :win32))
+   (:file "inet6")
    (:file "local" :if-feature (:not :win32))
 
    (:file "name-service")
