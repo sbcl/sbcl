@@ -52,12 +52,13 @@
       nil))
   t)
 
-(when (handler-case (make-instance 'inet-socket
-                                   :type :stream
-                                   :protocol (get-protocol-by-name "tcp"))
-        (error nil)
-        (:no-error (x) x))
-  (push :ipv4-support *features*))
+(eval-when (:compile-toplevel :execute)
+  (when (handler-case (make-instance 'inet-socket
+                                     :type :stream
+                                     :protocol (get-protocol-by-name "tcp"))
+          (error nil)
+          (:no-error (x) x))
+    (push :ipv4-support *features*)))
 
 #+ipv4-support
 (deftest make-inet-socket.smoke
