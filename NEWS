@@ -4,6 +4,7 @@ changes relative to sbcl-2.0.4:
   * enhancement: CMUCL-style START-BLOCK and END-BLOCK declarations are now
     supported for block compiling forms at a sub-file granularity.
   * enhancement: IPv6 support in sb-bsd-sockets is enabled on Windows.
+  * enhancement: better musl libc support (Thanks to Eric Timmons).
   * minor change: *compile-print* now makes it more clear what block
     compilation is actually doing. The default output is now slightly more
     verbose as a result.
