@@ -257,7 +257,7 @@ int futex_wake(volatile intptr_t *lock_word, int n);
 
 /* Debugging */
 void pthread_np_lose(int trace_depth, const char* fmt, ...);
-struct _pthread_mutex_info DEAD_MUTEX;
+extern struct _pthread_mutex_info DEAD_MUTEX;
 
 static inline void pthread_np_assert_live_mutex(pthread_mutex_t* ptr,
                                                 const char *action)

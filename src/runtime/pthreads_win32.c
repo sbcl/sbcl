@@ -389,6 +389,8 @@ int pthread_mutexattr_settype(pthread_mutexattr_t* attr,int mutex_type)
   return 0;
 }
 
+struct _pthread_mutex_info DEAD_MUTEX;
+
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
     if (*mutex != PTHREAD_MUTEX_INITIALIZER) {
