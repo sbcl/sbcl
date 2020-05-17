@@ -392,7 +392,8 @@
 
 #+(and ipv4-support sb-thread)
 (deftest interrupt-io
-    (let (result)
+    (let (result
+          (sem (sb-thread:make-semaphore)))
       (labels
           ((client (port)
              (setf result
@@ -407,11 +408,8 @@
                        (handler-case
                            (prog1
                                (catch 'stop
-                                 (progn
-                                   (read-char stream)
-                                   (sleep 0.1)
-                                   (sleep 0.1)
-                                   (sleep 0.1)))
+                                 (sb-thread:signal-semaphore sem)
+                                 (read-char stream))
                              (close stream))
                          (error (c)
                            c))))))
@@ -433,10 +431,11 @@
                                                     :buffering :none))
                         (ok :ok))
                    (socket-close s)
-                   (sleep 5)
+                   (sb-thread:wait-on-semaphore sem)
+                   (sleep 0.1)
                    (sb-thread:interrupt-thread client
                                                (lambda () (throw 'stop ok)))
-                   (sleep 5)
+                   (sb-ext:wait-for (null (sb-thread::thread-interruptions client)) :timeout 3)
                    (setf ok :not-ok)
                    (write-char #\x stream)
                    (close stream)
