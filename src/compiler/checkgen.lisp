@@ -584,12 +584,27 @@
                (convert-type-check cast types)
                (setf generated t))
               (:too-hairy
-               (let ((*compiler-error-context* cast))
-                 (when (policy cast (>= safety inhibit-warnings))
+               (when (policy cast (>= safety inhibit-warnings))
+                 (let* ((*compiler-error-context* cast)
+                       (type (cast-asserted-type cast))
+                       (value-type (coerce-to-values type)))
                    (compiler-notify
-                    "type assertion too complex to check:~%~
-                    ~/sb-impl:print-type/."
-                    (coerce-to-values (cast-asserted-type cast)))))
+                    "Type assertion too complex to check:~@
+                    ~/sb-impl:print-type/.~a"
+                    type
+                    (cond ((values-type-rest value-type)
+                           (format nil
+                                   "~%It allows an unknown number of values, consider using~@
+                                    ~/sb-impl:print-type/."
+                                   (make-values-type :required (values-type-required value-type)
+                                                     :optional (values-type-optional value-type))))
+                          ((values-type-optional value-type)
+                           (format nil
+                                   "~%It allows a variable number of values, consider using~@
+                                    ~/sb-impl:print-type/."
+                                   (make-values-type :required (append (values-type-required value-type)
+                                                                       (values-type-optional value-type)))))
+                          ("")))))
                (setf (cast-type-to-check cast) *wild-type*)
                (setf (cast-%type-check cast) nil)))))))
     generated))
