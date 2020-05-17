@@ -49,7 +49,7 @@
        (inst ret)))
     ((:none :full-call-no-return))))
 
-(defmacro with-registers-preserved ((fpr-size &key except) &body body)
+(defmacro with-registers-preserved ((fpr-size &key except (callee-saved t)) &body body)
   (multiple-value-bind (mnemonic fpr-align getter)
       (ecase fpr-size
         (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
@@ -64,7 +64,9 @@
                       `(inst ,mnemonic (,getter ,regno) (ea ,(* regno fpr-align) rsp-tn))))))
            (gpr-save/restore (operation except)
              (declare (type (member push pop) operation))
-             (let ((registers '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn)))
+             (let ((registers (if callee-saved
+                                  '#1=(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn)
+                                  '(rbx-tn r12-tn r14-tn r15-tn . #1#))))
                (when except
                  (setf registers (remove except registers)))
                ;; Preserve alignment
