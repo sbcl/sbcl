@@ -150,6 +150,7 @@ cat > $TEST_FILESTEM-noop-dlclose-test.c <<EOF
 #include <stddef.h>
 
 int dlclose_is_noop () {
+#ifdef RTLD_NOLOAD
     void * handle = dlopen("./$TEST_FILESTEM-noop-dlclose-test-helper.so", RTLD_NOW | RTLD_GLOBAL);
     dlclose(handle);
 
@@ -157,6 +158,7 @@ int dlclose_is_noop () {
     if (handle != NULL) {
         return 1;
     }
+#endif
     return 0;
 }
 EOF
