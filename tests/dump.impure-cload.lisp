@@ -460,3 +460,15 @@
 
 (with-test (:name (:cdr-eq-detection :lp1583753))
   (constant-folding-cdr-test-fun))
+
+(locally
+    (declare (optimize (debug 2) (safety 3)))
+  (defconstant +consy-constant+ (if (boundp '+consy-constant+) (symbol-value '+consy-constant+) '(message-id CAOrNaszM=eSufoqA4KFVNq4CUpjSJym-ktQnufQgj7a5g2sHmg@mail.gmail.com)))
+  (defun test-constant-identity (x)
+    (list '(message-id CAOrNaszM=eSufoqA4KFVNq4CUpjSJym-ktQnufQgj7a5g2sHmg@mail.gmail.com)
+          (eq x +consy-constant+))))
+
+(with-test (:name (defconstant :reference :identity))
+  (let ((z (eval `(test-constant-identity ,(intern "+CONSY-CONSTANT+")))))
+    (assert (equal (car z) +consy-constant+))
+    (assert (cadr z))))

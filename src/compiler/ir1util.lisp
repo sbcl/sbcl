@@ -2509,6 +2509,9 @@ is :ANY, the function name is not checked."
       #-sb-xc-host
       (when (and (not faslp) (simple-string-p object))
         (logically-readonlyize object nil))
+      ;; refer to named structured constants through their name
+      (when (and faslp (not (sb-fasl:dumpable-layout-p object)) namep)
+        (maybe-emit-make-load-forms object name))
       ;; Has this identical object been seen before? Bail out early if so.
       (awhen (and ns (gethash object (eq-constants ns)))
         (return-from find-constant it))
@@ -2522,14 +2525,15 @@ is :ANY, the function name is not checked."
                    ;; by the similarity table (as currently implemented)
                    (or (not (sb-xc:typep object 'instance))
                        (sb-xc:typep object 'pathname)))))
-        (when effectively-coalescible
+        ;; constants referred to by name must retain their identity:
+        ;; they must not be coalesced with some other similar-enough
+        ;; constant.
+        (when (and effectively-coalescible (not namep))
           (dolist (candidate (gethash object (similar-constants ns)))
             (when (similarp (constant-value candidate) object)
               (return-from find-constant candidate))))
-        (when (and faslp (not (sb-fasl:dumpable-layout-p object)))
-          (if namep
-              (maybe-emit-make-load-forms object name)
-              (maybe-emit-make-load-forms object)))
+        (when (and faslp (not (sb-fasl:dumpable-layout-p object)) (not namep))
+          (maybe-emit-make-load-forms object))
         (let ((new (make-constant object)))
           (when ns
             (setf (gethash object (eq-constants ns)) new)
