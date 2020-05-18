@@ -443,7 +443,7 @@
     (mapc #'sb-thread:join-thread threads)))
 
 (with-test (:name (run-program :child-fd-leak)
-            :skipped-on :win32)
+            :skipped-on (or :openbsd :win32))
   (when (probe-file "/dev/fd")
     (with-open-file (stream "/dev/null")
       (let* ((fd (sb-sys:fd-stream-fd stream))
