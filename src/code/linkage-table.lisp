@@ -25,6 +25,7 @@
 (define-load-time-global *linkage-info*
     ;; CDR of the cons is the list of undefineds
     (list (make-hash-table :test 'equal :synchronized t)))
+(declaim (type (cons hash-table) *linkage-info*))
 
 (define-alien-variable undefined-alien-address unsigned)
 
