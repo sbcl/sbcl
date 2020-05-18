@@ -29,6 +29,25 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
+#ifndef TRACEROOT_USE_ABSL_HASHMAP
+#define TRACEROOT_USE_ABSL_HASHMAP 0
+#endif
+
+#if TRACEROOT_USE_ABSL_HASHMAP
+extern void* new_absl_hashmap(int);
+extern void absl_hashmap_destroy(void*);
+extern unsigned absl_hashmap_get(void*,lispobj);
+extern unsigned* absl_hashmap_get_ref(void*,lispobj);
+extern int absl_hashmap_size(void*,int*);
+typedef void* inverted_heap_t;
+#define inverted_heap_get(graph, key) absl_hashmap_get(graph, key)
+#define inverted_heap_get_ref(graph, key) absl_hashmap_get_ref(graph, key)
+#else
+typedef struct hopscotch_table* inverted_heap_t;
+#define inverted_heap_get(graph, key) hopscotch_get(graph, key, 0)
+#define inverted_heap_get_ref(graph, key) hopscotch_get_ref(graph, key)
+#endif
+
 int heap_trace_verbose = 0;
 
 extern generation_index_t gencgc_oldest_gen_to_gc;
@@ -60,8 +79,8 @@ struct scan_state {
     long n_immediates;
     long n_pointers;
     int record_ptrs;
-    // A hashtable mapping each object to a list of objects pointing to it
-    struct hopscotch_table inverted_heap;
+    // A hashmap from object to list of objects pointing to it
+    struct hopscotch_table* inverted_heap;
     struct scratchpad scratchpad;
     int keep_leaves;
 };
@@ -465,7 +484,7 @@ static lispobj make_sap(char* value)
 static lispobj trace1(lispobj object,
                       struct hopscotch_table* targets,
                       struct hopscotch_table* visited,
-                      struct hopscotch_table* inverted_heap,
+                      inverted_heap_t graph,
                       struct scratchpad* scratchpad,
                       int n_pins, lispobj* pins, void (*context_scanner)(),
                       int criterion)
@@ -496,7 +515,7 @@ static lispobj trace1(lispobj object,
         if (heap_trace_verbose)
             printf("Next layer: Looking for %d object(s)\n", targets->count);
         for_each_hopscotch_key(i, target, (*targets)) {
-            uint32_t list = hopscotch_get(inverted_heap, target, 0);
+            uint32_t list = inverted_heap_get(graph, target);
             if (heap_trace_verbose>1) {
                 uint32_t list1 = list;
                 fprintf(stderr, "target=%p srcs=", (void*)target);
@@ -663,7 +682,7 @@ static boolean record_ptr(lispobj* source, lispobj target,
     ss->scratchpad.free = (char*)next;
     if (ss->scratchpad.free > ss->scratchpad.end) lose("undersized scratchpad");
     new_cell[0] = encode_pointer((lispobj)source);
-    uint32_t* valref = hopscotch_get_ref(&ss->inverted_heap, target);
+    uint32_t* valref = inverted_heap_get_ref(ss->inverted_heap, target);
     new_cell[1] = *valref;
     *valref = (uint32_t)((char*)new_cell - ss->scratchpad.base);
     return 1;
@@ -821,9 +840,8 @@ static void scan_spaces(struct scan_state* ss)
 
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
 
-static void compute_heap_inverse(boolean keep_leaves,
-                                 struct hopscotch_table* inverted_heap,
-                                 struct scratchpad* scratchpad)
+static void* compute_heap_inverse(boolean keep_leaves,
+                                  struct scratchpad* scratchpad)
 {
     struct scan_state ss;
     memset(&ss, 0, sizeof ss);
@@ -836,9 +854,15 @@ static void compute_heap_inverse(boolean keep_leaves,
     if (heap_trace_verbose) {
         fprintf(stderr, "Pass 2: Inverting heap. Initial size=%d objects\n", size);
     }
-    hopscotch_create(&ss.inverted_heap, HASH_FUNCTION,
+#if TRACEROOT_USE_ABSL_HASHMAP
+    void* inverted_heap = new_absl_hashmap(size);
+    ss.inverted_heap = inverted_heap;
+#else
+    ss.inverted_heap = malloc(sizeof(struct hopscotch_table));
+    hopscotch_create(ss.inverted_heap, HASH_FUNCTION,
                      4, // XXX: half the word size if 64-bit
                      size /* initial size */, 0 /* default hop range */);
+#endif
     // Add one pointer due to inability to use the first
     // two words of the scratchpad.
     uword_t scratchpad_min_size = (1 + ss.n_pointers) * 2 * sizeof (uint32_t);
@@ -857,23 +881,30 @@ static void compute_heap_inverse(boolean keep_leaves,
 #endif
     ss.record_ptrs = 1;
     scan_spaces(&ss);
-    *inverted_heap = ss.inverted_heap;
     *scratchpad = ss.scratchpad;
 #if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
     // We're done building the necessary structure. Show some memory stats.
     if (heap_trace_verbose) {
+        int count;
+        int capacity;
+#if TRACEROOT_USE_ABSL_HASHMAP
+        count = absl_hashmap_size(ss.inverted_heap, &capacity);
+#else
+        count = ss.inverted_heap->count;
+        capacity = 1+hopscotch_max_key_index(*ss.inverted_heap);
+#endif
 #define timediff(b,a,field) \
         ((a.field.tv_sec-b.field.tv_sec)*1000000+(a.field.tv_usec-b.field.tv_usec))
+        float stime = timediff(before, after, ru_stime);
+        float utime = timediff(before, after, ru_utime);
         fprintf(stderr,
-                "Inverted heap: ct=%d, cap=%d, LF=%f ET=%ld+%ld sys+usr\n",
-                inverted_heap->count,
-                1+hopscotch_max_key_index(*inverted_heap),
-                100*(float)inverted_heap->count / (1+hopscotch_max_key_index(*inverted_heap)),
-                timediff(before, after, ru_stime),
-                timediff(before, after, ru_utime));
+                "Inverted heap: ct=%d, cap=%d, LF=%f ET=%f+%f sys+usr=%f\n",
+                count, capacity, 100*(float)count / (capacity>0?capacity:1),
+                stime/1000000, utime/1000000, (stime+utime)/1000000);
     }
 #endif
+    return ss.inverted_heap;
 };
 
 /* Return true if the user wants to find a leaf object.
@@ -902,7 +933,7 @@ static int trace_paths(void (*context_scanner)(),
                        int criterion)
 {
     int i;
-    struct hopscotch_table inverted_heap;
+    void* inverted_heap;
     struct scratchpad scratchpad;
     // A hashset of all objects in the reverse reachability graph so far
     struct hopscotch_table visited;  // *Without* lowtag
@@ -916,8 +947,8 @@ static int trace_paths(void (*context_scanner)(),
           fprintf(stderr, " %p%s", (void*)pins[i],
                   ((i%8)==7||i==n_pins-1)?"\n":"");
     }
-    compute_heap_inverse(finding_leaf_p(weak_pointers),
-                         &inverted_heap, &scratchpad);
+    inverted_heap = compute_heap_inverse(finding_leaf_p(weak_pointers),
+                                         &scratchpad);
     hopscotch_create(&visited, HASH_FUNCTION, 0, 32, 0);
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
     i = 0;
@@ -933,7 +964,7 @@ static int trace_paths(void (*context_scanner)(),
             hopscotch_reset(&targets);
             lispobj path = trace1(canonical_obj(value),
                                   &targets, &visited,
-                                  &inverted_heap, &scratchpad,
+                                  inverted_heap, &scratchpad,
                                   n_pins, pins, context_scanner, criterion);
             if ((VECTOR(paths)->data[i] = path) != 0) ++n_found;
         }
@@ -941,7 +972,12 @@ static int trace_paths(void (*context_scanner)(),
     } while (weak_pointers != NIL);
     ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
-    hopscotch_destroy(&inverted_heap);
+#if TRACEROOT_USE_ABSL_HASHMAP
+    absl_hashmap_destroy(inverted_heap);
+#else
+    hopscotch_destroy(inverted_heap);
+    free(inverted_heap);
+#endif
     hopscotch_destroy(&visited);
     hopscotch_destroy(&targets);
     return n_found;
