@@ -1549,16 +1549,9 @@
     ((layout-for-pcl-obj-p owrapper)
      (binding* ((class (wrapper-class* nwrapper))
                 (oslots (get-slots instance))
-                ((nslots nwrapper)
-                 ;; All we need is a new backing store, but I guess we have
-                 ;; to go through ALLOCATE-INSTANCE - is that per AMOP ?
-                 ;; Anyway, let's render the new instance unusable.
-                 (let ((copy (allocate-instance class)))
-                   (if (std-instance-p copy)
-                       (values (shiftf (%std-instance-slots copy) 0)
-                               (%instance-layout copy))
-                       (values (shiftf (%fsc-instance-slots copy) 0)
-                               (%fun-layout copy)))))
+                (nwrapper (class-wrapper class))
+                (nslots (make-array (layout-length nwrapper)
+                                    :initial-element +slot-unbound+))
                 (added ())
                 (discarded ())
                 (plist ())
