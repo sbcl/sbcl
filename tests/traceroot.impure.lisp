@@ -76,3 +76,31 @@
 (with-test (:name (sb-ext:search-roots :stack-direct)
             :fails-on :sunos)
   (f0))
+
+;;; Employ circumlocution so the file loader doesn't hold on to a string "hi"
+(defvar *string-hi* (make-weak-pointer (concatenate 'string "h" "i")))
+(defstruct s1 foo)
+(defparameter *top*
+  `(p q r w x y ,(make-s1 :foo `#((a b c ,(weak-pointer-value *string-hi*) d))) z))
+
+;;; Sample output:
+;;; Path to "hi":
+;;;  6       1000209AB3 [   1] a package-hashtable
+;;;  1       10048F145F [  29] a (simple-vector 37)
+;;;  1         503B403F [   2] COMMON-LISP-USER::*TOP*
+;;;  0       1004B885B7 [   6] a cons = (P Q R ...) ; = (NTHCDR 6 object)
+;;;  0       1004B88617 [   0] a cons = (# Z)
+;;;  0       1004C1AA53 [   1] a s1
+;;;  0       1004CBB93F [   2] a (simple-vector 1)
+;;;  0       1004D28AE7 [   3] a cons = (A B C ...) ; = (NTHCDR 3 object)
+;;;  0       1004D28B17 [   0] a cons = ("hi" D)
+(with-test (:name :traceroot-collapse-lists)
+  (let* ((string (with-output-to-string (*standard-output*)
+                   (search-roots *string-hi* :print :verbose)))
+         (lines (split-string string #\newline)))
+    (assert
+     (loop for line in lines
+             thereis (search "[   6] a cons = (P Q R ...)" line)))
+    (assert
+     (loop for line in lines
+             thereis (search "[   3] a cons = (A B C ...)" line)))))
