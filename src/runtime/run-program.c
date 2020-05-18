@@ -142,23 +142,18 @@ int closefrom_fddir(char *dir, int lowfd)
 
 void closefds_from(int lowfd)
 {
-    int fds_closed = 0;
-
-#if defined(LISP_FEATURE_OPENBSD) \
-    || defined(LISP_FEATURE_NETBSD) \
-    || defined(LISP_FEATURE_DRAGONFLY)
+#if defined(LISP_FEATURE_OPENBSD) || defined(LISP_FEATURE_NETBSD)       \
+    || defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_FREEBSD) \
+    || defined(LISP_FEATURE_SUNOS)
     closefrom(lowfd);
 #else
-
-#ifdef F_CLOSEM
-    if (!fds_closed)
-        fds_closed = (-1 != fcntl(lowfd, F_CLOSEM));
-#endif
+    int fds_closed = 0;
 
 #ifdef LISP_FEATURE_LINUX
     if (!fds_closed)
         fds_closed = !closefrom_fddir("/proc/self/fd/", lowfd);
-#else
+#endif
+#ifdef LISP_FEATURE_DARWIN
     if (!fds_closed)
         fds_closed = !closefrom_fddir("/dev/fd/", lowfd);
 #endif
