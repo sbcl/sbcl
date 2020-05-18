@@ -111,11 +111,7 @@ if the symbol isn't found."
       ;; How exactly was this deadlocking?  A reductio ad absurdum argument
       ;; says that every call into a system API could potentially acquire
       ;; a lock, and therefore every one should inhibit GC. But they don't.
-      ;; Well, there seems to be some evidence that WITHOUT-GCING fixed something
-      ;; somehow, which I can't explain. It's such a grotesque "fix" that it
-      ;; should be confined to darwin only.
-      (let ((err (#+darwin without-gcing
-                  #-darwin progn (alien-funcall dladdr addr (addr info)))))
+      (let ((err (alien-funcall dladdr addr (addr info))))
         (if (zerop err)
             nil
             (slot info 'symbol))))
