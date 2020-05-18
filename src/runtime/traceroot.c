@@ -63,6 +63,7 @@ struct scan_state {
     // A hashtable mapping each object to a list of objects pointing to it
     struct hopscotch_table inverted_heap;
     struct scratchpad scratchpad;
+    int keep_leaves;
 };
 
 static int traceroot_gen_of(lispobj obj) {
@@ -115,7 +116,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
 
 /// If 'obj' is a simple-fun, return its code component,
 /// otherwise return obj directly.
-static lispobj canonical_obj(lispobj obj)
+static inline lispobj canonical_obj(lispobj obj)
 {
     if (functionp(obj) && widetag_of(FUNCTION(obj)) == SIMPLE_FUN_WIDETAG)
         return fun_code_tagged(FUNCTION(obj));
@@ -643,13 +644,18 @@ static lispobj trace1(lispobj object,
     return path;
 }
 
-static void record_ptr(lispobj* source, lispobj target,
-                       struct scan_state* ss)
+// Add 'source' to the list of objects keyed by 'target' in the inverted heap.
+// Note that 'source' has no lowtag, and 'target' does.
+// Pointer compression is used: the linked list of source objects
+// is built using offsets into the scratchpad rather than absolute addresses.
+// Return 1 if and only if 'target' was actually added to the graph.
+static boolean record_ptr(lispobj* source, lispobj target,
+                          struct scan_state* ss)
 {
-    // Add 'source' to the list of objects keyed by 'target' in the inverted heap.
-    // Note that 'source' has no lowtag, and 'target' does.
-    // Pointer compression occurs here as well: the linked list of source objects
-    // is built using offsets into the scratchpad rather than absolute addresses.
+    if (!ss->keep_leaves) { // expected case
+        if (!listp(target) &&
+            leaf_obj_widetag_p(widetag_of(native_pointer(target)))) return 0;
+    }
     target = canonical_obj(target);
     uint32_t* new_cell = (uint32_t*)ss->scratchpad.free;
     uint32_t* next = new_cell + 2;
@@ -660,17 +666,18 @@ static void record_ptr(lispobj* source, lispobj target,
     uint32_t* valref = hopscotch_get_ref(&ss->inverted_heap, target);
     new_cell[1] = *valref;
     *valref = (uint32_t)((char*)new_cell - ss->scratchpad.base);
+    return 1;
 }
 
-#define relevant_ptr_p(x) find_page_index(x)>=0||immobile_space_p((lispobj)x)
+#define relevant_ptr_p(x) (find_page_index((void*)(x))>=0||immobile_space_p((lispobj)(x)))
 
-#define check_ptr(ptr) { \
-    ++n_scanned_words; \
-    if (!is_lisp_pointer(ptr)) ++n_immediates; \
-    else if (relevant_ptr_p((void*)(ptr))) { \
-      ++n_pointers; \
-      if (record_ptrs) record_ptr(where,ptr,ss); \
-    }}
+#define COUNT_POINTER(x) { ++n_scanned_words; \
+      if (!is_lisp_pointer(x)) ++n_immediates; \
+      else if (relevant_ptr_p(x)) ++n_pointers; }
+
+#define check_ptr(x) { \
+    if (count_only) COUNT_POINTER(x) \
+    else if (is_lisp_pointer(x) && relevant_ptr_p(x)) record_ptr(where,x,ss); }
 
 static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
@@ -680,7 +687,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
 
-    boolean record_ptrs = ss->record_ptrs;
+    boolean count_only = !ss->record_ptrs;
     for ( ; where < end ; where += nwords ) {
         ++n_objects;
         lispobj header = *where;
@@ -760,9 +767,26 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 (widetag == RATIO_WIDETAG))
                 continue;
         }
-        for(i=1; i<scan_limit; ++i) check_ptr(where[i]);
+        if (widetag == SIMPLE_VECTOR_WIDETAG && ss->record_ptrs) {
+            // Try to eliminate some duplicate edges in the reversed graph.
+            // This is only a heuristic and will not eliminate all duplicate edges.
+            // It helps for vectors which get initialized like #(#:FOO #:FOO ...)
+            // by storing only one backpointer to #:FOO.
+            // It is not particularly helpful for other objects.
+            lispobj prev_interesting_ptr = 0;
+            for(i=1; i<scan_limit; ++i) {
+                lispobj pointer = where[i];
+                if (is_lisp_pointer(pointer)
+                    && relevant_ptr_p(pointer)
+                    && pointer != prev_interesting_ptr
+                    && record_ptr(where,pointer,ss))
+                    prev_interesting_ptr = pointer;
+            }
+        } else {
+            for(i=1; i<scan_limit; ++i) check_ptr(where[i]);
+        }
     }
-    if (!record_ptrs) { // just count them
+    if (count_only) {
         ss->n_objects += n_objects;
         ss->n_scanned_words += n_scanned_words;
         ss->n_immediates += n_immediates;
@@ -797,11 +821,13 @@ static void scan_spaces(struct scan_state* ss)
 
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
 
-static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
+static void compute_heap_inverse(boolean keep_leaves,
+                                 struct hopscotch_table* inverted_heap,
                                  struct scratchpad* scratchpad)
 {
     struct scan_state ss;
     memset(&ss, 0, sizeof ss);
+    ss.keep_leaves = keep_leaves;
     if (heap_trace_verbose) fprintf(stderr, "Pass 1: Counting heap objects...\n");
     scan_spaces(&ss);
     // Guess at the initial size of ~ .5 million objects.
@@ -850,6 +876,22 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
 #endif
 };
 
+/* Return true if the user wants to find a leaf object.
+ * If not, then we can omit all leaf objects from the inverted heap
+ * because no leaf object can point to anything */
+static boolean finding_leaf_p(lispobj weak_pointers)
+{
+    do {
+        lispobj car = CONS(weak_pointers)->car;
+        lispobj value = ((struct weak_pointer*)native_pointer(car))->value;
+        weak_pointers = CONS(weak_pointers)->cdr;
+        if (is_lisp_pointer(value)
+            && !listp(value)
+            && leaf_obj_widetag_p(widetag_of(native_pointer(value)))) return 1;
+    } while (weak_pointers != NIL);
+    return 0; // this is the expected (and optimal) case
+}
+
 /* Find any shortest path from a thread or tenured object
  * to each of the specified objects.
  */
@@ -874,7 +916,8 @@ static int trace_paths(void (*context_scanner)(),
           fprintf(stderr, " %p%s", (void*)pins[i],
                   ((i%8)==7||i==n_pins-1)?"\n":"");
     }
-    compute_heap_inverse(&inverted_heap, &scratchpad);
+    compute_heap_inverse(finding_leaf_p(weak_pointers),
+                         &inverted_heap, &scratchpad);
     hopscotch_create(&visited, HASH_FUNCTION, 0, 32, 0);
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
     i = 0;
