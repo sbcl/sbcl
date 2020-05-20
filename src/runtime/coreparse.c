@@ -83,7 +83,7 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
-#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
+#if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
 #elif !defined(ELFCORE)
 #define ELFCORE 0
