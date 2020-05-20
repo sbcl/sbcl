@@ -780,8 +780,10 @@
                                    `(,dummy)))
                     (ignorable ,n-args ,n-results))
            ,@(loads)
-           (assemble ()
-             ,@(vop-parse-body parse))
+           ;; RETURN-FROM can exit the ASSEMBLE while continuing on with saves.
+           (block ,(vop-parse-name parse)
+             (assemble ()
+               ,@(vop-parse-body parse)))
            ,@(saves))))))
 
 (defvar *parse-vop-operand-count*)

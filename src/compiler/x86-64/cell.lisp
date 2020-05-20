@@ -358,13 +358,15 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
+  (:args-var args)
   (:generator 2
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; car slot, so we have to zero the fixnum tag bit(s) to make sure
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst and res (lognot fixnum-tag-mask))))
+    (unless (not-nil-tn-ref-p args)
+      (inst and res (lognot fixnum-tag-mask)))))
 
 ;;; Combine SYMBOL-HASH and the lisp fallback code into one vop.
 (define-vop ()

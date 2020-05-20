@@ -104,6 +104,7 @@
   (values index fixnum)
   (foldable flushable))
 
+(defknown sb-impl::number-sxhash (number) hash-code (foldable flushable))
 (defknown %sxhash-string (string) hash-code (foldable flushable))
 (defknown %sxhash-simple-string (simple-string) hash-code (foldable flushable))
 

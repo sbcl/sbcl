@@ -201,27 +201,28 @@
 ;;                             Word bits    ;  32 | 64  32 | 64
                                             ;------------------
                                             ; [ all numbers are hex ]
-  bignum-widetag                            ;  0A   11  0A   11
-  ratio-widetag                             ;  0E   15  0E   15
-  single-float-widetag                      ;  12   19  12   19
-  double-float-widetag                      ;  16   1D  16   1D
-  complex-widetag                           ;  1A   21  1A   21
-  complex-single-float-widetag              ;  1E   25  1E   25
-  complex-double-float-widetag              ;  22   29  22   29
+  bignum-widetag                            ;  0A   11  0A   11       \
+  ratio-widetag                             ;  0E   15  0E   15        |
+  single-float-widetag                      ;  12   19  12   19        |
+  double-float-widetag                      ;  16   1D  16   1D        | EQL-hash picks off this
+  complex-widetag                           ;  1A   21  1A   21        | range of widetags
+  complex-single-float-widetag              ;  1E   25  1E   25        |
+  complex-double-float-widetag              ;  22   29  22   29        |
+                                            ;                          |
+  symbol-widetag                            ;  26   2D  26   2D       /
 
-  code-header-widetag                       ;  26   2D  26   2D
+  code-header-widetag                       ;  2A   31  2A   31
 
-  simple-fun-widetag                        ;  2A   31  2A   31
-  closure-widetag                           ;  2E   35  2E   35
-  funcallable-instance-widetag              ;  32   39  32   39
+  simple-fun-widetag                        ;  2E   35  2E   35
+  closure-widetag                           ;  32   39  32   39
+  funcallable-instance-widetag              ;  36   3D  36   3D
 
   ;; x86[-64] does not have objects with this widetag,
   #+(or x86 x86-64) unused00-widetag
   #-(or x86 x86-64)
-  return-pc-widetag                         ;  36   3D  36   3D
+  return-pc-widetag                         ;  3A   41  3A   41
 
-  value-cell-widetag                        ;  3A   41  3A   41
-  symbol-widetag                            ;  3E   45  3E   45
+  value-cell-widetag                        ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49
   sap-widetag                               ;  46   4D  46   4D
   unbound-marker-widetag                    ;  4A   51  4A   51

@@ -268,7 +268,11 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
+  (:args-var args)
   (:generator 4
+    (when (not-nil-tn-ref-p args)
+      (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+      (return-from symbol-hash))
     (inst cmpld symbol null-tn)
     (inst beq NULL)
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)

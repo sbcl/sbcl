@@ -156,6 +156,7 @@
 
 (defun number-sxhash (x)
   (declare (optimize (sb-c:verify-arg-count 0) speed))
+  (declare (explicit-check))
   (labels ((hash-ratio (x)
              (let ((result 127810327))
                (declare (type fixnum result))

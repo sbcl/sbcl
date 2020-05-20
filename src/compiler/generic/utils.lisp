@@ -207,6 +207,11 @@
                                instance
                                character))))))
 
+(defun not-nil-tn-ref-p (tn-ref)
+  (and (tn-ref-type tn-ref)
+       (not (types-equal-or-intersect (tn-ref-type tn-ref)
+                                      (specifier-type '(eql nil))))))
+
 (defun length-field-shift (widetag)
   (if (= widetag instance-widetag)
       instance-length-shift

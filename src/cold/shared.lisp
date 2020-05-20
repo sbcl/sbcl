@@ -243,6 +243,17 @@
              (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
                           target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
+        (when (and (member :x86 target-feature-list)
+                   (member :int4-breakpoints target-feature-list))
+          ;; 0xCE is a perfectly good 32-bit instruction,
+          ;; unlike on x86-64 where it is illegal. It's therefore
+          ;; confusing to allow this feature in a 32-bit build.
+          ;; But it's annoying to have a build script that otherwise works
+          ;; for a native x86/x86-64 build except for needing one change.
+          ;; Just print something and go on with life.
+          (setq target-feature-list
+                (remove :int4-breakpoints target-feature-list))
+          (warn "Removed :INT4-BREAKPOINTS from target features"))
         ;; Putting arch and gc choice first is visually convenient, versus
         ;; having to parse a random place in the line to figure out the value
         ;; of a binary choice {cheney vs gencgc} and architecture.
@@ -309,11 +320,6 @@
           ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")
          ("(and immobile-symbols (not immobile-space))"
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
-         ("(and int4-breakpoints x86)"
-          ;; 0xCE is a perfectly good 32-bit instruction,
-          ;; unlike on x86-64 where it is illegal. It's therefore
-          ;; confusing to allow this feature in a 32-bit build.
-          ":INT4-BREAKPOINTS are incompatible with x86")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))
