@@ -3070,7 +3070,7 @@ no guarantees of interface stability."
                "POLLFD" "POLLIN" "POLLOUT" "POLLHUP" "POLLNVAL" "POLLERR"
                "FD" "EVENTS" "REVENTS"
                "FD-ISSET" "FD-SET" "UNIX-FAST-SELECT"
-               "UNIX-KILL" "CODESET"
+               "UNIX-KILL"
                "FD-ZERO" "FD-CLR"
                "FD-SETSIZE" "UNIX-FAST-GETRUSAGE"
                "UNIX-KILLPG"))

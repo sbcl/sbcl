@@ -294,7 +294,7 @@ case `uname` in
         esac
         ;;
     DragonFly)
-	sbcl_os="dragonfly"
+	sbcl_os="dragonflybsd"
 	;;
     Darwin)
         sbcl_os="darwin"
@@ -424,7 +424,7 @@ then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
         x86|x86-64|ppc|arm64|riscv)
-	    if [ "$sbcl_os" = "dragonfly" ]
+	    if [ "$sbcl_os" = "dragonflybsd" ]
 	    then
 		echo "No threads on this platform."
 	    else
@@ -513,7 +513,6 @@ case "$sbcl_os" in
 		;;
         esac
 
-
         link_or_copy Config.$sbcl_arch-linux Config
         link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
         link_or_copy linux-os.h target-os.h
@@ -533,13 +532,12 @@ case "$sbcl_os" in
         link_or_copy haiku-os.h target-os.h
         ;;
     *bsd)
-        printf ' :unix' >> $ltf
-        printf ' :bsd' >> $ltf
+        printf ' :unix :bsd :elf' >> $ltf
+        # FIXME: can we enable :gcc-tls across all variants?
         link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
         case "$sbcl_os" in
             *freebsd)
-                printf ' :elf' >> $ltf
                 printf ' :freebsd' >> $ltf
                 printf ' :gcc-tls' >> $ltf
                 if [ $sbcl_os = "gnu-kfreebsd" ]; then
@@ -552,32 +550,22 @@ case "$sbcl_os" in
                 link_or_copy Config.$sbcl_arch-$sbcl_os Config
                 ;;
             openbsd)
-                printf ' :elf' >> $ltf
                 printf ' :openbsd' >> $ltf
                 link_or_copy Config.$sbcl_arch-openbsd Config
                 ;;
             netbsd)
                 printf ' :netbsd' >> $ltf
-                printf ' :elf' >> $ltf
                 link_or_copy Config.$sbcl_arch-netbsd Config
+                ;;
+            dragonflybsd)
+                printf ' :dragonfly' >> $ltf
+                link_or_copy Config.$sbcl_arch-dragonfly Config
                 ;;
             *)
                 echo unsupported BSD variant: `uname`
                 exit 1
                 ;;
         esac
-        ;;
-    dragonfly)
-        printf ' :unix' >> $ltf
-        printf ' :bsd' >> $ltf
-        printf ' :elf' >> $ltf
-        printf ' :dragonfly' >> $ltf
-        if [ $sbcl_arch = "x86" ]; then
-            printf ' :restore-fs-segment-register-from-tls' >> $ltf
-        fi
-        link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
-        link_or_copy bsd-os.h target-os.h
-        link_or_copy Config.$sbcl_arch-dragonfly Config
         ;;
     darwin)
         printf ' :unix' >> $ltf
@@ -691,7 +679,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :unbind-in-unwind :no-continue-unwind' >> $ltf
 
     case "$sbcl_os" in
-    linux | darwin | *bsd | dragonfly)
+    linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then

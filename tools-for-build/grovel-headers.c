@@ -39,13 +39,10 @@
   #include <sys/times.h>
   #include <sys/wait.h>
   #include <sys/ioctl.h>
-#ifdef LISP_FEATURE_ANDROID
+#if defined __HAIKU__ || defined __DragonFly__ || defined LISP_FEATURE_ANDROID
   #include <termios.h>
 #else
-# ifndef LISP_FEATURE_HAIKU
-#  include <sys/termios.h>
-# endif
-  #include <langinfo.h>
+  #include <sys/termios.h>
 #endif
   #include <sys/time.h>
   #include <dlfcn.h>
@@ -170,10 +167,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("pollnval", POLLNVAL);
     defconstant("pollerr", POLLERR);
     DEFTYPE("nfds-t", nfds_t);
-#ifndef LISP_FEATURE_ANDROID
-    printf(";;; langinfo\n");
-    defconstant("codeset", CODESET);
-#endif
     printf(";;; types, types, types\n");
     DEFTYPE("clock-t", clock_t);
     DEFTYPE("dev-t",   dev_t);
