@@ -572,7 +572,6 @@ case "$sbcl_os" in
         printf ' :bsd' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :dragonfly' >> $ltf
-        printf ' :sb-qshow' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
             printf ' :restore-fs-segment-register-from-tls' >> $ltf
         fi
@@ -692,7 +691,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :unbind-in-unwind :no-continue-unwind' >> $ltf
 
     case "$sbcl_os" in
-    linux | darwin | *bsd)
+    linux | darwin | *bsd | dragonfly)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
