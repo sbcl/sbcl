@@ -221,6 +221,7 @@
                         (multiple-value-prog1 ,(uwp forms)
                           (setf ,index (- (string-input-stream-index ,var) ,offset))))
                      `(let ((,var ,ctor))
+                        (declare (ignorable ,var))
                         ,@decls
                         ,(uwp forms)))))))) ; easy way
 

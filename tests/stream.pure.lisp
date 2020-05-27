@@ -482,6 +482,10 @@
       (assert (equal (type-of (get-output-stream-string s))
                      '(simple-base-string 1))))))
 
+(with-test (:name :with-input-from-string-nowarn)
+  (checked-compile '(lambda ()
+                     (with-input-from-string (s "muffin")))))
+
 (with-test (:name :with-input-from-string-declarations)
   (checked-compile-and-assert
       ()
