@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.4:
+  * platform support:
+    ** experimental support for ARM32 and ARM64 on OpenBSD
   * enhancement: CMUCL-style START-BLOCK and END-BLOCK declarations are now
     supported for block compiling forms at a sub-file granularity.
   * enhancement: IPv6 support in sb-bsd-sockets is enabled on Windows.
