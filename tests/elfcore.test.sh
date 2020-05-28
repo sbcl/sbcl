@@ -13,17 +13,11 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-. ../find-gnumake.sh
-find_gnumake
-
-# sbcl likely won't run from /tmp on OpenBSD due to RWX mmap() restrictions
-if [ "x$SBCL_SOFTWARE_TYPE" != xOpenBSD ]; then
-    export TEST_BASEDIR=${TMPDIR:-/tmp}
-fi
+export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
-  #+(and elf sb-thread)
+  #+(and linux elf sb-thread)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
  (exit :code 2) ; otherwise
@@ -37,7 +31,7 @@ fi
 set -e # exit on error
 
 # Ensure that we're not running a stale shrinkwrap-sbcl
-(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; $GNUMAKE shrinkwrap-sbcl)
+(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; make shrinkwrap-sbcl)
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --noprint <<EOF
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
@@ -67,37 +61,35 @@ EOF
 
 m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
 
-(cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; $GNUMAKE libsbcl.a)
+(cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \
   ${tmpcore} $TEST_DIRECTORY/elfcore-test.s
 # I guess we're going to have to hardwire the system libraries
 # until I can figure out how to get a Makefile to work, which is fine
 # for now because elfination is only supported on linux/x86-64.
-./run-compiler.sh -sbcl-libs -no-pie -g -o $TEST_DIRECTORY/elfcore-test \
+./run-compiler.sh -no-pie -g -o $TEST_DIRECTORY/elfcore-test \
   $TEST_DIRECTORY/elfcore-test.s \
   $TEST_DIRECTORY/elfcore-test-core.o \
-  $SBCL_PWD/../src/runtime/libsbcl.a -lm -lpthread ${m_arg}
+  $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
 
 $TEST_DIRECTORY/elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
 echo Custom core: PASS
 
-if [ "x$SBCL_SOFTWARE_TYPE" = xLinux ]; then
-    ./run-compiler.sh -sbcl-libs -no-pie -g -o $TEST_DIRECTORY/relocating-elfcore-test \
-      $TEST_DIRECTORY/elfcore-test.s \
-      $TEST_DIRECTORY/elfcore-test-core.o \
-      $SBCL_PWD/../tests/heap-reloc/fake-mman.c \
-      $SBCL_PWD/../src/runtime/libsbcl.a -lm -lpthread ${m_arg}
+./run-compiler.sh -no-pie -g -o $TEST_DIRECTORY/relocating-elfcore-test \
+  $TEST_DIRECTORY/elfcore-test.s \
+  $TEST_DIRECTORY/elfcore-test-core.o \
+  $SBCL_PWD/../tests/heap-reloc/fake-mman.c \
+  $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
 
-    (cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a)
+(cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a)
 
-    export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap
-    i=1
-    while [ $i -le 6 ]
-    do
-      echo Trial $i
-      i=`expr $i + 1`
-      $TEST_DIRECTORY/relocating-elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
-    done
-fi
+export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap
+i=1
+while [ $i -le 6 ]
+do
+  echo Trial $i
+  i=`expr $i + 1`
+  $TEST_DIRECTORY/relocating-elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
+done
 
 exit $EXIT_TEST_WIN
