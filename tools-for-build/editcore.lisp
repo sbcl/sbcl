@@ -32,7 +32,7 @@
                 #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement
-                #:near-cond-jump-displacement #:mov #:call
+                #:near-cond-jump-displacement #:mov #:call #:jmp
                 #:get-gpr #:reg-name)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
@@ -587,17 +587,22 @@
                                       (signed-sap-ref-8 sap (+ offs 2))
                                       (reg-name (get-gpr :qword reg)))))
                    (push (list* (1- (dstate-cur-offs dstate)) 8 "mov" text) list)))
-                ((and (eq (inst-name inst) 'call) ; match "call qword ptr [addr]"
-                      (eql (ldb (byte 24 0) (sap-ref-32 sap offs))
-                           #x2514FF)) ; ModRM+SIB encodes disp32, no base, no index
-                 ;; This form of call instruction is employed for asm routines when
-                 ;; compile-to-memory-space is :AUTO.  If the code were to be loaded
-                 ;; into dynamic space, the offset to the called routine isn't
-                 ;; a (signed-byte 32), so we need the indirection.
-                 (push (list* (dstate-cur-offs dstate) 7 "call*" operand) list))
+                ((let ((bytes (ldb (byte 24 0) (sap-ref-32 sap offs))))
+                   (or (and (eq (inst-name inst) 'call) ; match "{call,jmp} qword ptr [addr]"
+                            (eql bytes #x2514FF)) ; ModRM+SIB encodes disp32, no base, no index
+                       (and (eq (inst-name inst) 'jmp)
+                            (eql bytes #x2524FF))))
+                 (let ((new-opcode (ecase (sap-ref-8 sap (1+ offs))
+                                     (#x14 "call *")
+                                     (#x24 "jmp *"))))
+                   ;; This instruction form is employed for asm routines when
+                   ;; compile-to-memory-space is :AUTO.  If the code were to be loaded
+                   ;; into dynamic space, the offset to the called routine isn't
+                   ;; a (signed-byte 32), so we need the indirection.
+                   (push (list* (dstate-cur-offs dstate) 7 new-opcode operand) list)))
                 (t
                  (bug "Can't reverse-engineer fixup: ~s ~x"
-                      (inst-name inst) (sap-ref-32 sap offs))))))
+                      (inst-name inst) (sap-ref-64 sap offs))))))
           (pop (core-fixup-addrs core))
           (setq next-fixup-addr (or (car (core-fixup-addrs core)) most-positive-word)))
          ((or (eq inst inst-jmp) (eq inst inst-call))
@@ -737,11 +742,12 @@
                            ;; the so-called "operand" is the entire instruction
                            (write-string operand stream)
                            (terpri stream))
-                          ((string= opcode "call*")
+                          ((or (string= opcode "call *") (string= opcode "jmp *"))
                            ;; Indirect call - since the code is in immobile space,
                            ;; we could render this as a 2-byte NOP followed by a direct
                            ;; call. For simplicity I'm leaving it exactly as it was.
-                           (format stream " call *(CS+0x~x)~%"
+                           (format stream " ~A(CS+0x~x)~%"
+                                   opcode ; contains a "*" as needed for the syntax
                                    (- operand (bounds-low (core-code-bounds core)))))
                           (t))
                 (bug "Random annotated opcode ~S" opcode))

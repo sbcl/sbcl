@@ -56,6 +56,12 @@ run_sbcl --noinform <<EOF
   ;; Call an assembly routine from dynamic space
   (defun f (x y z) (+ x (- y z)))
   (compile 'f)
+  ;; :AUTO physically allocates code in immobile space (unless it fills up)
+  ;; using instruction forms that do not assume immobile space
+  ;; (for that same reason) which caused a glitch in editcore.
+  (setq sb-c:*compile-to-memory-space* :auto)
+  (defun g (fun &rest args) (apply fun args)) ; exercise TAIL-CALL-VARIABLE
+  (compile 'g)
   (save-lisp-and-die "${tmpcore}")
 EOF
 
