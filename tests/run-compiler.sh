@@ -20,12 +20,24 @@ case "$platform" in
     FreeBSD-X86)   args="-m32" ;;
 esac
 
+libs=
+case "$platform" in
+    Linux-*)   libs=-ldl ;;
+    FreeBSD-*) libs=-lutil ;;
+    OpenBSD-*) libs="-Wl,-z,wxneeded -lutil" ;;
+    NetBSD-*)  libs=-lutil ;;
+esac
+
 while [ $# -gt 0 ]; do
     arg="$1"
     new=
     case "$arg" in
         -sbcl-pic)
             new=-fPIC
+            ;;
+
+        -sbcl-libs)
+            new="$libs"
             ;;
 
         -sbcl-shared)
