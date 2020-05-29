@@ -97,17 +97,12 @@ set_pty(char *pty_name)
 
 void closefrom_fallback(int lowfd)
 {
-    int fd, maxfd = -1;
-#ifdef F_MAXFD
-    maxfd = fcntl(0, F_MAXFD);
-#endif
+    int fd, maxfd;
 
 #ifdef SVR4
-    if (-1 == maxfd)
-        maxfd = sysconf(_SC_OPEN_MAX)-1;
+    maxfd = sysconf(_SC_OPEN_MAX)-1;
 #else
-    if (-1 == maxfd)
-        maxfd = getdtablesize()-1;
+    maxfd = getdtablesize()-1;
 #endif
 
     for (fd = maxfd; fd >= lowfd; fd--)
