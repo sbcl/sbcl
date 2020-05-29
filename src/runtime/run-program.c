@@ -146,6 +146,7 @@ void closefds_from(int lowfd)
 #else
     int fds_closed = 0;
 
+/* readdir() uses malloc, which is prone to deadlocking
 #ifdef LISP_FEATURE_LINUX
     if (!fds_closed)
         fds_closed = !closefrom_fddir("/proc/self/fd/", lowfd);
@@ -154,6 +155,7 @@ void closefds_from(int lowfd)
     if (!fds_closed)
         fds_closed = !closefrom_fddir("/dev/fd/", lowfd);
 #endif
+*/
 
     if (!fds_closed)
         closefrom_fallback(lowfd);
