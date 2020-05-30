@@ -9,10 +9,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
-#include <sys/ucontext.h>
-#include <sys/mcontext.h>
 
 #include <errno.h>
 #include <sys/types.h>
