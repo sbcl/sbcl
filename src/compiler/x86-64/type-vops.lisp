@@ -147,9 +147,17 @@
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
 
+      ;; FIXME: the first case, by elision of the lowtag test, can cause this
+      ;; typecase to memory fault if given an unbound marker:
+      ;;  (typecase x
+      ;;   ((or character number list instance function) 1)
+      ;;   ((simple-vector x) 2)
       (cond ((and value-tn-ref
                   (eq lowtag other-pointer-lowtag)
                   (other-pointer-tn-ref-p value-tn-ref))) ; best case: lowtag is right
+            ;; This case is theoretically right, but causes a strictly greater number
+            ;; of ways to elide a lowtag test, hence more likely to memory fault.
+            #+nil
             ((and value-tn-ref
                   ;; If HEADERS contains a range, then list pointers have to be
                   ;; disallowed - consider a list whose CAR has a fixnum that
