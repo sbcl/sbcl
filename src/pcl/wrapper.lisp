@@ -83,23 +83,6 @@
        (aver layout)
        layout))))
 
-(declaim (inline wrapper-class*))
-(defun wrapper-class* (wrapper)
-  (or (wrapper-class wrapper)
-      ;; FIXME: this branch seems unreachable.
-      ;; It would be nice to eliminate WRAPPER-CLASS* if we can show that it
-      ;; is only a holdover from an earlier way of bootstrapping that resulted
-      ;; in the temporary absence of a PCL-CLASS for some non-standard-class.
-      ;; Certainly no test gets here [changing it to (BUG "got here") worked].
-      ;; Note however that
-      ;;  (CLASSOID-PCL-CLASS (FIND-CLASSOID 'STANDARD-INSTANCE)) => NIL
-      ;; which can be resolved by just ensuring one time that it has a CLASS.
-      ;; And nothing else seems to be problematic.
-      (let ((classoid (layout-classoid wrapper)))
-        (ensure-non-standard-class
-         (classoid-name classoid)
-         classoid))))
-
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This
 ;;; mechanism is used to implement the updating of instances when the
@@ -239,7 +222,7 @@
              ;;    previous call to REGISTER-LAYOUT for a superclass of
              ;;    INSTANCE's class.  See also the comment above
              ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
-             (let ((class (wrapper-class* owrapper)))
+             (let ((class (wrapper-class owrapper)))
                (%force-cache-flushes class)
                ;; KLUDGE: avoid an infinite recursion, it's still better to
                ;; bail out with an error for server softwares. see FIXME above.
@@ -385,7 +368,7 @@
                     (setf (cdr dfun-wrappers-tail) new-dfun-wrappers-tail)
                     (setf dfun-wrappers-tail new-dfun-wrappers-tail))))
            ,@(when wrappers
-               `((setq class (wrapper-class* wrapper))
+               `((setq class (wrapper-class wrapper))
                  (setq type `(class-eq ,class)))))
          ,@(when wrappers
              `((push wrapper wrappers-rev)

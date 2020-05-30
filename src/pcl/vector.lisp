@@ -97,7 +97,7 @@
         (when slot-names
           (let* ((wrapper (pop wrappers))
                  (std-p (layout-for-pcl-obj-p wrapper))
-                 (class (wrapper-class* wrapper)))
+                 (class (wrapper-class wrapper)))
             (dolist (slot-name slot-names)
               (destructuring-bind (location . info)
                   (or (find-slot-cell wrapper slot-name)

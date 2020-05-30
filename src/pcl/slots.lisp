@@ -95,7 +95,7 @@
                  (return-from slot-value
                    (if cell
                        (funcall (slot-info-reader (cdr cell)) object)
-                       (values (slot-missing (wrapper-class* wrapper) object
+                       (values (slot-missing (wrapper-class wrapper) object
                                              slot-name 'slot-value)))))
                 ;; this next test means CONSP, but the transform that weakens
                 ;; CONSP to LISTP isn't working here for some reason.
@@ -104,14 +104,14 @@
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (if (unbound-marker-p value)
-        (slot-unbound (wrapper-class* wrapper) object slot-name)
+        (slot-unbound (wrapper-class wrapper) object slot-name)
         value)))
 
 (defun set-slot-value (object slot-name new-value)
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
                    (return-from set-slot-value
-                     (progn (slot-missing (wrapper-class* wrapper)
+                     (progn (slot-missing (wrapper-class wrapper)
                                           object slot-name 'setf new-value)
                             new-value))))
          (location (car cell))
@@ -143,7 +143,7 @@
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
                    (return-from slot-value
-                     (values (slot-missing (wrapper-class* wrapper) object slot-name
+                     (values (slot-missing (wrapper-class wrapper) object slot-name
                                            'cas (list old-value new-value))))))
          (location (car cell))
          (info (cdr cell))
@@ -163,7 +163,7 @@
                      (t
                       (bug "Bogus slot-cell in (CAS SLOT-VALUE): ~S" cell)))))
       (if (and (unbound-marker-p old) (neq old old-value))
-          (slot-unbound (wrapper-class* wrapper) object slot-name)
+          (slot-unbound (wrapper-class wrapper) object slot-name)
           old))))
 
 (defun slot-boundp (object slot-name)
@@ -179,7 +179,7 @@
                  (return-from slot-boundp
                    (if cell
                        (funcall (slot-info-boundp (cdr cell)) object)
-                       (and (slot-missing (wrapper-class* wrapper) object
+                       (and (slot-missing (wrapper-class wrapper) object
                                           slot-name 'slot-boundp)
                             t))))
                 ((listp location) ; forcibly transform CONSP to LISTP
@@ -199,10 +199,10 @@
                      +slot-unbound+)))
           ((not location)
            (if cell
-               (let ((class (wrapper-class* wrapper)))
+               (let ((class (wrapper-class wrapper)))
                  (slot-makunbound-using-class class object
                                               (find-slot-definition class slot-name)))
-               (slot-missing (wrapper-class* wrapper) object slot-name
+               (slot-missing (wrapper-class wrapper) object slot-name
                              'slot-makunbound)))
           ((listp location) ; forcibly transform CONSP to LISTP
            (setf (cdr location) +slot-unbound+))

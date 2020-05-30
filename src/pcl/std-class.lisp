@@ -1567,7 +1567,7 @@
 (defun %obsolete-instance-trap (owrapper nwrapper instance)
   (cond
     ((layout-for-pcl-obj-p owrapper)
-     (binding* ((class (wrapper-class* nwrapper))
+     (binding* ((class (wrapper-class nwrapper))
                 (oslots (get-slots instance))
                 (nwrapper (class-wrapper class))
                 (nslots (make-array (layout-length nwrapper)
@@ -1669,7 +1669,7 @@
              (new-slots (make-array (layout-length new-wrapper)
                                     :initial-element +slot-unbound+))
              (old-wrapper (layout-of instance))
-             (old-class (wrapper-class* old-wrapper))
+             (old-class (wrapper-class old-wrapper))
              (old-slots (get-slots instance))
              (safe (safe-p new-class))
              (new-wrapper-slots (layout-slot-list new-wrapper)))
