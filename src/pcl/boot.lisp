@@ -2016,7 +2016,6 @@ bootstrapping.
 (define-load-time-global *sgf-wrapper*
   (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function
-                      nil
                       #+immobile-code +machine-code-embedding-fsc-instance-bitmap+))
 
 (define-load-time-global *sgf-slots-init*

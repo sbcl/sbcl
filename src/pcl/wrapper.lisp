@@ -31,21 +31,18 @@
 
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
-;;; classes. We pass in the class name in addition to the class.
-(defun !boot-make-wrapper (length name &optional class (bitmap -1))
+;;; classes.
+(defun !boot-make-wrapper (length name &optional (bitmap -1))
   (let ((found (find-classoid name nil)))
     (cond
      (found
-      (unless (classoid-pcl-class found)
-        (setf (classoid-pcl-class found) class))
-      (aver (eq (classoid-pcl-class found) class))
       (let ((layout (classoid-layout found)))
         (aver layout)
         layout))
      (t
       (set-layout-valid
        (make-layout (hash-layout-name name)
-                    (make-standard-classoid :name name :pcl-class class)
+                    (make-standard-classoid :name name)
                     :length length
                     :flags +pcl-object-layout-flag+
                     :bitmap bitmap))))))
