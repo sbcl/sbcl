@@ -262,6 +262,33 @@
           (when p
             (file-position stream p)))))))
 
+;;; Return a string representing symbols in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+;;; which are present in a particular compilation.
+(defun compute-features-affecting-fasl-format ()
+  (let ((list (sort (copy-list (intersection *features-potentially-affecting-fasl-format*
+                                             sb-xc:*features*))
+                    #'string< :key #'symbol-name)))
+    ;; Stringify the subset of *FEATURES* that affect fasl format.
+    ;; A list would be the natural representation choice for this, but a string
+    ;; is convenient for and a requirement for writing to and reading from fasls
+    ;; at this stage of the loading. WITH-STANDARD-IO-SYNTAX and WRITE-TO-STRING
+    ;; would work, but this is simple enough to do by hand.
+    (with-simple-output-to-string (stream)
+      (let ((delimiter #\())
+        (dolist (symbol list)
+          (write-char delimiter stream)
+          (write-string (string symbol) stream)
+          (setq delimiter #\Space)))
+      (write-char #\) stream))))
+
+#-sb-xc-host
+(eval-when (:compile-toplevel)
+  (let ((string (compute-features-affecting-fasl-format)))
+    (assert (and (> (length string) 2)
+                 (not (find #\newline string))
+                 (not (find #\# string))
+                 (not (search ".." string))))))
+
 ;;;; LOAD-AS-FASL
 ;;;;
 ;;;; Note: LOAD-AS-FASL is used not only by LOAD, but also (with
