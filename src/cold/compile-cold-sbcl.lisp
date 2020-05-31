@@ -186,6 +186,10 @@
                           (get-stems-and-flags 2)))
                (n 0)
                (sb-xc:*compile-verbose* nil))
+           ;; Workaround memory exhaustion in SB-FASTEVAL.
+           ;; In SB-EVAL the default evaluator-mode is :compile,
+           ;; but it also would exhaust memory if interpreting.
+           #+sbcl (setq host-sb-ext:*evaluator-mode* :compile)
            (with-math-journal
             (do-stems-and-flags (stem flags 2)
               (unless (position :not-target flags)
