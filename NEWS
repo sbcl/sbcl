@@ -26,6 +26,8 @@ changes relative to sbcl-2.0.4:
     default values of nested macro arguments.  (lp#1876194)
   * bug fix: RESTART-BIND's body is an implicit progn, and so does not accept
     declarations.  (lp#1876303, reported by Michal Herda)
+  * optimization: EQUAL hash tables with keys involving structure-objects will
+    have fewer systematic collisions.
 
 changes in sbcl-2.0.4 relative to sbcl-2.0.3:
   * platform support:
