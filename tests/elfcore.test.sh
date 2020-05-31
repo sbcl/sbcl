@@ -33,7 +33,7 @@ set -e # exit on error
 # Ensure that we're not running a stale shrinkwrap-sbcl
 (cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; make shrinkwrap-sbcl)
 
-$SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --noprint <<EOF
+$SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
 ;; This just needs any function that when ELFinated has its packed fixups rewritten.
 ;; If the packed value is a bignum, it goes into a C data section.
