@@ -74,6 +74,13 @@
                   ;; controlled by function arguments and lexical variables.
                   (*compile-verbose* nil)
                   (*compile-print* nil)
+                  ;; in some circumstances, we can trigger execution
+                  ;; of user code during optimization, which can
+                  ;; re-enter the compiler through explicit calls to
+                  ;; EVAL or COMPILE.  Those inner evaluations
+                  ;; shouldn't attempt to report any compiler problems
+                  ;; using the outer compiler error context.
+                  (*compiler-error-context* nil)
                   (oops nil))
              (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
                (unless source-paths

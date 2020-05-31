@@ -513,5 +513,27 @@ cat > $tmpfilename <<EOF
 EOF
 fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass subclass (superclass) ((zslot2 :initarg :zslot2 :accessor zslot2))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass superclass () ((c :initarg c :accessor c))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-kernel::%invalidate-layout (sb-pcl::class-wrapper (find-class 'subclass))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmethod sb-mop:finalize-inheritance :after (class)
+    (eval '(defmethod z (x) (abcde)))
+    (funcall (compile nil '(lambda () (defun zz (x) (defgh)))))))
+
+(defun subclass-p (x)
+  (typep x 'subclass))
+EOF
+expect_warned_compile $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN
