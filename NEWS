@@ -3,15 +3,29 @@
 changes relative to sbcl-2.0.4:
   * platform support:
     ** experimental support for ARM32 and ARM64 on OpenBSD
+    ** better musl libc support.  (lp#1768368, thanks to Eric Timmons)
+    ** more correct use of futexes on 64-bit Linux.  (lp#1876825, reported by
+       Ilya Perminov)
+    ** restore building on current Solaris.  (lp#1881393, thanks to Shawn
+       Ellis)
   * enhancement: CMUCL-style START-BLOCK and END-BLOCK declarations are now
     supported for block compiling forms at a sub-file granularity.
   * enhancement: IPv6 support in sb-bsd-sockets is enabled on Windows.
-  * enhancement: better musl libc support (Thanks to Eric Timmons).
   * minor change: *compile-print* now makes it more clear what block
     compilation is actually doing. The default output is now slightly more
     verbose as a result.
+  * bug fix: number keys in EQUALP hash tables are correctly hashed.
+    (lp#1878653, reported by Syll)
   * bug fix: EQness is better preserved given partial sharing of list contents
     in the file compiler.  (lp#1583753, reported by Denis Budyak)
+  * bug fix: the peephole pass neglected to preserve jump table labels.
+    (lp#1876485)
+  * bug fix: fix compiler crash in block compilation merging of toplevel
+    lambdas.  (lp#1865336, reported by il71)
+  * bug fix: sb-introspect's function-lambda-arglist is better at extracting
+    default values of nested macro arguments.  (lp#1876194)
+  * bug fix: RESTART-BIND's body is an implicit progn, and so does not accept
+    declarations.  (lp#1876303, reported by Michal Herda)
 
 changes in sbcl-2.0.4 relative to sbcl-2.0.3:
   * platform support:
