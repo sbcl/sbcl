@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.4:
+changes in sbcl-2.0.5 relative to sbcl-2.0.4:
   * platform support:
     ** experimental support for ARM32 and ARM64 on OpenBSD
     ** better musl libc support.  (lp#1768368, thanks to Eric Timmons)
