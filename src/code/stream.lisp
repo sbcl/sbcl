@@ -2536,4 +2536,35 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (t
      stream)))
 
+;;; STREAM-ERROR-STREAM is supposed to return a stream even if the
+;;; stream has dynamic-extent. While technically a stream,
+;;; this object is not actually usable as such - it's only for error reporting.
+(defstruct (stub-stream
+            (:include ansi-stream)
+            (:constructor %make-stub-stream (direction string)))
+  direction
+  string) ; string or nil
+
+(defun make-stub-stream (underlying-stream)
+  (multiple-value-bind (direction string)
+      (etypecase underlying-stream
+        (string-input-stream
+         (values :input (string-input-stream-string underlying-stream)))
+        (string-output-stream
+         (values :output nil))
+        (fill-pointer-output-stream
+         (values :output (fill-pointer-output-stream-string underlying-stream))))
+    (%make-stub-stream direction string)))
+
+(defmethod print-object ((stub stub-stream) stream)
+  (print-unreadable-object (stub stream)
+    (let ((direction (stub-stream-direction stub))
+          (string (stub-stream-string stub)))
+      (format stream "dynamic-extent ~A (unavailable)~@[ ~A ~S~]"
+              (if (eq direction :input) 'string-input-stream 'string-output-stream)
+              (if string (if (eq direction :input) "from" "to"))
+              (if (> (length string) 10)
+                  (concatenate 'string (subseq string 0 8) "...")
+                  string)))))
+
 ;;;; etc.

@@ -494,3 +494,11 @@
            (declare (optimize safety))
            (read-char x)))
     (("a") #\a)))
+
+(defun input-from-dynamic-extent-stream ()
+  (handler-case (with-input-from-string (stream "#w") (read stream nil nil))
+    (error (condition)
+      (format nil "~A" condition))))
+(compile 'input-from-dynamic-extent-stream)
+(with-test (:name :with-input-from-string-signal-stream-error)
+  (assert (search "unavailable" (input-from-dynamic-extent-stream))))

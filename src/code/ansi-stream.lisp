@@ -196,11 +196,11 @@
          ;; In light of the second point, we need not close the stream if the object is
          ;; stack-allocated, because any attempt to access it after the forms exit will surely
          ;; crash, and there are otherwise no observable effects from closing the stream.
-         ;; The choice to avoid DX-LET in safe code is strictly unecessary, because it is
+         ;; The choice to avoid DX-LET in some policies is strictly unecessary, because it is
          ;; *always* undefined behavior to use the DX object after its extent ends,
          ;; however it might help expose user code bugs by keeping the stream accessible
          ;; but closed.
-         (bind (if (sb-c:policy env (= safety 3)) 'let 'dx-let))
+         (bind (if (sb-c:policy env (or (= safety 3) (= debug 3))) 'let 'dx-let))
          (ctor `(%init-string-input-stream
                  ,dummy ,string
                  ;; not (OR START 0), because ":START NIL" should err

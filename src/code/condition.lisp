@@ -202,13 +202,34 @@
         ;; Interestingly we fail to validate the actual-initargs,
         ;; allowing any random initarg names.  Is this permissible?
         ;; And why is lazily filling in ASSIGNED-SLOTS beneficial anyway?
-        (let ((instance (%make-instance (+ sb-vm:instance-data-start
-                                           1 ; ASSIGNED-SLOTS
-                                           (length initargs))))) ; rest
-          (setf (%instance-layout instance) (classoid-layout classoid)
+        (let* ((layout (classoid-layout classoid))
+               (stream-err-p
+                (let ((stream-err-layout (load-time-value (find-layout 'stream-error))))
+                  (or (eq layout stream-err-layout)
+                      (find stream-err-layout (layout-inherits layout)))))
+               (instance (%make-instance (+ sb-vm:instance-data-start
+                                            1 ; ASSIGNED-SLOTS
+                                            (length initargs)))) ; rest
+               (data-index (1+ sb-vm:instance-data-start))
+               (arg-index 0))
+          (setf (%instance-layout instance) layout
                 (condition-assigned-slots instance) nil)
-          (do-rest-arg ((val index) initargs)
-            (setf (%instance-ref instance (+ sb-vm:instance-data-start index 1)) val))
+          ;; Replace a dynamic-extent stream with a stub. Doing it in this low-level
+          ;; allocator is more robust than trying to intercept all conceivable ways
+          ;; in which to construct an instance of a subtype of STREAM-ERROR
+          ;; (e.g. through the function READER-EOF-ERROR, SIMPLE-READER-ERROR, etc)
+          ;; DO-REST-ARG doesn't quite fit the bill for this.
+          ;; And it's what you might call really poor separation of concerns.
+          (loop (when (>= arg-index (length initargs)) (return))
+                (let ((key (fast-&rest-nth arg-index initargs))
+                      (val (fast-&rest-nth (1+ arg-index) initargs)))
+                  (setf (%instance-ref instance data-index) key
+                        (%instance-ref instance (1+ data-index))
+                        (if (and stream-err-p (eq key :stream) (stack-allocated-p val))
+                            (sb-impl::make-stub-stream val)
+                            val))
+                  (incf arg-index 2)
+                  (incf data-index 2)))
           (values instance classoid))
         (error 'simple-type-error
                :datum designator

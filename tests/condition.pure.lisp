@@ -288,13 +288,20 @@
 ;; should print the stream position information.
 (with-test (:name (reader-error :stream-error-position-info :open-stream
                                 :bug-1264902))
-  (assert
-   (search
+  (locally
+   ;; High debug avoids stack-allocating the stream.
+   ;; It would be fine to stack-allocate it, because the handler-case does not
+   ;; use the stream outside of its extent, however, because ALLOCATE-CONDITION
+   ;; doesn't know when you will use the stream, it always replaces a DX stream
+   ;; with a dummy. The dummy stream would not have position information.
+   (declare (optimize debug))
+   (assert
+    (search
     "Line: 1, Column: 22, File-Position: 22"
     (with-input-from-string (stream "no-such-package::symbol")
       (handler-case
           (read stream)
-        (reader-error (condition) (princ-to-string condition)))))))
+        (reader-error (condition) (princ-to-string condition))))))))
 
 ;; Printing a READER-ERROR when the underlying stream has been closed
 ;; should still work, but the stream information will not be printed.
