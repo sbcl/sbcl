@@ -1690,9 +1690,7 @@
 (defun split-core
     (input-pathname asm-pathname
      &key enable-pie (verbose nil)
-     &aux (split-core-pathname
-           (merge-pathnames (make-pathname :type "core") asm-pathname))
-          (elf-core-pathname
+     &aux (elf-core-pathname
            (merge-pathnames
             (make-pathname :name (concatenate 'string (pathname-name asm-pathname) "-core")
                            :type "o")
@@ -1709,13 +1707,13 @@
 
   ;; Remove old files
   (ignore-errors (delete-file asm-pathname))
-  (ignore-errors (delete-file split-core-pathname))
   (ignore-errors (delete-file elf-core-pathname))
   ;; Ensure that all files can be opened
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (asm-file asm-pathname :direction :output :if-exists :supersede)
-      (with-open-file (split-core split-core-pathname :direction :output
-                                  :element-type '(unsigned-byte 8) :if-exists :supersede)
+      ;;(with-open-file (split-core split-core-pathname :direction :output
+      ;;                            :element-type '(unsigned-byte 8) :if-exists :supersede)
+      (let ((split-core nil))
         (setq core-offset (read-core-header input core-header verbose))
         (do-core-header-entry ((id len ptr) core-header)
           (case id
@@ -1766,7 +1764,8 @@
                                   :element-type '(unsigned-byte 8)))
               (filepos))
           ;; Write the new core file
-          (write-sequence core-header split-core)
+          (when split-core
+            (write-sequence core-header split-core))
           (dolist (action (reverse copy-actions)) ; nondestructive
             ;; page index convention assumes absence of core header.
             ;; i.e. data page 0 is the file page immediately following the core header
@@ -1776,7 +1775,8 @@
                 (format t "File offset ~10x: ~10x bytes~%" offset nbytes))
               (setq filepos (+ core-offset offset))
               (file-position input filepos)
-              (copy-bytes input split-core nbytes buffer)))
+              (when split-core
+                (copy-bytes input split-core nbytes buffer))))
           ;; Trailer (runtime options and magic number)
           (let ((nbytes (read-sequence buffer input)))
             ;; expect trailing magic number
@@ -1789,13 +1789,15 @@
               (format t "Trailer words:(~{~X~^ ~})~%"
                       (loop for i below (floor nbytes n-word-bytes)
                             collect (%vector-raw-bits buffer i))))
-            (write-sequence buffer split-core :end nbytes)
-            (finish-output split-core))
+            (when split-core
+              (write-sequence buffer split-core :end nbytes)
+              (finish-output split-core)))
           ;; Sanity test
-          (aver (= (+ core-offset
-                      (* page-adjust +backend-page-bytes+)
-                      (file-length split-core))
-                   (file-length input)))
+          (when split-core
+            (aver (= (+ core-offset
+                        (* page-adjust +backend-page-bytes+)
+                        (file-length split-core))
+                     (file-length input))))
           ;; Seek back to the PTE pages so they can be copied to the '.o' file
           (file-position input filepos)))
 
