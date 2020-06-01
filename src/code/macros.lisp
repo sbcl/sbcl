@@ -1774,3 +1774,38 @@ symbol-case giving up: case=((V U) (F))
                     ;; is cheaper than a branch around a write.
                     (rplacd (truly-the cons ,splice) ,orig)))
             ,copy))))))
+
+(defun expand-with-output-to-string (var element-type body wild-result-type)
+  ;; This is simpler than trying to arrange transforms that cause
+  ;; MAKE-STRING-OUTPUT-STREAM to be DXable. While that might be awesome,
+  ;; this macro exists for a reason.
+  (let ((initial-buffer '#:buf)
+        (dummy '#:stream)
+        (string-let (or #+c-stack-is-control-stack 'dx-let 'let))
+        (string-ctor
+          (if (and (sb-xc:constantp element-type)
+                   (let ((ctype (sb-c::careful-specifier-type
+                                 (constant-form-value element-type))))
+                     (and ctype
+                          (csubtypep ctype (specifier-type 'character)))))
+              ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
+              ;; "The default initial element #\Nul is not a STANDARD-CHAR."
+              'make-array ; hooray! it's known be a valid string type
+              ;; Force a runtime STRINGP check unless futher transforms
+              ;; deduce a known type. You'll get "could not stack allocate"
+              ;; perhaps, but that's acceptable.
+              'make-string)))
+    ;; A full call to MAKE-STRING-OUTPUT-STREAM uses a larger initial buffer
+    ;; if BASE-CHAR but I really don't care to think about that here.
+    `(,string-let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+       (dx-let ((,dummy (%allocate-string-ostream)))
+         (let ((,var (%init-string-output-stream ,dummy ,initial-buffer
+                                                 ,wild-result-type)))
+           (declare (ignorable ,var))
+           ,@body)
+         ;; On the architecture that does not support #+stack-allocatable-fixed-objects
+         ;; (Sparc) we could close the stream, but what's the point of doing that
+         ;; whem you're expressly prohibited by the standard from using the variable
+         ;; outside of its extent as specified? Just fix the backend if it bothers you.
+         ;; And I'm not even considering the obsolete backends.
+         (get-output-stream-string ,dummy)))))

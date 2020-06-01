@@ -264,10 +264,11 @@
 
 (defmacro %allocate-string-ostream ()
   `(%make-instance ,(dd-length (find-defstruct-description 'string-output-stream))))
+
 (defmacro with-output-to-string
     ((var &optional string &key (element-type ''character)) &body body)
-  (let ((initial-buffer '#:buf) (dummy '#:stream))
-    (if string
+  (if string
+      (let ((dummy '#:stream))
         ;; "If string is supplied, element-type is ignored".
         ;; Why do implementors take this to mean "evaluated and ignored?"
         ;; I would have figured it meant expansion-time ignored.
@@ -280,48 +281,11 @@
              ;; "The stream variables established by ... with-output-to-string
              ;; are, by definition, always used"
              (declare (ignorable ,var))
-             ,@body))
-        ;; Should we call CONSTANTP and CONSTANT-FORM-VALUE and TYPEXPAND first?
-        (let ((et (cond ((or (equal element-type ''base-char)
-                             (equal element-type ''standard-char))
-                         'base-char)
-                        ((equal element-type ''character)
-                         'character))))
-          ;; This is simpler than trying to arrange transforms that cause
-          ;; MAKE-STRING-OUTPUT-STREAM to be DXable. While that might be awesome,
-          ;; this macro exists for a reason.
-          (if et
-              `(dx-let ((,dummy (%allocate-string-ostream))
-                        (,initial-buffer (make-array 31 :element-type ',et)))
-                 (let ((,var (%init-string-output-stream ,dummy ',et ,initial-buffer)))
-                   (declare (ignorable ,var))
-                   ,@body)
-                 ;; On the architecture that does not support #+stack-allocatable-fixed-objects
-                 ;; (Sparc) we could close the stream, but what's the point of doing that
-                 ;; whem you're expressly prohibited by the standard from using the variable
-                 ;; outside of its extent as specified? Just fix the backend if it bothers you.
-                 ;; And I'm not even considering the obsolete backends.
-                 (get-output-stream-string ,dummy))
-              `(dx-let ((,dummy (%allocate-string-ostream)))
-                 (let ((,var (%init-string-output-stream
-                              ,dummy
-                              ;; Transforms on this which avoid type-parsing would not help-
-                              ;; the dxified buffer has to be of that type also.
-                              ;; And I'll bet that most people use a literal :ELEMENT-TYPE
-                              ;; which gets the better code above.
-                              (pick-string-ostream-type ,element-type)
-                              0)))
-                   (declare (ignorable ,var))
-                   ,@body)
-                 (get-output-stream-string ,dummy)))))))
+             ,@body)))
+      (expand-with-output-to-string var element-type body nil)))
 
 ;;; Similar to WITH-OUTPUT-TO-STRING, but produces the most compact result
 ;;; string possible (BASE or CHARACTER) depending on what was written.
 ;;; This is not something that the standard macro permits.
 (defmacro %with-output-to-string ((var) &body body)
-  (let ((initial-buffer '#:buf) (dummy '#:stream))
-    `(dx-let ((,dummy (%allocate-string-ostream))
-              (,initial-buffer (make-array 31 :element-type 'character)))
-       (let ((,var (%init-string-output-stream ,dummy :default ,initial-buffer)))
-         ,@body)
-       (get-output-stream-string ,dummy))))
+  (expand-with-output-to-string var ''character body t))

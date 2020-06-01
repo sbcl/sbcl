@@ -361,7 +361,6 @@
 ;;  - the initial cons cell in READ-LIST
 (with-test (:name :read-does-not-cons-per-se
             :skipped-on (:or (:not :stack-allocatable-fixed-objects)
-                         (not 64-bit) ;; single-floats
                          :interpreter))
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
@@ -391,7 +390,7 @@
     ;; impossible to cons 1 byte per run.
     ;; If this still fails, it might be due to somebody changing the
     ;; backend-page-bytes to exceed 32KB. Not sure what to do about that.
-    (test-reading "4.0s0")
+    #+64-bit (test-reading "4.0s0")
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
     (test-reading "()")
     (test-reading "#\\-") ; should not copy the token buffer

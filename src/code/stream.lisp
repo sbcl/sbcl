@@ -1369,11 +1369,11 @@
 ;;;; corrupt the heap here, it certainly is possible to end up with
 ;;;; a string-output-stream whose internal state is messed up.
 ;;;;
-(defun %init-string-output-stream (stream element-type initial-buffer)
+(defun %init-string-output-stream (stream buffer wild-result-type)
   (declare (optimize speed (sb-c::verify-arg-count 0)))
+  (declare (string buffer)
+           (ignorable wild-result-type)) ; if #-sb-unicode
   (setf (%instance-layout (truly-the instance stream)) #.(find-layout 'string-output-stream))
-  #-sb-unicode (when element-type
-                 (setq element-type 'base-char))
   (macrolet ((initforms ()
                `(setf ,@(mapcan (lambda (dsd)
                                   (list `(%instance-ref stream ,(dsd-index dsd))
@@ -1469,46 +1469,48 @@
                          ;; resume checking for Unicode characters
                          (ansi-stream-out stream) #'default-out)
                    (string-out-misc stream operation arg1 arg2))))
-      (binding* (((unicode-p out sout-aux)
-                  (case element-type
-                    (base-char (values :ignore #'base-char-out #'base-string-out))
-                    (character (values t       #'character-out #'char-string-out))
-                    ((nil)     (values :ignore #'reject #'reject))
-                    (t         (values nil     #'default-out   #'char-string-out))))
-                 (buffer
-                  (cond ((not (eql initial-buffer 0)) initial-buffer)
-                        ((eq element-type 'base-char)
-                         (make-array 63 :element-type 'base-char))    ; 2w + 64b
-                        (t ;; we should remove the trailing #\nul character
-                           ;; for UCS4 strings. There's no reason for it.
-                         (make-array 31 :element-type 'character))))) ; 2w + 128b
+      (multiple-value-bind (element-type unicode-p out sout-aux)
+          (case (%other-pointer-widetag buffer)
+            #+sb-unicode
+            (#.sb-vm:simple-character-string-widetag
+             (if wild-result-type
+                 (values :default   nil  #'default-out   #'char-string-out)
+                 (values 'character t    #'character-out #'char-string-out)))
+            (#.sb-vm:simple-base-string-widetag
+             (values 'base-char :ignore #'base-char-out #'base-string-out))
+            (t
+             (values nil :ignore #'reject #'reject)))
         (initforms)
         (truly-the string-output-stream stream)))))
 
 ;;; Constructors used by the transform of MAKE-STRING-OUTPUT-STREAM,
 ;;; avoiding parsing of the specified element-type at runtime.
 (defun %make-base-string-ostream ()
-  (%init-string-output-stream (%allocate-string-ostream) 'base-char 0))
+  (%init-string-output-stream (%allocate-string-ostream)
+                              (make-array 63 :element-type 'base-char) ; 2w + 64b
+                              nil))
 (defun %make-character-string-ostream ()
-  (%init-string-output-stream (%allocate-string-ostream) 'character 0))
+  (%init-string-output-stream (%allocate-string-ostream)
+                              (make-array 31 :element-type 'character) ; 2w + 128b
+                              nil))
 
-(defun pick-string-ostream-type (element-type)
-  (let ((ctype (specifier-type element-type)))
-    (cond ((eq ctype *empty-type*) nil)
-          ((csubtypep ctype (specifier-type 'base-char)) 'base-char)
-          ((csubtypep ctype (specifier-type 'character)) 'character)
-          (t (error "~S is not a subtype of CHARACTER" element-type)))))
-
-(defun make-string-output-stream (&key (element-type 'character et-suppliedp))
+(defun make-string-output-stream (&key (element-type 'character))
   "Return an output stream which will accumulate all output given it for the
 benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (explicit-check))
-  (%init-string-output-stream
-   (%allocate-string-ostream)
-   ;; To be super pedantic, call the PICK routine even if #-sb-unicode
-   ;; to verify that the specifier is a subtype of character.
-   (if et-suppliedp (pick-string-ostream-type element-type) 'character)
-   0))
+  ;; No point in optimizing for unsupplied ELEMENT-TYPE.
+  ;; Compiler transforms into %MAKE-CHARACTER-STRING-OSTREAM.
+  (let ((ctype (specifier-type element-type)))
+    (cond ((eq ctype *empty-type*)
+           (%init-string-output-stream (%allocate-string-ostream)
+                                       (make-array 0 :element-type nil)
+                                       nil))
+          ((csubtypep ctype (specifier-type 'base-char))
+           (%make-base-string-ostream))
+          ((csubtypep ctype (specifier-type 'character))
+           (%make-character-string-ostream))
+          (t
+           (error "~S is not a subtype of CHARACTER" element-type)))))
 
 ;;; Now that we support base-char string-output streams, it may be possible to eliminate
 ;;; this, though the other benefit it confers is that the buffer never needs to extend,
