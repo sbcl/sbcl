@@ -33,8 +33,10 @@
   ;; whatever it is that show would have shown. Comment this out if you need.
     (when s (set s nil))))
 
-(assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
-                      (ash sb-vm:character-widetag -2))))
+(let ((byte (deref (extern-alien "widetag_lowtag" (array char 256))
+                   sb-vm:character-widetag)))
+  (assert (not (logbitp 7 byte))) ; not a headered object
+  (assert (= (logand byte sb-vm:lowtag-mask) sb-vm:list-pointer-lowtag)))
 (gc :full t)
 
 ;;; Verify that all defstructs except for one were compiled in a null lexical

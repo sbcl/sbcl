@@ -1706,18 +1706,16 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
     // Given the precondition that the heap is in a valid state,
     // it may be assumed that one check of is_cons_half() suffices;
     // we don't need to check the other half.
-    lispobj header = *start_addr;
-    if (is_cons_half(header))
+    lispobj word = *start_addr;
+    if (!is_header(word))
         return make_lispobj(start_addr, LIST_POINTER_LOWTAG) == pointer;
 
     // Because this heap object was not deemed to be a cons,
     // it must be an object header. Don't need a check except when paranoid.
     gc_dcheck(other_immediate_lowtag_p(header));
 
-    // The space of potential widetags has 64 elements, not 256,
-    // because of the constant low 2 bits.
-    int widetag = header_widetag(header);
-    int lowtag = lowtag_for_widetag[widetag>>2];
+    int widetag = header_widetag(word);
+    int lowtag = LOWTAG_FOR_WIDETAG(widetag);
     if (lowtag && make_lispobj(start_addr, lowtag) == pointer)
         return 1; // instant win
 

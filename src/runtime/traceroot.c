@@ -151,9 +151,9 @@ static int find_ref(lispobj* source, lispobj target)
     lispobj layout, bitmap;
     int scan_limit, i;
 
-    lispobj header = *source;
-    if (is_cons_half(header)) {
-        check_ptr(0, header);
+    lispobj word = *source;
+    if (!is_header(word)) {
+        check_ptr(0, source[0]);
         check_ptr(1, source[1]);
         return -1;
     }
@@ -709,14 +709,14 @@ static uword_t build_refs(lispobj* where, lispobj* end,
     boolean count_only = !ss->record_ptrs;
     for ( ; where < end ; where += nwords ) {
         ++n_objects;
-        lispobj header = *where;
-        if (is_cons_half(header)) {
+        lispobj word = *where;
+        if (!is_header(word)) {
             nwords = 2;
-            check_ptr(header);
+            check_ptr(where[0]);
             check_ptr(where[1]);
             continue;
         }
-        int widetag = widetag_of(where);
+        int widetag = header_widetag(word);
         nwords = scan_limit = sizetab[widetag](where);
         switch (widetag) {
         case INSTANCE_WIDETAG:
@@ -776,7 +776,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 continue;
             break;
         default:
-            if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))
+            if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag)))
               lose("Unknown widetag %x", widetag);
             // Skip irrelevant objects.
             if (leaf_obj_widetag_p(widetag) ||

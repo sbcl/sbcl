@@ -1673,7 +1673,7 @@ static inline boolean plausible_tag_p(lispobj addr)
             && is_cons_half(CONS(addr)->cdr);
     unsigned char widetag = widetag_of(native_pointer(addr));
     return other_immediate_lowtag_p(widetag)
-        && lowtag_of(addr) == lowtag_for_widetag[widetag>>2];
+        && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
 }
 
 #if !GENCGC_IS_PRECISE
@@ -1824,13 +1824,16 @@ scavenge_pinned_ranges()
     int i;
     lispobj key;
     for_each_hopscotch_key(i, key, pinned_objects) {
-        lispobj* obj = native_pointer(key);
-        lispobj header = *obj;
-        // Never invoke scavenger on a simple-fun, just code components.
-        if (is_cons_half(header))
-            scavenge(obj, 2);
-        else if (header_widetag(header) != SIMPLE_FUN_WIDETAG)
-            scavtab[header_widetag(header)](obj, header);
+        gc_assert(is_lisp_pointer(key));
+        if (listp(key)) // don't need is_header() since we know the lowtag
+            scavenge((lispobj*)CONS(key), 2);
+        else {
+            lispobj* obj = native_pointer(key);
+            lispobj header = *obj;
+            int widetag = header_widetag(header);
+            // Never invoke scavenger on a simple-fun, just code components.
+            if (widetag != SIMPLE_FUN_WIDETAG) scavtab[widetag](obj, header);
+        }
     }
 }
 
@@ -1897,16 +1900,17 @@ void visit_freed_objects(char __attribute__((unused)) *start,
             where += OBJECT_SIZE(*fwd_where, fwd_where);
         } else { // dead object
             fprintf(stderr, "%p: %"OBJ_FMTX" %"OBJ_FMTX"\n", where, where[0], where[1]);
-            if (is_cons_half(word)) {
+            if (is_header(word)) {
+                // Do something interesting
+                where += sizetab[header_widetag(word)](where);
+            } else {
                 /* Can't do much useful with conses because often we can't distinguish
                  * filler from data. visit_freed_objects is called on ranges of pages
                  * without regard to whether each intervening page was completely full.
                  * (This is not usually the way, but freeing of pages is slightly
-                 * imprecise in that regard) */
+                 * imprecise in that regard).
+                 * And it's probably broken, since we leave detritus on code pages */
                 where += 2;
-            } else {
-                // Do something interesting
-                where += sizetab[header_widetag(word)](where);
             }
         }
     }
@@ -1961,11 +1965,11 @@ wipe_nonpinned_words()
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
       int widetag = header_widetag(word);
-      if (is_cons_half(word))
-          fprintf(stderr, "%p: (cons)\n", obj);
-      else
+      if (is_header(word))
           fprintf(stderr, "%p: %d words (%s)\n", obj,
                   (int)sizetab[widetag](obj), widetag_names[widetag>>2]);
+      else
+          fprintf(stderr, "%p: (cons)\n", obj);
     }
 #endif
 
@@ -2836,8 +2840,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         if (!state->vaddr && where > state->object_end &&
             (state->flags & VERIFYING_HEAP_OBJECTS)) {
             state->object_start = where;
-            state->widetag =
-                is_cons_half(*where) ? LIST_POINTER_LOWTAG : widetag_of(where);
+            state->widetag = is_header(*where) ? widetag_of(where) : LIST_POINTER_LOWTAG;
             state->tagged_object_start = compute_lispobj(where);
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
             state->object_gen = gen_of((lispobj)where);
@@ -2936,8 +2939,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         int widetag = header_widetag(thing);
         if (is_lisp_immediate(thing) || widetag == NO_TLS_VALUE_MARKER_WIDETAG) {
             /* skip immediates */
-        } else if (!(other_immediate_lowtag_p(widetag)
-                     && lowtag_for_widetag[widetag>>2])) {
+        } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
             lose("Unhandled widetag %d at %p", widetag, where);
         } else if (leaf_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);

@@ -1621,7 +1621,6 @@ static void apply_absolute_fixups(lispobj, struct code*);
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
-    lispobj header_word;
     int widetag;
     long size;
     int __attribute__((unused)) static_space_p = ((lispobj)where == STATIC_SPACE_START);
@@ -1629,9 +1628,9 @@ static void fixup_space(lispobj* where, size_t n_words)
 
     while (where < end) {
         gc_assert(!forwarding_pointer_p(where));
-        header_word = *where;
-        if (is_cons_half(header_word)) {
-            adjust_words(where, 2, 0); // A cons.
+        lispobj header_word = *where;
+        if (!is_header(header_word)) {
+            adjust_words(where, 2, 0); // A cons. (It can only be filler?)
             where += 2;
             continue;
         }
@@ -1846,7 +1845,7 @@ static void place_fixedobj(lispobj* obj, int size_in_bytes,
 #endif
       gc_assert(!*tempspace_addr(new)); // better not clobber some other object
       memcpy(tempspace_addr(new), obj, size_in_bytes);
-      set_forwarding_pointer(obj, make_lispobj(new, lowtag_for_widetag[widetag>>2]));
+      set_forwarding_pointer(obj, make_lispobj(new, LOWTAG_FOR_WIDETAG(widetag)));
       if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) // fix the self-pointer
           tempspace_addr(new)[1] = (lispobj)(new + 4*N_WORD_BYTES);
       *alloc_ptr = new + size_in_bytes;

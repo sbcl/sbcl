@@ -157,13 +157,9 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
     sword_t nwords, i;
 
     for ( ; where < limit ; where = next ) {
-        lispobj header = *where;
-        if (is_cons_half(header)) {
-            coalesce_obj(where+0, ht);
-            coalesce_obj(where+1, ht);
-            next = where + 2;
-        } else {
-            int widetag = header_widetag(header);
+        lispobj word = *where;
+        if (is_header(word)) {
+            int widetag = header_widetag(word);
             nwords = sizetab[widetag](where);
             next = where + nwords;
             switch (widetag) {
@@ -186,6 +182,10 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             }
             for(i=1; i<nwords; ++i)
                 coalesce_obj(where+i, ht);
+        } else {
+            coalesce_obj(where+0, ht);
+            coalesce_obj(where+1, ht);
+            next = where + 2;
         }
     }
     return 0;

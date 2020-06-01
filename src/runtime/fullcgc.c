@@ -509,27 +509,16 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
 
     // TODO: consecutive dead objects on same page should be merged.
     for ( ; where < end ; where += nwords ) {
-        lispobj header = *where;
-        if (is_cons_half(header)) {
-            nwords = 2;
-            if (!cons_markedp((lispobj)where)) {
-                if (where[0] | where[1]) {
-               cons:
-                    gc_dcheck(!immobile_space_p((lispobj)where));
-                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
-                                 where, 2, zeroed,
-                                 where[0] = where[1] = 0);
-                }
-            }
-        } else {
-            nwords = sizetab[header_widetag(header)](where);
+        lispobj word = *where;
+        if (is_header(word)) {
+            nwords = sizetab[header_widetag(word)](where);
             lispobj markbit = MARK_BIT;
-            switch (header_widetag(header)) {
+            switch (header_widetag(word)) {
             case BIGNUM_WIDETAG: markbit = BIGNUM_MARK_BIT; break;
             case FDEFN_WIDETAG : markbit = FDEFN_MARK_BIT; break;
             }
-            if (header & markbit)
-                *where = header ^ markbit;
+            if (word & markbit)
+                *where = word ^ markbit;
             else {
                 // Turn the object into either a (0 . 0) cons
                 // or an unboxed filler depending on size.
@@ -547,6 +536,17 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                                      | CODE_HEADER_WIDETAG;
                         memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                     })
+                }
+            }
+        } else {
+            nwords = 2;
+            if (!cons_markedp((lispobj)where)) {
+                if (where[0] | where[1]) {
+               cons:
+                    gc_dcheck(!immobile_space_p((lispobj)where));
+                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
+                                 where, 2, zeroed,
+                                 where[0] = where[1] = 0);
                 }
             }
         }

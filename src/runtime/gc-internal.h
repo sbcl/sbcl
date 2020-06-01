@@ -99,7 +99,7 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
-  (is_cons_half(header)?2:sizetab[header_widetag(header)](where))
+  (is_header(header)?sizetab[header_widetag(header)](where):CONS_SIZE)
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {

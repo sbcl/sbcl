@@ -199,8 +199,8 @@ dump_cmd(char **ptr)
                     && valid_widetag_p(header_widetag(word))) {
                     printf(" %s", widetag_names[header_widetag(word)>>2]);
                     next_object += sizetab[header_widetag(word)](next_object);
-                } else if (is_cons_half(word)) {
-                    next_object += 2;
+                } else if (!is_header(word)) {
+                    next_object += CONS_SIZE;
                 } else { // disable decoder if weirdness observed
                     decode = 0;
                 }

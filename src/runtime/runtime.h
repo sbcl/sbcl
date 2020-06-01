@@ -420,21 +420,32 @@ other_immediate_lowtag_p(lispobj header)
     return (lowtag_of(header) & 3) == OTHER_IMMEDIATE_0_LOWTAG;
 }
 
+// widetag_lowtag encodes in the sign bit whether the byte corresponds
+// to a headered object, and in the low bits the lowtag of a tagged pointer
+// pointing to this object, be it headered or a cons.
+extern unsigned char widetag_lowtag[256];
+#define LOWTAG_FOR_WIDETAG(x) (widetag_lowtag[x] & LOWTAG_MASK)
+
+// is_header() and is_cons_half() are logical complements when invoked
+// on the first word of any lisp object. However, given a word which is
+// only *potentially* the first word of a lisp object, they can both be false.
+// In ambiguous root detection, is_cons_half() is to be used, as it is the more
+// stringent check. The set of valid bit patterns in the low byte of the car
+// of a cons is smaller than the set of patterns accepted by !is_header().
+static inline int is_header(lispobj potential_header_word) {
+    return widetag_lowtag[potential_header_word & WIDETAG_MASK] & 0x80;
+}
+
 static inline int
 is_cons_half(lispobj obj)
 {
-    /* A word that satisfies other_immediate_lowtag_p is a headered object
-     * and can not be half of a cons, except that widetags which satisfy
-     * other_immediate and are Lisp immediates can be half of a cons */
-    return !other_immediate_lowtag_p(obj)
+    if (fixnump(obj) || is_lisp_pointer(obj)) return 1;
+    int widetag = header_widetag(obj);
+    return widetag == CHARACTER_WIDETAG ||
 #if N_WORD_BITS == 64
-        || ((uword_t)IMMEDIATE_WIDETAGS_MASK >> (header_widetag(obj) >> 2)) & 1;
-#else
-      /* The above bit-shifting approach is not applicable
-       * since we can't employ a 64-bit unsigned integer constant. */
-      || header_widetag(obj) == CHARACTER_WIDETAG
-      || header_widetag(obj) == UNBOUND_MARKER_WIDETAG;
+           widetag == SINGLE_FLOAT_WIDETAG ||
 #endif
+           widetag == UNBOUND_MARKER_WIDETAG;
 }
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying

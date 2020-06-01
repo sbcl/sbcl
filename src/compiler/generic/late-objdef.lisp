@@ -149,31 +149,43 @@
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
     (format stream "~%}~%"))
 
-  (format stream "extern unsigned char lowtag_for_widetag[64];
+  (format stream "extern unsigned char widetag_lowtag[256];
 static inline lispobj compute_lispobj(lispobj* base_addr) {
-  lispobj header = *base_addr;
-  return make_lispobj(base_addr,
-                      is_cons_half(header) ? LIST_POINTER_LOWTAG :
-                        lowtag_for_widetag[header_widetag(header)>>2]);~%}~%")
+  return make_lispobj(base_addr, LOWTAG_FOR_WIDETAG(*base_addr & WIDETAG_MASK));~%}~%")
 
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
-  (let ((a (make-array 64 :initial-element 0)))
+  (let ((lowtag-tbl (make-array 256 :initial-element 0)))
+    ;; Build a table translating from the from low byte of first word of any
+    ;; heap object to that object's lowtag when pointed to by a tagged pointer.
+    ;; If the first word is {immediate | pointer} then the object is a cons,
+    ;; otherwise the object is a headered object.
+    (dotimes (byte 256)
+      (when (or (eql 0 (logand byte fixnum-tag-mask))
+                (member (logand byte lowtag-mask)
+                        `(,instance-pointer-lowtag
+                          ,list-pointer-lowtag
+                          ,fun-pointer-lowtag
+                          ,other-pointer-lowtag))
+                (member byte `(#+64-bit ,single-float-widetag
+                               ,character-widetag
+                               ,unbound-marker-widetag)))
+        ;; gotta be a CONS
+        (setf (svref lowtag-tbl byte) list-pointer-lowtag)))
     (dolist (entry *scav/trans/size*)
       (destructuring-bind (widetag scav &rest ignore) entry
         (declare (ignore ignore))
         (unless (string= scav "immediate")
-          (setf (aref a (ash widetag -2))
-                (case widetag
-                  (#.instance-widetag instance-pointer-lowtag)
-                  (#.+function-widetags+ fun-pointer-lowtag)
-                  (t other-pointer-lowtag))))))
-    (let ((contents (format nil "~{0x~x,~} " (coerce a 'list))))
-      (format stream
-              "unsigned char lowtag_for_widetag[64] = {~{~%  ~A~}~%};~%"
-              ;; write 4 characters per widetag ("0xN,"), 16 per line
-              (loop for i from 0 by 64 repeat 4
-                    ;; trailing comma on the last item is OK in C
-                    collect (subseq contents i (+ i 64))))))
+          (setf (svref lowtag-tbl widetag)
+                (+ #x80 (case widetag
+                          (#.instance-widetag instance-pointer-lowtag)
+                          (#.+function-widetags+ fun-pointer-lowtag)
+                          (t other-pointer-lowtag)))))))
+    (format stream "unsigned char widetag_lowtag[256] = {")
+    (dotimes (line 16)
+      (format stream "~%~:{ ~:[0x~2,'0x~;~4d~],~}"
+              (mapcar (lambda (x) (list (member x `(0 ,sb-vm:list-pointer-lowtag)) x))
+                      (coerce (subseq lowtag-tbl (* line 16) (* (1+ line) 16)) 'list))))
+    (format stream "~%};~%"))
   (let ((scavtab  (make-array 256 :initial-element nil))
         (ptrtab   (make-list #+ppc64 16 #-ppc64 4))
         (transtab (make-array 64  :initial-element nil))

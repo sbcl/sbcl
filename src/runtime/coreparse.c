@@ -393,7 +393,6 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
 static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
     lispobj *where = (lispobj*)start;
-    lispobj header_word;
     int widetag;
     long nwords;
     lispobj layout, adjusted_layout, bitmap;
@@ -402,13 +401,13 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 
     adj->n_relocs_abs = adj->n_relocs_rel = 0;
     for ( ; where < end ; where += nwords ) {
-        header_word = *where;
-        if (is_cons_half(header_word)) {
+        lispobj word = *where;
+        if (!is_header(word)) {
             adjust_pointers(where, 2, adj);
             nwords = 2;
             continue;
         }
-        widetag = header_widetag(header_word);
+        widetag = header_widetag(word);
         nwords = sizetab[widetag](where);
         switch (widetag) {
         case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -575,7 +574,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
               && specialized_vector_widetag_p(widetag))
               continue;
           else
-              lose("Unrecognized heap object: @%p: %"OBJ_FMTX, where, header_word);
+              lose("Unrecognized heap object: @%p: %"OBJ_FMTX, where, *where);
         }
         adjust_pointers(where+1, nwords-1, adj);
     }
