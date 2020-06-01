@@ -71,3 +71,9 @@
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
 (declaim (always-bound *evaluator-mode*))
+
+(declaim (inline sb-vm:is-lisp-pointer))
+(defun sb-vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
+  #-64-bit (oddp addr)
+  #+ppc64 (= (logand addr #b101) #b100)
+  #+(and 64-bit (not ppc64)) (not (logtest (logxor addr 3) 3)))

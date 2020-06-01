@@ -178,16 +178,22 @@
 
 ;;;; MAKE-CONDITION
 
+;;; Pre-scan INITARGS to see whether any are stack-allocated.
+;;; If not, then life is easy. If any are, then depending on whether the
+;;; condition is a TYPE-ERROR, call TYPE-OF on the bad datum, so that
+;;; if the condition outlives the extent of the object, and someone tries
+;;; to print the condition, we don't crash.
+;;; Putting a placeholder in for the datum would work, but seems a bit evil,
+;;; since the user might actually want to know what it was. And we shouldn't
+;;; assume that the object would definitely escape its dynamic-extent.
+
 (defun allocate-condition (designator &rest initargs)
   (when (oddp (length initargs))
     (error 'simple-error
            :format-control "odd-length initializer list: ~S."
-           :format-arguments
-           (let (list)
-             ;; avoid direct reference to INITARGS as a list
-             ;; so that it is not reified unless we reach here.
-             (do-rest-arg ((arg) initargs) (push arg list))
-             (list (nreverse list)))))
+           ;; Passing the initargs to LIST avoids consing them into
+           ;; a list except when this error is signaled.
+           :format-arguments (list (apply #'list initargs))))
   ;; I am going to assume that people are not somehow getting to here
   ;; with a CLASSOID, which is not strictly legal as a designator,
   ;; but which is accepted because it is actually the desired thing.
@@ -198,45 +204,84 @@
                      (symbol (find-classoid designator nil))
                      (class (lookup (class-name designator)))
                      (t designator)))))
-    (if (condition-classoid-p classoid)
-        ;; Interestingly we fail to validate the actual-initargs,
-        ;; allowing any random initarg names.  Is this permissible?
-        ;; And why is lazily filling in ASSIGNED-SLOTS beneficial anyway?
-        (let* ((layout (classoid-layout classoid))
-               (stream-err-p
-                (let ((stream-err-layout (load-time-value (find-layout 'stream-error))))
-                  (or (eq layout stream-err-layout)
-                      (find stream-err-layout (layout-inherits layout)))))
-               (instance (%make-instance (+ sb-vm:instance-data-start
-                                            1 ; ASSIGNED-SLOTS
-                                            (length initargs)))) ; rest
-               (data-index (1+ sb-vm:instance-data-start))
-               (arg-index 0))
-          (setf (%instance-layout instance) layout
-                (condition-assigned-slots instance) nil)
-          ;; Replace a dynamic-extent stream with a stub. Doing it in this low-level
-          ;; allocator is more robust than trying to intercept all conceivable ways
-          ;; in which to construct an instance of a subtype of STREAM-ERROR
-          ;; (e.g. through the function READER-EOF-ERROR, SIMPLE-READER-ERROR, etc)
-          ;; DO-REST-ARG doesn't quite fit the bill for this.
-          ;; And it's what you might call really poor separation of concerns.
-          (loop (when (>= arg-index (length initargs)) (return))
-                (let ((key (fast-&rest-nth arg-index initargs))
-                      (val (fast-&rest-nth (1+ arg-index) initargs)))
-                  (setf (%instance-ref instance data-index) key
-                        (%instance-ref instance (1+ data-index))
-                        (if (and stream-err-p (eq key :stream) (stack-allocated-p val))
-                            (sb-impl::make-stub-stream val)
-                            val))
-                  (incf arg-index 2)
-                  (incf data-index 2)))
-          (values instance classoid))
-        (error 'simple-type-error
-               :datum designator
-               ;; CONDITION-CLASS isn't a type-specifier. Is this legal?
-               :expected-type 'condition-class
-               :format-control "~S does not designate a condition class."
-               :format-arguments (list designator)))))
+    (unless (condition-classoid-p classoid)
+      (error 'simple-type-error
+             :datum designator
+             :expected-type 'sb-pcl::condition-class
+             :format-control "~S does not designate a condition class."
+             :format-arguments (list designator)))
+    (flet ((stream-err-p (layout)
+             (let ((stream-err-layout (load-time-value (find-layout 'stream-error))))
+               (or (eq layout stream-err-layout)
+                   (find stream-err-layout (layout-inherits layout)))))
+           (type-err-p (layout)
+             (let ((type-err-layout (load-time-value (find-layout 'type-error))))
+               (or (eq layout type-err-layout)
+                   (find type-err-layout (layout-inherits layout)))))
+           ;; avoid full calls to STACK-ALLOCATED-P here
+           (stackp (x)
+             (let ((addr (get-lisp-obj-address x)))
+               (and (sb-vm:is-lisp-pointer addr)
+                    (<= (get-lisp-obj-address sb-vm:*control-stack-start*) addr)
+                    (< addr (get-lisp-obj-address sb-vm:*control-stack-end*))))))
+      (let* ((any-dx
+              (loop for arg-index from 1 below (length initargs) by 2
+                    thereis (stackp (fast-&rest-nth arg-index initargs))))
+             (layout (classoid-layout classoid))
+             (extra (if (and any-dx (type-err-p layout)) 2 0)) ; space for secret initarg
+             (instance (%make-instance (+ sb-vm:instance-data-start
+                                          1 ; ASSIGNED-SLOTS
+                                          (length initargs)
+                                          extra)))
+             (data-index (1+ sb-vm:instance-data-start))
+             (arg-index 0)
+             (have-type-error-datum)
+             (type-error-datum))
+        (setf (%instance-layout instance) layout
+              (condition-assigned-slots instance) nil)
+        (macrolet ((store-pair (key val)
+                     `(setf (%instance-ref instance data-index) ,key
+                            (%instance-ref instance (1+ data-index)) ,val)))
+          (cond ((not any-dx)
+                 ;; uncomplicated way
+                 (loop (when (>= arg-index (length initargs)) (return))
+                       (store-pair (fast-&rest-nth arg-index initargs)
+                                   (fast-&rest-nth (1+ arg-index) initargs))
+                       (incf data-index 2)
+                       (incf arg-index 2)))
+                (t
+                 (loop (when (>= arg-index (length initargs)) (return))
+                       (let ((key (fast-&rest-nth arg-index initargs))
+                             (val (fast-&rest-nth (1+ arg-index) initargs)))
+                         (when (and (eq key :datum)
+                                    (not have-type-error-datum)
+                                    (type-err-p layout))
+                           (setq type-error-datum val
+                                 have-type-error-datum t))
+                         (if (and (eq key :stream) (stream-err-p layout) (stackp val))
+                             (store-pair key (sb-impl::make-stub-stream val))
+                             (store-pair key val)))
+                       (incf data-index 2)
+                       (incf arg-index 2))
+                 (when (and have-type-error-datum (/= extra 0))
+                   ;; We can get into serious trouble here if the
+                   ;; datum is already stack garbage!
+                   (let ((actual-type (type-of type-error-datum)))
+                     (store-pair 'dx-object-type actual-type))))))
+        (values instance classoid)))))
+
+;;; Access the type of type-error-datum if the datum can't be accessed.
+;;; Testing the stack pointer when rendering the condition is a heuristic
+;;; that might work, but more likely, the erring frame has been exited
+;;; and then the stack pointer changed again to make it seems like the
+;;; object pointer is valid. I'm not sure what to do, but we can leave
+;;; that decision for later.
+(defun type-error-datum-stored-type (condition)
+  (do ((i (- (%instance-length condition) 2) (- i 2)))
+      ((<= i (1+ sb-vm:instance-data-start))
+       (make-unbound-marker))
+    (when (eq (%instance-ref condition i) 'dx-object-type)
+      (return (%instance-ref condition (1+ i))))))
 
 (defun make-condition (type &rest initargs)
   "Make an instance of a condition object using the specified initargs."

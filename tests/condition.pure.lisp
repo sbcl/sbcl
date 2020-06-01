@@ -437,3 +437,12 @@ is not of type
     (declare (ignore newcond))
     (assert (string= (write-to-string error :escape nil)
                      "odd-length initializer list: (:A 1 :B)."))))
+
+(with-test (:name :type-error-on-dx-object)
+  (handler-case
+    (sb-int:dx-let ((a (make-array 3)))
+      (setf (aref a 0) a)
+      (print (1+ (aref a 0))))
+    (error (e)
+      (assert (equal (sb-kernel:type-error-datum-stored-type e)
+                     '(simple-vector 3))))))
