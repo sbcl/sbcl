@@ -1601,3 +1601,9 @@
                    0))
               :allow-notes nil)))
     (assert-no-consing (funcall fun))))
+
+(with-test (:name :with-output-to-string)
+  (let ((s (make-array 20000 :fill-pointer 0 :element-type 'character)))
+    (assert-no-consing
+     (with-output-to-string (*standard-output* s)
+       (write-char #\x)))))

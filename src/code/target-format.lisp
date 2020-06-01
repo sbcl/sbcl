@@ -50,7 +50,7 @@
     f))
 
 (defun unparse-fmt-control (fmt)
-  (with-simple-output-to-string (s)
+  (%with-output-to-string (s)
     (write-char #\" s)
     (let ((symbols (fmt-control-symbols fmt)))
       (dolist (piece (tokenize-control-string (fmt-control-string fmt)))
@@ -98,10 +98,10 @@
            (dynamic-extent format-arguments))
   (etypecase destination
     (null
-     (with-simple-output-to-string (stream)
+     (%with-output-to-string (stream)
        (%format stream control-string format-arguments)))
     (string
-     (with-simple-output-to-string (stream destination)
+     (with-output-to-string (stream destination)
        (%format stream control-string format-arguments)))
     ((member t)
      (%format *standard-output* control-string format-arguments)
@@ -1142,7 +1142,7 @@
                      (len (or (sb-impl::line-length stream) 72)))
                     (directive-params first-semi)
                   (setf newline-string
-                        (with-simple-output-to-string (stream)
+                        (%with-output-to-string (stream)
                           (setf args
                                 (interpret-directive-list stream
                                                           (pop segments)
@@ -1151,7 +1151,7 @@
                   (setf extra-space extra)
                   (setf line-len len)))
               (dolist (segment segments)
-                (push (with-simple-output-to-string (stream)
+                (push (%with-output-to-string (stream)
                         (setf args
                               (interpret-directive-list stream segment
                                                         orig-args args)))

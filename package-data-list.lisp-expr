@@ -2414,7 +2414,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
                "%SET-FDEFINITION" "%SCHARSET"
                "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
-               "WITH-SIMPLE-OUTPUT-TO-STRING"))
+               "%WITH-OUTPUT-TO-STRING"))
 
    #s(sb-cold:package-data
       :name "SB-THREAD"

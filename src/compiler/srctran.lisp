@@ -4531,7 +4531,7 @@
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (stream control ,@arg-names)
        (declare (ignore stream))
-       (with-simple-output-to-string (stream)
+       (%with-output-to-string (stream)
          (funcall control stream ,@arg-names)))))
 
 (defun concatenate-format-p (control args)

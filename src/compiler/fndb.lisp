@@ -1250,12 +1250,14 @@
 (defknown sb-impl::%init-string-input-stream (instance string &optional index sequence-end)
   (values sb-impl::string-input-stream index &optional)
   (flushable))
+(defknown sb-impl::%init-string-output-stream (instance t t) sb-impl::string-output-stream
+  ;; Not flushable, for two reasons:
+  ;; - possibly need to verify that the second arg is a type specifier
+  ;; - if you don't initialize the stream, then GET-OUTPUT-STRING-STREAM will crash
+  ())
 (defknown make-string-output-stream (&key (:element-type type-specifier))
   sb-impl::string-output-stream
   (flushable))
-;; FIXME: sb-impl::string-output-stream as the result type causes a few
-;; "CROSS-TYPEP uncertain: CTYPEP T #<UNKNOWN-TYPE STRING-OUTPUT-STREAM>"
-;; warnings which need to be resolved.
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
 (defknown stream-element-type (stream) type-specifier ; can it return a CLASS?
@@ -2045,7 +2047,7 @@
 ;;; by wiring in the needed functions instead of dereferencing their fdefns.
 (defknown (ill-in ill-bin ill-out ill-bout
            sb-impl::string-inch sb-impl::string-in-misc
-           sb-impl::string-ouch sb-impl::string-sout sb-impl::string-out-misc
+           sb-impl::string-sout
            sb-impl::finite-base-string-ouch sb-impl::finite-base-string-out-misc
            sb-impl::fill-pointer-ouch sb-impl::fill-pointer-sout
            sb-impl::fill-pointer-misc

@@ -168,7 +168,7 @@
   (binding* (((state since replacements)
               (deprecated-thing-p namespace name))
              (note (when state
-                     (with-simple-output-to-string (stream)
+                     (%with-output-to-string (stream)
                        (sb-impl::print-deprecation-message
                         namespace name (first since) (second since)
                         replacements stream)))))

@@ -1369,151 +1369,146 @@
 ;;;; corrupt the heap here, it certainly is possible to end up with
 ;;;; a string-output-stream whose internal state is messed up.
 ;;;;
-(defconstant +string-output-stream-buffer-initial-size+ 64)
+(defun %init-string-output-stream (stream element-type initial-buffer)
+  (declare (optimize speed (sb-c::verify-arg-count 0)))
+  (setf (%instance-layout (truly-the instance stream)) #.(find-layout 'string-output-stream))
+  #-sb-unicode (when element-type
+                 (setq element-type 'base-char))
+  (macrolet ((initforms ()
+               `(setf ,@(mapcan (lambda (dsd)
+                                  (list `(%instance-ref stream ,(dsd-index dsd))
+                                        (case (dsd-name dsd)
+                                          (sout '#'string-sout) ; global fun
+                                          (misc '#'misc) ; local fun
+                                          ((element-type unicode-p out sout-aux buffer)
+                                           (dsd-name dsd))
+                                          (t (dsd-default dsd)))))
+                                (dd-slots
+                                 (find-defstruct-description 'string-output-stream)))))
+             (cout (elt-type)
+               `(let ((pointer (string-output-stream-pointer
+                                (truly-the string-output-stream stream)))
+                      (buffer (truly-the (simple-array ,elt-type (*))
+                                         (string-output-stream-buffer stream)))
+                      (index (string-output-stream-index stream)))
+                  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (when (= pointer (length buffer))
+                    ;; The usual doubling technique: the new buffer shall hold as many
+                    ;; characters as were already emplaced.
+                    (setf buffer (string-output-stream-new-buffer stream index)
+                          pointer 0))
+                  (setf (aref (truly-the (simple-array ,elt-type (*)) buffer) pointer)
+                        char
+                        (string-output-stream-pointer stream) (1+ pointer))
+                  (setf (string-output-stream-index stream) (1+ index))))
+             (sout (elt-type)
+               ;; Only one case cares whether the string contains non-base chars.
+               ;;  base-string source and buffer : OK
+               ;;  base-string source, character-string buffer : OK
+               ;;  character-string source, base-string buf verifies base-char on copy
+               ;;  character-string source + buf needs a pre-scan for Unicode.
+               `(etypecase src
+                  #+sb-unicode
+                  (simple-character-string
+                   ,@(when (eq elt-type 'character)
+                       ;; When UNICODE-P is NIL, meaning no non-base chars were seen yet
+                       ;; in the input, pre-scan to see whether that still holds.
+                       '((when (and (not (string-output-stream-unicode-p
+                                          (truly-the string-output-stream stream)))
+                                    (input-contains-unicode))
+                           (setf (string-output-stream-unicode-p stream) t
+                                 ;; no need to keep checking each character
+                                 (ansi-stream-out stream) #'character-out))))
+                   ;; There are transforms for all the necessary REPLACE variations.
+                   (replace (truly-the (simple-array ,elt-type (*)) dst)
+                            (truly-the simple-character-string src)
+                            :start1 start1 :start2 start2 :end2 end2))
+                  (simple-base-string
+                   (replace (truly-the (simple-array ,elt-type (*)) dst)
+                            (truly-the simple-base-string src)
+                            :start1 start1 :start2 start2 :end2 end2))))
+             (input-contains-unicode ()
+               ;; For streams with :DEFAULT element-type (producing the most space-efficient
+               ;; string that can hold the output), checking whether Unicode characters appear
+               ;; in the source material is potentially advantageous versus checking the
+               ;; buffer in GET-OUTPUT-STREAM-STRING, because if all source strings are
+               ;; BASE-STRING, we needn't check anything.
+               ;; Bounds check was already performed by ANSI-STREAM-WRITE-STRING
+               `(let ((s (truly-the simple-character-string src)))
+                  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (loop for i from start2 below end2
+                        thereis (>= (char-code (aref s i)) base-char-code-limit)))))
+    ;; The "wonderful" thing is you never know where type checks have already been done.
+    ;; Is CHAR a character for sure? I have no idea. And how about the indices in SOUT?
+    (labels ((base-char-out (stream char)
+               (cout base-char))
+             (character-out (stream char)
+               (cout character))
+             (default-out (stream char)
+               (when (>= (char-code char) base-char-code-limit)
+                 (setf (string-output-stream-unicode-p stream) t
+                       ;; no need to keep checking each character
+                       (ansi-stream-out stream) #'character-out))
+               (cout character))
+             (base-string-out (stream dst src start1 start2 end2)
+               (declare (ignorable stream) (index start1 start2 end2))
+               (sout base-char))
+             (char-string-out (stream dst src start1 start2 end2)
+               (declare (ignorable stream) (index start1 start2 end2))
+               (sout character))
+             (reject (&rest args)
+               (declare (ignore args))
+               (error "Stream can not accept characters"))
+             (misc (stream operation &optional arg1 arg2)
+               ;; Intercept the misc handler to reset the Unicode state
+               ;; (since the char handlers are local functions).
+               ;; Technically this should be among the actions performed on :CLEAR-OUTPUT,
+               ;; which would also include *actually* clearing the output. But we don't.
+               (if (eq operation :reset)
+                   (setf (string-output-stream-unicode-p stream) nil
+                         ;; resume checking for Unicode characters
+                         (ansi-stream-out stream) #'default-out)
+                   (string-out-misc stream operation arg1 arg2))))
+      (binding* (((unicode-p out sout-aux)
+                  (case element-type
+                    (base-char (values :ignore #'base-char-out #'base-string-out))
+                    (character (values t       #'character-out #'char-string-out))
+                    ((nil)     (values :ignore #'reject #'reject))
+                    (t         (values nil     #'default-out   #'char-string-out))))
+                 (buffer
+                  (cond ((not (eql initial-buffer 0)) initial-buffer)
+                        ((eq element-type 'base-char)
+                         (make-array 63 :element-type 'base-char))    ; 2w + 64b
+                        (t ;; we should remove the trailing #\nul character
+                           ;; for UCS4 strings. There's no reason for it.
+                         (make-array 31 :element-type 'character))))) ; 2w + 128b
+        (initforms)
+        (truly-the string-output-stream stream)))))
 
-(defstruct (string-output-stream
-            (:include ansi-stream
-                      (sout #'string-sout)
-                      (misc #'string-out-misc))
-            (:constructor nil)
-            (:copier nil)
-            (:predicate nil))
-  ;; Function to perform a piece of the SOUT operation
-  (sout-aux nil :type (sfunction (t t t t t) t) :read-only t)
-  ;; The string we throw stuff in.
-  (buffer nil :type (or simple-base-string simple-character-string))
-  ;; Whether any non-base character has been written.
-  ;; BASE-STRING-OUTPUT-STREAM initializes this to :IGNORE
-  ;; which prevents SOUT from doing unnecessary work.
-  (unicode-p :ignore)
-  ;; Chains of buffers to use
-  (prev nil :type list)
-  (next nil :type list)
-  ;; Index of the next location to use in the current string.
-  (pointer 0 :type index)
-  ;; Global location in the stream
-  (index 0 :type index)
-  ;; Index cache: when we move backwards we save the greater of this
-  ;; and index here, so the greater of index and this is always the
-  ;; end of the stream.
-  (index-cache 0 :type index)
-  ;; Pseudo-actual element type. We no longer store the as-requested type.
-  ;; (If the value is :DEFAULT, we return CHARACTER on inquiry.)
-  (element-type nil :read-only t
-                    :type (member #+sb-unicode :default
-                                  #+sb-unicode character
-                                  base-char nil)))
+;;; Constructors used by the transform of MAKE-STRING-OUTPUT-STREAM,
+;;; avoiding parsing of the specified element-type at runtime.
+(defun %make-base-string-ostream ()
+  (%init-string-output-stream (%allocate-string-ostream) 'base-char 0))
+(defun %make-character-string-ostream ()
+  (%init-string-output-stream (%allocate-string-ostream) 'character 0))
 
-;;; NB: BASE-STRING-OUTPUT-STREAM means a string-output-stream that holds BASE-CHAR.
-;;; It is not the "ancestral type" of output streams. That's just STRING-OUTPUT-STREAM.
-;;;
-;;; This is not the only way to implement a more space-efficient string stream.
-;;; One other possibility would be to have only one type of stream that buffers
-;;; octets and uses UTF-8 encoding. But depending on how FILE-POSITION is supposed
-;;; to work (if it is) for setting the position, using a variable-length encoding
-;;; may not be a wise choice.
-(defmacro def-string-stream (et kind)
-  ;; DEFSTRUCTs aren't so happy when buried in a macrolet,
-  ;; especially if we want to inline the constructor to stack-allocate the thing.
-  (let ((obj-type (symbolicate kind "-STRING-OSTREAM"))
-        (buf-type `(simple-array ,et (*)))
-        (ouch-fun (symbolicate kind "-STRING-OUCH")))
-    `(progn
-       (defstruct (,obj-type
-                   (:include string-output-stream
-                    (buffer (make-string +string-output-stream-buffer-initial-size+
-                                         :element-type ',et)
-                            :type ,buf-type)
-                    (out #',ouch-fun)
-                    (sout-aux #',(symbolicate kind "-STRING-SOUT")))
-                   ,@(case et
-                       (base-char
-                        ;; BASE-STRING stream can create an output string
-                        ;; of type (VECTOR NIL) - whether we need to or not,
-                        ;; which seems somewhat in dispute - by supplying an
-                        ;; element-type of NIL to the constructor.
-                        `((:constructor %make-base-string-ostream
-                              (&optional (element-type 'base-char)))))
-                       (character
-                        `((:constructor %make-default-string-ostream
-                              (&aux (element-type :default) (unicode-p nil)
-                                    (out #'default-string-ouch)))
-                          (:constructor %make-character-string-ostream
-                              (&aux (element-type 'character) (unicode-p t))))))
-                   ;; Don't want a distinct family of accessors
-                   (:conc-name string-output-stream-)
-                   (:copier nil)
-                   (:predicate nil)))
+(defun pick-string-ostream-type (element-type)
+  (let ((ctype (specifier-type element-type)))
+    (cond ((eq ctype *empty-type*) nil)
+          ((csubtypep ctype (specifier-type 'base-char)) 'base-char)
+          ((csubtypep ctype (specifier-type 'character)) 'character)
+          (t (error "~S is not a subtype of CHARACTER" element-type)))))
 
-       (declaim (freeze-type ,obj-type))
-
-       ;; For CHARACTER stream, we define two OUCH functions, one which checks
-       ;; per each character whether it is above the range of base-char,
-       ;; setting UNICODE-P if true, and one which doesn't check.
-       ;; The checking version is used when the stream element type is :DEFAULT,
-       ;; which means that we want to try to return a BASE-STRING if possible.
-       ,@(flet ((define-char-out-fun (name initially)
-                 `(defun ,name (stream char)
-                    (declare (,et char))
-                    ,@initially
-                    (let ((pointer (string-output-stream-pointer stream))
-                          (buffer (truly-the ,buf-type
-                                             (string-output-stream-buffer stream)))
-                          (index (string-output-stream-index stream)))
-                      (when (= pointer (length buffer))
-                        (setf buffer (string-output-stream-new-buffer stream index)
-                              pointer 0))
-                      (setf (aref buffer pointer) char
-                            (string-output-stream-pointer stream) (1+ pointer))
-                      (setf (string-output-stream-index stream) (1+ index))))))
-
-           (list
-            (when (eq et 'character)
-              (define-char-out-fun
-                  'default-string-ouch
-                  '((when (>= (char-code char) base-char-code-limit)
-                      (setf (string-output-stream-unicode-p stream) t
-                            ;; no need to keep checking each character
-                            (ansi-stream-out stream) #'character-string-ouch)))))
-            (define-char-out-fun ouch-fun nil)))
-
-       ;; Define some helper functions for the STRING-SOUT method to handle
-       ;; all combinations of {base,character} source and destination string.
-       ;; REPLACE transforms (see src/compiler/seqtran) can handle those 4 cases
-       ;; efficiently, utilizing a bit-bash copier for same-sized copies,
-       ;; otherwise an inlined loop. The one case that needs to type-check each
-       ;; character copied is a Unicode source string into a stream of base-char,
-       ;; which may signal OBJECT-NOT-BASE-CHAR-ERROR.
-       (defun ,(symbolicate kind "-STRING-SOUT") (dst src start1 start2 end2)
-         (declare (index start1 start2 end2) (optimize speed))
-         (macrolet ((copy (dst-type src-type)
-                      `(replace (truly-the ,dst-type dst)
-                                (truly-the ,src-type src)
-                                :start1 start1 :start2 start2 :end2 end2)))
-           (etypecase src
-             #+sb-unicode (simple-character-string
-                           (copy ,buf-type simple-character-string))
-             (simple-base-string (copy ,buf-type simple-base-string))))))))
-
-;; Define two stream types and 2 helper functions for copying strings
-;; into the stream buffer for purposes of WRITE-STRING.
-;; For non-unicode, only define BASE-STRING-OUTPUT-STREAM and 1 helper.
-#+sb-unicode (def-string-stream character character)
-(def-string-stream base-char base)
-
-(declaim (freeze-type string-output-stream))
-(defun make-string-output-stream (&key (element-type 'character))
+(defun make-string-output-stream (&key (element-type 'character et-suppliedp))
   "Return an output stream which will accumulate all output given it for the
 benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (explicit-check))
-  (let ((ctype (specifier-type element-type)))
-    (cond ((csubtypep ctype (specifier-type 'base-char))
-           (%make-base-string-ostream (if (eq ctype *empty-type*) nil 'base-char)))
-          #+sb-unicode
-          ((csubtypep ctype (specifier-type 'character))
-           (%make-character-string-ostream))
-          (t
-           (error "~S is not a subtype of CHARACTER" element-type)))))
+  (%init-string-output-stream
+   (%allocate-string-ostream)
+   ;; To be super pedantic, call the PICK routine even if #-sb-unicode
+   ;; to verify that the specifier is a subtype of character.
+   (if et-suppliedp (pick-string-ostream-type element-type) 'character)
+   0))
 
 ;;; Now that we support base-char string-output streams, it may be possible to eliminate
 ;;; this, though the other benefit it confers is that the buffer never needs to extend,
@@ -1587,29 +1582,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defun string-sout (stream string start end)
   (declare (explicit-check string)
            (type index start end))
-  (case (%other-pointer-widetag string)
-    #+sb-unicode
-    (#.sb-vm:simple-character-string-widetag
-     ;; For streams with :DEFAULT element-type (producing the most space-efficient
-     ;; string that can hold the output), checking whether Unicode characters appear
-     ;; in the source material is potentially advantageous versus checking the
-     ;; buffer in GET-OUTPUT-STREAM-STRING, because if all source strings are
-     ;; BASE-STRING, we needn't check anything.
-     ;; When UNICODE-P is NIL, then we care whether Unicode characters
-     ;; would be written, changing the flag to T. If non-nil, skip this.
-     (unless (string-output-stream-unicode-p stream)
-       ;; Bounds check was already performed by ANSI-STREAM-WRITE-STRING
-       (locally
-           (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-         (let ((s (truly-the simple-character-string string)))
-           (when (loop for i from start below end
-                         thereis (>= (char-code (aref s i)) base-char-code-limit))
-             (setf (string-output-stream-unicode-p stream) t
-                   ;; no need to keep checking each character
-                   (ansi-stream-out stream) #'character-string-ouch))))))
-    (#.sb-vm:simple-array-nil-widetag
-     (return-from string-sout ; fail if the span is nonempty
-       (if (> end start) (aref string start)))))
+  (when (typep (truly-the simple-string string) '(simple-array nil (*)))
+    ;; Such garbage that we have to deal with in all these routines
+    ;; for b.s. strings.
+    (return-from string-sout ; fail if the span is nonempty
+      (if (> end start) (aref string start))))
   (let* ((full-length (- end start))
          (length full-length)
          (buffer (string-output-stream-buffer stream))
@@ -1624,11 +1601,16 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
      :more
        (when (plusp here)
          (funcall (string-output-stream-sout-aux stream)
-                  buffer string pointer start stop)
+                  stream buffer string pointer start stop)
          (setf (string-output-stream-pointer stream) (+ here pointer)))
        (when (plusp overflow)
          (setf start stop
                length (- end start)
+               ;; BUG: doesn't always enlarge as intended. Consider:
+               ;;  - initial buffer capacity of 63 characters
+               ;;  - WRITE-STRING with 2 characters setting INDEX=2, SPACE=61
+               ;;  - another WRITE-STRING with 62 characters. 61 copied, 1 overflow.
+               ;;  - then new BUFFER length is (MAX OVERFLOW INDEX) = 2
                buffer (string-output-stream-new-buffer
                        stream (max overflow (string-output-stream-index stream)))
                pointer 0
@@ -1642,6 +1624,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (incf (string-output-stream-index stream) full-length)))
 
 ;;; Factored out of the -misc method due to size.
+;;; This is a steaming pile of horsecrap (lp#1839040)
 (defun set-string-output-stream-file-position (stream pos)
   (let* ((index (string-output-stream-index stream))
          (end (max index (string-output-stream-index-cache stream))))
@@ -1759,12 +1742,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (string-output-stream-next stream) nil)
 
     ;; Reset UNICODE-P unless it was :IGNORE or element-type is CHARACTER.
-    #+sb-unicode
     (when (and (eq (string-output-stream-element-type stream) :default)
                (eq (string-output-stream-unicode-p stream) t))
-      (setf (string-output-stream-unicode-p stream) nil
-            ;; resume checking for Unicode characters
-            (ansi-stream-out stream) #'default-string-ouch))
+      (funcall (ansi-stream-misc stream) stream :reset))
 
     ;; There are exactly 3 cases that we have to deal with when copying:
     ;;  CHARACTER-STRING into BASE-STRING (without type-checking per character)
@@ -1775,16 +1755,18 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;; The first case occurs when and only when the element type is :DEFAULT and
     ;; only base characters were written. The other two cases can be handled
     ;; using BYTE-BLT with indices multiplied by either 1 or 4.
-    (flet ((copy (fun)
+    (flet ((copy (fun extra)
              (let ((start 0)) ; index into RESULT
                (declare (index start))
                (dolist (buffer prev)
-                 (funcall fun buffer start)
+                 ;; It doesn't look as though we should have to pass RESULT
+                 ;; in to FUN to avoid closure consing, but indeed we do.
+                 (funcall fun result buffer start extra)
                  (incf start (length buffer)))
-               (funcall fun this start)
+               (funcall fun result this start extra)
                (incf start (length this))
                (dolist (buffer next)
-                 (funcall fun buffer start)
+                 (funcall fun result buffer start extra)
                  (incf start (length buffer))))))
       (if (and (eq (string-output-stream-element-type stream) :default)
                base-string-p)
@@ -1792,24 +1774,28 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           ;; PRINx-TO-STRING, (FORMAT NIL ...), and many other constructs.
           ;; REPLACE will elide the type test per compilation policy
           ;; which is fine because we've already checked that it'll work.
-          (copy (lambda (source start)
+          (copy (lambda (result source start dummy)
                   (declare (optimize speed (sb-c::type-check 0)))
+                  (declare (ignore dummy))
                   (replace (the simple-base-string result)
                            (the simple-character-string source)
-                           :start1 start)))
-          (let ((scale (if base-string-p 0 2)))
-            (with-pinned-objects (result)
+                           :start1 start))
+                0)
+          (with-pinned-objects (result)
               ;; BYTE-BLT doesn't know that it could use memcpy rather then memmove,
               ;; but it nonetheless should be faster than REPLACE.
-              (copy (lambda (source start)
+              (copy (lambda (result source start scale)
+                      (declare (index start))
                       (let* ((length (min (- (length result) start) (length source)))
                              (end (+ start length)))
+                        (declare (index length end))
                         (with-pinned-objects (source)
                           (%byte-blt (vector-sap source)
                                      0
                                      (vector-sap result)
-                                     (truly-the index (ash (the index start) scale))
-                                     (truly-the index (ash (the index end) scale)))))))))))
+                                     (truly-the index (ash start scale))
+                                     (truly-the index (ash end scale))))))
+                    (if base-string-p 0 2)))))
     result))
 
 (defun finite-base-string-ouch (stream character)
@@ -1878,15 +1864,38 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                       (out #'fill-pointer-ouch)
                       (sout #'fill-pointer-sout)
                       (misc #'fill-pointer-misc))
-            (:constructor make-fill-pointer-output-stream (string))
+            (:constructor nil)
             (:copier nil)
             (:predicate nil))
   ;; a string with a fill pointer where we stuff the stuff we write
   (string (missing-arg) :type string-with-fill-pointer :read-only t))
 
 (declaim (freeze-type fill-pointer-output-stream))
+;;; TODO: specialize on string type?
+(defun %init-fill-pointer-output-stream (stream string element-type)
+  (declare (optimize speed (sb-c::verify-arg-count 0)))
+  (declare (ignore element-type))
+  (unless (and (stringp string)
+               (array-has-fill-pointer-p string))
+    (error "~S is not a string with a fill-pointer" string))
+  (setf (%instance-layout (truly-the instance stream))
+        #.(find-layout 'fill-pointer-output-stream))
+  (macrolet ((initforms ()
+               `(setf ,@(mapcan (lambda (dsd)
+                                  (list `(%instance-ref stream ,(dsd-index dsd))
+                                        (case (dsd-name dsd)
+                                          (string 'string)
+                                          (t (dsd-default dsd)))))
+                                (dd-slots
+                                 (find-defstruct-description 'fill-pointer-output-stream))))))
+    (initforms)
+    (truly-the fill-pointer-output-stream stream)))
 
 (defun fill-pointer-ouch (stream character)
+  ;; FIXME: ridiculously inefficient. Can we throw some TRULY-THEs in here?
+  ;; I think the prohibition against touching the string - implying that you can't
+  ;; decide to re-displace it - means we should be able to just look at the
+  ;; underlying vector, at least until we run out of space in it.
   (let* ((buffer (fill-pointer-output-stream-string stream))
          (current (fill-pointer buffer))
          (current+1 (1+ current)))

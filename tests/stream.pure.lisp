@@ -472,7 +472,7 @@
 
 #+sb-unicode
 (with-test (:name (:default-char-stream-resets))
-  (let ((s (sb-impl::%make-default-string-ostream)))
+  (sb-impl::%with-output-to-string (s)
     (dotimes (i 2)
       (write-char (code-char 1000) s)
       (assert (equal (type-of (get-output-stream-string s))

@@ -476,7 +476,7 @@ distinct from the global value. Can also be SETF."
                            (code-char (+ (char-code #\0) r)))
                      s)))
           (recurse 1 counter)))
-      (with-simple-output-to-string (s)
+      (%with-output-to-string (s)
         (write-string prefix s)
         (%output-integer-in-base counter 10 s)))))
 

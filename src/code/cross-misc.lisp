@@ -352,3 +352,8 @@
 (defmacro %primitive (name arg)
   (ecase name
     (print `(format t "~A~%" ,arg))))
+
+(defmacro %with-output-to-string ((var) &body body)
+  ;; Let's suppose that the host lisp knows what it's doing to efficiently
+  ;; compile the standard macro. Don't try to outdo it.
+  `(with-output-to-string (,var) ,@body))

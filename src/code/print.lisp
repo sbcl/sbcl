@@ -193,7 +193,7 @@ variable: an unreadable object representing the error is printed instead.")
      (multiple-value-bind (fun pretty)
          (and *print-pretty* (pprint-dispatch object))
        (if pretty
-           (with-simple-output-to-string (stream)
+           (%with-output-to-string (stream)
               (sb-pretty::with-pretty-stream (stream)
                 (funcall fun stream object)))
            (let ((buffer-size (approx-chars-in-repr object)))
@@ -206,7 +206,7 @@ variable: an unreadable object representing the error is printed instead.")
                                (finite-base-string-output-stream-pointer stream)))))))
     ;; Could do something for other numeric types, symbols, ...
     (t
-     (with-simple-output-to-string (stream)
+     (%with-output-to-string (stream)
        (output-object object stream)))))
 
 ;;; Estimate the number of chars in the printed representation of OBJECT.

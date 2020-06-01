@@ -411,7 +411,7 @@
   (csubtypep type (specifier-type 'eq-comparable-type)))
 
 (defun specialized-list-seek-function-name (function-name key-functions &optional variant)
-  (or (find-symbol (with-simple-output-to-string (s)
+  (or (find-symbol (%with-output-to-string (s)
                      ;; Write "%NAME-FUN1-FUN2-FUN3", etc. Not only is
                      ;; this ever so slightly faster then FORMAT, this
                      ;; way we are also proof against *PRINT-CASE*

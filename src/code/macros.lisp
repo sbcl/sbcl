@@ -1565,41 +1565,6 @@ symbol-case giving up: case=((V U) (F))
                 (setq ,abortp nil))
            (when ,stream
              (close ,stream :abort ,abortp)))))))
-
-(sb-xc:defmacro with-output-to-string
-    ((var &optional string &key (element-type ''character))
-     &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
-    (if string
-        (let ((element-type-var (gensym)))
-          `(let ((,var (make-fill-pointer-output-stream ,string))
-                 ;; ELEMENT-TYPE isn't currently used for anything
-                 ;; (see FILL-POINTER-OUTPUT-STREAM FIXME in stream.lisp),
-                 ;; but it still has to be evaluated for side-effects.
-                 (,element-type-var ,element-type))
-             (declare (ignore ,element-type-var))
-             ,@decls
-             (unwind-protect
-                  (progn ,@forms)
-               (close ,var))))
-        ;; I don't see why we need the unwind-protect.
-        ;; CLHS says: "The output string stream to which the variable /var/
-        ;; is bound has dynamic extent; its extent ends when the form is exited."
-        ;; So technically you can't reference the stream after the string
-        ;; is returned. And since the implication is that we can legally DXify
-        ;; the stream, what difference does it make whether it's open or closed?
-        ;; Certainly in code that is compiled in SAFETY < 3 we should
-        ;; just not bother with the unwind-protect or the close.
-        `(let ((,var (make-string-output-stream
-                      ;; CHARACTER is the default element-type of
-                      ;; string-ouput-stream, save a few bytes when passing it
-                      ,@(and (not (equal element-type ''character))
-                             `(:element-type ,element-type)))))
-           ,@decls
-           (unwind-protect
-                (progn ,@forms)
-             (close ,var))
-           (get-output-stream-string ,var)))))
 
 ;;;; Iteration macros:
 

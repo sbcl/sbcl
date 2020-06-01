@@ -323,7 +323,7 @@
   (let* ((vop (tn-ref-vop op))
          (args (vop-args vop))
          (results (vop-results vop))
-         (name (with-simple-output-to-string (stream)
+         (name (%with-output-to-string (stream)
                  (print-tn-guts tn stream)))
          (2comp (component-info *component-being-compiled*))
          temp)

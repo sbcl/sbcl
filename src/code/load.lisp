@@ -273,7 +273,7 @@
     ;; is convenient for and a requirement for writing to and reading from fasls
     ;; at this stage of the loading. WITH-STANDARD-IO-SYNTAX and WRITE-TO-STRING
     ;; would work, but this is simple enough to do by hand.
-    (with-simple-output-to-string (stream)
+    (%with-output-to-string (stream)
       (let ((delimiter #\())
         (dolist (symbol list)
           (write-char delimiter stream)

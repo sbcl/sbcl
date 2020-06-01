@@ -162,7 +162,7 @@
         (seperator-after-directory-p
          (or (pathname-component-present-p (pathname-name pathname))
              (not as-file))))
-    (with-simple-output-to-string (s)
+    (%with-output-to-string (s)
       (when directory
         (ecase (pop directory)
           (:absolute
