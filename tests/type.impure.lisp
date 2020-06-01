@@ -348,7 +348,7 @@
      (assert (subtypep 'simple-error 'error))
      (assert (not (subtypep 'condition 'simple-condition)))
      (assert (not (subtypep 'error 'simple-error)))
-     (assert (eq (car (sb-pcl:class-direct-superclasses
+     (assert (eq (car (sb-mop:class-direct-superclasses
                        (find-class 'simple-condition)))
                  (find-class 'condition)))
 
@@ -360,12 +360,12 @@
                                  sb-int:simple-file-error
                                  sb-int:simple-style-warning))))
        (assert (null (set-difference
-                      (sb-pcl:class-direct-subclasses (find-class
+                      (sb-mop:class-direct-subclasses (find-class
                                                        'simple-condition))
                       subclasses))))
 
      ;; precedence lists
-     (assert (equal (sb-pcl:class-precedence-list
+     (assert (equal (sb-mop:class-precedence-list
                      (find-class 'simple-condition))
                     (mapcar #'find-class '(simple-condition
                                            condition
@@ -373,24 +373,24 @@
                                            t))))
     (sb-mop:finalize-inheritance (find-class 'fundamental-stream))
      ;; stream classes
-     (assert (equal (sb-pcl:class-direct-superclasses (find-class
+     (assert (equal (sb-mop:class-direct-superclasses (find-class
                                                        'fundamental-stream))
                     (mapcar #'find-class '(standard-object stream))))
      (assert (null (set-difference
-                    (sb-pcl:class-direct-subclasses (find-class
+                    (sb-mop:class-direct-subclasses (find-class
                                                      'fundamental-stream))
                     (mapcar #'find-class '(fundamental-binary-stream
                                            fundamental-character-stream
                                            fundamental-output-stream
                                            fundamental-input-stream)))))
-     (assert (equal (sb-pcl:class-precedence-list (find-class
+     (assert (equal (sb-mop:class-precedence-list (find-class
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object
                                            sb-pcl::slot-object
                                            stream
                                            t))))
-     (assert (equal (sb-pcl:class-precedence-list (find-class
+     (assert (equal (sb-mop:class-precedence-list (find-class
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object

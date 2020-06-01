@@ -662,7 +662,7 @@
             (when methods
               (format stream "~@:_Method-combination: ~S"
                       (sb-pcl::method-combination-type-name
-                       (sb-pcl:generic-function-method-combination fun)))
+                       (sb-mop:generic-function-method-combination fun)))
               (cond ((eq :none methods)
                      (format stream "~@:_No methods."))
                     (t

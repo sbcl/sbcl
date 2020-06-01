@@ -122,7 +122,7 @@
   t)
 
 (deftest find-source-stuff.4
-    (matchp (car (sb-pcl:generic-function-methods #'cl-user::two)) 4)
+    (matchp (car (sb-mop:generic-function-methods #'cl-user::two)) 4)
   t)
 
 (deftest find-source-stuff.5

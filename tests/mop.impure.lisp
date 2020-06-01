@@ -313,7 +313,7 @@
                                          &rest initargs)
   (declare (ignore initargs))
   (let ((dsd-class-name (gensym)))
-    (sb-pcl:ensure-class
+    (sb-mop:ensure-class
      dsd-class-name
      :metaclass 'auto-accessors-direct-slot-definition-class
      :direct-superclasses (list (find-class 'standard-direct-slot-definition))
@@ -420,7 +420,7 @@
 ;;; detection of multiple class options in defclass, reported by Bruno Haible
 (defclass option-class (standard-class)
   ((option :accessor cl-option :initarg :my-option)))
-(defmethod sb-pcl:validate-superclass ((c1 option-class) (c2 standard-class))
+(defmethod sb-mop:validate-superclass ((c1 option-class) (c2 standard-class))
   t)
 (multiple-value-bind (result error)
     (ignore-errors (eval '(defclass option-class-instance ()

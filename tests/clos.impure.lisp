@@ -443,7 +443,7 @@
 ;; FORWARD-REFERENCED-CLASS CHANGE-CLASS.FORWARD-REFERENCED.3.
 (defclass change-class.forward-referenced.2 (change-class.forward-referenced.3) ())
 
-(with-test (:name (change-class sb-pcl:forward-referenced-class))
+(with-test (:name (change-class sb-mop:forward-referenced-class))
   (mapc
    #'change-class-test-case
    '(;; Changing instances of "ordinary classes" to classes which are
@@ -846,16 +846,16 @@
 (assert-error (defmethod incompatible-ll-test-1 (x &rest y) y))
 ;;; Sneakily using a bit of MOPness to check some consistency
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-1)) 1))
 
 (defmethod incompatible-ll-test-2 (x &key bar) bar)
 (assert-error (defmethod incompatible-ll-test-2 (x) x))
 (defmethod incompatible-ll-test-2 (x &rest y) y)
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-2)) 1))
 (defmethod incompatible-ll-test-2 ((x integer) &key bar) bar)
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-2)) 2))
 
 ;;; Per Christophe, this is an illegal method call because of 7.6.5
 (handler-bind ((style-warning #'muffle-warning))

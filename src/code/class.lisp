@@ -671,7 +671,7 @@ between the ~A definition and the ~A definition"
       (if (typep classoid 'standard-classoid)
           (let ((class (classoid-pcl-class classoid)))
             (cond
-              ((sb-pcl:class-finalized-p class)
+              ((sb-mop:class-finalized-p class)
                (sb-pcl::%force-cache-flushes class)
                t)
               ((sb-pcl::class-has-a-forward-referenced-superclass-p class)
@@ -683,7 +683,7 @@ between the ~A definition and the ~A definition"
                       error-context))
                nil)
               (t
-               (sb-pcl:finalize-inheritance class)
+               (sb-mop:finalize-inheritance class)
                t)))
           (bug "~@<Don't know how to ensure validity of ~S (not a STANDARD-CLASSOID) ~
                 for ~A.~%~:@>"
