@@ -1426,15 +1426,18 @@
              (ref-p array-ref)
              (ref-p index-ref)
              (or
-              (let ((index-leaf (ref-leaf index-ref)))
+              (let* ((index-leaf (ref-leaf index-ref))
+                     (index-value (and (constant-p index-leaf)
+                                       (constant-value index-leaf)))
+                     (index-value (and (integerp index-value)
+                                       index-value)))
                 (loop for constraint in (ref-constraints array-ref)
                       for y = (constraint-y constraint)
                       thereis (and
                                (eq (constraint-kind constraint) 'array-in-bounds-p)
-                               (if (constant-p index-leaf)
+                               (if index-value
                                    (and (constant-p y)
-                                        (<= (constant-value index-leaf)
-                                            (constant-value y)))
+                                        (<= index-value (constant-value y)))
                                    (eq index-leaf y)))))
               (loop for constraint in (ref-constraints index-ref)
                     thereis (and (eq (constraint-kind constraint) 'array-in-bounds-p)

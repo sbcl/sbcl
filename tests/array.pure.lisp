@@ -590,3 +590,11 @@
                   (lambda (x)
                     (make-array 1 :displaced-to (the vector x) :initial-contents '(1))))
                :allow-warnings t))))
+
+(with-test (:name :check-bound-type-error)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (p)
+                         (unless (svref p 0)
+                           (svref p nil)))
+                      :allow-warnings t))))
