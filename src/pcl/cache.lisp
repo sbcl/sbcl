@@ -157,6 +157,7 @@
 ;;; Perhaps we can dynamically optimize the mixing by picking bits that work
 ;;; best for the set of keys in the cache.
 (declaim (inline compute-cache-index))
+(export 'compute-cache-index) ; for a test
 (defun compute-cache-index (cache layouts)
   (macrolet ((fetch-hash (x)
                `(let ((hash (layout-clos-hash ,x)))

@@ -242,6 +242,7 @@
         (t
          (bug "Something strange where symbol or class expected."))))
 
+(export '(+ctor-list-max-size+ +ctor-table-max-size+)) ; for a test
 ;;; Max number of CTORs kept in an inline list cache. Once this is
 ;;; exceeded we switch to a table.
 (defconstant +ctor-list-max-size+ 12)

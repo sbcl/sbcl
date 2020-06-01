@@ -35,10 +35,10 @@
            (l2 (sb-kernel:find-layout 'cons))
            (l3 (sb-kernel:find-layout 'integer))
            (cache (sb-pcl::%make-cache :mask -1)))
-      (let ((safe-answer (sb-pcl::compute-cache-index cache (list l1 l2 l3)))
+      (let ((safe-answer (sb-pcl:compute-cache-index cache (list l1 l2 l3)))
             (optimized-answer (optimized-way l1 l2 l3)))
         (assert (= safe-answer optimized-answer)))
-      (let ((safe-answer (sb-pcl::compute-cache-index cache (list l1 l3 l2)))
+      (let ((safe-answer (sb-pcl:compute-cache-index cache (list l1 l3 l2)))
             (optimized-answer (optimized-way l1 l3 l2)))
         (assert (= safe-answer optimized-answer))))))
 

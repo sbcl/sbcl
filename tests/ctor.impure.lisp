@@ -135,7 +135,7 @@
 
 (with-test (:name (make-instance :ctor-inline-cache-resize))
   (let* ((f (checked-compile `(lambda (name) (make-instance name))))
-         (classes (loop repeat (* 2 sb-pcl::+ctor-table-max-size+)
+         (classes (loop repeat (* 2 sb-pcl:+ctor-table-max-size+)
                         collect (class-name (eval `(defclass ,(gentemp) () ())))))
          (count 0)
          (caches (find-ctor-caches f))
@@ -146,7 +146,7 @@
     (dolist (class classes)
       (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
       (incf count)
-      (cond ((<= count sb-pcl::+ctor-list-max-size+)
+      (cond ((<= count sb-pcl:+ctor-list-max-size+)
              (unless (consp (cdr cache))
                (error "oops, wanted list cache, got: ~S" cache))
              (unless (= count (length (cdr cache)))
