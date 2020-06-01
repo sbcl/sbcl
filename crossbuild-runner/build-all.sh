@@ -23,7 +23,17 @@ do
   # we don't compile. Or else it doesn't matter much which lisp code is compiled.
   # Assume that dlopen() is provided so that we don't try to read sbcl.nm though.
   echo '(lambda (features) (union features (list :crossbuild-test :os-provides-dlopen ' > $ltf
+  echo ":$arch" >> $ltf
+  # x86-64 is tested as if #+win32
+  if [ $arch != "x86-64" ]; then
+    echo ':unix :linux :elf :sb-futex' >> $ltf
+  fi
+  cat crossbuild-runner/backends/$arch/features >> $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf
+  case "$arch" in
+    alpha | hppa)  ;;
+    *) echo ':linkage-table' >> $ltf
+  esac
   echo ')))' >> $ltf
 
   cp -fv crossbuild-runner/backends/$arch/stuff-groveled-from-headers.lisp \

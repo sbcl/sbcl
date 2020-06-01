@@ -1,1 +1,1 @@
-:riscv :unix :elf :linux :64-bit :gencgc :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :linkage-table :little-endian :compare-and-swap-vops :memory-barrier-vops :sb-thread
+:64-bit :gencgc :little-endian :sb-thread

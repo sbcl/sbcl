@@ -1,0 +1,4 @@
+:gencgc
+:stack-allocatable-closures :stack-allocatable-vectors
+:stack-allocatable-lists :stack-allocatable-fixed-objects
+:compare-and-swap-vops :memory-barrier-vops

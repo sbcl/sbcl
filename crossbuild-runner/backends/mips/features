@@ -1,0 +1,4 @@
+:cheneygc
+:stack-allocatable-closures :stack-allocatable-vectors
+:stack-allocatable-lists :stack-allocatable-fixed-objects
+:alien-callbacks

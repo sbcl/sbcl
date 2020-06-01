@@ -1,0 +1,4 @@
+:64-bit-registers
+:cheneygc
+:stack-allocatable-closures :stack-allocatable-lists
+:stack-allocatable-fixed-objects

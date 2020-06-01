@@ -1,1 +1,1 @@
-:sparc :unix :elf :linux :gencgc :linkage-table :stack-allocatable-closures :stack-allocatable-lists :big-endian
+:gencgc :big-endian
