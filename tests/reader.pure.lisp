@@ -361,7 +361,7 @@
 ;;  - the initial cons cell in READ-LIST
 (with-test (:name :read-does-not-cons-per-se
             :skipped-on (:or (:not :stack-allocatable-fixed-objects)
-                         :32-bit ;; single-floats
+                         (not 64-bit) ;; single-floats
                          :interpreter))
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
