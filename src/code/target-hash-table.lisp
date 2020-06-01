@@ -1904,6 +1904,12 @@ table itself."
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
           `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
 
+;;; This assignment has to occur some time after the defstruct.
+;;; We don't call EQUALP on hash-table, so as late as possible is fine.
+;;; It can't go in src/code/pred whose forms execute *before* the defstruct,
+;;; so its effect would just get clobbered by the defstruct.
+(sb-kernel::assign-equalp-impl 'hash-table #'hash-table-equalp)
+
 #|
 (defun show-address-sensitivity (&optional tbl)
   (flet ((show1 (tbl)

@@ -505,6 +505,7 @@
                   (word-logical-not (%vector-raw-bits bit-array index))))))))
 
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
+  ;; TODO: unroll if length is known and not more than a few words
   `(and (= (length x) (length y))
         (let ((length (length x)))
           (or (= length 0)
@@ -545,6 +546,7 @@
 
 (deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
+  ;; TODO: unroll if length is known and not more than a few words
   `(let ((length (length sequence)))
     (if (zerop length)
         0

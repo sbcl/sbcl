@@ -1448,3 +1448,10 @@ redefinition."
                  `(defstruct foo4131 bar bar))
     (assert-that "slot name BAR duplicated via included FOO4130"
                  `(defstruct (foo4132 (:include foo4130)) bar))))
+
+(test-util:with-test (:name :specialized-equalp)
+  ;; make sure we didn't mess up PATHNAME and HASH-TABLE
+  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'pathname))))
+    (assert (eq f #'sb-int:pathname=)))
+  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'hash-table))))
+    (assert (eq f #'sb-int:hash-table-equalp))))

@@ -1146,9 +1146,6 @@ core and return a descriptor to it."
      :inherits inherits
      :info *nil-descriptor*
      :bitmap bitmap
-      ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
-      ;; but for type-correctness this slot needs to be a simple-vector.
-     :equalp-tests *simple-vector-0-descriptor*
      :slot-list *nil-descriptor*)
 
     (awhen (gethash name *layout-deferred-instances*)

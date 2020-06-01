@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.5:
+  * enhancement: EQUALP on structure instances uses code specialized
+    to each structure type, inlining comparison of non-pointer slots.
+
 changes in sbcl-2.0.5 relative to sbcl-2.0.4:
   * platform support:
     ** experimental support for ARM32 and ARM64 on OpenBSD

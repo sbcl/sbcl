@@ -387,11 +387,11 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
            (equal x y)))))
 
 ;;; EQUALP comparison of HASH-TABLE values
+;;; Can be called only if both X and Y are definitely hash-tables.
 (defun hash-table-equalp (x y)
-  (declare (type hash-table x y))
+  (declare (type hash-table x y) (explicit-check))
   (or (eq x y)
-      (and (hash-table-p y)
-           (eql (hash-table-count x) (hash-table-count y))
+      (and (eql (hash-table-count x) (hash-table-count y))
            (eql (hash-table-test x) (hash-table-test y))
            (block comparison-of-entries
              (maphash (lambda (key x-value)
@@ -402,31 +402,25 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                       x)
              t))))
 
-(declaim (inline instance-equalp))
+(macrolet ((slot-ref-equalp ()
+             `(let ((x-el (%instance-ref x i))
+                    (y-el (%instance-ref y i)))
+                (or (eq x-el y-el) (equalp x-el y-el)))))
 (defun instance-equalp (x y)
-  (let ((layout-x (%instance-layout x)))
-    (and
-     (eq layout-x (%instance-layout y))
-     (logtest +structure-layout-flag+ (layout-flags layout-x))
-     (macrolet ((slot-ref-equalp ()
-                  `(let ((x-el (%instance-ref x i))
-                         (y-el (%instance-ref y i)))
-                     (or (eq x-el y-el) (equalp x-el y-el)))))
-       (let ((n (%instance-length x)))
-         (if (eql (layout-bitmap layout-x) sb-kernel:+layout-all-tagged+)
-             (loop for i downfrom (1- n) to sb-vm:instance-data-start
-                   always (slot-ref-equalp))
-             (let ((comparators (layout-equalp-tests layout-x)))
-               (unless (= (length comparators) (- n sb-vm:instance-data-start))
-                 (bug "EQUALP got incomplete instance layout"))
-               ;; See remark at the source code for %TARGET-DEFSTRUCT
-               ;; explaining how to use the vector of comparators.
-               (loop for i downfrom (1- n) to sb-vm:instance-data-start
-                     for test = (data-vector-ref
-                                 comparators (- i sb-vm:instance-data-start))
-                     always (cond ((eql test 0) (slot-ref-equalp))
-                                  ((functionp test) (funcall test i x y))
-                                  (t))))))))))
+  (declare (optimize (safety 0)))
+  (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
+        always (slot-ref-equalp)))
+(defun instance-equalp* (comparators x y)
+  (declare (optimize (safety 0))
+           (simple-vector comparators)
+           (type instance x y))
+  ;; See remark at the source code for %TARGET-DEFSTRUCT
+  ;; explaining how to use the vector of comparators.
+  (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
+        for test = (data-vector-ref comparators (- i sb-vm:instance-data-start))
+        always (cond ((eql test 0) (slot-ref-equalp))
+                     ((functionp test) (funcall test i x y))
+                     (t)))))
 
 ;;; Doesn't work on simple vectors
 (defun array-equalp (x y)
@@ -486,14 +480,12 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
          (and (consp y)
               (equalp (car x) (car y))
               (equalp (cdr x) (cdr y))))
-        ((pathnamep x)
-         (and (pathnamep y) (pathname= x y)))
-        ((hash-table-p x)
-         (and (hash-table-p y)
-              (hash-table-equalp x y)))
         ((%instancep x)
          (and (%instancep y)
-              (instance-equalp x y)))
+              (let ((layout (%instance-layout x)))
+                (and (logtest +structure-layout-flag+ (layout-flags layout))
+                     (eq (%instance-layout y) layout)
+                     (funcall (layout-equalp-impl layout) x y)))))
         ((and (simple-vector-p x) (simple-vector-p y))
          (let ((len (length x)))
            (and (= len (length y))

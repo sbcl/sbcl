@@ -191,8 +191,10 @@
   (info nil :type (or null defstruct-description))
   ;; Map of raw slot indices.
   (bitmap +layout-all-tagged+ :type layout-bitmap)
-  ;; Per-slot comparator for implementing EQUALP.
-  (equalp-tests #() :type simple-vector)
+  ;; EQUALP comparator for two instances with this layout
+  ;; Could be the generalized function, or a type-specific one
+  ;; if the defstruct was compiled in a policy of SPEED 3.
+  (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
   ;; If this layout is for an object of metatype STANDARD-CLASS,
   ;; these are the EFFECTIVE-SLOT-DEFINITION metaobjects.
   (slot-list nil :type list)
@@ -208,6 +210,9 @@
   (ancestor_4 0)
   (ancestor_5 0))
 (declaim (freeze-type layout))
+
+(defun equalp-err (a b)
+  (bug "EQUALP ~S ~S" a b))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-flags (depthoid length flags)

@@ -488,6 +488,7 @@
            (or (eq (%pathname-host pathname1) *physical-host*)
                (compare-component (%pathname-version pathname1)
                                   (%pathname-version pathname2))))))
+(sb-kernel::assign-equalp-impl 'pathname #'pathname=)
 
 ;;; This is conceptually like (DEFUN-CACHED (%MAKE-PATHNAME ...))
 ;;; except that we try hard never to evict entries until SAVE-LISP-AND-DIE.

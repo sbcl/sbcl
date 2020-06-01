@@ -44,3 +44,63 @@
     (assert (= (length layouts) 3))
     (assert (find (sb-kernel:find-layout 'sb-thread:thread)
                   layouts))))
+
+(defstruct (parent)
+  (bv #* :type bit-vector)
+  (x 0d0 :type double-float))
+(defstruct (child (:include parent))
+  (w 0 :type word))
+(defstruct (child2 (:include parent
+                    (bv #* :type simple-bit-vector))))
+
+#|
+Timing result:
+(defparameter *l1*
+  (coerce (loop repeat 1000
+                for i from 2
+                collect (make-child :x (coerce i 'double-float)
+                                    :w (1+ i)))
+          'vector))
+
+(defparameter *l2* (map 'vector 'copy-structure *l1*))
+
+(defun test (n)
+  (loop repeat (The fixnum n)
+        sum (loop for s1 across *l1*
+                  for s2 across *l2*
+                  count (equalp s1 s2) fixnum) fixnum))
+
+* (time (test 1000))
+Old:
+Evaluation took:
+  0.046 seconds of real time
+  127,769,104 processor cycles
+New:
+Evaluation took:
+  0.024 seconds of real time
+  66,055,457 processor cycles
+|#
+
+(with-test (:name :custom-equalp)
+  (assert (equalp (make-child :x -0d0 :w #xf00f :bv #*10101)
+                  (make-child :x +0d0 :w #xf00f :bv #*10101))))
+
+(with-test (:name :no-equalp-calls)
+  (dolist (type '(parent child child2))
+    (let* ((equalp-impl
+            (sb-kernel:layout-equalp-impl (sb-kernel:find-layout type)))
+           (constants
+            (ctu:find-code-constants equalp-impl)))
+      (case type
+        ((parent child)
+         (assert (and (sb-int:singleton-p constants)
+                      (eq (car constants)
+                          (sb-kernel::find-fdefn 'sb-int:bit-vector-=)))))
+        (child2
+         ;; FIXME: why does CHILD2-EQUALP reference a boxed constant
+         ;; equal to MOST-POSITIVE-WORD as a bignum?
+         ;; Something strange about the bit-vector-= xform on simple-bit-vector.
+         (assert (or (not constants)
+                     (and (sb-int:singleton-p constants)
+                          (not (typep (car constants)
+                                      'sb-kernel:fdefn))))))))))

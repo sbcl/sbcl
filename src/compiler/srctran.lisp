@@ -3510,6 +3510,8 @@
          '(= x y))
         ((both-csubtypep 'hash-table)
          '(hash-table-equalp x y))
+        ;; TODO: two instances of the same type should dispatch
+        ;; directly to the EQUALP-IMPL function in the layout.
         ((and (both-csubtypep 'array)
               ;; At least one array has to be longer than 0
               ;; and not adjustable, because #() and "" are equal.
