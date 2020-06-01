@@ -2365,7 +2365,7 @@ bootstrapping.
   (let ((fin (allocate-standard-funcallable-instance *sgf-wrapper* name)))
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (when function
-      (set-funcallable-instance-function fin function))
+      (setf (%funcallable-instance-fun fin) function))
     (setf (gdefinition name) fin)
     (!bootstrap-set-slot 'standard-generic-function fin 'name name)
     (!bootstrap-set-slot 'standard-generic-function fin

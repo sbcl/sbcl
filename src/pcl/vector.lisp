@@ -767,8 +767,8 @@
                             ,@inner-decls
                             ,@body-sans-decls))))
                  (mf (%make-method-function fmf)))
-            (set-funcallable-instance-function
-             mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
+            (setf (%funcallable-instance-fun mf)
+                  (method-function-from-fast-function fmf ',(getf initargs 'plist)))
             mf)
           ',initargs)))))
 

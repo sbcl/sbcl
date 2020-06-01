@@ -185,8 +185,8 @@
               (if qualifier (list qualifier)) specializers lambda-list
               `(:function
                 ,(let ((mf (%make-method-function fmf)))
-                   (sb-mop:set-funcallable-instance-function
-                    mf (method-function-from-fast-function fmf arg-info))
+                   (setf (%funcallable-instance-fun mf)
+                         (method-function-from-fast-function fmf arg-info))
                    mf)
                 plist ,arg-info simple-next-method-call t)
               source-loc))))))

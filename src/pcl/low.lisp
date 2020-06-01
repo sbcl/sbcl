@@ -100,17 +100,16 @@
            (setf ,drops (random-fixnum)
                  ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
-(import 'sb-kernel:funcallable-instance-p) ; why?
-
 (defun set-funcallable-instance-function (fin new-value)
-  (declare (type function new-value)
-           ;; KLUDGE: it might be nice to restrict
-           ;; SB-MOP:SET-FUNCALLABLE-INSTANCE-FUNCTION to operate only
-           ;; on generalized instances of
-           ;; SB-MOP:FUNCALLABLE-STANDARD-OBJECT; at present, even
-           ;; PCL's internal use of SET-FUNCALLABLE-INSTANCE-FUNCTION
-           ;; doesn't obey this restriction.
-           (type funcallable-instance fin))
+  (declare (type function new-value))
+  ;; It's not worth bothering to teach the compiler to efficiently transform
+  ;; a type declaration involving FUNCALLABLE-STANDARD-OBJECT, not the least
+  ;; of the problems being that the type isn't known during make-host-2.
+  (unless (and #+compact-instance-header (functionp fin)
+               #-compact-instance-header (funcallable-instance-p fin)
+               (logtest (layout-flags (%fun-layout fin))
+                        +pcl-object-layout-flag+))
+    (error 'type-error :datum fin :expected-type 'funcallable-standard-object))
   (setf (%funcallable-instance-fun fin) new-value))
 
 ;;; FIXME: these macros should just go away.  It's not clear whether

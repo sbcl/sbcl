@@ -66,11 +66,10 @@
                                          (%make-standard-funcallable-instance slots hash))))
                        (setf (%fun-layout f) wrapper)
                        f)))))
-    (set-funcallable-instance-function
-     fin
-     #'(lambda (&rest args)
-         (declare (ignore args))
-         (error 'unset-funcallable-instance-function
+    (setf (%funcallable-instance-fun fin)
+          (lambda (&rest args)
+            (declare (ignore args))
+            (error 'unset-funcallable-instance-function
                 :format-control "~@<The function of funcallable instance ~
                                  ~S has not been set.~@:>"
                 :format-arguments (list fin))))
