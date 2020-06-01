@@ -30,10 +30,10 @@
          (dd-slots (lvar-value defstruct-description)))
   #+(and :gencgc :c-stack-is-control-stack)
   t)
-#+(or x86 x86-64)
+#+stack-allocatable-fixed-objects
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
-  (declare (ignore n dx))
-  t)
+  (declare (ignore n))
+  (eq dx 'truly-dynamic-extent))
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))

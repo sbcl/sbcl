@@ -360,7 +360,8 @@
 ;;  - multiple-value-call in WITH-CHAR-MACRO-RESULT
 ;;  - the initial cons cell in READ-LIST
 (with-test (:name :read-does-not-cons-per-se
-                  :skipped-on (:or :interpreter (:not :x86-64)))
+            :skipped-on (:or (:not :stack-allocatable-fixed-objects)
+                             :interpreter))
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
              (read s) ; once outside the loop, to make A-SYMBOL
