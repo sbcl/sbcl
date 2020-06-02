@@ -433,7 +433,7 @@
   (checked-compile-and-assert (:optimize '(:safety 0))
       `(lambda (x)
          ;; Strings are null-terminated for C interoperability
-         (char "abcd" x))
+         (char #.(coerce "abcd" 'simple-base-string) x))
     ((4) #\Nul)))
 
 (with-test (:name (adjust-array :transform))

@@ -938,12 +938,11 @@ NWORDS(uword_t x, uword_t n_bits)
 
 DEF_SPECIALIZED_VECTOR(vector_nil, 0*length)
 DEF_SPECIALIZED_VECTOR(vector_bit, NWORDS(length,1))
-/* NOTE: strings contain one more element of data (a terminating '\0'
+/* NOTE: base strings contain one more element of data (a terminating '\0'
  * to help interface with C functions) than indicated by the length slot.
- * This is true even for UCS4 strings, despite that C APIs are unlikely
- * to have a convention that expects 4 zero bytes. */
+ * UCS4 strings do not get a terminator element */
 DEF_SPECIALIZED_VECTOR(base_string, NWORDS((length+1), 8))
-DEF_SPECIALIZED_VECTOR(character_string, NWORDS((length+1), 32))
+DEF_SPECIALIZED_VECTOR(character_string, NWORDS(length, 32))
 DEF_SCAV_TRANS_SIZE_UB(2)
 DEF_SCAV_TRANS_SIZE_UB(4)
 DEF_SCAV_TRANS_SIZE_UB(8)

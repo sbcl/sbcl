@@ -78,7 +78,6 @@
                     :complex-typecode #.complex-base-string-widetag)
          #+sb-unicode
          (character ,(code-char 0) 32 simple-character-string
-                    :n-pad-elements 1
                     :complex-typecode #.complex-character-string-widetag)
          (single-float $0.0f0 32 simple-array-single-float)
          (double-float $0.0d0 64 simple-array-double-float)
