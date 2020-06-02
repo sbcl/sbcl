@@ -369,7 +369,6 @@
         (annotate-1-value-lvar arg)))))
 
 ;;; ...lists
-#+stack-allocatable-lists
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
     (declare (ignore dx))

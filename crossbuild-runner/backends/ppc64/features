@@ -1,6 +1,6 @@
 ; threads are required because differing versions of the vops for BOUNDP
 ; and [fast-]symbol-[global-]value and CAS create extra maintenance burden.
 :64-bit :untagged-fdefns :sb-thread
-:gencgc :stack-allocatable-closures :stack-allocatable-vectors
-:stack-allocatable-lists :stack-allocatable-fixed-objects
+:gencgc :stack-allocatable-vectors
+:stack-allocatable-fixed-objects
 :compare-and-swap-vops :alien-callbacks

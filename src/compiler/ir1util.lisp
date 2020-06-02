@@ -762,9 +762,7 @@
   (declare (ignorable lvar flush))
 
   #+(and sb-xc-host
-          (not (and stack-allocatable-closures
-                    stack-allocatable-vectors
-                    stack-allocatable-lists
+          (not (and stack-allocatable-vectors
                     stack-allocatable-fixed-objects)))
   (return-from note-no-stack-allocation)
 

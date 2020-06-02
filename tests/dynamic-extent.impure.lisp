@@ -330,7 +330,7 @@
 (defun make-var-length-dx-list (n thunk)
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
     (funcall thunk s)))
-;; :stack-allocatable-lists is necessary but not sufficient
+;; stack-allocatable lists are necessary but not sufficient
 (with-test (:name (:dx-list :make-list) :skipped-on (not :x86-64))
   (assert (null (ctu:find-named-callees #'make-var-length-dx-list)))
   (assert-no-consing (make-var-length-dx-list
@@ -703,12 +703,11 @@
 
 (defvar *a-cons* (cons nil nil))
 
-(with-test (:name (:no-consing :dx-closures) :skipped-on (not :stack-allocatable-closures))
+(with-test (:name (:no-consing :dx-closures))
   (assert-no-consing (dxclosure 42)))
 
 (with-test (:name (:no-consing :dx-lists)
-            :skipped-on (not (and :stack-allocatable-lists
-                               :stack-allocatable-fixed-objects)))
+            :skipped-on (not :stack-allocatable-fixed-objects))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))
@@ -725,13 +724,11 @@
   (assert-no-consing (list-delete-some-stuff))
   (assert-no-consing (multiple-dx-uses)))
 
-(with-test (:name (:no-consing :dx-value-cell)
-                  :skipped-on (not :stack-allocatable-closures))
+(with-test (:name (:no-consing :dx-value-cell))
   (assert-no-consing (dx-value-cell 13)))
 
 (with-test (:name (:no-consing :dx-fixed-objects)
-                  :skipped-on (not (and :stack-allocatable-fixed-objects
-                                         :stack-allocatable-closures)))
+                  :skipped-on (not :stack-allocatable-fixed-objects))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
@@ -1017,8 +1014,7 @@
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
 (with-test (:name :handler-case-bogus-compiler-note
-            :skipped-on (not (and :stack-allocatable-fixed-objects
-                                   :stack-allocatable-closures)))
+            :skipped-on (not :stack-allocatable-fixed-objects))
   ;; Taken from SWANK, used to signal a bogus stack allocation
   ;; failure note.
   (checked-compile
@@ -1045,8 +1041,7 @@
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
 (with-test (:name :dx-compiler-notes
-            :skipped-on (not (and :stack-allocatable-vectors
-                                  :stack-allocatable-closures))
+            :skipped-on (not :stack-allocatable-vectors)
             :fails-on (and))
   (flet ((assert-notes (j lambda)
            (let ((notes (nth 4 (multiple-value-list (checked-compile lambda))))) ; TODO
@@ -1099,8 +1094,7 @@
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
 (with-test (:name :handler-case-eating-stack
-            :skipped-on (not (and :stack-allocatable-fixed-objects
-                                   :stack-allocatable-closures)))
+            :skipped-on (not :stack-allocatable-fixed-objects))
   (assert-no-consing (handler-case-eating-stack)))
 
 ;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going
@@ -1144,8 +1138,7 @@
           :allow-notes 'sb-ext:compiler-note)))
 
 (with-test (:name :bug-586105
-            :skipped-on (not (and :stack-allocatable-vectors
-                               :stack-allocatable-lists)))
+            :skipped-on (not :stack-allocatable-vectors))
   (flet ((test (x)
            (let ((vec1 (make-array 1 :initial-contents (list (list x))))
                  (vec2 (make-array 1 :initial-contents `((,x))))
@@ -1448,14 +1441,12 @@
               t))
   (assert (and (= i 1) (= j 1))))
 
-(with-test (:name (:no-consing :auto-dx-closures)
-                  :skipped-on (not :stack-allocatable-closures))
+(with-test (:name (:no-consing :auto-dx-closures))
   (assert-no-consing (autodxclosure1 42))
   (assert-no-consing (autodxclosure2)))
 
 #+gencgc
-(with-test (:name (:no-consing :more-auto-dx-closures)
-                  :skipped-on (not :stack-allocatable-closures))
+(with-test (:name (:no-consing :more-auto-dx-closures))
   (assert-no-consing
    (let ((ct 0))
      (sb-vm:map-allocated-objects
@@ -1475,9 +1466,7 @@
      1)
    :allow-notes nil))
 
-(with-test (:name :stack-alloc-p
-            :skipped-on (or (not :stack-allocatable-lists)
-                            (not :sb-thread)))
+(with-test (:name :stack-alloc-p :skipped-on (not :sb-thread))
   (let* ((sem1 (sb-thread:make-semaphore))
          (sem2 (sb-thread:make-semaphore))
          (blah nil)

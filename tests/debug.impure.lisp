@@ -168,7 +168,7 @@
     (untrace)
     (assert (>= (count #\Newline (get-output-stream-string s)) 4))))
 
-(with-test (:name :bug-310175 :fails-on (not :stack-allocatable-lists))
+(with-test (:name :bug-310175)
   ;; KLUDGE: Not all DX-enabled platforms DX CONS, and the compiler
   ;; transforms two-arg-LIST* (and one-arg-LIST) to CONS.  Therefore,
   ;; use two-arg-LIST, which should get through to VOP LIST, and thus

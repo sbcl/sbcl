@@ -401,9 +401,6 @@
  ;;   just parameterized by #+X86, but it'd probably be better to
  ;;   use new flags like :CONTROL-STACK-CONTAINS-C-STACK.
  ;;
- ;;   :stack-allocatable-closures
- ;;     The compiler can allocate dynamic-extent closures on stack.
- ;;
  ;;   :alien-callbacks
  ;;     Alien callbacks have been implemented for this platform.
  ;;

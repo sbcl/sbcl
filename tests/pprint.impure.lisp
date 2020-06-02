@@ -287,8 +287,7 @@
                        (*print-pretty* t))
                    (format nil "~@<~S~:>" (make-instance 'frob))))))
 
-(with-test (:name :pprint-logical-block-code-deletion-node
-                  :skipped-on (not :stack-allocatable-closures))
+(with-test (:name :pprint-logical-block-code-deletion-node)
   (handler-case
       (compile nil
                `(lambda (words &key a b c)

@@ -1,6 +1,6 @@
 :64-bit :gencgc :fp-and-pc-standard-save
 :alien-callbacks
-:stack-allocatable-lists :stack-allocatable-fixed-objects
-:stack-allocatable-vectors :stack-allocatable-closures
+:stack-allocatable-fixed-objects
+:stack-allocatable-vectors
 :unbind-in-unwind
 :compare-and-swap-vops :undefined-fun-restarts

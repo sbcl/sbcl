@@ -5085,8 +5085,7 @@
 ;; quantifiers shouldn't cons themselves.
 (with-test (:name :quantifiers-no-consing
             :serial t
-            :skipped-on (or :interpreter
-                             (not :stack-allocatable-closures)))
+            :skipped-on :interpreter)
   (let ((constantly-t (lambda (x) x t))
         (constantly-nil (lambda (x) x nil))
         (list (make-list 1000 :initial-element nil))

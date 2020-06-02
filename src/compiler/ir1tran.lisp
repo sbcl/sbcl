@@ -1541,12 +1541,7 @@
                (etypecase fun
                  (leaf
                   (if bound-fun
-                      #+stack-allocatable-closures
                       (setf (leaf-extent bound-fun) extent)
-                      #-stack-allocatable-closures
-                      (compiler-notify
-                       "Ignoring DYNAMIC-EXTENT declaration on function ~S ~
-                        (not supported on this platform)." fname)
                       (compiler-notify
                        "Ignoring free DYNAMIC-EXTENT declaration: ~S" name)))
                  (cons

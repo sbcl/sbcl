@@ -3,9 +3,7 @@
 :c-stack-is-control-stack
 :compare-and-swap-vops
 :unwind-to-frame-and-call-vop
-:stack-allocatable-closures
 :stack-allocatable-vectors
-:stack-allocatable-lists
 :stack-allocatable-fixed-objects
 :alien-callbacks
 :cycle-counter
