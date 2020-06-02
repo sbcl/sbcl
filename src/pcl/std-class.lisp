@@ -1644,20 +1644,20 @@
        (error 'obsolete-structure :datum instance)))))
 
 
-(defun %change-class (instance new-class initargs)
-  (declare (notinline allocate-instance))
-  (binding* ((old-wrapper (layout-of instance))
+(defun %change-class (copy instance new-class initargs)
+  (binding* ((new-wrapper (class-wrapper (ensure-class-finalized new-class)))
+             (new-slots (make-array (layout-length new-wrapper)
+                                    :initial-element +slot-unbound+))
+             (old-wrapper (layout-of instance))
              (old-class (wrapper-class* old-wrapper))
-             (copy (allocate-instance new-class))
-             (new-wrapper (let ((layout (layout-of copy)))
-                            (aver (layout-for-pcl-obj-p layout))
-                            (aver (= (layout-bitmap old-wrapper)
-                                     (layout-bitmap layout)))
-                            layout))
              (old-slots (get-slots instance))
-             (new-slots (get-slots copy))
              (safe (safe-p new-class))
              (new-wrapper-slots (layout-slot-list new-wrapper)))
+    (if (functionp copy)
+        (setf (%fun-layout copy) new-wrapper
+              (%fsc-instance-slots copy) new-slots)
+        (setf (%instance-layout copy) new-wrapper
+              (%std-instance-slots copy) new-slots))
     (flet ((initarg-for-slot-p (slot)
              (when initargs
                (dolist (slot-initarg (slot-definition-initargs slot))
@@ -1696,22 +1696,13 @@
     ;; All uses of %CHANGE-CLASS are under the world lock, but that doesn't
     ;; preclude user code operating on the old slots + new layout or v.v.
     ;; Users need to synchronize their own access when changing class.
-    (cond ((std-instance-p instance)
-           (rotatef (%instance-layout instance) (%instance-layout copy))
-           (rotatef (%std-instance-slots instance) (%std-instance-slots copy)))
-          (t
+    (cond ((functionp instance)
            (rotatef (%fun-layout instance) (%fun-layout copy))
-           (rotatef (%fsc-instance-slots instance) (%fsc-instance-slots copy))))
-
+           (rotatef (%fsc-instance-slots instance) (%fsc-instance-slots copy)))
+          (t
+           (rotatef (%instance-layout instance) (%instance-layout copy))
+           (rotatef (%std-instance-slots instance) (%std-instance-slots copy))))
     (apply #'update-instance-for-different-class copy instance initargs)
-    ;; If the user subsequently operates on COPY, crash and burn. As per CLHS:
-    ;;  "The first argument to update-instance-for-different-class, /previous/,
-    ;;  is that copy; it holds the old slot values temporarily. This argument has
-    ;;  dynamic extent within change-class; if it is referenced in any way once
-    ;;  update-instance-for-different-class returns, the results are undefined."
-    (cond ((std-instance-p copy) (setf (%std-instance-slots copy) 0))
-          ((fsc-instance-p copy) (setf (%fsc-instance-slots copy) 0)))
-
     instance))
 
 (defun check-new-class-not-metaobject (new-class)
@@ -1727,11 +1718,26 @@
       (check-metaobject method)
       (check-metaobject slot-definition))))
 
+;;; "The first argument to update-instance-for-different-class, /previous/,
+;;; is that copy; it holds the old slot values temporarily. This argument has
+;;; dynamic extent within change-class; if it is referenced in any way once
+;;; update-instance-for-different-class returns, the results are undefined."
+;;; The full ALLOCATE-INSTANCE protocol can not possibly support dynamic-extent
+;;; allocation (at least, for SBCL; maybe for others it can).
+;;; Calling ALLOCATE-INSTANCE from CHANGE-CLASS doesn't seem to be mandatory.
+;;; At least 4 other Lisp implementations I tested don't call it.
+(macrolet ((with-temporary-instance ((var) &body body)
+             `(dx-let ((,var (%make-instance (1+ sb-vm:instance-data-start))))
+                (let ((.result. (progn ,@body)))
+                  ;; Crash if the user subsequently operates on VAR.
+                  #-stack-allocatable-fixed-objects (setf (%std-instance-slots ,var) 0)
+                  .result.))))
 (defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
   (with-world-lock ()
     (check-new-class-not-metaobject new-class)
-    (%change-class instance new-class initargs)))
+    (with-temporary-instance (temp)
+      (%change-class temp instance new-class initargs))))
 
 (defmethod change-class ((instance forward-referenced-class)
                          (new-class standard-class) &rest initargs)
@@ -1744,7 +1750,8 @@
                 (:amop :initialization class))))
       (when (eq class (find-class 'class))
         (return nil)))
-    (%change-class instance new-class initargs)))
+    (with-temporary-instance (temp)
+      (%change-class temp instance new-class initargs)))))
 
 (defmethod change-class ((instance t)
                          (new-class forward-referenced-class) &rest initargs)
@@ -1754,12 +1761,25 @@
    '((:amop :generic-function ensure-class-using-class)
      (:amop :initialization class))))
 
+(macrolet ((with-temporary-funinstance ((var) &body body)
+             `(dx-let ((,var (%make-funcallable-instance
+                              (+ sb-vm:instance-data-start 2))))
+                (dx-flet ((signal-error ()
+                            (declare (optimize (sb-c::verify-arg-count 0)))
+                            (error-no-implementation-function ,var)))
+                  (setf (%funcallable-instance-fun ,var) #'signal-error)
+                  (let ((.result. (progn ,@body)))
+                    ;; Crash if the user subsequently operates on VAR.
+                    #-stack-allocatable-fixed-objects
+                    (setf (%fsc-instance-slots ,var) 0)
+                    .result.)))))
 (defmethod change-class ((instance funcallable-standard-object)
                          (new-class funcallable-standard-class)
                          &rest initargs)
   (with-world-lock ()
     (check-new-class-not-metaobject new-class)
-    (%change-class instance new-class initargs)))
+    (with-temporary-funinstance (temp)
+      (%change-class temp instance new-class initargs)))))
 
 (defmethod change-class ((instance standard-object)
                          (new-class funcallable-standard-class)

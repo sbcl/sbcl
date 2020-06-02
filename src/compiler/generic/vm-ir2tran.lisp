@@ -31,9 +31,13 @@
   #+(and :gencgc :c-stack-is-control-stack)
   t)
 #+stack-allocatable-fixed-objects
+(progn
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
   (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
+(defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)
+  (declare (ignore n))
+  (eq dx 'truly-dynamic-extent)))
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))

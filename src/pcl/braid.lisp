@@ -45,6 +45,12 @@
    :references '((:amop :generic-function allocate-instance)
                  (:amop :function set-funcallable-instance-function))))
 
+(defmacro error-no-implementation-function (fin)
+  `(error 'unset-funcallable-instance-function
+          :format-control "~@<The function of funcallable instance ~
+                           ~S has not been set.~@:>"
+          :format-arguments (list ,fin)))
+
 (defun allocate-standard-funcallable-instance (wrapper name)
   (declare (layout wrapper))
   (let* ((hash (if name
@@ -69,10 +75,7 @@
     (setf (%funcallable-instance-fun fin)
           (lambda (&rest args)
             (declare (ignore args))
-            (error 'unset-funcallable-instance-function
-                :format-control "~@<The function of funcallable instance ~
-                                 ~S has not been set.~@:>"
-                :format-arguments (list fin))))
+            (error-no-implementation-function fin)))
     fin))
 
 (defun classify-slotds (slotds)
