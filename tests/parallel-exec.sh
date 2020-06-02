@@ -5,6 +5,7 @@ echo ==== Writing logs to $logdir ====
 junkdir=${SBCL_PAREXEC_TMP:-/tmp}/junk
 mkdir -p $junkdir $logdir
 
+export TEST_DIRECTORY SBCL_HOME
 TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --noinform --core ../output/sbcl.core --no-userinit --no-sysinit --noprint --disable-debugger << EOF
 (require :sb-posix)
