@@ -1704,15 +1704,11 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 {
     // If a headerless object, confirm that 'pointer' is a list pointer.
     // Given the precondition that the heap is in a valid state,
-    // it may be assumed that one check of is_cons_half() suffices;
-    // we don't need to check the other half.
+    // it may be assumed that is_cons_half() is satisfied by both the
+    // car and cdr.
     lispobj word = *start_addr;
     if (!is_header(word))
         return make_lispobj(start_addr, LIST_POINTER_LOWTAG) == pointer;
-
-    // Because this heap object was not deemed to be a cons,
-    // it must be an object header. Don't need a check except when paranoid.
-    gc_dcheck(other_immediate_lowtag_p(header));
 
     int widetag = header_widetag(word);
     int lowtag = LOWTAG_FOR_WIDETAG(widetag);

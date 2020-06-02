@@ -413,6 +413,16 @@ lispobj symbol_function(lispobj* symbol);
 #endif
 typedef int boolean;
 
+// other_immediate_lowtag_p is the least strict of the tests for whether a word
+// is potentially an object header, merely checking whether the bits fit the general
+// pattern of header widetags without regard for whether some headered object type
+// could in fact have those exact low bits. Specifically, this falsely returns 1
+// for UNBOUND_MARKER_WIDETAG, CHARACTER_WIDETAG, and on 64-bit machines,
+// SINGLE_FLOAT_WIDETAG; as well as unallocated and unused widetags (e.g. LRA on x86)
+// none of which denote the start of a headered object.
+// The ambiguous cases are for words would start a cons - the three mentioned above.
+// Other cases (NO_TLS_VALUE_MARKER_WIDETAG and other things) do not cause a problem
+// in practice because they can't be the first word of a lisp object.
 static inline boolean
 other_immediate_lowtag_p(lispobj header)
 {
