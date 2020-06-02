@@ -71,9 +71,10 @@
   (let* ((classoid (find-classoid (dd-name dd)))
          (layout (classoid-layout classoid)))
     (setf (%instance-ref layout (get-dsd-index sb-kernel:layout sb-kernel::equalp-impl))
-          (or equalp
-              (if (eql (layout-bitmap layout) +layout-all-tagged+)
-                  #'sb-impl::instance-equalp
+          (cond ((compiled-function-p equalp) equalp)
+                ((eql (layout-bitmap layout) +layout-all-tagged+)
+                 #'sb-impl::instance-equalp)
+                (t
                   ;; Make a vector of EQUALP slots comparators, indexed by
                   ;; (- word-index INSTANCE-DATA-START).
                   ;; The initial element of NIL means "do not compare".
