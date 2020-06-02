@@ -132,15 +132,22 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name stack-allocate-p)
+  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (pseudo-atomic ()
-      (allocation nil (pad-data-block words) lowtag result :temp-tn temp)
-      (when type
-        (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
-        (storew temp result 0 lowtag)))))
+    (cond (stack-allocate-p
+	   (allocation nil (pad-data-block words)
+		       lowtag result :stack-p t :temp-tn temp)
+	   (when type
+	     (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
+	     (storew temp result 0 lowtag)))
+	  (t
+            (pseudo-atomic ()
+              (allocation nil (pad-data-block words) lowtag result :temp-tn temp)
+              (when type
+                (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
+                (storew temp result 0 lowtag)))))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

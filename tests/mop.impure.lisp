@@ -760,8 +760,7 @@
   (assert (sb-ext:stack-allocated-p old))
   (when (functionp new)
     (assert (sb-ext:stack-allocated-p (sb-kernel:%funcallable-instance-fun old)))))
-(with-test (:name :change-class-temp-on-stack
-            :fails-on (:not :stack-allocatable-fixed-objects))
+(with-test (:name :change-class-temp-on-stack)
   (let ((i (make-instance 'chgclass-dx-test-1))
         (*uifdc-called* nil))
     (change-class i 'chgclass-dx-test-2)

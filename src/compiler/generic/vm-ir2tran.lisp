@@ -13,7 +13,6 @@
            sb-vm:instance-widetag sb-vm:instance-pointer-lowtag
            nil)
 
-#+stack-allocatable-fixed-objects
 (defoptimizer (%make-structure-instance stack-allocate-result)
     ((defstruct-description &rest args) node dx)
   (declare (ignore args dx))
@@ -30,14 +29,13 @@
          (dd-slots (lvar-value defstruct-description)))
   #+(and :gencgc :c-stack-is-control-stack)
   t)
-#+stack-allocatable-fixed-objects
-(progn
+
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
   (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
 (defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)
   (declare (ignore n))
-  (eq dx 'truly-dynamic-extent)))
+  (eq dx 'truly-dynamic-extent))
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
@@ -381,14 +379,12 @@
     t))
 
 ;;; ...conses
-#+stack-allocatable-fixed-objects
-(progn
-  (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
+(defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
     (declare (ignore args dx))
     t)
-  (defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
+(defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
     (declare (ignore args dx))
-    t))
+    t)
 
 ;;; MAKE-LIST optimizations
 #+x86-64

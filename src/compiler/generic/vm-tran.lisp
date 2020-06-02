@@ -117,7 +117,6 @@
     ;; There are some benefits to using the simple case for a known exact type:
     ;; - the layout can be wired in which might or might not save 1 instruction
     ;;   depending on whether layouts are in immobile space.
-    ;; - all backends can do this (subject to stack-allocatable-fixed-objects)
     ;; - for a small number of slots, copying them is inlined
     (cond ((not dd) ; it's going to be some subtype of NAME
            `(%copy-instance (%make-instance (%instance-length instance)) instance))

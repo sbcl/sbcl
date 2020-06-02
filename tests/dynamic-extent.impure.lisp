@@ -338,7 +338,7 @@
 
 ;;; MAKE-STRUCTURE
 
-;; :stack-allocatable-fixed-objects is necessary but not sufficient
+;; stack-allocatable fixed-size objects are necessary but not sufficient
 (with-test (:name :copy-structure-dx :skipped-on (not (or :x86 :x86-64)))
   (let ((thing sb-c::*backend-parsed-vops*))
     ;; check some preconditions
@@ -706,8 +706,7 @@
 (with-test (:name (:no-consing :dx-closures))
   (assert-no-consing (dxclosure 42)))
 
-(with-test (:name (:no-consing :dx-lists)
-            :skipped-on (not :stack-allocatable-fixed-objects))
+(with-test (:name (:no-consing :dx-lists))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))
@@ -727,8 +726,7 @@
 (with-test (:name (:no-consing :dx-value-cell))
   (assert-no-consing (dx-value-cell 13)))
 
-(with-test (:name (:no-consing :dx-fixed-objects)
-                  :skipped-on (not :stack-allocatable-fixed-objects))
+(with-test (:name (:no-consing :dx-fixed-objects))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
@@ -1013,8 +1011,7 @@
 (with-test (:name :length-and-words-packed-in-same-tn)
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
-(with-test (:name :handler-case-bogus-compiler-note
-            :skipped-on (not :stack-allocatable-fixed-objects))
+(with-test (:name :handler-case-bogus-compiler-note)
   ;; Taken from SWANK, used to signal a bogus stack allocation
   ;; failure note.
   (checked-compile
@@ -1093,8 +1090,7 @@
       (if sp
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
-(with-test (:name :handler-case-eating-stack
-            :skipped-on (not :stack-allocatable-fixed-objects))
+(with-test (:name :handler-case-eating-stack)
   (assert-no-consing (handler-case-eating-stack)))
 
 ;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going

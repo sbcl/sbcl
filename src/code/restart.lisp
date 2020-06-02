@@ -9,7 +9,6 @@
 
 (in-package "SB-KERNEL")
 
-#+stack-allocatable-fixed-objects
 (declaim (inline make-restart)) ;; to allow DX-allocation
 
 (defstruct (restart (:constructor make-restart

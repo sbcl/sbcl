@@ -1,3 +1,2 @@
 :gencgc :stack-allocatable-vectors
-:stack-allocatable-fixed-objects
 :compare-and-swap-vops :alien-callbacks

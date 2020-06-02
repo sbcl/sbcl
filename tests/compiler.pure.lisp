@@ -5029,9 +5029,7 @@
                               y)))
         (((list (string 'list)) (list "LIST")) t)))))
 
-(with-test (:name (compile restart-case optimize speed compiler-note)
-                  ;; Cannot-DX note crashes test driver unless we have this:
-            :skipped-on (not :stack-allocatable-fixed-objects))
+(with-test (:name (compile restart-case optimize speed compiler-note))
   (checked-compile '(lambda ()
                      (declare (optimize speed))
                      (restart-case () (c ()))))

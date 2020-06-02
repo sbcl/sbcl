@@ -1803,9 +1803,4 @@ symbol-case giving up: case=((V U) (F))
                                                  ,wild-result-type)))
            (declare (ignorable ,var))
            ,@body)
-         ;; On the architecture that does not support #+stack-allocatable-fixed-objects
-         ;; (Sparc) we could close the stream, but what's the point of doing that
-         ;; whem you're expressly prohibited by the standard from using the variable
-         ;; outside of its extent as specified? Just fix the backend if it bothers you.
-         ;; And I'm not even considering the obsolete backends.
          (get-output-stream-string ,dummy)))))

@@ -2,5 +2,4 @@
 ; and [fast-]symbol-[global-]value and CAS create extra maintenance burden.
 :64-bit :untagged-fdefns :sb-thread
 :gencgc :stack-allocatable-vectors
-:stack-allocatable-fixed-objects
 :compare-and-swap-vops :alien-callbacks

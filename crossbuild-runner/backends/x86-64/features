@@ -6,7 +6,6 @@
 :unwind-to-frame-and-call-vop
 :fp-and-pc-standard-save
 :stack-allocatable-vectors
-:stack-allocatable-fixed-objects
 :alien-callbacks
 :cycle-counter
 :integer-eql-vop

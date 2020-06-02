@@ -4,7 +4,6 @@
 :compare-and-swap-vops
 :unwind-to-frame-and-call-vop
 :stack-allocatable-vectors
-:stack-allocatable-fixed-objects
 :alien-callbacks
 :cycle-counter
 :fp-and-pc-standard-save

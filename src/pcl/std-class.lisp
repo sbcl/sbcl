@@ -1728,10 +1728,7 @@
 ;;; At least 4 other Lisp implementations I tested don't call it.
 (macrolet ((with-temporary-instance ((var) &body body)
              `(dx-let ((,var (%make-instance (1+ sb-vm:instance-data-start))))
-                (let ((.result. (progn ,@body)))
-                  ;; Crash if the user subsequently operates on VAR.
-                  #-stack-allocatable-fixed-objects (setf (%std-instance-slots ,var) 0)
-                  .result.))))
+                ,@body)))
 (defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
   (with-world-lock ()
@@ -1768,11 +1765,7 @@
                             (declare (optimize (sb-c::verify-arg-count 0)))
                             (error-no-implementation-function ,var)))
                   (setf (%funcallable-instance-fun ,var) #'signal-error)
-                  (let ((.result. (progn ,@body)))
-                    ;; Crash if the user subsequently operates on VAR.
-                    #-stack-allocatable-fixed-objects
-                    (setf (%fsc-instance-slots ,var) 0)
-                    .result.)))))
+                  ,@body))))
 (defmethod change-class ((instance funcallable-standard-object)
                          (new-class funcallable-standard-class)
                          &rest initargs)
