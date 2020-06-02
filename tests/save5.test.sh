@@ -10,8 +10,9 @@ run_sbcl <<EOF
   (defun bar ()
     (format t "~&Callbacks not supported, skipping~%")
     (exit :code 42))
-  #+alien-callbacks
-  (progn
+  ;; The symbol SB-ALIEN::DEFINE-ALIEN-CALLBACK exists (can be read)
+  ;; no matter whether support for it exists.
+  (when (member :alien-callbacks sb-impl:+internal-features+)
     (fmakunbound 'bar)
     (sb-alien::define-alien-callback foo int () 42)
     (defun bar () (exit :code (alien-funcall foo))))
