@@ -137,12 +137,12 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
     (cond (stack-allocate-p
-	   (allocation nil (pad-data-block words)
-		       lowtag result :stack-p t :temp-tn temp)
-	   (when type
-	     (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
-	     (storew temp result 0 lowtag)))
-	  (t
+           (allocation nil (pad-data-block words)
+                       lowtag result :stack-p t :temp-tn temp)
+           (when type
+             (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
+             (storew temp result 0 lowtag)))
+          (t
             (pseudo-atomic ()
               (allocation nil (pad-data-block words) lowtag result :temp-tn temp)
               (when type

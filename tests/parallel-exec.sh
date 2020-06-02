@@ -74,11 +74,12 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
             (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                   *error-output*))
             (cond ((string= (pathname-type file) "test")
-                   ;; exec /bin/sh with the test and we'll pick up its exit code
-                   (alien-funcall (extern-alien "execl" (function int c-string c-string
-                                                                  c-string unsigned))
-                                  "/bin/sh" "/bin/sh"
-                                  (concatenate 'string file ".sh") 0)
+                   (let ((shell (or (posix-getenv "SHELL") "/bin/sh")))
+                     ;; exec the shell with the test and we'll pick up its exit code
+                     (alien-funcall (extern-alien "execl" (function int c-string c-string
+                                                                    c-string unsigned))
+                                    shell shell
+                                    (concatenate 'string file ".sh") 0))
                    ;; if exec fails, just exit with a wrong (not 104) status
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
