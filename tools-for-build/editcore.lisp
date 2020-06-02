@@ -1774,9 +1774,11 @@
               (when verbose
                 (format t "File offset ~10x: ~10x bytes~%" offset nbytes))
               (setq filepos (+ core-offset offset))
-              (file-position input filepos)
-              (when split-core
-                (copy-bytes input split-core nbytes buffer))))
+              (cond (split-core
+                     (file-position input filepos)
+                     (copy-bytes input split-core nbytes buffer))
+                    (t
+                     (file-position input (+ filepos nbytes))))))
           ;; Trailer (runtime options and magic number)
           (let ((nbytes (read-sequence buffer input)))
             ;; expect trailing magic number
