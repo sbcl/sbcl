@@ -12,9 +12,9 @@
 (in-package "SB-VM")
 
 
-(define-assembly-routine (allocate-vector
+(macrolet ((foo (name)
+`(define-assembly-routine (,name
                           (:policy :fast-safe)
-                          (:translate allocate-vector)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -37,4 +37,6 @@
     (inst bis alloc-tn other-pointer-lowtag result)
     (inst addq alloc-tn words alloc-tn)
     (storew ndescr result 0 other-pointer-lowtag)
-    (storew length result vector-length-slot other-pointer-lowtag)))
+    (storew length result vector-length-slot other-pointer-lowtag)))))
+  (foo allocate-vector-on-heap)
+  (foo allocate-vector-on-stack)) ; get crossbuild to pass for what that's worth

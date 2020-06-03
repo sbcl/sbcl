@@ -1,5 +1,4 @@
 :64-bit :gencgc :fp-and-pc-standard-save
 :alien-callbacks
-:stack-allocatable-vectors
 :unbind-in-unwind
 :compare-and-swap-vops :undefined-fun-restarts

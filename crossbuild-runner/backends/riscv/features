@@ -1,3 +1,2 @@
 :gencgc
-:stack-allocatable-vectors
 :compare-and-swap-vops :memory-barrier-vops

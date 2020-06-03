@@ -5,7 +5,6 @@
 :compare-and-swap-vops
 :unwind-to-frame-and-call-vop
 :fp-and-pc-standard-save
-:stack-allocatable-vectors
 :alien-callbacks
 :cycle-counter
 :integer-eql-vop

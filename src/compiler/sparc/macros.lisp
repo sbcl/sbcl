@@ -176,7 +176,7 @@
       #+nil (inst add ,temp-tn csp-tn sb-vm:lowtag-mask)
       #+nil (inst andn ,temp-tn sb-vm:lowtag-mask)
 
-      ;; Set the result to temp-tn, with appropriate lowtag
+      ;; Set the result to csp-tn, with appropriate lowtag
       (inst or result-tn csp-tn lowtag)
 
       ;; Allocate the desired space on the stack.

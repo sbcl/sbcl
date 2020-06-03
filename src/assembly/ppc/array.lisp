@@ -14,8 +14,6 @@
 
 (define-assembly-routine (allocate-vector-on-heap
                           (:policy :fast-safe)
-                          #-stack-allocatable-vectors
-                          (:translate allocate-vector)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -51,7 +49,6 @@
   ;;  (storew zero-tn alloc-tn 0)
   (move result vector))
 
-#+stack-allocatable-vectors
 (define-assembly-routine (allocate-vector-on-stack
                           (:policy :fast-safe)
                           (:arg-types positive-fixnum

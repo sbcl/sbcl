@@ -761,9 +761,6 @@
   ;; It's just a distraction otherwise.
   (declare (ignorable lvar flush))
 
-  #+(and sb-xc-host (not stack-allocatable-vectors))
-  (return-from note-no-stack-allocation)
-
   (do-uses (use (principal-lvar lvar))
     (dolist (use (ensure-list (if (cast-p use)
                                   (principal-lvar-use (cast-value use))

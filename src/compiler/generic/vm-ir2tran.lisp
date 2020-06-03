@@ -316,12 +316,10 @@
                  node block (list value-tn) (node-lvar node))))))))
 
 ;;; Stack allocation optimizers per platform support
-#+stack-allocatable-vectors
-(progn
-  (defoptimizer (make-array-header* stack-allocate-result) ((&rest args) node dx)
+(defoptimizer (make-array-header* stack-allocate-result) ((&rest args) node dx)
     args dx
     t)
-  (defoptimizer (allocate-vector stack-allocate-result)
+(defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
     (declare (ignorable type) (ignore length))
     (and
@@ -341,14 +339,13 @@
                           (specifier-type
                            `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
                                            sb-vm:vector-data-offset)))))))
-
-  (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
+(defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (declare (ignore type length words))
     (vectorish-ltn-annotate-helper call ltn-policy
                                    'sb-vm::allocate-vector-on-stack
                                    'sb-vm::allocate-vector-on-heap))
 
-  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
+(defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
     (let* ((args (basic-combination-args call))
            (template-name (if (node-stack-allocate-p call)
                               dx-template
@@ -364,7 +361,7 @@
       (setf (node-tail-p call) nil)
 
       (dolist (arg args)
-        (annotate-1-value-lvar arg)))))
+        (annotate-1-value-lvar arg))))
 
 ;;; ...lists
 (progn

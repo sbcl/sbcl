@@ -370,6 +370,8 @@ about function addresses and register values.")
   (data   :field (byte 22 0) :reader format-2-unimp-data))
 
 (defconstant-eqx f3-printer
+  ;; FIXME: args are inverted if eliding display of source1,
+  ;; and I think totally backwards in any case.
   '(:name :tab
           (:unless (:same-as rd) rs1 ", ")
           (:choose rs2 immed) ", "
