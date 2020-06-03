@@ -906,7 +906,7 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
  * thing to maintain).
  */
 
-void* load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_size_t count;
 
