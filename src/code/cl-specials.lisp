@@ -141,6 +141,14 @@
                        cl:*compile-file-pathname*
                        cl:*compile-file-truename*))
 
+;;; Some functions for which we should *never* (or almost never) bind eagerly
+;;; to the functional definition.
+;;; IR2-CONVERT-GLOBAL-VAR won't use a :KNOWN-FUN constant-tn, but will instead
+;;; dereference the fdefinition like for most function calls.
+;;; They aren't actually "inlined", but they were bypassing the fdefinition in
+;;; situations involving (APPLY ...) which rendered encapsulation impossible.
+(declaim (notinline open compile-file load compile))
+
 ;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
 ;;;; These have alternate definitions (in cross-misc) which rely on
 ;;;; the underlying host DEFVAR when building the cross-compiler.

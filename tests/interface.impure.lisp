@@ -549,4 +549,15 @@
 (with-test (:name :describe-function-not-named-by-designator)
   (describe (formatter "~&~A~A") (make-broadcast-stream))) ; should not crash
 
+(defun test-intercepted-load (arg) (apply #'load arg (list :foo :bar :allow-other-keys t)))
+(compile 'test-intercepted-load)
+(sb-int:encapsulate 'load 'interceptor
+ (compile nil '(lambda (realfun pathname &rest things)
+                (if (eq pathname :testme)
+                    :yes
+                    (apply realfun pathname things)))))
+
+(with-test (:name :load-encapsulatable)
+  (assert (eq (test-intercepted-load :testme) :yes)))
+
 ;;;; success
