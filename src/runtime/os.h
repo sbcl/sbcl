@@ -121,7 +121,7 @@ extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
 /* This maps a file into memory, or calls lose(..) for various
  * failures. */
 extern void* load_core_bytes(int fd,
-                             int offset,
+                             os_vm_offset_t offset,
                              os_vm_address_t addr,
                              os_vm_size_t len);
 
