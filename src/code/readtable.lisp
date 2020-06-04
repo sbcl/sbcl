@@ -71,7 +71,7 @@ types for the Common Lisp expression reader."
                :initial-element +char-attr-constituent+)
    :type attribute-table
    :read-only t)
-  (character-attribute-hash-table (make-hash-table)
+  (character-attribute-hash-table (make-hash-table :test 'eq)
    :type hash-table
    :read-only t)
   ;; The CHARACTER-MACRO-TABLE is a vector of BASE-CHAR-CODE-LIMIT
@@ -84,7 +84,7 @@ types for the Common Lisp expression reader."
    (make-array base-char-code-limit :initial-element nil)
    :type (simple-vector #.base-char-code-limit)
    :read-only t)
-  (character-macro-hash-table (make-hash-table) :type hash-table
+  (character-macro-hash-table (make-hash-table :test 'eq) :type hash-table
    :read-only t)
   (%readtable-case 0 :type (mod 4))
   ;; Element type to use when reading a string literal with no extended-chars.

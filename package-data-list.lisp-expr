@@ -1261,7 +1261,7 @@ possibly temporarily, because it might be used internally."
                "POSSIBLY-BASE-STRINGIZE"
                "POWER-OF-TWO-CEILING"
                "PRINT-NOT-READABLE-ERROR"
-               "REPLACE/EQL-HASH-TABLE"
+               "HASH-TABLE-REPLACE"
                "RECONS"
                "SET-CLOSURE-NAME"
 

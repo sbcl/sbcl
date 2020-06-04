@@ -807,8 +807,7 @@ line break."
          (new (make-pprint-dispatch-table (copy-list (pp-dispatch-entries orig))
                                           (pp-dispatch-number-matchable-p orig)
                                           (pp-dispatch-only-initial-entries orig))))
-    (replace/eql-hash-table (pp-dispatch-cons-entries new)
-                            (pp-dispatch-cons-entries orig))
+    (hash-table-replace (pp-dispatch-cons-entries new) (pp-dispatch-cons-entries orig))
     new))
 
 (defun pprint-dispatch (object &optional (table *print-pprint-dispatch*))

@@ -264,7 +264,7 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
         (if (member new-value '(:strings :both)) 'base-char 'character))
   new-value)
 
-(defun replace/eql-hash-table (to from &optional (transform #'identity))
+(defun hash-table-replace (to from &optional (transform #'identity))
   (maphash (lambda (k v) (setf (gethash k to) (funcall transform v))) from)
   to)
 
@@ -286,8 +286,7 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
   (let ((dtable (%dispatch-macro-char-table entry)))
     (if dtable
         (%make-dispatch-macro-char
-         (cons (awhen (car dtable)
-                 (replace/eql-hash-table (make-hash-table) it))
+         (cons (awhen (car dtable) (hash-table-replace (make-hash-table) it))
                (copy-seq (cdr dtable))))
         entry)))
 
@@ -301,16 +300,14 @@ readtable when not provided."
         (really-to-readtable (or to-readtable (make-readtable))))
     (replace (character-attribute-array really-to-readtable)
              (character-attribute-array really-from-readtable))
-    (replace/eql-hash-table
-     (clrhash (character-attribute-hash-table really-to-readtable))
-     (character-attribute-hash-table really-from-readtable))
+    (hash-table-replace (clrhash (character-attribute-hash-table really-to-readtable))
+                        (character-attribute-hash-table really-from-readtable))
     (map-into (character-macro-array really-to-readtable)
               #'copy-cmt-entry
               (character-macro-array really-from-readtable))
-    (replace/eql-hash-table
-     (clrhash (character-macro-hash-table really-to-readtable))
-     (character-macro-hash-table really-from-readtable)
-     #'copy-cmt-entry)
+    (hash-table-replace (clrhash (character-macro-hash-table really-to-readtable))
+                        (character-macro-hash-table really-from-readtable)
+                        #'copy-cmt-entry)
     (setf (readtable-case really-to-readtable)
           (readtable-case really-from-readtable))
     (setf (%readtable-string-preference really-to-readtable)
