@@ -333,6 +333,8 @@
 #-win32
 (with-test (:name (run-program :if-input-does-not-exist))
   (let ((file (pathname (sb-posix:mktemp "rpXXXXXX"))))
+    (when (boundp 'run-tests::*allowed-inputs*)
+      (push (namestring file) (symbol-value 'run-tests::*allowed-inputs*)))
     (assert (null (run-program "/bin/cat" '() :input file)))
     (assert (null (run-program "/bin/cat" '() :output #.(or *compile-file-truename*
                                                             *load-truename*)
