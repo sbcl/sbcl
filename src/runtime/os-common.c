@@ -262,7 +262,7 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
     }
 #endif
     if (fail)
-        lose("load_core_bytes(%d,%x,%lx,%x) failed", fd, offset, (long)addr, (int)len);
+        lose("load_core_bytes(%d,%zx,%p,%zx) failed", fd, offset, addr, len);
     return (void*)actual;
 }
 
