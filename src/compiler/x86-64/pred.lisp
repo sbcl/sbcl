@@ -267,11 +267,27 @@
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
+  (:args-var x-tn-ref)
   (:generator 6
     (cond
       ((sc-is y immediate)
        (let* ((value (encode-value-if-immediate y))
               (immediate (plausible-signed-imm32-operand-p value)))
+         (when (and (null (tn-value y)) (tn-ref-type x-tn-ref))
+           ;; if the complement of X's type with respect to type NULL can't
+           ;; be a cons, then we don't need a 4-byte comparison against NIL.
+           ;; It suffices to test the low byte. Similar logic could pertain to many
+           ;; other type tests, e.g. STRINGP on known (OR INSTANCE STRING)
+           ;; could skip the widetag test.
+           ;; I'm starting to wonder if it would be better to expose the lowtag/widetag
+           ;; tests in IR1 as an AND expression so that type inference can remove what's
+           ;; possible to deduce. The we just need a way to efficiently recombine
+           ;; the AND back to one vop where we can. "selection DAG, anyone?"
+           (when (not (types-equal-or-intersect
+                       (type-difference (tn-ref-type x-tn-ref) (specifier-type 'null))
+                       (specifier-type 'cons)))
+             (inst cmp :byte x (logand nil-value #xff))
+             (return-from if-eq)))
          (cond ((fixup-p value) ; immobile object
                 (inst cmp x value))
                ((and (zerop value) (sc-is x any-reg descriptor-reg))
