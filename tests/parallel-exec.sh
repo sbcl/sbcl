@@ -74,7 +74,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
             (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                   *error-output*))
             (cond ((string= (pathname-type file) "test")
-                   (let ((shell (or (posix-getenv "SHELL") "/bin/sh")))
+                   (let ((shell (or #+sunos (posix-getenv "SHELL") "/bin/sh")))
                      ;; exec the shell with the test and we'll pick up its exit code
                      (alien-funcall (extern-alien "execl" (function int c-string c-string
                                                                     c-string unsigned))

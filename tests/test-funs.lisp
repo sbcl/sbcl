@@ -78,7 +78,8 @@
   (progn
     (test-util::setenv "TEST_SBCL_EVALUATOR_MODE"
                         (string-downcase *test-evaluator-mode*))
-    (let ((process (sb-ext:run-program (or (posix-getenv "SHELL") "/bin/sh")
+    (let ((process (sb-ext:run-program (or #+sunos (posix-getenv "SHELL")
+                                           "/bin/sh")
                                        (list (native-namestring file))
                                        :output *error-output*)))
       (let ((*failures* nil))
