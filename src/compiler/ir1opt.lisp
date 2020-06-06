@@ -1304,30 +1304,32 @@
        ;; is it for?
        (with-ir1-environment-from-node call
          (let ((fun (defined-fun-functional leaf)))
-           (if (or (not fun)
-                   (and (eq inlinep 'inline) (functional-kind fun))
-                   ;; Referencing it again will break the invariant
-                   ;; for assignment functions.
-                   (eq (functional-kind fun) :assignment))
-               ;; Convert.
-               (let* ((name (leaf-source-name leaf))
-                      (*inline-expansions*
-                        (register-inline-expansion leaf call))
-                      (res (ir1-convert-inline-expansion
-                            name
-                            (defined-fun-inline-expansion leaf)
-                            leaf
-                            inlinep
-                            (info :function :info name))))
-                 ;; Allow backward references to this function from following
-                 ;; forms. (Reused only if policy matches.)
-                 (push res (defined-fun-functionals leaf))
-                 (change-ref-leaf ref res)
-                 (unless ir1-converting-not-optimizing-p
-                   (locall-analyze-component *current-component*)))
-               ;; If we've already converted, change ref to the converted
-               ;; functional.
-               (change-ref-leaf ref fun))))
+           (cond ((or (not fun)
+                      (and (eq inlinep 'inline) (functional-kind fun))
+                      ;; Referencing it again will break the invariant
+                      ;; for assignment functions.
+                      (eq (functional-kind fun) :assignment))
+                  ;; Convert.
+                  (let* ((name (leaf-source-name leaf))
+                         (*inline-expansions*
+                           (register-inline-expansion leaf call))
+                         (res (ir1-convert-inline-expansion
+                               name
+                               (defined-fun-inline-expansion leaf)
+                               leaf
+                               inlinep
+                               (info :function :info name))))
+                    ;; Allow backward references to this function from following
+                    ;; forms. (Reused only if policy matches.)
+                    (push res (defined-fun-functionals leaf))
+                    (change-ref-leaf ref res)
+                    (unless ir1-converting-not-optimizing-p
+                      (locall-analyze-component *current-component*))))
+                 (t
+                  ;; If we've already converted, change ref to the converted
+                  ;; functional.
+                  (maybe-reanalyze-functional fun)
+                  (change-ref-leaf ref fun)))))
        (values (ref-leaf ref) nil))
       (t
        (let ((info (info :function :info (leaf-source-name leaf))))

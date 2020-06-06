@@ -2896,3 +2896,21 @@
                                (+ (restart-bind nil (go missing-tag))
                                   (progv nil nil o)))))))
                  :allow-failure t))))
+
+
+(declaim (maybe-inline inline-recursive))
+(defun inline-recursive (x)
+  (declare (muffle-conditions compiler-note
+                              style-warning))
+  (if (zerop x)
+      x
+      (inline-recursive (1- x))))
+(declaim (inline inline-recursive))
+
+(with-test (:name :reanalyze-functionals-when-inlining)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (inline-recursive x)
+      (inline-recursive x))
+   ((5) 0)))
