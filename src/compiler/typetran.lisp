@@ -75,8 +75,31 @@
 (defun ir1-transform-type-predicate (object type node)
   (declare (type lvar object) (type ctype type))
   (let ((otype (lvar-type object)))
-    (flet ((tricky ()
-             (cond ((typep type 'alien-type-type)
+    (cond ((not (types-equal-or-intersect otype type))
+           (return-from ir1-transform-type-predicate nil))
+          ((csubtypep otype type)
+           (return-from ir1-transform-type-predicate t))
+          ((eq type *empty-type*)
+           (return-from ir1-transform-type-predicate nil)))
+    (let ((intersect (type-intersection2 type otype)))
+      ;; I guess the theory here is that an intersection type
+      ;; is never a singleton, because if we could see that it was
+      ;; a singleton, it wouldn't be an intersection.
+      (when (and intersect (not (intersection-type-p intersect)))
+        (multiple-value-bind (constantp value) (type-singleton-p intersect)
+          (when constantp
+            (return-from ir1-transform-type-predicate `(eql object ',value)))))
+      ;; If the object type is known to be (OR NULL <type>),
+      ;; it is almost always cheaper to test for not EQ to NIL.
+      ;; There is one exception:
+      ;;  - FIXNUMP is possibly cheapear than comparison to NIL, or definitely
+      ;;    not worse. For x86, NIL is a 4-byte immediate operand,
+      ;;    for lack of a null-tn register. FIXNUM-TAG-MASK is only 1 byte.
+      (when (type= otype (type-union (specifier-type 'null) type))
+        (let ((difference (type-difference type (specifier-type 'null))))
+          (unless (type= difference (specifier-type 'fixnum))
+            (return-from  ir1-transform-type-predicate `(not (null object))))))
+      (cond ((typep type 'alien-type-type)
                     ;; We don't transform alien type tests until here, because
                     ;; once we do that the rest of the type system can no longer
                     ;; reason about them properly -- so we'd miss out on type
@@ -86,8 +109,8 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-                   #+(vop-translates sb-int:fixnump-instance-ref)
-                   ((and (type= type (specifier-type 'fixnum))
+            #+(vop-translates sb-int:fixnump-instance-ref)
+            ((and (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)))
                            (and (combination-p use)
                                 (almost-immediately-used-p object use)
@@ -97,37 +120,20 @@
                                           (second (combination-args use))))
                                     (member (lvar-fun-name (combination-fun use))
                                             '(car cdr))))))
-                    ;; This is a disturbing trend, but it's the best way to
-                    ;; combine instructions in the compiler as it is
-                    ;; (as opposed to the compiler as we wish it would be).
-                    (case (lvar-fun-name (combination-fun (lvar-uses object)))
-                     (%instance-ref
-                      (splice-fun-args object '%instance-ref 2)
-                      `(lambda (obj i) (fixnump-instance-ref obj i)))
-                     (car
-                      (splice-fun-args object 'car 1)
-                      `(lambda (obj) (fixnump-car obj)))
-                     (cdr
-                      (splice-fun-args object 'cdr 1)
-                      `(lambda (obj) (fixnump-cdr obj)))))
-                   (t
-                    (give-up-ir1-transform)))))
-      (cond ((not (types-equal-or-intersect otype type))
-            nil)
-           ((csubtypep otype type)
-            t)
-           ((eq type *empty-type*)
-            nil)
-           (t
-            (let ((intersect (type-intersection2 type otype)))
-              (when (or (not intersect)
-                        (intersection-type-p intersect))
-                (tricky))
-              (multiple-value-bind (constantp value)
-                  (type-singleton-p intersect)
-                (if constantp
-                    `(eql object ',value)
-                    (tricky)))))))))
+             ;; FIXME: vopcombine should be able to combine a load
+             ;; and a fixnump test withoot special-casing these three.
+             (case (lvar-fun-name (combination-fun (lvar-uses object)))
+               (%instance-ref
+                (splice-fun-args object '%instance-ref 2)
+                `(lambda (obj i) (fixnump-instance-ref obj i)))
+               (car
+                (splice-fun-args object 'car 1)
+                `(lambda (obj) (fixnump-car obj)))
+               (cdr
+                (splice-fun-args object 'cdr 1)
+                `(lambda (obj) (fixnump-cdr obj)))))
+            (t
+             (give-up-ir1-transform))))))
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type) * * :node node)

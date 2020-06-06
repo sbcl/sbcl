@@ -12,6 +12,21 @@
 #-x86-64 (sb-ext:exit :code 104)
 
 (load "compiler-test-util.lisp")
+(defun disassembly-lines (fun)
+  ;; FIXME: I don't remember what this override of the hook is for.
+  (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
+                      (lambda (f &rest args) (declare (ignore f args))))
+  (prog1
+      (mapcar (lambda (x) (string-left-trim " ;" x))
+              (cddr
+               (split-string
+                (with-output-to-string (s)
+                  (let ((sb-disassem:*disassem-location-column-width* 0)
+                        (*print-pretty* nil))
+                    (disassemble fun :stream s)))
+                #\newline)))
+    (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)))
+
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
   ;; is something stupid like (lambda () in ...) which pretty-prints
@@ -21,16 +36,7 @@
                          (declare (optimize (debug 0) (safety ,safety)
                                             (sb-c:verify-arg-count 0)))
                          ,expr))))
-    (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
-                        (lambda (f &rest args) (declare (ignore f args))))
-    (let ((lines
-            (split-string
-             (with-output-to-string (s)
-               (let ((sb-disassem:*disassem-location-column-width* 0))
-                 (disassemble fun :stream s)))
-             #\newline)))
-      (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)
-      (setq lines (cddr lines))         ; remove "Disassembly for"
+    (let ((lines (disassembly-lines fun)))
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
       (when (string= (car (last lines)) "")
@@ -718,3 +724,18 @@ sb-vm::(define-vop (cl-user::test)
     (assert (zerop (sb-kernel:code-n-entries trampoline)))
     (assert (typep (sb-di::debug-fun-from-pc trampoline 8)
                    'sb-di::bogus-debug-fun))))
+
+(defstruct foo (s 0 :type (or null string)))
+(with-test (:name :reduce-stringp-to-not-null)
+  (let ((f1 (disassembly-lines
+             '(lambda (x) (if (null (foo-s (truly-the foo x))) 'not 'is))))
+        (f2 (disassembly-lines
+             '(lambda (x) (if (stringp (foo-s (truly-the foo x))) 'is 'not)))))
+    ;; the comparison of X to NIL should be a single-byte test
+    (assert (loop for line in f1
+                  thereis (search (format nil "CMP AL, ~D"
+                                          (logand sb-vm:nil-value #xff))
+                                  line)))
+    ;; the two variations of the test compile to the identical code
+    (dotimes (i 4)
+      (assert (string= (nth i f1) (nth i f2))))))
