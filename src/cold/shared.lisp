@@ -592,10 +592,7 @@
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
              (restart-case
-                 (funcall compile-file src :output-file tmp-obj
-                          ;; if tracing, also show high-level progress
-                          :trace-file trace-file
-                          :print trace-file
+                 (apply compile-file src :output-file tmp-obj
                           :block-compile (and ;; Block compilation was
                                               ;; completely broken
                                               ;; from the beginning of
@@ -609,7 +606,12 @@
                                                                          (lisp-implementation-version))
                                                                 '(2 0 2))))
                                               block-compile)
-                          :allow-other-keys t)
+                          :allow-other-keys t
+                          ;; If tracing, also print, but don't specify :PRINT unless specifying
+                          ;; :TRACE-FILE so that whatever the default is for *COMPILE-PRINT*
+                          ;; prevails, insensitively to whether it's the SB-XC: or CL: symbol.
+                          (when trace-file
+                            '(:trace-file t :print t)))
                (recompile ()
                  :report report-recompile-restart
                  (go retry-compile-file)))
