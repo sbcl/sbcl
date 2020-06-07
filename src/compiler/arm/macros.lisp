@@ -241,18 +241,17 @@
          (store-symbol-value flag-tn *allocation-pointer*))
         #+gencgc
         (t
-         (let ((boxed-region (- (+ static-space-start (* 2 n-word-bytes))
-                                nil-value))
+         (let ((region-disp (- boxed-region nil-value))
                (alloc (gen-label))
                (back-from-alloc (gen-label)))
-           (inst ldr result-tn (@ null-tn boxed-region)) ; free ptr
-           (inst ldr flag-tn (@ null-tn (+ boxed-region n-word-bytes))) ; end ptr
+           (inst ldr result-tn (@ null-tn region-disp)) ; free ptr
+           (inst ldr flag-tn (@ null-tn (+ region-disp n-word-bytes))) ; end ptr
            (if (integerp size)
                (composite-immediate-instruction add result-tn result-tn size)
                (inst add result-tn result-tn size))
            (inst cmp result-tn flag-tn)
            (inst b :hi ALLOC)
-           (inst str result-tn (@ null-tn boxed-region)) ; free ptr
+           (inst str result-tn (@ null-tn region-disp)) ; free ptr
 
            (if (integerp size)
                (composite-immediate-instruction sub result-tn result-tn size)

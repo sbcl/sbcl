@@ -269,6 +269,3 @@
 (progn
   (defconstant pseudo-atomic-flag (ash list-pointer-lowtag 0))
   (defconstant pseudo-atomic-interrupted-flag (ash list-pointer-lowtag 16)))
-
-#-sb-thread
-(defconstant boxed-region (- (+ static-space-start (* 2 n-word-bytes)) nil-value))

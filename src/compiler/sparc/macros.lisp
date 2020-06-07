@@ -132,13 +132,6 @@
 
 ;;;; Storage allocation:
 
-;;; Define the offset from NULL-TN to the first field in 'struct alloc_region'
-;;; located in static space. The structure begin at two words past the start
-;;; of the space, because there is a vector header at the exact start.
-;;; This displacement is negative because its address is below NIL.
-(defconstant boxed-region (- (+ static-space-start (* 2 n-word-bytes))
-                             nil-value))
-
 ;;;; Allocation macro
 ;;;;
 ;;;; This macro does the appropriate stuff to allocate space.
@@ -211,8 +204,8 @@
      ;; it.
      #+gencgc
      (t
-      (loadw result-tn null-tn 0 (- boxed-region)) ; free_pointer
-      (loadw temp-tn null-tn 1 (- boxed-region))   ; end_addr
+      (loadw result-tn null-tn 0 (- nil-value boxed-region)) ; free_pointer
+      (loadw temp-tn null-tn 1 (- nil-value boxed-region))   ; end_addr
 
       (without-scheduling ()
         (let ((done (gen-label))
@@ -236,7 +229,7 @@
           ;; and fold the lowtag addition into the size subtraction.
           ;; (Possibly not ok for the sprof_alloc_region,
           ;; but sb-sprof didn't work on sparc prior to this change)
-          (storew result-tn null-tn 0 (- boxed-region))
+          (storew result-tn null-tn 0 (- nil-value boxed-region))
           ;; Compute the base pointer and add lowtag.
           (cond ((integerp size)
                  (inst sub result-tn (- size lowtag)))

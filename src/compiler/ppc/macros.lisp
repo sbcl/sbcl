@@ -187,11 +187,7 @@
   #+gencgc
   (binding*  ((imm-size (typep size '(unsigned-byte 15)))
               ((region-base-tn field-offset)
-               #-sb-thread (values null-tn
-                                   (- (+ static-space-start
-                                         ;; skip over the array header
-                                         (* 2 n-word-bytes))
-                                      nil-value))
+               #-sb-thread (values null-tn (- boxed-region nil-value))
                #+sb-thread (values thread-base-tn
                                    (* thread-alloc-region-slot n-word-bytes))))
 

@@ -81,8 +81,7 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes thread-alloc-region-slot)
-                    #-sb-thread (+ static-space-start
-                                   (ash vector-data-offset word-shift))))
+                    #-sb-thread boxed-region))
          (end-addr
             ;; thread->alloc_region.end_addr
            (make-ea :dword
@@ -90,8 +89,7 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-                    #-sb-thread (+ static-space-start
-                                   (ash (1+ vector-data-offset) word-shift)))))
+                    #-sb-thread (+ boxed-region n-word-bytes))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #+(and sb-thread win32)

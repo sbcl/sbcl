@@ -224,16 +224,15 @@
         (progn
           ;; load-pair can't base off null-tn because the displacement
           ;; has to be a multiple of 8
-          (load-immediate-word flag-tn static-space-start)
-          (inst ldp result-tn flag-tn (@ flag-tn (* 2 n-word-bytes))))
+          (load-immediate-word flag-tn boxed-region)
+          (inst ldp result-tn flag-tn (@ flag-tn 0)))
         #+sb-thread
         (inst ldp result-tn flag-tn (@ thread-tn (* n-word-bytes thread-alloc-region-slot)))
         (setf size (add-sub-immediate size))
         (inst add result-tn result-tn size)
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
-        #-sb-thread (inst str result-tn (@ null-tn  (- (+ static-space-start (* 2 n-word-bytes))
-                                                       nil-value)))
+        #-sb-thread (inst str result-tn (@ null-tn (- boxed-region nil-value)))
         #+sb-thread (storew result-tn thread-tn thread-alloc-region-slot)
         ;; alloc_tramp uses tmp-tn for returning the result,
         ;; save on a move when possible

@@ -113,6 +113,11 @@
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
+;;; BOXED-REGION is address in static space at which a 'struct alloc_region'
+;;; is overlaid on a lisp vector with element type WORD.
+#-sb-thread
+(defconstant boxed-region (+ static-space-start (* 2 n-word-bytes)))
+
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
         (do-external-symbols (sym "SB-VM")

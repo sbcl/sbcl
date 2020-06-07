@@ -158,13 +158,11 @@
         ;; thread->alloc_region.free_pointer
         (free-pointer
          #+sb-thread (thread-slot-ea thread-alloc-region-slot)
-         #-sb-thread (ea (+ static-space-start
-                            (ash vector-data-offset word-shift))))
+         #-sb-thread (ea boxed-region))
         ;; thread->alloc_region.end_addr
         (end-addr
          #+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
-         #-sb-thread (ea (+ static-space-start
-                            (ash (1+ vector-data-offset) word-shift)))))
+         #-sb-thread (ea (+ boxed-region n-word-bytes))))
 
     (cond ((typep size `(integer , large-object-size))
            ;; large objects will never be made in a per-thread region

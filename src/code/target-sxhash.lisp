@@ -24,23 +24,18 @@
 ;; The result is guaranteed to be a positive fixnum.
 (declaim (inline address-based-counter-val))
 (defun address-based-counter-val ()
-  #+(and (not sb-thread) cheneygc)
-  (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb-vm:word-shift)))
-  ;; dynamic-space-free-pointer increments only when a page is full.
-  ;; Using boxed_region directly is finer-grained.
-  #+(and (not sb-thread) gencgc)
-  (progn #+(or arm arm64 riscv x86 x86-64 ppc ppc64) ; new way: alloc_region is in static space
-         (ash (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm:static-space-start)
-                                   (* 2 sb-vm:n-word-bytes))
-              (- (1+ sb-vm:word-shift)))
-         #-(or arm arm64 riscv x86 x86-64 ppc ppc64) ; old way: alloc_region is in C data
-         (ash (extern-alien "gc_alloc_region" unsigned-long)
-              (- (1+ sb-vm:word-shift))))
-  ;; threads imply gencgc. use the per-thread alloc region pointer
-  #+sb-thread
-  (ash (sap-int (sb-vm::current-thread-offset-sap
-                 #.sb-vm::thread-alloc-region-slot))
-       (- (1+ sb-vm:word-shift))))
+  (let ((word
+         ;; threads imply gencgc. use the per-thread alloc region pointer
+         #+sb-thread
+         (sap-int (sb-vm::current-thread-offset-sap #.sb-vm::thread-alloc-region-slot))
+         #+(and (not sb-thread) cheneygc)
+         (sap-int (dynamic-space-free-pointer))
+         ;; dynamic-space-free-pointer increments only when a page is full.
+         ;; Using boxed_region directly is finer-grained.
+         #+(and (not sb-thread) gencgc)
+         (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm::boxed-region) 0)))
+    ;; counter should increase by 1 for each cons cell allocated
+    (ash word (- (1+ sb-vm:word-shift)))))
 
 ;;; Return some bits that are dependent on the next address that will be
 ;;; allocated, mixed with the previous state (in case addresses get recycled).
