@@ -552,14 +552,6 @@
          (setq trail (cdr trail)))))))
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
-
-#-sb-devel
-(declaim (start-block ir1-convert ir1-convert-progn-body
-                      ir1-convert-combination-args reference-leaf
-                      reference-constant
-                      expand-compiler-macro
-                      instrument-coverage))
-
 (declaim (ftype (sfunction (ctran ctran (or lvar null) t)
                            (values))
                 ir1-convert))
