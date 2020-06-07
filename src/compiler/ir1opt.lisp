@@ -1299,16 +1299,12 @@
        ;; For INLINE case local call analysis will copy the expansion later,
        ;; but for MAYBE-INLINE and NIL cases we only get one copy of the
        ;; expansion per component.
-       ;;
-       ;; FIXME: We also convert in INLINE & FUNCTIONAL-KIND case below. What
-       ;; is it for?
        (with-ir1-environment-from-node call
          (let ((fun (defined-fun-functional leaf)))
            (cond ((or (not fun)
-                      (and (eq inlinep 'inline) (functional-kind fun))
-                      ;; Referencing it again will break the invariant
-                      ;; for assignment functions.
-                      (eq (functional-kind fun) :assignment))
+                      ;; It has already been processed by locall,
+                      ;; inline again.
+                      (functional-kind fun))
                   ;; Convert.
                   (let* ((name (leaf-source-name leaf))
                          (*inline-expansions*
