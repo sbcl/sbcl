@@ -189,6 +189,96 @@
 
 (clear-info :function :inlinep 'integer-sxhash)
 
+(macrolet ((with-hash ((var seed) &body body)
+             `(let ((,var (word-mix 410823708 ,seed)))
+                (declare (type word ,var))
+                ,@body))
+           (mix-chunk (word)
+             `(setq result (word-mix ,word result)))
+           (mix-remaining (word)
+             ;; N-BITS-REMAINING is between 1 inclusive and N-WORD-BITS exclusive
+             (let ((mask
+                    #+little-endian ; if all except 1 bit remain, right-shift by 1, etc
+                    `(ash most-positive-word (- n-bits-remaining sb-vm:n-word-bits))
+                    #+big-endian ; same, except left-shift (modularly)
+                    `(logand most-positive-word
+                             (ash most-positive-word
+                                  (- sb-vm:n-word-bits n-bits-remaining)))))
+               `(setq result (word-mix (logand ,word ,mask) result)))))
+(defun %sxhash-simple-bit-vector (x)
+  (with-hash (result (length (truly-the simple-bit-vector x)))
+    (multiple-value-bind (n-full-words n-bits-remaining) (floor (length x) sb-vm:n-word-bits)
+      (dotimes (i n-full-words) (mix-chunk (%vector-raw-bits x i)))
+      (when (plusp n-bits-remaining)
+        ;; FIXME: Do we really have to mask off bits of the final word?
+        ;; I don't think so, given that remaining bits are invariantly zero.
+        ;; Maybe this has to do with stack-allocated vectors?
+        ;; Either that, or it anticipates a change wherein we do not always
+        ;; prezero unboxed vectors unless :INITIAL-ELEMENT was specified.
+        ;; (i.e. you'd get random bytes, and so the only known good bits/bytes
+        ;; would appear where you had performed a SETF on them)
+        (mix-remaining (%vector-raw-bits x n-full-words))))
+    (logand result sb-xc:most-positive-fixnum)))
+(defun %sxhash-bit-vector (bit-vector)
+  (with-array-data ((x bit-vector) (start) (end) :check-fill-pointer t)
+    (multiple-value-bind (start-word start-bit) (floor start sb-vm:n-word-bits)
+      (cond ((= start-bit 0) ; relevant bits are word-aligned
+             (multiple-value-bind (end-word n-bits-remaining) (floor end sb-vm:n-word-bits)
+               (with-hash (result (- end start))
+                 (do ((i start-word (1+ i)))
+                     ((>= i end-word))
+                   (mix-chunk (%vector-raw-bits x i)))
+                 (when (plusp n-bits-remaining)
+                   (mix-remaining (%vector-raw-bits x end-word)))
+                 (logand result sb-xc:most-positive-fixnum))))
+            #+(or arm64 x86 x86-64)
+            ((not (logtest start-bit 7)) ; relevant bits are byte-aligned
+             ;; The case is probably ok on all little-endian CPUs that permit
+             ;; unaligned loads but I didn't try it on them all.
+             (with-pinned-objects (x)
+               (let ((byte-offset (ash start -3))
+                     (n-bits-remaining (- end start))
+                     (sap (vector-sap x)))
+                 (with-hash (result (- end start))
+                   (loop (unless (>= n-bits-remaining sb-vm:n-word-bits) (return))
+                         #+nil
+                         (format t "~& mixing middle word: [~a]~%"
+                                 (nreverse (format nil "~64,'0b" (sap-ref-word sap byte-offset))))
+                         ;; Since we have at least sb-vm:n-word-bits more to go,
+                         ;; and the non-simple vector fits within its backing vector,
+                         ;; it must be OK to read an entire word from that vector.
+                         (mix-chunk (sap-ref-word sap byte-offset))
+                         (incf byte-offset sb-vm:n-word-bytes)
+                         (decf n-bits-remaining sb-vm:n-word-bits))
+                   (when (plusp n-bits-remaining)
+                     ;; Perform exactly one more word-sized load rather than N-BYTES-REMAINING
+                     ;; byte-sized loads + shifts to reconstruct the final word. This load puts
+                     ;; the final relevant byte into the MSB of the loaded word and is
+                     ;; guaranteed neither to overrun nor underrun the backing vector.
+                     ;; It might grab some bytes from the vector-length word as an edge case.
+                     ;; Consider e.g. a non-simple vector of 8 bits with displaced-index-offset 16
+                     ;; into an underlying vector of 30 bits.
+                     (let* ((n-bytes-remaining (ceiling n-bits-remaining sb-vm:n-byte-bits))
+                            ;; Compute how many bytes we didn't actually want to read. It could
+                            ;; be 0 if we want all remaining bytes (but presumably not all bits)
+                            (shift-out (- sb-vm:n-word-bytes n-bytes-remaining))
+                            (word (ash (sap-ref-word
+                                        sap
+                                        (+ byte-offset n-bytes-remaining (- sb-vm:n-word-bytes)))
+                                       (* -8 shift-out))))
+                       #+nil (format t "~&  mixing final word: [~a]~%"
+                                     (nreverse (format nil "~64,'0b" word)))
+                       (mix-remaining word)))
+                   (logand result sb-xc:most-positive-fixnum)))))
+            (t ; not aligned in a way that this can deal with.
+             ;; Fallback to the simple algorithm using a copy.
+             ;; Nobody has complained in 17 years, ever since git rev a3ab89c1db when this
+             ;; was corrected to hash more than 4 bits. Prior to that, the code was plain wrong,
+             ;; violating constraint 1 in the spec for SXHASH.
+             ;; If we do manage to improve this not to cons a new vector, the test
+             ;; in hash.pure.lisp should be made more rigorous as well.
+             (%sxhash-simple-bit-vector (copy-seq bit-vector))))))))
+
 ;;; To avoid "note: Return type not fixed values ..."
 (declaim (ftype (sfunction (t) hash-code) pathname-sxhash))
 
@@ -241,24 +331,9 @@
                     (instance-sxhash x)))
                (array
                 (typecase x
-                  ;; If we could do something smart for widetag-based jump tables,
-                  ;; then we wouldn't have to think so much about whether to test
-                  ;; STRING and BIT-VECTOR inside or outside of the ARRAY stanza.
-                  ;; The code is structured now to narrow down in broad strokes with
-                  ;; the outer typecase, and then refines the type further.
-                  ;; We could equally well move the STRING test into the outer
-                  ;; typecase, but that would impart one more test in front of
-                  ;; all remaining stanzas.
                   (string (%sxhash-string x))
-                  (simple-bit-vector (sxhash x)) ; through DEFTRANSFORM
-                  (bit-vector
-                   ;; FIXME: It must surely be possible to do better
-                   ;; than this.  The problem is that a non-SIMPLE
-                   ;; BIT-VECTOR could be displaced to another, with a
-                   ;; non-zero offset -- so that significantly more
-                   ;; work needs to be done using the %VECTOR-RAW-BITS
-                   ;; approach.  This will probably do for now.
-                   (sxhash-recurse (copy-seq x) depthoid))
+                  (bit-vector (%sxhash-bit-vector x))
+                  ;; Would it be legal to mix in the widetag?
                   (t (logxor 191020317 (sxhash (array-rank x))))))
                ;; general, inefficient case of NUMBER
                ;; There's a spurious FIXNUMP test here, as we've already picked it off.

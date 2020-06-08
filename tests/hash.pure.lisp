@@ -47,6 +47,58 @@
     ;; GC could occur in here. Just check that 9 out of 10 trials succeed.
     (assert (>= win 9))))
 
+(with-test (:name (sxhash :bit-vector-sxhash-mask-to-length))
+  (let ((bv (make-array 5 :element-type 'bit))
+        (unsafely-set-bit
+         (compile nil
+                  '(lambda (bv i val)
+                     (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                     (setf (bit bv i) val)))))
+    (replace bv '(1 0 1 1 1))
+    (let ((hash (sxhash bv)))
+      ;; touch all bits of the first data word as well as the padding word
+      (loop for i from 5 below (* 2 sb-vm:n-word-bytes)
+            do (funcall unsafely-set-bit bv i 1)
+               (assert (eql (sxhash bv) hash))
+               (funcall unsafely-set-bit bv i 0)))))
+
+(defvar *sbv* (make-array 512 :element-type 'bit))
+(defun sxhash-for-bv-test (test-bv)
+  (let ((underlying *sbv*)
+        (expected-hash (sxhash test-bv)))
+    ;; Currently %SXHASH-BIT-VECTOR can only operate on non-simple vectors
+    ;; if the displacement on bits aligns to a word boundary,
+    ;; or possibly on a byte boundary for some CPUs.
+    ;; Otherwise it just copies the non-simple vector as there's no point
+    ;; to exercising varying values of displaced-index-offet for that.
+    (loop for index-offset
+          from 0 by 8 repeat 25
+          do (let ((unsimple-bv (make-array 300
+                                            :element-type 'bit
+                                            :displaced-to underlying
+                                            :displaced-index-offset index-offset
+                                            :fill-pointer (length test-bv))))
+               (flet ((check-unreplaced-bits (expect)
+                        ;; make sure REPLACE didn't touch bits outside
+                        ;; the expected range. This is a test of REPLACE
+                        ;; more so than SXHASH, but is needed to establish
+                        ;; that SXHASH of the nonsimple vector isn't
+                        ;; looking at bits that it shouldn't.
+                        (loop for i from 0 below index-offset
+                              do (assert (= (bit underlying i) expect)))
+                        (loop for i from (+ index-offset (length test-bv))
+                              below (length underlying)
+                              do (assert (= (bit underlying i) expect)))))
+                 (fill underlying 0)
+                 (replace unsimple-bv test-bv)
+                 (check-unreplaced-bits 0)
+                 (assert (eql (sxhash unsimple-bv) expected-hash))
+                 (fill underlying 1)
+                 (replace unsimple-bv test-bv)
+                 (check-unreplaced-bits 1)
+                 (assert (eql (sxhash unsimple-bv) expected-hash)))))
+    expected-hash))
+
 ;;; The value of SXHASH on bit-vectors of length a multiple of the word
 ;;; size didn't depend on the contents of the last word, specifically
 ;;; making it a constant for bit-vectors of length equal to the word
@@ -63,11 +115,11 @@
                      (map-into v (lambda ()
                                    (random 2)))))
               (randomize-v)
-              (let ((sxhash (sxhash v))
+              (let ((sxhash (sxhash-for-bv-test v))
                     (random-bits-used 0))
                 (loop
                   (randomize-v)
-                  (when (/= (sxhash v) sxhash)
+                  (when (/= (sxhash-for-bv-test v) sxhash)
                     (return))
                   (incf random-bits-used length)
                   (when (>= random-bits-used random-bits-to-use)
@@ -91,13 +143,13 @@
                            repeat sb-vm:n-word-bits
                            do (setf (aref v i) (random 2)))))
               (randomize-v)
-              (let ((sxhash (sxhash v)))
+              (let ((sxhash (sxhash-for-bv-test v)))
                 (dotimes (i (ceiling random-bits-to-use sb-vm:n-word-bits)
                           (error "SXHASH on bit-vectors of length ~a ~
                                   does not depend on the final ~a bits."
                                  length sb-vm:n-word-bits))
                   (randomize-v)
-                  (when (/= (sxhash v) sxhash)
+                  (when (/= (sxhash-for-bv-test v) sxhash)
                     (return)))))))))
 
 (with-test (:name :maphash-multiple-evaluation)
@@ -308,3 +360,39 @@
   (let ((table (make-hash-table :test #'equalp)))
     (assert (eql (setf (gethash 3d0 table) 1)
                  (gethash 3   table)))))
+
+(with-test (:name :transform-sxhash-string-and-bv)
+  (let ((f (compile
+            nil
+            '(lambda (x y)
+               (logxor (ash (sxhash (truly-the (or string null) x)) -3)
+                       (sxhash (truly-the (or bit-vector null) y))))))
+        (fdefn1 (sb-kernel::find-fdefn 'sb-kernel:%sxhash-string))
+        (fdefn2 (sb-kernel::find-fdefn 'sb-kernel:%sxhash-bit-vector)))
+    (every (lambda (x) (member x `(,fdefn1 ,fdefn2)))
+           (ctu:find-code-constants f))))
+
+(with-test (:name :sxhash-on-displaced-string
+            :fails-on :sbcl)
+  (let* ((adjustable-string
+          (make-array 100 :element-type 'character :adjustable t))
+         (displaced-string
+          (make-array 50 :element-type 'character :displaced-to adjustable-string
+                      :displaced-index-offset 19)))
+    (adjust-array adjustable-string 68)
+    (assert-error (aref displaced-string 0)) ; should not work
+    ;; This should fail, but instead it computes the hash of a string of
+    ;; length 0 which is what we turn displaced-string into after adjustable-string
+    ;; is changed to be too small to hold displaced-string.
+    ;; As a possible fix, we could distinguish between safe and unsafe code,
+    ;; never do the sxhash transforms in safe code, and have the full call to
+    ;; sxhash always check for "obsolete" strings.
+    ;; I would guess that all sorts of string transforms are similarly
+    ;; suspect in this edge case.
+    ;; On the one hand, this is undefined behavior as per CLHS:
+    ;;  "If A is displaced to B, the consequences are unspecified if B is adjusted
+    ;;   in such a way that it no longer has enough elements to satisfy A."
+    ;; But on the other, we always try to be maximally helpful,
+    ;; and it's extremely dubious that we're totally silent here.
+    ;; Also the same issue exists with bit-vectors.
+    (assert-error (sxhash displaced-string))))

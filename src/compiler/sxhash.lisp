@@ -12,13 +12,29 @@
 
 (in-package "SB-C")
 
-;;; Because we unobviously run transforms in the reverse order of definition,
-;;; these must be the first transforms defined so that they become the last
-;;; transforms attempted, with INTEGER taking precedence over NUMBER.
+;;; CAUTION: transforms are selected in the *reverse* order of definition,
+;;; so define the most general first, followed by more specific.
 ;;; I once tried to fix that glitch by using APPEND instead of PUSH into
 ;;; FUN-INFO-TRANSFORMS, and of course it broke things because we depend on such
-;;; stupidity. It would be easily remedied by reversing all definitions whenever
+;;; stupidity. It would be remedied by reversing all definitions whenever
 ;;; it matters but I didn't feel like figuring out all places where it does.
+
+(deftransform sxhash ((x) (t))
+  (let ((type (lvar-type x)))
+    ;; It is common for structure slots to have a :TYPE resembling (OR STRING NULL),
+    ;; and also common to create custom hash calculations on structures with such slots.
+    ;; So it makes sense for the compiler to try to pick off cases where the slot type
+    ;; has a specialized hash computation via sxhash after picking off NIL.
+    (or (dolist (case '((simple-string . %sxhash-simple-string)
+                        (string . %sxhash-string)
+                        (simple-bit-vector . %sxhash-simple-bit-vector)
+                        (bit-vector . %sxhash-bit-vector)))
+          (cond ((csubtypep type (specifier-type (car case)))
+                 (return `(,(cdr case) x)))
+                ((csubtypep type (specifier-type `(or null ,(car case))))
+                 (return `(if x (,(cdr case) x) ,(sb-xc:sxhash nil))))))
+        (give-up-ir1-transform))))
+
 (deftransform sxhash ((x) (number)) `(sb-impl::number-sxhash x))
 (deftransform sxhash ((x) (integer)) `(sb-impl::integer-sxhash x))
 
@@ -149,38 +165,6 @@
 
 (deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
 
-;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
-;;; because it is endian-dependent.
-;;; ("because it is endian-dependent" is not a reason to define
-;;; a transform. This is probably better off as an asm routine)
-(deftransform sxhash ((x) (simple-bit-vector))
-  `(let* ((length (length x))
-          (result (word-mix 410823708 length)))
-    (declare (type unsigned-byte result))
-     (multiple-value-bind (n-full-words n-bits-remaining)
-         (floor length sb-vm:n-word-bits)
-       (dotimes (i n-full-words)
-         (setq result (word-mix (%vector-raw-bits x i) result)))
-       (when (plusp n-bits-remaining)
-         ;; FIXME: Do we really have to mask off bits of the final word?
-         ;; I don't think so, given that remaining bits are invariantly zero.
-         (setq result
-               (word-mix (logand (ash (1- (ash 1 n-bits-remaining))
-                                      ,(ecase sb-c:*backend-byte-order*
-                                         (:little-endian 0)
-                                         (:big-endian
-                                          '(- sb-vm:n-word-bits n-bits-remaining))))
-                                 (%vector-raw-bits x n-full-words))
-                         result)))
-       (logand result sb-xc:most-positive-fixnum))))
-
-;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in
-;;; order to avoid having to do TYPECASE at runtime.
-(deftransform sxhash ((x) (string))
-  (cond ((csubtypep (lvar-type x) (specifier-type 'simple-string))
-         '(%sxhash-simple-string x))
-        (t
-         '(%sxhash-string x))))
 (deftransform sxhash ((x) (symbol))
   (cond ((csubtypep (lvar-type x) (specifier-type 'keyword))
          ;; All interned symbols have a precomputed hash.
