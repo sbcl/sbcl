@@ -374,6 +374,15 @@
 
 ;;;; CODE-COMPONENT
 
+(defun %code-debug-info (code-obj)
+  ;; Extract the unadulterated debug-info emitted by the compiler. The slot
+  ;; value might be a cons of that and info stuffed in by the debugger.
+  (let ((info (sb-vm::%%code-debug-info code-obj)))
+    (if (and (listp info) (%instancep (car info)))
+        (car info)
+        ;; return it unchanged in all other cases
+        info)))
+
 (defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
   (%code-entry-point code-obj 0))
 

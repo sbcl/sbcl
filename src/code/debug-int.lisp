@@ -338,24 +338,15 @@
             (compiled-frame-escaped obj))))
 
 
+(define-load-time-global *debug-funs-mutex* (sb-thread:make-mutex :name "CDF lock"))
 ;;; This maps SB-C::COMPILED-DEBUG-FUNs to
 ;;; COMPILED-DEBUG-FUNs, so we can get at cached stuff and not
 ;;; duplicate COMPILED-DEBUG-FUN structures.
+#+cheneygc ; can't write to debuf-info in a purified code object
 (define-load-time-global *compiled-debug-funs*
+    ;; The table's lock is redundant - I'm working on removal of the default
+    ;; assumption of synchronization on all weak tables, but it's unrelated.
     (make-hash-table :test 'eq :weakness :key))
-
-;;; Make a COMPILED-DEBUG-FUN for a SB-C::COMPILER-DEBUG-FUN and its
-;;; component. This maps the latter to the former in
-;;; *COMPILED-DEBUG-FUNS*. If there already is a COMPILED-DEBUG-FUN,
-;;; then this returns it from *COMPILED-DEBUG-FUNS*.
-;;;
-;;; FIXME: It seems this table can potentially grow without bounds,
-;;; and retains roots to functions that might otherwise be collected.
-(defun make-compiled-debug-fun (compiler-debug-fun component)
-  (let ((table *compiled-debug-funs*))
-    (with-locked-system-table (table)
-      (ensure-gethash compiler-debug-fun table
-                      (%make-compiled-debug-fun compiler-debug-fun component)))))
 
 ;;;; breakpoints
 
@@ -448,6 +439,36 @@
   ;; the :FUN-START breakpoint (if any) used to facilitate
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
+
+;;; Map a SB-C::COMPILED-DEBUG-FUN to a SB-DI::COMPILED-DEBUG-FUN.
+;;; The mapping is memoized into %CODE-DEBUG-INFO of COMPONENT
+;;; except on #+cheneygc where that is assumed not to be possible
+;;; (even if it is possible), because usually it's not, because
+;;; code might reside in readonly space, and it can only have pointers
+;;; to static space, not dynamic space.
+;;;
+;;; BTW, the nomenclature here is utter and total confusion.
+;;; The type of the object in the argument named COMPILER-DEBUG-FUN
+;;; is SB-C::COMPILED-DEBUG-FUN.
+;;; There is no such type as a "COMPILER-DEBUG-FUN", it's just the name
+;;; of the slot in the SB-DI:: version of the structure.
+(defun make-compiled-debug-fun (compiler-debug-fun component)
+  (declare (code-component component))
+  ;; Technically this could all be lockfree if we had compare-and-swap
+  ;; on the debug-info slot. Not worth the effort.
+  (sb-thread::with-system-mutex (*debug-funs-mutex*)
+    #+gencgc
+    (let* ((info (ensure-list (sb-vm::%%code-debug-info component)))
+           (found (assoc compiler-debug-fun (cdr info) :test #'eq)))
+      (if found
+          (cdr found)
+          (let* ((my-debug-fun (%make-compiled-debug-fun compiler-debug-fun component))
+                 (new-pair (cons compiler-debug-fun my-debug-fun)))
+            (setf (%code-debug-info component) (list* (car info) new-pair (cdr info)))
+            my-debug-fun)))
+    #+cheneygc
+    (ensure-gethash compiler-debug-fun *compiled-debug-funs*
+                    (%make-compiled-debug-fun compiler-debug-fun component))))
 
 ;;;; CODE-LOCATIONs
 
@@ -1201,8 +1222,8 @@ register."
     (etypecase info
       (sb-c::compiled-debug-info
        (make-compiled-debug-fun (compiled-debug-fun-from-pc info pc escaped) component))
-      (cons ; interrupted in an assembler routine
-       (let ((routine (dohash ((name pc-range) (car info))
+      (hash-table ; interrupted in an assembler routine
+       (let ((routine (dohash ((name pc-range) info)
                         (when (<= (car pc-range) pc (cadr pc-range))
                           (return name)))))
          (make-bogus-debug-fun (cond ((not routine)
@@ -1437,6 +1458,8 @@ register."
                                         (%code-debug-info component))
                       then next
                       for next = (sb-c::compiled-debug-fun-next fmap-entry)
+                      ;; Is NAME really the right thing to match on given how bogus
+                      ;; it might be? I would think PC range is better.
                       when (and (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
                                 (eq (sb-c::compiled-debug-fun-kind fmap-entry) nil))
                       return fmap-entry

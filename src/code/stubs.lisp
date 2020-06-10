@@ -81,7 +81,6 @@
   (def value-cell-ref)
   (def %caller-frame ())
   (def %caller-pc ())
-  (def %code-debug-info)
   #+(or x86 x86-64) (def sb-vm::%code-fixups)
   #+x86-64 (def pointerp)
 

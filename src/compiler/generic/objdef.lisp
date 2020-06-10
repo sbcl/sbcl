@@ -197,9 +197,15 @@ during backtrace.
   (boxed-size :type fixnum ; see above figure
               :ref-known (flushable movable)
               :ref-trans %code-boxed-size)
+  ;; This slot usually holds an instance of SB-C::COMPILED-DEBUG-FUN
+  ;; but the debugger can replace it with a cons of that and something else.
+  ;; It could also be the symbol :BPT-LRA, or, as a special case
+  ;; for the assembler code component, a cons holding a hash-table.
+  ;; (the cons points from read-only to static space, but the hash-table
+  ;; wants to be in dynamic space)
   (debug-info :type t
               :ref-known (flushable)
-              :ref-trans %code-debug-info
+              :ref-trans %%code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
   ;; Define this slot if the architecture might ever use fixups.

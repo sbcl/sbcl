@@ -64,13 +64,15 @@ static int decode_locs(lispobj packed_integer, int *offset, int *elsewhere)
 struct compiled_debug_fun *
 debug_function_from_pc (struct code* code, void *pc)
 {
-    sword_t offset = (char*)pc - code_text_start(code);
     struct compiled_debug_info *di;
 
-    if (!instancep(code->debug_info))
+    fprintf(stderr, "MEATBALL %p %p\n", code, pc);
+    if (instancep(code->debug_info))
+        di = (void*)native_pointer(code->debug_info);
+    else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
+        di = (void*)native_pointer(CONS(code->debug_info)->car);
+    else
         return NULL;
-
-    di = (struct compiled_debug_info *) native_pointer(code->debug_info);
 
     if (!instancep(di->fun_map))
         return NULL;
@@ -79,6 +81,7 @@ debug_function_from_pc (struct code* code, void *pc)
     int begin, end, elsewhere_begin, elsewhere_end;
     if (!decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
         return NULL;
+    sword_t offset = (char*)pc - code_text_start(code);
     while (df) {
         struct compiled_debug_fun *next;
         if (df->next != NIL) {

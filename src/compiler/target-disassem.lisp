@@ -2144,7 +2144,7 @@
          (segments
           (if (eq code-component sb-fasl:*assembler-routines*)
               (collect ((segs))
-                (dohash ((name locs) (car (%code-debug-info code-component)))
+                (dohash ((name locs) (%code-debug-info code-component))
                   (destructuring-bind (start end . index) locs
                     (declare (ignore index))
                     (let ((seg (make-code-segment
@@ -2264,7 +2264,7 @@
                         (setf (gethash (funcall addr-xform address) addr->name) name))
                       name->addr)))
       (let ((code sb-fasl:*assembler-routines*))
-        (invert (car (%code-debug-info code))
+        (invert (%code-debug-info code)
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
     #-linkage-table
        (invert *static-foreign-symbols* #'identity))
@@ -2284,7 +2284,7 @@
            (values found 0))
           (t
            (let* ((code sb-fasl:*assembler-routines*)
-                  (hashtable (car (%code-debug-info code)))
+                  (hashtable (%code-debug-info code))
                   (start (sap-int (code-instructions code)))
                   (end (+ start (1- (%code-text-size code)))))
              (when (<= start address end) ; it has to be an asm routine

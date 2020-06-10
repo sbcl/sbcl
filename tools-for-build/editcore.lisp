@@ -1012,7 +1012,10 @@
                                           (end (car (translate (cdr val) spaces))))
                         (list* (translate (symbol-name name) spaces) start end))
                       (target-hash-table-alist
-                       (car (translate (%code-debug-info code-component) spaces))
+                       ;; Can't use %CODE-DEBUG-INFO on a foreign core because
+                       ;; it would dereference the cons not at its current physically mapped
+                       ;; address, but at its logical address. %%CODE-DEBUG-INFO is ok though.
+                       (car (translate (sb-vm::%%code-debug-info code-component) spaces))
                        spaces))
               #'< :key #'cadr)))
         ;; Possibly a padding word

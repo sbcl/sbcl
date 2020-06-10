@@ -474,6 +474,7 @@ sufficiently motivated to do lengthy fixes."
 
 sb-c::
 (defun coalesce-debug-info ()
+  #+cheneygc (clrhash sb-di::*compiled-debug-funs*)
   (flet ((debug-source= (a b)
            (and (equal (debug-source-plist a) (debug-source-plist b))
                 (eql (debug-source-created a) (debug-source-created b)))))
@@ -491,6 +492,10 @@ sb-c::
          (declare (ignore size))
          (case widetag
           (#.sb-vm:code-header-widetag
+           (let ((di (sb-vm::%%code-debug-info obj)))
+             ;; Discard memoized debugger's debug info
+             (when (and (consp di) (neq obj sb-fasl:*assembler-routines*))
+               (setf (%code-debug-info obj) (car di))))
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))
@@ -509,7 +514,7 @@ sb-c::
             (compiled-debug-info
              (let ((source (compiled-debug-info-source obj)))
                (typecase source
-                 (core-debug-source)    ; skip
+                 (core-debug-source)    ; skip - uh, why?
                  (debug-source
                   (let* ((namestring (debug-source-namestring source))
                          (canonical-repr

@@ -291,7 +291,7 @@
 (declaim (code-component *assembler-routines*))
 
 (defun calc-asm-routine-bounds ()
-  (loop for v being each hash-value of (car (%code-debug-info *assembler-routines*))
+  (loop for v being each hash-value of (%code-debug-info *assembler-routines*)
         minimize (car v) into min
         maximize (cadr v) into max
         ;; min/max are inclusive byte ranges, but return the answer
@@ -302,7 +302,7 @@
 (defvar *!initial-assembler-routines*)
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
-  (awhen (the list (gethash (the symbol name) (car (%code-debug-info code))))
+  (awhen (the list (gethash (the symbol name) (%code-debug-info code)))
     (sap-int (sap+ (code-instructions code)
                    (if indirect
                        ;; Return the address containing the routine address

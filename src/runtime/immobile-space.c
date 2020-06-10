@@ -1862,6 +1862,8 @@ static boolean executable_object_p(lispobj* obj)
     int widetag = widetag_of(obj);
     int answer = widetag == FDEFN_WIDETAG ||
         (widetag == CODE_HEADER_WIDETAG && code_header_words((struct code*)obj) >= 3
+         /* The debug_info slot of a "simplifying trampoline" contains a pointer
+          * to the original closure or funcallable instance */
          && lowtag_of(((struct code*)obj)->debug_info) == FUN_POINTER_LOWTAG)
         || widetag == FUNCALLABLE_INSTANCE_WIDETAG;
 #if !WRITABLE_TEXT_SEGMENT

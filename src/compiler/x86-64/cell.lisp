@@ -764,7 +764,7 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (any-reg descriptor-reg) * code-header-ref)
 
-;; CODE-HEADER-SET of a constant index is never used, so we specifically
+;; CODE-HEADER-SET of a constant index is seldom used, so we specifically
 ;; ask not to get it defined. (It's not impossible to use, it's just not
 ;; helpful to have - either you want to access CODE-FIXUPS or CODE-DEBUG-INFO,
 ;; which do things their own way, or you want a variable index.)
