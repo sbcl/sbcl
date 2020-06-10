@@ -254,7 +254,7 @@
       (assert (eq x :infinity))
       (set-dispatch-macro-character (code-char #x266F) (code-char #x221E) nil)
       (assert (zerop (hash-table-count
-                      (car (sb-impl::%dispatch-macro-char-table
+                      (cdr (sb-impl::%dispatch-macro-char-table
                             (get-macro-character (code-char #x266F)))))))))
 
   (let ((*readtable* (copy-readtable)))

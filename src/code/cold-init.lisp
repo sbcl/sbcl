@@ -65,7 +65,7 @@
 
   (/show0 "entering !COLD-INIT")
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
-  (!cold-init-hash-table-methods) ; needed by MAKE-READTABLE
+  (!readtable-cold-init)
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)
@@ -74,6 +74,7 @@
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   (unless (!c-runtime-noinform-p)
     (write-string "COLD-INIT... "))
+  (!cold-init-hash-table-methods)
   ;; Establish **initial-handler-clusters**
   (show-and-call sb-kernel::!target-error-cold-init)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*

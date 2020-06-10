@@ -211,7 +211,7 @@
                   :skipped-on (not :sb-unicode))
   (let ((rt (copy-readtable)))
     (set-macro-character (code-char #x100fa) #'error nil rt)
-    (assert (plusp (hash-table-count (sb-impl::character-macro-hash-table rt))))
+    (assert (plusp (hash-table-count (sb-impl::extended-char-table rt))))
     (copy-readtable nil rt)
     (assert (null (get-macro-character #\UFC rt)))))
 

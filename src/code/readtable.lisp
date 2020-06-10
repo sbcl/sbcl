@@ -45,6 +45,8 @@
 ;; Meta: there is no such function as READ-UNQUALIFIED-TOKEN. No biggie.
 (defconstant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
+(define-load-time-global *empty-extended-char-table* nil)
+
 (sb-xc:defstruct (readtable (:conc-name nil)
                             (:constructor make-readtable ())
                             (:predicate readtablep)
@@ -54,7 +56,7 @@
                             (:copier nil))
   "A READTABLE is a data structure that maps characters into syntax
 types for the Common Lisp expression reader."
-  ;; The CHARACTER-ATTRIBUTE-TABLE is a vector of BASE-CHAR-CODE-LIMIT
+  ;; The BASE-CHAR-SYNTAX-ARRAY is a vector of BASE-CHAR-CODE-LIMIT
   ;; integers for describing the character type. Conceptually, there
   ;; are 4 distinct "primary" character attributes:
   ;; +CHAR-ATTR-WHITESPACE+, +CHAR-ATTR-TERMINATING-MACRO+,
@@ -65,27 +67,24 @@ types for the Common Lisp expression reader."
   ;; In order to make READ-TOKEN fast, all this information is stored
   ;; in the character attribute table by having different varieties of
   ;; constituents.
-  (character-attribute-array
+  (base-char-syntax-array
    (make-array base-char-code-limit
                :element-type '(unsigned-byte 8)
                :initial-element +char-attr-constituent+)
    :type attribute-table
    :read-only t)
-  (character-attribute-hash-table (make-hash-table :test 'eq)
-   :type hash-table
-   :read-only t)
-  ;; The CHARACTER-MACRO-TABLE is a vector of BASE-CHAR-CODE-LIMIT
+  ;; The BASE-CHAR-MACRO-TABLE is a vector of BASE-CHAR-CODE-LIMIT
   ;; functions. One of these functions called with appropriate
   ;; arguments whenever any non-WHITESPACE character is encountered
   ;; inside READ-PRESERVING-WHITESPACE. These functions are used to
   ;; implement user-defined read-macros, system read-macros, and the
   ;; number-symbol reader.
-  (character-macro-array
+  (base-char-macro-array
    (make-array base-char-code-limit :initial-element nil)
    :type (simple-vector #.base-char-code-limit)
    :read-only t)
-  (character-macro-hash-table (make-hash-table :test 'eq) :type hash-table
-   :read-only t)
+  ;; Characters above the BASE-CHAR range
+  (extended-char-table *empty-extended-char-table* :type hash-table)
   (%readtable-case 0 :type (mod 4))
   ;; Element type to use when reading a string literal with no extended-chars.
   ;; The system itself prefers base-string, but otherwise it is a contentious
