@@ -79,13 +79,19 @@
 ;;; a character. This seems to be necessary to ensure that gray stream
 ;;; methods that should return characters don't return random objects.
 (defmacro char-syntax (char syntax-array extension-table &optional cast)
-  `(truly-the (unsigned-byte 8)
-    (if (typep ,char 'base-char)
-        (elt ,syntax-array (char-code ,char))
-        (car (truly-the list
-              (gethash ,(if cast `(the character ,char) char)
-                       ,extension-table
-                       ',`(,+char-attr-constituent+)))))))
+  #-sb-unicode (declare (ignore cast))
+  `(progn
+     #-sb-unicode ,extension-table
+     (truly-the (unsigned-byte 8)
+                #-sb-unicode
+                (elt ,syntax-array (char-code ,char))
+                #+sb-unicode
+                (if (typep ,char 'base-char)
+                    (elt ,syntax-array (char-code ,char))
+                    (car (truly-the list
+                                    (gethash ,(if cast `(the character ,char) char)
+                                             ,extension-table
+                                             ',`(,+char-attr-constituent+))))))))
 
 ;;; Formerly known as SET-CAT-ENTRY and SET-CMT-ENTRY
 (defun assign-char-syntax (readtable char attributes function)
