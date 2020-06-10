@@ -300,7 +300,14 @@
   (let ((table (specializer-method-table self))
         (object (specializer-object self)))
     (if create
-        (ensure-gethash object table (cons nil nil) t)
+        (sb-thread::with-system-mutex ((sb-impl::hash-table-lock table))
+          (ensure-gethash object table (cons nil nil)))
+        ;; FIXME: in the CREATE case we're locking, because we might be inserting,
+        ;; and must ensure mutual exclusion with other writers. Fine,
+        ;; but SBCL's hash-tables aren't *reader* *safe* with any writer, so
+        ;; how can we know that this branch is safe? Honestly I have no idea.
+        ;; I believe that the lock should scope be widened,
+        ;; surrounding either branch of the IF.
         (gethash object table))))
 
 (defun map-specializers (function)
