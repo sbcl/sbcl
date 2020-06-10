@@ -185,8 +185,7 @@
 ;;;   an extra right-shift to remove bits that lack any randomness. CACHE-MASK can be
 ;;;   reworked to examine bits other than at the low end.
 (defun hash-layout-name (name)
-  (let ((limit (1+ (ash sb-xc:most-positive-fixnum -1)))
-        (random-state (load-time-value (make-random-state))))
+  (let ((limit (1+ (ash sb-xc:most-positive-fixnum -1))))
     (declare (notinline random))
     (logior (if (typep name '(and symbol (not null)))
                 (flet ((improve-hash (x)
@@ -203,5 +202,16 @@
                           (cond #+sb-xc ((eq package *cl-package*) "COMMON-LISP")
                                 ((not package) "uninterned")
                                 (t (package-name package)))))))
-                (random (ash limit -1) random-state))
+                ;; This L-T-V form has to remain out of the common path,
+                ;; or else cheneygc will crash in cold-init.
+                ;; Cold-init calls HASH-LAYOUT-NAME many times *before* the L-T-V
+                ;; is actually executed and stuffed in as a constant.
+                ;; That's harmless - the loader put an unbound marker there, and we don't care.
+                ;; *HOWEVER* there is an interesting issue that arises if the value-cell
+                ;; indirection is present (see the IR1 translator for L-T-V and the
+                ;; conditional code for cheneygc): when can the compiler dereference the
+                ;; value-cell? If the binding were earlier (before the IF), then the dereference
+                ;; would happen earlier, and crash, because unbound-marker isn't a pointer.
+                (let ((random-state (load-time-value (make-random-state))))
+                  (random (ash limit -1) random-state)))
             limit)))

@@ -89,6 +89,10 @@ guaranteed to never be modified, so it can be put in read-only storage."
              ;; KLUDGE: purify on cheneygc moves everything in code
              ;; constants into read-only space, value-cell breaks the
              ;; chain.
+             ;; Technically, if FORM returns an INSTANCE which does not have
+             ;; ":PURE T" in its defstruct, then it will not be put in readonly
+             ;; space, so we _could_ avoid the indirection cell. But it's not
+             ;; worth trying to optimize that out for benefit of a crappy GC.
              (cond #-gencgc
                    ((not read-only-p)
                     `(make-value-cell ,form))
