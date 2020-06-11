@@ -66,7 +66,6 @@ debug_function_from_pc (struct code* code, void *pc)
 {
     struct compiled_debug_info *di;
 
-    fprintf(stderr, "MEATBALL %p %p\n", code, pc);
     if (instancep(code->debug_info))
         di = (void*)native_pointer(code->debug_info);
     else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
