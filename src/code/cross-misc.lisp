@@ -16,6 +16,7 @@
 
 (defun make-system-hash-table (&rest args)
   (let ((args (copy-list args)))
+    (remf args :weakness)
     (remf args :synchronized)
     (remf args :finalizer)
     (apply 'make-hash-table args)))
