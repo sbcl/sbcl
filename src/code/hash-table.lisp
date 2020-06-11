@@ -52,10 +52,11 @@
 
 ;;; The PAIRS vector has an odd length with the following overhead elements:
 ;;;
-;;; [0] = backpointer to hash-table
+;;; [0] = high-water-mark
 ;;; [1] = rehash-due-to-GC indicator
 ;;; ...
-;;; [length-1] = high-water-mark
+;;; [length-1] = auxilliary info depending on kind of table
+;;;   See KV-VECTOR-AUX-INFO in 'target-hash-table'
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))

@@ -57,64 +57,6 @@
   (and (hash-table-weak-p ht)
        (decode-hash-table-weakness (ash (hash-table-flags ht) -4))))
 
-;;; Code for detecting concurrent accesses to the same table from
-;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
-;;; feature is enabled. The main reason for the existence of this code
-;;; is to detect thread-unsafe uses of hash-tables in sbcl itself,
-;;; where debugging anythign can be impossible after an important
-;;; internal hash-table has been corrupted. It's plausible that this
-;;; could be useful for some user code too, but the runtime cost is
-;;; really too high to enable it by default.
-;;; TODO: This macro needs to be repaired or removed.
-(defmacro with-concurrent-access-check (hash-table operation &body body)
-  (declare (ignorable hash-table operation)
-           (type (member :read :write) operation))
-  #-sb-hash-table-debug
-  `(progn ,@body)
-  #+sb-hash-table-debug
-  (let ((thread-slot-accessor (if (eq operation :read)
-                                  'hash-table-reading-thread
-                                  'hash-table-writing-thread)))
-    (once-only ((hash-table hash-table))
-      `(progn
-         (flet ((body-fun ()
-                  ,@body)
-                (error-fun ()
-                  ;; Don't signal more errors for this table.
-                  (setf (hash-table-signal-concurrent-access ,hash-table) nil)
-                  (cerror "Ignore the concurrent access"
-                          "Concurrent access to ~A" ,hash-table)))
-           (declare (inline body-fun))
-           (if (hash-table-signal-concurrent-access ,hash-table)
-               (unwind-protect
-                    (progn
-                      (unless (and (null (hash-table-writing-thread
-                                          ,hash-table))
-                                   ,@(when (eq operation :write)
-                                           `((null (hash-table-reading-thread
-                                                    ,hash-table)))))
-                        (error-fun))
-                      (setf (,thread-slot-accessor ,hash-table)
-                            sb-thread::*current-thread*)
-                      (body-fun))
-                 (unless (and ,@(when (eq operation :read)
-                                  `((null (hash-table-writing-thread
-                                           ,hash-table))))
-                              ,@(when (eq operation :write)
-                                  ;; no readers are allowed while writing
-                                  `((null (hash-table-reading-thread
-                                           ,hash-table))
-                                    (eq (hash-table-writing-thread
-                                         ,hash-table)
-                                        sb-thread::*current-thread*))))
-                   (error-fun))
-                 (when (eq (,thread-slot-accessor ,hash-table)
-                           sb-thread::*current-thread*)
-                   ;; this is not 100% correct here and may hide
-                   ;; concurrent access in rare circumstances.
-                   (setf (,thread-slot-accessor ,hash-table) nil)))
-               (body-fun)))))))
-
 #-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values fixnum (member t nil)))
