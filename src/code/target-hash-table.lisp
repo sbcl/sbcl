@@ -310,6 +310,18 @@ Examples:
 
      v))
 
+;;; I don't want to change peoples' assumptions about what operations are threadsafe
+;;; on a weak table that was not created as expressly synchronized, so we continue to
+;;; create nearly all weak tables as synchronized. With such tables, lock acquisition
+;;; might be recursive, because we also told users that they can use
+;;; SB-EXT:WITH-LOCKED-HASH-TABLE even with tables that are self-locking.
+;;; This results in a really strange design in which it is exceptionally difficult
+;;; to plug in standard POSIX mutexes which do not default to being recursive.
+;;; To slightly mitigate the problem of assuming all mutexes should be recursive,
+;;; some of the system weak hash-table are frobbed to turn off SYNCHRONIZED.
+;;; Maybe I can figure out how to make concurrent weak GETHASH threadsafe,
+;;; but I've spent a bit of time on it and it is quite difficult.
+
 (defun make-hash-table (&key
                         (test 'eql)
                         (size #.+min-hash-table-size+)
@@ -481,9 +493,7 @@ Examples:
                    rehash-size rehash-threshold
                    kv-vector index-vector next-vector hash-vector
                    (logior (if userfunp hash-table-userfun-flag 0)
-                           ;; FIXME: shouldn't weak tables always return
-                           ;; T from HASH-TABLE-SYNCHRONIZED-P ?
-                           (if synchronized hash-table-synchronized-flag 0)
+                           (if (or weakness synchronized) hash-table-synchronized-flag 0)
                            weakness-bits))))
       (declare (type index scaled-size))
       ;; The trailing metadata element is either the table itself or the hash-vector
@@ -491,6 +501,19 @@ Examples:
       ;; at the table. Weak hashing vectors need the table.
       (setf (kv-vector-table kv-vector) (if weakness table hash-vector))
       table)))
+
+(defun make-system-hash-table (&rest args &key (synchronized nil synchronizedp) finalizer
+                                &allow-other-keys)
+  (setq args (copy-list args))
+  (remf args :finalizer)
+  (let* ((ht (apply #'make-hash-table args))
+         (flags (hash-table-flags ht)))
+    (when (and synchronizedp (not synchronized))
+      (setf flags (logandc2 flags hash-table-synchronized-flag)))
+    (when finalizer
+      (setf flags (logior flags hash-table-finalizer-flag)))
+    (setf (%instance-ref ht (get-dsd-index hash-table flags)) flags)
+    ht))
 
 ;;; I guess we might have more than one representation of a table,
 ;;; hence this small wrapper function. But why not for the others?
@@ -1169,8 +1192,6 @@ nnnn 1_    any       linear scan
     (macrolet ((return-hit ()
                  '(return-from findhash-weak
                     (values probed-val probed-key physical-index predecessor))))
-      ;; FIXME: since a weak table is always synchronized, maybe get rid of
-      ;; this loop-over-epoch noise?
       (let ((start-epoch sb-kernel::*gc-epoch*)
             (kv-vector (hash-table-pairs hash-table)))
         (tagbody
@@ -1244,18 +1265,20 @@ nnnn 1_    any       linear scan
                  (unless (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
                    address-sensitive-p))
                 (hash (prefuzz-hash (the fixnum hash0))))
+       (dx-flet ((body ()
+                   (binding* (((probed-value probed-key physical-index predecessor)
+                               (findhash-weak key hash-table hash address-sensitive-p))
+                              (kv-vector (hash-table-pairs hash-table)))
+                     (declare (index physical-index))
+                     ,@body)))
        ;; It would be ideal if we were consistent about all tables NOT having
-       ;; synchronization unless created with ":SYNCHRONIZED T".
-       ;; But removing the implicit synchronization from weak tables looks tricky
-       ;; and doesn't seem worth spending much time on.
-       (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
-         ;; Receive the existing k,v pair to ensure liveness thereof because
-         ;; otherwise we have no "certificate of existence" of the pair.
-         (binding* (((probed-value probed-key physical-index predecessor)
-                     (findhash-weak key hash-table hash address-sensitive-p))
-                    (kv-vector (hash-table-pairs hash-table)))
-           (declare (index physical-index))
-           ,@body)))))
+       ;; synchronization unless created with ":SYNCHRONIZED T"
+       ;; but it looks tricky to support concurrent gethash on weak tables,
+       ;; so we mostly default to locking, except where there is an outer scope
+       ;; providing mutual exclusion such as WITH-FINALIZER-STORE.
+       (if (hash-table-synchronized-p hash-table)
+           (sb-thread::call-with-system-mutex #'body (hash-table-lock hash-table))
+           (body))))))
 
 (defun gethash/weak (key hash-table default)
   (declare (type hash-table hash-table) (optimize speed))
@@ -1753,6 +1776,7 @@ table itself."
   ;; observe junk, but you can't put good value at higher than the HWM]
   #+hash-table-simulate (setf (hash-table-%alist hash-table) nil)
   (when (plusp (kv-vector-high-water-mark (hash-table-pairs hash-table)))
+    ;; FIXME: why always acquire the lock?
     (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
       (let* ((kv-vector (hash-table-pairs hash-table))
              (high-water-mark (kv-vector-high-water-mark kv-vector)))

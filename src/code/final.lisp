@@ -12,14 +12,13 @@
 (in-package "SB-IMPL")
 
 (defmacro with-finalizer-store ((var) &body body)
-  `(let ((mutex (hash-table-lock (finalizer-id-map **finalizer-store**))))
-     ;; This does not inhibit GC, though the hashtable operations will,
-     ;; as is (currently) required for tables with non-null weakness.
-     (sb-thread::with-recursive-system-lock (mutex)
-       ;; Grab the store again inside the lock in case the array was enlarged
-       ;; after we referenced the mutex but before we acquired it.
-       (let ((,var **finalizer-store**))
-         ,@body))))
+  `(with-system-mutex ((hash-table-lock (finalizer-id-map **finalizer-store**)))
+     ;; Grab the global var inside the lock in case the array was enlarged
+     ;; after we referenced the mutex but before we acquired it.
+     ;; It's OK to reference the FINALIZER-ID-MAP because that is always
+     ;; in element 1 of the array regardless of what happens to the array.
+     (let ((,var **finalizer-store**))
+       ,@body)))
 
 (defmacro finalizer-recycle-bin (store) `(cdr (elt ,store 0)))
 (defmacro finalizer-id-map (store) `(elt ,store 1))
@@ -27,9 +26,8 @@
 
 (defun make-finalizer-store (array-length)
   (let* ((v (make-array (the index array-length)))
-         (ht (make-hash-table :test 'eq :weakness :key)))
-    (setf (%instance-ref ht (get-dsd-index hash-table flags))
-          (logior (hash-table-flags ht) hash-table-finalizer-flag))
+         (ht (make-system-hash-table :test 'eq :weakness :key :synchronized nil
+                                     :finalizer t)))
     ;; The recycle bin has a dummy item in front so that the simple-vector
     ;; is growable without messing up RUN-PENDING-FINALIZERS when it atomically
     ;; pushes items into the recycle bin - it is unaffected by looking at
@@ -308,7 +306,7 @@ Examples:
   (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
     (cond #+sb-thread
           ((%instancep *finalizer-thread*)
-           (sb-thread::with-system-mutex (*finalizer-queue-lock*)
+           (with-system-mutex (*finalizer-queue-lock*)
              (sb-thread:condition-notify *finalizer-queue*)))
           #+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
@@ -324,7 +322,7 @@ Examples:
                 (loop
                   (scan-finalizers)
                   ;; Wait for a notification
-                  (sb-thread::with-system-mutex (*finalizer-queue-lock*)
+                  (with-system-mutex (*finalizer-queue-lock*)
                     ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
                     (unless *finalizer-thread*
                       (return))
@@ -367,6 +365,6 @@ Examples:
     (when (%instancep thread)
       ;; The finalizer thread will exit when we wake it up
       ;; and it sees that *FINALIZER-THREAD* is NIL.
-      (sb-thread::with-system-mutex (*finalizer-queue-lock*)
+      (with-system-mutex (*finalizer-queue-lock*)
         (sb-thread:condition-notify *finalizer-queue*))
       (sb-thread:join-thread thread)))) ; wait for it

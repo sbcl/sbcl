@@ -854,10 +854,11 @@ Experimental: interface subject to change."
                  (add-to-xset part seen)
                  (funcall fun part))))
       (when ext
-        (let ((table sb-pcl::*eql-specializer-table*))
-          (multiple-value-bind (value foundp)
-              (with-locked-system-table (table) (gethash object table))
-            (when foundp (call value)))))
+        (multiple-value-bind (value foundp)
+            (let ((table sb-pcl::*eql-specializer-table*))
+              (with-system-mutex ((sb-impl::hash-table-lock table))
+                (gethash object table)))
+          (when foundp (call value))))
       (sb-vm:do-referenced-object (object call)
         (cons
          :extend

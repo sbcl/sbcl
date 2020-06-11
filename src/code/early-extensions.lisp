@@ -277,7 +277,7 @@
                        ,result)))
     `(let ((,n-table ,table))
        ,(if locked
-            `(with-locked-system-table (,n-table) ,iter-form)
+            `(with-system-mutex ((hash-table-lock ,n-table)) ,iter-form)
             iter-form))))
 
 ;;; Executes BODY for all entries of PLIST with KEY and VALUE bound to

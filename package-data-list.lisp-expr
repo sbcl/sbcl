@@ -1058,6 +1058,7 @@ possibly temporarily, because it might be used internally."
 
                ;; Like WITH-LOCKED-HASH-TABLE, but disabled interrupts
                "WITH-LOCKED-SYSTEM-TABLE"
+               "WITH-SYSTEM-MUTEX"
 
                ;; generic set implementation backed by a list that upgrades
                ;; to a hashtable if a certain size is exceeded.

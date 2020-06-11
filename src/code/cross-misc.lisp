@@ -14,6 +14,12 @@
 
 ;;; Forward declarations
 
+(defun make-system-hash-table (&rest args)
+  (let ((args (copy-list args)))
+    (remf args :synchronized)
+    (remf args :finalizer)
+    (apply 'make-hash-table args)))
+
 ;;; In correct code, TRULY-THE has only a performance impact and can
 ;;; be safely degraded to ordinary THE.
 (defmacro truly-the (type expr)
@@ -339,7 +345,8 @@
 
 (defmacro sb-format:tokens (string) string)
 
-(defmacro sb-thread::with-recursive-system-lock ((lock) &body body)
+;;; For a use in EARLY-TYPE
+(defmacro with-system-mutex ((lock) &body body)
   (declare (ignore lock))
   `(progn ,@body))
 

@@ -568,14 +568,12 @@
 ;; gethash on a live key should get the identical specializer, but since
 ;; nothing referenced the old specializer, consing a new one is fine.
 (defglobal *eql-specializer-table*
-  (make-hash-table :test 'eql :weakness :value))
+  (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
 
 (defun intern-eql-specializer (object)
   ;; Avoid style-warning about compiler-macro being unavailable.
   (declare (notinline make-instance))
-  ;; Need to lock, so that two threads don't get non-EQ specializers
-  ;; for an EQL object.
-  (with-locked-system-table (*eql-specializer-table*)
+  (with-system-mutex ((sb-impl::hash-table-lock *eql-specializer-table*))
     (ensure-gethash object *eql-specializer-table*
                     (make-instance 'eql-specializer :object object))))
 

@@ -851,14 +851,9 @@
 ;;; sitll signal that an unknown specifier is unknown on each reparse of the same.
 ;;; But as long as any reference enlivens the relevant CTYPE, we'll return that object.
 (defglobal **unknown-type-atoms**
-    ;; I think it's safe to say that if the host is SBCL, we can employ a weak table.
-    ;; SBCL has had weak tables since Sep 2006 (git rev 1479483c5f).
-    ;; For other hosts, just use an ordinary hash-table.
-    ;; This table isn't specified as synchronized because we need to wrap the lock
+    ;; This table is specified as unsynchronized because we need to wrap the lock
     ;; around a read/modify/write. GETHASH and PUTHASH can't do that themselves.
-    ;; Not that it would matter anyway - weak tables are always synchronized.
-    (let ((weakness #+(or (not sb-xc-host) host-quirks-sbcl) '(:weakness :value)))
-      (apply #'make-hash-table :test 'eq weakness)))
+    (sb-impl::make-system-hash-table :test 'eq :weakness :value :synchronized nil))
 
 #-sb-xc-host
 (progn (declaim (inline class-classoid))
@@ -930,7 +925,7 @@
     (setf (type-context-cacheable context) nil)
     (return (if (atom spec)
                 (let ((table **unknown-type-atoms**))
-                  (sb-thread::with-recursive-system-lock ((sb-impl::hash-table-lock table))
+                  (with-system-mutex ((sb-impl::hash-table-lock table))
                     (or (gethash spec table)
                         (progn #+sb-xc-host
                                (when *compile-print*
