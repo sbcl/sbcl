@@ -46,7 +46,7 @@ extern void *gc_general_alloc(sword_t nbytes,int page_type_flag);
 #define note_transported_object(old, new) /* do nothing */
 
 static inline lispobj
-gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
+gc_general_copy_object(lispobj object, size_t nwords, int page_type_flag)
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
 

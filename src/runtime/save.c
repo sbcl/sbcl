@@ -77,7 +77,7 @@ write_lispobj(lispobj obj, FILE *file)
 }
 
 static void
-write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
+write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
 {
     if (compression == COMPRESSION_LEVEL_NONE) {
         while (bytes > 0) {
@@ -145,14 +145,23 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
     }
 };
 
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
+#define FTELL _ftelli64
+#define FSEEK _fseeki64
+typedef __int64 ftell_type;
+#else
+#define FTELL ftell
+#define FSEEK fseek
+typedef long ftell_type;
+#endif
 
-static long write_bytes(FILE *file, char *addr, long bytes,
+static long write_bytes(FILE *file, char *addr, size_t bytes,
                         os_vm_offset_t file_offset, int compression)
 {
-    long here, data;
+    ftell_type here, data;
 
 #ifdef LISP_FEATURE_WIN32
-    long count;
+    size_t count;
     /* touch every single page in the space to force it to be mapped. */
     for (count = 0; count < bytes; count += 0x1000) {
         volatile int temp = addr[count];
@@ -160,12 +169,12 @@ static long write_bytes(FILE *file, char *addr, long bytes,
 #endif
 
     fflush(file);
-    here = ftell(file);
-    fseek(file, 0, SEEK_END);
-    data = ALIGN_UP(ftell(file), os_vm_page_size);
-    fseek(file, data, SEEK_SET);
+    here = FTELL(file);
+    FSEEK(file, 0, SEEK_END);
+    data = ALIGN_UP(FTELL(file), os_vm_page_size);
+    FSEEK(file, data, SEEK_SET);
     write_bytes_to_file(file, addr, bytes, compression);
-    fseek(file, here, SEEK_SET);
+    FSEEK(file, here, SEEK_SET);
     return ((data - file_offset) / os_vm_page_size) - 1;
 }
 
@@ -265,7 +274,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         fflush(stdout);
     }
 
-    os_vm_offset_t core_start_pos = ftell(file);
+    os_vm_offset_t core_start_pos = FTELL(file);
     write_lispobj(CORE_MAGIC, file);
 
     /* If 'save_runtime_options' is specified then the saved thread stack size

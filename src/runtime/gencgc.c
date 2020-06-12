@@ -4555,7 +4555,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
 /* Read corefile ptes from 'fd' which has already been positioned
  * and store into the page table */
 void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
-                           off_t offset, int fd)
+                           os_vm_offset_t offset, int fd)
 {
     compute_layout_of_layout();
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
@@ -4565,7 +4565,15 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
     // consume addresses that would have been taken by a mapped space.
     gc_allocate_ptes();
 
-    if (lseek(fd, offset, SEEK_SET) != offset) lose("failed seek");
+    if (
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
+        _lseeki64
+#else
+        lseek
+#endif
+        (fd, offset, SEEK_SET) != offset)
+        lose("failed seek");
+
     char data[8192];
     // Process an integral number of ptes on each read.
     // Parentheses around sizeof (type) are necessary to suppress a

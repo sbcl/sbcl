@@ -969,7 +969,7 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_GENCGC
 extern void gc_load_corefile_ptes(core_entry_elt_t, core_entry_elt_t,
-                                  off_t offset, int fd);
+                                  os_vm_offset_t offset, int fd);
 #else
 #define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4)
 #endif

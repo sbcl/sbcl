@@ -908,16 +908,25 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
 
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
 {
-    os_vm_size_t count;
 
     AVER(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE)||
          VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT,
                       PAGE_EXECUTE_READWRITE));
-
+#ifdef LISP_FEATURE_64_BIT
+    CRT_AVER_NONNEGATIVE(_lseeki64(fd, offset, SEEK_SET));
+#else
     CRT_AVER_NONNEGATIVE(lseek(fd, offset, SEEK_SET));
+#endif
+    size_t count;
 
-    count = read(fd, addr, len);
-    CRT_AVER( count == len );
+    while (len) {
+        unsigned to_read = len > INT_MAX ? INT_MAX : len;
+        count = read(fd, addr, to_read);
+        addr += count;
+        len -= count;
+        CRT_AVER(count == to_read);
+    }
+
     return (void*)0;
 }
 static DWORD os_protect_modes[8] = {
