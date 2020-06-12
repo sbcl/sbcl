@@ -2626,18 +2626,22 @@ bootstrapping.
        (result
         (list :early-method
 
+              ;; SECOND
               (getf initargs :function)
+              ;; THIRD
               (let ((mf (getf initargs :function)))
                 (aver mf)
                 (and (typep mf '%method-function)
                      (%method-function-fast-function mf)))
 
+              ;; FOURTH
               ;; the parsed specializers. This is used by
               ;; EARLY-METHOD-SPECIALIZERS to cache the parse.
               ;; Note that this only comes into play when there is
               ;; more than one early method on an early gf.
               parsed
 
+              ;; FIFTH
               ;; A list to which REAL-MAKE-A-METHOD can be applied
               ;; to make a real method corresponding to this early
               ;; one.
@@ -2647,7 +2651,10 @@ bootstrapping.
                (when slot-name
                  (list :slot-name slot-name :object-class object-class
                        :method-class-function method-class-function))
-               (list 'source source)))))
+               (list 'source source))
+
+              ;; SIXTH
+              (cons nil nil))))
     (initialize-method-function initargs result)
     result))
 

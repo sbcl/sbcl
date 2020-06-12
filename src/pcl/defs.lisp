@@ -330,6 +330,7 @@
    (lambda-list :initform () :initarg :lambda-list :reader method-lambda-list)
    (%function :initform nil :initarg :function :reader method-function)
    (%documentation :initform nil :initarg :documentation)
+   (%cache :initform nil :accessor method-em-cache)
    ;; True IFF method is known to have no CALL-NEXT-METHOD in it, or
    ;; just a plain (CALL-NEXT-METHOD).
    (simple-next-method-call
