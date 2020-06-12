@@ -117,9 +117,10 @@
   ;; in 'gc-private.h'
   (flags 0 :type (unsigned-byte 6) :read-only t)
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
-  (lock (sb-thread:make-mutex :name "hash-table lock")
-        #-c-headers-only :type #-c-headers-only sb-thread:mutex
-        :read-only t)
+  ;; The lock is always created for synchronized tables, or created just-in-time
+  ;; with nonsynchronized tables that are guarded by WITH-LOCKED-HASH-TABLE
+  ;; or an equivalent "system" variant of the locking macro.
+  (%lock nil #-c-headers-only :type #-c-headers-only (or null sb-thread:mutex))
 
   ;; The 4 standard tests functions don't need these next 2 slots:
 
@@ -185,6 +186,9 @@
   (reading-thread nil)
   #+sb-hash-table-debug
   (writing-thread nil))
+
+(sb-xc:defmacro hash-table-lock (table)
+  `(let ((ht ,table)) (or (hash-table-%lock ht) (install-hash-table-lock ht))))
 
 ;; Our hash-tables store precomputed hashes to speed rehash and to guard
 ;; the call of the general comparator.

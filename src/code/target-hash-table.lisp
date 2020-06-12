@@ -310,6 +310,12 @@ Examples:
 
      v))
 
+(defun install-hash-table-lock (table)
+  (declare (inline sb-thread:make-mutex))
+  (let* ((lock (sb-thread:make-mutex :name "hash-table lock"))
+         (oldval (cas (hash-table-%lock (truly-the hash-table table)) nil lock)))
+    (if (eq oldval nil) lock oldval)))
+
 ;;; I don't want to change peoples' assumptions about what operations are threadsafe
 ;;; on a weak table that was not created as expressly synchronized, so we continue to
 ;;; create nearly all weak tables as synchronized. With such tables, lock acquisition
@@ -500,6 +506,7 @@ Examples:
       ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
       ;; at the table. Weak hashing vectors need the table.
       (setf (kv-vector-table kv-vector) (if weakness table hash-vector))
+      (when (or weakness synchronized) (install-hash-table-lock table))
       table)))
 
 (defun make-system-hash-table (&rest args &key (synchronized nil synchronizedp) finalizer
@@ -1277,7 +1284,9 @@ nnnn 1_    any       linear scan
        ;; so we mostly default to locking, except where there is an outer scope
        ;; providing mutual exclusion such as WITH-FINALIZER-STORE.
        (if (hash-table-synchronized-p hash-table)
-           (sb-thread::call-with-system-mutex #'body (hash-table-lock hash-table))
+           ;; Use the private slot accessor for the lock because it's known
+           ;; to have a mutex.
+           (sb-thread::call-with-system-mutex #'body (hash-table-%lock hash-table))
            (body))))))
 
 (defun gethash/weak (key hash-table default)
@@ -1347,23 +1356,25 @@ nnnn 1_    any       linear scan
                   (equal (,wrapping gethash/equal puthash/equal remhash/equal))
                   (t     (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
             (locked-methods (getter setter remover)
+              ;; Use the private slot accessor, because we know that the mutex
+              ;; has been constructed.
               `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
                          (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t t &optional)
                            (sb-thread::with-recursive-system-lock
-                               ((hash-table-lock (truly-the hash-table table)))
+                               ((hash-table-%lock (truly-the hash-table table)))
                              (,getter key table default))))
                        (named-lambda ,(symbolicate setter "/LOCK") (key table value)
                          (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t &optional)
                            (sb-thread::with-recursive-system-lock
-                               ((hash-table-lock (truly-the hash-table table)))
+                               ((hash-table-%lock (truly-the hash-table table)))
                              (,setter key table value))))
                        (named-lambda ,(symbolicate remover "/LOCK") (key table)
                          (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t &optional)
                            (sb-thread::with-recursive-system-lock
-                               ((hash-table-lock (truly-the hash-table table)))
+                               ((hash-table-%lock (truly-the hash-table table)))
                              (,remover key table))))))
             (methods (getter setter remover)
               `(values #',getter #',setter #',remover)))

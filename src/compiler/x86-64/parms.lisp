@@ -204,6 +204,7 @@
     two-arg-gcd
     two-arg-lcm
     ensure-symbol-hash
+    sb-impl::install-hash-table-lock
     update-object-layout-or-invalid
     %coerce-callable-to-fun)
   #'equalp)

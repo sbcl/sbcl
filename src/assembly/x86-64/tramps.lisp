@@ -134,7 +134,7 @@
   (loadw rax-tn rax-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
-(define-assembly-routine (ensure-symbol-hash (:return-style :none)) ()
+(define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
   #+avx2
   (progn
     (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
@@ -149,8 +149,26 @@
   (with-registers-preserved (lisp xmm :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
-    (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
-  (inst ret))
+    (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
+
+(define-assembly-routine (sb-impl::install-hash-table-lock
+                          (:return-style :raw))
+  ()
+  #+avx2
+  (progn
+    (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
+    (inst test :byte (ea temp-reg-tn) 1)
+    (inst jmp :z call-preserving-xmm-only)
+    (with-registers-preserved (lisp ymm :except r11-tn)
+      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
+      (call-static-fun 'sb-impl::install-hash-table-lock 1)
+      (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
+    (inst ret))
+  call-preserving-xmm-only
+  (with-registers-preserved (lisp xmm :except r11-tn)
+    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
+    (call-static-fun 'sb-impl::install-hash-table-lock 1)
+    (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
 
 (define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
   #+avx2

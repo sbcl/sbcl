@@ -387,6 +387,17 @@
     GOOD
     (inst and res (lognot fixnum-tag-mask)))) ; redundant (but ok) if asm routine used
 
+(define-vop ()
+  (:policy :fast-safe)
+  (:translate sb-impl::install-hash-table-lock)
+  (:args (arg :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:generator 5
+    (inst push arg)
+    (invoke-asm-routine 'call 'sb-impl::install-hash-table-lock vop)
+    (inst pop res)))
+
 (eval-when (:compile-toplevel)
   ;; assumption: any object can be read 1 word past its base pointer
   (assert (= sb-vm:symbol-hash-slot 1)))
