@@ -15,7 +15,7 @@
 (define-assembly-routine (alloc->rnn (:export cons->rnn)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->RNN
-  (with-registers-preserved (xmm)
+  (with-registers-preserved (c xmm)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
@@ -24,7 +24,7 @@
 (define-assembly-routine (alloc->rnn.avx2 (:export cons->rnn.avx2)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->RNN.AVX2
-  (with-registers-preserved (ymm)
+  (with-registers-preserved (c ymm)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
@@ -32,7 +32,7 @@
 (define-assembly-routine (alloc->r11 (:export cons->r11) (:return-style :none)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->R11
-  (with-registers-preserved (xmm :except r11-tn)
+  (with-registers-preserved (c xmm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov r11-tn rax-tn))
@@ -42,7 +42,7 @@
 (define-assembly-routine (alloc->r11.avx2 (:export cons->r11.avx2) (:return-style :none)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->R11.AVX2
-  (with-registers-preserved (ymm :except r11-tn)
+  (with-registers-preserved (c ymm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov r11-tn rax-tn))
@@ -60,7 +60,7 @@
 ;;; There's no layout allocator preserving YMM regs because MAKE-LAYOUT entails a full call.
 #+immobile-space
 (define-assembly-routine (alloc-layout) ()
-  (with-registers-preserved (xmm :except r11-tn)
+  (with-registers-preserved (c xmm :except r11-tn)
     (inst call (make-fixup "alloc_layout" :foreign))
     (inst mov r11-tn rax-tn)))
 
@@ -68,12 +68,12 @@
 ;;; The C support routine's argument is the return PC.
 ;;; FIXME: we're missing routines that preserve YMM. I guess nobody cares.
 (define-assembly-routine (enable-alloc-counter) ()
-  (with-registers-preserved (xmm)
+  (with-registers-preserved (c xmm)
     (inst lea rdi-tn (ea 8 rbp-tn))
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
-  (with-registers-preserved (xmm)
+  (with-registers-preserved (c xmm)
     (inst lea rdi-tn (ea 8 rbp-tn))
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
 
@@ -140,15 +140,13 @@
     (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
     (inst test :byte (ea temp-reg-tn) 1)
     (inst jmp :z call-preserving-xmm-only)
-    (with-registers-preserved (ymm :except r11-tn
-                                   :callee-saved nil)
+    (with-registers-preserved (lisp ymm :except r11-tn)
       (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
       (call-static-fun 'ensure-symbol-hash 1)
       (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
     (inst ret))
   call-preserving-xmm-only
-  (with-registers-preserved (xmm :except r11-tn
-                                 :callee-saved nil)
+  (with-registers-preserved (lisp xmm :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
@@ -160,16 +158,14 @@
     (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
     (inst test :byte (ea temp-reg-tn) 1)
     (inst jmp :z call-preserving-xmm-only)
-    (with-registers-preserved (ymm :except r11-tn
-                                   :callee-saved nil)
+    (with-registers-preserved (lisp ymm :except r11-tn)
       (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
       (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
       (call-static-fun 'update-object-layout-or-invalid 2)
       (inst mov (ea 24 rbp-tn) rdx-tn)) ; result to arg passing loc
     (inst ret 8)) ; remove 1 arg. Caller pops the result
   call-preserving-xmm-only
-  (with-registers-preserved (xmm :except r11-tn
-                                 :callee-saved nil)
+  (with-registers-preserved (lisp xmm :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
     (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
     (call-static-fun 'update-object-layout-or-invalid 2)
