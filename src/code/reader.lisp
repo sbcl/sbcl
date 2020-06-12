@@ -32,6 +32,7 @@
                                  (list `(%instance-ref table ,(dsd-index dsd))
                                        (case (dsd-name dsd)
                                          (gethash-impl '#'gethash-return-default)
+                                         (pairs (make-array kv-pairs-overhead-slots))
                                          (lock nil)
                                          (t (dsd-default dsd)))))
                                (dd-slots
