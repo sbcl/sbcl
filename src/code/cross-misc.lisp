@@ -30,10 +30,6 @@
   (declare (ignore name))
   `#'(lambda ,args ,@body))
 
-(defmacro with-locked-system-table ((table) &body body)
-  (declare (ignore table))
-  `(progn ,@body))
-
 (defmacro define-thread-local (&rest rest) `(defvar ,@rest))
 
 (defmacro defglobal (name value &rest doc)

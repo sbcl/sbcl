@@ -610,7 +610,7 @@ between the ~A definition and the ~A definition"
 (defun insured-find-classoid (name predicate constructor)
   (declare (type function predicate constructor))
   (let ((table *forward-referenced-layouts*))
-    (with-locked-system-table (table)
+    (with-system-mutex ((hash-table-lock table))
       (let* ((old (find-classoid name nil))
              (res (if (and old (funcall predicate old))
                       old

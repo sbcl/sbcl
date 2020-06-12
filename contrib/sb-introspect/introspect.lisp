@@ -856,7 +856,7 @@ Experimental: interface subject to change."
       (when ext
         (multiple-value-bind (value foundp)
             (let ((table sb-pcl::*eql-specializer-table*))
-              (with-system-mutex ((sb-impl::hash-table-lock table))
+              (with-system-mutex ((hash-table-lock table))
                 (gethash object table)))
           (when foundp (call value))))
       (sb-vm:do-referenced-object (object call)

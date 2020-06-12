@@ -58,7 +58,7 @@
   (let* ((key (if datap (list name) name))
          (info *linkage-info*)
          (ht (car info)))
-    (or (awhen (with-locked-system-table (ht)
+    (or (awhen (with-system-mutex ((hash-table-lock ht))
                  (or (gethash key ht)
                      (let* ((index (hash-table-count ht))
                             (capacity (floor (- sb-vm:linkage-table-space-end
@@ -104,7 +104,7 @@
                    (unless defined (push key notdef))
                    (arch-write-linkage-table-entry index real-address
                                                    (if datap 1 0)))))))
-    (with-locked-system-table (ht)
+    (with-system-mutex ((hash-table-lock ht))
       (if full-scan
           ;; Look up everything; this is for image restart or library unload.
           (dohash ((key index) ht)

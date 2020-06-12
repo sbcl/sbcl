@@ -1056,9 +1056,8 @@ possibly temporarily, because it might be used internally."
                ;; Stack allocation without any questions asked
                "TRULY-DYNAMIC-EXTENT"
 
-               ;; Like WITH-LOCKED-HASH-TABLE, but disabled interrupts
-               "WITH-LOCKED-SYSTEM-TABLE"
                "WITH-SYSTEM-MUTEX"
+               "HASH-TABLE-LOCK"
 
                ;; generic set implementation backed by a list that upgrades
                ;; to a hashtable if a certain size is exceeded.

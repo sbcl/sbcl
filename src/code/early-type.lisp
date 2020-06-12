@@ -925,7 +925,7 @@
     (setf (type-context-cacheable context) nil)
     (return (if (atom spec)
                 (let ((table **unknown-type-atoms**))
-                  (with-system-mutex ((sb-impl::hash-table-lock table))
+                  (with-system-mutex ((hash-table-lock table))
                     (or (gethash spec table)
                         (progn #+sb-xc-host
                                (when *compile-print*

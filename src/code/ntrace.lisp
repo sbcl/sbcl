@@ -584,7 +584,7 @@ the N-th value returned by the function."
       ((not fun)
        ;; Someone has FMAKUNBOUND it.
        (let ((table *traced-funs*))
-         (with-locked-system-table (table)
+         (with-system-mutex ((hash-table-lock table))
            (maphash (lambda (fun info)
                       (when (equal function-or-name (trace-info-what info))
                         (remhash fun table)))

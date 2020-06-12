@@ -35,7 +35,7 @@ comments from CMU CL:
   "Return a hash-table containing only the entries in Table1 whose key is not
    also a key in Table2." (declare (type hash-table table1 table2))
   (let ((res (make-hash-table-like table1)))
-    (with-locked-system-table (table2)
+    (with-system-mutex ((hash-table-lock table2))
       (dohash ((k v) table1 :locked t)
         (unless (nth-value 1 (gethash k table2))
           (setf (gethash k res) v))))

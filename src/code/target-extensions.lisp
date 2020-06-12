@@ -184,13 +184,6 @@ unspecified."
   `(sb-thread:with-recursive-lock ((hash-table-lock ,hash-table))
      ,@body))
 
-;;; This macro is horrible (because WITH-RECURSIVE-SYSTEM-LOCK is).
-;;; So PLEASE don't use it, if at all possible.
-(defmacro with-locked-system-table ((hash-table) &body body)
-  `(sb-thread::with-recursive-system-lock
-       ((hash-table-lock ,hash-table))
-     ,@body))
-
 (defmacro find-package-restarts ((package-designator &optional reader)
                                  &body body)
   (let ((package `(or ,(if reader
