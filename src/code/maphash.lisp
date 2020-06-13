@@ -116,3 +116,49 @@ for."
                 #',name))))
        (macrolet ((,name () '(funcall ,function)))
          ,@body))))
+
+(define-compiler-macro make-hash-table (&whole form &rest keywords)
+  (let ((kind
+         (cond ((not keywords) 1)
+               ((typep keywords '(cons (eql :test) (cons t null)))
+                (let* ((arg (cadr keywords))
+                       (test (when (typep arg '(cons (member function quote) (cons t null)))
+                               (cadr arg))))
+                  (position test #(eq eql equal equalp)))))))
+    (if kind
+        `(make-hash-table-using-defaults ,kind)
+        form)))
+
+(defconstant hash-table-weak-flag         8)
+(defconstant hash-table-finalizer-flag    4)
+(defconstant hash-table-userfun-flag      2)
+(defconstant hash-table-synchronized-flag 1)
+
+;;; Keep in sync with weak_ht_alivep_funs[] in gc-common
+(defconstant +ht-weak-key-AND-value+ 0)
+(defconstant +ht-weak-key+           1)
+(defconstant +ht-weak-value+         2)
+(defconstant +ht-weak-key-OR-value+  3)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +min-hash-table-size+ 14)
+  (defconstant default-rehash-size $1.5))
+
+(defmacro make-system-hash-table (&key test synchronized weakness finalizer)
+  (multiple-value-bind (kind args)
+      (cond ((equal test '(quote eq))  (values 0 '('eq  #'eq  #'eq-hash)))
+            ((equal test '(quote eql)) (values 1 '('eql #'eql #'eql-hash)))
+            (t
+             (bug "Incomplete implementation of MAKE-SYSTEM-HASH-TABLE")
+             0))
+    `(%make-hash-table
+      (logior ,(ecase weakness
+                (:key   '(pack-ht-flags-weakness +ht-weak-key+))
+                (:value '(pack-ht-flags-weakness +ht-weak-value+)))
+               (pack-ht-flags-kind ,kind)
+               ,(if synchronized 'hash-table-synchronized-flag 0)
+               ,(if finalizer 'hash-table-finalizer-flag 0))
+      ,@args
+      ,+min-hash-table-size+
+      default-rehash-size
+      $1.0)))

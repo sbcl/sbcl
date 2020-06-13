@@ -111,7 +111,7 @@
                (setf (gethash char table) (cons attributes function)))
               (t
                ;; If the table is *empty-extended-char-table* the item won't be
-               ;; found, so we're not actuallly altering the empty table.
+               ;; found, so we're not actually altering the empty table.
                (remhash char table)))))
   nil)
 

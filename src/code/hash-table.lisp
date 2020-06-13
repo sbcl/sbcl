@@ -61,8 +61,9 @@
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
-                             (:constructor %make-hash-table
-                               (gethash-impl
+                             (:constructor %alloc-hash-table
+                               (flags
+                                gethash-impl
                                 puthash-impl
                                 remhash-impl
                                 clrhash-impl
@@ -74,8 +75,7 @@
                                 pairs
                                 index-vector
                                 next-vector
-                                hash-vector
-                                flags)))
+                                hash-vector)))
 
   (gethash-impl #'error :type function :read-only t)
   (puthash-impl #'error :type function :read-only t)
@@ -107,15 +107,17 @@
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents address-based hashing on the
   ;; respective key.
   (hash-vector nil :type (or null (simple-array hash-table-index (*))))
-  ;; flags: WEAKNESS-KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZEDP
-  ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
+  ;; flags: WEAKNESS | KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZEDP
+  ;; WEAKNESS is 2 bits, KIND is 2 bits, the rest are 1 bit each
+  ;;   - WEAKNESS     : {K-and-V, K, V, K-or-V}, irrelevant unless WEAKP
+  ;;   - KIND         : {EQ, EQL, EQUAL, EQUALP}, irrelevant if USERFUNP
   ;;   - WEAKP        : table is weak
   ;;   - FINALIZERSP  : table is the global finalizer store
-  ;;   - USERFUNP     : table has a user-defined predicate
+  ;;   - USERFUNP     : table has a nonstandard hash function
   ;;   - SYCHRONIZEDP : all operations are automatically guarded by a mutex
   ;; If you change these, be sure to check the definition of hash_table_weakp()
   ;; in 'gc-private.h'
-  (flags 0 :type (unsigned-byte 6) :read-only t)
+  (flags 0 :type (unsigned-byte 8) :read-only t)
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   ;; The lock is always created for synchronized tables, or created just-in-time
   ;; with nonsynchronized tables that are guarded by WITH-LOCKED-HASH-TABLE
@@ -189,6 +191,13 @@
 
 (sb-xc:defmacro hash-table-lock (table)
   `(let ((ht ,table)) (or (hash-table-%lock ht) (install-hash-table-lock ht))))
+
+(sb-xc:defmacro pack-ht-flags-weakness (x) `(logior (ash ,x 6) hash-table-weak-flag))
+(sb-xc:defmacro ht-flags-weakness (flags) `(ldb (byte 2 6) ,flags))
+;;; KIND corresponds directly to the HASH-TABLE-TEST for the 4 standard tests,
+;;; but is not meaningful with a user-provided test or hash function.
+(sb-xc:defmacro pack-ht-flags-kind (x) `(ash ,x 4))
+(sb-xc:defmacro ht-flags-kind (flags) `(ldb (byte 2 4) ,flags))
 
 ;; Our hash-tables store precomputed hashes to speed rehash and to guard
 ;; the call of the general comparator.

@@ -24,11 +24,6 @@
 ;;;;    swapped out for a new instance with new vectors. Remove array bounds
 ;;;;    checking since all the arrays will be tied together.
 
-(defconstant hash-table-weak-flag         8)
-(defconstant hash-table-finalizer-flag    4)
-(defconstant hash-table-userfun-flag      2)
-(defconstant hash-table-synchronized-flag 1)
-
 ;;; T if and only if table has non-null weakness kind.
 (declaim (inline hash-table-weak-p))
 (defun hash-table-weak-p (ht)
@@ -55,7 +50,7 @@
   "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
 :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
   (and (hash-table-weak-p ht)
-       (decode-hash-table-weakness (ash (hash-table-flags ht) -4))))
+       (decode-hash-table-weakness (ht-flags-weakness (hash-table-flags ht)))))
 
 #-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
@@ -269,9 +264,7 @@ Examples:
 ;;; So we allocate 14 k/v pairs = 28 cells + 3 overhead = 31 cells,
 ;;; and at maximum load the table will have a load factor of 87.5%
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +min-hash-table-size+ 14)
-  (defconstant kv-pairs-overhead-slots 3)
-  (defconstant default-rehash-size $1.5))
+  (defconstant kv-pairs-overhead-slots 3))
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
 ;; The GC will set this to 1 if it moves an address-sensitive key. This used
@@ -328,14 +321,13 @@ Examples:
 ;;; Maybe I can figure out how to make concurrent weak GETHASH threadsafe,
 ;;; but I've spent a bit of time on it and it is quite difficult.
 
-(defun make-hash-table (&key
-                        (test 'eql)
-                        (size #.+min-hash-table-size+)
-                        (rehash-size #.default-rehash-size)
-                        (rehash-threshold 1)
-                        (hash-function nil hash-function-suppliedp)
-                        (weakness nil)
-                        (synchronized))
+(defun make-hash-table (&key (test 'eql)
+                             (size #.+min-hash-table-size+)
+                             (rehash-size #.default-rehash-size)
+                             (rehash-threshold 1)
+                             (hash-function nil user-hashfun-p)
+                             (weakness nil)
+                             (synchronized))
   "Create and return a new hash table. The keywords are as follows:
 
   :TEST
@@ -397,43 +389,42 @@ Examples:
     future."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
-  (multiple-value-bind (userfunp test test-fun hash-fun)
-      (cond ((or (eq test #'eq) (eq test 'eq)) (values nil 'eq #'eq #'eq-hash))
-            ((or (eq test #'eql) (eq test 'eql)) (values nil 'eql #'eql #'eql-hash))
+  (multiple-value-bind (kind test test-fun hash-fun)
+      (cond ((or (eq test #'eq) (eq test 'eq))
+             (values 0 'eq #'eq #'eq-hash))
+            ((or (eq test #'eql) (eq test 'eql))
+             (values 1 'eql #'eql #'eql-hash))
             ((or (eq test #'equal) (eq test 'equal))
-             (cond ((or (eq hash-function #'equal-hash/unstable)
-                        (eq hash-function 'equal-hash/unstable))
-                    ;; USERFUNP must remain NIL to permit address-based hashing.
-                    ;; Don't want to assign HASH-FUNCTION itself
-                    ;; because that prevents use of the argument's type assertion.
-                    (setq hash-function-suppliedp nil)
-                    (values nil 'equal #'equal #'equal-hash/unstable))
-                   (t
-                    (values nil 'equal #'equal #'equal-hash))))
+             ;; As an unadvertised feature, you can pick whether instances should receive
+             ;; stable or address-based hashes. A use-case for address-based would be for
+             ;; in system code so as not to incur memory growth by causing user structures
+             ;; to accrete a stable hash slot due to key movement by GC.
+             ;; USERFUNP must remain NIL in that case to permit address-based hashing.
+             (values 2 'equal #'equal
+                     (let ((instance-addr-hashing
+                            (or (eq hash-function #'equal-hash/unstable)
+                                (eq hash-function 'equal-hash/unstable))))
+                       (when instance-addr-hashing
+                         (setq user-hashfun-p nil))
+                       (if instance-addr-hashing #'equal-hash/unstable #'equal-hash))))
             ((or (eq test #'equalp) (eq test 'equalp))
-             (values nil 'equalp #'equalp #'equalp-hash))
+             (values 3 'equalp #'equalp #'equalp-hash))
             (t
-             ;; FIXME: It would be nice to have a compiler-macro
-             ;; that resolved this at compile time: we could grab
-             ;; the alist cell in a LOAD-TIME-VALUE, etc.
              (dolist (info *user-hash-table-tests*
                       (if hash-function
                           (if (functionp test)
-                              (values t (%fun-name test) test nil)
-                              (values t test (%coerce-callable-to-fun test) nil))
-                       (error "Unknown :TEST for MAKE-HASH-TABLE: ~S"
-                              test)))
+                              (values -1 (%fun-name test) test nil)
+                              (values -1 test (%coerce-callable-to-fun test) nil))
+                          (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test)))
                (destructuring-bind (test-name test-fun hash-fun) info
                  (when (or (eq test test-name) (eq test test-fun))
-                   (return (values t test-name test-fun hash-fun)))))))
-    (when (and hash-function-suppliedp hash-function)
+                   (return (values -1 test-name test-fun hash-fun)))))))
+    (when user-hashfun-p
+      ;; It is permitted to specify a custom hash function with any of the standard predicates.
+      ;; This forces use of the generalized table methods.
       (setf hash-fun (%coerce-callable-to-fun hash-function)
-            ;; It is permitted to specify your own hash function with one of the
-            ;; builtin predicates. This forces use of the general predicate.
-            userfunp t))
-
-    (binding*
-          ((size (max +min-hash-table-size+
+            kind -1))
+    (let* ((size (max +min-hash-table-size+
                       ;; Our table sizes are capped by the 32-bit integers used as indices
                       ;; into the chains. Prevent our code from failing if the user specified
                       ;; most-positive-fixnum here. (fndb says that size is 'unsigned-byte')
@@ -445,7 +436,25 @@ Examples:
            ;; not 1, to make it easier for the compiler to avoid
            ;; boxing.
            (rehash-threshold (max +min-hash-table-rehash-threshold+
-                                  (float rehash-threshold $1.0))) ; always single-float
+                                  (float rehash-threshold $1.0)))) ; always single-float
+      (%make-hash-table
+       ;; compute flags. The stored KIND bits don't matter for a user-supplied hash
+       ;; and/or test fun, however we don't want to imply that it is an EQ table
+       ;; because EQ tables don't get a hash-vector allocated.
+       (logior (if weakness
+                   (or (loop for i below 4
+                             when (eq (decode-hash-table-weakness i) weakness)
+                             do (return (pack-ht-flags-weakness i)))
+                       (bug "Unreachable"))
+                   0)
+               (pack-ht-flags-kind (logand kind 3)) ; kind -1 becomes 3
+               (if (or weakness synchronized) hash-table-synchronized-flag 0)
+               (if (eql kind -1) hash-table-userfun-flag 0))
+       test test-fun hash-fun
+       size rehash-size rehash-threshold))))
+
+(defun %make-hash-table (flags test test-fun hash-fun size rehash-size rehash-threshold)
+  (binding* (
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size) rehash-threshold)), and indeed
            ;; it was expressed like that until 0.7.0. However,
@@ -463,7 +472,8 @@ Examples:
            (index-vector (make-array bucket-count
                                      :element-type 'hash-table-index
                                      :initial-element 0))
-           (kv-vector (new-kv-vector size weakness))
+           (weakp (logtest flags hash-table-weak-flag))
+           (kv-vector (new-kv-vector size weakp))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
            ;; together.
@@ -480,47 +490,43 @@ Examples:
            ;; it would need to know which pointer objects aren't hashed by address.
            ;; Conversely, we use a hash-vector for an EQ table if it has
            ;; a user-supplied hash function.
-           (hash-vector (when (or hash-function (neq test 'eq))
+           (hash-vector (when (> (ht-flags-kind flags) 0)
                           (make-array (1+ size) :element-type 'hash-table-index)))
-           (weakness-bits
-            (if weakness
-                (or (loop for i below 4
-                          when (eq (decode-hash-table-weakness i) weakness)
-                          do (return (logior (ash i 4) hash-table-weak-flag)))
-                    (bug "Unreachable"))
-                0))
            ((getter setter remover)
-            (if weakness
+            (if weakp
                 (values #'gethash/weak #'puthash/weak #'remhash/weak)
-                (pick-table-methods synchronized userfunp test)))
-           (table (%make-hash-table
-                   getter setter remover #'clrhash-impl
-                   test test-fun hash-fun
-                   rehash-size rehash-threshold
-                   kv-vector index-vector next-vector hash-vector
-                   (logior (if userfunp hash-table-userfun-flag 0)
-                           (if (or weakness synchronized) hash-table-synchronized-flag 0)
-                           weakness-bits))))
+                (pick-table-methods (logtest flags hash-table-synchronized-flag)
+                                    (if (logtest flags hash-table-userfun-flag)
+                                        -1
+                                        (ht-flags-kind flags)))))
+           (table
+            (%alloc-hash-table flags getter setter remover #'clrhash-impl
+                               test test-fun hash-fun
+                               rehash-size rehash-threshold
+                               kv-vector index-vector next-vector hash-vector)))
       (declare (type index scaled-size))
       ;; The trailing metadata element is either the table itself or the hash-vector
       ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
       ;; at the table. Weak hashing vectors need the table.
-      (setf (kv-vector-table kv-vector) (if weakness table hash-vector))
-      (when (or weakness synchronized) (install-hash-table-lock table))
-      table)))
+      (setf (kv-vector-table kv-vector) (if weakp table hash-vector))
+      (when (logtest flags hash-table-synchronized-flag)
+        (install-hash-table-lock table))
+      table))
 
-(defun make-system-hash-table (&rest args &key (synchronized nil synchronizedp) finalizer
-                                &allow-other-keys)
-  (setq args (copy-list args))
-  (remf args :finalizer)
-  (let* ((ht (apply #'make-hash-table args))
-         (flags (hash-table-flags ht)))
-    (when (and synchronizedp (not synchronized))
-      (setf flags (logandc2 flags hash-table-synchronized-flag)))
-    (when finalizer
-      (setf flags (logior flags hash-table-finalizer-flag)))
-    (setf (%instance-ref ht (get-dsd-index hash-table flags)) flags)
-    ht))
+;;; a "plain" hash-table has nothing fancy: default size, default growth rate,
+;;; not weak, not synchronized, not a user-defined hash fun and/or comparator.
+(defun make-hash-table-using-defaults (kind)
+  (declare ((integer 0 3) kind))
+  (let ((test (aref #(eq eql equal equalp) kind)))
+    (declare (optimize (safety 0))) ; skip FBOUNDP checks
+    (let ((test-fun (symbol-function test))
+          (hash-fun (symbol-function
+                     (aref #(eq-hash eql-hash equal-hash equalp-hash) kind))))
+      (%make-hash-table (pack-ht-flags-kind kind)
+                        test test-fun hash-fun
+                        +min-hash-table-size+
+                        default-rehash-size
+                        $1.0)))) ; rehash threshold
 
 ;;; I guess we might have more than one representation of a table,
 ;;; hence this small wrapper function. But why not for the others?
@@ -1348,14 +1354,19 @@ nnnn 1_    any       linear scan
           (t
            (values default nil)))))
 
-(defun pick-table-methods (synchronized userp test)
- (macrolet ((gen-cases (wrapping)
-              `(case test
-                  (eq    (,wrapping gethash/eq puthash/eq remhash/eq))
-                  (eql   (,wrapping gethash/eql puthash/eql remhash/eql))
-                  (equal (,wrapping gethash/equal puthash/equal remhash/equal))
-                  (t     (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
-            (locked-methods (getter setter remover)
+(defun pick-table-methods (synchronized kind)
+  (declare ((integer -1 3) kind))
+  ;; test is specified as 0..3 for a standard fun or -1 for userfun
+  (macrolet ((gen-cases (wrapping)
+              `(case kind
+                  (-1 (,wrapping gethash/any puthash/any remhash/any))
+                  (0  (,wrapping gethash/eq puthash/eq remhash/eq))
+                  (1  (,wrapping gethash/eql puthash/eql remhash/eql))
+                  (2  (,wrapping gethash/equal puthash/equal remhash/equal))
+                  (3  (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
+             (locked-methods (getter setter remover)
+              ;; We might want to think about inlining the guts of CALL-WITH-...LOCK
+              ;; into these methods
               ;; Use the private slot accessor, because we know that the mutex
               ;; has been constructed.
               `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
@@ -1376,15 +1387,11 @@ nnnn 1_    any       linear scan
                            (sb-thread::with-recursive-system-lock
                                ((hash-table-%lock (truly-the hash-table table)))
                              (,remover key table))))))
-            (methods (getter setter remover)
+             (methods (getter setter remover)
               `(values #',getter #',setter #',remover)))
-    (if userp
-        (if synchronized
-            (locked-methods gethash/any puthash/any remhash/any)
-            (methods gethash/any puthash/any remhash/any))
-        (if synchronized
-            (gen-cases locked-methods)
-            (gen-cases methods)))))
+    (if synchronized
+        (gen-cases locked-methods)
+        (gen-cases methods))))
 
 ;;; Three argument version of GETHASH
 (defun gethash3 (key hash-table default)
