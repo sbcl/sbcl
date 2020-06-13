@@ -1962,6 +1962,7 @@ extended <package-name>::<form-in-package> syntax."
 ;; values was a hashtable which got immediately coerced to an alist.
 ;; In anticipation of perhaps not doing an extra re-shaping, if HASH-TABLE-P
 ;; is NIL then return nested alists: ((#\# (#\R . #<FUNCTION SHARP-R>) ...))
+;; FIXME: provide a better interface for iterating over reader macros
 (defun dispatch-tables (readtable &optional (hash-table-p t))
   (let (alist)
     (flet ((process (char fn &aux (dtable (%dispatch-macro-char-table fn)))
@@ -1973,7 +1974,7 @@ extended <package-name>::<form-in-package> syntax."
                        when fn do (push (cons (code-char ch) fn) output))
                  (dolist (cell output) ; coerce values to function-designator
                    (rplacd cell (cmt-entry-to-fun-designator (cdr cell))))
-                 (when hash-table-p ; caller wants hash-tables
+                 (when hash-table-p     ; caller wants hash-tables
                    (setq output (%stuff-hash-table (make-hash-table) output)))
                  (push (cons char output) alist)))))
       (loop for fn across (base-char-macro-array readtable) and ch from 0
@@ -1983,6 +1984,12 @@ extended <package-name>::<form-in-package> syntax."
         (maphash (lambda (char val) (process char (cdr val)))
                  (extended-char-table readtable))))
     alist))
+
+(declaim (inline character-macro-array character-macro-hash-table))
+(define-deprecated-function :early "2.0.6" character-macro-array base-char-macro-array (readtable)
+  (base-char-macro-array readtable))
+(define-deprecated-function :early "2.0.6" character-macro-hash-table extended-char-table (readtable)
+  (extended-char-table readtable))
 
 ;; Stub - should never get called with anything but NIL
 ;; and only after all macros have been changed to constituents already.
