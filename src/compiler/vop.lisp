@@ -1110,8 +1110,7 @@
             (:copier nil))
   ;; the IR2-BLOCK that this structure represents the conflicts for
   (block (missing-arg) :type ir2-block)
-  ;; thread running through all the GLOBAL-CONFLICTSs for BLOCK. This
-  ;; thread is sorted by TN number
+  ;; thread running through all the GLOBAL-CONFLICTSs for BLOCK.
   (next-blockwise nil :type (or global-conflicts null))
   ;; the way that TN is used by BLOCK
   ;;

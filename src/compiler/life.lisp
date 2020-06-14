@@ -41,16 +41,9 @@
 ;;; Do the actual insertion of the conflict NEW into BLOCK's global
 ;;; conflicts.
 (defun insert-block-global-conflict (new block)
-  (let ((global-num (tn-number (global-conflicts-tn new))))
-    (do ((prev nil conf)
-         (conf (ir2-block-global-tns block)
-               (global-conflicts-next-blockwise conf)))
-        ((or (null conf)
-             (> (tn-number (global-conflicts-tn conf)) global-num))
-         (if prev
-             (setf (global-conflicts-next-blockwise prev) new)
-             (setf (ir2-block-global-tns block) new))
-         (setf (global-conflicts-next-blockwise new) conf))))
+  ;; This used to keep the TNs sorted by TN-NUMBER, but appears to be
+  ;; unnecessary.
+  (shiftf (global-conflicts-next-blockwise new) (ir2-block-global-tns block) new)
   (values))
 
 ;;; Reset the CURRENT-CONFLICT slot in all packed TNs to point to the
