@@ -290,8 +290,11 @@ static inline int instancep(lispobj obj) {
 static inline int functionp(lispobj obj) {
     return lowtag_of(obj) == FUN_POINTER_LOWTAG;
 }
+static inline int other_pointer_p(lispobj obj) {
+    return lowtag_of(obj) == OTHER_POINTER_LOWTAG;
+}
 static inline int simple_vector_p(lispobj obj) {
-    return lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
+    return other_pointer_p(obj) &&
            widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
 

@@ -286,9 +286,9 @@ Examples:
 ;; read/modify/write on the header. In C there's sync_or_and_fetch, etc.
 (defmacro kv-vector-needs-rehash (vector) `(svref ,vector 1))
 
-;;; The 'table' points to the hash-table if the table is weak,
+;;; The 'supplement' points to the hash-table if the table is weak,
 ;;; or to the hash vector if the table is not weak.
-(defmacro kv-vector-table (pairs) `(svref ,pairs (1- (length ,pairs))))
+(defmacro kv-vector-supplement (pairs) `(svref ,pairs (1- (length ,pairs))))
 
 (declaim (inline set-kv-hwm)) ; can't setf data-vector-ref
 (defun set-kv-hwm (vector hwm) (setf (svref vector 0) hwm))
@@ -299,6 +299,10 @@ Examples:
                         :initial-element +empty-ht-slot+)))
      (setf (kv-vector-high-water-mark v) 0)
      (setf (kv-vector-needs-rehash v) 0)
+     ;; GC will see the vector as a hashing vector as soon as HASHING-SUBTYPE
+     ;; is set, so it needs to see a valid value in the 'supplement' slot.
+     ;; Neither 0 nor +empty-ht-slot+ is a valid value.
+     (setf (kv-vector-supplement v) nil)
      (set-header-data v (if ,weakp
                             (logior sb-vm:vector-weak-subtype
                                     sb-vm:vector-hashing-subtype)
@@ -511,7 +515,7 @@ Examples:
       ;; The trailing metadata element is either the table itself or the hash-vector
       ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
       ;; at the table. Weak hashing vectors need the table.
-      (setf (kv-vector-table kv-vector) (if weakp table hash-vector))
+      (setf (kv-vector-supplement kv-vector) (if weakp table hash-vector))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
       table))
@@ -820,7 +824,7 @@ multiple threads accessing the same hash-table without locking."
     ;; Clearing the weakness causes all entries to stay alive.
     ;; Furthermore, clearing both makes the trailing metadata ignorable.
     (set-header-data old-kv-vector sb-vm:vector-hashing-subtype)
-    (setf (kv-vector-table old-kv-vector) 0)
+    (setf (kv-vector-supplement old-kv-vector) 0)
 
     ;; The high-water-mark remains unchanged.
     ;; Set this before copying pairs, otherwise they would not be seen
@@ -835,7 +839,7 @@ multiple threads accessing the same hash-table without locking."
     ;; but I'd rather the table remain in a consistent state, in case we
     ;; ever devise a way to allow concurrent reads with a single writer,
     ;; for example.
-    (setf (kv-vector-table new-kv-vector) new-hash-vector)
+    (setf (kv-vector-supplement new-kv-vector) new-hash-vector)
 
     ;; Copy the k/v pairs excluding leading and trailing metadata.
     (replace new-kv-vector old-kv-vector
@@ -853,7 +857,7 @@ multiple threads accessing the same hash-table without locking."
         (setf (hash-table-smashed-cells table) nil)
         ;; Now that the table points to the right hash-vector
         ;; we can set the vector's backpointer and turn it weak.
-        (setf (kv-vector-table new-kv-vector) table)
+        (setf (kv-vector-supplement new-kv-vector) table)
         (set-header-bits new-kv-vector sb-vm:vector-weak-subtype))
 
       ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
@@ -1802,7 +1806,7 @@ table itself."
       (let* ((kv-vector (hash-table-pairs hash-table))
              (high-water-mark (kv-vector-high-water-mark kv-vector)))
         (when (hash-table-weak-p hash-table)
-          (aver (eq (kv-vector-table kv-vector) hash-table)))
+          (aver (eq (kv-vector-supplement kv-vector) hash-table)))
         ;; Remove address-sensitivity.
         (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
         ;; Do this only after unsetting the address-sensitive bit,
