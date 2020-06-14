@@ -74,3 +74,10 @@
       ;; but let's not be too sensitive to the exact bin count in use.
       ;; It's a heck of a lot better than everything in 1 bin.
       (assert (> bins-used 40)))))
+
+(with-test (:name :rehash-no-spurious-address-sensitivity)
+  (let ((h (make-hash-table :test 'eq)))
+    (dotimes (i 100)
+      (setf (gethash i h) (- i)))
+    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs h))
+               sb-vm:vector-hashing-subtype))))

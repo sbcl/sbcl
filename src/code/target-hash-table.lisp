@@ -60,6 +60,9 @@
   ;; the lightest-weight in terms of speed, so I'm letting everything use
   ;; address-based hashing, unlike the other standard hash-table hash functions
   ;; which try use the hash slot of certain objects.
+  ;; Note also that as we add logic into the EQ-HASH function to decide whether
+  ;; the hash is address-based, we either have to replicate that logic into
+  ;; rehashing, or else actually call EQ-HASH to decide for us.
   (values (pointer-hash key)
           (sb-vm:is-lisp-pointer (get-lisp-obj-address key))))
 
@@ -673,12 +676,12 @@ multiple threads accessing the same hash-table without locking."
       ;; Scan backwards so that chains are in ascending index order.
       (do ((i hwm (1- i))) ((zerop i))
         (declare (type index/2 i))
-        (with-pair (pair-key pair-val)
+        (with-pair (key val)
          ;; It's unclear why we check for key AND value being empty - a half
          ;; empty cell could only appear mid-insertion, but concurrent
          ;; insert is forbidden, so how could it happen?
          ;; i.e. I would think KEY emptiness is an adequate test.
-         (cond ((and (empty-ht-slot-p pair-key) (empty-ht-slot-p pair-val))
+         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p val))
                 ;; Slot is empty, push it onto free list.
                 (setf (aref next-vector i) next-free next-free i))
                ((/= (aref hash-vector i) +magic-hash-vector-value+)
@@ -689,17 +692,16 @@ multiple threads accessing the same hash-table without locking."
                 ;; Precise GC platforms can move any key except the ones which
                 ;; are explicitly pinned.
                 (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-                (push-in-chain (pointer-hash->bucket
-                                (pointer-hash pair-key) mask))))))
+                (push-in-chain (pointer-hash->bucket (pointer-hash key) mask))))))
       (do ((i hwm (1- i))) ((zerop i))
         (declare (type index/2 i))
-        (with-pair (pair-key pair-val)
-         (cond ((and (empty-ht-slot-p pair-key) (empty-ht-slot-p pair-val))
+        (with-pair (key val)
+         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p val))
                 (setf (aref next-vector i) next-free next-free i))
                (t
-                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-                (push-in-chain (pointer-hash->bucket
-                                (pointer-hash pair-key) mask)))))))
+                (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
+                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+                (push-in-chain (pointer-hash->bucket (pointer-hash key) mask)))))))
   ;; This is identical to the calculation of next-free-kv in INSERT-AT.
   (cond ((/= next-free 0) next-free)
         ((= hwm (hash-table-pairs-capacity kv-vector)) 0)
@@ -764,7 +766,8 @@ multiple threads accessing the same hash-table without locking."
              (declare (type index/2 i))
              (with-pair (pair-key)
               (unless (empty-ht-slot-p pair-key)
-                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                (when (sb-vm:is-lisp-pointer (get-lisp-obj-address pair-key))
+                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
                 (push-in-chain (pointer-hash->bucket
                                 (pointer-hash pair-key) mask))
                 (when (eq pair-key key) (setq result key-index))))))
