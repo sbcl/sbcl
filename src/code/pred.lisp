@@ -89,7 +89,6 @@
   ;; the type it tests for in the Common Lisp type system, and since it's
   ;; only used in the implementation of a few specialized things.)
   (def-type-predicate-wrapper double-float-p)
-  (def-type-predicate-wrapper extended-char-p)
   (def-type-predicate-wrapper fdefn-p)
   (def-type-predicate-wrapper fixnump)
   (def-type-predicate-wrapper floatp)
