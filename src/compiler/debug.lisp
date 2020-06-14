@@ -759,11 +759,6 @@
                (global-conflicts-next-blockwise conf))
          (prev nil conf))
         ((null conf))
-      (when prev
-        (unless (> (tn-number (global-conflicts-tn conf))
-                   (tn-number (global-conflicts-tn prev)))
-          (barf "~S and ~S out of order in ~S" prev conf block)))
-
       (unless (find-in #'global-conflicts-next-tnwise
                        conf
                        (tn-global-conflicts
