@@ -55,7 +55,7 @@
 ;;; [0] = high-water-mark
 ;;; [1] = rehash-due-to-GC indicator
 ;;; ...
-;;; [length-1] = auxilliary info depending on kind of table
+;;; [length-1] = auxiliary info depending on kind of table
 ;;;   See KV-VECTOR-AUX-INFO in 'target-hash-table'
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.

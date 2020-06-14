@@ -62,7 +62,7 @@
 
 ;;; A "group" comprises all the info for a particular Name, and its list
 ;;; of types may may span descriptors, though rarely.
-;;; An "auxilliary key" is the first element of a 2-list Name. It is interposed
+;;; An "auxiliary key" is the first element of a 2-list Name. It is interposed
 ;;; within the data portion of the vector after the preceding info group.
 ;;; Descriptors are self-delimiting in that the first field in a group
 ;;; indicates the number of additional fields in the group.
@@ -71,8 +71,8 @@
 ;;; ----------------------
 ;;; This representation is used transiently during insertion/deletion.
 ;;; It is a concatenation of plists as a vector, interposing at the splice
-;;; points the auxilliary key for the group, except for the root name which
-;;; does not store an auxilliary key.
+;;; points the auxiliary key for the group, except for the root name which
+;;; does not store an auxiliary key.
 ;;;
 ;;; Unpacked vector format looks like:
 ;;;
@@ -82,7 +82,7 @@
 ;;;    ^
 ;;;    info group for the primary Name, a/k/a "root symbol", starts here
 ;;;
-;;; One can envision that the first info group stores its auxilliary key
+;;; One can envision that the first info group stores its auxiliary key
 ;;; at vector index -1 when thinking about the correctness of algorithms
 ;;; that process unpacked info-vectors.
 ;;; See !TEST-PACKIFY-INFOS for examples of each format.
@@ -127,7 +127,7 @@
     (declare (type index index end n-fields))
     (loop
        ;; 'length' is the number of vector elements in this info group,
-       ;; including itself but not including its auxilliary key.
+       ;; including itself but not including its auxiliary key.
        (let ((length (the index (svref vector index))))
          ;; Divide by 2 because we only count one field for the entry, but the
          ;; input vector had 2 cells per entry. Add 1 because the group's field
@@ -258,7 +258,7 @@
              (nreverse list)))))
 
 ;; Compute the number of elements needed to hold packed VECTOR after unpacking.
-;; The unpacked size is the number of auxilliary keys plus the number of entries
+;; The unpacked size is the number of auxiliary keys plus the number of entries
 ;; @ 2 cells per entry, plus the number of length cells which indicate the
 ;; number of data cells used (including length cells but not aux key cells).
 ;; Equivalently, it's the number of packed fields times 2 minus 1.
@@ -266,7 +266,7 @@
 (defun compute-unpackified-info-size (vector)
   (declare (simple-vector vector))
   (!do-packed-info-vector-aux-key (vector) ()
-    ;; off-by-one: the first info group's auxilliary key is imaginary
+    ;; off-by-one: the first info group's auxiliary key is imaginary
     (1- (truly-the fixnum (ash total-n-fields 1)))))
 
 ;; Convert packed INPUT vector to unpacked.
@@ -293,12 +293,12 @@
              (return (if output-supplied-p nil output))))))) ; else done
 
 ;; Return the index of the 'length' item for an info group having
-;; auxilliary-key KEY in unpacked VECTOR bounded by END (exclusive),
+;; auxiliary-key KEY in unpacked VECTOR bounded by END (exclusive),
 ;; or NIL if not found.
 ;;
 (defun info-find-aux-key/unpacked (key vector end)
   (declare (type index end))
-  (if (eql key +no-auxilliary-key+)
+  (if (eql key +no-auxiliary-key+)
       0 ; the first group's length (= end) is stored here always
       (let ((index 0))
         (declare (type index index))
@@ -311,7 +311,7 @@
                  ((eq (svref vector (1- index)) key)
                   (return index)))))))
 
-;; In packed info VECTOR try to find the auxilliary key SYMBOL.
+;; In packed info VECTOR try to find the auxiliary key SYMBOL.
 ;; If found, return indices of its data, info descriptor word, and field.
 ;; If not found, the first value is NIL and the descriptor indices
 ;; arbitrarily point to the next available descriptor field.
@@ -367,7 +367,7 @@
   (declare (simple-vector input) (type info-number info-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
-          (if (and (not (eql aux-key +no-auxilliary-key+))
+          (if (and (not (eql aux-key +no-auxiliary-key+))
                    (not (info-find-aux-key/packed input aux-key)))
               4   ; need space for [aux-key, length, type-num, value]
               2)) ; only space for [type-num, value]
@@ -457,7 +457,7 @@
 
 (declaim (maybe-inline packed-info-insert))
 (defun packed-info-insert (vector aux-key info-number newval)
-  (if (and (eql aux-key +no-auxilliary-key+)
+  (if (and (eql aux-key +no-auxiliary-key+)
            (info-quickly-insertable-p vector))
       (quick-packed-info-insert vector info-number newval)
       (%packed-info-insert vector aux-key info-number newval)))
@@ -470,7 +470,7 @@
   (let ((data-idx (length vector)) (descriptor-idx 0) (field-idx 0))
     (declare (type index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))
-    (unless (eql aux-key +no-auxilliary-key+)
+    (unless (eql aux-key +no-auxiliary-key+)
       (multiple-value-setq (data-idx descriptor-idx field-idx)
         (info-find-aux-key/packed vector aux-key))
       (unless data-idx
@@ -504,7 +504,7 @@
                swath (min n-infos +infos-per-word+))))))
 
 ;; Helper for CLEAR-INFO-VALUES when Name has the efficient form.
-;; Given packed info-vector INPUT and auxilliary key KEY2
+;; Given packed info-vector INPUT and auxiliary key KEY2
 ;; return a new vector in which TYPE-NUMS are absent.
 ;; When none of TYPE-NUMs were present to begin with, return NIL.
 ;;
@@ -514,7 +514,7 @@
 (defun packed-info-remove (input key2 type-nums)
   (declare (simple-vector input))
   (when (or (eql (length input) (length +nil-packed-infos+))
-            (and (not (eql key2 +no-auxilliary-key+))
+            (and (not (eql key2 +no-auxiliary-key+))
                  (not (info-find-aux-key/packed input key2))))
     (return-from packed-info-remove nil)) ; do nothing
   (let* ((end (compute-unpackified-info-size input))
@@ -533,7 +533,7 @@
                      return probe)))
         ;; N.B. the early termination checks aren't just optimizations,
         ;; they're requirements, because otherwise the loop could smash
-        ;; data that does not belong to this auxilliary key.
+        ;; data that does not belong to this auxiliary key.
         (cond ((not i)) ; not found - ignore
               ;; Squash out 2 cells if deleting an info for primary name,
               ;; or for secondary name with at least one more entry.
@@ -616,7 +616,7 @@
              (return))))))
 
 #|
-Info packing example. This example has 2 auxilliary-keys: SETF and CAS.
+Info packing example. This example has 2 auxiliary-keys: SETF and CAS.
 
 (!test-packify-infos '(13 :XYZ 18 "nine" 28 :BAR 7 T)
                      '(SETF 8 NIL 17 :FGX)
@@ -630,8 +630,8 @@ Reading from right-to-left, converting each 2-digit octal number to decimal:
   4, 13, 18, 28, 7, 2, 8, 17, 3, 6, 2, 47
 Which is interpreted as:
   4 infos for the root name.       type numbers: 13, 18, 28, 7
-  2 infos for SETF auxilliary-key. type numbers: 8, 17
-  3 infos for CAS auxilliary-key.  type numbers: 6, 2, 47
+  2 infos for SETF auxiliary-key. type numbers: 8, 17
+  3 infos for CAS auxiliary-key.  type numbers: 6, 2, 47
 
 (unpackify-infos (!test-packify-infos ...)) ; same input
 => #(9 13 :XYZ 18 "nine" 28 :BAR 7 T
@@ -677,12 +677,12 @@ This is interpreted as
 ;; If NAME is "simple", bind KEY2 and KEY1 to the elements
 ;; in that order, and execute the SIMPLE code, otherwise execute the HAIRY code.
 ;; If ALLOW-ATOM is T - the default - then NAME can be just a symbol
-;; in which case its second component is +NO-AUXILLIARY-KEY+.
+;; in which case its second component is +NO-AUXILIARY-KEY+.
 ;;
 (defmacro with-globaldb-name ((key1 key2 &optional (allow-atom t))
                               name &key simple hairy)
   (with-unique-names (rest)
-    `(let ((,key1 ,name) (,key2 +NO-AUXILLIARY-KEY+))
+    `(let ((,key1 ,name) (,key2 +NO-AUXILIARY-KEY+))
        (if (or ,@(if allow-atom `((symbolp ,key1)))
                (if (listp ,key1)
                    (let ((,rest (cdr ,key1)))
@@ -704,7 +704,7 @@ This is interpreted as
 #+sb-xc-host
 (defun update-symbol-info (symbol update-fn)
   ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-  ;; a vector describing 0 infos and 0 auxilliary keys.
+  ;; a vector describing 0 infos and 0 auxiliary keys.
   (let ((newval (funcall update-fn (or (symbol-info-vector symbol)
                                        +nil-packed-infos+))))
     (when newval
@@ -797,7 +797,7 @@ This is interpreted as
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
                     (augment (or old-info +nil-packed-infos+)
-                             +no-auxilliary-key+)))
+                             +no-auxiliary-key+)))
           (info-puthash *info-environment* name #'hairy-name)))))
   new-value)
 
@@ -837,7 +837,7 @@ This is interpreted as
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
                     (augment (or old-info +nil-packed-infos+)
-                             +no-auxilliary-key+)))
+                             +no-auxiliary-key+)))
           (info-puthash *info-environment* name #'hairy-name))))
     new-value))
 
@@ -878,7 +878,7 @@ This is interpreted as
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
                     (or (get-or-set (or old-info +nil-packed-infos+)
-                                    +no-auxilliary-key+)
+                                    +no-auxiliary-key+)
                         ;; Return OLD-INFO to elide writeback. Unlike for
                         ;; UPDATE-SYMBOL-INFO, NIL is not a no-op marker.
                         old-info)))

@@ -178,7 +178,7 @@
         (let ((val (format nil "value for ~D" num)))
           (setq iv1 (quick-packed-info-insert iv1 num val)
                 iv2 (%packed-info-insert ; not PACKED-INFO-INSERT
-                     iv2 +no-auxilliary-key+ num val))
+                     iv2 +no-auxiliary-key+ num val))
           (assert (equalp iv1 iv2))))
       ;; the first and only info descriptor should be full
       (assert (not (info-quickly-insertable-p iv1))))))

@@ -24,29 +24,29 @@
 
 (in-package "SB-IMPL")
 
-(let ((foo-iv (packed-info-insert +nil-packed-infos+ +no-auxilliary-key+
+(let ((foo-iv (packed-info-insert +nil-packed-infos+ +no-auxiliary-key+
                                   5 "hi 5"))
-      (bar-iv (packed-info-insert +nil-packed-infos+ +no-auxilliary-key+
+      (bar-iv (packed-info-insert +nil-packed-infos+ +no-auxiliary-key+
                                   6 "hi 6"))
       (baz-iv (packed-info-insert +nil-packed-infos+ 'mumble
                                   9 :phlebs)))
 
   ;; removing nonexistent types returns NIL
-  (assert (equal nil (packed-info-remove foo-iv +no-auxilliary-key+
+  (assert (equal nil (packed-info-remove foo-iv +no-auxiliary-key+
                                          '(4 6 7))))
   (assert (equal nil (packed-info-remove baz-iv 'mumble '(4 6 7))))
 
   ;; removing the one info shrinks the vector to nothing
   ;; and all values of nothing are EQ
-  (assert (equalp #(0) (packed-info-remove foo-iv +no-auxilliary-key+ '(5))))
-  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ '(5))
-              (packed-info-remove bar-iv +no-auxilliary-key+ '(6))))
-  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ '(5))
+  (assert (equalp #(0) (packed-info-remove foo-iv +no-auxiliary-key+ '(5))))
+  (assert (eq (packed-info-remove foo-iv +no-auxiliary-key+ '(5))
+              (packed-info-remove bar-iv +no-auxiliary-key+ '(6))))
+  (assert (eq (packed-info-remove foo-iv +no-auxiliary-key+ '(5))
               (packed-info-remove baz-iv 'mumble '(9)))))
 
 ;; Test that the packing invariants are maintained:
 ;; 1. if an FDEFINITION is present in an info group, it is the *first* info
-;; 2. if SETF is an auxilliary key, it is the *first* aux key
+;; 2. if SETF is an auxiliary key, it is the *first* aux key
 (let ((vect +nil-packed-infos+)
       (s 'foo))
   (flet ((iv-put (aux-key number val)

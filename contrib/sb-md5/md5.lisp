@@ -132,7 +132,7 @@ where a is the intended low-order byte and d the high-order byte."
   #-lw-int32
   `(aref ,vector ,index))
 
-;;; Section 3.4:  Auxilliary functions
+;;; Section 3.4:  Auxiliary functions
 
 (declaim (inline f g h i)
          (ftype (function (ub32 ub32 ub32) ub32) f g h i))

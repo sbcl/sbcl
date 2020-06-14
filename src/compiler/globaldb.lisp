@@ -186,7 +186,7 @@
                   (if old
                       ;; if -REMOVE => nil, then update NEW but return OLD
                       (or (setq new (packed-info-remove
-                                     old +no-auxilliary-key+ info-numbers))
+                                     old +no-auxiliary-key+ info-numbers))
                           old))))
         (info-puthash *info-environment* name #'clear-hairy)))
     (not (null new))))
@@ -234,7 +234,7 @@
            ;; but constraint propagation isn't informing the compiler here.
            :simple (values (symbol-info-vector (truly-the symbol key1)) key2)
            :hairy (values (info-gethash name *info-environment*)
-                          +no-auxilliary-key+)))
+                          +no-auxiliary-key+)))
       (when vector
         (let ((index (packed-info-value-index vector aux-key info-number)))
           (when index

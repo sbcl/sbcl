@@ -81,7 +81,7 @@
 (defconstant +info-metainfo-type-num+ 0)
 
 ;; Refer to info-vector.lisp for the meaning of this constant.
-(defconstant +no-auxilliary-key+ 0)
+(defconstant +no-auxiliary-key+ 0)
 
 ;;; Return the globaldb info for SYMBOL. With respect to the state diagram
 ;;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
@@ -122,7 +122,7 @@
 (defmacro !get-meta-infos (kind)
   `(let* ((info-vector (symbol-info-vector ,kind))
           (index (if info-vector
-                     (packed-info-value-index info-vector +no-auxilliary-key+
+                     (packed-info-value-index info-vector +no-auxiliary-key+
                                               +info-metainfo-type-num+))))
      (if index (svref info-vector index))))
 

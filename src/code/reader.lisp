@@ -565,7 +565,7 @@ standard Lisp readtable when NIL."
   ;; Counter advanced as characters are placed into 'string'
   (fill-ptr 0 :type index)
   ;; Counter advanced as characters are consumed from 'string' on re-scan
-  ;; by auxilliary functions MAKE-{INTEGER,FLOAT,RATIONAL} etc.
+  ;; by auxiliary functions MAKE-{INTEGER,FLOAT,RATIONAL} etc.
   (cursor 0 :type index)
   ;; A string used only for FIND-PACKAGE calls in package-qualified
   ;; symbols so that we don't need to call SUBSEQ on the 'string'.
