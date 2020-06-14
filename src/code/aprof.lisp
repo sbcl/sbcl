@@ -456,12 +456,12 @@
 ;;; Return a name for PC-OFFS in CODE. PC-OFFSET is relative
 ;;; to CODE-INSTRUCTIONS.
 (defun pc-offs-to-fun-name (pc-offs code &aux (di (%code-debug-info code)))
-  (if (consp di) ; assembler routines
+  (if (hash-table-p di) ; assembler routines
       (block nil
        (maphash (lambda (k v) ; FIXME: OAOO violation, at least twice over
                   (when (<= (car v) pc-offs (cadr v))
                     (return k)))
-                (car di)))
+                di))
       (let* ((funmap (sb-c::compiled-debug-info-fun-map di)))
         (unless (sb-c::compiled-debug-fun-next funmap)
           (aver (typep funmap 'sb-c::compiled-debug-fun-toplevel))
