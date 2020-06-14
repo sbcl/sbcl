@@ -402,18 +402,12 @@
     ;; just to avoid that ugly mess.
     nil))
 
-;;; The specialized array registry has file-wide scope. Hacking that aspect
-;;; into the xc build scaffold seemed slightly easier than hacking the
-;;; compiler (i.e. making the registry a slot of the fasl-output struct)
-(defvar *array-to-specialization* (make-hash-table :test #'eq))
-
 (defmacro do-stems-and-flags ((stem flags build-phase) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
     `(dolist (,stem-and-flags (get-stems-and-flags ,build-phase))
        (let ((,stem (first ,stem-and-flags))
              (,flags (rest ,stem-and-flags)))
-         ,@body
-         (clrhash *array-to-specialization*)))))
+         ,@body))))
 
 ;;; Given a STEM, remap the path component "/target/" to a suitable
 ;;; target directory.

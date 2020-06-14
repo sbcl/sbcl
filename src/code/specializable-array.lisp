@@ -52,9 +52,13 @@
 ;; Because this is not performance-critical, we can just punt to a function.
 ;; If no contents given, explicitly 0-fill in case element-type upgrades to T
 ;; and would get a default of NIL where we would use 0 in our specialization.
+
+(defvar *array-to-specialization* (make-hash-table :test #'eq))
+
 (defun sb-xc:make-array (dims &key (element-type 't)
                                    (initial-contents nil contentsp)
-                                   (initial-element 0))
+                                   (initial-element 0)
+                                   (retain-specialization-for-after-xc-core))
   ;; ECL fails to compile MAKE-ARRAY when keyword args are not literal keywords. e.g.:
   ;; (DEFUN TRY (DIMS SELECT VAL)
   ;;   (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)) ->
@@ -79,15 +83,22 @@
                               (if contentsp :initial-contents :initial-element)
                               (if contentsp initial-contents initial-element))))
     (unless (eq element-type 't)
-      (setf (gethash array sb-cold::*array-to-specialization*) element-type))
+      (setf (gethash array *array-to-specialization*)
+            (cons element-type retain-specialization-for-after-xc-core)))
     array))
 (defun sb-xc:array-element-type (array)
-  (cond ((gethash array sb-cold::*array-to-specialization*))
+  (cond ((car (gethash array *array-to-specialization*)))
         ((bit-vector-p array) 'bit)
         ((stringp array) 'base-char)
         (t t)))
 
 (defun target-specialized-array-p (array)
-  (gethash array sb-cold::*array-to-specialization*))
+  (if (gethash array *array-to-specialization*) t nil))
 (deftype sb-xc:simple-vector ()
   '(and cl:simple-vector (not (satisfies target-specialized-array-p))))
+
+(defun sb-cold::clear-specialized-array-registry ()
+  (let ((registry *array-to-specialization*))
+    (maphash (lambda (key value)
+               (unless (cdr value) (remhash key registry))) ; cdr = "retain"
+             registry)))

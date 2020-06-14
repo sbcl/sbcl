@@ -213,8 +213,9 @@
 ;;; properties of characters (as long as they are constituents).
 ;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
 ;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
-(defconstant +constituent-trait-table+
+(defconstant-eqx +constituent-trait-table+
   #.(let ((a (sb-xc:make-array base-char-code-limit
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
       (flet ((!set-constituent-trait (char trait)
@@ -245,7 +246,8 @@
         (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
                          return-char-code rubout-char-code))
           (!set-constituent-trait (code-char c) +char-attr-invalid+)))
-      a))
+      a)
+  #'equalp)
 
 (declaim (inline get-constituent-trait))
 (defun get-constituent-trait (char)

@@ -195,4 +195,8 @@
               (unless (position :not-target flags)
                 (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
                 (target-compile-stem stem flags)
-                (terpri)))))))))
+                (terpri)
+                ;; The specialized array registry has file-wide scope. Hacking that aspect
+                ;; into the xc build scaffold seemed slightly easier than hacking the
+                ;; compiler (i.e. making the registry a slot of the fasl-output struct)
+                (clear-specialized-array-registry)))))))))

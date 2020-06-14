@@ -488,16 +488,19 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
-(defconstant +digit-bases+
+(defconstant-eqx +digit-bases+
   #.(let ((a (sb-xc:make-array 128 ; FIXME
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8)
                                :initial-element 36)))
       (dotimes (i 36 a)
         (let ((char (digit-char i 36)))
-          (setf (aref a (sb-xc:char-code char)) i)))))
+          (setf (aref a (sb-xc:char-code char)) i))))
+  #'equalp)
 
-(defconstant +character-attributes+
+(defconstant-eqx +character-attributes+
   #.(let ((a (sb-xc:make-array 160 ; FIXME
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 16)
                                :initial-element 0)))
       (flet ((set-bit (char bit)
@@ -529,7 +532,8 @@ variable: an unreadable object representing the error is printed instead.")
         (dotimes (i 160) ; FIXME
           (when (zerop (aref a i))
             (setf (aref a i) funny-attribute))))
-      a))
+      a)
+  #'equalp)
 
 ;;; A FSM-like thingie that determines whether a symbol is a potential
 ;;; number or has evil characters in it.
