@@ -438,7 +438,8 @@ is not of type
     (assert (string= (write-to-string error :escape nil)
                      "odd-length initializer list: (:A 1 :B)."))))
 
-(with-test (:name :type-error-on-dx-object)
+(with-test (:name :type-error-on-dx-object
+            :skipped-on :interpreter)
   (handler-case
     (sb-int:dx-let ((a (make-array 3)))
       (setf (aref a 0) a)

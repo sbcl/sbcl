@@ -41,7 +41,8 @@
 
 ;;; I'm not sure how to implement CLISP-compatibility and ABCL-compatibility
 ;;; via the standard interface now, so test the nonstandard interface.
-(with-test (:name :disassemble-method)
+(with-test (:name :disassemble-method
+            :skipped-on :interpreter)
   (with-output-to-string (s)
     (sb-c:dis (defmethod hello ((self cons)) "here i am") s)))
 
