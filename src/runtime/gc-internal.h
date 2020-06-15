@@ -63,10 +63,7 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 // masking out subtype_VectorWeakVisited.
 #define vector_subtype(header) (HeaderValue(header) & 7)
 // Test for presence of a bit in vector's header.
-// As a special case, if 'val' is 0, then test for all bits clear.
-#define is_vector_subtype(header, val) \
-  (subtype_##val ? (HeaderValue(header) & subtype_##val) : \
-   !(HeaderValue(header) & 7))
+#define is_vector_subtype(header, val) (HeaderValue(header) & subtype_##val)
 
 // Mask out the fullcgc mark bit when asserting header validity
 #define UNSET_WEAK_VECTOR_VISITED(v) \

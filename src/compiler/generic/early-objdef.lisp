@@ -308,7 +308,7 @@
   #'equal)
 
 ;;; the different vector subtypes, can be ORed together.
-(defconstant vector-normal-subtype       0)
+;;; N.B.: These are not "types" in the lisp sense.
 ;; Weak vectors that are NOT hash-table backing vectors use this bit to track
 ;; whether we've already recorded the vector for deferred scavenging.
 ;; Hash-tables use an entirely different mechanism. Flag bit used only in C.

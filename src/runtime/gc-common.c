@@ -1341,8 +1341,12 @@ scav_vector (lispobj *where, lispobj header)
     sword_t length = fixnum_value(where[1]);
 
     /* SB-VM:VECTOR-HASHING-SUBTYPE is set for all hash tables in the
-     * Lisp HASH-TABLE code to indicate need for special GC support. */
-    if (is_vector_subtype(header, VectorNormal)) {
+     * Lisp HASH-TABLE code to indicate need for special GC support.
+     * But note that if the vector is a hashing vector that is neither
+     * weak nor contains any key hashed by its address, then it is basically
+     * a regular vector, except that GC needs only to look at cells below
+     * the high-water-mark, plus the SUPPLEMENT slot at the end */
+    if (vector_subtype(header) == 0) { // no special indicator bits set
  normal:
         scavenge(where + 2, length);
         goto done;
