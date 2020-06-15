@@ -172,3 +172,9 @@
                      (sb-kernel:get-header-data pairs))
         (assert (or (actually-address-sensitive-p ht)
                     (hash-table-weakness ht)))))))
+
+(with-test (:name :unsynchronized-clrhash-no-lock)
+  (let ((ht (make-hash-table)))
+    (setf (gethash 1 ht) 2)
+    (clrhash ht)
+    (assert (not (sb-impl::hash-table-%lock ht)))))

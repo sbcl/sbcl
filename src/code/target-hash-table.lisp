@@ -1863,29 +1863,31 @@ table itself."
   ;; observe junk, but you can't put good value at higher than the HWM]
   #+hash-table-simulate (setf (hash-table-%alist hash-table) nil)
   (when (plusp (kv-vector-high-water-mark (hash-table-pairs hash-table)))
-    ;; FIXME: why always acquire the lock?
-    (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
-      (let* ((kv-vector (hash-table-pairs hash-table))
-             (high-water-mark (kv-vector-high-water-mark kv-vector)))
-        (when (hash-table-weak-p hash-table)
-          (aver (eq (kv-vector-supplement kv-vector) hash-table)))
-        ;; Remove address-sensitivity.
-        (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-        ;; Do this only after unsetting the address-sensitive bit,
-        ;; otherwise GC might come along and touch this bit again.
-        (setf (kv-vector-needs-rehash kv-vector) 0)
-        ;; We always deposit empty makers into k/v pairs that are REMHASHed,
-        ;; so a count of 0 implies no clearing need be done.
-        (when (plusp (hash-table-%count hash-table))
-          (setf (hash-table-%count hash-table) 0)
-          ;; Fill all slots with the empty marker.
-          (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
-          ;; Clear the index-vector.
-          ;; Don't need to clear the hash-vector or the next-vector.
-          (fill (hash-table-index-vector hash-table) 0))
-        (setf (hash-table-smashed-cells hash-table) nil
-              (hash-table-next-free-kv hash-table) 1
-              (kv-vector-high-water-mark kv-vector) 0))))
+    (dx-flet ((clear ()
+                (let* ((kv-vector (hash-table-pairs hash-table))
+                       (high-water-mark (kv-vector-high-water-mark kv-vector)))
+                  (when (hash-table-weak-p hash-table)
+                    (aver (eq (kv-vector-supplement kv-vector) hash-table)))
+                  ;; Remove address-sensitivity.
+                  (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                  ;; Do this only after unsetting the address-sensitive bit,
+                  ;; otherwise GC might come along and touch this bit again.
+                  (setf (kv-vector-needs-rehash kv-vector) 0)
+                  ;; We always deposit empty markers into k/v pairs that are REMHASHed,
+                  ;; so a count of 0 implies no clearing need be done.
+                  (when (plusp (hash-table-%count hash-table))
+                    (setf (hash-table-%count hash-table) 0)
+                    ;; Fill all slots with the empty marker.
+                    (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
+                    ;; Clear the index-vector.
+                    ;; Don't need to clear the hash-vector or the next-vector.
+                    (fill (hash-table-index-vector hash-table) 0))
+                  (setf (hash-table-smashed-cells hash-table) nil
+                        (hash-table-next-free-kv hash-table) 1
+                        (kv-vector-high-water-mark kv-vector) 0))))
+      (if (hash-table-synchronized-p hash-table)
+          (sb-thread::call-with-recursive-system-lock #'clear (hash-table-%lock hash-table))
+          (clear))))
   hash-table)
 
 
