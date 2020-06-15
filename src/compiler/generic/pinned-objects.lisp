@@ -50,3 +50,14 @@ garbage collection."
                            `(touch-object ,pin))
                          pins)))))
       `(progn ,@body)))
+
+(defmacro with-pinned-object-iterator ((name) &body body)
+  #-gencgc
+  `(macrolet ((,name (arg) (declare (ignore arg)) nil)) ,@body)
+  #+(and gencgc (not (or x86 x86-64)))
+  `(dx-let ((.cell. (cons nil *pinned-objects*)))
+     (let ((*pinned-objects* .cell.))
+       (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
+  #+(and gencgc (or x86 x86-64))
+  `(dx-let ((.cell. (cons nil nil)))
+     (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))

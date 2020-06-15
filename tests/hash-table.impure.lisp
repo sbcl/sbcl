@@ -81,3 +81,68 @@
       (setf (gethash i h) (- i)))
     (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs h))
                sb-vm:vector-hashing-subtype))))
+
+;;; EQL tables no longer get a hash vector, so the GC has to decide
+;;; for itself whether key movement forces rehash.
+;;; Let's make sure that works.
+(with-test (:name :address-insensitive-eql-hash)
+  (let ((tbl (make-hash-table :size 20)))
+    (dotimes (i 5)
+      (let ((key (coerce i 'double-float)))
+        (setf (gethash key tbl) (sb-kernel:get-lisp-obj-address key)))
+      (let ((key (coerce i '(complex single-float))))
+        (setf (gethash key tbl) (sb-kernel:get-lisp-obj-address key)))
+      (let ((key (make-symbol (make-string (1+ i) :initial-element #\a))))
+        (setf (gethash key tbl) (sb-kernel:get-lisp-obj-address key))))
+    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+               sb-vm:vector-hashing-subtype)) ; noo address-based key
+    (let ((foo (cons 0 0)))
+      (setf (gethash foo tbl) foo)
+      (remhash foo tbl))
+    ;; now we've added an address-based key (but removed it)
+    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+               (+ sb-vm:vector-addr-hashing-subtype
+                  sb-vm:vector-hashing-subtype)))
+    (gc)
+    (let ((n-keys-moved 0))
+      (maphash (lambda (key value)
+                 (unless (= value (sb-kernel:get-lisp-obj-address key))
+                   (incf n-keys-moved)))
+               tbl)
+      (assert (plusp n-keys-moved))
+      ;; keys were moved, the table is marked as address-based,
+      ;; but no key that moved forced a rehash
+      (assert (zerop (sb-impl::kv-vector-needs-rehash
+                      (sb-impl::hash-table-pairs tbl)))))
+    ;; the vector type is unchanged
+    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+               (+ sb-vm:vector-addr-hashing-subtype
+                  sb-vm:vector-hashing-subtype)))
+    (setf (gethash (cons 1 2) tbl) 'one)
+    (setf (gethash (cons 3 4) tbl) 'two)
+    (setf (gethash (cons 5 6) tbl) 'three)
+    (gc)
+    ;; now some key should have moved and forced a rehash
+    (assert (not (zerop (sb-impl::kv-vector-needs-rehash
+                         (sb-impl::hash-table-pairs tbl)))))
+    ;; This next thing is impossible to test without some hacks -
+    ;; we want to see that the addr-hashing flag can be cleared
+    ;; if, on rehash, there is currently no address-sensitive key
+    ;; in the table.
+    ;; This could happen in the real world, but it's actually very
+    ;; difficult to construct an example because it requires controlling
+    ;; the addresses of objects.  But the 'rehash' bit had to first get
+    ;; set, and then any key that could cause the bit to get set
+    ;; has to be removed, which means we had to have successfully found
+    ;; and removed address-sensitive keys despite having obsolete hashes.
+    ;; That could only happen by random chance.
+    ;; However, by stomping on a few keys, we can simulate it.
+    (let ((pairs (sb-impl::hash-table-pairs tbl)))
+      (loop for i from 2 below (length pairs) by 2
+            when (consp (aref pairs i))
+            do (setf (aref pairs i) i))) ; highly illegal!
+    ;; try to find an address-sensitive key
+    (assert (not (gethash '(foo) tbl)))
+    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+               ;; Table is no longer address-sensitive
+               sb-vm:vector-hashing-subtype))))

@@ -1096,7 +1096,7 @@ static inline void *get_array_data(lispobj array, int widetag)
 {
     if (is_lisp_pointer(array) && widetag_of(native_pointer(array)) == widetag)
         return &(VECTOR(array)->data[0]);
-    lose("bad type: %"OBJ_FMTX" should have widetag %d", array, widetag);
+    lose("bad type: %"OBJ_FMTX" should have widetag %x", array, widetag);
 }
 
 extern uword_t gc_private_cons(uword_t, uword_t);
@@ -1219,14 +1219,34 @@ void weakobj_init()
                      32 /* logical bin count */, 0 /* default range */);
 }
 
+static inline boolean stable_eql_hash_p(lispobj obj)
+{
+    return lowtag_of(obj) == OTHER_POINTER_LOWTAG
+        && widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) <= SYMBOL_WIDETAG;
+}
+
+/* EQUAL and EQUALP tables always have hash vectors, so GC always knows
+ * for any given key whether it was hashed by address.
+ * EQ never has a hash vector (except if there is a user-defined hash function)
+ * but always hashes by the pointer bits (which could be an address or immediate).
+ * EQL never has a hash vector (same exception), but can hash some objects
+ * by their contents, not their address. This macro determines for a key whether
+ * its pointer bits force a rehash. In the case where we would call
+ * stable_eql_hash_p(), skip the call if 'rehash' is already 1.
+ */
+#define SHOULD_REHASH(oldkey, newkey, hashvec, hv_index) \
+  ((newkey != oldkey) && \
+   (!hashvec ? rehash || !eql_hashing || !stable_eql_hash_p(newkey) : \
+    hashvec[hv_index] == MAGIC_HASH_VECTOR_VALUE))
+
+
 /* Scavenge the "real" entries in the hash-table kv vector. The vector element
  * at index 0 bounds the scan. The element at length-1 (the hash table itself)
  * was scavenged already.
  *
  * We can disregard any entry in which both key and value are immediates.
  * This effectively ignores empty pairs, as well as makes fixnum -> fixnum table
- * more efficient. If the bitwise OR of two lispobjs satisfies is_lisp_pointer(),
- * then at least one is a pointer.
+ * more efficient.
  */
 #define SCAV_ENTRIES(entry_alivep, defer)                                      \
     boolean __attribute__((unused)) any_deferred = 0;                          \
@@ -1240,9 +1260,7 @@ void weakobj_init()
             /* Scavenge the key and value. */                                  \
             scav_entry(&data[2*i]);                                            \
             /* mark the table for rehash if address-based key moves */         \
-            if (data[2*i] != key &&                                            \
-                (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
-                rehash = 1;                                                    \
+            if (SHOULD_REHASH(key, data[2*i], hashvals, i)) rehash = 1;        \
     }}}                                                                        \
     /* Though at least partly writable, vector element 1 could be on a write-protected page. */ \
     if (rehash) \
@@ -1264,15 +1282,19 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     // its last element points to the hash-vector as for any strong KV vector.
     sword_t kv_length = fixnum_value(kv_vector->length);
     lispobj kv_supplement = data[kv_length-1];
-    lispobj lhash_vector;
-    if (instancep(kv_supplement))
-        lhash_vector = ((struct hash_table*)native_pointer(kv_supplement))->hash_vector;
-    else
-        lhash_vector = kv_supplement;
-    uint32_t *hash_vector = 0;
-    if (lhash_vector != NIL) {
-        hash_vector = get_array_data(lhash_vector, SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
-        gc_assert(2 * fixnum_value(VECTOR(lhash_vector)->length) + 1 == kv_length);
+    boolean eql_hashing = 0; // whether this table is an EQL table
+    if (instancep(kv_supplement)) {
+        struct hash_table* ht = (struct hash_table*)native_pointer(kv_supplement);
+        eql_hashing = hashtable_kind(ht) == 1;
+        kv_supplement = ht->hash_vector;
+    } else if (kv_supplement == T) { // EQL hashing on a non-weak table
+        eql_hashing = 1;
+        kv_supplement = NIL;
+    }
+    uint32_t *hashvals = 0;
+    if (kv_supplement != NIL) {
+        hashvals = get_array_data(kv_supplement, SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
+        gc_assert(2 * fixnum_value(VECTOR(kv_supplement)->length) + 1 == kv_length);
     }
     SCAV_ENTRIES(1, );
 }
@@ -1286,9 +1308,9 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
         lose("invalid kv_vector %"OBJ_FMTX, hash_table->pairs);
     sword_t kv_length = fixnum_value(VECTOR(hash_table->pairs)->length);
 
-    uint32_t *hash_vector = 0;
+    uint32_t *hashvals = 0;
     if (hash_table->hash_vector != NIL) {
-        hash_vector = get_array_data(hash_table->hash_vector,
+        hashvals = get_array_data(hash_table->hash_vector,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
         gc_assert(VECTOR(hash_table->hash_vector)->length ==
                   VECTOR(hash_table->next_vector)->length);
@@ -1302,6 +1324,7 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
               == kv_length);
 
     int weakness = hashtable_weakness(hash_table);
+    boolean eql_hashing = hashtable_kind(hash_table) == 1;
     /* Work through the KV vector. */
     SCAV_ENTRIES(predicate(key, value), add_kv_triggers(&data[2*i], weakness));
     if (!any_deferred && debug_weak_ht)
@@ -1405,8 +1428,9 @@ scav_vector (lispobj *where, lispobj header)
 }
 
 /* Walk through the chain whose first element is *FIRST and remove
- * dead weak entries. */
-static inline void
+ * dead weak entries.
+ * Return the new value for 'should rehash' */
+static inline boolean
 cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             uint32_t bucket, uint32_t index,
                             lispobj *kv_vector,
@@ -1414,9 +1438,10 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
                             boolean save_culled_values,
-                            boolean *rehash)
+                            boolean rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
+    int eql_hashing = hashtable_kind(hash_table) == 1;
     for ( ; index ; index = next_vector[index] ) {
         lispobj key = kv_vector[2 * index];
         lispobj value = kv_vector[2 * index + 1];
@@ -1479,12 +1504,12 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             if (fix_pointers) { // Follow FPs as necessary
                 lispobj key = kv_vector[2 * index];
                 fix_pointers(&kv_vector[2 * index]);
-                if (kv_vector[2 * index] != key &&
-                    (!hash_vector || hash_vector[index] == MAGIC_HASH_VECTOR_VALUE))
-                    *rehash = 1;
+                if (SHOULD_REHASH(key, kv_vector[2 * index], hash_vector, index))
+                    rehash = 1;
             }
         }
     }
+    return rehash;
 }
 
 static void
@@ -1507,11 +1532,19 @@ cull_weak_hash_table (struct hash_table *hash_table,
 
     boolean rehash = 0;
     boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;
+    // I'm slightly confused as to why we can't (or don't) compute the
+    // 'should rehash' flag while scavenging the weak k/v vector.
+    // I believe the explanation is this: for weak-key-AND-value tables, the vector
+    // is never scavenged. It just ends up here after all other scavenging is done.
+    // We then need to fix the still-live pointers, which entails possibly setting the
+    // 'rehash' flag. It would not make sense to treat the other 3 flavors of
+    // weakness any differently.
     for (i = 0; i < n_buckets; i++) {
-        cull_weak_hash_table_bucket(hash_table, i, index_vector[i],
-                                    kv_vector, next_vector, hash_vector,
-                                    alivep_test, fix_pointers,
-                                    save_culled_values, &rehash);
+        if (cull_weak_hash_table_bucket(hash_table, i, index_vector[i],
+                                        kv_vector, next_vector, hash_vector,
+                                        alivep_test, fix_pointers,
+                                        save_culled_values, rehash))
+            rehash = 1;
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
     if (rehash)

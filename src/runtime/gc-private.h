@@ -249,6 +249,7 @@ static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
 }
 
 /* Keep in sync with 'target-hash-table.lisp' */
+#define hashtable_kind(ht) ((ht->flags >> (4+N_FIXNUM_TAG_BITS)) & 3)
 #define hashtable_weakp(ht) (ht->flags & (8<<N_FIXNUM_TAG_BITS))
 #define hashtable_weakness(ht) (ht->flags >> (6+N_FIXNUM_TAG_BITS))
 
