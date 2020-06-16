@@ -21,6 +21,12 @@
 
 (in-package "SB-C")
 
+(defstruct (local-call-context
+            (:constructor make-local-call-context (fun var))
+            (:copier nil))
+  (fun nil :read-only t)
+  (var nil :read-only t))
+
 ;;; This function propagates information from the variables in the
 ;;; function FUN to the actual arguments in CALL. This is also called
 ;;; by the VALUES IR1 optimizer when it sleazily converts MV-BINDs to
@@ -36,10 +42,13 @@
   (declare (type combination call) (type clambda fun))
   (loop with policy = (lexenv-policy (node-lexenv call))
         for args on (basic-combination-args call)
-        and var in (lambda-vars fun)
+        for var in (lambda-vars fun)
+        for name = (lambda-var-%source-name var)
         do (assert-lvar-type (car args) (leaf-type var) policy
-                             (lambda-var-%source-name var))
-        do (unless (leaf-refs var)
+                             (if (eq (functional-kind fun) :optional)
+                                 (opaquely-quote (make-local-call-context fun name))
+                                 name))
+           (unless (leaf-refs var)
              (flush-dest (car args))
              (setf (car args) nil)))
   (values))

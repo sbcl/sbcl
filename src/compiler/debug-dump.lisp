@@ -17,7 +17,7 @@
 (declaim (type byte-buffer *byte-buffer*))
 (defvar *contexts*)
 (declaim (type (vector t) *contexts*))
-
+(defvar *local-call-context*)
 
 ;;;; debug blocks
 
@@ -104,6 +104,35 @@
 (defun leaf-visible-to-debugger-p (leaf node)
   (gethash leaf (make-lexenv-var-cache (node-lexenv node))))
 
+(defun optional-leaf-p (leaf)
+  (let ((home (lambda-var-home leaf)))
+    (case (functional-kind home)
+      (:external
+       (let ((entry (lambda-entry-fun home)))
+         (when (optional-dispatch-p entry)
+           (let ((pos (1- (position leaf (lambda-vars home)))))
+             (>= pos (optional-dispatch-min-args entry)))))))))
+
+;;; Type checks of the arguments in an external function happen before
+;;; all the &optionals are initialized. PROPAGATE-TO-ARGS marks such
+;;; locations with the entry point, which allows to deduce if an
+;;; optional is alive at that point.
+(defun optional-processed (leaf)
+  (let ((home (lambda-var-home leaf)))
+    (case (functional-kind home)
+      (:external
+       (let ((entry (lambda-entry-fun home)))
+         (if (and (optional-dispatch-p entry)
+                  *local-call-context*)
+             (let ((pos (1- (position leaf (lambda-vars home))))
+                   (entry-pos (position *local-call-context*
+                                        (optional-dispatch-entry-points entry)
+                                        :key #'force)))
+               (not (and entry-pos
+                         (>= pos (+ (optional-dispatch-min-args entry) entry-pos)))))
+             t)))
+      (t t))))
+
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the
 ;;; variables dumped, compute a bit-vector representing the set of
@@ -126,9 +155,11 @@
                                     '(:environment :debug-environment)))
                        (leaf-visible-to-debugger-p leaf node))
                    (or (null spilled)
-                       (not (member tn spilled))))
+                       (not (member tn spilled)))
+                   (optional-processed leaf))
           (let ((num (gethash leaf var-locs)))
             (when num
+
               (setf (sbit res num) 1))))))
     res))
 
@@ -173,6 +204,12 @@
   (let* ((byte-buffer *byte-buffer*)
          (stepping (and (combination-p node)
                         (combination-step-info node)))
+         (*local-call-context*
+           (if (local-call-context-p context)
+               (local-call-context-fun context)))
+         (context (if (local-call-context-p context)
+                      (local-call-context-var context)
+                      context))
          (live (and live
                     (compute-live-vars live node block var-locs vop)))
          (anything-alive (and live
@@ -182,7 +219,10 @@
 
          (path (node-source-path node))
          (loc (if (fixnump label) label (label-position label)))
-         (form-number (source-path-form-number path)))
+         (form-number (source-path-form-number path))
+         (context (if (opaque-box-p context)
+                      (opaque-box-value context)
+                      context)))
     (vector-push-extend
      (logior
       (if context
@@ -421,7 +461,8 @@
                (not (gethash tn (ir2-component-spilled-tns
                                  (component-info *component-being-compiled*))))
                (lexenv-contains-lambda fun
-                                       (lambda-lexenv (lambda-var-home var))))
+                                       (lambda-lexenv (lambda-var-home var)))
+               (not (optional-leaf-p var))) ;; not always initialized
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))

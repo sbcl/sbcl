@@ -656,3 +656,22 @@
                    (sb-debug:print-backtrace :count 100 :stream stream))))
         (foo 100 (let ((list (list t)))
                    (nconc list list)))))))
+
+(with-test (:name :uninitialized-optionals)
+  (let ((fun (checked-compile
+              `(lambda (l &optional m n)
+                 (declare (fixnum l))
+                 (values l m n)))))
+    (checked-compile-and-assert
+        ()
+        `(lambda (fun &rest args)
+           (block nil
+             (handler-bind ((error
+                              (lambda (c)
+                                c
+                                (return (cdar (sb-debug:list-backtrace :count 1))))))
+               (apply fun args))))
+      ((fun t) (list t *unavailable-argument* *unavailable-argument*) :test #'equalp)
+      ((fun t 1) (list t 1 *unavailable-argument*) :test #'equalp)
+      ((fun t 1 2) (list t 1 2) :test #'equalp)
+      ((fun 1 2 3) (values 1 2 3)))))
