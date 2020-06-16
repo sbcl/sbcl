@@ -110,8 +110,9 @@
       (:external
        (let ((entry (lambda-entry-fun home)))
          (when (optional-dispatch-p entry)
-           (let ((pos (1- (position leaf (lambda-vars home)))))
-             (>= pos (optional-dispatch-min-args entry)))))))))
+           (let ((pos (position leaf (lambda-vars home))))
+             (and pos
+                  (>= (1- pos) (optional-dispatch-min-args entry))))))))))
 
 ;;; Type checks of the arguments in an external function happen before
 ;;; all the &optionals are initialized. PROPAGATE-TO-ARGS marks such
@@ -124,12 +125,13 @@
        (let ((entry (lambda-entry-fun home)))
          (if (and (optional-dispatch-p entry)
                   *local-call-context*)
-             (let ((pos (1- (position leaf (lambda-vars home))))
+             (let ((pos (position leaf (lambda-vars home)))
                    (entry-pos (position *local-call-context*
                                         (optional-dispatch-entry-points entry)
                                         :key #'force)))
-               (not (and entry-pos
-                         (>= pos (+ (optional-dispatch-min-args entry) entry-pos)))))
+               (not (and pos
+                         entry-pos
+                         (>= (1- pos) (+ (optional-dispatch-min-args entry) entry-pos)))))
              t)))
       (t t))))
 
