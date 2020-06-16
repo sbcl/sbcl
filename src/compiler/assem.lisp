@@ -1402,7 +1402,7 @@
 
 ;;; Map of opcode symbol to function that emits it into the byte stream
 ;;; (or with the schedulding assembler, into the queue)
-(defglobal *inst-encoder* (make-hash-table :test 'eq))
+(defglobal *inst-encoder* (make-hash-table)) ; keys are symbols
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble (segment section)

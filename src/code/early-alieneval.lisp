@@ -9,7 +9,7 @@
 
 (in-package "SB-ALIEN")
 
-(defglobal *alien-type-classes* (make-hash-table :test 'eq))
+(defglobal *alien-type-classes* (make-hash-table)) ; keys are symbols
 
 #-sb-xc-host (sb-impl::define-thread-local *saved-fp* nil)
 

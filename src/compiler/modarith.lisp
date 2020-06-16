@@ -16,12 +16,12 @@
 
 (defstruct (modular-class (:copier nil))
   ;; hash: name -> { :GOOD | optimizer | ({modular-fun-info}*)}
-  (funs (make-hash-table :test 'eq))
+  (funs (make-hash-table)) ; keys are symbols
   ;; hash: modular-variant -> (prototype width)
   ;;
   ;; FIXME: Reimplement with generic function names of kind
   ;; (MODULAR-VERSION prototype width)
-  (versions (make-hash-table :test 'eq))
+  (versions (make-hash-table))
   ;; list of increasing widths + signedps
   (widths nil))
 (define-load-time-global *untagged-unsigned-modular-class* (make-modular-class))

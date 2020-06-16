@@ -1206,7 +1206,7 @@
  ;; hand-generated lists of useful functions
  (setq *unary-functions*
   (sb-impl::%stuff-hash-table
-   (make-hash-table :test #'eq)
+   (make-hash-table) ; keys are symbols
    (macrolet
        ((def-wrapper (&rest input)
           (cons 'list
@@ -1286,7 +1286,7 @@
 
  (setq *binary-functions*
   (sb-impl::%stuff-hash-table
-   (make-hash-table :test #'eq)
+   (make-hash-table) ; keys are symbols
    (macrolet
        ((def-wrapper (&rest input)
           (cons 'list

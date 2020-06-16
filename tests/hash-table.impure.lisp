@@ -160,19 +160,6 @@
              ht)
     some-actually-address-sensitive-key))
 
-;;; Every table in the pristine core that claims to be address-sensitive
-;;; should _actually_ contains some address-sensitive key,
-;;; unless GC removed all such keys from a weak table.
-;;; It is easy to create situations where this is violated in normal user code,
-;;; but it requires at least one REMHASH to occur.
-(with-test (:name :spurious-address-sensitivity-again)
-  (dolist (ht (sb-vm::list-allocated-objects :dynamic :test #'hash-table-p))
-    (let ((pairs (sb-impl::hash-table-pairs ht)))
-      (when (logtest sb-vm:vector-addr-hashing-subtype
-                     (sb-kernel:get-header-data pairs))
-        (assert (or (actually-address-sensitive-p ht)
-                    (hash-table-weakness ht)))))))
-
 (with-test (:name :unsynchronized-clrhash-no-lock)
   (let ((ht (make-hash-table)))
     (setf (gethash 1 ht) 2)

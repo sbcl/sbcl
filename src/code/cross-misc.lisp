@@ -19,6 +19,10 @@
     (remf args :weakness)
     (remf args :synchronized)
     (remf args :finalizer)
+    (let ((hash-fun (getf args :hash-function)))
+      (when hash-fun
+        (assert (eq (getf args :test) 'eq))
+        (remf args :hash-function)))
     (apply 'make-hash-table args)))
 
 ;;; In correct code, TRULY-THE has only a performance impact and can

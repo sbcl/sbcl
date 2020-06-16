@@ -1483,6 +1483,11 @@ We could try a few things to mitigate this:
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-point-fixups into the weak hash-table.
+;;; FIXME: I suspect that this wants to be just a weak vector
+;;; (all code objects that have any allocation profiling compiled in),
+;;; and not a hash-table, and that the list of fixups in the component
+;;; can be attached to the debug info (in the manner of debug funs).
+;;; When this was first implemented, weak-vectors weren't a thing. Maybe?
 (defvar *!cold-allocation-point-fixups*)
 (let ((hash-table (make-hash-table :test 'eq)))
   ;; Group by code component

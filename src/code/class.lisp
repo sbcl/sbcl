@@ -344,11 +344,16 @@ between the ~A definition and the ~A definition"
 
       (dovector (super-layout (layout-inherits layout))
         (let* ((super (layout-classoid super-layout))
-               (subclasses (or (classoid-subclasses super)
-                               (setf (classoid-subclasses super)
-                                     (make-hash-table :test 'eq
-                                                      #-sb-xc-host #-sb-xc-host
-                                                      :synchronized t)))))
+               (subclasses
+                 (or (classoid-subclasses super)
+                     (setf (classoid-subclasses super)
+                           #+sb-xc-host (make-hash-table :test 'eq)
+                           ;; Might as well use CTYPE-HASH-VALUE as a
+                           ;; stable hash since we have it.
+                           #-sb-xc-host
+                           (make-hash-table :hash-function #'type-hash-value
+                                            :test 'eq
+                                            :synchronized t)))))
           (when (and (eq (classoid-state super) :sealed)
                      (not (gethash classoid subclasses)))
             (warn "unsealing sealed class ~S in order to subclass it"

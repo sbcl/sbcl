@@ -28,7 +28,7 @@
                       ',bidi-mirroring-list)
                   (defun !unicode-properties-cold-init ()
                     ;;
-                    (let ((hash (make-hash-table :test 'eq))
+                    (let ((hash (make-hash-table)) ; keys are symbols
                           (list ',(sb-cold:read-from-file
                                    "output/misc-properties.lisp-expr")))
                       (setq **proplist-properties** hash)

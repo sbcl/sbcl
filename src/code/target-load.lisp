@@ -315,7 +315,7 @@
          (size (%code-text-size code))
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
-         (ht (make-hash-table :test 'eq)))
+         (ht (make-hash-table))) ; keys are symbols
     (rplaca (%code-debug-info code) ht)
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)
