@@ -52,9 +52,9 @@
 (with-test (:name :gc-while-growing-weak-hash-table)
   (let ((h (make-hash-table :weakness :key)))
     (setq *gc-after-rehash-me* h)
-    (dotimes (i 14) (setf (gethash (list (gensym)) h) i))
+    (dotimes (i 50) (setf (gethash (list (gensym)) h) i))
     (setf (gethash (cons 1 2) h) 'foolz))
-  (assert (= *rehash+gc-count* 1)))
+  (assert (>= *rehash+gc-count* 10)))
 
 (defstruct this x)
 (defstruct that x)
@@ -82,6 +82,7 @@
     (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs h))
                sb-vm:vector-hashing-subtype))))
 
+(defmacro kv-vector-needs-rehash (x) `(svref ,x 1))
 ;;; EQL tables no longer get a hash vector, so the GC has to decide
 ;;; for itself whether key movement forces rehash.
 ;;; Let's make sure that works.
@@ -112,7 +113,7 @@
       (assert (plusp n-keys-moved))
       ;; keys were moved, the table is marked as address-based,
       ;; but no key that moved forced a rehash
-      (assert (zerop (sb-impl::kv-vector-needs-rehash
+      (assert (zerop (kv-vector-needs-rehash
                       (sb-impl::hash-table-pairs tbl)))))
     ;; the vector type is unchanged
     (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
@@ -123,7 +124,7 @@
     (setf (gethash (cons 5 6) tbl) 'three)
     (gc)
     ;; now some key should have moved and forced a rehash
-    (assert (not (zerop (sb-impl::kv-vector-needs-rehash
+    (assert (not (zerop (kv-vector-needs-rehash
                          (sb-impl::hash-table-pairs tbl)))))
     ;; This next thing is impossible to test without some hacks -
     ;; we want to see that the addr-hashing flag can be cleared
