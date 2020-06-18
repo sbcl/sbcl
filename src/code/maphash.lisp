@@ -141,7 +141,10 @@ for."
 (defconstant +ht-weak-key-OR-value+  3)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +min-hash-table-size+ 14)
+  ;; Don't raise this number to 8 - if you do it'll increase the memory
+  ;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
+  ;; padding slots.  This is a "perfect" minimal size.
+  (defconstant +min-hash-table-size+ 7)
   (defconstant default-rehash-size $1.5))
 
 (defmacro make-system-hash-table (&key test synchronized weakness finalizer)
