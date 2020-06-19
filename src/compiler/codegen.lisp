@@ -310,7 +310,7 @@
           ((null vop))
         (let ((gen (vop-info-generator-function (vop-info vop))))
           (awhen *static-vop-usage-counts*
-            (let ((name (vop-info-name (vop-info vop))))
+            (let ((name (vop-name vop)))
               (incf (gethash name it 0))))
           (assemble (:code vop)
             (cond ((not gen)

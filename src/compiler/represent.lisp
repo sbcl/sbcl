@@ -577,8 +577,7 @@
                                             pass-tn vop))
                (after
                 (cond ((eq how :local-call)
-                       (aver (eq (vop-info-name (vop-info prev))
-                                 'allocate-frame))
+                       (aver (eq (vop-name prev) 'allocate-frame))
                        prev)
                       (prev (vop-next prev))
                       (t

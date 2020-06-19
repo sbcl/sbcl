@@ -1092,7 +1092,7 @@
 ;;; necessary.
 (defun print-vop (vop)
   (pprint-logical-block (*standard-output* nil)
-    (princ (vop-info-name (vop-info vop)))
+    (princ (vop-name vop))
     (princ #\space)
     (pprint-indent :current 0)
     (print-operands (vop-args vop))

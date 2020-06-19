@@ -1359,7 +1359,7 @@
     (incf n)
     (binding* ((vop (stmt-vop statement) :exit-if-null))
       (unless (eq vop last-vop)
-        (format stream "## ~A~%" (sb-c::vop-info-name (sb-c::vop-info vop))))
+        (format stream "## ~A~%" (sb-c::vop-name vop)))
       (setq last-vop vop))
     (let ((op (stmt-mnemonic statement))
           (eol-comment ""))

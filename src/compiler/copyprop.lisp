@@ -74,7 +74,7 @@
          (not (tn-sc tn))               ; Not wired or restricted.
          (and writes (null (tn-ref-next writes)))
          (let ((vop (tn-ref-vop writes)))
-           (and (eq (vop-info-name (vop-info vop)) 'move)
+           (and (eq (vop-name vop) 'move)
                 (let ((arg-tn (tn-ref-tn (vop-args vop))))
                   (and (or (not (tn-sc arg-tn))
                            (eq (tn-kind arg-tn) :constant))
@@ -86,7 +86,7 @@
                           ;; performed based on the SC.
                           (and reads
                                (null (tn-ref-next reads))
-                               (eq (vop-info-name (vop-info (tn-ref-vop reads))) 'move)))
+                               (eq (vop-name (tn-ref-vop reads)) 'move)))
                         (subsetp (primitive-type-scs
                                   (tn-primitive-type tn))
                                  (primitive-type-scs
@@ -113,7 +113,7 @@
       ;; MOVEs can be chained and read in other blocks. This is done
       ;; not for correctness but for memory usage reduction, so there
       ;; is no need to follow all the chains, just be conservative.
-      (when (or (eq (vop-info-name (vop-info vop)) 'move)
+      (when (or (eq (vop-name vop) 'move)
                 (neq (ir2-block-block (vop-block vop)) block))
         (return)))))
 
@@ -128,7 +128,7 @@
         (out (make-sset)))
     (do ((vop (ir2-block-start-vop (block-info block)) (vop-next vop)))
         ((null vop))
-      (unless (and (eq (vop-info-name (vop-info vop)) 'move)
+      (unless (and (eq (vop-name vop) 'move)
                    (let ((y (tn-ref-tn (vop-results vop))))
                      (when (tn-is-copy-of y)
                        (unless (reads-within-block-p y block)
@@ -141,7 +141,7 @@
             (do ((read (tn-reads res-tn) (tn-ref-next read)))
                 ((null read))
               (let ((read-vop (tn-ref-vop read)))
-                (when (eq (vop-info-name (vop-info read-vop)) 'move)
+                (when (eq (vop-name read-vop) 'move)
                   (let ((y (tn-ref-tn (vop-results read-vop))))
                     (when (tn-is-copy-of y)
                       (sset-delete y out)
@@ -232,7 +232,7 @@
           (block-kill block) nil)
     (do ((vop (ir2-block-start-vop (block-info block)) (vop-next vop)))
         ((null vop))
-      (let ((this-copy (and (eq (vop-info-name (vop-info vop)) 'move)
+      (let ((this-copy (and (eq (vop-name vop) 'move)
                             (let ((y (tn-ref-tn (vop-results vop))))
                               (when (tn-is-copy-of y) y)))))
         ;; Substitute copied TN for copy when we find a reference to a copy.

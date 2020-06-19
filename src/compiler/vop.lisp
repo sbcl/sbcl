@@ -744,7 +744,7 @@
 (defprinter (tn-ref)
   tn
   write-p
-  (vop :test vop :prin1 (vop-info-name (vop-info vop))))
+  (vop :test vop :prin1 (vop-name vop)))
 
 (declaim (inline vop-name))
 (defun vop-name (vop)
