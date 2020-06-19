@@ -2902,8 +2902,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (push (list string
                                    priority
                                    (symbol-value symbol)
-                                   suffix
-                                   (documentation symbol 'variable))
+                                   suffix)
                              constants))
                      ;; machinery for old-style CMU CL Lisp-to-C
                      ;; arbitrary renaming, being phased out in favor of
@@ -2961,12 +2960,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (push (list (c-symbol-name c)
                   -1                    ; invent a new priority
                   (symbol-value c)
-                  ""
-                  nil)
+                  "")
             constants))
     ;; One more symbol that doesn't fit into the code above.
     (let ((c 'sb-impl::+magic-hash-vector-value+))
-      (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+ nil)
+      (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+)
             constants))
     (setf constants
           (sort constants
@@ -2978,13 +2976,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       (< (second const1) (second const2))))))
     (let ((prev-priority (second (car constants))))
       (dolist (const constants)
-        (destructuring-bind (name priority value suffix doc) const
+        (destructuring-bind (name priority value suffix) const
           (unless (= prev-priority priority)
             (terpri)
             (setf prev-priority priority))
           (when (minusp value)
             (error "stub: negative values unsupported"))
-          (format t "#define ~A ~A~A /* 0x~X ~@[ -- ~A ~]*/~%" name value suffix value doc))))
+          (format t "#define ~A ~A~A /* 0x~X */~%" name value suffix value))))
     (terpri))
 
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
