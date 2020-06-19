@@ -596,7 +596,7 @@ static void relocate_heap(struct heap_adjust* adj)
                         (char*)adj->range[i].start + adj->range[i].delta,
                         (char*)adj->range[i].end + adj->range[i].delta);
     }
-    relocate_space(STATIC_SPACE_START, static_space_free_pointer, adj);
+    relocate_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
 #endif
@@ -646,7 +646,7 @@ void calc_asm_routine_bounds()
     if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
         asm_routines_start = READ_ONLY_SPACE_START;
     } else {
-        lispobj *where = (lispobj*)STATIC_SPACE_START;
+        lispobj *where = (lispobj*)STATIC_SPACE_OBJECTS_START;
         for (; where < static_space_free_pointer; where += OBJECT_SIZE(*where, where))
             if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
                 asm_routines_start = (uword_t)where;
@@ -1251,7 +1251,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
                      1<<18, /* initial size */
                      0);
     {
-      lispobj* where = (lispobj*)STATIC_SPACE_START;
+      lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
       lispobj* end = static_space_free_pointer;
       while (where<end) {
         // This falsely treats NIL as 4 conses but it doesn't really matter.

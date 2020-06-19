@@ -36,7 +36,7 @@ search_read_only_space(void *pointer)
 lispobj *
 search_static_space(void *pointer)
 {
-    lispobj *start = (lispobj *)STATIC_SPACE_START;
+    lispobj *start = (lispobj *)STATIC_SPACE_OBJECTS_START;
     lispobj *end = static_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;

@@ -3106,7 +3106,7 @@ void verify_heap(uword_t flags)
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
     if (verbose)
         fprintf(stderr, " [static]");
-    verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
+    verify_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, flags);
     if (verbose)
         fprintf(stderr, " [dynamic]");
     verify_generation(-1, flags | VERIFYING_GENERATIONAL);
@@ -3600,9 +3600,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (gencgc_verbose > 1) {
         FSHOW((stderr,
                "/scavenge static space: %d bytes\n",
-               (uword_t)static_space_free_pointer - STATIC_SPACE_START));
+               (uword_t)static_space_free_pointer - STATIC_SPACE_OBJECTS_START));
     }
-    heap_scavenge((lispobj*)STATIC_SPACE_START, static_space_free_pointer);
+    heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as

@@ -2966,6 +2966,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (let ((c 'sb-impl::+magic-hash-vector-value+))
       (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+)
             constants))
+    ;; I find this entire mechanism to be overengineered, and I'd much prefer
+    ;; a simple data table constructed via backquote perhaps.
+    ;; But this (PUSH (LIST ..)) is the worst possible way, obviously.
+    (push (list "STATIC_SPACE_OBJECTS_START" 7
+                (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
+                +c-literal-64bit+)
+          constants)
     (setf constants
           (sort constants
                 (lambda (const1 const2)

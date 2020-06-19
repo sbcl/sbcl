@@ -387,7 +387,7 @@ void execute_full_mark_phase()
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
 #endif
-    lispobj* where = (lispobj*)STATIC_SPACE_START;
+    lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
     lispobj* end = static_space_free_pointer;
     while (where < end) {
         lispobj obj = compute_lispobj(where);

@@ -206,7 +206,7 @@ void coalesce_similar_objects()
     coalesce_range((lispobj*)READ_ONLY_SPACE_START,
                    (lispobj*)READ_ONLY_SPACE_END,
                    arg);
-    coalesce_range((lispobj*)STATIC_SPACE_START,
+    coalesce_range((lispobj*)STATIC_SPACE_OBJECTS_START,
                    (lispobj*)STATIC_SPACE_END,
                    arg);
 #endif

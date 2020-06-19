@@ -208,7 +208,7 @@ int parse_addr(char **ptr, boolean safely, char **output)
 static lispobj lookup_symbol(char *name)
 {
     uword_t ranges[][2] = {
-      { STATIC_SPACE_START, (uword_t)static_space_free_pointer },
+      { STATIC_SPACE_OBJECTS_START, (uword_t)static_space_free_pointer },
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
       { FIXEDOBJ_SPACE_START, (uword_t)fixedobj_free_pointer },
 #endif

@@ -1516,7 +1516,7 @@ static inline boolean known_space_p(lispobj ptr)
     return find_page_index((char*)ptr) >= 0
         || tempspace_p((char*)ptr)
         || immobile_space_p(ptr)
-        || (STATIC_SPACE_START <= ptr && ptr < STATIC_SPACE_END);
+        || (STATIC_SPACE_OBJECTS_START <= ptr && ptr < STATIC_SPACE_END);
 }
 static boolean forwardable_ptr_p(lispobj ptr)
 {
@@ -1623,7 +1623,6 @@ static void fixup_space(lispobj* where, size_t n_words)
     lispobj* end = where + n_words;
     int widetag;
     long size;
-    int __attribute__((unused)) static_space_p = ((lispobj)where == STATIC_SPACE_START);
     struct code* code;
 
     while (where < end) {
@@ -2165,8 +2164,8 @@ static void defrag_immobile_space(boolean verbose)
     }
 
     // Fix Lisp pointers in static, immobile, and dynamic spaces
-    fixup_space((lispobj*)STATIC_SPACE_START,
-                static_space_free_pointer - (lispobj*)STATIC_SPACE_START);
+    fixup_space((lispobj*)STATIC_SPACE_OBJECTS_START,
+                static_space_free_pointer - (lispobj*)STATIC_SPACE_OBJECTS_START);
 
     // Objects in immobile space are physically at 'tempspace',
     // but logically at their natural address. Perform fixups

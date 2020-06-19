@@ -824,7 +824,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
 static void scan_spaces(struct scan_state* ss)
 {
     struct scan_state old = *ss;
-    build_refs((lispobj*)STATIC_SPACE_START, static_space_free_pointer, ss);
+    build_refs((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, ss);
     show_tally(old, ss);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     old = *ss; build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);

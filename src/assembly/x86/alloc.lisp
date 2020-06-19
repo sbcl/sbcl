@@ -57,7 +57,7 @@
                                            (make-ea :dword :disp (ash thread-alloc-region-slot 2))
                                            :fs)
                          #-sb-thread (inst sub ,reg
-                                           (make-ea :dword :disp (+ 8 static-space-start)))))))
+                                           (make-ea :dword :disp boxed-region))))))
              (case reg
                ;; Now that we're using lisp asm code instead of a .S file
                ;; this could be done more intelligently - the macro can decide
