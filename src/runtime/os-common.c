@@ -212,7 +212,7 @@ boolean
 gc_managed_heap_space_p(lispobj addr)
 {
     if ((READ_ONLY_SPACE_START <= addr && addr < READ_ONLY_SPACE_END)
-        || (STATIC_SPACE_OBJECTS_START <= addr && addr < STATIC_SPACE_END)
+        || (STATIC_SPACE_START <= addr && addr < STATIC_SPACE_END)
 #if defined LISP_FEATURE_GENCGC
         || (DYNAMIC_SPACE_START <= addr &&
             addr < (DYNAMIC_SPACE_START + dynamic_space_size))

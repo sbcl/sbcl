@@ -591,12 +591,6 @@
 
 ;;;; automatic allocators for primitive objects
 
-(define-vop (make-unbound-marker)
-  (:args)
-  (:results (result :scs (descriptor-reg any-reg)))
-  (:generator 1
-    (inst mov result unbound-marker-widetag)))
-
 (define-vop (make-funcallable-instance-tramp)
   (:args)
   (:results (result :scs (any-reg)))

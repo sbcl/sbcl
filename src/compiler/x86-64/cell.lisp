@@ -95,6 +95,13 @@
 
 ;;;; symbol hacking VOPs
 
+(define-vop (make-unbound-marker)
+  (:args)
+  (:results (result :scs (descriptor-reg any-reg)))
+  (:generator 1
+    (inst mov result (logior (+ sb-vm:static-space-start #x100)
+                             unbound-marker-widetag))))
+
 (define-vop (%set-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate))
          (value :scs (descriptor-reg any-reg immediate)))
@@ -128,7 +135,7 @@
   (:generator 9
     (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
       (loadw value object symbol-value-slot other-pointer-lowtag)
-      (inst cmp :dword value unbound-marker-widetag)
+      (inst cmp :byte value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
 ;; Return the DISP field to use in an EA relative to thread-base-tn
@@ -190,7 +197,7 @@
         #-sb-thread (progn (move rax old)
                             ;; is the :LOCK is necessary?
                             (inst cmpxchg (symbol-value-slot-ea symbol) new :lock))
-        (inst cmp :dword rax unbound-marker-widetag)
+        (inst cmp :byte rax unbound-marker-widetag)
         (inst jmp :e unbound)
         (move result rax))))
 
@@ -275,7 +282,7 @@
 
         (when check-boundp
           (assemble ()
-            (inst cmp :dword value unbound-marker-widetag)
+            (inst cmp :byte value unbound-marker-widetag)
             (let* ((immediatep (sc-is symbol immediate))
                    (staticp (and immediatep (static-symbol-p known-symbol)))
                    (*location-context* (make-restart-location RETRY value)))
@@ -331,7 +338,7 @@
         (inst mov :dword temp (thread-tls-ea temp))
         (inst cmp :dword temp no-tls-value-marker-widetag)
         (inst cmov :dword :e temp (symbol-value-slot-ea object))
-        (inst cmp :dword temp unbound-marker-widetag))))
+        (inst cmp :byte temp unbound-marker-widetag))))
 
 ) ; END OF MACROLET
 
@@ -348,7 +355,7 @@
     (:args (symbol :scs (descriptor-reg)))
     (:conditional :ne)
     (:generator 9
-      (inst cmp :dword (object-slot-ea
+      (inst cmp :byte (object-slot-ea
                  symbol symbol-value-slot other-pointer-lowtag)
             unbound-marker-widetag))))
 

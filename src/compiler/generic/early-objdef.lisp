@@ -109,14 +109,17 @@
        ;; 8 is the number of words to reserve at the beginning of static space
        ;; prior to the words of NIL.
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
-       #+(and gencgc (not sb-thread)) (ash 8 word-shift)
+       #+(and (not x86-64) gencgc (not sb-thread)) (ash 8 word-shift)
+       #+x86-64 #x100
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
 ;;; BOXED-REGION is address in static space at which a 'struct alloc_region'
 ;;; is overlaid on a lisp vector with element type WORD.
 #-sb-thread
-(defconstant boxed-region (+ static-space-start (* 2 n-word-bytes)))
+(defconstant boxed-region
+  (+ static-space-start
+     (* 2 n-word-bytes))) ; skip the array header
 
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
@@ -196,6 +199,7 @@
 ;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
 
 (defconstant widetag-spacing 4)
+#+x86-64 (defconstant unbound-marker-widetag 9)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defenum (;; The first widetag must be greater than SB-VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
@@ -223,36 +227,30 @@
   funcallable-instance-widetag              ;  36   3D  36   3D
 
   ;; x86[-64] does not have objects with this widetag,
-  #+(or x86 x86-64) unused00-widetag
-  #-(or x86 x86-64)
-  return-pc-widetag                         ;  3A   41  3A   41
+  #-(or x86 x86-64) return-pc-widetag       ;  3A   41  3A   41
+  #+(or x86 x86-64) lra-widetag-notused
 
   value-cell-widetag                        ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49
   sap-widetag                               ;  46   4D  46   4D
-  unbound-marker-widetag                    ;  4A   51  4A   51
+  #-x86-64 unbound-marker-widetag           ;  4A   51  4A   51
+  #+x86-64 unused00-widetag
   weak-pointer-widetag                      ;  4E   55  4E   55
   instance-widetag                          ;  52   59  52   59
   fdefn-widetag                             ;  56   5D  56   5D
 
   no-tls-value-marker-widetag               ;  5A   61  5A   61
-  #-sb-simd-pack
-  unused01-widetag                          ;  5E       5E
-  #+sb-simd-pack
-  simd-pack-widetag                         ;       65       65
-  #-sb-simd-pack-256
-  unused03-widetag                          ;  62   69  62   69
-  #+sb-simd-pack-256
-  simd-pack-256-widetag                     ;  62   69  62   69
+  #+sb-simd-pack simd-pack-widetag          ;       65       65
+  #-sb-simd-pack unused01-widetag           ;  5E       5E
+  #+sb-simd-pack-256 simd-pack-256-widetag  ;  62   69  62   69
+  #-sb-simd-pack-256 unused03-widetag       ;  62   69  62   69
   filler-widetag                            ;  66   6D  66   6D
   unused04-widetag                          ;  6A   71  6A   71
   unused05-widetag                          ;  6E   75  6E   75
   unused06-widetag                          ;  72   79  72   79
   unused07-widetag                          ;  76   7D  76   7D
-  #-64-bit
-  unused08-widetag                          ;  7A       7A
-  #-64-bit
-  unused09-widetag                          ;  7E       7E
+  #-64-bit unused08-widetag                 ;  7A       7A
+  #-64-bit unused09-widetag                 ;  7E       7E
 
   simple-array-widetag                      ;  82   81  82   81
   simple-array-unsigned-byte-2-widetag      ;  86   85  86   85

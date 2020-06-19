@@ -11,6 +11,29 @@
 
 #-x86-64 (sb-ext:exit :code 104)
 
+(with-test (:name :lowtag-test-elision)
+  ;; This tests a certain behavior that while "undefined" should at least not
+  ;; be fatal. This is important for things like hash-table :TEST where we might
+  ;; call (EQUAL x y) with X being an unbound marker indicating an empty cell.
+  ;; After we started using IR1 type derivation to elide lowtag as a guard condition
+  ;; in some type tests, it became more likely to dereference an unbound marker
+  ;; which does not fit anywhere in the lisp type space.
+  (let ((f (compile nil
+                    '(lambda (x)
+                      (typecase x
+                        ((or character number list sb-kernel:instance function) 1)
+                        ;; After eliminating the preceding cases, the compiler knows
+                        ;; that the only remaining pointer type is OTHER-POINTER,
+                        ;; so it just tries to read the widetag.
+                        ;; If X is the unbound marker, this will read a byte preceding
+                        ;; the start of static space, but it holds a zero.
+                        (simple-vector 2))))))
+    (assert (not (funcall f (sb-kernel:make-unbound-marker)))))
+  (assert (not (equalp (sb-kernel:make-unbound-marker) "")))
+  (let ((a (- (sb-kernel:get-lisp-obj-address (sb-kernel:make-unbound-marker))
+              sb-vm:other-pointer-lowtag)))
+    (assert (> a sb-vm:static-space-start))))
+
 (load "compiler-test-util.lisp")
 (defun disassembly-lines (fun)
   ;; FIXME: I don't remember what this override of the hook is for.

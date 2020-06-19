@@ -1546,13 +1546,14 @@ core and return a descriptor to it."
   (allocate-vector #-64-bit sb-vm:simple-array-signed-byte-32-widetag
                    #+64-bit sb-vm:simple-array-signed-byte-64-widetag
                    6 6 *static*)
+  #+x86-64 (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
   (let* ((des (allocate-header+object *static* sb-vm:symbol-size 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
-                                     (* 2 sb-vm:n-word-bytes)
-                                     (- sb-vm:list-pointer-lowtag
-                                        ;; ALLOCATE-HEADER+OBJECT always adds in
-                                        ;; OTHER-POINTER-LOWTAG, so subtract it.
-                                        sb-vm:other-pointer-lowtag))))
+                                      (* 2 sb-vm:n-word-bytes)
+                                      (- sb-vm:list-pointer-lowtag
+                                         ;; ALLOCATE-HEADER+OBJECT always adds in
+                                         ;; OTHER-POINTER-LOWTAG, so subtract it.
+                                         sb-vm:other-pointer-lowtag))))
          (header (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
          (initial-info (cold-cons nil-val nil-val))
          ;; NIL's name is in dynamic space because any extra bytes allocated
