@@ -201,8 +201,7 @@
 #+sb-safepoint
 (defun emit-safepoint ()
   (inst test eax-tn (make-ea :dword :disp
-                             (- nil-value n-word-bytes other-pointer-lowtag
-                                gc-safepoint-trap-offset))))
+                             (- static-space-start gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)
   #+sb-safepoint-strictly
