@@ -470,8 +470,7 @@
                                (ash 1 (1+ (- word-shift n-fixnum-tag-bits)))))
                      ,answer)))
            (compute-end ()
-             `(let ((size (cond ((or (not (fixnump size))
-                                     (plausible-signed-imm32-operand-p size))
+             `(let ((size (cond ((typep size '(or (signed-byte 32) tn))
                                  size)
                                 (t
                                  (inst mov limit size)

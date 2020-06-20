@@ -762,3 +762,7 @@ sb-vm::(define-vop (cl-user::test)
     ;; the two variations of the test compile to the identical code
     (dotimes (i 4)
       (assert (string= (nth i f1) (nth i f2))))))
+
+(with-test (:name :make-list-ridiculously-huge)
+  (checked-compile '(lambda () (make-list 3826305079707827596))
+                   :allow-warnings t))

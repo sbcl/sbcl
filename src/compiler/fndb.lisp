@@ -873,9 +873,19 @@
 
 (defknown list (&rest t) list (movable flushable))
 (defknown list* (t &rest t) t (movable flushable))
-(defknown make-list (index &key (:initial-element t)) list
+;;; The length constraint on MAKE-LIST is such that:
+;;; - not every byte of addressable memory can be used up.
+;;; - the number of bytes to allocate should not be a bignum,
+;;    nor can its native representation be larger than 'sword_t'
+;;; So it's half of most-positive-word divided by the cons size,
+;;; which is roughly twice as small as array-dimension-limit on 32-bit machines,
+;;; or 8x smaller on 64-bit machines.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant make-list-limit
+    (floor (/ sb-ext:most-positive-word 2) (* 2 sb-vm:n-word-bytes))))
+(defknown make-list ((integer 0 (#.make-list-limit)) &key (:initial-element t)) list
   (movable flushable))
-(defknown %make-list (index t) list (movable flushable))
+(defknown %make-list ((integer 0 (#.make-list-limit)) t) list (movable flushable))
 
 (defknown sb-impl::|List| (&rest t) list (movable flushable foldable))
 (defknown sb-impl::|List*| (t &rest t) t (movable flushable foldable))
