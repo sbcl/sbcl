@@ -5771,12 +5771,10 @@
          (map a 'list (the vector b) #*))
     (('vector #()) #() :test #'equalp)))
 
-(with-test (:name (make-list :large 1))
-  (checked-compile `(lambda ()
-                      (make-list (expt 2 28) :initial-element 0))))
-
-(with-test (:name (make-list :large 2)
+(with-test (:name (make-list :large)
             :skipped-on (not :64-bit))
+  (checked-compile `(lambda ()
+                      (make-list (expt 2 28) :initial-element 0)))
   (checked-compile `(lambda ()
                       (make-list (expt 2 30) :initial-element 0))))
 
