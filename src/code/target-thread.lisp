@@ -1556,10 +1556,6 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (init-thread-local-storage thread)
-  ;; Can't initiate GC before *current-thread* is set, otherwise the
-  ;; locks grabbed by SUB-GC wouldn't function.
-  ;; Other threads can GC with impunity.
   (setf (thread-os-thread thread) (current-thread-os-thread)
         (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
         (thread-primitive-thread thread) (sap-int (current-thread-sap)))
@@ -1697,6 +1693,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   (setf (sb-vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
+                  (init-thread-local-storage thread)
                   (new-lisp-thread-trampoline thread setup-sem
                                               real-function arguments)))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up

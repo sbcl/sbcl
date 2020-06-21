@@ -297,8 +297,9 @@ the alien callback for that function with the given alien type."
 (defun enter-foreign-callback (index return arguments)
   (let ((thread (without-gcing
                   ;; Hold off GCing until *current-thread* is set up
-                  (setf *current-thread*
-                        (make-foreign-thread :name "foreign callback")))))
+                  (let ((thread (make-foreign-thread :name "foreign callback")))
+                    (init-thread-local-storage thread)
+                    thread))))
     (dx-flet ((enter ()
-                (sb-alien::enter-alien-callback index return arguments)))
+                     (sb-alien::enter-alien-callback index return arguments)))
       (new-lisp-thread-trampoline thread nil #'enter nil))))
