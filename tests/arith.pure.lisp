@@ -834,3 +834,23 @@
      (declare (type (integer -142 -29) a))
      (eql (gcd (setq a -29) a) 1))
    ((-33) nil)))
+
+;;; Test that LOGIOR and LOGXOR on PPC64 can correctly perform the constant 2nd-arg
+;;; vop variant on a 32-bit immediate using op + op-shifted instructions.
+;;; (Probably we should refactor large parts of the test suite by the CPU
+;;; architecture so that you can really see clearly the areas of concern
+;;; for each backend, but I'm not about to embark on that now)
+(with-test (:name :ppc64-logxor-32-bit-const)
+  (let ((f (compile nil
+                    '(lambda (x)
+                      (declare (fixnum x))
+                      ;; The asm code went wrong only if the result was not in the same
+                      ;; register as the source, so make sure that X is live throughout
+                      ;; the test so that each result is in a different register.
+                      (let ((a (logxor x #x9516A7))
+                            (b (logior x #x2531b4))
+                            (c (ash x -1)))
+                        (list a b c x))))))
+    (let ((result (funcall f 0)))
+      (assert (equal result
+                     '(#x9516A7 #x2531b4 0 0))))))

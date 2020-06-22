@@ -204,13 +204,13 @@
   `(flet ((emit (r x y)
             (cond ((typep y '(unsigned-byte 16))
                    (inst ,op r x y))
-                  ((and (typep (ash y -16) '(unsigned-byte 16))
+                  ((and (typep (ash y -16) '(unsigned-byte 16)) ; effectively (unsigned-byte 32)
                         ;; logical AND can't be split into two instructions
                         ,@(if (eq translate 'logand) '((zerop (ldb (byte 16 0) y)))))
                    (inst ,shifted-op r x (ash y -16))
                    (when (ldb-test (byte 16 0) y)
-                     (inst ,op r x (ldb (byte 16 0) y)))) ; not sign-extended
-                  (t
+                     (inst ,op r r (ldb (byte 16 0) y)))) ; not sign-extended
+                  (t ; everything else: just load the constant from memory
                    (inst lr temp-reg-tn y)
                    (inst ,general-op r x temp-reg-tn)))))
      (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum) fast-fixnum-logop-c)
