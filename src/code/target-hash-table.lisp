@@ -297,7 +297,11 @@ Examples:
 (defun set-kv-hwm (vector hwm) (setf (svref vector 0) hwm))
 (defsetf kv-vector-high-water-mark set-kv-hwm)
 
-(defmacro new-kv-vector (size weakp)
+;;; Make a new key/value vector. Weak tables do not mark the vector as weak
+;;; initially, because the vector can't hold a backpointer to the table
+;;; since the table hasn't been made yet. (GC asserts that every weak hash-table
+;;; storage vector has a table pointer - no exceptions)
+(defmacro %alloc-kv-pairs (size)
   `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
                         :initial-element +empty-ht-slot+)))
      (setf (kv-vector-high-water-mark v) 0)
@@ -306,11 +310,7 @@ Examples:
      ;; is set, so it needs to see a valid value in the 'supplement' slot.
      ;; Neither 0 nor +empty-ht-slot+ is a valid value.
      (setf (kv-vector-supplement v) nil)
-     (set-header-data v (if ,weakp
-                            (logior sb-vm:vector-weak-subtype
-                                    sb-vm:vector-hashing-subtype)
-                            sb-vm:vector-hashing-subtype))
-
+     (set-header-data v sb-vm:vector-hashing-subtype)
      v))
 
 (defun install-hash-table-lock (table)
@@ -488,7 +488,7 @@ Examples:
                                      :element-type 'hash-table-index
                                      :initial-element 0))
            (weakp (logtest flags hash-table-weak-flag))
-           (kv-vector (new-kv-vector size weakp))
+           (kv-vector (%alloc-kv-pairs size))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
            ;; together.
@@ -521,6 +521,9 @@ Examples:
             (if weakp
                 table
                 (or hash-vector (= table-kind hash-table-kind-eql))))
+      (when weakp
+        (set-header-data kv-vector (logior sb-vm:vector-hashing-subtype
+                                           sb-vm:vector-weak-subtype)))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
       table))
@@ -631,8 +634,7 @@ multiple threads accessing the same hash-table without locking."
          (new-index-vector (make-array new-n-buckets
                                        :element-type 'hash-table-index
                                        :initial-element 0))
-         ;; New kv vector is not marked as weak, even for a weak table
-         (new-kv-vector (new-kv-vector new-size nil))
+         (new-kv-vector (%alloc-kv-pairs new-size))
          (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index))
          (new-hash-vector
            (when old-hash-vector

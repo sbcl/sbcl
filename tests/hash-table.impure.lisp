@@ -3,6 +3,31 @@
 ;;; Keep moving everything that can move during each GC
 #+gencgc (setf (generation-number-of-gcs-before-promotion 0) 1000000)
 
+;;; Check for GC invariant loss during weak table creation.
+;;; This didn't always fail, but might have, and now shouldn't.
+(defglobal *number-of-weak-tables* 0)
+(defun make-weak-key-table () (make-hash-table :weakness :key))
+(defun something-useless (x) (list x))
+(defun weak-table-allocation-test ()
+  (let ((thread
+         (sb-thread:make-thread
+           (lambda ()
+             (loop
+               (sleep .0001)
+               (gc)
+               (sb-thread:barrier (:read))
+               (when (> *number-of-weak-tables* 1000) (return)))))))
+    (loop repeat 1001 do
+      (something-useless (make-weak-key-table))
+      (incf *number-of-weak-tables*)
+      (sb-thread:barrier (:write)))
+    (sb-thread:join-thread thread)))
+;;; Interpreted code is probably too slow to be useful in this test
+(compile 'weak-table-allocation-test)
+(weak-table-allocation-test)
+(with-test (:name :weak-table-gc-invariant :skipped-on (not :sb-thread))
+  (weak-table-allocation-test))
+
 (defun is-address-sensitive (tbl)
   (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
     (logtest data sb-vm:vector-addr-hashing-subtype)))

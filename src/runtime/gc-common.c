@@ -1358,7 +1358,7 @@ scav_vector (lispobj *where, lispobj header)
     }
 
     lispobj* data = where + 2;
-    // Verify that the rehash epoch is a fixnum
+    // Verify that the rehash stamp is a fixnum
     gc_assert(fixnump(data[1]));
 
     /* Scavenge element (length-1), which may be a hash-table structure. */
