@@ -24,7 +24,7 @@
     (sb-thread:join-thread thread)))
 ;;; Interpreted code is probably too slow to be useful in this test
 (compile 'weak-table-allocation-test)
-(weak-table-allocation-test)
+
 (with-test (:name :weak-table-gc-invariant :skipped-on (not :sb-thread))
   (weak-table-allocation-test))
 
