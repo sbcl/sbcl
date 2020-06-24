@@ -109,9 +109,9 @@
                  (setf table (make-hash-table :test 'eq)
                        (extended-char-table readtable) table))
                (setf (gethash char table) (cons attributes function)))
-              (t
-               ;; If the table is *empty-extended-char-table* the item won't be
-               ;; found, so we're not actually altering the empty table.
+              ((neq table *empty-extended-char-table*)
+               ;; can't REMHASH from *empty-extended-char-table*
+               ;; since it's not a real hash-table.
                (remhash char table)))))
   nil)
 
@@ -1981,10 +1981,8 @@ extended <package-name>::<form-in-package> syntax."
                  (push (cons char output) alist)))))
       (loop for fn across (base-char-macro-array readtable) and ch from 0
             do (process (code-char ch) fn))
-      (unless (eq (extended-char-table readtable) *empty-extended-char-table*)
-        ;; very unsafe to maphash over the empty table - it's a stub object
-        (maphash (lambda (char val) (process char (cdr val)))
-                 (extended-char-table readtable))))
+      (maphash (lambda (char val) (process char (cdr val)))
+               (extended-char-table readtable)))
     alist))
 
 (declaim (inline character-macro-array character-macro-hash-table))
