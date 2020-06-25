@@ -1368,7 +1368,7 @@ nnnn 1_    any       linear scan
        (if (hash-table-synchronized-p hash-table)
            ;; Use the private slot accessor for the lock because it's known
            ;; to have a mutex.
-           (sb-thread::call-with-system-mutex #'body (hash-table-%lock hash-table))
+           (sb-thread::call-with-recursive-system-lock #'body (hash-table-%lock hash-table))
            (body))))))
 
 (defun gethash/weak (key hash-table default)

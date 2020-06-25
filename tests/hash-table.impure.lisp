@@ -191,3 +191,14 @@
     (setf (gethash 1 ht) 2)
     (clrhash ht)
     (assert (not (sb-impl::hash-table-%lock ht)))))
+
+;;; Prove that our completely assinine API with regard to locking works,
+;;; which is to say, if the user explicitly locks an implicitly locked table,
+;;; there is no "Recursive lock attempt" error.
+;;; In general, we can't discern between a lock that preserves table invariants
+;;; at the implementation level, or the user level. But I guess with "system" locks
+;;; it's sort of OK because reentrance isn't really possible, and internally
+;;; the table considers the lock to be a "system" lock.
+(with-test (:name :weak-hash-table-with-explicit-lock)
+  (let ((h (make-hash-table :weakness :key)))
+    (with-locked-hash-table (h) (setf (gethash 'foo h) 1))))
