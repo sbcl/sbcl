@@ -65,8 +65,8 @@ set -e
 #######################################################################
 
 warm_option=""
-if [ "$1" == --load ]; then
-    warm_option="--load"
+if [ "$1" == --load -o "$1" == --load-with-sb-devel ]; then
+    warm_option="$1"
     shift
 fi
 
