@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.5:
+changes in sbcl-2.0.6 relative to sbcl-2.0.5:
   * planned incompatible change: the defined symbols in the Metaobject
     Protocol, currently accessible from both SB-MOP and SB-PCL packages, will
     in a later release be no longer exported from SB-PCL.
