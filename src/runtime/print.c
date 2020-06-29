@@ -921,10 +921,7 @@ struct vector * symbol_name(lispobj * sym)
     sym = native_pointer(forwarding_pointer_value(sym));
   if (lowtag_of(((struct symbol*)sym)->name) != OTHER_POINTER_LOWTAG)
       return NULL;
-  lispobj * name = native_pointer(((struct symbol*)sym)->name);
-  if (forwarding_pointer_p(name))
-      name = native_pointer(forwarding_pointer_value(name));
-  return (struct vector*)name;
+  return VECTOR(follow_maybe_fp(((struct symbol*)sym)->name));
 }
 struct vector * classoid_name(lispobj * classoid)
 {

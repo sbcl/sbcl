@@ -59,4 +59,17 @@ set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
     return newspace_copy;
 }
 
+/// Chase the pointer in 'word' if it points to a forwarded object.
+static inline lispobj follow_maybe_fp(lispobj word)
+{
+    return (is_lisp_pointer(word) && forwarding_pointer_p(native_pointer(word)))
+        ? forwarding_pointer_value(native_pointer(word)) : word;
+}
+/// As above, but 'ptr' MUST be a pointer.
+static inline lispobj follow_fp(lispobj ptr)
+{
+  return forwarding_pointer_p(native_pointer(ptr))
+      ? forwarding_pointer_value(native_pointer(ptr)) : ptr;
+}
+
 #endif

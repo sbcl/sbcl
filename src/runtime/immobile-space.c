@@ -1605,13 +1605,6 @@ static struct layout* fix_object_layout(lispobj* obj)
     return native_layout;
 }
 
-static lispobj follow_fp(lispobj ptr)
-{
-  if (forwarding_pointer_p(native_pointer(ptr)))
-      return forwarding_pointer_value(native_pointer(ptr));
-  else
-      return ptr;
-}
 static void apply_absolute_fixups(lispobj, struct code*);
 
 /// It's tricky to try to use the scavtab[] functions for fixing up moved

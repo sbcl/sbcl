@@ -35,6 +35,7 @@
 #include "gc.h"
 #include "code.h"
 #include "var-io.h"
+#include "forwarding-ptr.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
@@ -145,6 +146,7 @@ static int string_equal (struct vector *vector, char *string)
 static void
 print_entry_name (lispobj name, FILE *f)
 {
+    name = follow_maybe_fp(name);
     if (listp(name)) {
         putc('(', f);
         while (name != NIL) {
@@ -154,19 +156,20 @@ print_entry_name (lispobj name, FILE *f)
                 return;
             }
             print_entry_name(CONS(name)->car, f);
-            name = CONS(name)->cdr;
+            name = follow_maybe_fp(CONS(name)->cdr);
             if (name != NIL)
                 putc(' ', f);
         }
         putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
-        lispobj *object = native_pointer(name);
-        if (widetag_of(object) == SYMBOL_WIDETAG) {
-            struct symbol *symbol = (struct symbol *) object;
+        struct symbol *symbol = SYMBOL(name);
+        int widetag = header_widetag(symbol->header);
+        switch (widetag) {
+        case SYMBOL_WIDETAG:
             if (symbol->package != NIL) {
                 struct package *pkg
-                    = (struct package *) native_pointer(symbol->package);
-                struct vector *pkg_name = VECTOR(pkg->_name);
+                    = (struct package *) native_pointer(follow_maybe_fp(symbol->package));
+                struct vector *pkg_name = VECTOR(follow_maybe_fp(pkg->_name));
                 if (string_equal(pkg_name, "COMMON-LISP"))
                     ;
                 else if (string_equal(pkg_name, "COMMON-LISP-USER")) {
@@ -179,17 +182,18 @@ print_entry_name (lispobj name, FILE *f)
                     fputs("::", f);
                 }
             }
-            print_string(VECTOR(symbol->name), f);
-        } else if (widetag_of(object) == SIMPLE_BASE_STRING_WIDETAG
+            print_string(VECTOR(follow_maybe_fp(symbol->name)), f);
+            break;
+        case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-                   || widetag_of(object) == SIMPLE_CHARACTER_STRING_WIDETAG
+        case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-            ) {
             putc('"', f);
-            print_string((struct vector*)object, f);
+            print_string((struct vector*)symbol, f);
             putc('"', f);
-        } else {
-            fprintf(f, "<??? type %d>", widetag_of(object));
+            break;
+        default:
+            fprintf(f, "<??? type %d>", widetag);
         }
     } else if (fixnump(name)) {
         fprintf(f, "%d", (int)fixnum_value(name));
