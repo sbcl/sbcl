@@ -106,7 +106,8 @@
 
 (define-type-vop complex-double-float-p (complex-double-float-widetag))
 
-(define-type-vop single-float-p (single-float-widetag))
+(define-type-vop single-float-p (single-float-widetag)
+   #+x86-64 simple-type-predicate)
 
 (define-type-vop double-float-p (double-float-widetag))
 
@@ -133,7 +134,8 @@
                *specialized-array-element-type-properties*))))
   (def)) ; simple-rank-1-array-*-p
 
-(define-type-vop characterp (character-widetag))
+(define-type-vop characterp (character-widetag)
+  #+x86-64 simple-type-predicate)
 
 (define-type-vop system-area-pointer-p (sap-widetag))
 

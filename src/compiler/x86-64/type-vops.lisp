@@ -88,12 +88,8 @@
 
 (defun %test-immediate (value temp target not-p immediate
                         &optional (drop-through (gen-label)))
-  ;; Code a single instruction byte test if possible.
-  (cond ((sc-is value any-reg descriptor-reg)
-         (inst cmp :byte value immediate))
-        (t
-         (move temp value) ; FIXME - why load?
-         (inst cmp :byte temp immediate)))
+  (declare (ignore temp))
+  (inst cmp :byte value immediate)
   (inst jmp (if not-p :ne :e) target)
   (emit-label drop-through))
 
