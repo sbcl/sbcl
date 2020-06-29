@@ -1,8 +1,27 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.5:
+  * planned incompatible change: the defined symbols in the Metaobject
+    Protocol, currently accessible from both SB-MOP and SB-PCL packages, will
+    in a later release be no longer exported from SB-PCL.
+  * platform support:
+    ** better support for dynamic-extent on the SPARC architecture.
+    ** bug fix for loading very large core files.
+    ** bug fix for logior and logxor on PPC64.
   * enhancement: EQUALP on structure instances uses code specialized
     to each structure type, inlining comparison of non-pointer slots.
+  * enhancement: some standard operators, such as WITH-OUTPUT-TO-STRING and
+    CHANGE-CLASS, have been adapted to use dynamic-extent temporary objects,
+    and so cons less garbage on the heap.
+  * enhancement: read tables are more space- and speed efficient
+  * bug fix: stream conditions with dynamic-extent streams have the stream
+    replaced by a stub.  (reported by Matt Kaufmann)
+  * bug fix: garbage collections triggered from foreign callbacks crashed.
+    (lp#1884403, reported by Andrew Kent)
+  * bug fix: compiler failure in compiling MAKE-LIST.  (lp#1881349)
+  * bug fix: using the debugger from frames with calls to functions with
+    unsupplied optional arguments is less likely to cause heap corruption.
+    (lp#1883745)
 
 changes in sbcl-2.0.5 relative to sbcl-2.0.4:
   * platform support:
