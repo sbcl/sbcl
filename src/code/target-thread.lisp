@@ -163,6 +163,11 @@ arbitrary printable objects, and need not be unique.")
 (defmethod print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
     (let* ((cookie (list thread))
+           ;; Hmm, state-change, mutex acquisition, and semantic problems
+           ;; all because of a goddamn print method? What the effing hell?
+           ;; You literally can't call this method in two threads at once
+           ;; without lock contention and risk of joining >1 time,
+           ;; which we don't treat as user error even though it is.
            (info (if (thread-alive-p thread)
                      :running
                      (multiple-value-list
@@ -212,17 +217,10 @@ to terminate this thread cleanly prior to core file saving without signalling
 an error in that case."
   (thread-%ephemeral-p thread))
 
-;; A thread is eligible for gc iff it has finished and there are no
-;; more references to it. This structure keeps a reference to
-;; all running threads ordered by stack base address.
+;; Keep an AVL tree of threads ordered by stack base address. NIL is the empty tree.
 (sb-ext:define-load-time-global *all-threads* ())
-(sb-ext:define-load-time-global *all-threads-lock* (make-mutex :name "all threads lock"))
 
 (defvar *default-alloc-signal* nil)
-
-(defmacro with-all-threads-lock (&body body)
-  `(with-system-mutex (*all-threads-lock*)
-     ,@body))
 
 (defun list-all-threads ()
   "Return a list of the live threads. Note that the return value is
@@ -268,7 +266,7 @@ created and old ones may exit at any time."
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
   ;;; FIXME: is it purposeful or accidental that we recreate some of
-  ;;; the global mutexes but not *ALL-THREADS-LOCKS* ?
+  ;;; the global mutexes but not all of them?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread :name "main thread"
@@ -1318,12 +1316,7 @@ on this semaphore, then N of them is woken up."
 ;;; *waiting* for the session lock for things like GET-FOREGROUND to
 ;;; be interruptible.
 ;;;
-;;; Take care: we sometimes need to obtain the session lock while
-;;; holding on to *ALL-THREADS-LOCK*, so we must _never_ obtain it
-;;; _after_ getting a session lock! (Deadlock risk.)
-;;;
-;;; FIXME: It would be good to have ordered locks to ensure invariants
-;;; like the above.
+;;; FIXME: It might be good to have a way to enforce lock ordering invariants
 (defmacro with-session-lock ((session) &body body)
   `(with-system-mutex ((session-lock ,session) :allow-with-interrupts t)
      ,@body))
@@ -1360,19 +1353,30 @@ on this semaphore, then N of them is woken up."
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
+(defmacro with-interruptions-lock ((thread) &body body)
+  `(with-system-mutex ((thread-interruptions-lock ,thread))
+     ,@body))
+
 ;;; Remove thread from its session, if it has one.
 #+sb-thread
-(defun handle-thread-exit (thread control-stack-start)
+(defun handle-thread-exit ()
   (/show0 "HANDLING THREAD EXIT")
   (when *exit-in-process*
     (%exit))
   ;; Lisp-side cleanup
-  (with-all-threads-lock
-    (setf (thread-%alive-p thread) nil)
-    (setf (thread-os-thread thread) sb-ext:most-positive-word)
-    (setq *all-threads* (avl-delete control-stack-start *all-threads*))
+  (let ((thread *current-thread*))
     (when *session*
-      (%delete-thread-from-session thread *session*))))
+      (%delete-thread-from-session thread *session*))
+    (with-interruptions-lock (thread)
+      (setf (thread-%alive-p thread) nil)
+      (setf (thread-os-thread thread) sb-ext:most-positive-word))
+    (sb-thread:barrier (:read))
+    (let ((old *all-threads*))
+      (loop
+       (let ((new (avl-delete (get-lisp-obj-address sb-vm:*control-stack-start*)
+                              old)))
+         (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return)))))))
+
 
 (defvar sb-ext:*invoke-debugger-hook* nil
   "This is either NIL or a designator for a function of two arguments,
@@ -1564,13 +1568,15 @@ session."
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   #+linux (setf (thread-os-tid thread) (sb-gettid))
   (with-mutex ((thread-result-lock thread))
-    (with-all-threads-lock
+    (let ((old *all-threads*))
+      (loop
         (let ((addr (get-lisp-obj-address sb-vm:*control-stack-start*)))
           ;; If ADDR exists, then we have a bug in the thread exit handler.
           ;; The workaround here would be to delete the old thread first,
           ;; but I'd rather find out about the bug than bury it.
-          (aver (not (avl-find addr *all-threads*)))
-          (setq *all-threads* (avl-insert *all-threads* addr thread))))
+          (aver (not (avl-find addr old)))
+          (let ((new (avl-insert old addr thread)))
+            (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return))))))
     (let ((session *session*)
           (session-cons (list thread)))
         (with-session-lock (session)
@@ -1624,10 +1630,9 @@ session."
                 (setq *interrupt-pending* nil)
                 #+sb-thruption
                 (setq *thruption-pending* nil)
-                (handle-thread-exit thread
-                                    (get-lisp-obj-address
-                                     sb-vm:*control-stack-start*)))))))))
-  (values))
+                (handle-thread-exit))))))))
+  ;; this returns to C, so return a single value
+  0)
 
 (defun make-thread (function &key name arguments)
   "Create a new thread of NAME that runs FUNCTION with the argument
@@ -1766,10 +1771,6 @@ subject to change."
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
-(defmacro with-interruptions-lock ((thread) &body body)
-  `(with-system-mutex ((thread-interruptions-lock ,thread))
-     ,@body))
-
 ;;; Called from the signal handler.
 #-(or sb-thruption win32)
 (defun run-interruption ()
@@ -1811,6 +1812,7 @@ subject to change."
         (setf *thruption-pending* t)))))
 
 (defun interrupt-thread (thread function)
+  (declare (ignorable thread))
   "Interrupt THREAD and make it run FUNCTION.
 
 The interrupt is asynchronous, and can occur anywhere with the exception of
@@ -1864,34 +1866,57 @@ the state of a thread:
 
 Short version: be careful out there."
   #+(and (not sb-thread) win32)
-  #+(and (not sb-thread) win32)
-  (declare (ignore thread))
   (with-interrupt-bindings
     (with-interrupts (funcall function)))
   #-(and (not sb-thread) win32)
+  (macrolet ((enqueue (set-invoked)
+               ;; Append to the end of the interruptions queue. It's
+               ;; O(N), but it does not hurt to slow interruptors down a
+               ;; bit when the queue gets long.
+              `(setf (thread-interruptions thread)
+                     (append (thread-interruptions thread)
+                             (list (lambda ()
+                                     ,@(if set-invoked '((setf invoked t)))
+                                     (barrier (:memory))
+                                     (without-interrupts
+                                       (allow-with-interrupts
+                                        (funcall function)))))))))
+
+  ;; POSIX says:
+  ;; "If an application attempts to use a thread ID whose lifetime has ended,
+  ;;  the behavior is undefined."
+  ;; We have two ways of handling this, the good way and the shiat way.
+  ;; The good way is to pthread_kill() while holding the interruptions lock,
+  ;; which prevents thread exit since a thread needs to briefly acquire
+  ;; that lock just prior to exit.
+
+  #+(and sb-thread (not sb-safepoint) (not sb-thruption)) ; Good way
+  (unless (with-interruptions-lock (thread)
+            (let ((os-thread (thread-os-thread thread)))
+              (unless (= os-thread sb-ext:most-positive-word)
+                (enqueue nil)
+                (alien-funcall (extern-alien "pthread_kill" (function void unsigned int))
+                               os-thread sb-unix:sigpipe)
+                t)))
+    (error 'interrupt-thread-error :thread thread))
+
+  ;; Shiat way: call to C to acquire the all_threads lock and scan all_threads.
+  ;; Beyond that there's the question of why INVOKED is ever set/examined. Seems fubar.
+  ;; I have no friggin idea how sb-thruption is supposed to work.
+  #-(and sb-thread (not sb-safepoint) (not sb-thruption))
   (let ((os-thread (thread-os-thread thread)))
     (cond ((= os-thread (ldb (byte sb-vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))
           (t
            (let (invoked)
              (with-interruptions-lock (thread)
-               ;; Append to the end of the interruptions queue. It's
-               ;; O(N), but it does not hurt to slow interruptors down a
-               ;; bit when the queue gets long.
-               (setf (thread-interruptions thread)
-                     (append (thread-interruptions thread)
-                             (list (lambda ()
-                                     (setf invoked t)
-                                     (barrier (:memory))
-                                     (without-interrupts
-                                       (allow-with-interrupts
-                                         (funcall function))))))))
+               (enqueue t))
              (when (and (minusp (wake-thread os-thread))
                         ;; The interrupt queue has been processed by
                         ;; some other interrupt.
                         (progn (barrier (:memory))
                                (not invoked)))
-               (error 'interrupt-thread-error :thread thread)))))))
+               (error 'interrupt-thread-error :thread thread))))))))
 
 (defun terminate-thread (thread)
   "Terminate the thread identified by THREAD, by interrupting it and
@@ -1950,7 +1975,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   (defun %symbol-value-in-thread (symbol thread)
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
-    (with-all-threads-lock
+    (with-interruptions-lock (thread)
       (if (thread-alive-p thread)
           (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
                                       (symbol-tls-index symbol))))
@@ -1963,7 +1988,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   (defun %set-symbol-value-in-thread (symbol thread value)
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
-    (with-all-threads-lock
+    (with-interruptions-lock (thread)
       (if (thread-alive-p thread)
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)

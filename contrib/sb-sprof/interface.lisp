@@ -203,7 +203,10 @@ The following keyword args are recognized:
            (progn
              (when (eq :all threads)
                ;; Set the value new threads inherit.
-               (sb-thread::with-all-threads-lock
+               ;; This used to acquire the all-threads lock, but I fail to see how
+               ;; doing so ensured anything at all. Maybe because our locks tend
+               ;; to act as memory barriers? Anyway, what's the point?
+               (progn
                  (setf sb-thread::*default-alloc-signal* alloc-signal)))
              ;; Turn on allocation profiling in existing threads.
              (dolist (thread (profiled-threads))

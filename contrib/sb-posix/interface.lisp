@@ -344,7 +344,7 @@ not supported."
        (let ()
          #+sb-thread
          (sb-impl::finalizer-thread-stop)
-         (sb-thread::with-all-threads-lock
+         (sb-thread::with-system-mutex (sb-thread::*make-thread-lock*)
            (when (let ((avltree sb-thread::*all-threads*))
                    (or (sb-thread::avlnode-left avltree)
                        (sb-thread::avlnode-right avltree)))

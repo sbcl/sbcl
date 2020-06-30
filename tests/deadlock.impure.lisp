@@ -22,6 +22,9 @@
                      (sb-thread:join-thread t2))))
       (assert (equal '(:ok :ok) res)))))
 
+;;; I would optimistically guess that this test can no longer fail,
+;;; even for :win32, since there is no lisp mutex around *all-threads*.
+;;; (There is still the C one)
 (with-test (:name :gc-deadlock
             :broken-on :win32)
   (write-line "WARNING: THIS TEST WILL HANG ON FAILURE!")
@@ -50,7 +53,7 @@
                   ;; but the same can happen because of a regular
                   ;; MAKE-THREAD or LIST-ALL-THREADS, and various
                   ;; session functions.
-                  (sb-thread::with-all-threads-lock
+                  (progn
                     (sb-thread::with-session-lock (sb-thread::*session*)
                       (sb-ext:gc))))
                 :name (format nil "GC-~D" i)))
