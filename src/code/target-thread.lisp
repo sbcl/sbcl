@@ -354,6 +354,8 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 ;;;; Aliens, low level stuff
 
+#+(or sb-safepoint sb-thruption)
+(progn
 (define-alien-routine "kill_safely"
     int
   (os-thread #-alpha unsigned #+alpha unsigned-int)
@@ -361,7 +363,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 (define-alien-routine "wake_thread"
     int
-  (os-thread unsigned))
+  (os-thread unsigned)))
 
 #+sb-thread
 (progn
@@ -1771,6 +1773,27 @@ subject to change."
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
+;;; raise() is defined to send the signal to pthread_self() if multithreaded.
+(defmacro raise (signal)
+  `(alien-funcall (extern-alien "raise" (function int int)) ,signal))
+
+;;; A macro, because the OS-THREAD slot holds a WORD which could cause boxing if passed
+;;; to a function.
+;;; Incidentally, this macro is used in a test, which means that it would have
+;;; to be protected from the tree-shaker, which isn't removing it because we don't
+;;; seem to remove symbols from SB-THREAD, but we should.
+(defmacro pthread-kill (os-thread signal)
+  (declare (ignorable os-thread))
+  ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
+  ;; And raise() - as we use it - can't fail, so just ignore the result.
+  ;; (The signal number is always SIGPIPE or SIGINT, and the process is obviously not dead)
+  #-sb-thread `(raise ,signal)
+  #+sb-thread
+  `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"
+                                             (function int unsigned int))
+                               ,os-thread ,signal))
+     (error "pthread_kill() failed")))
+
 ;;; Called from the signal handler.
 #-(or sb-thruption win32)
 (defun run-interruption ()
@@ -1781,7 +1804,9 @@ subject to change."
     ;; OS's point of view the signal we are in the handler for is no
     ;; longer pending, so the signal will not be lost.
     (when (thread-interruptions *current-thread*)
-      (kill-safely (thread-os-thread *current-thread*) sb-unix:sigpipe))
+      (raise sb-unix:sigpipe))
+    ;; FIXME: does this really respect the promised ordering of interruptions?
+    ;; It looks backwards to raise first and run the popped function second.
     (when interruption
       (funcall interruption))))
 
@@ -1890,20 +1915,19 @@ Short version: be careful out there."
   ;; which prevents thread exit since a thread needs to briefly acquire
   ;; that lock just prior to exit.
 
-  #+(and sb-thread (not sb-safepoint) (not sb-thruption)) ; Good way
+  #-(or sb-safepoint sb-thruption) ; Good way
   (unless (with-interruptions-lock (thread)
             (let ((os-thread (thread-os-thread thread)))
               (unless (= os-thread sb-ext:most-positive-word)
                 (enqueue nil)
-                (alien-funcall (extern-alien "pthread_kill" (function void unsigned int))
-                               os-thread sb-unix:sigpipe)
+                (pthread-kill os-thread sb-unix:sigpipe)
                 t)))
     (error 'interrupt-thread-error :thread thread))
 
   ;; Shiat way: call to C to acquire the all_threads lock and scan all_threads.
   ;; Beyond that there's the question of why INVOKED is ever set/examined. Seems fubar.
   ;; I have no friggin idea how sb-thruption is supposed to work.
-  #-(and sb-thread (not sb-safepoint) (not sb-thruption))
+  #+(or sb-safepoint sb-thruption)
   (let ((os-thread (thread-os-thread thread)))
     (cond ((= os-thread (ldb (byte sb-vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))

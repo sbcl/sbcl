@@ -69,9 +69,13 @@
   (assert (eq :condition
               (handler-case
                   (progn
+                    ;; KILL-SAFELY has C code for it only if (OR :SB-SAFEPOINT :SB-THRUPTION),
+                    ;; otherwise we directly call a POSIX function.
+                    #+(or sb-safepoint sb-thruption)
                     (sb-thread::kill-safely
                      (sb-thread::thread-os-thread sb-thread::*current-thread*)
                      sb-unix:sigint)
+                    #-(or sb-safepoint sb-thruption) (sb-thread::raise sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it

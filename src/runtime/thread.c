@@ -1067,6 +1067,14 @@ thread_yield()
 #endif
 }
 
+// The code is extremely trashy and a good candidate for removal/cleanup
+// but I don't understand this feature combination well enough to do so.
+// The part of it we need to keep is the GC state interaction, though
+// as can plainly be seen from the "good" case of SB-THREAD::INTERRUPT-THREAD
+// there is a perfectly fine way of detecting validity of a pthread ID,
+// and even the link below to Ulrich Drepper's blog post says exactly what
+// to do. So why does this have anything to do with the all_threads_lock???
+#if defined LISP_FEATURE_SB_THRUPTION || defined LISP_FEATURE_SB_SAFEPOINT
 int
 wake_thread(os_thread_t os_thread)
 {
@@ -1174,3 +1182,4 @@ kill_safely(os_thread_t os_thread, int signal)
 #endif
     }
 }
+#endif
