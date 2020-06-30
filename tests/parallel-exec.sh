@@ -15,20 +15,41 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
 (import '(sb-alien:alien-funcall sb-alien:extern-alien
           sb-alien:int sb-alien:c-string sb-alien:unsigned))
 (setq *summarize-test-times* t)
+;;; Ordered approximately in descending order by running time
+(defvar *slow-tests* '("threads.impure"
+                       "seq.impure"
+                       "threads.pure"
+                       "compiler.pure"
+                       "timer.impure"
+                       "bug-1180102.impure"
+                       "gethash-concurrency.impure"
+                       "arith.pure"))
+(defun choose-order (tests)
+  (sort tests
+        (lambda (a b)
+          (let ((posn-a (or (position a *slow-tests* :test #'string=)
+                            most-positive-fixnum))
+                (posn-b (or (position b *slow-tests* :test #'string=)
+                            most-positive-fixnum)))
+            (cond ((< posn-a posn-b) t)
+                  ((> posn-a posn-b) nil)
+                  (t (string< a b)))))))
 (defun parallel-execute-tests (max-jobs)
   (format t "Using ~D processes~%" max-jobs)
   ;; Interleave the order in which all tests are launched rather than
   ;; starting them in the batches that filtering places them in.
-  (let ((files (sort (mapcar #'pathname-name
+  (let ((files (choose-order
+                (mapcar #'pathname-name
                              (append (pure-load-files)
                                      (pure-cload-files)
                                      (impure-load-files)
                                      (impure-cload-files)
-                                     (sh-files)))
-                     #'string<))
+                                     (sh-files)))))
         (subprocess-count 0)
         (subprocess-list nil)
         (aggregate-vop-usage (make-hash-table))
+        ;; Start timing only after all the DIRECTORY calls are done (above)
+        (start-time (get-internal-real-time))
         (missing-usage)
         (losing))
     (labels ((wait ()
@@ -39,15 +60,16 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                  (decf subprocess-count)
                  (let ((process (assoc pid subprocess-list)))
                    (setq subprocess-list (delete process subprocess-list))
-                   (let* ((code (ash status -8))
-                          (filename (cdr process)))
+                   (let ((code (ash status -8))
+                         (filename (cadr process))
+                         (et (- (get-internal-real-time) (caddr process))))
                      (unless (sum-vop-usage (format nil "$logdir/~a.vop-usage" filename) t)
                        (when (or (search ".pure" filename) (search ".impure" filename))
                          (push filename missing-usage)))
                      (cond ((eq code 104)
-                            (format t "~A: success~%" filename))
+                            (format t "~A: success (~d msec)~%" filename et))
                            (t
-                            (format t "~A: status ~D~%" filename code)
+                            (format t "~A: status ~D (~d msec)~%" filename code et)
                             (push filename losing)))))))
              (sum-vop-usage (input deletep)
                (with-open-file (f input :if-does-not-exist nil)
@@ -98,7 +120,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    (exit :code (if (unexpected-failures) 1 104)))))
           (format t "~A: pid ~d~%" file pid)
           (incf subprocess-count)
-          (push (cons pid file) subprocess-list)))
+          (push (list pid file (get-internal-real-time)) subprocess-list)))
       (loop (if (plusp subprocess-count) (wait) (return)))
 
       (dolist (result '("vop-usage.txt" "vop-usage-combined.txt"))
@@ -113,6 +135,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
               (format output "~7d ~s~%" (car cell) (cdr cell)))))
         (sum-vop-usage "../output/warm-vop-usage.txt" nil))
 
+      (format t "~&Total realtime: ~d msec~%" (- (get-internal-real-time) start-time))
       (when missing-usage
         (format t "~&Missing vop-usage:~{ ~a~}~%" missing-usage))
 
