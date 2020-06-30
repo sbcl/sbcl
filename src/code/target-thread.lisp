@@ -657,26 +657,34 @@ returns NIL each time."
 
 (defun %try-mutex (mutex new-owner)
   (declare (type mutex mutex) (optimize (speed 3)))
-  (barrier (:read))
-  (let ((old (mutex-%owner mutex)))
-    (when (eq new-owner old)
-      (error "Recursive lock attempt ~S." mutex))
-    #-sb-thread
-    (when old
-      (error "Strange deadlock on ~S in an unithreaded build?" mutex))
-    #-(and sb-thread sb-futex)
-    (and (not old)
-         ;; Don't even bother to try to CAS if it looks bad.
-         (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
-    #+(and sb-thread sb-futex)
+  #-(and sb-thread sb-futex)
+  (progn
+    (barrier (:read))
+    (let ((old (mutex-%owner mutex)))
+      (when (eq new-owner old)
+        (error "Recursive lock attempt ~S." mutex))
+      #-sb-thread
+      (when old
+        (error "Strange deadlock on ~S in an unithreaded build?" mutex))
+      #-(and sb-thread sb-futex)
+      (and (not old)
+           ;; Don't even bother to try to CAS if it looks bad.
+           (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))
+  #+(and sb-thread sb-futex)
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-    (when (eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
+    (cond ((eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
                                                     +lock-free+
                                                     +lock-taken+))
-      (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
-        (when prev
-          (bug "Old owner in free mutex: ~S" prev))
-        t))))
+           ;; TODO: measure the speed difference of doing an ordinary store here.
+           ;; CAS is overkill but we would have to forgo the bug detection.
+           ;; Alternatively, we could use one double-wide CAS.
+           (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex) nil
+                                                (sb-ext:truly-the thread new-owner))))
+             (when prev
+               (bug "Old owner in free mutex: ~S" prev))
+             t))
+          ((eq (mutex-%owner mutex) new-owner)
+           (error "Recursive lock attempt ~S." mutex))))
 
 #+sb-thread
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
