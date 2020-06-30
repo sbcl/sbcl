@@ -338,14 +338,11 @@
             (compiled-frame-escaped obj))))
 
 
-(define-load-time-global *debug-funs-mutex* (sb-thread:make-mutex :name "CDF lock"))
 ;;; This maps SB-C::COMPILED-DEBUG-FUNs to
 ;;; COMPILED-DEBUG-FUNs, so we can get at cached stuff and not
 ;;; duplicate COMPILED-DEBUG-FUN structures.
-#+cheneygc ; can't write to debuf-info in a purified code object
+#+cheneygc ; can't write to debug-info in a purified code object
 (define-load-time-global *compiled-debug-funs*
-    ;; The table's lock is redundant - I'm working on removal of the default
-    ;; assumption of synchronization on all weak tables, but it's unrelated.
     (make-hash-table :test 'eq :weakness :key))
 
 ;;;; breakpoints
@@ -441,11 +438,11 @@
   (end-starter nil :type (or null breakpoint)))
 
 ;;; Map a SB-C::COMPILED-DEBUG-FUN to a SB-DI::COMPILED-DEBUG-FUN.
-;;; The mapping is memoized into %CODE-DEBUG-INFO of COMPONENT
+;;; The mapping is memoized into a slot of %CODE-DEBUG-INFO of COMPONENT
 ;;; except on #+cheneygc where that is assumed not to be possible
 ;;; (even if it is possible), because usually it's not, because
-;;; code might reside in readonly space, and it can only have pointers
-;;; to static space, not dynamic space.
+;;; code and the debug structures are defined with :PURE T and might reside
+;;; in readonly space, which can only have pointers to static space.
 ;;;
 ;;; BTW, the nomenclature here is utter and total confusion.
 ;;; The type of the object in the argument named COMPILER-DEBUG-FUN
@@ -454,21 +451,31 @@
 ;;; of the slot in the SB-DI:: version of the structure.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
   (declare (code-component component))
-  ;; Technically this could all be lockfree if we had compare-and-swap
-  ;; on the debug-info slot. Not worth the effort.
-  (sb-thread::with-system-mutex (*debug-funs-mutex*)
-    #+gencgc
-    (let* ((info (ensure-list (sb-vm::%%code-debug-info component)))
-           (found (assoc compiler-debug-fun (cdr info) :test #'eq)))
-      (if found
-          (cdr found)
-          (let* ((my-debug-fun (%make-compiled-debug-fun compiler-debug-fun component))
-                 (new-pair (cons compiler-debug-fun my-debug-fun)))
-            (setf (%code-debug-info component) (list* (car info) new-pair (cdr info)))
-            my-debug-fun)))
-    #+cheneygc
-    (ensure-gethash compiler-debug-fun *compiled-debug-funs*
-                    (%make-compiled-debug-fun compiler-debug-fun component))))
+  #+gencgc
+  (let ((memo-cell
+         (let* ((info (sb-vm::%%code-debug-info component))
+                (val (sb-c::compiled-debug-info-tlf-num+offset info)))
+           (if (consp val)
+               val
+               (let* ((list (list val))
+                      (old (cas (sb-c::compiled-debug-info-tlf-num+offset info) val list)))
+                 (if (eq old val) list old))))))
+    ;; The CDR of TLF-NUM+OFFSET slot is an alist from compiler -> debugger structure.
+    (let ((new-df nil) (new-pair nil) (new-alist nil) (alist (cdr memo-cell)))
+      (loop
+        ;; This list generally contains 5 items or less. At least, in our tests it does
+        ;; which I assume is typical.
+        (awhen (assoc compiler-debug-fun alist :test #'eq) (return (cdr it)))
+        (if new-alist
+            (rplacd new-alist alist)
+            (setq new-df (%make-compiled-debug-fun compiler-debug-fun component)
+                  new-pair (cons compiler-debug-fun new-df)
+                  new-alist (cons new-pair alist)))
+        (let ((old (cas (cdr memo-cell) alist new-alist)))
+          (if (eq old alist) (return new-df) (setq alist old))))))
+  #+cheneygc
+  (ensure-gethash compiler-debug-fun *compiled-debug-funs*
+                  (%make-compiled-debug-fun compiler-debug-fun component)))
 
 ;;;; CODE-LOCATIONs
 

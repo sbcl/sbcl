@@ -633,8 +633,15 @@
 
 (in-package "SB-C")
 
+;;; Decode the packed TLF-NUM+OFFSET slot, which might have ancillary
+;;; data for the debugger pushed in.  So if it's a cons, take the CDR.
 ;;; This is target-only code, so doesn't belong in 'debug-info.lisp'
-(flet ((unpack-tlf-num+offset (integer &aux (bytepos 0))
+(flet ((unpack-tlf-num+offset (cdi &aux (tlf-num+offset
+                                         (compiled-debug-info-tlf-num+offset cdi))
+                                        (integer (if (consp tlf-num+offset)
+                                                     (car tlf-num+offset)
+                                                     tlf-num+offset))
+                                        (bytepos 0))
          (flet ((unpack-1 ()
                   (let ((shift 0) (acc 0))
                     (declare (notinline sb-kernel:%ldb)) ; lp#1573398
@@ -650,9 +657,6 @@
              (values (if (eql v1 0) nil (1- v1))
                      (if (eql v2 0) nil (1- v2)))))))
   (defun compiled-debug-info-tlf-number (cdi)
-    (nth-value 0 (unpack-tlf-num+offset
-                  (compiled-debug-info-tlf-num+offset cdi))))
-
+    (nth-value 0 (unpack-tlf-num+offset cdi)))
   (defun compiled-debug-info-char-offset (cdi)
-    (nth-value 1 (unpack-tlf-num+offset
-                  (compiled-debug-info-tlf-num+offset cdi)))))
+    (nth-value 1 (unpack-tlf-num+offset cdi))))
