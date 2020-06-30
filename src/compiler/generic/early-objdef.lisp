@@ -109,8 +109,8 @@
        ;; 8 is the number of words to reserve at the beginning of static space
        ;; prior to the words of NIL.
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
-       #+(and (not x86-64) gencgc (not sb-thread)) (ash 8 word-shift)
-       #+x86-64 #x100
+       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
+       #+64-bit #x100
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
@@ -199,7 +199,7 @@
 ;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
 
 (defconstant widetag-spacing 4)
-#+x86-64 (defconstant unbound-marker-widetag 9)
+#+64-bit (defconstant unbound-marker-widetag 9)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defenum (;; The first widetag must be greater than SB-VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
@@ -233,8 +233,8 @@
   value-cell-widetag                        ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49
   sap-widetag                               ;  46   4D  46   4D
-  #-x86-64 unbound-marker-widetag           ;  4A   51  4A   51
-  #+x86-64 unused00-widetag
+  #-64-bit unbound-marker-widetag           ;  4A   51  4A   51
+  #+64-bit unused00-widetag
   weak-pointer-widetag                      ;  4E   55  4E   55
   instance-widetag                          ;  52   59  52   59
   fdefn-widetag                             ;  56   5D  56   5D

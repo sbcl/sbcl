@@ -385,16 +385,6 @@
        (inst jmp (if not-p :a :be) target)
        (emit-label skip))))
 
-;;; The generic code (in src/compiler/generic/{early,late}-type-vops)
-;;; would do the wrong thing. UNBOUND-MARKER-WIDETAG looks like a lowtag
-;;; to that code and so it would mask off 4 bits before testing,
-;;; which matches too many values.
-(define-vop (unbound-marker-p simple-type-predicate)
-  (:translate unbound-marker-p)
-  (:generator 2
-   (inst cmp :byte value unbound-marker-widetag)
-   (inst jmp (if not-p :ne :e) target)))
-
 (define-vop (pointerp)
   (:args (value :scs (any-reg descriptor-reg) :target temp))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)

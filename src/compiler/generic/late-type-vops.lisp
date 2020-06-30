@@ -257,8 +257,8 @@
 #+sb-simd-pack-256
 (define-type-vop simd-pack-256-p (simd-pack-256-widetag))
 
-#.(when (> unbound-marker-widetag lowtag-mask)
-    '(define-type-vop unbound-marker-p (unbound-marker-widetag)))
+(define-type-vop unbound-marker-p (unbound-marker-widetag)
+  #+x86-64 simple-type-predicate)
 
 ;;; Not type vops, but generic over all backends
 (macrolet ((def (name lowtag)

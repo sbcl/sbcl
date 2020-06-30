@@ -1546,7 +1546,7 @@ core and return a descriptor to it."
   (allocate-vector #-64-bit sb-vm:simple-array-signed-byte-32-widetag
                    #+64-bit sb-vm:simple-array-signed-byte-64-widetag
                    6 6 *static*)
-  #+x86-64 (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
+  #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
   (let* ((des (allocate-header+object *static* sb-vm:symbol-size 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                       (* 2 sb-vm:n-word-bytes)
