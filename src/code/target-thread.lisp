@@ -11,6 +11,17 @@
 
 (in-package "SB-THREAD")
 
+;;; symbols to protect from tree-shaker, for some tests
+(export '(%thread-local-references
+          current-thread-sap
+          get-spinlock
+          pthread-kill
+          raise
+          release-spinlock
+          spinlock
+          with-session-lock
+          with-spinlock))
+
 ;;; CAS Lock
 ;;;
 ;;; Locks don't come any simpler -- or more lightweight than this. While
@@ -1787,9 +1798,6 @@ subject to change."
 
 ;;; A macro, because the OS-THREAD slot holds a WORD which could cause boxing if passed
 ;;; to a function.
-;;; Incidentally, this macro is used in a test, which means that it would have
-;;; to be protected from the tree-shaker, which isn't removing it because we don't
-;;; seem to remove symbols from SB-THREAD, but we should.
 (defmacro pthread-kill (os-thread signal)
   (declare (ignorable os-thread))
   ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
