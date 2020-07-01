@@ -341,7 +341,7 @@ EXPERIMENTAL: Interface subject to change."
     (let ((lock *distribution-lock*))
       ;; Don't flood the system with more interrupts if the last
       ;; set is still being delivered.
-      (unless (sb-thread:mutex-value lock)
+      (unless (sb-thread:mutex-owner lock)
         (sb-thread::with-system-mutex (lock)
           (dolist (thread (profiled-threads))
             ;; This may occasionally fail to deliver the signal, but that

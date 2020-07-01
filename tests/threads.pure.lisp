@@ -29,10 +29,10 @@
   ;; Make sure basics are sane on unithreaded ports as well
   (let ((mutex (make-mutex)))
     (grab-mutex mutex)
-    (assert (eq *current-thread* (mutex-value mutex)))
+    (assert (eq *current-thread* (mutex-owner mutex)))
     (handler-bind ((warning #'error))
       (release-mutex mutex))
-    (assert (not (mutex-value mutex)))))
+    (assert (not (mutex-owner mutex)))))
 
 ;;; Terminating a thread that's waiting for the terminal.
 
