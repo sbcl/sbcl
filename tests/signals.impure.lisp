@@ -70,7 +70,7 @@
   (signal int))
 (defun current-thread-os-thread ()
   #+sb-thread
-  (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
+  (sb-sys:sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
   #-sb-thread
   0)
 
