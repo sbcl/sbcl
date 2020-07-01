@@ -170,7 +170,7 @@ stale value, use MUTEX-OWNER instead."
                     (barrier (:write)))))
                (exec)))))))
 
-(defmacro with-mutex ((mutex &key (wait-p t) timeout value)
+(defmacro with-mutex ((mutex &key (wait-p t) timeout (value nil valuep))
                             &body body)
   "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
 and the MUTEX is not immediately available, sleep until it is available.
@@ -192,9 +192,20 @@ current thread."
      (call-with-mutex
       #'with-mutex-thunk
       ,mutex
-      ,value
       ,wait-p
-      ,timeout)))
+      ;; Users should not pass VALUE. If they do, the overhead of validity checking
+      ;; is at the call site so that normal invocations of CALL-WITH-MUTEX receive
+      ;; only the useful arguments.
+      ;; And as is true of so many macros, strict left-to-right evaluation of args
+      ;; is not promised, but let's try to be consistent with the order in the lambda list.
+      ;; (i.e. You don't know if the source form was ":value me :wait-p nil")
+      ,(if valuep
+           `(prog1 ,timeout
+              (let ((value ,value))
+                (unless (or (null value) (eq *current-thread* value))
+                  (error "~S called with non-nil :VALUE that isn't the current thread."
+                         'with-mutex))))
+           timeout))))
 
 (defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body)
   "Acquire MUTEX for the dynamic scope of BODY.
@@ -247,12 +258,9 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
 #-sb-thread
 (progn
-  (defun call-with-mutex (function mutex value waitp timeout)
+  (defun call-with-mutex (function mutex waitp timeout)
     (declare (ignore mutex waitp timeout)
              (function function))
-    (unless (or (null value) (eq *current-thread* value))
-      (error "~S called with non-nil :VALUE that isn't the current thread."
-             'with-mutex))
     (funcall function))
 
   (defun call-with-recursive-lock (function mutex waitp timeout)
@@ -267,12 +275,9 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
 #+sb-thread
 (progn
-  (defun call-with-mutex (function mutex value waitp timeout)
+  (defun call-with-mutex (function mutex waitp timeout)
     (declare (function function))
     (declare (dynamic-extent function))
-    (unless (or (null value) (eq *current-thread* value))
-      (error "~S called with non-nil :VALUE that isn't the current thread."
-             'with-mutex))
     (let ((got-it nil))
       (without-interrupts
         (unwind-protect

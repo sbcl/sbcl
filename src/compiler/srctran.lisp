@@ -4989,7 +4989,8 @@
   `(write-string object stream))
 
 #+sb-thread
-(defoptimizer (sb-thread::call-with-recursive-lock derive-type) ((function mutex waitp timeout))
+(progn
+(defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
   (declare (ignore mutex))
   (let ((type (lvar-fun-type function)))
     (when (fun-type-p type)
@@ -5002,19 +5003,8 @@
                                (values-specifier-type '(values null &optional)))
             (fun-type-returns type))))))
 
-#+sb-thread
-(defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex value waitp timeout))
-  (declare (ignore mutex value))
-  (let ((type (lvar-fun-type function)))
-    (when (fun-type-p type)
-      (let ((null-p (not (and (constant-lvar-p waitp)
-                              (lvar-value waitp)
-                              (constant-lvar-p timeout)
-                              (null (lvar-value timeout))))))
-        (if null-p
-            (values-type-union (fun-type-returns type)
-                               (values-specifier-type '(values null &optional)))
-            (fun-type-returns type))))))
+(setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-recursive-lock))
+      (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-mutex))))
 
 (deftransform pointerp ((object))
   (let ((type (lvar-type object)))

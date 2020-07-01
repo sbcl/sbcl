@@ -2090,6 +2090,5 @@
     *)
 
 #+sb-thread
-(defknown sb-thread::call-with-recursive-lock (function t t t) *)
-#+sb-thread
-(defknown sb-thread::call-with-mutex (function t t t t) *)
+(defknown (sb-thread::call-with-mutex sb-thread::call-with-recursive-lock)
+    (function t t t) *)
