@@ -1,6 +1,6 @@
 (use-package "SB-INT")
 
-#-sb-thread (sb-ext:exit :code 104) ;; some of the symbols below disappear
+#-sb-thread (invoke-restart 'run-tests::skip-file) ;; some of the symbols below disappear
 
 (import 'sb-thread::(avlnode-key avlnode-data avlnode-left avlnode-right
                      avl-insert avl-delete avl-find
