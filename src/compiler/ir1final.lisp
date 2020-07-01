@@ -211,9 +211,10 @@
                ;; there are others, maybe %with-compilation-unit
                sb-impl::%print-unreadable-object
                ))
-  (let ((info (fun-info-or-lose fun)))
-    (setf (ir1-attributep (fun-info-attributes info) callee-omit-arg-count-check)
-          t)))
+  (let ((info (info :function :info fun)))
+    (when info
+      (setf (ir1-attributep (fun-info-attributes info) callee-omit-arg-count-check)
+            t))))
 
 ;;; Convert function designators to functions in calls to known functions
 ;;; Also convert to TWO-ARG- variants
@@ -222,8 +223,7 @@
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known)
-                 ;; XXX: What kind of magic is this that REDUCE has to be excluded?
-                 ;; Comment please!
+                 ;; REDUCE can call with zero arguments.
                  (neq (lvar-fun-name (combination-fun node) t) 'reduce))
         (map-callable-arguments
            (lambda (lvar args results &key no-function-conversion &allow-other-keys)
