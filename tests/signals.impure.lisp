@@ -62,6 +62,13 @@
     ;; we get EINTR.
     (loop until returning)
     (assert (= saved-errno (sb-unix::get-errno)))))
+
+#+(or sb-safepoint sb-thruption)
+(sb-alien:define-alien-routine "kill_safely"
+  int
+  (sb-thread::os-thread unsigned)
+  (signal int))
+
 ;; It is desirable to support C-c on Windows, but SIGINT
 ;; is not the mechanism to use on this platform.
 #-win32
@@ -72,7 +79,7 @@
                     ;; KILL-SAFELY has C code for it only if (OR :SB-SAFEPOINT :SB-THRUPTION),
                     ;; otherwise we directly call a POSIX function.
                     #+(or sb-safepoint sb-thruption)
-                    (sb-thread::kill-safely
+                    (kill-safely
                      (sb-thread::thread-os-thread sb-thread::*current-thread*)
                      sb-unix:sigint)
                     #-(or sb-safepoint sb-thruption) (sb-thread::raise sb-unix:sigint)

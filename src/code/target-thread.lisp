@@ -366,15 +366,9 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 ;;;; Aliens, low level stuff
 
 #+(or sb-safepoint sb-thruption)
-(progn
-(define-alien-routine "kill_safely"
-    int
-  (os-thread #-alpha unsigned #+alpha unsigned-int)
-  (signal int))
-
 (define-alien-routine "wake_thread"
-    int
-  (os-thread unsigned)))
+  int
+  (os-thread unsigned))
 
 #+sb-thread
 (progn
