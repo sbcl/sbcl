@@ -312,6 +312,8 @@ EXPERIMENTAL: Interface subject to change."
   (let ((profiled-threads *profiled-threads*))
     (remove *timer-thread*
             (if (eq :all profiled-threads)
+                ;; FIXME: inefficient, probably memoize on a best-effort basis:
+                ;;  detect whether the tree has changed, and recompute only if it did.
                 (sb-thread:list-all-threads)
                 profiled-threads))))
 
@@ -327,11 +329,6 @@ EXPERIMENTAL: Interface subject to change."
   (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
   (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
 
-  #+sb-thread
-  (declaim (inline pthread-kill))
-  #+sb-thread
-  (define-alien-routine pthread-kill int (os-thread unsigned-long) (signal int))
-
   ;;; A random thread will call this in response to either a timer firing,
   ;;; This in turn will distribute the notice to those threads we are
   ;;; interested using SIGPROF.
@@ -344,12 +341,8 @@ EXPERIMENTAL: Interface subject to change."
       (unless (sb-thread:mutex-owner lock)
         (sb-thread::with-system-mutex (lock)
           (dolist (thread (profiled-threads))
-            ;; This may occasionally fail to deliver the signal, but that
-            ;; seems better then using kill_thread_safely with it's 1
-            ;; second backoff.
-            (let ((os-thread (sb-thread::thread-os-thread thread)))
-              (when os-thread
-                (pthread-kill os-thread sb-unix:sigprof)))))))
+            (sb-thread:with-os-thread (os-thread thread)
+              (sb-thread::pthread-kill os-thread sb-unix:sigprof))))))
     #-sb-thread
     (unix-kill 0 sb-unix:sigprof))
 

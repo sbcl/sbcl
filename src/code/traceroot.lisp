@@ -35,10 +35,12 @@
   0)
 
 (defun find-lisp-thread-from-thread-struct (addr)
+  (declare (type sb-ext:word addr))
   ;; It is of course possible to do this without consing the list
   ;; of all threads, but I don't care.
+  ;; Actually, why doesn't we make it correctly use the AVL tree?
   (dolist (thread (sb-thread:list-all-threads))
-    (when (= (sb-thread::thread-primitive-thread thread) addr)
+    (when (sap= (sb-thread::thread-primitive-thread thread) (int-sap addr))
       (return thread))))
 
 ;;; Convert each path to (TARGET . NODES)

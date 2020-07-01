@@ -68,6 +68,11 @@
   int
   (sb-thread::os-thread unsigned)
   (signal int))
+(defun current-thread-os-thread ()
+  #+sb-thread
+  (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
+  #-sb-thread
+  0)
 
 ;; It is desirable to support C-c on Windows, but SIGINT
 ;; is not the mechanism to use on this platform.
@@ -78,10 +83,8 @@
                   (progn
                     ;; KILL-SAFELY has C code for it only if (OR :SB-SAFEPOINT :SB-THRUPTION),
                     ;; otherwise we directly call a POSIX function.
-                    #+(or sb-safepoint sb-thruption)
-                    (kill-safely
-                     (sb-thread::thread-os-thread sb-thread::*current-thread*)
-                     sb-unix:sigint)
+                    #+(or sb-safepoint sb-thruption) (kill-safely (current-thread-os-thread)
+                                                                  sb-unix:sigint)
                     #-(or sb-safepoint sb-thruption) (sb-thread::raise sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked

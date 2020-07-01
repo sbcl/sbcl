@@ -19,6 +19,7 @@
           raise
           release-spinlock
           spinlock
+          with-os-thread
           with-session-lock
           with-spinlock))
 
@@ -259,13 +260,6 @@ created and old ones may exit at any time."
   #-sb-thread
   (int-sap 0))
 
-(declaim (inline current-thread-os-thread))
-(defun current-thread-os-thread ()
-  #+sb-thread
-  (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
-  #-sb-thread
-  0)
-
 (sb-ext:define-load-time-global *initial-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
@@ -286,9 +280,8 @@ created and old ones may exit at any time."
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
-    (setf (thread-os-thread thread) (current-thread-os-thread)
-          (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
-          (thread-primitive-thread thread) (sap-int (current-thread-sap))
+    (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
+          (thread-primitive-thread thread) (current-thread-sap)
           *initial-thread* thread)
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -1384,7 +1377,11 @@ on this semaphore, then N of them is woken up."
       (%delete-thread-from-session thread *session*))
     (with-interruptions-lock (thread)
       (setf (thread-%alive-p thread) nil)
-      (setf (thread-os-thread thread) sb-ext:most-positive-word))
+      ;; The memory range can exist without a pthread running yet, but the pthread
+      ;; can't exist without the memory range. By clobbering this SAP here,
+      ;; it is safe to manipulate the memory and/or the pthread from another thread
+      ;; that acquires the interruptions lock if the SAP reads as nonzero.
+      (setf (thread-primitive-thread thread) (int-sap 0)))
     (sb-thread:barrier (:read))
     (let ((old *all-threads*))
       (loop
@@ -1575,9 +1572,8 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (setf (thread-os-thread thread) (current-thread-os-thread)
-        (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
-        (thread-primitive-thread thread) (sap-int (current-thread-sap)))
+  (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
+        (thread-primitive-thread thread) (current-thread-sap))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
@@ -1790,7 +1786,7 @@ subject to change."
 (defmacro raise (signal)
   `(alien-funcall (extern-alien "raise" (function int int)) ,signal))
 
-;;; A macro, because the OS-THREAD slot holds a WORD which could cause boxing if passed
+;;; A macro, because OS-THREAD is a WORD which could cause boxing if passed
 ;;; to a function.
 (defmacro pthread-kill (os-thread signal)
   (declare (ignorable os-thread))
@@ -1845,6 +1841,24 @@ subject to change."
         ;; in the mean time.
         ;; -- DFL
         (setf *thruption-pending* t)))))
+
+;;; A macro to extract the pthread id out of the thread's C memory
+;;; while ensuring that the thread can't exit.
+;;; Invokes BODY only if the pthread ID is valid.
+(defmacro with-os-thread ((os-thread thread) &body body)
+  #+sb-thread
+  `(let ((lisp-thread ,thread))
+     (with-interruptions-lock (lisp-thread)
+       (let ((memory (thread-primitive-thread lisp-thread)))
+         (when (/= (sap-int memory) 0)
+           (let ((,os-thread (sap-ref-word memory
+                                           (ash sb-vm::thread-os-thread-slot
+                                                sb-vm:word-shift))))
+             ,@body)))))
+  #-sb-thread
+  `(let ((lisp-thread ,thread) (,os-thread 0))
+     (declare (ignorable lisp-thread ,os-thread))
+     ,@body))
 
 (defun interrupt-thread (thread function)
   (declare (ignorable thread))
@@ -1926,20 +1940,22 @@ Short version: be careful out there."
   ;; that lock just prior to exit.
 
   #-(or sb-safepoint sb-thruption) ; Good way
-  (unless (with-interruptions-lock (thread)
-            (let ((os-thread (thread-os-thread thread)))
-              (unless (= os-thread sb-ext:most-positive-word)
-                (enqueue nil)
-                (pthread-kill os-thread sb-unix:sigpipe)
-                t)))
+  (unless (with-os-thread (os-thread thread)
+            (enqueue nil)
+            (pthread-kill os-thread sb-unix:sigpipe)
+            t)
     (error 'interrupt-thread-error :thread thread))
 
   ;; Shiat way: call to C to acquire the all_threads lock and scan all_threads.
   ;; Beyond that there's the question of why INVOKED is ever set/examined. Seems fubar.
   ;; I have no friggin idea how sb-thruption is supposed to work.
   #+(or sb-safepoint sb-thruption)
-  (let ((os-thread (thread-os-thread thread)))
-    (cond ((= os-thread (ldb (byte sb-vm:n-word-bits 0) -1))
+  (let ((os-thread
+          ;; This causes an extra acquire/release cycle, and potentially conses a bignum
+          ;; to hold a word.
+          ;; Anybody who builds with these features should feel free to improve it.
+          (with-os-thread (os-thread thread) os-thread)))
+    (cond ((not os-thread)
            (error 'interrupt-thread-error :thread thread))
           (t
            (let (invoked)
@@ -2002,17 +2018,20 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 ;;; with an SBCL developer first, or are doing something that you
 ;;; should probably discuss with a professional psychiatrist first
 #+sb-thread
-(progn
+(macrolet ((with-thread-memory ((var) &body body)
+             ;; Prevent the thread from dying completely while we look at the TLS
+             ;; area...
+             ;; Liveness per se is not important, but rather whether the memory exists.
+             `(with-interruptions-lock (thread)
+                (let ((,var (thread-primitive-thread thread)))
+                  ,@body))))
 
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
 
   (defun %symbol-value-in-thread (symbol thread)
-    ;; Prevent the thread from dying completely while we look for the TLS
-    ;; area...
-    (with-interruptions-lock (thread)
-      (if (thread-alive-p thread)
-          (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
-                                      (symbol-tls-index symbol))))
+    (with-thread-memory (sap)
+      (if (/= (sap-int sap) 0)
+          (let ((val (sap-ref-lispobj sap (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
               (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
               (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
@@ -2020,17 +2039,13 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    ;; Prevent the thread from dying completely while we look for the TLS
-    ;; area...
-    (with-interruptions-lock (thread)
-      (if (thread-alive-p thread)
+    (with-thread-memory (sap)
+      (if (/= (sap-int sap) 0)
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
                   (t
-                   (setf (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
-                                          offset)
-                         value)
+                   (setf (sap-ref-lispobj sap offset) value)
                    (values value :ok))))
           (values nil :thread-dead))))
 
@@ -2048,7 +2063,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                    sb-vm:n-word-bytes)
                 (- index sb-vm:n-word-bytes))
          ;; (There's no reason this couldn't work on any thread now.)
-         (sap (int-sap (thread-primitive-thread *current-thread*)))
+         (sap (thread-primitive-thread *current-thread*))
          (list))
         ((< index (ash sb-vm::primitive-thread-object-length sb-vm:word-shift))
          list)

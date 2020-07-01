@@ -33,8 +33,6 @@ in future versions."
   (name          nil :type (or null simple-string)) ; C code could read this
   (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean :read-only t)
-  ;; 0 is used on thread-less builds
-  (os-thread  (ldb (byte sb-vm:n-word-bits 0) -1) :type sb-vm:word)
   ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread (C memory).
   ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
   ;; due to possible unmapping on thread death. Technically this is a fixed amount
@@ -42,7 +40,7 @@ in future versions."
   (stack-end 0 :type sb-vm:word)
   ;; Points to the SB-VM::THREAD primitive object.
   ;; Yes, there are three different thread structures.
-  (primitive-thread 0 :type sb-vm:word)
+  (primitive-thread (int-sap 0) :type system-area-pointer)
   (interruptions nil :type list)
   ;; Gotta have half a dozen or more different ways to identify a thread.
   #+linux (os-tid 0 :type (unsigned-byte 32))
