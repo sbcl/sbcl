@@ -767,7 +767,8 @@ sb-vm::(define-vop (cl-user::test)
   (checked-compile '(lambda () (make-list 3826305079707827596))
                    :allow-warnings t))
 
-(with-test (:name :with-foo-macro-elides-arg-count-trap)
+(with-test (:name :with-foo-macro-elides-arg-count-trap
+            :skipped-on (not :sb-thread))
   (let ((lines
           (split-string
            (with-output-to-string (s)
