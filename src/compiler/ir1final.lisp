@@ -194,6 +194,27 @@
 (def-two-arg-funs (number number)
   >= <= /=)
 
+;;; A list of function which always call their functional argument correctly,
+;;; meaning that no arg-count-error can occur in the callee
+;;; and therefore the callee can skip the check.
+(dolist (fun '(sb-thread::call-with-mutex
+               sb-thread::call-with-recursive-lock
+               sb-thread::call-with-system-mutex
+               sb-thread::call-with-system-mutex/allow-with-interrupts
+               sb-thread::call-with-system-mutex/without-gcing
+               sb-thread::call-with-recursive-system-lock
+               ;; wish we had a little more commonality to these names
+               sb-impl::%with-standard-io-syntax
+               sb-impl::%with-rebound-io-syntax
+               sb-debug::funcall-with-debug-io-syntax
+               sb-impl::call-with-sane-io-syntax
+               ;; there are others, maybe %with-compilation-unit
+               sb-impl::%print-unreadable-object
+               ))
+  (let ((info (fun-info-or-lose fun)))
+    (setf (ir1-attributep (fun-info-attributes info) callee-omit-arg-count-check)
+          t)))
+
 ;;; Convert function designators to functions in calls to known functions
 ;;; Also convert to TWO-ARG- variants
 (defun ir1-optimize-functional-arguments (component)
@@ -201,6 +222,8 @@
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known)
+                 ;; XXX: What kind of magic is this that REDUCE has to be excluded?
+                 ;; Comment please!
                  (neq (lvar-fun-name (combination-fun node) t) 'reduce))
         (map-callable-arguments
            (lambda (lvar args results &key no-function-conversion &allow-other-keys)
@@ -238,7 +261,27 @@
                                   (change-ref-leaf ref replacement :recklessly t)
                                   (setf (node-derived-type cast)
                                         (lvar-derived-type (cast-value cast)))))))))))))
-           node)))))
+           node)
+        ;; One more thing: builtin higher-order functions utilized by builtin macros
+        ;; can impart a policy change to the callee, but it can't (easily) be done
+        ;; strictly lexically, because the policy would leak downward.
+        ;; e.g. (WITH-SOME-STUFF () ..) ->
+        ;; -> (DX-FLET ((THUNK () <user-code>)) (CALL-WITH-STUFF #'THUNK))
+        ;; should not inject (OPTIMIZE (VERIFY-ARG-COUNT 0)) at the top of <user-code>
+        ;; because every lambda therein would omit the arg-count check.
+        (when (ir1-attributep (fun-info-attributes (combination-fun-info node))
+                              callee-omit-arg-count-check)
+          (let* ((args (combination-args node))
+                 (arg (if (eq (lvar-fun-name (combination-fun node) t)
+                              'sb-impl::%print-unreadable-object)
+                          (fourth args)
+                          (first args)))
+                 (ref (and arg (lvar-uses arg))))
+            (when (and (ref-p ref) (lambda-p (ref-leaf ref)))
+              ;; It seems impolite (un-debuggable too) to alter the lexenv-policy
+              ;; of functional-lexenv, so annotate this differently.
+              (setf (getf (functional-plist (ref-leaf ref)) 'verify-arg-count)
+                    nil))))))))
 
 (defun rewrite-full-call (combination)
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))

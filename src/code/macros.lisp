@@ -1721,9 +1721,6 @@ symbol-case giving up: case=((V U) (F))
                  `(sb-c::%proclaim ',spec (sb-c:source-location)))
                specs)))
 
-;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT
-(sb-xc:proclaim '(ftype (sfunction (t t t &optional t) null)
-                        %print-unreadable-object))
 (sb-xc:defmacro print-unreadable-object ((object stream &key type identity)
                                              &body body)
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally

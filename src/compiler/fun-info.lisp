@@ -87,6 +87,8 @@
   ;; as a consistency checking mechanism inside the compiler during IR2
   ;; transformation.
   always-translatable
+  ;; Function's funarg can safely skip its argument count check.
+  callee-omit-arg-count-check
   ;; If a function is called with two arguments and the first one is a
   ;; constant, then the arguments will be swapped.
   commutative)

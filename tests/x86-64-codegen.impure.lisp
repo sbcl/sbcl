@@ -766,3 +766,16 @@ sb-vm::(define-vop (cl-user::test)
 (with-test (:name :make-list-ridiculously-huge)
   (checked-compile '(lambda () (make-list 3826305079707827596))
                    :allow-warnings t))
+
+(with-test (:name :with-foo-macro-elides-arg-count-trap)
+  (let ((lines
+          (split-string
+           (with-output-to-string (s)
+             (sb-c:dis '(lambda (m) (sb-thread:with-mutex (m) (eval 'f))) s))
+           #\newline)))
+    ;; The outer lambda checks its arg count, but the lambda
+    ;; passed to call-with-mutex does not.
+    (assert (= (count-if (lambda (line)
+                           (search "Invalid argument count trap" line))
+                         lines)
+               1))))
