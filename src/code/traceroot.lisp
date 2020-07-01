@@ -40,8 +40,9 @@
   ;; of all threads, but I don't care.
   ;; Actually, why doesn't we make it correctly use the AVL tree?
   (dolist (thread (sb-thread:list-all-threads))
-    (when (sap= (sb-thread::thread-primitive-thread thread) (int-sap addr))
-      (return thread))))
+    (let ((sap (sb-thread::thread-primitive-thread thread)))
+      (when (and sap (sap= sap (int-sap addr)))
+        (return thread)))))
 
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:

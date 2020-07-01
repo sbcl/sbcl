@@ -274,8 +274,7 @@ created and old ones may exit at any time."
   ;;; the global mutexes but not all of them?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
-  (let ((thread (%make-thread :name "main thread"
-                              :%alive-p t)))
+  (let ((thread (%make-thread "main thread" nil)))
     #+linux (setf (thread-os-tid thread) (sb-gettid))
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
@@ -1376,12 +1375,12 @@ on this semaphore, then N of them is woken up."
     (when *session*
       (%delete-thread-from-session thread *session*))
     (with-interruptions-lock (thread)
-      (setf (thread-%alive-p thread) nil)
       ;; The memory range can exist without a pthread running yet, but the pthread
       ;; can't exist without the memory range. By clobbering this SAP here,
       ;; it is safe to manipulate the memory and/or the pthread from another thread
       ;; that acquires the interruptions lock if the SAP reads as nonzero.
-      (setf (thread-primitive-thread thread) (int-sap 0)))
+      ;; Doing this also makes THREAD-ALIVE-P return false hereafter.
+      (setf (thread-primitive-thread thread) nil))
     (sb-thread:barrier (:read))
     (let ((old *all-threads*))
       (loop
@@ -1593,7 +1592,6 @@ session."
         (with-session-lock (session)
           (setf (cdr session-cons) (session-threads session)
                 (session-threads session) session-cons)))
-    (setf (thread-%alive-p thread) t)
 
     (when setup-sem
       (signal-semaphore setup-sem)
@@ -1663,16 +1661,18 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                  (arguments)
                  "Argument passed to ~S, ~S, is an improper list."
                  'make-thread arguments)
-         (run-thread (%make-thread :name name) function arguments)))
+         (run-thread (%make-thread name nil)
+                     (coerce function 'function)
+                     (ensure-list arguments))))
 
 ;;; System-internal use only
 #+sb-thread
 (defun make-ephemeral-thread (name function arguments)
-  (run-thread (%make-thread :name name :%ephemeral-p t) function arguments))
+  (run-thread (%make-thread name t) function arguments))
 
 ;;; The purpose of splitting out RUN-THREAD from MAKE-THREAD is that when
 ;;; starting the finalizer thread, we might be able to do:
-;;; (let ((thread (%make-thread :name "finalizer" :%ephemeral-p t)))
+;;; (let ((thread (%make-thread "finalizer" t)))
 ;;;   (when (cas *finalizer-thread* nil thread)
 ;;;     (run-thread thread ...)
 ;;; which is possibly an improvement in two ways:
@@ -1697,8 +1697,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                      make-waitqueue
                      make-mutex))
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
-           (real-function (coerce function 'function))
-           (arguments     (ensure-list arguments))
            #+(or win32 darwin)
            (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
                           (sb-vm:floating-point-modes))))
@@ -1711,7 +1709,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   ;; ready to run GC. Be careful.
                   (init-thread-local-storage thread)
                   (new-lisp-thread-trampoline thread setup-sem
-                                              real-function arguments)))
+                                              function arguments)))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
         (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
@@ -1850,7 +1848,7 @@ subject to change."
   `(let ((lisp-thread ,thread))
      (with-interruptions-lock (lisp-thread)
        (let ((memory (thread-primitive-thread lisp-thread)))
-         (when (/= (sap-int memory) 0)
+         (when memory
            (let ((,os-thread (sap-ref-word memory
                                            (ash sb-vm::thread-os-thread-slot
                                                 sb-vm:word-shift))))
@@ -2030,7 +2028,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
   (defun %symbol-value-in-thread (symbol thread)
     (with-thread-memory (sap)
-      (if (/= (sap-int sap) 0)
+      (if sap
           (let ((val (sap-ref-lispobj sap (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
               (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
@@ -2040,7 +2038,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
   (defun %set-symbol-value-in-thread (symbol thread value)
     (with-thread-memory (sap)
-      (if (/= (sap-int sap) 0)
+      (if sap
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
@@ -2063,7 +2061,8 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                    sb-vm:n-word-bytes)
                 (- index sb-vm:n-word-bytes))
          ;; (There's no reason this couldn't work on any thread now.)
-         (sap (thread-primitive-thread *current-thread*))
+         (sap (the system-area-pointer
+                   (thread-primitive-thread *current-thread*)))
          (list))
         ((< index (ash sb-vm::primitive-thread-object-length sb-vm:word-shift))
          list)

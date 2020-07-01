@@ -26,21 +26,27 @@
   (name   nil :type (or null simple-string))
   (%owner nil :type (or null thread)))
 
-(defstruct (thread (:constructor %make-thread (&key name %alive-p %ephemeral-p))
+(defstruct (thread (:constructor %make-thread (name %ephemeral-p))
                    (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
   (name          nil :type (or null simple-string)) ; C code could read this
-  (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean :read-only t)
   ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread (C memory).
   ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
   ;; due to possible unmapping on thread death. Technically this is a fixed amount
   ;; below PRIMITIVE-THREAD, but the exact offset varies by build configuration.
   (stack-end 0 :type sb-vm:word)
-  ;; Points to the SB-VM::THREAD primitive object.
-  ;; Yes, there are three different thread structures.
-  (primitive-thread (int-sap 0) :type system-area-pointer)
+  ;; This is one of a few different views of a lisp thread:
+  ;;  1. the memory space (thread->os_addr in C)
+  ;;  2. 'struct thread' at some offset into the memory space, coinciding
+  ;;     with the SB-VM::THREAD primitive object
+  ;;  3. a pthread, which may reside anywhere, possibly the high end of the lisp stack
+  ;;     (above the SP given to your entrypoint), whatever the pthread library chooses.
+  ;;  4. the THREAD instance (this structure)
+  ;; This value is NIL if the thread is not considered alive, though the pthread
+  ;; may be running its termination code (unlinking from all_threads etc)
+  (primitive-thread nil :type (or null system-area-pointer))
   (interruptions nil :type list)
   ;; Gotta have half a dozen or more different ways to identify a thread.
   #+linux (os-tid 0 :type (unsigned-byte 32))
@@ -59,7 +65,7 @@ in future versions."
   "Return T if THREAD is still alive. Note that the return value is
 potentially stale even before the function returns, as the thread may exit at
 any time."
-  (thread-%alive-p thread))
+  (not (null (thread-primitive-thread thread))))
 
 (sb-impl::define-thread-local *current-thread*
       ;; This initform is magical - DEFINE-THREAD-LOCAL stuffs the initial
