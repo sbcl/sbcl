@@ -2096,12 +2096,10 @@
 (defknown sb-debug::funcall-with-debug-io-syntax (function &rest t) *)
 (defknown sb-impl::%print-unreadable-object (t t t &optional function) null)
 
-#+sb-thread
-(progn
 (defknown (sb-thread::call-with-mutex sb-thread::call-with-recursive-lock)
     (function t t t) *)
 (defknown (sb-thread::call-with-system-mutex
            sb-thread::call-with-system-mutex/allow-with-interrupts
            sb-thread::call-with-system-mutex/without-gcing
            sb-thread::call-with-recursive-system-lock)
-    (function t) *))
+    (function t) *)
