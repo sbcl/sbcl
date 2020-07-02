@@ -23,6 +23,15 @@
           with-session-lock
           with-spinlock))
 
+(eval-when (:compile-toplevel :load-toplevel)
+  #+(and sb-thread sb-futex linux) (pushnew :futex-use-tid sb-xc:*features*))
+
+#+futex-use-tid
+(defmacro my-kernel-thread-id ()
+  `(sb-ext:truly-the
+    (unsigned-byte 32)
+    (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-kernel-tid-slot))))
+
 ;;; CAS Lock
 ;;;
 ;;; Locks don't come any simpler -- or more lightweight than this. While
@@ -263,11 +272,6 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *initial-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
-(eval-when (:compile-toplevel :load-toplevel)
-  #+(and sb-thread sb-futex linux) (push :futex-use-tid sb-xc:*features*))
-
-#+linux (define-alien-routine "sb_GetTID" (unsigned 32))
-
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
   ;;; FIXME: is it purposeful or accidental that we recreate some of
@@ -275,12 +279,10 @@ created and old ones may exit at any time."
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread "main thread" nil)))
-    #+linux (setf (thread-os-tid thread) (sb-gettid))
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
-    (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
-          (thread-primitive-thread thread) (current-thread-sap)
+    (setf (thread-primitive-thread thread) (current-thread-sap)
           *initial-thread* thread)
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -962,7 +964,7 @@ IF-NOT-OWNER is :FORCE)."
                (with-pinned-objects (queue
                                      ;; No point in pinning ME if not taking the adddress.
                                      #-futex-use-tid me)
-                 (setf (waitqueue-token queue) #+futex-use-tid (thread-os-tid me)
+                 (setf (waitqueue-token queue) #+futex-use-tid (my-kernel-thread-id)
                                                #-futex-use-tid me)
                  (release-mutex mutex)
                  ;; Now we go to sleep using futex-wait. If anyone else
@@ -973,7 +975,7 @@ IF-NOT-OWNER is :FORCE)."
                  (setf status
                        (case (allow-with-interrupts
                                (futex-wait (waitqueue-token-address queue)
-                                           #+futex-use-tid (thread-os-tid me)
+                                           #+futex-use-tid (my-kernel-thread-id)
                                            #-futex-use-tid (get-lisp-obj-address me)
                                            ;; our way of saying "no
                                            ;; timeout":
@@ -1364,30 +1366,32 @@ on this semaphore, then N of them is woken up."
   `(with-system-mutex ((thread-interruptions-lock ,thread))
      ,@body))
 
-;;; Remove thread from its session, if it has one.
+;;; Remove thread from its session, if it has one, and from *all-threads*.
+;;; Also clobber the pointer to the primitive thread
+;;; which makes THREAD-ALIVE-P return false hereafter.
 #+sb-thread
-(defun handle-thread-exit ()
-  (/show0 "HANDLING THREAD EXIT")
-  (when *exit-in-process*
-    (%exit))
-  ;; Lisp-side cleanup
-  (let ((thread *current-thread*))
-    (when *session*
-      (%delete-thread-from-session thread *session*))
-    (with-interruptions-lock (thread)
-      ;; The memory range can exist without a pthread running yet, but the pthread
-      ;; can't exist without the memory range. By clobbering this SAP here,
-      ;; it is safe to manipulate the memory and/or the pthread from another thread
-      ;; that acquires the interruptions lock if the SAP reads as nonzero.
-      ;; Doing this also makes THREAD-ALIVE-P return false hereafter.
-      (setf (thread-primitive-thread thread) nil))
-    (sb-thread:barrier (:read))
-    (let ((old *all-threads*))
-      (loop
-       (let ((new (avl-delete (get-lisp-obj-address sb-vm:*control-stack-start*)
-                              old)))
-         (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return)))))))
-
+(defmacro handle-thread-exit ()
+  '(progn
+    (/show0 "HANDLING THREAD EXIT")
+    (when *exit-in-process*
+      (%exit))
+    ;; Lisp-side cleanup
+    (let ((thread *current-thread*))
+      (when *session*
+        (%delete-thread-from-session thread *session*))
+      (with-interruptions-lock (thread)
+        ;; The memory range can exist without a pthread running yet, but the pthread
+        ;; can't exist without the memory range. By clobbering this SAP here,
+        ;; it is safe to manipulate the memory and/or the pthread from another thread
+        ;; that acquires the interruptions lock if the SAP reads as nonzero.
+        (setf (thread-primitive-thread thread) nil))
+      (sb-thread:barrier (:read))
+      (let ((old *all-threads*))
+        (loop
+         (let ((new (avl-delete (get-lisp-obj-address sb-vm:*control-stack-start*)
+                                old)))
+           (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
+             (return))))))))
 
 (defvar sb-ext:*invoke-debugger-hook* nil
   "This is either NIL or a designator for a function of two arguments,
@@ -1571,12 +1575,10 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
-        (thread-primitive-thread thread) (current-thread-sap))
+  (setf (thread-primitive-thread thread) (current-thread-sap))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
-  #+linux (setf (thread-os-tid thread) (sb-gettid))
   (with-mutex ((thread-result-lock thread))
     (let ((old *all-threads*))
       (loop
@@ -1857,6 +1859,23 @@ subject to change."
   `(let ((lisp-thread ,thread) (,os-thread 0))
      (declare (ignorable lisp-thread ,os-thread))
      ,@body))
+
+#+linux
+(defun thread-os-tid (thread)
+  (declare (ignorable thread))
+  #+sb-thread
+  (if (eq *current-thread* thread)
+      (my-kernel-thread-id)
+      (with-interruptions-lock (thread)
+        (let ((memory (thread-primitive-thread thread)))
+          (when memory
+            (sap-ref-32 memory
+                        (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
+                           #+(and 64-bit big-endian) 4))))))
+  ;; The man page for gettid() says
+  ;;   "In a single-threaded process, the thread ID is equal to the process ID"
+  ;; It probably would be fine to return 0 here; nothing internal uses the value.
+  #-sb-thread (sb-unix:unix-getpid))
 
 (defun interrupt-thread (thread function)
   (declare (ignorable thread))

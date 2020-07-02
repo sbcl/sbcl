@@ -36,13 +36,11 @@
 
 (defun find-lisp-thread-from-thread-struct (addr)
   (declare (type sb-ext:word addr))
-  ;; It is of course possible to do this without consing the list
-  ;; of all threads, but I don't care.
-  ;; Actually, why doesn't we make it correctly use the AVL tree?
-  (dolist (thread (sb-thread:list-all-threads))
-    (let ((sap (sb-thread::thread-primitive-thread thread)))
-      (when (and sap (sap= sap (int-sap addr)))
-        (return thread)))))
+  ;; find a stack whose base is nearest and below A.
+  (awhen (sb-thread::avl-find<= addr sb-thread::*all-threads*)
+    (let ((thread (sb-thread::avlnode-data it)))
+      (when (sap= (int-sap addr) (sb-thread::thread-primitive-thread thread))
+        thread))))
 
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:

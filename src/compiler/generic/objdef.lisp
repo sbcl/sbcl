@@ -480,11 +480,14 @@ during backtrace.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
+
   ;; Technically this slot violates our requirement that the size of the thread
   ;; primitive object be computable by assuming one word per slot. POSIX says
   ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
   ;;  adding pthread_t to the list of types that are not required to be arithmetic
   ;;  types, thus allowing pthread_t to be defined as a structure."
+  ;; And this slot is badly named, it should be "Pthread" since it's the POSIX
+  ;; (or emulated POSIX) thread object, not necessarily the OS's thread notion.
   (os-thread :c-type "os_thread_t")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
@@ -522,6 +525,7 @@ during backtrace.
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :pointer t)
+  (os-kernel-tid) ; the kernel's thread identifier, 32 bits on linux
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.

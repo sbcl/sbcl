@@ -188,6 +188,13 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
+#if __linux__
+// gettid() was added in glibc 2.30 but we support older glibc
+static int sb_GetTID() { return syscall(SYS_gettid); }
+#else
+#define sb_GetTID() 0
+#endif
+
 static int main_thread_trampoline(struct thread *th)
 {
     lispobj function;
@@ -210,7 +217,8 @@ static int main_thread_trampoline(struct thread *th)
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
     link_thread(th);
-    th->os_thread=thread_self();
+    th->os_kernel_tid = sb_GetTID();
+    th->os_thread = thread_self();
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, NULL);
 #endif
@@ -469,6 +477,7 @@ undo_init_new_thread(struct thread *th,
 void* new_thread_trampoline(void* arg)
 {
     struct thread *th = (struct thread *)arg;
+    th->os_kernel_tid = sb_GetTID();
     int result;
     init_thread_data scribble;
 

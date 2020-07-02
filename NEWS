@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.6:
+  * minor incompatible change: SB-THREAD:THREAD-OS-TID returns NIL for
+    a thread which has exited.
+
 changes in sbcl-2.0.6 relative to sbcl-2.0.5:
   * planned incompatible change: the defined symbols in the Metaobject
     Protocol, currently accessible from both SB-MOP and SB-PCL packages, will

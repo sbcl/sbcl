@@ -32,11 +32,6 @@
 in future versions."
   (name          nil :type (or null simple-string)) ; C code could read this
   (%ephemeral-p  nil :type boolean :read-only t)
-  ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread (C memory).
-  ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
-  ;; due to possible unmapping on thread death. Technically this is a fixed amount
-  ;; below PRIMITIVE-THREAD, but the exact offset varies by build configuration.
-  (stack-end 0 :type sb-vm:word)
   ;; This is one of a few different views of a lisp thread:
   ;;  1. the memory space (thread->os_addr in C)
   ;;  2. 'struct thread' at some offset into the memory space, coinciding
@@ -48,8 +43,6 @@ in future versions."
   ;; may be running its termination code (unlinking from all_threads etc)
   (primitive-thread nil :type (or null system-area-pointer))
   (interruptions nil :type list)
-  ;; Gotta have half a dozen or more different ways to identify a thread.
-  #+linux (os-tid 0 :type (unsigned-byte 32))
   ;; On succesful execution of the thread's lambda a list of values.
   (result 0)
   (interruptions-lock
