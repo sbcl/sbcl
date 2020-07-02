@@ -366,10 +366,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 #+sb-thread
 (progn
-  ;; FIXME it would be good to define what a thread id is or isn't
-  ;; (our current assumption is that it's a fixnum).  It so happens
-  ;; that on Linux it's a pid, but it might not be on posix thread
-  ;; implementations.
   (define-alien-routine ("create_thread" %create-thread)
       unsigned (lisp-fun-address unsigned))
 
