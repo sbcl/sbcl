@@ -68,3 +68,46 @@
 ;;; CLASS-PROTOTYPE for FUNCTION should not use ALLOCATE-INSTANCE.
 (let ((class (find-class 'function)))
   (setf (slot-value class 'prototype) #'identity))
+
+(dolist (symbol '(add-method allocate-instance class-name compute-applicable-methods
+                  ensure-generic-function make-instance method-qualifiers
+                  remove-method add-dependent add-direct-method add-direct-subclass
+                  class-default-initargs class-direct-default-initargs
+                  class-direct-slots class-direct-subclasses
+                  class-direct-superclasses class-finalized-p class-precedence-list
+                  class-prototype class-slots
+                  compute-applicable-methods-using-classes
+                  compute-class-precedence-list compute-default-initargs
+                  compute-discriminating-function compute-effective-method
+                  compute-effective-slot-definition compute-slots
+                  direct-slot-definition direct-slot-definition-class
+                  effective-slot-definition effective-slot-definition-class
+                  ensure-class ensure-class-using-class
+                  ensure-generic-function-using-class eql-specializer
+                  eql-specializer-object extract-lambda-list
+                  extract-specializer-names finalize-inheritance
+                  find-method-combination forward-referenced-class
+                  funcallable-standard-class funcallable-standard-instance-access
+                  funcallable-standard-object
+                  generic-function-argument-precedence-order
+                  generic-function-declarations generic-function-lambda-list
+                  generic-function-method-class generic-function-method-combination
+                  generic-function-methods generic-function-name
+                  intern-eql-specializer make-method-lambda map-dependents
+                  method-function method-generic-function method-lambda-list
+                  method-specializers accessor-method-slot-definition
+                  reader-method-class remove-dependent remove-direct-method
+                  remove-direct-subclass set-funcallable-instance-function
+                  slot-boundp-using-class slot-definition slot-definition-allocation
+                  slot-definition-initargs slot-definition-initform
+                  slot-definition-initfunction slot-definition-location
+                  slot-definition-name slot-definition-readers
+                  slot-definition-writers slot-definition-type
+                  slot-makunbound-using-class slot-value-using-class specializer
+                  specializer-direct-generic-functions specializer-direct-methods
+                  standard-accessor-method standard-direct-slot-definition
+                  standard-effective-slot-definition standard-instance-access
+                  standard-reader-method standard-slot-definition
+                  standard-writer-method update-dependent validate-superclass
+                  writer-method-class))
+  (sb-impl::deprecate-export *package* symbol :early "2.0.7"))

@@ -281,3 +281,20 @@ unspecified."
          `(defvar ,name ,@(when valuep (list value))))
         ((:final)
          `',name))))
+
+(define-load-time-global *deprecated-exports* nil)
+
+(defun deprecate-export (package symbol state version)
+  (declare (type deprecation-state state)
+           (type string version)
+           (type symbol symbol))
+  (setf (getf (getf *deprecated-exports* package) symbol)
+        (cons state version)))
+
+(defun check-deprecated-export (package symbol)
+  (let ((state (getf (getf *deprecated-exports* package) symbol)))
+    (when state
+      (deprecation-warn (car state) "SBCL" (cdr state) 'symbol
+                        (format nil "~A:~A" (package-name package) symbol)
+                        (list symbol))
+      t)))

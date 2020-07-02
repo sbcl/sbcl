@@ -1594,6 +1594,9 @@ extended <package-name>::<form-in-package> syntax."
                   (multiple-value-bind (symbol accessibility)
                       (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
                     (when (eq accessibility :external) (return symbol))
+                    (when (and accessibility
+                               (check-deprecated-export pkg symbol))
+                      (return symbol))
                     (with-simple-restart (continue "Use symbol anyway.")
                       (error 'simple-reader-package-error
                              :package pkg
