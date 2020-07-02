@@ -188,8 +188,7 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
-static int
-initial_thread_trampoline(struct thread *th)
+static int main_thread_trampoline(struct thread *th)
 {
     lispobj function;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -859,13 +858,13 @@ create_thread_struct(lispobj start_routine) {
     return th;
 }
 
-void create_initial_thread(lispobj initial_function) {
+void create_main_lisp_thread(lispobj initial_function) {
     struct thread *th = create_thread_struct(initial_function);
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
     pthread_key_create(&lisp_thread, 0);
 #endif
     if(th) {
-        initial_thread_trampoline(th); /* no return */
+        main_thread_trampoline(th); /* no return */
     } else lose("can't create initial thread");
 }
 

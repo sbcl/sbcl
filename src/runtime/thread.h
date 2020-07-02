@@ -374,7 +374,7 @@ void signal_handler_callback(lispobj, int, void *, void *);
 
 #endif
 
-extern void create_initial_thread(lispobj);
+extern void create_main_lisp_thread(lispobj);
 
 #ifdef LISP_FEATURE_SB_THREAD
 extern pthread_mutex_t all_threads_lock;

@@ -725,7 +725,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
-    create_initial_thread(initial_function);
+    create_main_lisp_thread(initial_function);
     lose("unexpected return from initial thread in main()");
     return 0;
 }
