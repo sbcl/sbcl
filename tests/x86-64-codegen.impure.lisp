@@ -767,12 +767,11 @@ sb-vm::(define-vop (cl-user::test)
   (checked-compile '(lambda () (make-list 3826305079707827596))
                    :allow-warnings t))
 
-(with-test (:name :with-foo-macro-elides-arg-count-trap
-            :skipped-on (not :sb-thread))
+(with-test (:name :with-foo-macro-elides-arg-count-trap)
   (let ((lines
           (split-string
            (with-output-to-string (s)
-             (sb-c:dis '(lambda (m) (sb-thread:with-mutex (m) (eval 'f))) s))
+             (sb-c:dis '(lambda (x) (with-standard-io-syntax (eval x))) s))
            #\newline)))
     ;; The outer lambda checks its arg count, but the lambda
     ;; passed to call-with-mutex does not.
