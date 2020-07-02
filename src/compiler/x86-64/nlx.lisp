@@ -38,6 +38,15 @@
 
 ;;; Compute the address of the catch block from its TN, then store into the
 ;;; block the current Fp, Env, Unwind-Protect, and the entry PC.
+#+sb-thread
+(progn
+  ;; MOVAPD instruction faults if not properly aligned
+  (assert (evenp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)))
+  (assert (= (- (info :variable :wired-tls '*current-catch-block*)
+                (info :variable :wired-tls '*binding-stack-pointer*))
+             n-word-bytes))
+  (assert (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
+
 (define-vop (make-unwind-block)
   (:args (tn))
   (:info entry-label)
@@ -53,9 +62,7 @@
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
     #+sb-thread
-    (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
-      #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
-                     (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
+    (let ((bsp (info :variable :wired-tls '*binding-stack-pointer*)))
       (inst movapd xmm-temp (thread-tls-ea bsp))
       (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp))
     #-sb-thread
