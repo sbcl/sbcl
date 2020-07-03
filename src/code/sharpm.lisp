@@ -236,6 +236,9 @@
          ;; though the docs say this is undefined behavior, so it's ok,
          ;; other than it being something we should complain about
          ;; for portability reasons.
+         ;; Some other things that shouldn't work:
+         ;; * (read-from-string "#x a") => 10
+         ;; * (read-from-string "#x #+foo a b") => 11
          (let ((res (let ((*read-base* radix))
                       (read stream t nil t))))
            (unless (typep res 'rational)
