@@ -468,9 +468,10 @@ information."
                 ;; find a stack whose base is nearest and below A.
                 (awhen (sb-thread::avl-find<= a sb-thread::*all-threads*)
                   (let ((thread (sb-thread::avlnode-data it)))
-                    (when (and thread
-                               (sap< (int-sap a)
-                                     (sb-thread::thread-primitive-thread thread)))
+                    (when (and (< a (sb-thread::thread-stack-end thread))
+                               ;; Make a final check that it's live.
+                               ;; It could die by the time this returns.
+                               (sb-thread::thread-primitive-thread thread))
                       thread))))))))
 
 ;;;; frame printing

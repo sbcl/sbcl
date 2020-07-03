@@ -272,8 +272,8 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *initial-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
-(defun init-initial-thread ()
-  (/show0 "Entering INIT-INITIAL-THREAD")
+(defun init-main-thread ()
+  (/show0 "Entering INIT-MAIN-THREAD")
   ;;; FIXME: is it purposeful or accidental that we recreate some of
   ;;; the global mutexes but not all of them?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
@@ -283,6 +283,7 @@ created and old ones may exit at any time."
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
     (setf (thread-primitive-thread thread) (current-thread-sap)
+          (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
           *initial-thread* thread)
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -1572,6 +1573,7 @@ session."
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
   (setf (thread-primitive-thread thread) (current-thread-sap))
+  (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)

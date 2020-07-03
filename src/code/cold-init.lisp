@@ -78,7 +78,7 @@
   ;; Establish **initial-handler-clusters**
   (show-and-call sb-kernel::!target-error-cold-init)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
-  (sb-thread::init-initial-thread)
+  (sb-thread::init-main-thread)
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
@@ -337,7 +337,7 @@ process to continue normally."
   (without-gcing
     ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated
     ;; can be called, as pretty much anything can assume that it is set.
-    (sb-thread::init-initial-thread)
+    (sb-thread::init-main-thread)
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed

@@ -42,6 +42,12 @@ in future versions."
   ;; This value is NIL if the thread is not considered alive, though the pthread
   ;; may be running its termination code (unlinking from all_threads etc)
   (primitive-thread nil :type (or null system-area-pointer))
+  ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread.
+  ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
+  ;; due to possible unmapping on thread death.
+  ;; Usually this is a fixed amount below PRIMITIVE-THREAD, but the exact offset
+  ;; varies by build configuration, and if #+win32 it is not related in any way.
+  (stack-end 0 :type sb-vm:word)
   (interruptions nil :type list)
   ;; On succesful execution of the thread's lambda a list of values.
   (result 0)
