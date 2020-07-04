@@ -172,14 +172,9 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
     (condition)
   (thread-error-thread condition))
 
-;;; Of the WITH-PINNED-OBJECTS in this file, not every single one is
-;;; necessary because threads are only supported with the conservative
-;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
-;;; are treated as references.
-
 (setf (documentation 'thread-name 'function)
- "Name of the thread. Can be assigned to using SETF. Thread names can be
-arbitrary printable objects, and need not be unique.")
+ "Name of the thread. Can be assigned to using SETF. A thread name must be
+a simple-string (not necessarily unique) or NIL.")
 
 (defmethod print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
