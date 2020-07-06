@@ -174,7 +174,20 @@
 (defmethod add-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
     (with-world-lock ()
-      (pushnew subclass direct-subclasses :test #'eq))
+      (pushnew subclass direct-subclasses :test #'eq)
+      (let ((layout (class-wrapper subclass)))
+        (when layout
+          (let* ((classoid (layout-classoid layout)))
+            (dovector (super-layout (layout-inherits layout))
+              (let* ((super (layout-classoid super-layout))
+                     (subclasses (or (classoid-subclasses super)
+                                     (or (classoid-subclasses super)
+                                         (setf (classoid-subclasses super)
+                                               (make-hash-table :hash-function #'type-hash-value
+                                                                :test 'eq
+                                                                :synchronized t))))))
+                (when subclasses
+                  (setf (gethash classoid subclasses) layout))))))))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
