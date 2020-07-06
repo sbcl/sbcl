@@ -2358,7 +2358,7 @@
       (use-value (value)
         :report "Try opening a different file."
         :interactive read-evaluated-form
-        (list :filename (the pathname-designator value))))))
+        (list :new-filename (the pathname-designator value))))))
 
 (defun open (filename
              &key
