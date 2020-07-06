@@ -522,7 +522,7 @@
                     (f)))
                :allow-style-warnings t))))
 
-(with-test (:name :inapprorate-declare)
+(with-test (:name :inappropriate-declare)
   (assert
    (nth-value 5
               (checked-compile
@@ -538,3 +538,35 @@
               (checked-compile
                `(lambda () (prog1 10 (declare (optimize))))
                :allow-failure t))))
+
+(with-test (:name :reduce-initial-value)
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda ()
+                  (reduce (lambda (x y)
+                            (declare (fixnum x))
+                            (+ x (char-code y)))
+                          "abc"))
+               :allow-warnings t)))
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda ()
+                  (reduce (lambda (x y)
+                            (declare (fixnum x))
+                            (+ x (char-code y)))
+                          "abc"
+                          :initial-value #\a))
+               :allow-warnings t)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (declare (string s))
+         (reduce (lambda (x y)
+                   (declare (fixnum x))
+                   (+ x (char-code y)))
+                 s
+                 :initial-value 0))
+    (("abc") 294)))
+

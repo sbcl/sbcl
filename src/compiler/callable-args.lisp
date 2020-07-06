@@ -51,7 +51,8 @@
                    (incf arg-position))
                  (handle-keys (options)
                    (loop for (key value*) on options by #'cddr
-                         for value = (if (eq key :key)
+                         for value = (if (or (eq key :key)
+                                             (eq key :value))
                                          (let ((lvar (getf (nthcdr positional-count lvars) value*)))
                                            (and lvar
                                                 (record-lvar lvar)))
@@ -294,9 +295,16 @@
       (labels ((%process-arg (spec)
                  (destructuring-bind (nth-arg . options) spec
                    (let* ((arg (nth nth-arg deps))
+                          (value-nth (getf options :value))
                           (key-nth (getf options :key))
+                          (value (and value-nth
+                                      (nth value-nth deps)))
                           (key (and key-nth (nth key-nth deps)))
-                          (key-return-type (cond ((not key)
+                          (key-return-type (cond (value-nth
+                                                  (if (lvar-p value)
+                                                      (lvar-type value)
+                                                      *universal-type*))
+                                                 ((not key)
                                                   nil)
                                                  ((lvar-p key)
                                                   (multiple-value-bind (type name) (lvar-fun-type key)

@@ -562,7 +562,7 @@
 (defknown (every notany notevery) (function-designator proper-sequence &rest proper-sequence) boolean
   (foldable unsafely-flushable call))
 
-(defknown reduce ((function-designator ((nth-arg 1 :sequence t :key :key)
+(defknown reduce ((function-designator ((nth-arg 1 :sequence t :key :key :value :initial-value)
                                         (nth-arg 1 :sequence t :key :key)))
                   proper-sequence &rest t &key (:from-end t)
                   (:start (inhibit-flushing index 0))
