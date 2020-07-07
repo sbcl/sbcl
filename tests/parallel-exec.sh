@@ -143,6 +143,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
         (format t "~&Failing files:~%")
         (dolist (filename losing)
           (format t "~A~%" filename))
+        (format t "==== Logs are in $logdir ====~%")
         (exit :code 1)))))
 (parallel-execute-tests $1)
 EOF
