@@ -290,18 +290,28 @@ statistics are appended to it."
       ;; (as suggested above) would largely solve this - the post-GC action would be to
       ;; just "kick" that thread to do its thing. If it doesn't finish in time (by the
       ;; time we kick it again), that's its problem, not the GC's problem.
-      ;; How to solve this without multiple threads if there are post-gc hooks
-      ;; is an interesting question, but not a question of high merit.
+      ;;
+      ;; If we do implement a general post-GC thread, there remains a question of
+      ;; of what to do with post-GC actions for #-sb-thread that cons too much,
+      ;; risking recursive invocation of GC. Pretty much don't do that.
+      ;;
       (when (and *allow-with-interrupts*
                  ;; Continue if any of the following:
                  ;; - you want a finalizer thread but it hasn't been started
                  ;; - you don't want a finalizer thread, and we're not already
                  ;;   in SCAN-FINALIZERS
                  ;; - there are some hooks to run
-                 (or #+sb-thread
-                     (if sb-impl::*finalizer-thread*
-                         (not threadp)
-                         (not sb-impl::*in-a-finalizer*))
+                 ;; Logically, the finalizer existence test belongs in src/code/final,
+                 ;; but the flaw in that is we're not going to call that code until unmasking
+                 ;; interrupts, which is precisely the thing we need to NOT do if already
+                 ;; in post-GC code of any kind (be it finalizer or other).
+                 (or #+sb-thread (if sb-impl::*finalizer-thread*
+                                     (not threadp)
+                                     (not sb-impl::*in-a-finalizer*))
+                     #-sb-thread (and (sb-impl::hash-table-culled-values
+                                       (sb-impl::finalizer-id-map
+                                        sb-impl::**finalizer-store**))
+                                      (not sb-impl::*in-a-finalizer*))
                      *after-gc-hooks*))
         (sb-thread::without-thread-waiting-for ()
          (with-interrupts

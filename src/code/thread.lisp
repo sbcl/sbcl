@@ -147,6 +147,8 @@ stale value, use MUTEX-OWNER instead."
           (function with-recursive-spinlock :replacement with-recursive-lock)
           (function with-spinlock :replacement with-mutex)))
 
+;;; I wish there were a shred of documentation about WHY this needs to exist.
+;;; SOMEBODY PLEASE HELP!
 (defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
   (with-unique-names (thread prev)
     (let ((without (if already-without-interrupts
