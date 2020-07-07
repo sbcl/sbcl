@@ -44,6 +44,12 @@ echo //entering finalize.test.sh
     (setf junk (foo junk))
     (foo junk))
 
+(defun scrubstack ()
+  (sb-int:dx-let ((b (make-array 20))) (eval b))
+  (sb-sys:scrub-control-stack))
+
+(scrubstack)
+
 ;;(format *error-output* "About to GC~%")
 (gc :full t)
 
