@@ -253,7 +253,7 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
  * low_level_handle_now_handler
  * low_level_maybe_now_maybe_later
  *
- * This gives us a single point of control (or six) over errno, fp
+ * This gives us a single point of control (or four) over errno, fp
  * control word, and fixing up signal context on sparc.
  *
  * The SPARC/Linux platform doesn't quite do signals the way we want

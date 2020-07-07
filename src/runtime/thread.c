@@ -1033,9 +1033,8 @@ void gc_start_the_world()
     struct thread *p,*th=arch_os_get_current_thread();
     int lock_ret;
     /* if a resumed thread creates a new thread before we're done with
-     * this loop, the new thread will get consed on the front of
-     * all_threads, but it won't have been stopped so won't need
-     * restarting */
+     * this loop, the new thread will be suspended waiting to acquire
+     * the all_threads lock */
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:begin\n"));
     for(p=all_threads;p;p=p->next) {
         gc_assert(p->os_thread!=0);
