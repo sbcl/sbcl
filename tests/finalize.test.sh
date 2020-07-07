@@ -19,10 +19,14 @@ echo //entering finalize.test.sh
   (declare (ignore _))
   nil)
 
+(defglobal *maxdepth* 0)
 (let ((junk (mapcar (compile nil '(lambda (_)
                                    (declare (ignore _))
                                    (let ((x (gensym)))
                                      (finalize x (lambda ()
+                                                   (setq *maxdepth*
+                                                         (max sb-kernel:*free-interrupt-context-index*
+                                                              *maxdepth*))
                                                    ;; cons in finalizer
                                                    (setf *tmp* (make-list 10000))
                                                    (incf *count*)))
@@ -40,6 +44,12 @@ echo //entering finalize.test.sh
 #+sb-thread (sb-impl::finalizer-thread-stop)
 ;; FIXME: turns out, it does fail:
 (sb-kernel:run-pending-finalizers)
+
+;;; This was failing with something like:
+;;;  The assertion (<= *MAXDEPTH* 1) failed with *MAXDEPTH* = 29.
+;;; but it could actually made much worse by increasing the arguments
+;;; to one or both MAKE-LISTs, at the risk of exhausting the heap.
+(assert (<= *maxdepth* 1))
 
 (if (= *count* 10000)
     (with-open-file (f "finalize-test-passed" :direction :output)

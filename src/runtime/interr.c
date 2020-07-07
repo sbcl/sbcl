@@ -137,6 +137,32 @@ lose(char *fmt, ...)
     call_lossage_handler();
 }
 
+#if 0
+/// thread printf. This was used to produce the 2-column output
+/// at the bottom of "src/code/final". The main thread'd os_kernel_tid
+/// must be assigned a constant in main_thread_trampoline().
+void tprintf(char *fmt, ...)
+{
+    va_list ap;
+    char buf[200];
+    char *ptr;
+    const char spaces[] = "                                           ";
+    struct thread*th = arch_os_get_current_thread();
+    buf[0] = ';'; buf[1] = ' ';
+    ptr = buf+2;
+    if (th->os_kernel_tid == 'A') {
+        strcpy(ptr, spaces);
+        ptr += (sizeof spaces)-1;
+    }
+    va_start(ap, fmt);
+    int n = vsprintf(ptr, fmt, ap);
+    va_end(ap);
+    ptr += n;
+    *ptr++ = '\n';
+    write(2, buf, ptr-buf);
+}
+#endif
+
 boolean lose_on_corruption_p = 0;
 
 void

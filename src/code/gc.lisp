@@ -274,7 +274,34 @@ statistics are appended to it."
         ;; if there is no finalizer thread and interrupts are disabled.
         ;; That's my excuse anyway, not having looked more in-depth.
         (run-pending-finalizers))
-      (when *allow-with-interrupts*
+      ;; Here's one reason that MAX_INTERRUPTS is as high as it is.
+      ;; If the thread that performed GC runs post-GC hooks which cons enough to
+      ;; cause another GC while in the hooks, then as soon as interrupts are allowed
+      ;; again, a GC can be invoked "recursively" - while there is a maybe_gc() on
+      ;; the C call stack. It's not even true that _this_ thread had to cons a ton -
+      ;; any thread could have, causing this thread to hit the GC trigger which sets the
+      ;; P-A interrupted bit which causes the interrupt instruction at the end of a
+      ;; pseudo-atomic sequence to take a signal hit. So with interrupts eanbled,
+      ;; we get back into the GC, which calls post-GC, which might cons ...
+      ;; See the example at the bottom of src/code/final for a clear picture.
+      ;;
+      ;; To mitigate that problem, if you have no hooks, we can avoid inducing overflow
+      ;; of the interrupt contexts. Relegating post-GC actions to their own thread
+      ;; (as suggested above) would largely solve this - the post-GC action would be to
+      ;; just "kick" that thread to do its thing. If it doesn't finish in time (by the
+      ;; time we kick it again), that's its problem, not the GC's problem.
+      ;; How to solve this without multiple threads if there are post-gc hooks
+      ;; is an interesting question, but not a question of high merit.
+      (when (and *allow-with-interrupts*
+                 ;; Continue if any of the following:
+                 ;; - you want a finalizer thread but it hasn't been started
+                 ;; - you don't want a finalizer thread, and we're not already
+                 ;;   in SCAN-FINALIZERS
+                 ;; - there are some hooks to run
+                 (or (if sb-impl::*finalizer-thread*
+                         (not threadp)
+                         (not sb-impl::*in-a-finalizer*))
+                     *after-gc-hooks*))
         (sb-thread::without-thread-waiting-for ()
          (with-interrupts
            (unless threadp

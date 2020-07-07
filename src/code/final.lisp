@@ -231,7 +231,10 @@ Examples:
     object))
 
 ;;; Drain the queue of finalizers and return when empty.
-;;; Concurrent invocations of this function are ok.
+;;; Concurrent invocations of this function in different threads are ok.
+;;; Nested invocations (from a GC forced by a finalizer) are not ok.
+;;; See the trace at the bottom of this file.
+(defvar *in-a-finalizer* nil)
 (defun scan-finalizers ()
   ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
@@ -263,7 +266,7 @@ Examples:
          ;; Now call the function(s)
          (flet ((call (finalizer)
                   (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
-                    (handler-case (funcall fun)
+                    (handler-case (let ((*in-a-finalizer* t)) (funcall fun))
                       (error (c)
                         (warn "Error calling finalizer ~S:~%  ~S" fun c))))))
            (if (simple-vector-p finalizers)
@@ -306,8 +309,12 @@ Examples:
   (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
     (cond #+sb-thread
           ((%instancep *finalizer-thread*)
-           (with-system-mutex (*finalizer-queue-lock*)
-             (sb-thread:condition-notify *finalizer-queue*)))
+           ;; Do absolutely nothing if in a finalizer. If we are then it's obvious
+           ;; that we're in the SCAN-FINALIZERS loop, and that the loop will just
+           ;; go on looping without further provocation.
+           (unless *in-a-finalizer*
+             (with-system-mutex (*finalizer-queue-lock*)
+               (sb-thread:condition-notify *finalizer-queue*))))
           #+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
            (sb-thread::make-ephemeral-thread
@@ -368,3 +375,138 @@ Examples:
       (with-system-mutex (*finalizer-queue-lock*)
         (sb-thread:condition-notify *finalizer-queue*))
       (sb-thread:join-thread thread)))) ; wait for it
+
+#|
+;;; This is a display produced by annotating parts of gc-common.c and
+;;; interrupt.c with each thread's output in its own column.
+;;; The main thread is on the right.
+
+;;; This output shows that if the finalizer thread calls a function that
+;;; triggers a GC, the interrupt nesting depth can grow without limit.
+;;; The finalizer thread does not have to be a memory hog - it just has
+;;; to be unlucky enough to be the thread that triggers the collection.
+;;; _Any_ thread can bring the GC trigger up to the threshold,
+;;; and as long as the finalizer thread is the one to cross the
+;;; the threshold, it is tasked with triggering the next scan
+;;; of finalizers, but it MUST NOT do so recursively.
+;;;
+;;; The same thing can happen without using a finalizer thread,
+;;; but it's actually easier to understand the output this way.
+
+Thread 2                                     Main
+--------                                     --------
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+|                                            Stopped world
+|                                            SUB-GC calling gc(0)
+|                                            set auto_gc_trig=4858833
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+|                                            Stopped world
+|                                            SUB-GC calling gc(6)
+|                                            set auto_gc_trig=5075473
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Trying to start finalizer thread
+| starting
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+| Caught SIGUSR2, pc=52a946bd
+| STOP_FOR_GC PA=1 inh=N sigmask=0
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 1 >handle_pending
+| STOP_FOR_GC PA=0 inh=N sigmask=0
+| fake ffcall "stop_for_gc"
+| bind(free_ICI, 1)
+|                                            Stopped world
+|                                            SUB-GC calling gc(6)
+|                                            set auto_gc_trig=520eeb3
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Notify finalizer thread
+| unbind free_ICI -> 0
+| leave STOP_FOR_GC
+| evt 1 <handle_pending
+| gc_trig=52bcf80, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 2 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 1)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=552b033
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=55d9110, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 3 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 2)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=56c0423
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=576e500, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 4 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 3)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=59dc213
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=5a8a2f0, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 5 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 4)
+| maybe_gc calling SUB-GC
+| Stopping world
+|
+;;; This pattern of binding FREE_INTERRUPT_CONTEXT_INDEX to successively
+;;; higher values will continue forever until reaching the limit and crashing.
+|#
