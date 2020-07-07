@@ -27,36 +27,45 @@ echo //entering finalize.test.sh
 #+sb-thread ; Check that we do want to start a thread, and it hasn't been started.
 (assert (eq sb-impl::*finalizer-thread* t))
 
-(let ((junk (mapcar (compile nil '(lambda (_)
-                                   (declare (ignore _))
-                                   (let ((x (gensym)))
-                                     (finalize x (lambda ()
-                                                   (setq *maxdepth*
-                                                         (max sb-kernel:*free-interrupt-context-index*
-                                                              *maxdepth*))
-                                                   ;; cons 640K in the finalizer for #+64-bit,
-                                                   ;; or 80K for #-64-bit
-                                                   (setf *tmp* (make-list #+64-bit 40000
-                                                                          #-64-bit 10000))
-                                                   (sb-ext:atomic-incf *count*)))
-                                     x)))
-                    (make-list *n-finalized-things*))))
-    (setf junk (foo junk))
-    (foo junk))
+(defun makejunk (_)
+  (declare (ignore _))
+  (let ((x (gensym)))
+    (finalize x (lambda ()
+                  (setq *maxdepth*
+                        (max sb-kernel:*free-interrupt-context-index*
+                             *maxdepth*))
+                  ;; cons 640K in the finalizer for #+64-bit,
+                  ;; or 80K for #-64-bit
+                  (setf *tmp* (make-list #+64-bit 40000
+                                         #-64-bit 10000))
+                  (sb-ext:atomic-incf *count*)))
+    x))
+(compile 'makejunk)
 
 (defun scrubstack ()
   (sb-int:dx-let ((b (make-array 20))) (eval b))
   (sb-sys:scrub-control-stack))
 
-(scrubstack)
-
-;;(format *error-output* "About to GC~%")
-(gc :full t)
+(dotimes (iter 10)
+  (let ((junk (mapcar #'makejunk
+                      (make-list (/ *n-finalized-things* 10)))))
+    (setf junk (foo junk))
+    (foo junk))
+  (scrubstack)
+  (gc :full t))
 
 #+sb-thread
 (progn
   ;; Verify that the thread was started.
-  (assert (typep sb-impl::*finalizer-thread* 'sb-thread::thread))
+  (unless (typep sb-impl::*finalizer-thread* 'sb-thread::thread)
+    (with-open-file (*standard-output* "finalize-test-failed" :direction :output)
+      (format t "No finalizer thread - how can this happen?")
+      (print sb-impl::**finalizer-store**)
+      (terpri)
+      (format t "Culled values:")
+      (print (sb-impl::hash-table-culled-values (svref sb-impl::**finalizer-store** 1)))
+      (terpri))
+    (sb-ext:quit))
   ;; We're asserting on an exact count of finalizers that ran, which is a bit sketchy.
   ;; It would mostly be fine to that is within some fudge factor of the expected number,
   ;; however, the purpose of this "stress test" is to verify that we don't miss any
