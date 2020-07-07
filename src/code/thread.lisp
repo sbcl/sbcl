@@ -64,6 +64,7 @@ in future versions."
   "Return T if THREAD is still alive. Note that the return value is
 potentially stale even before the function returns, as the thread may exit at
 any time."
+  (barrier (:read))
   (not (null (thread-primitive-thread thread))))
 
 (sb-impl::define-thread-local *current-thread*

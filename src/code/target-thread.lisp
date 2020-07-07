@@ -1303,7 +1303,15 @@ on this semaphore, then N of them is woken up."
 ;;;; Job control, independent listeners
 
 (defstruct (session (:copier nil))
+  ;; New threads are atomically pushed into NEW-ENROLLEES without acquiring the
+  ;; session lock. Any operation on the session that transfers ownership of the
+  ;; foreground must move the enrollees into THREADS while holding the lock.
+  (new-enrollees)
   (lock (make-mutex :name "session lock"))
+  ;; If we wanted to get fancy, these next 2 lists might become lockfree linked lists
+  ;; so that it would be possible for threads to exit without acquiring the lock.
+  ;; It might be tricky (i.e. too much trouble) to figure out how to reimplement
+  ;; the various operations on a session though.
   (threads nil)
   (interactive-threads nil)
   (interactive-threads-queue (make-waitqueue)))
@@ -1320,19 +1328,41 @@ on this semaphore, then N of them is woken up."
 ;;; FIXME: It might be good to have a way to enforce lock ordering invariants
 (defmacro with-session-lock ((session) &body body)
   `(with-system-mutex ((session-lock ,session) :allow-with-interrupts t)
+     (%enroll-new-threads ,session)
      ,@body))
 
-(defun new-session ()
-  (make-session :threads (list *current-thread*)
-                :interactive-threads (list *current-thread*)))
+;;; Move new enrollees into SESSION-THREADS. The session lock must be held.
+;;; The reason this can be lazy is that a thread is never an interactive thread
+;;; just by joining a session, so it doesn't involve itself with the waitqueue;
+;;; it can't cause a thread waiting on the condition to wake.
+;;; i.e. even if a newly created thread were required to obtain the lock to insert
+;;; itself into the session, it would not and could not have any effect on any other
+;;; thread in the session.
+(defun %enroll-new-threads (session)
+  (loop (let ((thread (sb-ext:atomic-pop (session-new-enrollees session))))
+          (cond ((not thread) (return))
+                ((thread-alive-p thread)
+                 ;; Can it become dead immediately upon insertion into THREADS?
+                 ;; No, because to become dead, it must acquire the session lock.
+                 (push thread (session-threads session)))))))
+
+(defun new-session (thread)
+  (make-session :threads (list thread)
+                :interactive-threads (list thread)))
 
 (defun init-job-control ()
   (/show0 "Entering INIT-JOB-CONTROL")
-  (setf *session* (new-session))
+  (setf *session* (new-session *current-thread*))
   (/show0 "Exiting INIT-JOB-CONTROL"))
 
 (defun %delete-thread-from-session (thread session)
   (with-session-lock (session)
+    ;; One of two things about THREAD must be true, either:
+    ;; - it was transferred from SESSION-NEW-ENROLLEES to SESSION-THREADS
+    ;; - it was NOT yet transferred from SESSION-NEW-ENROLLEES.
+    ;; There can't be an "in flight" state of having done the atomic-pop from
+    ;; SESSION-NEW-ENROLLEES but not the push into THREADS, because anyone manipulating
+    ;; the THREADS list must be holding the session lock.
     (let ((was-foreground (eq thread (foreground-thread session))))
       (setf (session-threads session)
             ;; FIXME: I assume these could use DELQ1.
@@ -1345,12 +1375,12 @@ on this semaphore, then N of them is woken up."
 
 (defun call-with-new-session (fn)
   (%delete-thread-from-session *current-thread* *session*)
-  (let ((*session* (new-session)))
+  (let ((*session* (new-session *current-thread*)))
     (funcall fn)))
 
 (defmacro with-new-session (args &body forms)
   (declare (ignore args))               ;for extensibility
-  (with-unique-names (fb-name)
+  (with-unique-names (fb-name) ; FIXME: what's the significance of "fb-" ?
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
@@ -1369,15 +1399,19 @@ on this semaphore, then N of them is woken up."
       (%exit))
     ;; Lisp-side cleanup
     (let ((thread *current-thread*))
-      (when *session*
-        (%delete-thread-from-session thread *session*))
       (with-interruptions-lock (thread)
         ;; The memory range can exist without a pthread running yet, but the pthread
         ;; can't exist without the memory range. By clobbering this SAP here,
         ;; it is safe to manipulate the memory and/or the pthread from another thread
         ;; that acquires the interruptions lock if the SAP reads as nonzero.
-        (setf (thread-primitive-thread thread) nil))
-      (sb-thread:barrier (:read))
+        (setf (thread-primitive-thread thread) nil)
+        (barrier (:write)))
+      ;; After making the thread dead, remove from session. If this were done first,
+      ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
+      ;; only to remove it right away.
+      (when *session*
+        (%delete-thread-from-session thread *session*))
+      (barrier (:read))
       (let ((old *all-threads*))
         (loop
          (let ((new (avl-delete (get-lisp-obj-address sb-vm:*control-stack-start*)
@@ -1582,12 +1616,7 @@ session."
           (aver (not (avl-find addr old)))
           (let ((new (avl-insert old addr thread)))
             (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return))))))
-    (let ((session *session*)
-          (session-cons (list thread)))
-        (with-session-lock (session)
-          (setf (cdr session-cons) (session-threads session)
-                (session-threads session) session-cons)))
-
+    (sb-ext:atomic-push thread (session-new-enrollees *session*))
     (when setup-sem
       (signal-semaphore setup-sem)
       ;; setup-sem was dx-allocated, set it to NIL so that the
