@@ -1649,6 +1649,30 @@ component_ptr_from_pc(char *pc)
     return NULL;
 }
 
+/// Return the name of the simple-fun containing 'pc',
+/// and if 'pfun' is non-null then store the base pointer
+/// to the function in *pfun. This is an easier-to-use interface than
+/// just returning the function, because accessing the name requires
+/// knowing the function's index into the entry-point vector.
+lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
+{
+    struct code* code = (void*)component_ptr_from_pc(pc);
+    if (!code) return 0; // not in lisp heap
+    char *insts = code_text_start(code);
+    unsigned int* offsets = code_fun_table(code) - 1;
+    int i;
+    // Scanning backwards makes the stopping condition easy:
+    // the first function lower than 'pc' is the right answer.
+    for (i=code_n_funs(code)-1; i>=0; --i) {
+        struct simple_fun* fun = (void*)(insts + offsets[-i]);
+        if ((char*)fun < pc) {
+            if (pfun) *pfun = (lispobj*)fun;
+            return code->constants[i*CODE_SLOTS_PER_SIMPLE_FUN];
+        }
+    }
+    return 0; // oops, how did this happen?
+}
+
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success, or NULL on failure. */
 lispobj *
