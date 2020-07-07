@@ -46,16 +46,22 @@ echo //entering finalize.test.sh
   (sb-int:dx-let ((b (make-array 20))) (eval b))
   (sb-sys:scrub-control-stack))
 
-(dotimes (iter 10)
-  (let ((junk (mapcar #'makejunk
-                      (make-list (/ *n-finalized-things* 10)))))
-    (setf junk (foo junk))
-    (foo junk))
-  (scrubstack)
-  (gc :full t))
+(defun run-consy-thing ()
+  (dotimes (iter 10)
+    (let ((junk (mapcar #'makejunk
+                        (make-list (/ *n-finalized-things* 10)))))
+      (setf junk (foo junk))
+      (foo junk))
+    (scrubstack)
+    (gc :full t)))
+
+; no threads - hope for the best with respect to conservative root retention
+#-sb-thread (run-consy-thing)
 
 #+sb-thread
 (progn
+  (sb-thread:join-thread (sb-thread:make-thread #'run-consy-thing))
+  (gc :full t) ; one more time to clean everything up
   ;; Verify that the thread was started.
   (unless (typep sb-impl::*finalizer-thread* 'sb-thread::thread)
     (with-open-file (*standard-output* "finalize-test-failed" :direction :output)
@@ -85,9 +91,12 @@ echo //entering finalize.test.sh
 ;;; The test parameters for 64-bit are quite severe, but should not exhaust the heap.
 (assert (<= *maxdepth* 1))
 
-(if (= *count* *n-finalized-things*)
+(if (or (= *count* *n-finalized-things*)
+        ;; allow some slop for non-thread because the stack might pin some junk
+        (and (not (member :sb-thread *features*))
+             (>= *count* (- *n-finalized-things* 2))))
     (with-open-file (f "finalize-test-passed" :direction :output)
-      (write-line "OK" f))
+      (format f "OK - ran ~d finalizers~%" *count*))
     (with-open-file (f "finalize-test-failed" :direction :output)
       (format f "OOPS: ~A~%" *count*)
       (sb-kernel:run-pending-finalizers)
@@ -102,7 +111,7 @@ WAITED=x
 echo "Waiting for SBCL to finish stress-testing finalizers"
 while true; do
     if [ -f finalize-test-passed ]; then
-        echo "OK"
+        cat finalize-test-passed
         rm finalize-test-passed
         exit $EXIT_TEST_WIN
     elif [ -f finalize-test-failed ]; then
