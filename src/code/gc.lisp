@@ -298,7 +298,8 @@ statistics are appended to it."
                  ;; - you don't want a finalizer thread, and we're not already
                  ;;   in SCAN-FINALIZERS
                  ;; - there are some hooks to run
-                 (or (if sb-impl::*finalizer-thread*
+                 (or #+sb-thread
+                     (if sb-impl::*finalizer-thread*
                          (not threadp)
                          (not sb-impl::*in-a-finalizer*))
                      *after-gc-hooks*))
