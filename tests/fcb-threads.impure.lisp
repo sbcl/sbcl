@@ -30,9 +30,9 @@
     (unless cell
       (let* ((thr sb-thread:*current-thread*)
              (string
-               (format nil "~s from ~s (TID ~d Pthread ~x)~%"
+               (format nil "~s from ~s (~@[TID ~d~] Pthread ~x)~%"
                        arg1 thr
-                       (sb-thread::thread-os-tid thr)
+                       (or #+linux (sb-thread::thread-os-tid thr))
                        (sb-thread::thread-primitive-thread thr))))
         (sb-sys:with-pinned-objects (string)
           (sb-unix:unix-write 1 (sb-sys:vector-sap string) 0 (length string)))
