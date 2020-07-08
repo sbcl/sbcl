@@ -803,13 +803,17 @@
          (call (and ref
                     (node-lvar ref)
                     (lvar-dest (node-lvar ref))))
-         (vars (lambda-vars original-lambda)))
+         (all-vars (lambda-vars original-lambda)))
     (when (and call
-               (eq var (car (last vars)))
-               (notany #'lambda-var-specvar vars))
+               (eq var (car (last all-vars)))
+               (notany #'lambda-var-specvar all-vars))
       (or (= (count-if #'identity (combination-args call)) 1)
           (with-ir1-environment-from-node call
-            (let* ((penultimate (lvar-uses (car (last (combination-args call) 2))))
+            (let* ((all-args (combination-args call))
+                   (penultimate-arg (find-if #'identity all-args
+                                             :from-end t
+                                             :end (1- (length all-args))))
+                   (penultimate (lvar-uses penultimate-arg))
                    (penultimate (if (consp penultimate)
                                     (car penultimate)
                                     penultimate))
@@ -820,7 +824,7 @@
                                               :pred (block-pred next-block)
                                               :succ (list next-block)))
                    (bind (make-bind))
-                   (vars (butlast vars))
+                   (vars (butlast all-vars))
                    (lambda (make-lambda :vars vars
                                         :kind :let
                                         :bind bind
@@ -828,11 +832,11 @@
                                         :%source-name 'split
                                         :%debug-name `(split ,(lambda-%debug-name original-lambda))))
                    (ref (make-ref lambda))
-                   (args (butlast (combination-args call))))
+                   (args (butlast all-args)))
               (push lambda (lambda-lets (lambda-home original-lambda)))
               (push ref (lambda-refs lambda))
-              (setf (combination-args call) (last (combination-args call)))
-              (setf (lambda-vars original-lambda) (last (lambda-vars original-lambda))
+              (setf (combination-args call) (last all-args))
+              (setf (lambda-vars original-lambda) (last all-vars)
                     (lambda-tail-set lambda) (make-tail-set :funs (list lambda)))
               (setf (bind-lambda bind) lambda)
               (loop for var in vars

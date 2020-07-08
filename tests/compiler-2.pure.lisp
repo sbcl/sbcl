@@ -2913,4 +2913,21 @@
    `(lambda (x)
       (inline-recursive x)
       (inline-recursive x))
-   ((5) 0)))
+    ((5) 0)))
+
+(with-test (:name :split-let-unused-vars)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (let ((a
+                 (if x y))
+               (b)
+               (c
+                 (if y
+                     x)))
+           (declare (ignore b))
+           (if c (if a a c))))
+    ((t t) t)
+    ((t nil) nil)
+    ((nil t) nil)
+    ((nil nil) nil)))
