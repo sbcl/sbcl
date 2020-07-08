@@ -13,11 +13,17 @@
 
 #+(or (not sb-thread) win32) (sb-ext:exit :code 104)
 
-(with-scratch-file (solib "so")
-  (sb-ext:run-program "/bin/sh"
-                      `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                        "-o" ,solib "fcb-threads.c"))
-  (sb-alien:load-shared-object solib))
+(if (probe-file "fcb-threads.so")
+    ;; Assume the test automator built this for us
+    (load-shared-object (truename "fcb-threads.so"))
+    ;; Otherwise, write into /tmp so that we never fail to rebuild
+    ;; the '.so' if it gets changed, and assume that it's OK to
+    ;; delete a mapped file (which it is for *nix).
+    (with-scratch-file (solib "so")
+      (sb-ext:run-program "/bin/sh"
+                          `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                            "-o" ,solib "fcb-threads.c"))
+      (sb-alien:load-shared-object solib)))
 
 (defglobal *counter* 0)
 (declaim (fixnum *counter*))

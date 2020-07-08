@@ -34,7 +34,8 @@ int call_thing_from_threads(void* ptr, int n_threads, int n_calls)
     }
     for(i=0; i<n_threads; ++i) {
         pthread_join(threads[i].pthread_id, &threads[i].result);
-        fprintf(stderr, "%d: pthread %lx returned %d\n",
+        fprintf(stderr, "%d: pthread %lx returned %p\n",
                 i, (long)threads[i].pthread_id, threads[i].result);
     }
+    return 0;
 }

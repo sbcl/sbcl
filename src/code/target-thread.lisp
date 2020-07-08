@@ -380,6 +380,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
   #+sb-futex
   (progn
+    (export 'futex-wake) ; for naughty users only
     (declaim (inline futex-wait %futex-wait futex-wake))
 
     (define-alien-routine ("futex_wait" %futex-wait) int

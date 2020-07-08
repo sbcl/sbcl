@@ -550,7 +550,8 @@ static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct thread* get_recyclebin_item()
 {
     struct thread* result = 0;
-    int rc = pthread_mutex_lock(&recyclebin_lock);
+    int rc;
+    rc = pthread_mutex_lock(&recyclebin_lock);
     gc_assert(!rc);
     if (recyclebin_threads) {
         result = recyclebin_threads;
@@ -561,7 +562,8 @@ static struct thread* get_recyclebin_item()
 }
 static void put_recyclebin_item(struct thread* th)
 {
-    int rc = pthread_mutex_lock(&recyclebin_lock);
+    int rc;
+    rc = pthread_mutex_lock(&recyclebin_lock);
     gc_assert(!rc);
     th->next = recyclebin_threads;
     recyclebin_threads = th;
@@ -665,7 +667,7 @@ detach_os_thread(init_thread_data *scribble)
 
     undo_init_new_thread(th, scribble);
 
-    odxprint(misc, "deattach_os_thread: detached");
+    odxprint(misc, "detach_os_thread: detached");
 #ifdef LISP_FEATURE_GCC_TLS
     is_lisp_thread = 0;
 #else
