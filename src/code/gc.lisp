@@ -266,6 +266,7 @@ statistics are appended to it."
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
   (when (sb-thread:thread-alive-p sb-thread:*current-thread*)
+    #+sb-thread (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
     (let ((threadp #+sb-thread (%instancep sb-impl::*finalizer-thread*)))
       (when threadp
         ;; It's OK to frob a condition variable regardless of

@@ -373,10 +373,18 @@ init_new_thread(struct thread *th,
     }
 
     th->os_thread=thread_self();
-    if (guardp)
+
+#define GUARD_CONTROL_STACK 1
+#define GUARD_BINDING_STACK 2
+#define GUARD_ALIEN_STACK   4
+
+    if (guardp & GUARD_CONTROL_STACK)
         protect_control_stack_guard_page(1, NULL);
-    protect_binding_stack_guard_page(1, NULL);
-    protect_alien_stack_guard_page(1, NULL);
+    if (guardp & GUARD_BINDING_STACK)
+        protect_binding_stack_guard_page(1, NULL);
+    if (guardp & GUARD_ALIEN_STACK)
+        protect_alien_stack_guard_page(1, NULL);
+
     /* Since GC can only know about this thread from the all_threads
      * list and we're just adding this thread to it, there is no
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
@@ -500,7 +508,9 @@ void* new_thread_trampoline(void* arg)
 
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
-    init_new_thread(th, &scribble, 1, 0);
+    init_new_thread(th, &scribble,
+                    GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
+                    0);
     result = funcall0(function);
     undo_init_new_thread(th, &scribble);
 
@@ -529,7 +539,48 @@ void* new_thread_trampoline_switch_stack(void* arg) {
 }
 #endif
 
-static struct thread *create_thread_struct(lispobj);
+static struct thread *create_thread_struct(void*,lispobj);
+
+static struct thread* recyclebin_threads;
+static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct thread* get_recyclebin_item()
+{
+    struct thread* result = 0;
+    int rc = pthread_mutex_lock(&recyclebin_lock);
+    gc_assert(!rc);
+    if (recyclebin_threads) {
+        result = recyclebin_threads;
+        recyclebin_threads = result->next;
+    }
+    pthread_mutex_unlock(&recyclebin_lock);
+    return result ? result->os_address : 0;
+}
+static void put_recyclebin_item(struct thread* th)
+{
+    int rc = pthread_mutex_lock(&recyclebin_lock);
+    gc_assert(!rc);
+    th->next = recyclebin_threads;
+    recyclebin_threads = th;
+    pthread_mutex_unlock(&recyclebin_lock);
+}
+void empty_thread_recyclebin()
+{
+    if (!recyclebin_threads) return;
+    sigset_t old;
+    block_deferrable_signals(&old);
+    int rc = pthread_mutex_trylock(&recyclebin_lock);
+    if (!rc) { // no big deal if already locked (recursive GC?)
+        struct thread* this = recyclebin_threads;
+        while (this) {
+            struct thread* next = this->next;
+            free_thread_struct(this);
+            this = next;
+        }
+        recyclebin_threads = 0;
+        pthread_mutex_unlock(&recyclebin_lock);
+    }
+    thread_sigmask(SIG_SETMASK, &old, 0);
+}
 
 void
 attach_os_thread(init_thread_data *scribble)
@@ -537,8 +588,10 @@ attach_os_thread(init_thread_data *scribble)
     os_thread_t os = pthread_self();
     odxprint(misc, "attach_os_thread: attaching to %p", os);
 
-    struct thread *th = create_thread_struct(NO_TLS_VALUE_MARKER_WIDETAG);
     block_deferrable_signals(&scribble->oldset);
+    void* recycled_memory = get_recyclebin_item();
+    struct thread *th = create_thread_struct(recycled_memory,
+                                             NO_TLS_VALUE_MARKER_WIDETAG);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
@@ -581,7 +634,11 @@ attach_os_thread(init_thread_data *scribble)
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
 
-    init_new_thread(th, scribble, 0, 1);
+    init_new_thread(th, scribble,
+                    /* recycled memory already had mprotect() done,
+                     * so avoid 2 syscalls when possible */
+                    recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
+                    1);
     th->os_kernel_tid = sb_GetTID();
 
     uword_t stacksize
@@ -626,8 +683,8 @@ detach_os_thread(init_thread_data *scribble)
         rc = sigwait(&gc_sigset, &sig);
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
     }
+    put_recyclebin_item(th);
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
-    free_thread_struct(th);
 }
 
 #if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
@@ -736,7 +793,7 @@ void release_all_threads_lock()
  */
 
 static struct thread *
-create_thread_struct(lispobj start_routine) {
+create_thread_struct(void* spaces, lispobj start_routine) {
 #if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
 #endif
@@ -749,9 +806,18 @@ create_thread_struct(lispobj start_routine) {
      * on the alignment passed from os_validate, since that might
      * assume the current (e.g. 4k) pagesize, while we calculate with
      * the biggest (e.g. 64k) pagesize allowed by the ABI. */
-    void *spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE);
-    if(!spaces)
-        return NULL;
+    boolean zeroize_stack_top = 0;
+    if (spaces) {
+        // If reusing memory from a previously exited thread, start by removing
+        // some old junk from the stack. This is imperfect since we only clear a little
+        // at the top, but doing so enables diagnosing some garbage-retention issues
+        // using a fine-toothed comb. It would not be possible at all to diagnose
+        // if any newly started thread could refer a dead thread's heap objects.
+        zeroize_stack_top = 1;
+    } else {
+        spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE);
+        if (!spaces) return NULL;
+    }
     /* Aligning up is safe as THREAD_STRUCT_SIZE has
      * THREAD_ALIGNMENT_BYTES padding. */
     char *aligned_spaces = PTR_ALIGN_UP(spaces, THREAD_ALIGNMENT_BYTES);
@@ -792,6 +858,15 @@ create_thread_struct(lispobj start_routine) {
     th->binding_stack_start=
         (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
+
+    // This is a little wasteful of cycles to pre-zero the pthread overhead (which in glibc
+    // resides at the highest stack addresses) comprising about 5kb, below which is the lisp
+    // stack. We don't need to zeroize above the lisp stack end, but we don't know exactly
+    // where that will be.  Zeroizing more than necessary is conservative, and helps ensure
+    // that garbage retention from reused stacks does not pose a huge problem.
+    if (zeroize_stack_top)
+        memset((char*)th->control_stack_end - 16384, 0, 16384);
+
     th->control_stack_guard_page_protected = T;
     th->alien_stack_start=
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
@@ -910,7 +985,7 @@ create_thread_struct(lispobj start_routine) {
 }
 
 void create_main_lisp_thread(lispobj initial_function) {
-    struct thread *th = create_thread_struct(initial_function);
+    struct thread *th = create_thread_struct(0, initial_function);
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
     pthread_key_create(&lisp_thread, 0);
 #endif
@@ -996,7 +1071,7 @@ os_thread_t create_thread(lispobj start_routine) {
      * linking it to all_threads can be left to the thread itself
      * without fear of gc lossage. 'start_routine' violates this
      * assumption and must stay pinned until the child starts up. */
-    th = create_thread_struct(start_routine);
+    th = create_thread_struct(0, start_routine);
     if (th && !create_os_thread(th, &kid_tid)) {
         free_thread_struct(th);
         kid_tid = 0;
