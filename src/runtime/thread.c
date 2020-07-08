@@ -676,6 +676,7 @@ detach_os_thread(init_thread_data *scribble)
      *  - but STOP_FOR_GC is pending because it was in the blocked set.
      * Bad things happen unless we clear the pending GC signal.
      */
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     sigset_t pending;
     sigpending(&pending);
     if (sigismember(&pending, SIG_STOP_FOR_GC)) {
@@ -683,6 +684,7 @@ detach_os_thread(init_thread_data *scribble)
         rc = sigwait(&gc_sigset, &sig);
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
     }
+#endif
     put_recyclebin_item(th);
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
 }
