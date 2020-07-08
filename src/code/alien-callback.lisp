@@ -295,16 +295,23 @@ the alien callback for that function with the given alien type."
 (in-package "SB-THREAD")
 #+sb-thread
 (defun enter-foreign-callback (index return arguments)
-  ;; Deferrable signals are blocked.
-  ;; STOP_FOR_GC is not blocked, but it can't occur because GC could only send
-  ;; it after acquiring the all_threads lock, which it can't get because
-  ;; this thread is holding the lock.
-  (let ((thread *foreign-thread*))
-    (init-thread-local-storage thread)
-    (setq *foreign-thread* (make-foreign-thread)) ; "Pay it forward"
-    ;; The all_threads lock acts both as an inhibitor of stop-the-world
-    ;; and a guard on the preallocated thread instance.
-    (alien-funcall (extern-alien "release_all_threads_lock" (function void)))
+  (let ((thread
+          #+sb-safepoint ; cons a FOREIGN-THREAD
+          (without-gcing (init-thread-local-storage (make-foreign-thread)))
+
+          ;; Deferrable signals are blocked. STOP_FOR_GC is not blocked but can't
+          ;; occur because GC could only send it after acquiring the all_threads lock,
+          ;; which it can't get because this thread owns it for the moment.
+          #-sb-safepoint ; use the preallocated FOREIGN-THREAD
+          (let ((thread (init-thread-local-storage *foreign-thread*)))
+            ;; GC would be ok to happen now, but it can't yet because of the
+            ;; all_threads_lock acting both as a guard on the preallocated thread
+            ;; and the stop-the-world inhibitor.
+            ;; There's no point in splitting that into two locks.
+            (setq *foreign-thread* (make-foreign-thread)) ; "Pay it forward"
+            (alien-funcall (extern-alien "release_all_threads_lock"
+                                         (function void)))
+            thread)))
     (dx-flet ((enter ()
                      (sb-alien::enter-alien-callback index return arguments)))
       (new-lisp-thread-trampoline thread nil #'enter nil))))

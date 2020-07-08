@@ -421,6 +421,7 @@ undo_init_new_thread(struct thread *th,
      * non-safepoint versions of this code.  Can we unify this more?
      */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
+
     block_blockable_signals(0);
     ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
@@ -432,7 +433,9 @@ undo_init_new_thread(struct thread *th,
     unlink_thread(th);
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
+
 #else
+
     /* Block GC */
     block_blockable_signals(0);
     /* This state change serves to "acknowledge" any stop-the-world
@@ -453,6 +456,7 @@ undo_init_new_thread(struct thread *th,
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
+
 #endif
 
     arch_os_thread_cleanup(th);
@@ -634,11 +638,17 @@ attach_os_thread(init_thread_data *scribble)
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    const int retain_lock = 0;
+#else
+    const int retain_lock = 1;
+#endif
     init_new_thread(th, scribble,
                     /* recycled memory already had mprotect() done,
                      * so avoid 2 syscalls when possible */
                     recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
-                    1);
+                    retain_lock);
+
     th->os_kernel_tid = sb_GetTID();
 
     uword_t stacksize

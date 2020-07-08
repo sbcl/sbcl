@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+(or (not sb-thread) win32 sb-safepoint) (sb-ext:exit :code 104)
+#+(or (not sb-thread) win32) (sb-ext:exit :code 104)
 
 (with-scratch-file (solib "so")
   (sb-ext:run-program "/bin/sh"
