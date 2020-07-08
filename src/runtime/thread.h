@@ -29,7 +29,7 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 lispobj thread_state(struct thread *thread);
-void set_thread_state(struct thread *thread, lispobj state);
+void set_thread_state(struct thread *thread, lispobj state, boolean);
 void wait_for_thread_state_change(struct thread *thread, lispobj state);
 
 #ifdef LISP_FEATURE_GCC_TLS

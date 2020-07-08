@@ -73,6 +73,7 @@
     '#(sb-impl::*exit-lock*
        sb-thread::*make-thread-lock*
        sb-thread::*initial-thread*
+       sb-thread::*foreign-thread*
        sb-thread::*all-threads*
        sb-thread::*session*
        sb-kernel::*gc-epoch*))

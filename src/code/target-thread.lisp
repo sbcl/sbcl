@@ -265,6 +265,9 @@ created and old ones may exit at any time."
   (int-sap 0))
 
 (sb-ext:define-load-time-global *initial-thread* nil)
+;;; Always keep one preallocated foreign thread instance so that a non-lisp thread
+;;; doesn't need to cons anything prior to release of the all_threads lock.
+(sb-ext:define-load-time-global *foreign-thread* (make-foreign-thread))
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
 (defun init-main-thread ()
@@ -280,6 +283,7 @@ created and old ones may exit at any time."
     (setf (thread-primitive-thread thread) (current-thread-sap)
           (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
           *initial-thread* thread)
+    (setq *foreign-thread* (make-foreign-thread))
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple

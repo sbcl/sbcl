@@ -127,11 +127,14 @@ thread_state(struct thread *thread)
 }
 
 void
-set_thread_state(struct thread *thread, lispobj state)
+set_thread_state(struct thread *thread, lispobj state,
+                 boolean signals_already_blocked) // for foreign thread
 {
     int i, waitcount = 0;
     sigset_t old;
-    block_blockable_signals(&old);
+    // If we've already masked the blockable signals we can avoid two syscalls here.
+    if (!signals_already_blocked)
+        block_blockable_signals(&old);
     os_sem_wait(thread->state_sem, "set_thread_state");
     if (thread->state != state) {
         if ((STATE_STOPPED==state) ||
@@ -151,7 +154,8 @@ set_thread_state(struct thread *thread, lispobj state)
         thread->state = state;
     }
     os_sem_post(thread->state_sem, "set_thread_state");
-    thread_sigmask(SIG_SETMASK, &old, NULL);
+    if (!signals_already_blocked)
+        thread_sigmask(SIG_SETMASK, &old, NULL);
 }
 
 void
@@ -353,7 +357,8 @@ schedule_thread_post_mortem(struct thread *corpse)
 static void
 init_new_thread(struct thread *th,
                 init_thread_data __attribute__((unused)) *scribble,
-                int guardp)
+                int guardp,
+                int retain_all_threads_lock)
 {
     int lock_ret;
 
@@ -382,8 +387,10 @@ init_new_thread(struct thread *th,
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     link_thread(th);
-    lock_ret = pthread_mutex_unlock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
+    if (!retain_all_threads_lock) {
+        lock_ret = pthread_mutex_unlock(&all_threads_lock);
+        gc_assert(lock_ret == 0);
+    }
 
     /* Kludge: Changed the order of some steps between the safepoint/
      * non-safepoint versions of this code.  Can we unify this more?
@@ -420,10 +427,14 @@ undo_init_new_thread(struct thread *th,
 #else
     /* Block GC */
     block_blockable_signals(0);
-    set_thread_state(th, STATE_DEAD);
+    /* This state change serves to "acknowledge" any stop-the-world
+     * signal received while the STOP_FOR_GC signal is blocked */
+    set_thread_state(th, STATE_DEAD, 1);
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
-     * thread, but since we are already dead it won't wait long. */
+     * thread, but since we are either exiting lisp code as a lisp
+     * thread that is dying, or exiting lisp code to return to
+     * former status as a C thread, it won't wait long. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
@@ -489,7 +500,7 @@ void* new_thread_trampoline(void* arg)
 
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
-    init_new_thread(th, &scribble, 1);
+    init_new_thread(th, &scribble, 1, 0);
     result = funcall0(function);
     undo_init_new_thread(th, &scribble);
 
@@ -570,7 +581,8 @@ attach_os_thread(init_thread_data *scribble)
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
 
-    init_new_thread(th, scribble, 0);
+    init_new_thread(th, scribble, 0, 1);
+    th->os_kernel_tid = sb_GetTID();
 
     uword_t stacksize
         = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
@@ -592,6 +604,28 @@ detach_os_thread(init_thread_data *scribble)
 #else
     pthread_setspecific(lisp_thread, (void *)0);
 #endif
+
+    /* We have to clear a STOP_FOR_GC signal if pending. Consider:
+     *  - on entry to undo_init_new_thread, we block all signals
+     *  - simultaneously some other thread decides that it needs to initiate a GC
+     *  - that thread observes that this thread exists in all_threads and sends
+     *    STOP_FOR_GC, so it becomes pending but undeliverable in this thread
+     *  - immediately after blocking signals, we change state to DEAD,
+     *    which allows the GCing thread to ignore this thread
+     *    (it sees the state change criterion as having been satisfied)
+     *  - the GCing thread releases the all_threads lock
+     *  - this thread acquires the lock and removes itself from all_threads,
+     *    and indicates that it is no longer a lisp thread
+     *  - but STOP_FOR_GC is pending because it was in the blocked set.
+     * Bad things happen unless we clear the pending GC signal.
+     */
+    sigset_t pending;
+    sigpending(&pending);
+    if (sigismember(&pending, SIG_STOP_FOR_GC)) {
+        int sig, rc;
+        rc = sigwait(&gc_sigset, &sig);
+        gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
+    }
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
     free_thread_struct(th);
 }
@@ -648,6 +682,14 @@ callback_wrapper_trampoline(
 #endif
     }
 }
+
+// Balance out the mutex_lock in attach_os_thread()
+void release_all_threads_lock()
+{
+    if (pthread_mutex_unlock(&all_threads_lock))
+        lose("ENTER-FOREIGN-CALLBACK bug");
+}
+
 #endif /* LISP_FEATURE_SB_THREAD */
 
 /* this is called from any other thread to create the new one, and
@@ -987,7 +1029,7 @@ void gc_stop_the_world()
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock\n"));
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
     /* keep threads from starting while the world is stopped. */
-    lock_ret = pthread_mutex_lock(&all_threads_lock);      \
+    lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock\n"));
@@ -1047,7 +1089,7 @@ void gc_start_the_world()
                 }
                 FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
                               p->os_thread));
-                set_thread_state(p, STATE_RUNNING);
+                set_thread_state(p, STATE_RUNNING, 0);
             }
         }
     }

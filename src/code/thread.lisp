@@ -77,7 +77,8 @@ any time."
 
 (defstruct (foreign-thread
              (:copier nil)
-             (:include thread)
+             (:include thread (:name "foreign callback"))
+             (:constructor make-foreign-thread ())
              (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")

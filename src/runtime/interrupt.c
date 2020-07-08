@@ -1429,7 +1429,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
              (lispobj)fixnum_value(thread->state));
     }
 
-    set_thread_state(thread,STATE_STOPPED);
+    set_thread_state(thread, STATE_STOPPED, 0);
     FSHOW_SIGNAL((stderr,"suspended\n"));
 
     /* While waiting for gc to finish occupy ourselves with zeroing
