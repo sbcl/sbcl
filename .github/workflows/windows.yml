@@ -17,7 +17,7 @@ jobs:
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
       run: |
-        bash ./make.sh --xc-host='sbcl --dynamic-space-size 500MB --lose-on-corruption --disable-ldb --disable-debugger'
+        bash ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make installer
       run: |
         bash ./make-windows-installer.sh
