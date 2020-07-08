@@ -372,19 +372,19 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGWINCH);
 }
 
-void
-sigaddset_blockable(sigset_t *sigset)
-{
-    sigaddset_deferrable(sigset);
-    sigaddset_gc(sigset);
-}
-
-void
+static void
 sigaddset_gc(sigset_t __attribute__((unused)) *sigset)
 {
 #ifdef THREADS_USING_GCSIGNAL
     sigaddset(sigset,SIG_STOP_FOR_GC);
 #endif
+}
+
+void
+sigaddset_blockable(sigset_t *sigset)
+{
+    sigaddset_deferrable(sigset);
+    sigaddset_gc(sigset);
 }
 
 /* initialized in interrupt_init */

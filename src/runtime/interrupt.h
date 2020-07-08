@@ -22,8 +22,6 @@ extern void get_current_sigmask(sigset_t *sigset);
 extern void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
 extern void sigaddset_blockable(sigset_t *s);
-/* Set all gc signals into *s. */
-extern void sigaddset_gc(sigset_t *s);
 
 extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
