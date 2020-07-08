@@ -895,13 +895,13 @@
 (define-instruction vzeroupper (segment)
   (:printer vex2-op ((op #x77) (l 0) (r 1) (pp 0)))
   (:emitter
-   (emit-two-byte-vex segment 0 #b1111 0 nil)
+   (emit-two-byte-vex segment 0 0 0 nil)
    (emit-byte segment #x77)))
 
 (define-instruction vzeroall (segment)
   (:printer vex2-op ((op #x77) (l 1) (r 1) (pp 0)))
   (:emitter
-   (emit-two-byte-vex segment 0 #b1111 1 nil)
+   (emit-two-byte-vex segment 0 0 1 nil)
    (emit-byte segment #x77)))
 
 (macrolet ((def (name opcode &optional l (mem-size :qword))
