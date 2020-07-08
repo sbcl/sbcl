@@ -45,7 +45,7 @@ extern void block_deferrable_signals(sigset_t *old);
 extern void block_blockable_signals(sigset_t *old);
 
 extern void unblock_deferrable_signals(sigset_t *where);
-extern void unblock_gc_signals();
+extern void unblock_gc_signals(void);
 
 extern void maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset);
 

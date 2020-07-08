@@ -171,7 +171,7 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
 
 /* Foreign code may want to start some threads on its own.
  * Non-targetted, truly asynchronous signals can be delivered to
- * basically any thread, but invoking Lisp handlers in such foregign
+ * basically any thread, but invoking Lisp handlers in such foreign
  * threads is really bad, so let's resignal it.
  *
  * This should at least bring attention to the problem, but it cannot

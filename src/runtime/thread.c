@@ -211,7 +211,7 @@ static int main_thread_trampoline(struct thread *th)
 #if defined THREADS_USING_GCSIGNAL && \
     (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
-    unblock_gc_signals(0,0);
+    unblock_gc_signals();
 #endif
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
@@ -533,7 +533,7 @@ attach_os_thread(init_thread_data *scribble)
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
     /* FIXME: could be done using a single call to pthread_sigmask
        together with locking the deferrable signals above. */
-    unblock_gc_signals(0, 0);
+    unblock_gc_signals();
 #endif
 
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
