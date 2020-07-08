@@ -23,6 +23,7 @@ echo //entering finalize.test.sh
 (defglobal *maxdepth* 0)
 ;; Be gentler on 32-bit platforms
 (defglobal *n-finalized-things* #+64-bit 20000 #-64-bit 10000)
+(defglobal *weak-pointers* nil)
 
 #+sb-thread ; Check that we do want to start a thread, and it hasn't been started.
 (assert (eq sb-impl::*finalizer-thread* t))
@@ -30,13 +31,14 @@ echo //entering finalize.test.sh
 (defun makejunk (_)
   (declare (ignore _))
   (let ((x (gensym)))
+    (push (make-weak-pointer x) *weak-pointers*)
     (finalize x (lambda ()
                   (setq *maxdepth*
                         (max sb-kernel:*free-interrupt-context-index*
                              *maxdepth*))
-                  ;; cons 640K in the finalizer for #+64-bit,
+                  ;; cons 320K in the finalizer for #+64-bit,
                   ;; or 80K for #-64-bit
-                  (setf *tmp* (make-list #+64-bit 40000
+                  (setf *tmp* (make-list #+64-bit 20000
                                          #-64-bit 10000))
                   (sb-ext:atomic-incf *count*)))
     x))
@@ -98,9 +100,11 @@ echo //entering finalize.test.sh
     (with-open-file (f "finalize-test-passed" :direction :output)
       (format f "OK - ran ~d finalizers~%" *count*))
     (with-open-file (f "finalize-test-failed" :direction :output)
-      (format f "OOPS: ~A~%" *count*)
+      (format f "OOPS: ~A (threads=~A)~%" *count* (or #+sb-thread "yes" "no"))
       (sb-kernel:run-pending-finalizers)
-      (format f "After sb-kernel:run-pending-finalizers: ~A~%" *count*)))
+      (format f "After sb-kernel:run-pending-finalizers: ~A~%" *count*)
+      (let ((*standard-output* f))
+        (search-roots *weak-pointers* :print :verbose))))
 
 (sb-ext:quit)
 EOF
