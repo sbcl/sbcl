@@ -178,35 +178,27 @@ a simple-string (not necessarily unique) or NIL.")
 
 (defmethod print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
-    (let* ((cookie (list thread))
-           ;; Hmm, state-change, mutex acquisition, and semantic problems
-           ;; all because of a goddamn print method? What the effing hell?
-           ;; You literally can't call this method in two threads at once
-           ;; without lock contention and risk of joining >1 time,
-           ;; which we don't treat as user error even though it is.
-           (info (if (thread-alive-p thread)
-                     :running
-                     (multiple-value-list
-                      (join-thread thread :default cookie))))
-           (state (if (eq :running info)
-                      (let* ((thing (progn
-                                      (barrier (:read))
-                                      (thread-waiting-for thread))))
-                        (typecase thing
-                          (cons
-                           (list "waiting on:" (cdr thing)
-                                 "timeout: " (car thing)))
-                          (null
-                           (list info))
-                          (t
-                           (list "waiting on:" thing))))
-                      (if (eq cookie (car info))
-                          (list :aborted)
-                          :finished)))
-           (values (when (eq :finished state)
-                     info))
+    (let* ((values (cond ((thread-alive-p thread) :running)
+                         ;; don't call JOIN-THREAD, just read the result if ALIVE-P is NIL
+                         ((listp (thread-result thread)) (thread-result thread))
+                         (t :aborted)))
+           (state (cond ((eq values :running)
+                         (let* ((thing (progn
+                                         (barrier (:read))
+                                         (thread-waiting-for thread))))
+                           (typecase thing
+                             (null '(:running))
+                             (cons
+                              (list "waiting on:" (cdr thing)
+                                    "timeout: " (car thing)))
+                             (t
+                              (list "waiting on:" thing)))))
+                        ((eq values :aborted) '(:aborted))
+                        (t :finished)))
            (*print-level* 4))
       (format stream
+              ;; if not finished, show the STATE as a list.
+              ;; if finished, show the VALUES.
               "~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
               (thread-name thread)
               (eq :finished state)
