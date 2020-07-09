@@ -73,7 +73,7 @@
                                   (find (car (ensure-list x))
                                         (sb-vm:primitive-object-slots thread-struct)
                                         :key #'sb-vm:slot-special))
-                                sb-vm::!per-thread-c-interface-symbols)))
+                                sb-vm::per-thread-c-interface-symbols)))
                    (tls-slot (+ n-fixed (length (cdr list)))))
               (nconc list (list (list symbol initform)))
               (setf (info :variable :wired-tls symbol) (ash tls-slot sb-vm:word-shift))

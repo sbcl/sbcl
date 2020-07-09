@@ -1623,7 +1623,7 @@ core and return a descriptor to it."
   ;; Assign TLS indices of C interface symbols
   #+sb-thread
   (progn
-    (dolist (binding sb-vm::!per-thread-c-interface-symbols)
+    (dolist (binding sb-vm::per-thread-c-interface-symbols)
       (ensure-symbol-tls-index (car (ensure-list binding))))
     ;; Assign other known TLS indices
     (dolist (pair tls-init)
@@ -3214,7 +3214,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (format t "~%#endif /* __ASSEMBLER__ */~2%")))
 
 (defun write-thread-init (stream)
-  (dolist (binding sb-vm::!per-thread-c-interface-symbols)
+  (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (format stream "INITIALIZE_TLS(~A, ~A);~%"
             (c-symbol-name (if (listp binding) (car binding) binding) "*")
             (if (listp binding) (second binding)))))
@@ -3233,7 +3233,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (+ sb-vm:nil-value
                  (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
   #+sb-thread
-  (dolist (binding sb-vm::!per-thread-c-interface-symbols)
+  (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))
            (c-symbol (c-symbol-name symbol "*")))
       (unless (member symbol sb-vm::+common-static-symbols+)

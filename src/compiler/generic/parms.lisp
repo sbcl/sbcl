@@ -159,7 +159,7 @@
 ;;;  - static for efficiency of access but need not be
 ;;; On #+sb-thread builds, these are not static, because access to them
 ;;; is via the TLS, not the symbol.
-(defconstant-eqx !per-thread-c-interface-symbols
+(defconstant-eqx per-thread-c-interface-symbols
   `((*free-interrupt-context-index* 0)
     (sb-sys:*allow-with-interrupts* t)
     (sb-sys:*interrupts-enabled* t)
@@ -184,7 +184,7 @@
     ;; These symbols are accessed from C only through TLS,
     ;; never the symbol-value slot
     #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
-                           !per-thread-c-interface-symbols)
+                           per-thread-c-interface-symbols)
     ;; NLX variables are thread slots on x86-64 and RISC-V.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
     ;; so must lookup the TLS index given the symbol.
