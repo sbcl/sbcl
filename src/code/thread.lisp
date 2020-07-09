@@ -56,7 +56,7 @@ in future versions."
    :type mutex :read-only t)
   (result-lock
    (make-mutex :name "thread result lock")
-   :type mutex :read-only t)
+   :type (or null mutex) :read-only t)
   waiting-for)
 
 (declaim (inline thread-alive-p))
@@ -77,7 +77,7 @@ any time."
 
 (defstruct (foreign-thread
              (:copier nil)
-             (:include thread (:name "foreign callback"))
+             (:include thread (result-lock nil) (name "callback"))
              (:constructor make-foreign-thread ())
              (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads

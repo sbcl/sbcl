@@ -147,6 +147,10 @@ offending thread using THREAD-ERROR-THREAD."))
                 (format s "Joining thread timed out: thread ~A ~
                            did not exit in time."
                         (thread-error-thread c)))
+               (:foreign
+                (format s "Joining thread failed: thread ~A ~
+                           is not a lisp thread."
+                        (thread-error-thread c)))
                (:self-join
                 (format s "In thread ~A, attempt to join the current ~
                            thread."
@@ -1603,8 +1607,7 @@ session."
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
-  (with-mutex ((thread-result-lock thread))
-    (let ((old *all-threads*))
+  (let ((old *all-threads*))
       (loop
         (let ((addr (get-lisp-obj-address sb-vm:*control-stack-start*)))
           ;; If ADDR exists, then we have a bug in the thread exit handler.
@@ -1613,8 +1616,8 @@ session."
           (aver (not (avl-find addr old)))
           (let ((new (avl-insert old addr thread)))
             (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return))))))
-    (sb-ext:atomic-push thread (session-new-enrollees *session*))
-    (when setup-sem
+  (sb-ext:atomic-push thread (session-new-enrollees *session*))
+  (when setup-sem
       (signal-semaphore setup-sem)
       ;; setup-sem was dx-allocated, set it to NIL so that the
       ;; backtrace doesn't get confused
@@ -1623,7 +1626,7 @@ session."
     ;; Using handling-end-of-the-world would be a bit tricky
     ;; due to other catches and interrupts, so we essentially
     ;; re-implement it here. Once and only once more.
-    (catch 'sb-impl::toplevel-catcher
+  (catch 'sb-impl::toplevel-catcher
       (catch 'sb-impl::%end-of-the-world
         (catch '%abort-thread
           (restart-bind ((abort
@@ -1660,7 +1663,7 @@ session."
                 (setq *interrupt-pending* nil)
                 #+sb-thruption
                 (setq *thruption-pending* nil)
-                (handle-thread-exit))))))))
+                (handle-thread-exit)))))))
   ;; this returns to C, so return a single value
   0)
 
@@ -1729,8 +1732,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
                   (init-thread-local-storage thread)
-                  (new-lisp-thread-trampoline thread setup-sem
-                                              function arguments)))
+                  (with-mutex ((thread-result-lock thread))
+                    (new-lisp-thread-trampoline thread setup-sem
+                                                function arguments))))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
         (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
@@ -1773,6 +1777,8 @@ subject to change."
   (let ((lock (thread-result-lock thread))
         (got-it nil)
         (problem :timeout))
+    (unless lock
+      (error 'join-thread-error :thread thread :problem :foreign))
     (without-interrupts
       (unwind-protect
            (cond

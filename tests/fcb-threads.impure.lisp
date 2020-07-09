@@ -40,6 +40,10 @@
                        arg1 thr
                        (or #+linux (sb-thread::thread-os-tid thr))
                        (sb-thread::thread-primitive-thread thr))))
+        ;; This WRITE kind of has to stay here for timing purposes -
+        ;; With it, we get >100 GCs, without it only 3 or 4,
+        ;; and the intent of the test is to exercise GC and foreign
+        ;; calbacks together, which was formerly bug prone.
         (sb-sys:with-pinned-objects (string)
           (sb-unix:unix-write 1 (sb-sys:vector-sap string) 0 (length string)))
         (setq cell (cons thr (1- (floor arg2))))
@@ -77,3 +81,41 @@
   (f 2 5 40)
   ;; one trial, 10 threads, 10 calls
   (f 1 10 10))
+
+;;; Check that you get an error trying to join a foreign thread
+(defglobal *my-foreign-thread* nil)
+(sb-alien::define-alien-callback tryjointhis int ()
+  (setq *my-foreign-thread* sb-thread:*current-thread*)
+  (dotimes (i 10)
+    (write-char #\.) (force-output)
+    (sleep .01))
+  0)
+
+(defun tryjoiner ()
+  (setq *my-foreign-thread* nil)
+  (sb-int:dx-let ((pthread (make-array 1 :element-type 'sb-vm:word)))
+    (alien-funcall
+     (extern-alien "pthread_create"
+                   (function int system-area-pointer unsigned
+                             system-area-pointer unsigned))
+     (sb-sys:vector-sap pthread) 0 (alien-sap tryjointhis) 0)
+    (format t "Alien pthread is ~x~%" (aref pthread 0))
+    (let (found)
+      (loop
+        (setq found *my-foreign-thread*)
+        (when found (return))
+        (sleep .05))
+      (format t "Got ~s~%" found)
+      (let ((result (handler-case (sb-thread:join-thread found)
+                      (sb-thread:join-thread-error () 'ok))))
+        (when (eq result 'ok)
+          ;; actually join it to avoid resource leak
+          (alien-funcall
+           (extern-alien "pthread_join" (function int unsigned unsigned))
+           (aref pthread 0)
+           0))
+        (format t "Pthread joined ~s~%" found)
+        result))))
+
+(with-test (:name :try-join-foreign-thread)
+  (assert (eq (tryjoiner) 'ok)))

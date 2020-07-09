@@ -312,6 +312,5 @@ the alien callback for that function with the given alien type."
             (alien-funcall (extern-alien "release_all_threads_lock"
                                          (function void)))
             thread)))
-    (dx-flet ((enter ()
-                     (sb-alien::enter-alien-callback index return arguments)))
-      (new-lisp-thread-trampoline thread nil #'enter nil))))
+    (dx-let ((args (list index return arguments)))
+      (new-lisp-thread-trampoline thread nil #'sb-alien::enter-alien-callback args))))
