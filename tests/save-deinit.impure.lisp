@@ -20,15 +20,19 @@
 
 #-sb-thread (exit :code 104)
 
+;;; The test needs to purposely inject a small delay into new lisp thread creation
+;;; so it wraps an encapsulation on some piece of primordial thread code.
+;;; It formerly did that on the new thread trampoline, which is not the best place,
+;;; because I don't want to cons a &REST arg nor know the exact signature in this test.
+;;; Encapsulating INIT-THREAD-LOCAL-STORAGE works, but we have to make sure that
+;;; *DEADLINE* has been initialized before calling SLEEP.
+(defglobal *started-threads* nil)
 (sb-int:encapsulate
- 'sb-thread::new-lisp-thread-trampoline
+ 'sb-thread::init-thread-local-storage
  'finalizer-bug
- (lambda (f thread semaphore userfun args)
-   (funcall f thread semaphore
-            (lambda (&rest args)
-              (sleep .1)
-              (apply userfun args))
-            args)))
+ (compile nil '(lambda (f me)
+                (push me *started-threads*)
+                (prog1 (funcall f me) (sleep .05)))))
 
 (finalize (cons 1 'foo)
           (lambda () (format t "~&finalizer1~%")))
@@ -47,3 +51,9 @@
   (sb-impl::deinit)
   (sb-impl::restore-fd-streams)
   (sb-impl::reinit))
+
+;;; I think this test would be better as a shell test,
+;;; so that we actually call SAVE-LISP-AND-DIE to see that it works.
+;;; Why oh why didn't I do that???
+(assert (= 1 (length (sb-thread:list-all-threads)))) ; there's 1 now
+(assert *started-threads*) ; but there was more than 1
