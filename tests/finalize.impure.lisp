@@ -10,7 +10,7 @@
 
 (defglobal *maxdepth* 0)
 ;; Be gentler on 32-bit platforms
-(defglobal *n-finalized-things* #+64-bit 20000 #-64-bit 10000)
+(defglobal *n-finalized-things* (or #+(and 64-bit (not sb-safepoint)) 20000 10000))
 (defglobal *weak-pointers* nil)
 
 #+sb-thread ; Check that we do want to start a thread, and it hasn't been started.
@@ -26,8 +26,7 @@
                              *maxdepth*))
                   ;; cons 320K in the finalizer for #+64-bit,
                   ;; or 80K for #-64-bit
-                  (setf *tmp* (make-list #+64-bit 20000
-                                         #-64-bit 10000))
+                  (setf *tmp* (make-list *n-finalized-things*))
                   (sb-ext:atomic-incf *count*)))
     x))
 (compile 'makejunk)
