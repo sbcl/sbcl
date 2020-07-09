@@ -229,10 +229,15 @@ to terminate this thread cleanly prior to core file saving without signalling
 an error in that case."
   (thread-%ephemeral-p thread))
 
-;; Keep an AVL tree of threads ordered by stack base address. NIL is the empty tree.
+;;; Keep an AVL tree of threads ordered by stack base address. NIL is the empty tree.
 (sb-ext:define-load-time-global *all-threads* ())
 
 (defvar *default-alloc-signal* nil)
+;;; *ALLOC-SIGNAL* is in PER-THREAD-C-INTERFACE-SYMBOLS. Hence it doesn't require
+;;; the aspect of DEFINE-THREAD-LOCAL that ensures a nonzero TLS index.
+;;; (In fact you must not use DEFINE-THREAD-LOCAL, because it's incompatible
+;;; with the numbering assigned to the C interface symbols)
+(defvar sb-vm:*alloc-signal*)
 
 (defun list-all-threads ()
   "Return a list of the live threads. Note that the return value is
@@ -1604,9 +1609,6 @@ session."
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
   (setf (thread-primitive-thread thread) (current-thread-sap))
   (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*))
-  ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
-  ;; so this assigns into TLS, not the global value.
-  (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   (let ((old *all-threads*))
       (loop
         (let ((addr (get-lisp-obj-address sb-vm:*control-stack-start*)))
@@ -2220,6 +2222,8 @@ mechanism for inter-thread communication."
                                     append `((sap-ref-lispobj sap ,index) ,form)))
                       (setf *current-thread* thread))))
       (expand)))
+  ;; This is made thread-local by "src/runtime/genesis/thread-init.inc"
+  (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   thread)
 
 (eval-when (:compile-toplevel)

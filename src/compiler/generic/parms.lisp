@@ -152,7 +152,7 @@
     sb-unix::signal-handler-callback)
   #'equal)
 
-;;; (potentially) static symbols that C code must be able to assign to,
+;;; (potentially) static symbols that C code must be able to set/get
 ;;; as contrasted with static for other reasons such as:
 ;;;  - garbage collections roots (namely NIL)
 ;;;  - other symbols that Lisp codegen must hardwire (T)

@@ -19,7 +19,7 @@
 ;;; to running into any errors, or else you've got twice the trouble.
 ;;;
 ;;; There are other thread-locals which are used by C code, and those are all
-;;; defined in !PER-THREAD-C-INTERFACE-SYMBOLS. Those other symbols must have
+;;; defined in PER-THREAD-C-INTERFACE-SYMBOLS. Those other symbols must have
 ;;; initial values of either a fixnum or a static symbol (typically T or NIL).
 ;;;
 ;;; In contrast, DEFINE-THREAD-LOCAL allows more-or-less an arbitrary form,
