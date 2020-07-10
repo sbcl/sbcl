@@ -844,12 +844,12 @@ set_alloc_start_page(int page_type_flag, int large, page_index_t page)
 #include "private-cons.inc"
 
 static inline boolean region_closed_p(struct alloc_region* region) {
-    return !region->end_addr;
+    return !region->start_addr;
 }
 #define ASSERT_REGIONS_CLOSED() \
-    gc_assert(!((uintptr_t)boxed_region.end_addr \
-               |(uintptr_t)unboxed_region.end_addr \
-               |(uintptr_t)code_region.end_addr))
+    gc_assert(!((uintptr_t)boxed_region.start_addr \
+               |(uintptr_t)unboxed_region.start_addr \
+               |(uintptr_t)code_region.start_addr))
 
 /* Find a new region with room for at least the given number of bytes.
  *

@@ -313,7 +313,7 @@ trans_code(struct code *code)
     set_forwarding_pointer((lispobj *)code, l_new_code);
 
     struct code *new_code = (struct code *) native_pointer(l_new_code);
-    uword_t displacement = l_new_code - l_code;
+    sword_t displacement = l_new_code - l_code;
 
 #if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || \
     defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
@@ -836,7 +836,7 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
     lispobj obj = fdefn_callee_lispobj(fdefn);
     lispobj new = obj;
     scavenge(&new, 1);
-    if (new != obj) fdefn->raw_addr += (new - obj);
+    if (new != obj) fdefn->raw_addr += (sword_t)(new - obj);
     // Payload length is not computed from the header
     return FDEFN_SIZE;
 }
