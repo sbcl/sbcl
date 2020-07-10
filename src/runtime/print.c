@@ -647,6 +647,14 @@ static void print_fun_or_otherptr(lispobj obj)
         print_slots(symbol_slots, count & 0xFF, ptr);
         if (symbol_function(ptr-1) != NIL)
             print_obj("fun: ", symbol_function(ptr-1));
+#ifdef LISP_FEATURE_SB_THREAD
+        int tlsindex = tls_index_of((struct symbol*)(ptr-1));
+        struct thread*th = arch_os_get_current_thread();
+        if (th != 0 && tlsindex != 0) {
+            lispobj v = *(lispobj*)(tlsindex + (char*)th);
+            print_obj("tlsval: ", v);
+        }
+#endif
         break;
 
 #if N_WORD_BITS == 32
