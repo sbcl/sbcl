@@ -849,6 +849,7 @@ create_thread_struct(void* spaces, lispobj start_routine) {
     lispobj* tls = (lispobj*)th;
     for(i = 0; i < (unsigned int)(dynamic_values_bytes/N_WORD_BYTES); i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
+    th->lisp_thread = 0; // force it to be always-thread-local, of course
     th->tls_size = dynamic_values_bytes;
 #endif
     uword_t* __attribute__((__unused__)) constants = (uword_t*)th;

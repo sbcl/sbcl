@@ -226,6 +226,7 @@
 
  ("src/code/share-vm" :not-host)
 
+ ("src/code/thread-structs" :block-compile) ; some defstructs for genesis
  ("src/code/thread" :not-host :block-compile) ; provides *CURRENT-THREAD* for target-signal
  ("src/code/target-signal-common" :not-host)
 

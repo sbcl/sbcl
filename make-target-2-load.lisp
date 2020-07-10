@@ -393,10 +393,16 @@ Please check that all strings which were not recognizable to the compiler
         #.(find-package "SB-PCL")
         #.(find-package "SB-MOP")
         #.(find-package "SB-PRETTY")
-        #.(find-package "SB-THREAD")
         #.(find-package "SB-KERNEL"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))
+      (#.(find-package "SB-THREAD")
+       (or (eq accessibility :external)
+           ;; for some reason a recent change caused the tree-shaker to drop MAKE-SPINLOCK
+           ;; which makes sense. I'm not sure what was rooting the symbol.
+           ;; However the :spinlock-api test in threads.impure asserts that spinlock symbols
+           ;; exist despite being internal symbols.
+           (sb-int:info :function :deprecated symbol)))
       (#.(find-package "SB-FASL")
        ;; Retain +BACKEND-FASL-FILE-IMPLEMENTATION+ and +FASL-FILE-VERSION+
        ;; (and anything else otherwise reachable)

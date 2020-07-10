@@ -76,7 +76,7 @@
         (target-compile-stem stem flags)))))
 
 (when (and (eq (car sb-thread::*thread-local-specials*) :not-final)
-           (not (equal (cdr  sb-thread::*thread-local-specials*)
+           (not (equal (cdr sb-thread::*thread-local-specials*)
                        *original-thread-local-specials*)))
   (sb-int:style-warn "Detected modified thread-local-specials.
 Slam may not have recompiled everything as required."))

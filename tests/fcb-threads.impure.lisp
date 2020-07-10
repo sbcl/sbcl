@@ -36,7 +36,7 @@
     (unless cell
       (let* ((thr sb-thread:*current-thread*)
              (string
-               (format nil "~s from ~s (~@[TID ~d~] Pthread ~x)~%"
+               (format nil "~s from ~s (~@[TID ~d~] C-thread ~x)~%"
                        arg1 thr
                        (or #+linux (sb-thread::thread-os-tid thr))
                        (sb-thread::thread-primitive-thread thr))))

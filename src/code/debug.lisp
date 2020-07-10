@@ -471,7 +471,7 @@ information."
                     (when (and (< a (sb-thread::thread-stack-end thread))
                                ;; Make a final check that it's live.
                                ;; It could die by the time this returns.
-                               (sb-thread::thread-primitive-thread thread))
+                               (sb-thread:thread-alive-p thread))
                       thread))))))))
 
 ;;;; frame printing

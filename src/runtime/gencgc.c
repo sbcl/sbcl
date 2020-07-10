@@ -3096,7 +3096,7 @@ void verify_heap(uword_t flags)
                      (lispobj*)get_binding_stack_pointer(th),
                      flags ^ VERIFYING_HEAP_OBJECTS);
 #ifdef LISP_FEATURE_SB_THREAD
-        verify_space((lispobj)(th+1),
+        verify_space((lispobj)&th->lisp_thread,
                      (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th),
                      flags ^ VERIFYING_HEAP_OBJECTS);
 #endif
@@ -3577,13 +3577,13 @@ garbage_collect_generation(generation_index_t generation, int raise)
                                compacting_p() ? 0 : gc_mark_obj);
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
-            sword_t len;
-            len=(SymbolValue(FREE_TLS_INDEX,0) >> WORD_SHIFT) -
-                (sizeof (struct thread))/(sizeof (lispobj));
+            lispobj* from = &th->lisp_thread;
+            lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
+            sword_t nwords = to - from;
             if (compacting_p())
-                scavenge((lispobj *) (th+1), len);
+                scavenge(from, nwords);
             else
-                gc_mark_range((lispobj *) (th+1), len);
+                gc_mark_range(from, nwords);
 #endif
         }
     }

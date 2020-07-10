@@ -281,7 +281,7 @@ created and old ones may exit at any time."
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
-    (setf (thread-primitive-thread thread) (current-thread-sap)
+    (setf (thread-primitive-thread thread) (sap-int (current-thread-sap))
           (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
           *initial-thread* thread)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
@@ -1410,7 +1410,7 @@ on this semaphore, then N of them is woken up."
         ;; can't exist without the memory range. By clobbering this SAP here,
         ;; it is safe to manipulate the memory and/or the pthread from another thread
         ;; that acquires the interruptions lock if the SAP reads as nonzero.
-        (setf (thread-primitive-thread thread) nil)
+        (setf (thread-primitive-thread thread) 0)
         (barrier (:write)))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
@@ -1607,7 +1607,7 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (setf (thread-primitive-thread thread) (current-thread-sap))
+  (setf (thread-primitive-thread thread) (sap-int (current-thread-sap)))
   (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*))
   (let ((old *all-threads*))
       (loop
@@ -1869,19 +1869,23 @@ subject to change."
         ;; -- DFL
         (setf *thruption-pending* t)))))
 
+(defmacro with-c-thread ((c-thread thread) &body body)
+  `(with-interruptions-lock (,thread)
+     (let ((,c-thread (thread-primitive-thread ,thread)))
+       ,@body)))
+
 ;;; A macro to extract the pthread id out of the thread's C memory
 ;;; while ensuring that the thread can't exit.
 ;;; Invokes BODY only if the pthread ID is valid.
 (defmacro with-os-thread ((os-thread thread) &body body)
   #+sb-thread
   `(let ((lisp-thread ,thread))
-     (with-interruptions-lock (lisp-thread)
-       (let ((memory (thread-primitive-thread lisp-thread)))
-         (when memory
-           (let ((,os-thread (sap-ref-word memory
-                                           (ash sb-vm::thread-os-thread-slot
-                                                sb-vm:word-shift))))
-             ,@body)))))
+     (with-c-thread (c-thread lisp-thread)
+       (unless (= c-thread 0)
+         (let ((,os-thread (sap-ref-word (int-sap c-thread)
+                                         (ash sb-vm::thread-os-thread-slot
+                                              sb-vm:word-shift))))
+           ,@body))))
   #-sb-thread
   `(let ((lisp-thread ,thread) (,os-thread 0))
      (declare (ignorable lisp-thread ,os-thread))
@@ -1893,12 +1897,11 @@ subject to change."
   #+sb-thread
   (if (eq *current-thread* thread)
       (my-kernel-thread-id)
-      (with-interruptions-lock (thread)
-        (let ((memory (thread-primitive-thread thread)))
-          (when memory
-            (sap-ref-32 memory
-                        (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
-                           #+(and 64-bit big-endian) 4))))))
+      (with-c-thread (c-thread thread)
+        (unless (= c-thread 0)
+          (sap-ref-32 (int-sap c-thread)
+                      (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
+                         #+(and 64-bit big-endian) 4)))))
   ;; The man page for gettid() says
   ;;   "In a single-threaded process, the thread ID is equal to the process ID"
   ;; It probably would be fine to return 0 here; nothing internal uses the value.
@@ -2062,20 +2065,13 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 ;;; with an SBCL developer first, or are doing something that you
 ;;; should probably discuss with a professional psychiatrist first
 #+sb-thread
-(macrolet ((with-thread-memory ((var) &body body)
-             ;; Prevent the thread from dying completely while we look at the TLS
-             ;; area...
-             ;; Liveness per se is not important, but rather whether the memory exists.
-             `(with-interruptions-lock (thread)
-                (let ((,var (thread-primitive-thread thread)))
-                  ,@body))))
-
+(progn
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
 
   (defun %symbol-value-in-thread (symbol thread)
-    (with-thread-memory (sap)
-      (if sap
-          (let ((val (sap-ref-lispobj sap (symbol-tls-index symbol))))
+    (with-c-thread (c-thread thread)
+      (if (/= c-thread 0)
+          (let ((val (sap-ref-lispobj (int-sap c-thread) (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
               (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
               (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
@@ -2083,13 +2079,13 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    (with-thread-memory (sap)
-      (if sap
+    (with-c-thread (c-thread thread)
+      (if (/= c-thread 0)
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
                   (t
-                   (setf (sap-ref-lispobj sap offset) value)
+                   (setf (sap-ref-lispobj (int-sap c-thread) offset) value)
                    (values value :ok))))
           (values nil :thread-dead))))
 
@@ -2106,9 +2102,8 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                         sb-vm:n-fixnum-tag-bits)
                    sb-vm:n-word-bytes)
                 (- index sb-vm:n-word-bytes))
-         ;; (There's no reason this couldn't work on any thread now.)
-         (sap (the system-area-pointer
-                   (thread-primitive-thread *current-thread*)))
+         ;; (There's almost no reason this couldn't work on any thread.)
+         (sap (current-thread-sap))
          (list))
         ((< index (ash sb-vm::primitive-thread-object-length sb-vm:word-shift))
          list)
@@ -2209,19 +2204,24 @@ mechanism for inter-thread communication."
   (if (unbound-marker-p *current-thread*)
       (macrolet ((expand ()
                    `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
-        (expand))
-      (setf *current-thread* thread))
+        (expand)))
   ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison's sake
   #+sb-thread
   (let ((sap (current-thread-sap)))
     (macrolet ((expand ()
+                 ;; As for uni-thread, *current-thread* is always-boundp,
+                 ;; but the C part of tls-init makes it zero initially
+                 ;; (in violation of the type). Check for that.
                  `(if (= (sap-ref-word sap ,(info :variable :wired-tls '*current-thread*))
-                         sb-vm:no-tls-value-marker-widetag)
+                         0)
                       (setf ,@(loop for (var form) in (cdr *thread-local-specials*)
                                     for index = (info :variable :wired-tls var)
-                                    append `((sap-ref-lispobj sap ,index) ,form)))
-                      (setf *current-thread* thread))))
+                                    append `((sap-ref-lispobj sap ,index) ,form))))))
       (expand)))
+  ;; Straightforwardly assign *current-thread* because it's never the NO-TLS-VALUE marker.
+  ;; I wonder how to to prevent user code from doing this, but it isn't a new problem per se.
+  ;; Perhaps this should be symbol-macro with a vop behind it and no setf expander.
+  (setf *current-thread* thread)
   ;; This is made thread-local by "src/runtime/genesis/thread-init.inc"
   (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   thread)
@@ -2269,29 +2269,28 @@ mechanism for inter-thread communication."
                (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
                      ((= word sb-vm:unbound-marker-widetag) :unbound)
                      (t (sap-ref-lispobj sap offset)))))
-           (show (tlsindex val &optional thread-slot-p)
-             (if thread-slot-p
-                 (format t " ~3d ~30a : #x~x~%"
-                         (ash tlsindex (- sb-vm:word-shift))
-                         (aref names (ash tlsindex (- sb-vm:word-shift)))
-                         val)
-                 (let ((*print-right-margin* 128)
-                       (*print-lines* 4))
-                   (format t " ~3d ~30a : ~s~%"
-                           (ash tlsindex (- sb-vm:word-shift))
-                           ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
-                           ;; which is not defined during cross-compilation.
-                           (funcall 'sb-ext::find-symbol-from-tls-index tlsindex)
-                           val)))))
+           (show (tlsindex val)
+             (let ((*print-right-margin* 128)
+                   (*print-lines* 4))
+               (format t " ~3d ~30a : ~s~%"
+                       (ash tlsindex (- sb-vm:word-shift))
+                       ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
+                       ;; which is not defined during cross-compilation.
+                       (funcall 'sb-impl::find-symbol-from-tls-index tlsindex)
+                       val))))
       (format t "~&TLS: (base=~x)~%" (sap-int sap))
       (loop for tlsindex from sb-vm:n-word-bytes below
             (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
             by sb-vm:n-word-bytes
-            do (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
-                   (show tlsindex (sap-ref-word sap tlsindex) t)
-                   (let ((val (safely-read sap tlsindex)))
-                     (unless (eq val :no-tls-value)
-                       (show tlsindex val)))))
+            do (let ((thread-slot-name
+                       (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
+                           (aref names (ash tlsindex (- sb-vm:word-shift))))))
+                 (if (and thread-slot-name (neq thread-slot-name 'sb-vm::lisp-thread))
+                     (format t " ~3d ~30a : #x~x~%" (ash tlsindex (- sb-vm:word-shift))
+                             thread-slot-name (sap-ref-word sap tlsindex))
+                     (let ((val (safely-read sap tlsindex)))
+                       (unless (eq val :no-tls-value)
+                         (show tlsindex val))))))
       (let ((from (descriptor-sap sb-vm:*binding-stack-start*))
             (to (binding-stack-pointer-sap)))
         (format t "~%Binding stack: (depth ~d)~%"

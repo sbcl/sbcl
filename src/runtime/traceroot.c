@@ -18,6 +18,7 @@
 #include "search.h"
 #include "genesis/avlnode.h"
 #include "genesis/sap.h"
+#include "genesis/thread-instance.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -275,6 +276,7 @@ deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
 
 /* KNOWN BUG: stack reference to pinned large object or immobile object
  * won't be found in pins hashtable */
+/* Also: should take 'struct lisp_thread**' instead of 'struct thread**' */
 static lispobj examine_threads(struct hopscotch_table* targets,
                                void (*context_scanner)(),
                                int n_pins, lispobj* pins,
@@ -290,7 +292,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
 #ifdef LISP_FEATURE_SB_THREAD
         // Examine thread-local storage
         *root_kind = TLS;
-        where = (lispobj*)(th+1);
+        where = &th->lisp_thread;
         end   = (lispobj*)((char*)th + SymbolValue(FREE_TLS_INDEX,0));
         for( ; where < end ; ++where)
             if (interestingp(*where, targets)) {
@@ -1054,37 +1056,17 @@ int prove_liveness(lispobj objects, int criterion)
     return gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
 }
 
-// These are slot offsets in (DEFSTRUCT THREAD),
-// not the C structure defined in genesis/thread.h
-#define LISP_THREAD_NAME_SLOT INSTANCE_DATA_START+0
-#define LISP_THREAD_OS_THREAD_SLOT INSTANCE_DATA_START+3
-
-/* Perform exhaustive search on *ALL-THREADS* looking for a specific thread.
- * Efficiency is not a concern.
- */
-static struct instance* find_thread(os_thread_t os_thread, lispobj tree)
-{
-    if (tree == NIL) return 0;
-    struct avlnode* node = (struct avlnode*)native_pointer(tree);
-    struct instance* lisp_thread = (struct instance*)native_pointer(node->data);
-    if ((os_thread_t)lisp_thread->slots[LISP_THREAD_OS_THREAD_SLOT] == os_thread)
-        return lisp_thread;
-    if ((lisp_thread = find_thread(os_thread, node->left)) != NULL)
-        return lisp_thread;
-    if ((lisp_thread = find_thread(os_thread, node->right)) != NULL)
-        return lisp_thread;
-    return 0;
-}
-
+/// Given a pthread identifier, return the lisp thread's string name.
+/// Caveat emptor: This doesn't acquire the all_threads_lock.
+/// Ironically perhaps, 'traceroot' no longer uses this, but it's nice to have.
 struct vector* lisp_thread_name(os_thread_t os_thread)
 {
-    static unsigned int hint;
-    lispobj* sym = find_symbol("*ALL-THREADS*", find_package("SB-THREAD"), &hint);
-    if (sym) {
-        struct instance* lisp_thread =
-            find_thread(os_thread, ((struct symbol*)sym)->value);
-        if (lisp_thread)
-            return VECTOR(lisp_thread->slots[LISP_THREAD_NAME_SLOT]);
+    struct thread* th;
+    for_each_thread (th) {
+        if (pthread_equal(os_thread, th->os_thread)) {
+            struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
+            return VECTOR(lispthread->name);
+        }
     }
     return 0;
 }

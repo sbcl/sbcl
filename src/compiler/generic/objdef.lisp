@@ -474,7 +474,7 @@ during backtrace.
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
-(define-primitive-object (thread :size primitive-thread-object-length)
+#.`(define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of the start routine into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
@@ -587,7 +587,10 @@ during backtrace.
   ;; If we need the header slots, but they can't precede this structure
   ;; for technical reasons having to do with no writable memory being there,
   ;; then stuff them at the end, for lack of any place better.
-  . #.*thread-trailer-slots*)
+  ,@*thread-trailer-slots*
+  ;; The *current-thread* MUST be the last slot in the C thread structure.
+  ;; It it the only slot that needs to be noticed by the garbage collector.
+  (lisp-thread :pointer t :special sb-thread:*current-thread*))
 
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
 (declaim (inline code-object-size code-header-words %code-code-size))

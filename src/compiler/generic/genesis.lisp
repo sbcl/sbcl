@@ -3184,10 +3184,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (string-upcase c-name) (sb-vm:primitive-object-length obj)))
   (format t "~%#endif /* __ASSEMBLER__ */~2%"))
 
-(defun write-structure-object (dd *standard-output*)
+(defun write-structure-object (dd *standard-output* &optional structname)
   (flet ((cstring (designator) (c-name (string-downcase designator))))
     (format t "#ifndef __ASSEMBLER__~2%")
-    (format t "struct ~A {~%" (cstring (dd-name dd)))
+    (format t "struct ~A {~%" (or structname (cstring (dd-name dd))))
     (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
     ;; classoid's expressly declared layout isn't renamed as a special-case.
@@ -3863,6 +3863,9 @@ III. initially undefined function references (alphabetically):
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)) stream)))
+        (out-to "thread-instance"
+          (write-structure-object (layout-info (find-layout 'sb-thread::thread))
+                                  stream "thread_instance"))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file

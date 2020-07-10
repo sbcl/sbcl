@@ -34,13 +34,12 @@
      :all))
   0)
 
+;;; Given ADDR which is a pointer to a 'struct thread'
+;;; return the corresponding lisp thread.
 (defun find-lisp-thread-from-thread-struct (addr)
   (declare (type sb-ext:word addr))
-  ;; find a stack whose base is nearest and below A.
-  (awhen (sb-thread::avl-find<= addr sb-thread::*all-threads*)
-    (let ((thread (sb-thread::avlnode-data it)))
-      (when (sap= (int-sap addr) (sb-thread::thread-primitive-thread thread))
-        thread))))
+  (sap-ref-lispobj (int-sap addr)
+                   (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift)))
 
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
