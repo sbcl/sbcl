@@ -108,7 +108,7 @@ tls_index_of(struct symbol *symbol) // untagged pointer
 #endif
 }
 #else
-#  define tls_index_of(x) (x->tls_index)
+#  define tls_index_of(x) (x)->tls_index
 #endif
 #  define per_thread_value(sym,th) *(lispobj*)(tls_index_of(sym) + (char*)th)
 #endif
