@@ -25,8 +25,6 @@ extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);
 extern void skip_internal_error (os_context_t *context);
 
-extern lispobj debug_print(lispobj string);
-
 /* Portably printf()ing a pthread_t is tricky. It has to be printed
  * as opaque bytes by taking &id and sizeof id.
  * As the man page says:

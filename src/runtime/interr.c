@@ -345,26 +345,3 @@ describe_internal_error(os_context_t *context)
         }
     }
 }
-
-/* utility routines used by miscellaneous pieces of code */
-
-lispobj debug_print(lispobj string)
-{
-    /* This is a kludge.  It's not actually safe - in general - to use
-       %primitive print on the alpha, because it skips half of the
-       number stack setup that should usually be done on a function
-       call, so the called routine (i.e. this one) ends up being able
-       to overwrite local variables in the caller.  Rather than fix
-       this everywhere that %primitive print is used (it's only a
-       debugging aid anyway) we just guarantee our safety by putting
-       an unused buffer on the stack before doing anything else
-       here */
-    char untouched[32];
-    if (header_widetag(VECTOR(string)->header) != SIMPLE_BASE_STRING_WIDETAG)
-        fprintf(stderr, "debug_print: can't display string\n");
-    else
-        fprintf(stderr, "%s\n", (char *)(VECTOR(string)->data));
-    /* shut GCC up about not using this, because that's the point.. */
-    (void)untouched;
-    return NIL;
-}

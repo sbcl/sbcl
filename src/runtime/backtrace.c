@@ -113,6 +113,13 @@ print_string (struct vector *vector, FILE *f)
     }
 }
 
+lispobj debug_print(lispobj string)
+{
+    print_string(VECTOR(string), stderr);
+    putc('\n', stderr);
+    return 0;
+}
+
 static int string_equal (struct vector *vector, char *string)
 {
     if (widetag_of(&vector->header) != SIMPLE_BASE_STRING_WIDETAG)
