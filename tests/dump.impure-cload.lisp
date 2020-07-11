@@ -472,3 +472,17 @@
   (let ((z (eval `(test-constant-identity ,(intern "+CONSY-CONSTANT+")))))
     (assert (equal (car z) +consy-constant+))
     (assert (cadr z))))
+
+(macrolet ((expand ()
+             `(progn
+                ,@(loop for i from 0 below sb-vm:n-word-bits
+                        collect
+                        `(sb-int:defconstant-eqx ,(intern (format nil "MYSAP~d" i))
+                             ,(sb-sys:int-sap (ash 1 i))
+                           #'sb-sys:sap=)))))
+  (expand))
+(with-test (:name :dump-sap)
+  (dotimes (i sb-vm:n-word-bits)
+    (let ((s (intern (format nil "MYSAP~d" i))))
+      (assert (= (sb-sys:sap-int (symbol-value s))
+                 (ash 1 i))))))

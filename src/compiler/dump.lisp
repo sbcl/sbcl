@@ -409,7 +409,12 @@
              (dump-fop 'fop-truth file)
              (dump-non-immediate-object x file)))
         ((fixnump x) (dump-integer x file))
-        ((characterp x) (dump-character x file))
+        ((characterp x)
+         (dump-fop 'fop-character file (sb-xc:char-code x)))
+        #-sb-xc-host
+        ((system-area-pointer-p x)
+         (dump-fop 'fop-word-pointer file)
+         (dump-integer-as-n-bytes (sap-int x) sb-vm:n-word-bytes file))
         (t
          (dump-non-immediate-object x file))))
 
@@ -809,10 +814,7 @@
                             (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
                             #+sb-xc-host bits-per-length))))
 
-;;; Dump characters and string-ish things.
-
-(defun dump-character (char file)
-  (dump-fop 'fop-character file (sb-xc:char-code char)))
+;;; Dump string-ish things.
 
 ;;; Dump a SIMPLE-STRING.
 (defun dump-chars (s fasl-output base-string-p)

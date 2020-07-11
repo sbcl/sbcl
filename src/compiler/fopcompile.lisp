@@ -258,6 +258,7 @@
 (defun dumpable-leaflike-p (obj)
   (or (sb-xc:typep obj '(or symbol number character unboxed-array
                             debug-name-marker
+                            system-area-pointer
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))
       ;; The cross-compiler wants to dump CTYPE instances as leaves,

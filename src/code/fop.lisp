@@ -317,6 +317,10 @@
 (define-fop 36 (fop-integer ((:operands n-bytes)))
   (number-to-core (load-s-integer n-bytes (fasl-input-stream))))
 
+(define-fop 33 :not-host (fop-word-pointer)
+  (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
+    (int-sap (fast-read-u-integer #.sb-vm:n-word-bytes))))
+
 (define-fop 34 (fop-word-integer)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (number-to-core (fast-read-s-integer #.sb-vm:n-word-bytes))))
