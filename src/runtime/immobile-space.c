@@ -58,6 +58,7 @@
 #include "immobile-space.h"
 #include "unaligned.h"
 #include "code.h"
+#include "lispstring.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1727,17 +1728,6 @@ static lispobj* get_load_address(lispobj* old)
 }
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
-// This does not accept (SIMPLE-ARRAY NIL (*))
-// (You'd have a pretty bad time trying making a symbol like that)
-static int schar(struct vector* string, int index)
-{
-#ifdef LISP_FEATURE_SB_UNICODE
-    if (widetag_of(&string->header) == SIMPLE_CHARACTER_STRING_WIDETAG)
-        return ((int*)string->data)[index];
-#endif
-    return ((char*)string->data)[index];
-}
-
 #include "genesis/package.h"
 #define N_SYMBOL_KINDS 5
 

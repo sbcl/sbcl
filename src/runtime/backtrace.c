@@ -36,24 +36,11 @@
 #include "code.h"
 #include "var-io.h"
 #include "forwarding-ptr.h"
+#include "lispstring.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
 #endif
-
-static void
-sbcl_putwc(wchar_t c, FILE *file)
-{
-#ifdef LISP_FEATURE_OS_PROVIDES_PUTWC
-    putwc(c, file);
-#else
-    if (c < 256) {
-        fputc(c, file);
-    } else {
-        fputc('?', file);
-    }
-#endif
-}
 
 static int decode_locs(lispobj packed_integer, int *offset, int *elsewhere)
 {
@@ -106,34 +93,24 @@ debug_function_from_pc (struct code* code, void *pc)
 static void
 print_string (struct vector *vector, FILE *f)
 {
-  int tag = widetag_of(&vector->header);
-
-#define doit(TYPE)                              \
-  do {                                          \
-    int i;                                      \
-    int n = fixnum_value(vector->length);       \
-    TYPE *data = (TYPE *) vector->data;         \
-    for (i = 0; i < n; i++) {                   \
-      wchar_t c = (wchar_t) data[i];            \
-      if (c == '\\' || c == '"')                \
-        putc('\\', f);                          \
-      sbcl_putwc(c, f);                         \
-    }                                           \
-  } while (0)
-
-  switch (tag) {
-  case SIMPLE_BASE_STRING_WIDETAG:
-    doit(unsigned char);
-    break;
-#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-  case SIMPLE_CHARACTER_STRING_WIDETAG:
-    doit(unsigned int);
-    break;
-#endif
-  default:
-    fprintf(f, "<??? type %d>", tag);
-  }
-#undef doit
+    if (!string_widetag_p(widetag_of(&vector->header))) {
+        fprintf(f, "<??? type %d>", widetag_of(&vector->header));
+        return;
+    }
+    int i;
+    int n = fixnum_value(vector->length);
+    for (i = 0; i < n; i++) {
+        unsigned int c = schar(vector, i);
+        if (c > 0xFFFF) fprintf(f,"\\U%08x", c);
+        // without knowing whether the terminal can accept
+        // character codes 128 through 255, it's conservative
+        // to just output unicode escapes.
+        else if (c > 0x7F) fprintf(f,"\\u%04x", c);
+        else {
+            if (c == '\\' || c == '"') putc('\\', f);
+            putc(c, f);
+        }
+    }
 }
 
 static int string_equal (struct vector *vector, char *string)

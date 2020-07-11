@@ -45,8 +45,6 @@ tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/mmap-rwx
-tools-for-build/os-provides-putwc-test
-tools-for-build/os-provides-putwc-test.exe
 tools-for-build/where-is-mcontext
 contrib/*/test-passed
 contrib/*/test-output

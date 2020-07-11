@@ -24,8 +24,7 @@
           ;; "LISP_FEATURE_" on the corresponding #define is unfortunate.
           :GCC-TLS
           :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
-          :OS-PROVIDES-BLKSIZE-T ; only for 'src/runtime/wrap.h'
-          :OS-PROVIDES-PUTWC)) ; only for 'src/runtime/backtrace.c'
+          :OS-PROVIDES-BLKSIZE-T)) ; only for 'src/runtime/wrap.h'
        (public-features
         (cons
          sb-impl::!sbcl-architecture
