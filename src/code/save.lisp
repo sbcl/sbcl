@@ -337,6 +337,9 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
+  ;; To have any hope of making pathname interning actually work,
+  ;; this CLRHASH would need to be removed. But removing it causes excess
+  ;; garbage retention because weakness doesn't work. It's a catch-22.
   (clrhash *pathnames*)
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*

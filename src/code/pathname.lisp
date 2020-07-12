@@ -50,7 +50,7 @@
 
 (sb-xc:defstruct (pathname (:conc-name %pathname-)
                            (:copier nil)
-                           (:constructor allocate-pathname
+                           (:constructor !allocate-pathname
                                (host device hashed-dir name type version))
                            (:predicate pathnamep))
   (namestring nil) ; computed on demand

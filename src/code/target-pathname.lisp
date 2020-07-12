@@ -73,11 +73,6 @@
 ;;; because later on we define either UNIX-HOST or WIN32-HOST.
 #-sb-fluid (declaim (freeze-type pathname logical-host))
 
-(defmethod make-load-form ((logical-host logical-host) &optional env)
-  (declare (ignore env))
-  (values `(find-logical-host ',(logical-host-name logical-host))
-          nil))
-
 ;;; Utility functions
 
 (deftype absent-pathname-component ()
@@ -249,7 +244,7 @@
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-pathname ()
-  (allocate-pathname *physical-host* nil nil nil nil :newest))
+  (intern-pathname *physical-host* nil nil nil nil :newest))
 
 ;;; pathname methods
 
@@ -276,9 +271,6 @@
                   (%pathname-name pathname)
                   (%pathname-type pathname)
                   (%pathname-version pathname))))))
-
-(defmethod make-load-form ((pathname pathname) &optional environment)
-  (make-load-form-saving-slots pathname :environment environment))
 
 ;;; Use an unsynchronized weak hash table with explicit locking to "try"
 ;;; to intern pathnames. "Try" because there are several factors that preclude
@@ -346,9 +338,9 @@
               name (upcase-maybe name)
               type (upcase-maybe type))))
   (let ((table *pathnames*))
-    (declare (inline allocate-pathname)) ; for DXability
+    (declare (inline !allocate-pathname)) ; for DXability
     (with-system-mutex ((hash-table-%lock table))
-      (dx-let ((key (allocate-pathname
+      (dx-let ((key (!allocate-pathname
                      host
                      device
                      (when directory
@@ -371,9 +363,6 @@
 (declaim (simple-vector *logical-hosts*))
 
 ;;;; patterns
-
-(defmethod make-load-form ((pattern pattern) &optional environment)
-  (make-load-form-saving-slots pattern :environment environment))
 
 (defmethod print-object ((pattern pattern) stream)
   (print-unreadable-object (pattern stream :type t)
@@ -1758,9 +1747,8 @@ unspecified elements into a completed to-pathname based on the to-wildname."
         (parse-host (logical-chunkify namestr start end)))
       (values host :unspecific (directory) name type version))))
 
-;;; We can't initialize this yet because not all host methods are
-;;; loaded yet.
-(define-load-time-global *logical-pathname-defaults* nil)
+(define-load-time-global *logical-pathname-defaults*
+  (intern-pathname (make-logical-host :name "") :unspecific nil nil nil nil))
 
 (defun logical-namestring-p (x)
   (and (stringp x)
@@ -1954,13 +1942,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
       (translate-logical-pathname possibly-logical-pathname)
       possibly-logical-pathname))
 
-(setq *logical-pathname-defaults*
-  (let ((pn (allocate-pathname
-             (make-logical-host :name (logical-word-or-lose "BOGUS"))
-             :unspecific nil nil nil nil)))
-    (setf (%instance-layout pn) #.(find-layout 'logical-pathname))
-    pn))
-
 (defun load-logical-pathname-translations (host)
   "Reads logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
 with HOST replaced by the supplied parameter. Returns T on success.
@@ -2037,3 +2018,23 @@ existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and
               ("SYS:CONTRIB;**;*.*.*" ,(physical-target "contrib"))
               ("SYS:OUTPUT;**;*.*.*" ,(physical-target "output"))
               ,@current-translations)))))
+
+(defmethod make-load-form ((pn pathname) &optional env)
+  (declare (ignore env))
+  (labels ((reconstruct (component)
+             (if (and (listp component) (some #'pattern-p component))
+                 (cons 'list (mapcar #'patternify component))
+                 `',component))
+           (patternify (subcomponent)
+             (if (pattern-p subcomponent)
+                 `(make-pattern ',(pattern-pieces subcomponent))
+                 `',subcomponent)))
+    (values `(intern-pathname
+              ,(if (typep pn 'logical-pathname)
+                   `(find-logical-host ',(logical-host-name (%pathname-host pn)))
+                   '*physical-host*)
+              ,(reconstruct (%pathname-device pn))
+              ,(reconstruct (%pathname-directory pn))
+              ,(reconstruct (%pathname-name pn))
+              ,(reconstruct (%pathname-type pn))
+              ,(reconstruct (%pathname-version pn))))))

@@ -223,11 +223,6 @@
   (define-default-make-load-form-method standard-object)
   (define-default-make-load-form-method condition))
 
-sb-impl::
-(defmethod make-load-form ((host (eql *physical-host*)) &optional env)
-  (declare (ignore env))
-  '*physical-host*)
-
 ;;; I guess if the user defines other kinds of EQL specializers, she would
 ;;; need to implement this? And how is she supposed to know that?
 (defmethod eql-specializer-to-ctype ((specializer eql-specializer))
