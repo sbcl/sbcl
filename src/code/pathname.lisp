@@ -36,8 +36,10 @@
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
-(sb-xc:defstruct (pattern (:constructor make-pattern (pieces)) (:copier nil))
-  (pieces nil :type list))
+(sb-xc:defstruct (pattern (:constructor %make-pattern (hash pieces))
+                          (:copier nil))
+  (hash 0 :type fixnum :read-only t)
+  (pieces nil :type list :read-only t))
 
 ;;;; PATHNAME structures
 
@@ -48,24 +50,20 @@
 
 (sb-xc:defstruct (pathname (:conc-name %pathname-)
                            (:copier nil)
-                           (:constructor %%make-pathname
-                               (host device directory name type version
-                                &aux (dir-hash (pathname-dir-hash directory))
-                                     (stem-hash (mix (sxhash name) (sxhash type)))))
+                           (:constructor allocate-pathname
+                               (host device hashed-dir name type version))
                            (:predicate pathnamep))
   (namestring nil) ; computed on demand
-  ;; support for pathname interning and hashing.
-  ;; Host and device might be reducible to small integers if we keep tables (vectors)
-  ;; of the values seen.
-  ;; We might even be able to pack DIR-HASH, STEM-HASH, and HOST, DEVICE into one slot.
-  (dir-hash nil :type hash-code :read-only t)
-  (stem-hash nil :type hash-code :read-only t) ; name hash and type hash mixed
   ;; the host (at present either a UNIX or logical host)
+  ;; Host and device could be reduced to small integers and packed in one slot
+  ;; by keeping tables of the observed values.
   (host nil :type (or host null) :read-only t)
   ;; the name of a logical or physical device holding files
   (device nil :type (or simple-string pathname-component-tokens) :read-only t)
-  ;; a list of strings that are the component subdirectory components
-  (directory nil :type list :read-only t)
+  ;; an interned list of strings headed by :ABSOLUTE or :RELATIVE
+  ;; comprising the path, or NIL.
+  ;; if the list is non-NIL, the CAR is a numerical hash code.
+  (hashed-dir nil :type list :read-only t)
   ;; the filename
   (name nil :type (or simple-string pattern pathname-component-tokens) :read-only t)
   ;; the type extension of the file

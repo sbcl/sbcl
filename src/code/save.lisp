@@ -337,7 +337,7 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (fill *pathnames* nil)
+  (clrhash *pathnames*)
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
