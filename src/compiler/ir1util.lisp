@@ -3204,6 +3204,15 @@ is :ANY, the function name is not checked."
                    (values :calls constants)))))))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
+  (loop for annot in (lvar-annotations lvar)
+        when (lvar-lambda-var-annotation-p annot)
+        do (let ((lambda-var (lvar-lambda-var-annotation-lambda-var annot)))
+             (when (and (lambda-var-constant lambda-var)
+                        (not (lambda-var-sets lambda-var)))
+               (warn 'sb-kernel::macro-arg-modified
+                     :fun-name (lvar-modified-annotation-caller annotation)
+                     :variable (lambda-var-original-name lambda-var))
+               (return-from process-lvar-modified-annotation))))
   (multiple-value-bind (type values) (lvar-constants lvar)
     (labels ((modifiable-p (value)
                (or (consp value)

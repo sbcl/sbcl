@@ -1216,7 +1216,9 @@ NOTE: This interface is experimental and subject to change."
                                 ((or (listp id) ; must be a type-specifier
                                      (memq id '(special ignorable ignore
                                                 dynamic-extent
-                                                truly-dynamic-extent))
+                                                truly-dynamic-extent
+                                                sb-c::constant-value
+                                                sb-c::no-constraints))
                                      (info :type :kind id))
                                  (cdr decl))))))
            (partition (spec)

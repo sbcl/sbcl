@@ -1151,7 +1151,8 @@
                      (loop for (declare . declarations) in decls
                            collect (list* declare
                                           (remove 'lambda-list declarations :key #'car)))
-                     decls)))))
+                     decls))))
+             (variables (ds-lambda-list-variables parse nil)))
     ;; Signal a style warning for duplicate names, but disregard &AUX variables
     ;; because most folks agree that (LET* ((X (F)) (X (G X))) ..) makes sense
     ;; - some would even say that it is idiomatic - and &AUX bindings are just
@@ -1163,7 +1164,7 @@
             (when (memq (car tail) (cdr tail))
               (style-warn-once lambda-list "variable ~S occurs more than once"
                                (car tail))))
-          (append whole env (ds-lambda-list-variables parse nil)))
+          (append whole env variables))
     ;; Maybe kill docstring, but only under the cross-compiler.
     #+(and (not sb-doc) sb-xc-host) (setq docstring nil)
     ;; Note that we *NEVER* declare macro lambdas as a toplevel named lambda.
@@ -1190,7 +1191,9 @@
                                           `(:special-form . ,name)
                                           `(:macro ,name . ,kind)))
                      '(destructuring-bind))
-                  ,new-ll (,accessor ,ll-whole)
+               ,new-ll (,accessor ,ll-whole)
+               #-sb-xc-host
+               (declare (constant-value ,@variables))
                ,@decls
                ,@(if wrap-block
                      `((block ,(fun-name-block-name name) ,@forms))

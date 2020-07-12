@@ -649,6 +649,11 @@
                      (maybe-reanalyze-functional leaf))
                    leaf))
          (ref (make-ref leaf name)))
+    (when (and result
+               (lambda-var-p leaf)
+               (lambda-var-constant leaf))
+      (push (make-lvar-lambda-var-annotation :lambda-var leaf)
+            (lvar-annotations result)))
     (push ref (leaf-refs leaf))
     (when (and (functional-p leaf)
                (functional-ignore leaf))
@@ -1359,6 +1364,15 @@
         (t
          (setf (lambda-var-no-constraints var) t))))))
 
+(defun process-constant-decl (spec vars)
+  (dolist (name (rest spec))
+    (let ((var (find-in-bindings vars name)))
+      (cond
+        ((not var)
+         (warn "No ~s variable" name))
+        (t
+         (setf (lambda-var-constant var) t))))))
+
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
 ;;; (and TYPE if notinline), plus type-restrictions from the lexenv.
 (defun make-new-inlinep (var inlinep local-type)
@@ -1611,6 +1625,9 @@
          :flushable (cdr spec)))
        (no-constraints
         (process-no-constraints-decl spec vars)
+        res)
+       (constant-value
+        (process-constant-decl spec vars)
         res)
        ;; We may want to detect LAMBDA-LIST and VALUES decls here,
        ;; and report them as "Misplaced" rather than "Unrecognized".

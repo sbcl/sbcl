@@ -138,6 +138,11 @@
             (:include lvar-type-annotation)
             (:copier nil)))
 
+(defstruct (lvar-lambda-var-annotation
+            (:include lvar-annotation)
+            (:copier nil))
+  lambda-var)
+
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (when (boundp '*compilation*)
@@ -1286,7 +1291,9 @@
   ;; attributes must be set for the value-cell object to be created.
   explicit-value-cell
   ;; Do not propagate constraints for this var
-  no-constraints)
+  no-constraints
+  ;; Does it hold a constant that should't be destructively modified
+  constant)
 
 (defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
@@ -1341,6 +1348,9 @@
   `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
 (defmacro lambda-var-no-constraints (var)
   `(lambda-var-attributep (lambda-var-flags ,var) no-constraints))
+(defmacro lambda-var-constant (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) constant))
+
 
 ;;;; basic node types
 

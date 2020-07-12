@@ -966,6 +966,14 @@
   (:default-initargs :references '((:ansi-cl :special-operator quote)
                                    (:ansi-cl :section (3 2 2 3)))))
 
+(define-condition macro-arg-modified (constant-modified)
+  ((variable :initform nil :initarg :variable :reader macro-arg-modified-variable))
+  (:report (lambda (c s)
+             (format s "~@<Destructive function ~S called on a macro argument: ~S.~:>"
+                     (constant-modified-fun-name c)
+                     (macro-arg-modified-variable c))))
+  (:default-initargs :references nil))
+
 (define-condition package-at-variance (reference-condition simple-warning)
   ()
   (:default-initargs :references '((:ansi-cl :macro defpackage)

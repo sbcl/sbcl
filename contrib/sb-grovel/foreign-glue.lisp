@@ -356,7 +356,7 @@ deeply nested structures."
 (defmacro define-c-struct (name size &rest elements)
   (multiple-value-bind (struct-elements accessors)
       (let* ((root (make-instance 'struct :name name :children nil :offset 0)))
-        (loop for e in (sort elements #'< :key #'fourth)
+        (loop for e in (sort (copy-list elements) #'< :key #'fourth)
               do (insert-element root (apply 'mk-val e))
               finally (return root))
         (setf (children root)
