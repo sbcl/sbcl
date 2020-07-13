@@ -373,6 +373,8 @@ init_new_thread(struct thread *th,
         lose("arch_os_thread_init failed");
     }
 
+    th->os_thread=thread_self();
+
 #define GUARD_CONTROL_STACK 1
 #define GUARD_BINDING_STACK 2
 #define GUARD_ALIEN_STACK   4
@@ -1014,7 +1016,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         if (
 #ifdef OS_THREAD_STACK
             pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
-            (retcode = pthread_create(&th->os_thread, &attr, new_thread_trampoline_switch_stack, th))
+            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
 #else
 
 # ifdef LISP_FEATURE_WIN32
@@ -1030,12 +1032,11 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
             pthread_attr_setguardsize(&attr, 0) ||
 # endif
 
-            (retcode = pthread_create(&th->os_thread, &attr, new_thread_trampoline, th))
+            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))
 #endif
             ) {
           perror("create_os_thread");
         } else {
-          *kid_tid = th->os_thread;
           success = 1;
         }
         retcode = pthread_mutex_unlock(&create_thread_lock);
