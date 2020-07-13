@@ -49,8 +49,7 @@
                       ;; that are known to build cleanly.
                       (sb-int:simple-style-warning
                        (lambda (c &aux (fc (simple-condition-format-control c)))
-                         (when (and (feature-in-list-p '(:or :x86 :x86-64 :arm64)
-                                                       :target)
+                         (when (and (featurep '(:or :x86 :x86-64 :arm64))
                                     in-summary
                                     (stringp fc)
                                     (search "undefined" fc))

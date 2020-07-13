@@ -31,9 +31,7 @@
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
     (when (and sb-c::*undefined-warnings*
-               (feature-in-list-p
-                '(:or :x86 :x86-64 :arm64) ; until all the rest are clean
-                :target))
+               (featurep '(:or :x86 :x86-64 :arm64))) ; until all the rest are clean
       (setf fail t)
       (dolist (warning sb-c::*undefined-warnings*)
         (case (sb-c::undefined-warning-kind warning)
@@ -42,7 +40,7 @@
           (:function (setf functions t))))))
   ;; Exit the compilation unit so that the summary is printed. Then complain.
   ;; win32 is not clean
-  (when (and fail (not (feature-in-list-p :win32 :target)))
+  (when (and fail (not (featurep :win32)))
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-WHITELIST*?)~]"
@@ -103,8 +101,7 @@
     ;; As each platform's build becomes warning-free,
     ;; it should be added to the list here to prevent regresssions.
     (when (and likely-suspicious
-               (feature-in-list-p '(:and (:or :x86 :x86-64) (:or :linux :darwin))
-                                  :target))
+               (featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
       (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen

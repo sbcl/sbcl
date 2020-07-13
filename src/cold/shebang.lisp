@@ -88,25 +88,19 @@
 
 ;;; We should never call this with a selector of :HOST any more,
 ;;; but I'm keeping it in case of emergency.
-(defun feature-in-list-p (feature selector
-                          &aux (list (ecase selector
-                                       (:host cl:*features*)
-                                       (:target sb-xc:*features*))))
+(defun featurep (feature &aux (list sb-xc:*features*))
   (etypecase feature
     (symbol
-     (if (and (string= feature "SBCL") (eq selector :target))
+     (if (string= feature "SBCL")
          (error "Testing SBCL as a target feature is obviously bogus")
          (member feature list :test #'eq)))
-    (cons (flet ((subfeature-in-list-p (subfeature)
-                   (feature-in-list-p subfeature selector)))
+    (cons (flet ((subfeature-in-list-p (subfeature) (featurep subfeature)))
             (ecase (first feature)
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
               (:not (destructuring-bind (subexpr) (cdr feature)
                       (not (subfeature-in-list-p subexpr))))
               ((:vop-named :vop-translates)
-               (when (eq selector :host)
-                 (error "Invalid host feature test: ~S" feature))
                (destructuring-bind (subexpr) (cdr feature)
                  (case (first feature)
                    (:vop-named
@@ -115,7 +109,7 @@
                    (:vop-translates
                     (recording-feature-eval
                      feature (any-vop-translates-p subexpr)))))))))))
-(compile 'feature-in-list-p)
+(compile 'featurep)
 
 (defun read-targ-feature-expr (stream sub-character infix-parameter)
   (when infix-parameter
@@ -123,7 +117,7 @@
   (if (char= (if (let* ((*package* (find-package "KEYWORD"))
                         (*read-suppress* nil)
                         (feature (read stream t nil t)))
-                   (feature-in-list-p feature :target))
+                   (featurep feature))
                  #\+ #\-)
              sub-character)
       (read stream t nil t)
