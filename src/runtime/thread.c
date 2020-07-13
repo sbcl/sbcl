@@ -610,7 +610,7 @@ attach_os_thread(init_thread_data *scribble)
     size_t stack_size;
 # ifdef LISP_FEATURE_OPENBSD
     stack_t stack;
-    pthread_stackseg_np(os, &stack);
+    pthread_stackseg_np(th->os_thread, &stack);
     stack_size = stack.ss_size;
     stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
 # elif defined LISP_FEATURE_SUNOS
@@ -619,8 +619,8 @@ attach_os_thread(init_thread_data *scribble)
     stack_size = stack.ss_size;
     stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
 # elif defined(LISP_FEATURE_DARWIN)
-    stack_size = pthread_get_stacksize_np(os);
-    stack_addr = (char*)pthread_get_stackaddr_np(os) - stack_size;
+    stack_size = pthread_get_stacksize_np(th->os_thread);
+    stack_addr = (char*)pthread_get_stackaddr_np(th->os_thread) - stack_size;
 # else
     pthread_attr_t attr;
 #   if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_DRAGONFLY
