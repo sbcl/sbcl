@@ -7,7 +7,9 @@ mkdir -p $junkdir $logdir
 
 export TEST_DIRECTORY SBCL_HOME
 TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
-  --noinform --core ../output/sbcl.core --no-userinit --no-sysinit --noprint --disable-debugger << EOF
+  --noinform --core ../output/sbcl.core \
+  --no-userinit --no-sysinit --noprint --disable-debugger $* << EOF
+(pop *posix-argv*)
 (require :sb-posix)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
@@ -34,18 +36,11 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
             (cond ((< posn-a posn-b) t)
                   ((> posn-a posn-b) nil)
                   (t (string< a b)))))))
-(defun parallel-execute-tests (max-jobs)
+(defun parallel-execute-tests (files max-jobs vop-summary-stats-p)
   (format t "Using ~D processes~%" max-jobs)
   ;; Interleave the order in which all tests are launched rather than
   ;; starting them in the batches that filtering places them in.
-  (let ((files (choose-order
-                (mapcar #'pathname-name
-                             (append (pure-load-files)
-                                     (pure-cload-files)
-                                     (impure-load-files)
-                                     (impure-cload-files)
-                                     (sh-files)))))
-        (subprocess-count 0)
+  (let ((subprocess-count 0)
         (subprocess-list nil)
         (aggregate-vop-usage (make-hash-table))
         ;; Start timing only after all the DIRECTORY calls are done (above)
@@ -63,9 +58,10 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    (let ((code (ash status -8))
                          (filename (cadr process))
                          (et (- (get-internal-real-time) (caddr process))))
-                     (unless (sum-vop-usage (format nil "$logdir/~a.vop-usage" filename) t)
-                       (when (or (search ".pure" filename) (search ".impure" filename))
-                         (push filename missing-usage)))
+                     (when vop-summary-stats-p
+                       (unless (sum-vop-usage (format nil "$logdir/~a.vop-usage" filename) t)
+                         (when (or (search ".pure" filename) (search ".impure" filename))
+                           (push filename missing-usage))))
                      (cond ((eq code 104)
                             (format t "~A: success (~d msec)~%" filename et))
                            (t
@@ -87,11 +83,13 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (wait))
         (let ((pid (sb-posix:fork)))
           (when (zerop pid)
-            (with-open-file (stream (format nil "$logdir/~a" file)
+            ;; FILE is (filename . test-iteration)
+            (with-open-file (stream (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))
                                     :direction :output :if-exists :supersede)
               (alien-funcall (extern-alien "dup2" (function int int int))
                              (sb-sys:fd-stream-fd stream) 1)
               (alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
+            (setq file (car file))
             ;; Send this to the log file, not the terminal
             (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                   *error-output*))
@@ -110,30 +108,32 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (pure-runner (list (concatenate 'string file ".lisp"))
                                   (if (search "-cload" file) 'cload-test 'load-test)
                                   (make-broadcast-stream)))
-                   (with-open-file (output (format nil "$logdir/~a.vop-usage" file)
-                                           :direction :output)
-                     ;; There's an impure test that screws with the default pprint dispatch
-                     ;; table such that integers don't print normally (and can't be parsed).
-                     (let ((*print-pretty* nil))
-                       (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
-                         (format output "~7d ~s~%" count name))))
+                   (when vop-summary-stats-p
+                     (with-open-file (output (format nil "$logdir/~a.vop-usage" file)
+                                             :direction :output)
+                       ;; There's an impure test that screws with the default pprint dispatch
+                       ;; table such that integers don't print normally (and can't be parsed).
+                       (let ((*print-pretty* nil))
+                         (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
+                           (format output "~7d ~s~%" count name)))))
                    (exit :code (if (unexpected-failures) 1 104)))))
-          (format t "~A: pid ~d~%" file pid)
+          (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))
           (incf subprocess-count)
-          (push (list pid file (get-internal-real-time)) subprocess-list)))
+          (push (list pid (car file) (get-internal-real-time)) subprocess-list)))
       (loop (if (plusp subprocess-count) (wait) (return)))
 
-      (dolist (result '("vop-usage.txt" "vop-usage-combined.txt"))
-        (let (list)
-          (sb-int:dohash ((name vop) sb-c::*backend-template-names*)
-            (declare (ignore vop))
-            (push (cons (gethash name aggregate-vop-usage 0) name) list))
-          (with-open-file (output (format nil "$logdir/~a" result)
-                                          :direction :output
-                                          :if-exists :supersede)
-            (dolist (cell (sort list #'> :key #'car))
-              (format output "~7d ~s~%" (car cell) (cdr cell)))))
-        (sum-vop-usage "../output/warm-vop-usage.txt" nil))
+      (when vop-summary-stats-p
+        (dolist (result '("vop-usage.txt" "vop-usage-combined.txt"))
+          (let (list)
+            (sb-int:dohash ((name vop) sb-c::*backend-template-names*)
+              (declare (ignore vop))
+              (push (cons (gethash name aggregate-vop-usage 0) name) list))
+            (with-open-file (output (format nil "$logdir/~a" result)
+                                            :direction :output
+                                            :if-exists :supersede)
+              (dolist (cell (sort list #'> :key #'car))
+                (format output "~7d ~s~%" (car cell) (cdr cell)))))
+          (sum-vop-usage "../output/warm-vop-usage.txt" nil)))
 
       (format t "~&Total realtime: ~d msec~%" (- (get-internal-real-time) start-time))
       (when missing-usage
@@ -145,5 +145,36 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (format t "~A~%" filename))
         (format t "==== Logs are in $logdir ====~%")
         (exit :code 1)))))
-(parallel-execute-tests $1)
+(if (= (length *posix-argv*) 1)
+    ;; short form - all files, argument N is the number of parallel tasks
+    (let ((jobs (parse-integer (car *posix-argv*))))
+      (parallel-execute-tests
+       (mapcar #'list
+               (choose-order
+                (mapcar #'pathname-name
+                        (append (pure-load-files)
+                                (pure-cload-files)
+                                (impure-load-files)
+                                (impure-cload-files)
+                                (sh-files)))))
+       jobs
+       t))
+    ;; long form
+    (let ((jobs 4)
+          (runs-per-test 1)
+          (argv *posix-argv*))
+      (loop (cond ((string= (car argv) "-j")
+                   (setq jobs (parse-integer (cadr argv))
+                         argv (cddr argv)))
+                  ((string= (car argv) "--runs_per_test")
+                   (setq runs-per-test (parse-integer (cadr argv))
+                         argv (cddr argv)))
+                  (t
+                   (return))))
+      (parallel-execute-tests
+       (loop for trial-number from 1 to runs-per-test
+             nconc (mapcar (lambda (file) (cons file trial-number))
+                           argv))
+       jobs
+       nil)))
 EOF
