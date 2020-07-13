@@ -171,9 +171,15 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                          argv (cddr argv)))
                   (t
                    (return))))
+      (setq argv
+        (mapcar (lambda (file)
+                  (probe-file file) ; for effect
+                  (pathname-name file)) argv))
       (parallel-execute-tests
        (loop for trial-number from 1 to runs-per-test
-             nconc (mapcar (lambda (file) (cons file trial-number))
+             nconc (mapcar (lambda (file)
+                             (cons file
+                                   (when (> runs-per-test 1) trial-number)))
                            argv))
        jobs
        nil)))
