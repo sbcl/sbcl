@@ -63,10 +63,6 @@ extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
 #endif
 extern char **ENVIRON;
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
-extern pthread_key_t specials;
-#endif
-
 #if !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_control_stack_pointer;
 #endif

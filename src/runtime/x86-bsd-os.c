@@ -196,14 +196,7 @@ int arch_os_thread_init(struct thread *thread) {
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;
     arch_os_load_ldt(thread);
-
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = thread;
-#else
-    pthread_setspecific(specials,thread);
 #endif
-#endif
-
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     stack_t sigstack;

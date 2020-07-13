@@ -74,11 +74,6 @@ int arch_os_thread_init(struct thread *thread) {
                           ((entry_number << 3) + 3));
 
     if(entry_number < 0) return 0;
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = thread;
-#else
-    pthread_setspecific(specials,thread);
-#endif
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

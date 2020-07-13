@@ -76,9 +76,8 @@ static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
-__thread int is_lisp_thread;
 #else
-pthread_key_t lisp_thread = 0;
+pthread_key_t specials = 0;
 #endif
 #endif
 
@@ -199,17 +198,22 @@ static int sb_GetTID() { return syscall(SYS_gettid); }
 #define sb_GetTID() 0
 #endif
 
-static int main_thread_trampoline(struct thread *th)
-{
-    lispobj function;
+static struct thread *alloc_thread_struct(void*,lispobj);
+
+void create_main_lisp_thread(lispobj function) {
+    struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
+    if(!th || arch_os_thread_init(th)==0) lose("can't create initial thread");
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
+    pthread_key_create(&specials, 0);
+#endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
 # ifdef LISP_FEATURE_GCC_TLS
-    is_lisp_thread = 1;
+    current_thread = th;
 # else
-    pthread_setspecific(lisp_thread, (void *)1);
+    pthread_setspecific(specials, th);
 # endif
 #endif
 #if defined THREADS_USING_GCSIGNAL && \
@@ -217,9 +221,6 @@ static int main_thread_trampoline(struct thread *th)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
     unblock_gc_signals();
 #endif
-    function = th->no_tls_value_marker;
-    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
-    if(arch_os_thread_init(th)==0) return 1;
     link_thread(th);
     th->os_kernel_tid = sb_GetTID();
     th->os_thread = thread_self();
@@ -242,9 +243,9 @@ static int main_thread_trampoline(struct thread *th)
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
 #if !defined(LISP_FEATURE_WIN32) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    return call_into_lisp_first_time(function,args,0);
+    call_into_lisp_first_time(function,args,0);
 #else
-    return funcall0(function);
+    funcall0(function);
 #endif
 }
 
@@ -363,16 +364,14 @@ init_new_thread(struct thread *th,
     int lock_ret;
 
 #ifdef LISP_FEATURE_GCC_TLS
-    is_lisp_thread = 1;
+    current_thread = th;
 #else
-    pthread_setspecific(lisp_thread, (void *)1);
+    pthread_setspecific(specials, th);
 #endif
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
         lose("arch_os_thread_init failed");
     }
-
-    th->os_thread=thread_self();
 
 #define GUARD_CONTROL_STACK 1
 #define GUARD_BINDING_STACK 2
@@ -543,8 +542,6 @@ void* new_thread_trampoline_switch_stack(void* arg) {
 }
 #endif
 
-static struct thread *create_thread_struct(void*,lispobj);
-
 static struct thread* recyclebin_threads;
 static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct thread* get_recyclebin_item()
@@ -591,13 +588,10 @@ void empty_thread_recyclebin()
 void
 attach_os_thread(init_thread_data *scribble)
 {
-    os_thread_t os = pthread_self();
-    odxprint(misc, "attach_os_thread: attaching to %p", os);
-
     block_deferrable_signals(&scribble->oldset);
     void* recycled_memory = get_recyclebin_item();
-    struct thread *th = create_thread_struct(recycled_memory,
-                                             NO_TLS_VALUE_MARKER_WIDETAG);
+    struct thread *th = alloc_thread_struct(recycled_memory,
+                                            NO_TLS_VALUE_MARKER_WIDETAG);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
@@ -606,36 +600,38 @@ attach_os_thread(init_thread_data *scribble)
     unblock_gc_signals();
 #endif
 
+    th->os_kernel_tid = sb_GetTID();
+    th->os_thread = pthread_self();
+
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* On windows, arch_os_thread_init will take care of finding the
      * stack. */
     void *stack_addr;
     size_t stack_size;
-#ifdef LISP_FEATURE_OPENBSD
+# ifdef LISP_FEATURE_OPENBSD
     stack_t stack;
     pthread_stackseg_np(os, &stack);
     stack_size = stack.ss_size;
     stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
-#elif defined LISP_FEATURE_SUNOS
-  stack_t stack;
-  thr_stksegment(&stack);
-  stack_size = stack.ss_size;
-  stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
-#elif defined(LISP_FEATURE_DARWIN)
+# elif defined LISP_FEATURE_SUNOS
+    stack_t stack;
+    thr_stksegment(&stack);
+    stack_size = stack.ss_size;
+    stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
+# elif defined(LISP_FEATURE_DARWIN)
     stack_size = pthread_get_stacksize_np(os);
     stack_addr = (char*)pthread_get_stackaddr_np(os) - stack_size;
-#else
+# else
     pthread_attr_t attr;
-#if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_DRAGONFLY
-    pthread_attr_get_np(os, &attr);
-#else
+#   if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_DRAGONFLY
+    pthread_attr_get_np(th->os_thread, &attr);
+#   else
     int pthread_getattr_np(pthread_t, pthread_attr_t *);
-    pthread_getattr_np(os, &attr);
-#endif
+    pthread_getattr_np(th->os_thread, &attr);
+#   endif
     pthread_attr_getstack(&attr, &stack_addr, &stack_size);
     pthread_attr_destroy(&attr);
-#endif
-
+# endif
     th->control_stack_start = stack_addr;
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
@@ -650,13 +646,6 @@ attach_os_thread(init_thread_data *scribble)
                      * so avoid 2 syscalls when possible */
                     recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
                     retain_lock);
-
-    th->os_kernel_tid = sb_GetTID();
-
-    uword_t stacksize
-        = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
-    odxprint(misc, "attach_os_thread: attached %p as %p (0x%lx bytes stack)",
-             os, th, (long) stacksize);
 }
 
 void
@@ -666,13 +655,6 @@ detach_os_thread(init_thread_data *scribble)
     odxprint(misc, "detach_os_thread: detaching");
 
     undo_init_new_thread(th, scribble);
-
-    odxprint(misc, "detach_os_thread: detached");
-#ifdef LISP_FEATURE_GCC_TLS
-    is_lisp_thread = 0;
-#else
-    pthread_setspecific(lisp_thread, (void *)0);
-#endif
 
     /* We have to clear a STOP_FOR_GC signal if pending. Consider:
      *  - on entry to undo_init_new_thread, we block all signals
@@ -807,7 +789,7 @@ void release_all_threads_lock()
  */
 
 static struct thread *
-create_thread_struct(void* spaces, lispobj start_routine) {
+alloc_thread_struct(void* spaces, lispobj start_routine) {
 #if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
 #endif
@@ -999,16 +981,6 @@ create_thread_struct(void* spaces, lispobj start_routine) {
     return th;
 }
 
-void create_main_lisp_thread(lispobj initial_function) {
-    struct thread *th = create_thread_struct(0, initial_function);
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
-    pthread_key_create(&lisp_thread, 0);
-#endif
-    if(th) {
-        main_thread_trampoline(th); /* no return */
-    } else lose("can't create initial thread");
-}
-
 #ifdef LISP_FEATURE_SB_THREAD
 
 #ifndef __USE_XOPEN2K
@@ -1042,7 +1014,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         if (
 #ifdef OS_THREAD_STACK
             pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
-            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
+            (retcode = pthread_create(&th->os_thread, &attr, new_thread_trampoline_switch_stack, th))
 #else
 
 # ifdef LISP_FEATURE_WIN32
@@ -1058,11 +1030,12 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
             pthread_attr_setguardsize(&attr, 0) ||
 # endif
 
-            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))
+            (retcode = pthread_create(&th->os_thread, &attr, new_thread_trampoline, th))
 #endif
             ) {
           perror("create_os_thread");
         } else {
+          *kid_tid = th->os_thread;
           success = 1;
         }
         retcode = pthread_mutex_unlock(&create_thread_lock);
@@ -1086,7 +1059,7 @@ os_thread_t create_thread(lispobj start_routine) {
      * linking it to all_threads can be left to the thread itself
      * without fear of gc lossage. 'start_routine' violates this
      * assumption and must stay pinned until the child starts up. */
-    th = create_thread_struct(0, start_routine);
+    th = alloc_thread_struct(0, start_routine);
     if (th && !create_os_thread(th, &kid_tid)) {
         free_thread_struct(th);
         kid_tid = 0;

@@ -82,10 +82,6 @@ lispobj *current_auto_gc_trigger;
 lispobj *current_dynamic_space;
 #endif
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
-pthread_key_t specials=0;
-#endif
-
 void globals_init(void)
 {
     /* Space, stack, and free pointer vars are initialized by
@@ -110,9 +106,5 @@ void globals_init(void)
 #else
     foreign_function_call_active = 1;
 #endif
-#endif
-
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
-    pthread_key_create(&specials,0);
 #endif
 }
