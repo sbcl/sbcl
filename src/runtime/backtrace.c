@@ -588,3 +588,121 @@ lisp_backtrace(int nframes)
     }
 }
 #endif
+
+// Find the simple_fun that contains 'pc' in 'code'
+int simple_fun_index_from_pc(struct code* code, char *pc)
+{
+    char *instruction_area = code_text_start(code);
+    unsigned int* offsets = code_fun_table(code) - 1;
+    int index;
+    for (index = code_n_funs(code) - 1; index >= 0; --index) {
+        char *base = instruction_area + offsets[-index];
+        if (pc >= base) return index;
+    }
+    return -1;
+}
+
+static boolean print_lisp_fun_name(char* pc)
+{
+  struct code* code;
+  int fi;
+  lispobj fn;
+  if (gc_managed_addr_p((uword_t)pc) &&
+      (code = (void*)component_ptr_from_pc(pc)) != 0 &&
+      (fi = simple_fun_index_from_pc(code, pc)) >= 0 &&
+      is_lisp_pointer(fn = code->constants[fi*CODE_SLOTS_PER_SIMPLE_FUN])) {
+      fprintf(stderr, " %p [", pc);
+      print_entry_name(fn, stderr);
+      fprintf(stderr, "]\n");
+      return 1;
+  }
+  return 0;
+}
+
+#ifdef LISP_FEATURE_LIBUNWIND_BACKTRACE
+#define UNW_LOCAL_ONLY
+#include <libunwind.h>
+#include "genesis/thread-instance.h"
+#include "genesis/mutex.h"
+static int backtrace_completion_pipe[2] = {-1,-1};
+void libunwind_backtrace(struct thread *th, os_context_t *context)
+{
+    char procname[100];
+    fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
+    struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
+    if (lispthread->name != NIL) {
+        fprintf(stderr, " (\"");
+        print_string(VECTOR(lispthread->name), stderr);
+        fprintf(stderr, "\")");
+    }
+    putc('\n', stderr);
+    if (lispthread->waiting_for != NIL) {
+        fprintf(stderr, "waiting for %p", (void*)lispthread->waiting_for);
+        if (instancep(lispthread->waiting_for)) {
+            // THREAD-WAITING-FOR can be a mutex or a waitqueue (if not a cons).
+            // Accessing it as if it's a mutex works because both a waitqueue
+            // and a mutex have a name at the same slot offset (if #+sb-futex).
+            // So to reiterate the comment from linux-os.c -
+            // "Use this only if you know what you're doing"
+            struct mutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
+            if (lispmutex->name != NIL) {
+                fprintf(stderr, " (MUTEX:\"");
+                print_string(VECTOR(lispmutex->name), stderr);
+                fprintf(stderr, "\")");
+            }
+        }
+        putc('\n', stderr);
+    }
+    unw_cursor_t cursor;
+    // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
+    // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
+    //  this routine is also safe to use from a signal handler."
+    unw_init_local(&cursor, context);
+    do {
+        uword_t offset;
+        char *pc;
+        unw_get_reg(&cursor, UNW_X86_64_RIP, (uword_t*)&pc);
+        if (print_lisp_fun_name(pc)) {
+            // printed
+        } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
+            fprintf(stderr, " %p [%s]\n", pc, procname);
+        } else {
+            fprintf(stderr, " %p ?\n", pc);
+        }
+    } while (unw_step(&cursor));
+}
+void backtrace_lisp_threads(int __attribute__((unused)) signal,
+                                   siginfo_t __attribute__((unused)) *info,
+                                   os_context_t *context)
+{
+    if (backtrace_completion_pipe[1] >= 0) {
+        libunwind_backtrace(current_thread, context);
+        write(backtrace_completion_pipe[1], context /* any random byte */, 1);
+        return;
+    }
+    struct thread *th;
+    int nthreads = 0;
+    for_each_thread(th) { ++nthreads; }
+    fprintf(stderr, "Caught backtrace-all signal in tid %d, %d threads\n",
+            (int)arch_os_get_current_thread()->os_kernel_tid, nthreads);
+    // Would be nice if we could forcibly stop all the other threads,
+    // but pthread_mutex_trylock is not safe to use in a signal handler.
+    if (nthreads > 1) {
+        pipe(backtrace_completion_pipe);
+    }
+    for_each_thread(th) {
+        if (th == arch_os_get_current_thread())
+            libunwind_backtrace(th, context);
+        else {
+            char junk;
+            pthread_kill(th->os_thread, SIGXCPU);
+            read(backtrace_completion_pipe[0], &junk, 1);
+        }
+    }
+    if (nthreads > 1) {
+        close(backtrace_completion_pipe[1]);
+        close(backtrace_completion_pipe[0]);
+        backtrace_completion_pipe[0] = backtrace_completion_pipe[1] = -1;
+    }
+}
+#endif
