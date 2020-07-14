@@ -76,7 +76,8 @@
       (sb-thread:barrier (:write))
       (sb-thread:join-thread thr))))
 
-(with-test (:name :call-me-from-many-threads-and-gc)
+(with-test (:name :call-me-from-many-threads-and-gc
+                  :skipped-on :interpreter)
   ;; two trials, 5 threads, 40 calls each
   (f 2 5 40)
   ;; one trial, 10 threads, 10 calls
