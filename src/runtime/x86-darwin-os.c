@@ -81,8 +81,6 @@ int arch_os_thread_init(struct thread *thread) {
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;
     arch_os_load_ldt(thread);
-
-    pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_init(thread);

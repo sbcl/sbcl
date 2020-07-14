@@ -148,9 +148,6 @@ indirect_ptr(dynamic_space_free_pointer)
 indirect_ptr(foreign_function_call_active)
 #endif
 indirect_ptr(all_threads)
-#if defined(LISP_FEATURE_SB_THREAD)
-indirect_ptr(specials)
-#endif
 
 	.text
 
@@ -163,26 +160,10 @@ indirect_ptr(specials)
 	C_FULL_PROLOG
 	/* NL0 - function, NL1 - frame pointer, NL2 - nargs. */
 #ifdef LISP_FEATURE_SB_THREAD
-	/* We need to obtain a pointer to our TLS block before we do
-	 * anything else.  For this, we call pthread_getspecific().
-	 * We've preserved all of the callee-saves registers, so we
-	 * can use them to stash our arguments temporarily while we
-	 * make the call. */
-	mr reg_A0, reg_NL0
-	mr reg_A1, reg_NL1
-	mr reg_A2, reg_NL2
-
-	/* Call out to obtain our TLS block. */
-	load(reg_NL0,specials)
-        bl pthread_getspecific
-        nop
-
-	mr reg_THREAD, reg_NL0
-
-	/* Restore our original parameters. */
-	mr reg_NL2, reg_A2
-	mr reg_NL1, reg_A1
-	mr reg_NL0, reg_A0
+	// Copy ABI TLS value of current_thread into lisp thread base
+	addis reg_THREAD,13,current_thread@tprel@ha
+	addi reg_THREAD,reg_THREAD,current_thread@tprel@l
+	ld reg_THREAD,0(reg_THREAD)
 #endif
 	/* Initialize tagged registers */
 	li reg_ZERO,0

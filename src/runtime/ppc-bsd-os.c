@@ -77,7 +77,6 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 }
 
 int arch_os_thread_init(struct thread *thread) {
-
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     stack_t sigstack;
 
@@ -89,15 +88,9 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_size  = calc_altstack_size(thread);
     sigaltstack(&sigstack,0);
 #endif
-
-#if defined(LISP_FEATURE_SB_THREAD)
-    pthread_setspecific(specials,thread);
-#endif
-
     return 1;                  /* success */
 }
 
 int arch_os_thread_cleanup(struct thread *thread) {
-
     return 1;                  /* success */
 }

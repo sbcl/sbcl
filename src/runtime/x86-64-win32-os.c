@@ -76,7 +76,7 @@ int arch_os_thread_init(struct thread *thread)
 
 
 #ifdef LISP_FEATURE_SB_THREAD
-    pthread_setspecific(specials,thread);
+    pthread_setspecific(specials,thread); // FIXME: remove this line?
 #endif
     return 1;
 }
