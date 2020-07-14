@@ -1931,7 +1931,15 @@ the restart does not exist."))
                        (program-error-message condition)))))
 
 (define-condition simple-control-error (simple-condition control-error) ())
-(define-condition simple-file-error    (simple-condition file-error)    ())
+
+(define-condition simple-file-error (simple-condition file-error)
+  ((message :initarg :message :reader simple-file-error-message :initform nil))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<~?~@[: ~2I~_~A~]~@:>"
+             (simple-condition-format-control condition)
+             (simple-condition-format-arguments condition)
+             (simple-file-error-message condition)))))
 
 (defun %file-error (pathname &optional datum &rest arguments)
   (typecase datum
@@ -1940,9 +1948,26 @@ the restart does not exist."))
                                               :format-arguments arguments))
     (t (apply #'error datum :pathname pathname arguments))))
 
-(define-condition file-exists (simple-file-error) ())
-(define-condition file-does-not-exist (simple-file-error) ())
-(define-condition delete-file-error (simple-file-error) ())
+(define-condition file-exists (simple-file-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<The file ~S already exists~@[: ~2I~_~A~]~@:>"
+             (file-error-pathname condition)
+             (simple-file-error-message condition)))))
+
+(define-condition file-does-not-exist (simple-file-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<The file ~S does not exist~@[: ~2I~_~A~]~@:>"
+             (file-error-pathname condition)
+             (simple-file-error-message condition)))))
+
+(define-condition delete-file-error (simple-file-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<Could not delete the file ~S~@[: ~2I~_~A~]~@:>"
+             (file-error-pathname condition)
+             (simple-file-error-message condition)))))
 
 (define-condition simple-stream-error (simple-condition stream-error) ())
 (define-condition simple-parse-error  (simple-condition parse-error)  ())

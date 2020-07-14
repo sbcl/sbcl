@@ -360,13 +360,13 @@
                      :as-directory (eq :directory kind))))
            (errorp
             (file-perror filename (sb-win32:get-last-error)
-                         "Failed to find the ~a of ~A" query-for filename)))))
+                         "Failed to find the ~A of ~S" query-for filename)))))
       (:write-date
        (cond
          ((sb-win32::native-file-write-date filename))
          (errorp
           (file-perror filename (sb-win32:get-last-error)
-                       "Failed to find the ~a of ~A" query-for filename)))))))
+                       "Failed to find the ~A of ~S" query-for filename)))))))
 
 #-win32
 (defun %query-file-system (pathname query-for errorp)
@@ -404,7 +404,7 @@
                  (realpath
                   (parse realpath :as-directory t))
                  (errorp
-                  (file-perror filename errno "couldn't resolve ~A")))))
+                  (file-perror filename errno "Couldn't resolve ~S" filename)))))
            (resolve-problematic-symlink (filename errno realpath-failed)
              ;; SBCL has for many years had a policy that a pathname
              ;; that names an existing, dangling or self-referential
@@ -442,7 +442,8 @@
                  ;; The file doesn't exist; maybe error.
                  (errorp
                   (file-perror
-                   pathname errno "Failed to find the ~A of ~A" query-for pathname))))))
+                   pathname errno
+                   "Failed to find the ~A of ~A" query-for pathname))))))
     (binding* ((filename (native-namestring pathname :as-file t))
                ((existsp errno nil mode nil uid nil nil nil nil mtime)
                 (sb-unix:unix-stat filename)))
@@ -543,9 +544,7 @@ per standard Unix unlink() behaviour."
                      (values nil (sb-win32:get-last-error)))
         (unless res
           (with-simple-restart (continue "Return T")
-            (file-perror namestring err 'delete-file-error
-                         :format-control "Couldn't delete ~A"
-                         :format-arguments (list namestring))))))
+            (file-perror namestring err 'delete-file-error)))))
   t)
 
 (defun directorize-pathname (pathname)
@@ -619,9 +618,8 @@ exist or if is a file or a symbolic link."
                   (get-errno))
                  (if res
                      dir
-                     (file-perror
-                      namestring errno
-                      "Could not delete directory ~A" namestring))))))
+                     (file-perror namestring errno
+                                  "Could not delete directory ~S" namestring))))))
     (let ((physical (directorize-pathname
                      (physicalize-pathname
                       (merge-pathnames

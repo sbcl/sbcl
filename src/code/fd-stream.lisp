@@ -462,16 +462,16 @@
 
 (defun file-perror (pathname errno &optional datum &rest arguments)
   (declare (optimize allow-non-returning-tail-call))
-  (multiple-value-bind (condition-type arguments)
-      (typecase datum
-        (format-control
-         (values 'simple-file-error
-                 (list :format-control "~@<~?~@[: ~2I~_~A~]~:>"
-                       :format-arguments (list datum arguments
-                                               (when errno (strerror errno))))))
-        (t
-         (values datum arguments)))
-    (apply #'error condition-type :pathname pathname arguments)))
+  (let ((message (when errno (strerror errno))))
+    (multiple-value-bind (condition-type arguments)
+        (typecase datum
+          (format-control
+           (values 'simple-file-error (list :format-control datum
+                                            :format-arguments arguments)))
+          (t
+           (values datum arguments)))
+      (apply #'error condition-type :pathname pathname :message message
+             arguments))))
 
 (defun c-string-encoding-error (external-format code)
   (declare (optimize allow-non-returning-tail-call))
@@ -2312,10 +2312,8 @@
          "~@<couldn't rename ~2I~_~S ~I~_to ~2I~_~S~:>" namestring original))))
 
 (defun %open-error (pathname errno if-exists if-does-not-exist)
-  (flet ((signal-it (&optional (condition 'simple-file-error))
-           (file-perror pathname errno condition
-                        :format-control "Error opening ~S"
-                        :format-arguments (list pathname))))
+  (flet ((signal-it (&rest arguments)
+           (apply #'file-perror pathname errno arguments)))
     (restart-case
         (case errno
           (#-win32 #.sb-unix:enoent
@@ -2351,7 +2349,7 @@
                    :report "Reopen with :if-exists :append"
                    '(:new-if-exists :append)))))
           (t
-           (signal-it)))
+           (signal-it "Error opening ~S" pathname)))
       (continue ()
         :report "Retry opening."
         '())
@@ -2486,15 +2484,16 @@
                               (when (and output (= (logand orig-mode #o170000)
                                                    #o40000))
                                 (file-perror
-                                 pathname
-                                 "can't open ~A for output: is a directory" pathname))
+                                 pathname nil
+                                 "Can't open ~S for output: is a directory"
+                                 pathname))
                               (setf mode (logand orig-mode #o777))
                               t)
                              ((eql err/dev sb-unix:enoent)
                               nil)
                              (t
-                              (file-perror
-                               namestring err/dev "can't find ~S" namestring)))))))
+                              (file-perror namestring err/dev
+                                           "Can't find ~S" namestring)))))))
               (unless (and exists
                            (rename-the-old-one namestring original))
                 (setf original nil)
