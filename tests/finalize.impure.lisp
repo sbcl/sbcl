@@ -1,4 +1,5 @@
 #+interpreter (sb-ext:exit :code 104)
+#+sb-safepoint (sb-ext:exit :code 104) ; tends to hang
 
 (defvar *tmp* 0.0) ; don't remove - used by the setq below
 (defglobal *count* 0)
