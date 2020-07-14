@@ -602,7 +602,7 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
     return -1;
 }
 
-static boolean print_lisp_fun_name(char* pc)
+static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
 {
   struct code* code;
   int fi;
