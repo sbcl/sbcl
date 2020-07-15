@@ -2458,8 +2458,24 @@ is :ANY, the function name is not checked."
   ;;  1. layouts go in the hash-table so that a code component references
   ;;     any given layout at most once
   ;;  2. STANDARD-OBJECT layouts use MAKE-LOAD-FORM
+  ;;
+  ;; Note also, that in this code COALESCE-P has two meanings:
+  ;; (1) _could_ you look up in the hash-table some object
+  ;;     which *contains* certain types.
+  ;; (2) _should_ you look up ...
+  ;; Suppose you have a a cons of a string and an instance:
+  ;;  ("foo" . #<AIRPLANE {10015815D3}>)
+  ;; and another similar cons to that which has a STRING= string
+  ;; (same type), and an EQ instance. You _may_ look up that cons
+  ;; in the similarity table. But if the key to the table is just the
+  ;; #<AIRPLANE>, while you _may_ look it up, you SHOULD NOT look it up,
+  ;; because if it was not EQ to something, then it is not EQUAL either.
+  ;; Due to how our EQUAL hash-tables behave on INSTANCE types,
+  ;; you don't want to side-effect the instance by causing it to grow
+  ;; a stable hash slot. Of course, in the case of the cons holding
+  ;; an instance, it will cause the side-effect on the instance.
   (let ((faslp (producing-fasl-file))
-        (ns (if (boundp '*ir1-namespace*) *ir1-namespace*)))
+        (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
     (labels ((core-coalesce-p (x)
                (sb-xc:typep x '(or symbol number character instance)))
              (cons-coalesce-p (x)
@@ -2481,6 +2497,12 @@ is :ANY, the function name is not checked."
                        (descend x)))))
              (atom-colesce-p (x)
                (or (core-coalesce-p x)
+                   ;; Honestly I don't see why this list is so restrictive.
+                   ;; e.g. What's the harm in deciding that any array
+                   ;; may be a subpart of a coalescible object?
+                   ;; It seems quite bogus to presume that the similarity
+                   ;; relation would do the wrong thing and that we have to guard
+                   ;; against potential wrongdoing.
                    (typep x '(or bit-vector string))))
              (file-coalesce-p (x)
                ;; CLHS 3.2.4.2.2: We are also allowed to coalesce various
@@ -2506,32 +2528,39 @@ is :ANY, the function name is not checked."
       (when (and faslp (not (sb-fasl:dumpable-layout-p object)) namep)
         (maybe-emit-make-load-forms object name))
       ;; Has this identical object been seen before? Bail out early if so.
-      (awhen (and ns (gethash object (eq-constants ns)))
+      (awhen (and namespace (gethash object (eq-constants namespace)))
         (return-from find-constant it))
-      (let* ((coalescep (and ns
+      (let* ((coalescep (and namespace
                              (if faslp
                                  (file-coalesce-p object)
                                  (core-coalesce-p object))))
              (effectively-coalescible
+              ;; See comment at top about why NOT to look up some things.
+              ;; "effectively coalescible" means "would attempting to coalesce
+              ;; this object have any effect beyond merely using the EQ table?"
+              ;; This has to avoid being sensitive to the cross-compiler host.
+              ;; For example, the number #.(ash 1 32) is probably not an immediate
+              ;; value on any 32-bit lisp. It would extremely fortuitous to find
+              ;; it in the EQ table, but if it isn't there, we _should_ look in
+              ;; the similar table. In the target lisp, if on a 64-bit build,
+              ;; then EQUAL/similar is as good as EQ for that key.
               (and coalescep
-                   ;; No instance subtype except a pathname can be coalesced
-                   ;; by the similarity table (as currently implemented)
-                   (or (not (sb-xc:typep object 'instance))
-                       (sb-xc:typep object 'pathname)))))
+                   (not (sb-xc:typep object '(or symbol instance
+                                              #-sb-xc-host fixnum))))))
         ;; constants referred to by name must retain their identity:
         ;; they must not be coalesced with some other similar-enough
         ;; constant.
         (when (and effectively-coalescible (not namep))
-          (dolist (candidate (gethash object (similar-constants ns)))
+          (dolist (candidate (gethash object (similar-constants namespace)))
             (when (similarp (constant-value candidate) object)
               (return-from find-constant candidate))))
         (when (and faslp (not (sb-fasl:dumpable-layout-p object)) (not namep))
           (maybe-emit-make-load-forms object))
         (let ((new (make-constant object)))
-          (when ns
-            (setf (gethash object (eq-constants ns)) new)
+          (when namespace
+            (setf (gethash object (eq-constants namespace)) new)
             (when effectively-coalescible
-              (push new (gethash object (similar-constants ns)))))
+              (push new (gethash object (similar-constants namespace)))))
           new)))))
 
 ;;; Return true if X and Y are lvars whose only use is a
