@@ -613,7 +613,8 @@ between the ~A definition and the ~A definition"
 ;;; Again, this should be compiler-only, but easier to make this
 ;;; thread-safe.
 (defun insured-find-classoid (name predicate constructor)
-  (declare (type function predicate constructor))
+  (declare (type function predicate)
+           (type (or function symbol) constructor))
   (let ((table *forward-referenced-layouts*))
     (with-system-mutex ((hash-table-lock table))
       (let* ((old (find-classoid name nil))
@@ -1055,6 +1056,16 @@ between the ~A definition and the ~A definition"
       :inherits (symbol list sequence)
       :direct-superclasses (symbol list)
       :prototype-form 'nil)
+
+     ;; KLUDGE: the length must match the subsequent defstruct.
+     (pathname :depth 1
+               :length ,(+ 7 sb-vm:instance-data-start)
+               :prototype-form (make-pathname))
+     (logical-pathname :depth 2
+                       :length ,(+ 7 sb-vm:instance-data-start)
+                       :prototype-form (make-pathname :host "SYS")
+                       :inherits (pathname))
+
      ;; These last few are strange. STREAM has only T as an ancestor,
      ;; so you'd think it would be at depth 1. FILE- and STRING-STREAM
      ;; each have STREAM and T as ancestors, so you'd think they'd be at depth
@@ -1110,6 +1121,7 @@ between the ~A definition and the ~A definition"
               codes
               state
               depth
+              (length 0)
               prototype-form
               (hierarchical-p t) ; might be modified below
               (direct-superclasses (if inherits
@@ -1160,7 +1172,7 @@ between the ~A definition and the ~A definition"
            (find-and-init-or-check-layout name
                                           depthoid
                                           0 ; flags
-                                          0 ; length
+                                          length
                                           +layout-all-tagged+
                                           inherits-vector)
            :invalidate nil)))))

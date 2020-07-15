@@ -1429,7 +1429,10 @@
            (unless (eq (not not-i) i) (format t "~S -> ~A and ~A~%" c not-i i)))) |#
 (defun classoid-definitely-instancep (x)
   (or (structure-classoid-p x)
-      (condition-classoid-p x)))
+      (condition-classoid-p x)
+      ;; PATHNAMEs are INSTANCEs based on the lowtag criterion
+      (or (eq x (specifier-type 'logical-pathname))
+          (eq x (specifier-type 'pathname)))))
 (eval-when (:compile-toplevel :execute)
   (pushnew 'classoid-definitely-instancep sb-vm::*backend-cross-foldable-predicates*))
 

@@ -466,10 +466,9 @@
          (optimize-speed
           (and (not delayp) (sb-c:policy env (< space 3)))))
     `(progn
-       ,@(!expander-for-defstruct
-          null-env-p optimize-speed delayp
-          name-and-options slot-descriptions
-          :target))))
+       ,@(!expander-for-defstruct null-env-p optimize-speed delayp
+                                  name-and-options slot-descriptions
+                                  :target))))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
@@ -771,6 +770,9 @@ unless :NAMED is also specified.")))
                       (classoid-layout classoid) layout)
                 classoid)))
          (ancestor-slot-comparator-list))
+    #+sb-xc-host
+    (when (member (dd-name dd) '(pathname logical-pathname))
+      (setf (dd-alternate-metaclass dd) '(t built-in-classoid nil)))
     ;; Type parsing should be done assuming that prototype classoid
     ;; exists, which fixes a problem when redefining a DEFTYPE which
     ;; appeared to be a raw slot. e.g.
@@ -1095,6 +1097,8 @@ unless :NAMED is also specified.")))
                     (layout-inherits super)
                     (vector super
                             (classoid-layout (find-classoid 'string-stream)))))
+      (pathname (vector (find-layout 't)))
+      (logical-pathname (vector (find-layout 't) (find-layout 'pathname)))
       (t (concatenate 'simple-vector
                       (layout-inherits super)
                       (vector super))))))
@@ -1120,7 +1124,10 @@ unless :NAMED is also specified.")))
                  (unless (dsd-read-only slot)
                    (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
            (setq layout (classoid-layout classoid))))
-    (setf (find-classoid (dd-name dd)) classoid)
+    ;; Don't want to (setf find-classoid) on a a built-in-classoid
+    (unless (and (built-in-classoid-p classoid)
+                 (eq (find-classoid (dd-name dd) nil) classoid))
+      (setf (find-classoid (dd-name dd)) classoid))
 
     (when source-location
       (setf (classoid-source-location classoid) source-location))))
@@ -1301,7 +1308,10 @@ unless :NAMED is also specified.")))
           (t
            (unless (eq (classoid-layout classoid) layout)
              (register-layout layout :invalidate nil))
-           (setf (find-classoid (dd-name dd)) classoid)))
+           ;; Don't want to (setf find-classoid) on a a built-in-classoid
+           (unless (and (built-in-classoid-p classoid)
+                        (eq (find-classoid (dd-name dd) nil) classoid))
+             (setf (find-classoid (dd-name dd)) classoid))))
 
     ;; At this point the class should be set up in the INFO database.
     ;; But the logic that enforces this is a little tangled and
@@ -1317,8 +1327,8 @@ unless :NAMED is also specified.")))
     (dolist (ctor (dd-constructors dd))
       (setf (info :function :source-transform (car ctor)) info))))
 
-;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
-;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
+;;; Do (COMPILE LOAD EVAL)-time actions for the structure described by DD
+;;; which may be a "normal" defstruct or an alternate-metaclass struct.
 ;;; This includes generation of a style-warning about previously compiled
 ;;; calls to the accessors and/or predicate that weren't inlined.
 (defun %compiler-defstruct (dd inherits)
@@ -1544,12 +1554,15 @@ or they must be declared locally notinline at each call site.~@:>"
                  (t
                   (values 'structure-classoid 'make-structure-classoid)))
         (insured-find-classoid (dd-name info)
-                               (if (eq class 'structure-classoid)
-                                   (lambda (x)
-                                     (sb-xc:typep x 'structure-classoid))
-                                   (lambda (x)
-                                     (sb-xc:typep x (classoid-name (find-classoid class)))))
-                               (fdefinition constructor)))
+                               (case class
+                                 (structure-classoid #'structure-classoid-p)
+                                 ;; The final fallthrough case would recurse infinitely
+                                 ;; on BUILT-IN-CLASSOID if TYPEP were allowed to parse
+                                 ;; its argument, so don't let it.
+                                 (built-in-classoid #'built-in-classoid-p)
+                                 (t (lambda (x)
+                                      (sb-xc:typep x (classoid-name (find-classoid class))))))
+                               constructor))
     (setf (classoid-direct-superclasses classoid)
           (case (dd-name info)
             ((ansi-stream
@@ -2002,9 +2015,8 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
     ;; because alternate-metaclass structures can not have either.
     (case dd-type
-      ;; We don't support inheritance of alternate metaclass stuff,
-      ;; and it's not a general-purpose facility, so sanity check our
-      ;; own code.
+      ;; We don't fully support inheritance of alternate metaclass stuff,
+      ;; so sanity check our own code.
       (structure
        (aver (eq superclass-name 't)))
       (funcallable-structure
@@ -2033,7 +2045,7 @@ or they must be declared locally notinline at each call site.~@:>"
                 (metaclass-constructor (missing-arg))
                 (dd-type (missing-arg)))
 
-  (declare (type (and list (not null)) slot-names))
+  (declare (type list slot-names))
   (declare (type (and symbol (not null))
                  superclass-name
                  metaclass-name
@@ -2063,6 +2075,8 @@ or they must be declared locally notinline at each call site.~@:>"
     `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (%compiler-defstruct ',dd ',(!inherits-for-structure dd))
+           (when (eq (info :type :kind ',class-name) :defined)
+             (setf (info :type :kind ',class-name) :instance))
            ,@(when (eq metaclass-name 'static-classoid)
                `((declaim (freeze-type ,class-name)))))
          ,@(accessor-definitions dd)

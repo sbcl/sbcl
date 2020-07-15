@@ -848,6 +848,7 @@
                (values '(function-with-layout-p object)
                        '(%fun-layout object)))
               ((or (csubtypep classoid (specifier-type 'instance))
+                   (eq classoid (specifier-type 'logical-pathname))
                    ;; CONDITION can't be a funcallable-instance
                    (csubtypep classoid (specifier-type 'condition)))
                (values '(%instancep object)

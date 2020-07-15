@@ -178,6 +178,11 @@ evaluated expressions.
           t
           (inspected-structure-elements object)))
 
+(defmethod inspected-parts ((object pathname))
+  (values (format nil "The object is a ~S.~%" (type-of object))
+          t
+          (inspected-structure-elements object)))
+
 (defun inspected-standard-object-elements (object)
   (let ((reversed-elements nil)
         (class-slots (sb-pcl::class-slots (class-of object))))

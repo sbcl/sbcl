@@ -150,7 +150,7 @@
                      ;; probably not a function. What about FMT-CONTROL instances?
                      (values nil t)))
                 ((system-area-pointer stream fdefn weak-pointer file-stream
-                  code-component lra)
+                  code-component lra pathname logical-pathname)
                  (values nil t)))
               (cond ((eq name 'pathname)
                      (values (pathnamep obj) t))
@@ -226,6 +226,7 @@
                            ;; subtypes of structure-object in make-host-1.
                            '(hash-table lexenv sb-c::abstract-lexenv
                              condition restart
+                             pathname sb-impl::host sb-impl::pattern
                              synonym-stream
                              ;; why on earth is LABEL needed here?
                              sb-assem:label))))

@@ -3,6 +3,7 @@
 changes relative to sbcl-2.0.6:
   * minor incompatible change: SB-THREAD:THREAD-OS-TID returns NIL for
     a thread which has exited.
+  * minor incompatible change: PATHNAME is no longer a STRUCTURE-OBJECT
 
 changes in sbcl-2.0.6 relative to sbcl-2.0.5:
   * planned incompatible change: the defined symbols in the Metaobject

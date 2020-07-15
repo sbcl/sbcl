@@ -418,7 +418,7 @@
  ("src/code/random")
  ("src/code/hash-table" :c-headers)
  ("src/code/readtable")
- ("src/code/pathname")
+ ("src/code/pathname" :not-host)
  ("src/code/host-pprint") ; defines QUEUED-OP needed by 'pprint'
 
  ("src/compiler/fndb")
@@ -449,7 +449,6 @@
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
- ("src/code/target-pathname" :not-host) ; needs "code/pathname"
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/xref")
  ("src/compiler/target-main" :not-host)
@@ -623,6 +622,7 @@
  ("src/code/print" :not-host)
 
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
+ ("src/code/target-pathname"   :not-host)
  #-win32
  ("src/code/unix-pathname"     :not-host)
  #+win32

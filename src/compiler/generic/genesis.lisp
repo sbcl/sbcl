@@ -1195,6 +1195,7 @@ core and return a descriptor to it."
                                 :test #'type= :key #'car)))
            (cond (predicate (cdr predicate))
                  ((eq type-name 'stream) 'streamp)
+                 ((eq type-name 'pathname) 'pathnamep)
                  ((eq type-name 't) 'constantly-t)
                  (t (error "No predicate for builtin: ~S" type-name))))))
       (null
@@ -1213,6 +1214,7 @@ core and return a descriptor to it."
       (let* ((cell (cold-find-classoid-cell (classoid-name obj) :create t))
              (cold-classoid
               (read-slot cell (find-layout 'sb-kernel::classoid-cell) :classoid)))
+        (aver (not (sb-kernel::undefined-classoid-p obj)))
         (unless (cold-null cold-classoid)
           (return-from ctype-to-core cold-classoid)))
       ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
@@ -1938,18 +1940,33 @@ core and return a descriptor to it."
     (push stuff (cdr gf))))
 
 (defun attach-classoid-cells-to-symbols (hashtable)
-  (let ((num (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
-        (layout (cold-layout-descriptor
-                 (gethash 'sb-kernel::classoid-cell *cold-layouts*))))
-    (when (plusp (hash-table-count *classoid-cells*))
-      (aver layout))
-    ;; Iteration order is immaterial. The symbols will get sorted later.
-    (maphash (lambda (symbol cold-classoid-cell)
-               (setf (gethash symbol hashtable)
-                     (packed-info-insert
-                      (gethash symbol hashtable +nil-packed-infos+)
-                      sb-impl::+no-auxiliary-key+ num cold-classoid-cell)))
-             *classoid-cells*))
+  (when (plusp (hash-table-count *classoid-cells*))
+    (aver (cold-layout-descriptor
+           (gethash 'sb-kernel::classoid-cell *cold-layouts*)))
+    (let ((type-classoid-cell-info
+            (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
+          (type-kind-info
+            (sb-c::meta-info-number (sb-c::meta-info :type :kind))))
+      ;; Iteration order is immaterial. The symbols will get sorted later.
+      (maphash (lambda (symbol cold-classoid-cell)
+                 (let ((packed-info
+                        (packed-info-insert
+                         (gethash symbol hashtable +nil-packed-infos+)
+                         sb-impl::+no-auxiliary-key+
+                         type-classoid-cell-info cold-classoid-cell)))
+                   ;; an instance classoid won't be returned from %PARSE-TYPE
+                   ;; unless the :KIND is set, but we can't set the kind
+                   ;; to :INSTANCE unless the classoid is present in the cell.
+                   (when (and (eq (info :type :kind symbol) :instance)
+                              (not (cold-null (read-slot cold-classoid-cell
+                                                         'sb-kernel::classoid-cell
+                                                         :classoid))))
+                     (setf packed-info
+                           (packed-info-insert
+                            packed-info sb-impl::+no-auxiliary-key+
+                            type-kind-info (cold-intern :instance))))
+                   (setf (gethash symbol hashtable) packed-info)))
+               *classoid-cells*)))
   hashtable)
 
 ;; Create pointer from SYMBOL and/or (SETF SYMBOL) to respective fdefinition

@@ -58,20 +58,8 @@
 ;;;
 ;;; Physical pathnames include all these slots and a device slot.
 
-;;; Logical pathnames are a subclass of PATHNAME. Their class
-;;; relations are mimicked using structures for efficiency.
-(defstruct (logical-pathname (:conc-name %logical-pathname-)
-                             (:include pathname)
-                             (:constructor nil)
-                             (:copier nil)))
-
-;;; FIXME: this, and many other FREEZE-TYPEs don't actually do anything.
-;;; Unobvious order of execution of TLFs in cold-init is one potential problem,
-;;; but there could be other issues as well, like maybe we're unsealing classes
-;;; because the FREEZE-TYPE was wrong to begin with. (So why no warnings then?)
-;;; This declamation also freezes LOGICAL-PATHNAME, but we can't freeze HOST
-;;; because later on we define either UNIX-HOST or WIN32-HOST.
-#-sb-fluid (declaim (freeze-type pathname logical-host))
+;;; We can't freeze HOST because later on we define either UNIX-HOST or WIN32-HOST.
+#-sb-fluid (declaim (freeze-type logical-host))
 
 ;;; Utility functions
 
@@ -89,7 +77,7 @@
   (%make-pattern (sxhash pieces) pieces))
 
 (declaim (inline %pathname-directory))
-(defun %pathname-directory (pathname) (cdr (%pathname-hashed-dir pathname)))
+(defun %pathname-directory (pathname) (car (%pathname-dir+hash pathname)))
 
 (declaim (inline pathname-component-present-p))
 (defun pathname-component-present-p (component)
@@ -340,17 +328,14 @@
   (let ((table *pathnames*))
     (declare (inline !allocate-pathname)) ; for DXability
     (with-system-mutex ((hash-table-%lock table))
-      (dx-let ((key (!allocate-pathname
-                     host
-                     device
-                     (when directory
-                       (ensure-gethash directory table
-                                       (cons (pathname-key-hash directory) directory)))
-                     name
-                     type
-                     version)))
+      (let* ((dir+hash (when directory
+                         (ensure-gethash
+                          directory table
+                          (cons directory (pathname-key-hash directory)))))
+             (key (!allocate-pathname host device dir+hash name type version)))
+        (declare (truly-dynamic-extent key))
         (or (gethash key table)
-            (let ((key (copy-structure key)))
+            (let ((key (!allocate-pathname host device dir+hash name type version)))
               (when (typep host 'logical-host)
                 (setf (%instance-layout key) #.(find-layout 'logical-pathname)))
               (setf (gethash key table) key)))))))
@@ -519,10 +504,10 @@
                    ;; strength-reducing EQUAL to EQ is inadmissible here.
                    ;; To fix that, MAKE-LOAD-FORM methods need not to bypass
                    ;; INTERN-PATHNAME.
-                   (let ((dir-a (%pathname-hashed-dir a))
-                         (dir-b (%pathname-hashed-dir b)))
+                   (let ((dir-a (%pathname-dir+hash a))
+                         (dir-b (%pathname-dir+hash b)))
                      (or (eq dir-a dir-b)
-                         (compare-component (cdr dir-a) (cdr dir-b))))
+                         (compare-component (car dir-a) (car dir-b))))
                    (compare-component (%pathname-device a) (%pathname-device b))
                    (compare-component (%pathname-name a) (%pathname-name b))
                    (compare-component (%pathname-type a) (%pathname-type b)))))
@@ -564,7 +549,7 @@
               ;; NAME-HASH is based on SXHASH of a string
               (hash (if (typep host 'logical-host) (logical-host-name-hash host) 0)))
          (mixf hash (hash-piece (%pathname-device x))) ; surely stringlike, right?
-         (awhen (%pathname-hashed-dir x) (mixf hash (car it)))
+         (awhen (%pathname-dir+hash x) (mixf hash (cdr it)))
          (mixf hash (hash-piece (%pathname-name x)))
          (mixf hash (hash-piece (%pathname-type x)))
          ;; EQUAL might ignore the version, and it doesn't provide many bits
@@ -2022,11 +2007,10 @@ existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and
 (defmethod make-load-form ((pn pathname) &optional env)
   (declare (ignore env))
   (labels ((reconstruct (component)
-             (cond ((pattern-p component)
-                    (patternify component))
+             (cond ((pattern-p component) (patternify component))
                    ((and (listp component) (some #'pattern-p component))
                     (cons 'list (mapcar #'patternify component)))
-                   (t`',component)))
+                   (t `',component)))
            (patternify (subcomponent)
              (if (pattern-p subcomponent)
                  `(make-pattern ',(pattern-pieces subcomponent))

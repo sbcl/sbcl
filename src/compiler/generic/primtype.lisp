@@ -419,6 +419,8 @@
             (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)
             (values (primitive-type-or-lose (classoid-name type)) t))
+           ((pathname logical-pathname)
+            (part-of instance))
            (t
             (any))))
         (fun-designator-type

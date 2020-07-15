@@ -247,6 +247,15 @@
   (print-standard-describe-header object stream)
   (describe-instance object stream))
 
+(defmethod describe-object ((object pathname) stream)
+  (print-standard-describe-header object stream)
+  (loop for name across #(host device directory name type version)
+        for i from (get-dsd-index pathname host)
+        do (awhen (%instance-ref object i)
+             (format stream "~%  ~10A = ~A" name
+                     (prin1-to-line (if (eq name 'directory) (car it) it)))))
+  (terpri stream))
+
 (defmethod describe-object ((object character) stream)
   (print-standard-describe-header object stream)
   (format stream "~%Char-code: ~S~%Char-name: ~A"
