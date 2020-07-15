@@ -289,6 +289,7 @@
                     (seq-args (make-gensym-list (length all-seqs))))
                `(lambda (result-type fun ,@seq-args)
                   (map-into (locally
+                                #-sb-xc-host
                                 (declare (muffle-conditions array-initial-element-mismatch))
                               (make-sequence result-type
                                              (min ,@(loop for arg in seq-args
