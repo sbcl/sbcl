@@ -1152,8 +1152,8 @@ core and return a descriptor to it."
       (dolist (instance it (remhash name *layout-deferred-instances*))
         (set-instance-layout instance result)))
 
-    (when (member name '(null list symbol))
-      ;; Assign an empty slot-table.  Why this is done only for three
+    (when (member name '(null list symbol pathname))
+      ;; Assign an empty slot-table.  Why this is done only for four
       ;; classoids is ... too complicated to explain here in a few words,
       ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
       ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.

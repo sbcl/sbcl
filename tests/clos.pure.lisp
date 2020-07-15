@@ -82,16 +82,26 @@
                      (setf (slot-value x z) (slot-value y z)))
                    :allow-notes nil))
 
-(with-test (:name :slot-table-of-symbol-works)
-  (assert (eq :win
-              ;; the error that I want is about a missing slot,
-              ;; not a missing method, so don't let the compiler turn
-              ;; this into (funcall #'(SLOT-ACCESSOR :GLOBAL A READER)...)
-              (handler-case (eval '(slot-value 'a 'a))
-                (simple-condition (c)
-                  (and (search "slot ~S is missing"
-                               (simple-condition-format-control c))
-                       :win))))))
+(defun assert-no-such-slot (obj slot-name)
+  (dolist (method '(slot-value slot-boundp))
+    (assert (eq :win
+                ;; the error that I want is about a missing slot,
+                ;; not a missing method, so don't let the compiler turn
+                ;; this into (funcall #'(SLOT-ACCESSOR :GLOBAL A READER)...)
+                (handler-case (eval `(,method ',obj ',slot-name))
+                  (simple-condition (c)
+                    (and (search "slot ~S is missing"
+                                 (simple-condition-format-control c))
+                         :win))))))
+  ;; and of course SLOT-EXISTS-P should just return NIL
+  (assert (not (slot-exists-p obj slot-name))))
+
+(with-test (:name :slot-table-of-builtin-classoids)
+  (assert-no-such-slot 'some-symbol 'some-slot)
+  (assert-no-such-slot #P"foo" 'some-slot)
+  (let ((lpn #p"sys:contrib;"))
+    (assert (typep lpn 'logical-pathname))
+    (assert-no-such-slot lpn 'some-slot)))
 
 (with-test (:name :funcallable-instance-sxhash)
   (assert

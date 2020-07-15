@@ -74,7 +74,9 @@
   (version nil :type (or integer pathname-component-tokens (member :newest))
                :read-only t))
 
-(setf (layout-info (find-layout 'logical-pathname))
-      (find-defstruct-description 'pathname))
+(let ((to (find-layout 'logical-pathname))
+      (from (find-layout 'pathname)))
+  (setf (layout-info to) (layout-info from)
+        (layout-slot-table to) (layout-slot-table from)))
 (declaim (inline logical-pathname-p))
 (defun logical-pathname-p (x) (typep x 'logical-pathname))
