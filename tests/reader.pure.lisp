@@ -281,6 +281,11 @@
                  (coerce (read-from-string "#((0 . \"A\") (1 . \"B\"))")
                          'list))))
 
+(with-test (:name (read-delimited-list :non-recursive :circularity))
+  (let* ((stream (make-string-input-stream "#1=(nil) #1#)"))
+         (result (read-delimited-list #\) stream)))
+    (assert (eq (first result) (second result)))))
+
 ;;; parse-integer uses whitespace[1] not whitespace[2] as its
 ;;; definition of whitespace to skip.
 (with-test (:name (parse-integer :whitespace-handling))

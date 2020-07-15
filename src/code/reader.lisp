@@ -915,7 +915,8 @@ standard Lisp readtable when NIL."
                (read-list-item input-stream))))
       (if recursive-p
           (%read-delimited-list)
-          (with-read-buffer () (%read-delimited-list)))))) ; end MACROLET
+          (let ((*sharp-equal* nil))
+            (with-read-buffer () (%read-delimited-list))))))) ; end MACROLET
 
 (defun read-after-dot (stream firstchar collectp)
   ;; FIRSTCHAR is non-whitespace!
