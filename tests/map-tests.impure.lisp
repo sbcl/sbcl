@@ -223,3 +223,9 @@
     (test 'mapcar (list  #'list '(1 2 3) '(4 5 6) '(7 8 9))
           '((1 4 7) (2 5 8) (3 6 9)))
     (test 'mapcan (list #'identity '(1)) 1)))
+
+(with-test (:name (map :initial-element-style-warnin))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (map '(vector hash-table) #'identity x))))

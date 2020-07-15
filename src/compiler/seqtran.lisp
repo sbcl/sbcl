@@ -288,9 +288,11 @@
              (let* ((all-seqs (cons seq seqs))
                     (seq-args (make-gensym-list (length all-seqs))))
                `(lambda (result-type fun ,@seq-args)
-                  (map-into (make-sequence result-type
-                                           (min ,@(loop for arg in seq-args
-                                                        collect `(length ,arg))))
+                  (map-into (locally
+                                (declare (muffle-conditions array-initial-element-mismatch))
+                              (make-sequence result-type
+                                             (min ,@(loop for arg in seq-args
+                                                          collect `(length ,arg)))))
                             fun ,@seq-args))))
             (t
              (let* ((all-seqs (cons seq seqs))
