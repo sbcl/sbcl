@@ -11,6 +11,14 @@
 
 ;;;; Rudimentary DEFMETHOD
 
+;;; This stub ensures that:
+;;; - Argument specializations are stored in a way that permits an extremely simple
+;;;   single-dispatch implementation with correct behavior of MAKE-LOAD-FORM and
+;;;   PRINT-OBJECT. Subject to not needing method combination or CALL-NEXT-METHOD,
+;;;   exactly one primary method is chosen respecting class precedence order.
+;;; - The simple methods can be installed later by the full CLOS implementation.
+;;;   They play nice by using the same call signature for the "fast function"
+
 (sb-xc:defmacro defmethod (&whole form name lambda-list &rest body
                            &aux qualifier)
   (when (member name '((setf documentation) documentation) :test 'equal)
@@ -46,14 +54,17 @@
         (declare (ignore .pv. .next-method-call.)
                  (ignorable ,(car unspecialized-ll)))
         ,@decls
-        ;; Fail at compile-time if any transformational magic needs to happen.
+        ;; Fail at compile-time if any fancy slot access would happen, if compiled
+        ;; by the eventual implementation.
+        ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
+        ;; an ignorable function that uses a legal macro name.
         (macrolet ,(mapcar (lambda (f)
                              `(,f (&rest args)
                                   (declare (ignore args))
                                   (error "can't use ~A in trivial method" ',f)))
                            '(slot-boundp slot-value %set-slot-value call-next-method))
           (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
-            (declare (inline (setf slot-value)))
+            (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
             (block ,name ,@forms))))
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
       (sb-c:source-location))))
