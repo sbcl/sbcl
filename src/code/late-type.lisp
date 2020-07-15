@@ -1412,6 +1412,31 @@
          ;; named type in disguise, TYPE2 is not a superset of TYPE1.
          (values nil t))))
 
+;;; Return T if members of this classoid certainly have INSTANCE-POINTER-LOWTAG.
+;;; Logically it is the near opposite of CLASSOID-NON-INSTANCE-P, but not quite.
+;;; CTYPEs which are not represented as a classoid return NIL for both predicates
+;;; as do PCL types which may be either funcallable or non-funcallable.
+;;;
+;;; But some of that generality seems wrong. I don't think it would be allowed
+;;; to have (as merely an example) an EQL-SPECIALIZER which is funcallable,
+;;; having FUN-POINTER-LOWTAG instead of INSTANCE-POINTER-LOWTAG). Yet we think
+;;; it could happen, because the parse of the type (AND EQL-SPECIALIZER INSTANCE)
+;;; yields #<INTERSECTION-TYPE (AND SB-MOP:EQL-SPECIALIZER INSTANCE)>
+;;; versus simplifying down to EQL-SPECIALIZER.
+#| (loop for c being each hash-key of (classoid-subclasses (find-classoid 't))
+      do (let ((not-i (classoid-non-instance-p c))
+               (i (classoid-definitely-instancep c)))
+           (unless (eq (not not-i) i) (format t "~S -> ~A and ~A~%" c not-i i)))) |#
+(defun classoid-definitely-instancep (x)
+  (or (structure-classoid-p x)
+      (condition-classoid-p x)))
+(eval-when (:compile-toplevel :execute)
+  (pushnew 'classoid-definitely-instancep sb-vm::*backend-cross-foldable-predicates*))
+
+(defun classoid-is-or-inherits (sub super)
+  (or (classoid-inherits-from sub super)
+      (eq sub (find-classoid super))))
+
 (define-type-method (named :complex-subtypep-arg2) (type1 type2)
   (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
@@ -1432,17 +1457,13 @@
         ((and (eq type2 *extended-sequence-type*) (classoid-p type1))
          (values (if (classoid-inherits-from type1 'sequence) t nil) t))
         ((and (eq type2 *instance-type*) (classoid-p type1))
-         (cond
-           ((classoid-non-instance-p type1)
-            (values nil t))
-           ((classoid-inherits-from type1 'function)
-            (values nil t))
-           ((eq type1 (find-classoid 'function))
-            (values nil t))
-           ((or (structure-classoid-p type1)
-                (condition-classoid-p type1))
-            (values t t))
-           (t (values nil nil))))
+         (cond ((or (classoid-non-instance-p type1)
+                    (classoid-is-or-inherits type1 'function))
+                (values nil t))
+               ((classoid-definitely-instancep type1)
+                (values t t))
+               (t
+                (values nil nil))))
         ((and (eq type2 *funcallable-instance-type*) (classoid-p type1))
          (if (and (not (classoid-non-instance-p type1))
                   (classoid-inherits-from type1 'function))
@@ -1479,22 +1500,21 @@
     (cond
       ((eq type2 *extended-sequence-type*)
        (typecase type1
-         ((or structure-classoid condition-classoid) *empty-type*)
+         ((satisfies classoid-definitely-instancep) *empty-type*) ; dubious!
          (classoid (cond
                      ((classoid-non-instance-p type1) *empty-type*)
                      ((classoid-inherits-from type1 'sequence) type1)))
          (t (empty-unless-hairy type1))))
       ((eq type2 *instance-type*)
        (typecase type1
-         ((or structure-classoid condition-classoid) type1)
+         ((satisfies classoid-definitely-instancep) type1)
          (classoid (when (or (classoid-non-instance-p type1)
-                             (eq type1 (find-classoid 'function))
-                             (classoid-inherits-from type1 'function))
+                             (classoid-is-or-inherits type1 'function))
                      *empty-type*))
          (t (empty-unless-hairy type1))))
       ((eq type2 *funcallable-instance-type*)
        (typecase type1
-         ((or structure-classoid condition-classoid) *empty-type*)
+         ((satisfies classoid-definitely-instancep) *empty-type*)
          (classoid
           (cond
             ((classoid-non-instance-p type1) *empty-type*)
