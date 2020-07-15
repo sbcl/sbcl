@@ -406,6 +406,8 @@
                   (exactly simd-pack-256-single))
                  ((member 'double-float eltypes)
                   (exactly simd-pack-256-double)))))
+        (cons-type
+         (part-of list))
         (built-in-classoid
          (case (classoid-name type)
            #+sb-simd-pack
@@ -417,8 +419,6 @@
             (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)
             (values (primitive-type-or-lose (classoid-name type)) t))
-           (cons-type
-            (part-of list))
            (t
             (any))))
         (fun-designator-type

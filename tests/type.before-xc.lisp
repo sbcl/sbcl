@@ -420,3 +420,12 @@
 ;;; Unparse a union of (up to) 4 things depending on :sb-unicode as 2 things.
 (assert (equal (type-specifier (specifier-type '(or string null)))
                '(or string null)))
+
+(multiple-value-bind (result exactp)
+    (sb-vm::primitive-type (specifier-type 'list))
+  (assert (and (eq result (sb-vm::primitive-type-or-lose 'list))
+               exactp)))
+(multiple-value-bind (result exactp)
+    (sb-vm::primitive-type (specifier-type 'cons))
+  (assert (and (eq result (sb-vm::primitive-type-or-lose 'list))
+               (not exactp))))
