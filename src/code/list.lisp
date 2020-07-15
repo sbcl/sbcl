@@ -175,7 +175,7 @@
   (endp object))
 
 (defun list-length (list)
-  "Return the length of the given List, or Nil if the List is circular."
+  "Return the length of LIST, or NIL if LIST is circular."
   (do ((n 0 (+ n 2))
        (y list (cddr y))
        (z list (cdr z)))
@@ -351,7 +351,7 @@
       form))
 
 (defun list (&rest args)
-  "Return constructs and returns a list of its arguments."
+  "Construct and return a list containing the objects ARGS."
   args)
 
 ;;; LIST* is done the same as LIST, except that the last cons is made
@@ -380,7 +380,7 @@
              result)))))
 
 (defun make-list (size &key initial-element)
-  "Constructs a list with size elements each set to value"
+  "Construct and return a list with SIZE elements each set to INITIAL-ELEMENT."
   (declare (explicit-check))
   (%make-list size initial-element))
 ;;; This entry point is to be preferred, irrespective of
@@ -393,7 +393,7 @@
     (declare (type index count))))
 
 (defun append (&rest lists)
-  "Construct a new list by concatenating the list arguments"
+  "Construct and return a list by concatenating LISTS."
   (let* ((result (list nil))
          (tail result)
          (index 0)
