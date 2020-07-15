@@ -2394,16 +2394,17 @@
       (declare (type index mask))
       (let* (;; PATHNAME is the pathname we associate with the stream.
              (pathname (merge-pathnames filename))
-             (physical (physicalize-pathname pathname))
-             (truename (probe-file physical))
-             ;; NAMESTRING is the native namestring we open the file with.
-             (namestring (cond (truename
-                                (native-namestring truename :as-file t))
-                               ((or (not input)
-                                    (and input (eq if-does-not-exist :create))
-                                    (and (eq direction :io)
-                                         (not if-does-not-exist-given)))
-                                (native-namestring physical :as-file t)))))
+             (physical (native-namestring (physicalize-pathname pathname) :as-file t))
+             ;; One call to access() is reasonable. 40 calls to lstat() is not.
+             ;; So DO NOT CALL TRUENAME HERE.
+             (existsp (sb-unix:unix-access physical sb-unix:f_ok))
+             ;; Leave NAMESTRING as NIL if nonexistent and not creating a file.
+             (namestring (when (or existsp
+                                   (or (not input)
+                                       (and input (eq if-does-not-exist :create))
+                                       (and (eq direction :io)
+                                            (not if-does-not-exist-given))))
+                           physical)))
         ;; Process if-exists argument if we are doing any output.
         (cond (output
                (unless if-exists-given
@@ -2433,9 +2434,7 @@
                        nil)
                       (t
                        :create))))
-        (cond ((and if-exists-given
-                    truename
-                    (eq if-exists :new-version))
+        (cond ((and existsp if-exists-given (eq if-exists :new-version))
                (sb-kernel::%file-error
                 pathname "OPEN :IF-EXISTS :NEW-VERSION is not supported ~
                           when a new version must be created."))
@@ -2452,7 +2451,7 @@
                 pathname "OPEN :IF-DOES-NOT-EXIST ~s ~
                           :IF-EXISTS ~s will always signal an error."
                 if-does-not-exist if-exists))
-              (truename
+              (existsp
                (if if-exists
                    (sb-kernel::%file-error pathname 'file-exists)
                    (return)))
