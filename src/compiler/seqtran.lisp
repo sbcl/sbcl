@@ -1252,8 +1252,9 @@
                                 ;; As with MAKE-ARRAY, this is merely undefined
                                 ;; behavior, not an error.
                                 (compiler-style-warn
-                                 "The default initial element ~S is not a ~S."
-                                 default-initial-element elt-type))))
+                                 'initial-element-mismatch-style-warning
+                                 :format-control "The default initial element ~S is not a ~S."
+                                 :format-arguments (list default-initial-element elt-type)))))
                            ;; In would be possible in some cases,
                            ;; like :INITIAL-ELEMENT (IF X #\x #\y) in a call
                            ;; to MAKE-SEQUENCE '(VECTOR (MEMBER #\A #\B))
@@ -1263,10 +1264,10 @@
                                  (not (ctypep (lvar-value initial-element)
                                               elt-ctype)))
                             ;; MAKE-ARRAY considers this a warning, not an error.
-                            (compiler-warn "~S ~S is not a ~S"
-                                           :initial-element
-                                           (lvar-value initial-element)
-                                           elt-type)))))
+                            (compiler-warn 'array-initial-element-mismatch
+                                           :format-control "~S ~S is not a ~S"
+                                           :format-arguments
+                                           (list :initial-element (lvar-value initial-element) elt-type))))))
                  (give-up-ir1-transform)))))))
 
 (deftransform subseq ((seq start &optional end)

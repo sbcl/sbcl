@@ -1005,6 +1005,10 @@
       :references '((:ansi-cl :function make-array)
                     (:ansi-cl :function sb-xc:upgraded-array-element-type))))
 
+(define-condition initial-element-mismatch-style-warning
+    (array-initial-element-mismatch simple-style-warning)
+  ())
+
 (define-condition type-warning (reference-condition simple-warning)
   ()
   (:default-initargs :references '((:sbcl :node "Handling of Types"))))

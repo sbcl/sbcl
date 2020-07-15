@@ -874,9 +874,10 @@
                   ;; didn't realize this.
                   (cond
                     (initial-element
-                     (compiler-warn "~S ~S is not a ~S"
-                                    :initial-element default-initial-element
-                                    elt-spec))
+                     (compiler-warn 'array-initial-element-mismatch
+                                    :format-control "~S ~S is not a ~S"
+                                    :format-arguments
+                                    (list :initial-element default-initial-element elt-spec)))
                     ;; For the default initial element, only warn if
                     ;; any array elements are initialized using it.
                     ((and (not (eql c-length 0))
@@ -884,9 +885,9 @@
                           ;; then fill-array means it was supplied initial-contents
                           (not (lvar-matches-calls (combination-lvar call)
                                                    '(make-array-header* fill-array))))
-                     (compiler-style-warn "The default initial element ~S is not a ~S."
-                                          default-initial-element
-                                          elt-spec))))
+                     (compiler-style-warn 'initial-element-mismatch-style-warning
+                                          :format-control "The default initial element ~S is not a ~S."
+                                          :format-arguments (list default-initial-element elt-spec)))))
              (let ((lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
@@ -995,8 +996,9 @@
                    ((not (ctypep value eltype-type))
                     ;; this case will not cause an error at runtime, but
                     ;; it's still worth STYLE-WARNing about.
-                    (compiler-style-warn "~S is not a ~S."
-                                         value eltype)))))
+                    (compiler-style-warn 'initial-element-mismatch-style-warning
+                                         :format-control "~S is not a ~S."
+                                         :format-arguments (list value eltype))))))
              `(let ((array ,creation-form))
                 (multiple-value-bind (vector)
                     (%data-vector-and-index array 0)
