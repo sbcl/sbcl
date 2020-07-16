@@ -17,12 +17,55 @@
  */
 
 #include "os.h"
-#include "gc-internal.h" // for os_allocate()
+#include "gc-internal.h" // for sizetab[] and os_allocate()
 #include "hopscotch.h"
 #include <stdint.h>
 #include <stdio.h>
 #include "genesis/vector.h"
 #include "murmur_hash.h"
+
+#ifdef LISP_FEATURE_USE_SYS_MMAP
+///
+///                **********************************
+///                *  GC MUST NOT ACQUIRE ANY LOCKS *
+///                **********************************
+///
+/// It's normally fine to use the mmap() system call to obtain memory for the
+/// hopscotch tables, unless your C runtime intercepts mmap() and causes it
+/// to sometimes (or always?) need a spinlock. That lock may be owned already,
+/// so GC will patiently wait forever; meanwhile the lock owner is also
+/// waiting forever on GC to finish.
+/// So bypass the C library routine and call the OS directly
+/// in case of a non-signal-safe interceptor such as
+///   https://chromium.googlesource.com/chromium/src/third_party/tcmalloc/chromium/+/refs/heads/master/src/malloc_hook_mmap_linux.h#146
+///
+static inline void* sys_mmap(void* addr, size_t length, int prot, int flags,
+                             int fd, off_t offset) {
+    // "linux-os.h" brings in <syscall.h>, others may need something different.
+    // mmap2 allows large file access with 32-bit off_t. We don't care about that,
+    // but _usually_ only one or the other of the syscalls exists depending on,
+    // various factors. Basing it on word size will pick the right one.
+#ifdef LISP_FEATURE_64_BIT
+    void* result = (void*)syscall(SYS_mmap, addr, length, prot, flags, fd, offset);
+#else
+    void* result = (void*)syscall(SYS_mmap2, addr, length, prot, flags, fd, offset);
+#endif
+    if (result == MAP_FAILED) lose("mmap failed in GC");
+    return result;
+}
+static inline int sys_munmap(void* addr, size_t length) {
+    return syscall(__NR_munmap, addr, length);
+}
+#define hopscotch_allocate(nbytes) \
+  sys_mmap(0, nbytes, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, 0, 0)
+#define hopscotch_deallocate(addr,length) sys_munmap(addr, length)
+
+#else
+
+#define hopscotch_allocate(nbytes) os_allocate(nbytes)
+#define hopscotch_deallocate(addr,length) os_deallocate(addr, length)
+
+#endif
 
 typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
@@ -123,7 +166,7 @@ void hopscotch_init() // Called once on runtime startup, from gc_init().
     // Prefill the cache with 2 entries, each the size of a kernel page.
     int n_bytes_per_slice = getpagesize();
     int n_bytes_total = N_CACHED_ALLOCS * n_bytes_per_slice;
-    char* mem = os_allocate(n_bytes_total);
+    char* mem = hopscotch_allocate(n_bytes_total);
     gc_assert(mem);
     cached_alloc[0] = mem + ALLOCATION_OVERHEAD;
     cached_alloc[1] = cached_alloc[0] + n_bytes_per_slice;
@@ -158,7 +201,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
     // not a multiple of the mmap granularity, which we'll assume is 4K.
     // (It doesn't actually matter.)
     nbytes = ALIGN_UP(nbytes, hh_allocation_granularity);
-    char* result = os_allocate(nbytes);
+    char* result = hopscotch_allocate(nbytes);
     gc_assert(result);
     result += ALLOCATION_OVERHEAD;
     usable_size(result) = nbytes - ALLOCATION_OVERHEAD;
@@ -185,15 +228,15 @@ static void cached_deallocate(char* mem, uword_t zero_fill_length)
         int cached_size1 = usable_size(cached_alloc[1]);
         if (!(this_size > cached_size0 || this_size > cached_size1)) {
             // mem is not strictly larger than either cached block. Release it.
-            os_deallocate(mem - ALLOCATION_OVERHEAD,
-                          usable_size(mem) + ALLOCATION_OVERHEAD);
+            hopscotch_deallocate(mem - ALLOCATION_OVERHEAD,
+                                 usable_size(mem) + ALLOCATION_OVERHEAD);
             return;
         }
         // Evict and replace the smaller of the two cache entries.
         if (cached_size1 < cached_size0)
             line = 1;
-        os_deallocate(cached_alloc[line] - ALLOCATION_OVERHEAD,
-                      usable_size(cached_alloc[line]) + ALLOCATION_OVERHEAD);
+        hopscotch_deallocate(cached_alloc[line] - ALLOCATION_OVERHEAD,
+                             usable_size(cached_alloc[line]) + ALLOCATION_OVERHEAD);
     }
     memset(mem, 0, zero_fill_length);
     cached_alloc[line] = mem;

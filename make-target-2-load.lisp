@@ -22,7 +22,7 @@
           :OS-PROVIDES-POLL
           ;; The final batch of symbols is strictly for C. The prefix of
           ;; "LISP_FEATURE_" on the corresponding #define is unfortunate.
-          :GCC-TLS
+          :GCC-TLS :USE-SYS-MMAP
           :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
           :OS-PROVIDES-BLKSIZE-T)) ; only for 'src/runtime/wrap.h'
        (public-features

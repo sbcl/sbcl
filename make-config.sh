@@ -494,6 +494,10 @@ case "$sbcl_os" in
           arm64 | ppc64 | x86 | x86-64)
 	        printf ' :gcc-tls' >> $ltf
         esac
+        case "$sbcl_arch" in
+          arm | arm64 | ppc | ppc64 | x86 | x86-64)
+	        printf ' :use-sys-mmap' >> $ltf
+        esac
 
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
