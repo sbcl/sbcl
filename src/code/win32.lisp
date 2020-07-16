@@ -889,7 +889,7 @@ absense."
 
 (defun windows-pipe ()
   (multiple-value-bind (created read-handle write-handle)
-      (create-pipe nil 256)
+      (create-pipe nil 0)
     (if created (values read-handle write-handle)
         (win32-error 'create-pipe))))
 
