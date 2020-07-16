@@ -206,7 +206,8 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
 
     channel[0] = -1;
     channel[1] = -1;
-    pipe(channel);
+    // Surely we can do better than to lose()
+    if (pipe(channel)) lose("can't run-program");
 
     pid = fork();
     if (pid) {
