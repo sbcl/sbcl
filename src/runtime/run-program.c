@@ -27,6 +27,7 @@
 #include <termios.h>
 #include <errno.h>
 #include <dirent.h>
+#include "interr.h" // for lose()
 
 #ifdef LISP_FEATURE_OPENBSD
 #include <util.h>
