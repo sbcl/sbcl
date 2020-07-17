@@ -148,8 +148,7 @@
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
                             (sb-ext:*derive-function-types*
-                              ;; BUG: deriving a strange (wrong?) function type in this
-                              (unless (string= stem "src/pcl/fixup")
+                              (unless (search "/pcl/" stem)
                                 t)))
                         (ensure-directories-exist output)
                         ;; Like PROCLAIM-TARGET-OPTIMIZATION in 'compile-cold-sbcl'
