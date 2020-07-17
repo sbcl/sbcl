@@ -145,9 +145,21 @@
               retry-compile-file
                 (multiple-value-bind (output-truename warnings-p failure-p)
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
-                     ((t)   (let ((sb-c::*source-namestring* fullname))
-                              (ensure-directories-exist output)
-                              (compile-file stem :output-file output)))
+                     ((t)
+                      (let ((sb-c::*source-namestring* fullname)
+                            (sb-ext:*derive-function-types*
+                              ;; BUG: deriving a strange (wrong?) function type in this
+                              (unless (string= stem "src/pcl/fixup")
+                                t)))
+                        (ensure-directories-exist output)
+                        ;; Like PROCLAIM-TARGET-OPTIMIZATION in 'compile-cold-sbcl'
+                        ;; We should probably stash a copy of the POLICY instance from
+                        ;; make-host-2 in a global var and apply it here.
+                        (proclaim '(optimize
+                                    (safety 2) (speed 2)
+                                    (sb-c:insert-step-conditions 0)
+                                    (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)))
+                        (compile-file stem :output-file output)))
                      ((nil) output))
                   (cond ((not output-truename)
                          (error "COMPILE-FILE of ~S failed." stem))

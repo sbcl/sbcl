@@ -66,6 +66,12 @@
 (setq **boot-state** 'complete)
 
 ;;; CLASS-PROTOTYPE for FUNCTION should not use ALLOCATE-INSTANCE.
+;;;
+;;; FIXME: this causes an error
+;;;  "A function with declared result type NIL returned:
+;;;   (SLOT-ACCESSOR :GLOBAL PROTOTYPE WRITER)"
+;;; if SB-EXT:*DERIVE-FUNCTION-TYPES* is T.
+;;;
 (let ((class (find-class 'function)))
   (setf (slot-value class 'prototype) #'identity))
 
