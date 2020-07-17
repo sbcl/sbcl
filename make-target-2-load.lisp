@@ -377,6 +377,7 @@ Please check that all strings which were not recognizable to the compiler
                             sb-vm::thread-profile-data-slot
                             sb-vm::thread-alloc-region-slot
                             sb-vm::primitive-object-size
+                            sb-vm::reconstitute-object
                             ;; need this for defining a vop which
                             ;; tests the x86-64 allocation profiler
                             sb-vm::pseudo-atomic

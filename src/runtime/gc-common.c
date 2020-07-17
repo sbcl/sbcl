@@ -2381,3 +2381,8 @@ void gc_heapsort_uwords(heap array, int length)
         sift_down(array, 0, end);
     }
 }
+
+/// External function for calling from Lisp.
+page_index_t ext_lispobj_size(lispobj *addr) {
+    return OBJECT_SIZE(*addr,addr) * N_WORD_BYTES;
+}

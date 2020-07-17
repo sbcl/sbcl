@@ -403,9 +403,9 @@
            (physaddr start))
      (loop
       (when (>= physaddr end) (return))
-      (multiple-value-bind (obj tag size)
-          (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))
-        (when (and (= tag symbol-widetag)
+      (let* ((obj (reconstitute-object (ash physaddr (- n-fixnum-tag-bits))))
+             (size (sb-vm::primitive-object-size obj)))
+        (when (and (symbolp obj)
                    (string= symbol-name (translate (symbol-name obj) spaces))
                    (%instancep (symbol-package obj))
                    (string= package-name

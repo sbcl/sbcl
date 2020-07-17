@@ -61,6 +61,9 @@
           ;; not that this is expected to work concurrently with gc.
           (make-room-info (ash most-positive-word (- (1+ n-widetag-bits)))
                           'bignum :other))
+    (setf (svref infos filler-widetag)
+          (make-room-info (ash most-positive-word (- (1+ n-widetag-bits)))
+                          'filler :other))
 
     (setf (svref infos closure-widetag)
           (make-room-info short-header-max-words 'closure :closure))
@@ -169,13 +172,6 @@
       (multiple-value-bind (start end) (%space-bounds space)
         (ash (- end start) n-fixnum-tag-bits))))
 
-;;; Round SIZE (in bytes) up to the next dualword boundary. A dualword
-;;; is eight bytes on platforms with 32-bit word size and 16 bytes on
-;;; platforms with 64-bit word size.
-#-sb-fluid (declaim (inline round-to-dualword))
-(defun round-to-dualword (size)
-  (logand (the word (+ size lowtag-mask)) (lognot lowtag-mask)))
-
 (defun instance-length (instance) ; excluding header, not aligned to even
   ;; Add 1 if expressed length PLUS header (total number of words) would be
   ;; an even number, and the hash state bits indicate hashed-and-moved.
@@ -192,25 +188,6 @@
                (ash header-word (- hash-slot-present-flag))
                1))))
 
-;;; Return the vector OBJ, its WIDETAG, and the number of octets
-;;; required for its storage (including padding and alignment).
-(defun reconstitute-vector (obj saetp)
-  (declare (type (simple-array * (*)) obj)
-           (type specialized-array-element-type-properties saetp))
-  (let* ((length (+ (length obj)
-                    (saetp-n-pad-elements saetp)))
-         (n-bits (saetp-n-bits saetp))
-         (alignment-pad (floor 7 n-bits))
-         (n-data-octets (if (>= n-bits 8)
-                            (* length (ash n-bits -3))
-                            (ash (* (+ length alignment-pad)
-                                    n-bits)
-                                 -3))))
-    (values obj
-            (saetp-typecode saetp)
-            (round-to-dualword (+ (* vector-data-offset n-word-bytes)
-                                  n-data-octets)))))
-
 ;;; * If symbols are 7 words incl header, as they are on 32-bit w/threads,
 ;;;   then the part of NIL that manifests as symbol slots consumes 6 words
 ;;;   (less the header) because NIL's symbol widetag precedes it by 1 word.
@@ -222,6 +199,15 @@
 ;;; So either way, NIL's alignment padding makes it come out to 8 words in total.
 (defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
 
+;;; It's unclear to me whether reinventing sizetab[] in lisp is strictly
+;;; an improvement over doing the obvious:
+;;;  (WITH-PINNED-OBJECTS (object) (alien-funcall "ext_lispboj_size" ...))
+;;; It certainly doesn't feel that it's better, but it has significantly less overhead
+;;; at least on cheneygc if not also on the precise gencgc platforms.
+;;; But see WITH-PINNED-OBJECT-ITERATOR in 'target-hash-table' which offers
+;;; a way to mitigate the need to bind/unbind a special var when doing a massive
+;;; numbers of WITH-PINNED-OBJECT operations.
+;;; FIXME: export this from SB-EXT
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (if (is-lisp-pointer (get-lisp-obj-address object))
@@ -247,8 +233,19 @@
                               (+ array-dimensions-offset (array-rank object)))
                              ((simple-array-nil-p object) 2)
                              (t
-                              (return-from primitive-object-size
-                                (nth-value 2 (reconstitute-vector object room-info)))))
+                              (let* ((length (+ (length object)
+                                                (saetp-n-pad-elements room-info)))
+                                     (n-bits (saetp-n-bits room-info))
+                                     (alignment-pad (floor 7 n-bits))
+                                     ;; This math confuses me. So there's a self-test
+                                     ;; against the C code which is known good.
+                                     (n-data-octets (if (>= n-bits 8)
+                                                        (* length (ash n-bits -3))
+                                                        (ash (* (+ length alignment-pad)
+                                                                n-bits)
+                                                             -3))))
+                                (+ (ceiling n-data-octets n-word-bytes) ; N data words
+                                   vector-data-offset))))
                        ;; Other things (symbol, value-cell, etc)
                        ;; don't have a sizer, so use GET-HEADER-DATA
                        (1+ (logand (get-header-data object)
@@ -256,67 +253,22 @@
         (* (align-up words 2) n-word-bytes))
       0))
 
-;;; Given the address (untagged, aligned, and interpreted as a FIXNUM)
-;;; of a lisp object, return the object, its "type code" (either
-;;; LIST-POINTER-LOWTAG or a header widetag), and the number of octets
-;;; required for its storage (including padding and alignment).  Note
-;;; that this function is designed to NOT CONS, even if called
-;;; out-of-line.
-;;; FIXME: size calculation should be via PRIMITIVE-OBJECT-SIZE, not reinvented
+(defmacro widetag@baseptr (sap)
+  #+big-endian `(sap-ref-8 ,sap ,(1- n-word-bytes))
+  #+little-endian `(sap-ref-8 ,sap 0))
+
+(defmacro lispobj@baseptr (sap widetag)
+  `(%make-lisp-obj
+    (logior (sap-int ,sap)
+            (logand (deref (extern-alien "widetag_lowtag" (array char 256)) ,widetag)
+                    lowtag-mask))))
+
+;;; This uses the funny fixnum representation of ADDRESS. I'd like to change this
+;;; to take a SAP but god forbid people are using it?
+;;; DO NOT USE THIS! It is soon to be removed
 (defun reconstitute-object (address)
-  (let* ((object-sap (int-sap (get-lisp-obj-address address)))
-         (header (sap-ref-word object-sap 0))
-         (widetag (logand header widetag-mask))
-         (header-value (ash header (- n-widetag-bits)))
-         (info (svref *room-info* widetag)))
-    (macrolet
-        ((boxed-size (header-value)
-           `(round-to-dualword (ash (1+ ,header-value) word-shift)))
-         (tagged-object (tag)
-           `(%make-lisp-obj (logior ,tag (get-lisp-obj-address address)))))
-      (cond
-          ;; Pick off arrays, as they're the only plausible cause for
-          ;; a non-nil, non-ROOM-INFO object as INFO.
-        ((specialized-array-element-type-properties-p info)
-         (reconstitute-vector (tagged-object other-pointer-lowtag) info))
-        ((= widetag filler-widetag)
-         (values nil filler-widetag (boxed-size header-value)))
-        ((null info)
-         (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
-                widetag))
-
-        (t
-         (case (room-info-kind info)
-          (:list
-           (values (tagged-object list-pointer-lowtag)
-                   list-pointer-lowtag
-                   (* 2 n-word-bytes)))
-
-          (:instance
-           (let ((instance (tagged-object instance-pointer-lowtag)))
-             (values instance
-                     widetag
-                     (boxed-size (instance-length instance)))))
-
-          (:closure ; also funcallable-instance
-           (values (tagged-object fun-pointer-lowtag)
-                   widetag
-                   (boxed-size (logand header-value short-header-max-words))))
-
-          (:code
-           (let ((c (tagged-object other-pointer-lowtag)))
-             (values c
-                     code-header-widetag
-                     (code-object-size c))))
-
-          (:fdefn
-           (values (tagged-object other-pointer-lowtag) widetag
-                   (* fdefn-size n-word-bytes)))
-
-          (:other
-           (values (tagged-object other-pointer-lowtag)
-                   widetag
-                   (boxed-size (logand header-value (room-info-mask info)))))))))))
+  (let ((sap (descriptor-sap address)))
+    (lispobj@baseptr sap (widetag@baseptr sap))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
@@ -327,26 +279,47 @@
 (defun map-objects-in-range (fun start end &optional (strict-bound t))
   (declare (type function fun))
   (declare (dynamic-extent fun))
-  (named-let iter ((start start))
-  (cond
-    ((< (get-lisp-obj-address start) (get-lisp-obj-address end))
-     (multiple-value-bind (obj typecode size) (reconstitute-object start)
-      ;; SIZE is almost surely a fixnum. Non-fixnum would mean at least
-      ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
-       (aver (not (logtest (the word size) lowtag-mask)))
+  (let ((start (descriptor-sap start))
+        (end (descriptor-sap end)))
+    (loop
+     (if (sap>= start end) (return))
+     (binding* ((widetag (widetag@baseptr start))
+                (obj (lispobj@baseptr start widetag))
+                ((typecode size)
+                 ;; PRIMITIVE-OBJECT-SIZE works on conses, but they're exceptions already
+                 ;; because of absence of a widetag, so may as well not call the sizer.
+                 (if (listp obj)
+                     (values list-pointer-lowtag (* 2 n-word-bytes))
+                     (values widetag (primitive-object-size obj)))))
+       ;; SIZE is surely a fixnum. Non-fixnum would imply at least
+       ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
+       ;; But check to be sure.
+       (aver (not (logtest (the fixnum size) lowtag-mask)))
        (unless (= typecode filler-widetag)
          (funcall fun obj typecode size))
-             ;; This special little dance is to add a number of octets
-             ;; (and it had best be a number evenly divisible by our
-             ;; allocation granularity) to an unboxed, aligned address
-             ;; masquerading as a fixnum.  Without consing.
-      (iter (%make-lisp-obj
-              (mask-field (byte #.n-word-bits 0)
-                          (+ (get-lisp-obj-address start)
-                             size))))))
-    (strict-bound
+       (setq start (sap+ start size))))
+    (when strict-bound
      ;; If START is not eq to END, then we have blown past our endpoint.
-     (aver (eq start end))))))
+     (aver (sap= start end)))))
+
+;;; Test the sizing function ASAP, because if it's broken, then MAP-ALLOCATED-OBJECTS
+;;; is too, and then creating the initial core will crash because of the various heap
+;;; traversals performed in SAVE-LISP-AND-DIE. Don't delay a crash.
+(dovector (saetp *specialized-array-element-type-properties*)
+  (let ((length 0) (et (saetp-specifier saetp)))
+    (loop (let* ((array (make-array length :element-type et))
+                 (size-from-lisp (primitive-object-size array))
+                 (size-from-c
+                  (with-pinned-objects (array)
+                    (alien-funcall (extern-alien "ext_lispobj_size" (function unsigned unsigned))
+                                   (logandc2 (get-lisp-obj-address array) lowtag-mask)))))
+            (unless (= size-from-lisp size-from-c)
+              (bug "size calculation mismatch on ~S" array))
+            ;; Stop after enough trials to hit all the edge case
+            (when (or (>= size-from-lisp (* 8 sb-vm:n-word-bytes))
+                      (and (eq et nil) (>= length 4))) ; always 2 words
+              (return))
+            (incf length)))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
@@ -1309,9 +1282,10 @@ We could try a few things to mitigate this:
            (let ((where (+ dynamic-space-start (* page-num gencgc-card-bytes)))
                  (seen-filler nil))
              (loop
-               (multiple-value-bind (obj type size)
-                   (reconstitute-object (ash where (- n-fixnum-tag-bits)))
-                 (when (= type code-header-widetag)
+               (let* ((obj (let ((sap (int-sap where)))
+                             (lispobj@baseptr sap (widetag@baseptr sap))))
+                      (size (primitive-object-size obj)))
+                 (when (code-component-p obj)
                    (incf n-code-bytes size))
                  (when (if (and (consp obj) (eq (car obj) 0) (eq (cdr obj) 0))
                            (if seen-filler
