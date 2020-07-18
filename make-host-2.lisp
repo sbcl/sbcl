@@ -43,7 +43,7 @@
   (when (and fail (not (featurep :win32)))
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
-             ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-WHITELIST*?)~]"
+             ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-ALLOWLIST*?)~]"
             variables types functions)))
 
 #-clisp ; DO-ALL-SYMBOLS seems to kill CLISP at random

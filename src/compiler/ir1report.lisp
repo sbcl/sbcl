@@ -578,10 +578,10 @@ has written, having proved that it is unreachable."))
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
   #+sb-xc-host
-  ;; Whitelist functions are looked up prior to UNCROSS,
+  ;; Allowlist functions are looked up prior to UNCROSS,
   ;; so that we can distinguish CL:SOMEFUN from SB-XC:SOMEFUN.
   (when (and (eq kind :function)
-             (gethash name sb-cold:*undefined-fun-whitelist*))
+             (gethash name sb-cold:*undefined-fun-allowlist*))
     (return-from note-undefined-reference (values)))
   (setq name (uncross name))
   (unless (and

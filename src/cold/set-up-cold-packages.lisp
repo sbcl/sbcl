@@ -469,8 +469,8 @@
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
 
-(export '*undefined-fun-whitelist*)
-(defvar *undefined-fun-whitelist* (make-hash-table :test 'equal))
+(export '*undefined-fun-allowlist*)
+(defvar *undefined-fun-allowlist* (make-hash-table :test 'equal))
 (let ((list
        (with-open-file (data (prepend-genfile-path "package-data-list.lisp-expr"))
          ;; There's no need to use the precautionary READ-FROM-FILE function
@@ -478,7 +478,7 @@
          (create-target-packages (let ((*readtable* *xc-readtable*)) (read data)))
          (let ((*readtable* *xc-readtable*)) (read data)))))
   (dolist (name (apply #'append list))
-    (setf (gethash name *undefined-fun-whitelist*) t)))
+    (setf (gethash name *undefined-fun-allowlist*) t)))
 
 (defvar *asm-package-use-list*
   '("SB-ASSEM" "SB-DISASSEM"

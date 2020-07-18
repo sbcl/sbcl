@@ -238,8 +238,9 @@
 ;;; For macro lambdas that are processed by the host
 (declaim (declaration top-level-form))
 
-;;; The opposite of the whitelist - if certain full calls are seen, it is probably
-;;; the result of a missed transform and/or misconfiguration.
+;;; The opposite of *undefined-fun-allowlist* - if certain full calls
+;;; are seen, it is probably the result of a missed transform and/or
+;;; misconfiguration.
 (defparameter *full-calls-to-warn-about*
   '(;mask-signed-field ;; Too many to fix
     ))

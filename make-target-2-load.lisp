@@ -35,7 +35,7 @@
            :FREEBSD :GNU-KFREEBSD :OPENBSD :NETBSD :DRAGONFLY :HAIKU :HPUX
            :MACH-O :ELF ; obj file format: pick zero or one
            ;; I would argue that this should not be exposed,
-           ;; but I would also anticipate blowblack from removing it.
+           ;; but I would also anticipate blowback from removing it.
            :CHENEYGC :GENCGC ; GC: pick one and only one
            ;; Can't use s-l-a-d :compression safely without it
            :SB-CORE-COMPRESSION
