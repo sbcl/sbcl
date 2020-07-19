@@ -486,6 +486,13 @@ undo_init_new_thread(struct thread *th,
     /* Undo the association of the current pthread to its `struct thread',
      * such that we can call arch_os_get_current_thread() later in this
      * thread and cleanly get back NULL. */
+    /* FIXME: this seems to be prone to causing lossage of signals because
+     * until setting current_thread to NULL, lisp_thread_p() returns 1,
+     * so maybe_resignal_to_lisp_thread() would consider this thread ok to
+     * receive a signal if delivered to a non-lisp thread. But then we just
+     * block everything and disappear. It's essentially the same problem as
+     * the GC pending signal that has to be explicitly discarded, which is
+     * the right disposition of that signal, but not signals in general */
 #ifdef LISP_FEATURE_GCC_TLS
     current_thread = NULL;
 #else
