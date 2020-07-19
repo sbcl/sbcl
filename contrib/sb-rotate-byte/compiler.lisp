@@ -45,7 +45,7 @@
     (if (numeric-type-p size)
         (let ((size-high (numeric-type-high size))
               (num-type (sb-c::lvar-type num)))
-          (if (and size-high
+          (if (and (typep size-high '(integer 1))
                    num-type
                    (<= size-high sb-vm:n-word-bits)
                    (csubtypep num-type
