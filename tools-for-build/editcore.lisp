@@ -425,7 +425,7 @@
 (defparameter label-prefix (if (member :darwin *features*) "_" ""))
 (defun labelize (x) (concatenate 'string label-prefix x))
 
-(defun compute-linkage-symbols (spaces entry-size)
+(defun compute-linkage-symbols (spaces)
   (let* ((linkage-info (symbol-global-value
                         (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"
                                             spaces :physical)))
@@ -459,8 +459,7 @@
           (symbol-global-value
            (find-target-symbol "SB-VM" "LINKAGE-TABLE-ENTRY-SIZE"
                                spaces :physical)))
-         (linkage-symbols (compute-linkage-symbols spaces linkage-entry-size))
-         (inst-space (get-inst-space))
+         (linkage-symbols (compute-linkage-symbols spaces))
          (nil-object (compute-nil-object spaces))
          (ambiguous-symbols (make-hash-table :test 'equal))
          (core

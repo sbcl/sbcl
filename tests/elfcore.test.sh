@@ -33,6 +33,18 @@ set -e # exit on error
 # Ensure that we're not running a stale shrinkwrap-sbcl
 (cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; make shrinkwrap-sbcl)
 
+# Prevent style-warnings in the editcore script, but don't assume that it
+# can be compiled in the first place unless actually doing the ELFcore tests.
+run_sbcl --noinform <<EOF
+  (let ((*evaluator-mode* :interpret))
+    (load "../tests/test-util")
+    (load "../tools-for-build/corefile"))
+  (test-util:with-scratch-file (fasl "fasl")
+    (assert (not (nth-value 1
+                  (compile-file "../tools-for-build/editcore"
+                                :output-file fasl :print nil)))))
+EOF
+
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
 ;; This just needs any function that when ELFinated has its packed fixups rewritten.
