@@ -322,7 +322,7 @@ Examples:
 (defconstant hash-table-kind-eq     0)
 (defconstant hash-table-kind-eql    1)
 (defconstant hash-table-kind-equal  2)
-(defconstant hash-table-kind-equqlp 3)
+(defconstant hash-table-kind-equalp 3)
 
 ;;; I don't want to change peoples' assumptions about what operations are threadsafe
 ;;; on a weak table that was not created as expressly synchronized, so we continue to
@@ -366,12 +366,14 @@ Examples:
     approaches 0. Density 1 means an average of one entry per bucket.
 
   :HASH-FUNCTION
-    If NIL (the default), a hash function based on the TEST argument is used,
+    If unsupplied, a hash function based on the TEST argument is used,
     which then must be one of the standardized hash table test functions, or
     one for which a default hash function has been defined using
     SB-EXT:DEFINE-HASH-TABLE-TEST. If HASH-FUNCTION is specified, the TEST
     argument can be any two argument predicate consistent with it. The
     HASH-FUNCTION is expected to return a non-negative fixnum hash code.
+    If TEST is neither standard nor defined by DEFINE-HASH-TABLE-TEST,
+    then the HASH-FUNCTION must be specified.
 
   :WEAKNESS
     When :WEAKNESS is not NIL, garbage collection may remove entries from the

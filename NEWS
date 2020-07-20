@@ -6,6 +6,7 @@ changes relative to sbcl-2.0.6:
   * minor incompatible change: OPEN no longer calls TRUENAME implicitly
     on a string filespec prior to issuing an open() system call.
   * minor incompatible change: PATHNAME is no longer a STRUCTURE-OBJECT.
+  * documentation: HASH-FUNCTION is a function designator (lp#1888028)
 
 changes in sbcl-2.0.6 relative to sbcl-2.0.5:
   * planned incompatible change: the defined symbols in the Metaobject

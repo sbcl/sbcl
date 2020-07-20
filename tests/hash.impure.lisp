@@ -524,4 +524,28 @@
     (assert (= empty (psxhash (make-rslotty :cdf #c(0d0 -0d0)))))
     (assert (= empty (psxhash (make-rslotty :cdf #c(-0d0 0d0)))))))
 
+(defun my= (a b) (= a b))
+(defun fixnum-hash (x) (sxhash (the fixnum x)))
+(defun fixnum-hash-worse (x) (logand (sxhash (the fixnum x)) 7))
+(define-hash-table-test my= fixnum-hash)
+
+(with-test (:name :hash-fun-is-function-designator)
+  ;; Users shouldn't write this baroque expression to make an EQL table.
+  (assert-error (make-hash-table :hash-function nil))
+  ;; nor this
+  (assert-error (make-hash-table :test #'eql :hash-function nil))
+  ;; :TEST, if unknown, does not imply a hash function
+  ;; even when it looks like it could.
+  (assert-error (make-hash-table :test #'=))
+  ;; and of course this doesn't work either because the preceding doesn't
+  (assert-error (make-hash-table :test #'= :hash-function nil))
+  ;; Try user functions
+  (let ((h (make-hash-table :test 'my=)))
+    (assert (eq (sb-impl::hash-table-hash-fun h) #'fixnum-hash)))
+  (let ((h (make-hash-table :test 'my= :hash-function 'fixnum-hash-worse)))
+    (assert (eq (sb-impl::hash-table-hash-fun h) #'fixnum-hash-worse)))
+  (let ((h (make-hash-table :test 'my= :hash-function #'fixnum-hash-worse)))
+    (assert (eq (sb-impl::hash-table-hash-fun h) #'fixnum-hash-worse)))
+  (assert-error (make-hash-table :test 'my= :hash-function nil))) ; no good
+
 ;;; success
