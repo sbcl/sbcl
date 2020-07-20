@@ -1185,7 +1185,13 @@ Test case.
             ;; so the conservative thing is to plug in NILs, not bogus values
             ;; from whatever file (if any) is currently being loaded.
             (setf (sb-c::compiled-debug-info-tlf-num+offset cdi) 0)
-            (setf (symbol-function fname) compiled-fun)))))
+            ;; Skirt a package lock by avoiding (SETF SYMBOL-FUNCTION)
+            ;; *technically* this should be a compare-and-swap to ensure that the
+            ;; original lambda expression is as expected. To do that, we need
+            ;; to get to the point where fdefns do not store "both" representations
+            ;; of one function pointer, because we can't assume that multi-word CAS
+            ;; is a thing.  Or use a mutex (horrible).
+            (setf (fdefn-fun (find-fdefn fname)) compiled-fun)))))
 
     (when (fluid-def-p fname)
       ;; Return a handler that calls FNAME very carefully

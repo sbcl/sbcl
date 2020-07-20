@@ -325,3 +325,16 @@
   (assert (nth-value 1 (function-lambda-expression (sb-int:info :type :expander 'thingz))))
   ;; and make sure the expander actually works
   (assert (typep "hey" '(thingz 3))))
+
+(defpackage fancypkg (:use "CL" "SB-EXT") (:export make-mystruct mystruct-x))
+(in-package fancypkg)
+(defstruct mystruct (x 3) y)
+(in-package "CL-USER")
+(lock-package "FANCYPKG")
+
+(defun f ()
+  (fancypkg:mystruct-x (fancypkg:make-mystruct)))
+(test-util:with-test (:name :jit-compiled-struct-accessor-locked-pkg)
+  (assert (eql (f) 3))
+  (assert (not (compiled-function-p #'f)))
+  (assert (compiled-function-p #'fancypkg:mystruct-x)))
