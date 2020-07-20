@@ -271,6 +271,13 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *foreign-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
+;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
+(defmacro copy-primitive-thread-fields (this)
+  `(setf (thread-primitive-thread ,this) (sap-int (current-thread-sap))
+         (thread-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)
+         (thread-os-thread ,this)
+         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))))
+
 (defun init-main-thread ()
   (/show0 "Entering INIT-MAIN-THREAD")
   ;;; FIXME: is it purposeful or accidental that we recreate some of
@@ -278,12 +285,11 @@ created and old ones may exit at any time."
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread "main thread" nil)))
+    (copy-primitive-thread-fields thread)
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
-    (setf (thread-primitive-thread thread) (sap-int (current-thread-sap))
-          (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
-          *initial-thread* thread)
+    (setf *initial-thread* thread)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -1607,8 +1613,7 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (setf (thread-primitive-thread thread) (sap-int (current-thread-sap)))
-  (setf (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*))
+  (copy-primitive-thread-fields thread)
   (let ((old *all-threads*))
       (loop
         (let ((addr (get-lisp-obj-address sb-vm:*control-stack-start*)))
@@ -1745,7 +1750,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; INITIAL-FUNCTION to another thread.
         ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
         (with-system-mutex (*make-thread-lock*)
-          (if (zerop (%create-thread (get-lisp-obj-address #'start-routine)))
+          (if (zerop (setf (thread-os-thread thread)
+                           (%create-thread (get-lisp-obj-address #'start-routine))))
               (setf thread nil)
               (wait-on-semaphore setup-sem)))))
     (or thread (error "Could not create a new thread.")))
@@ -1882,9 +1888,7 @@ subject to change."
   `(let ((lisp-thread ,thread))
      (with-c-thread (c-thread lisp-thread)
        (unless (= c-thread 0)
-         (let ((,os-thread (sap-ref-word (int-sap c-thread)
-                                         (ash sb-vm::thread-os-thread-slot
-                                              sb-vm:word-shift))))
+         (let ((,os-thread (thread-os-thread lisp-thread)))
            ,@body))))
   #-sb-thread
   `(let ((lisp-thread ,thread) (,os-thread 0))

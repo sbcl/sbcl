@@ -69,10 +69,8 @@
   (sb-thread::os-thread unsigned)
   (signal int))
 (defun current-thread-os-thread ()
-  #+sb-thread
-  (sb-sys:sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
-  #-sb-thread
-  0)
+  #+sb-thread (sb-thread::thread-os-thread sb-thread:*current-thread*)
+  #-sb-thread 0)
 
 ;; It is desirable to support C-c on Windows, but SIGINT
 ;; is not the mechanism to use on this platform.

@@ -42,6 +42,30 @@ in future versions."
   ;; This value is 0 if the thread is not considered alive, though the pthread
   ;; may be running its termination code (unlinking from all_threads etc)
   (primitive-thread 0 :type sb-vm:word)
+  ;; This is a redundant copy of the pthread identifier from the primitive thread.
+  ;; It's needed in the SB-THREAD:THREAD as well because there are valid reasons to
+  ;; manipulate the new thread before it has assigned 'th->os_thread = pthread_self()'.
+  ;; While we always have access to the C struct thread from Lisp, apparently the C
+  ;; code can't pass "&th->os_thread" as the first argument to pthread_create() for the
+  ;; incredible reason that the word might be written *after* the memory pointed at
+  ;; by 'th' has already been freed. Such action might seem to violate:
+  ;;  "Before returning, a successful call to pthread_create() stores the ID of the
+  ;;   new thread in the buffer pointed to by thread"
+  ;;  (https://man7.org/linux/man-pages/man3/pthread_create.3.html)
+  ;; but that's not exactly what POSIX says, which is only:
+  ;;  "Upon successful completion, pthread_create() stores the ID of the created thread
+  ;;   in the location referenced by thread."
+  ;; (https://pubs.opengroup.org/onlinepubs/007908799/xsh/pthread_create.html)
+  ;; so there seems to be some leeway, and linux + glibc provides more of a guarantee.
+  ;; Technically we should have only one authoritative source of the pthread identifier,
+  ;; but it's not too critical, it's just annoying that there are two sources of
+  ;; the same value.
+  ;; The slot is somewhat poorly named (for consistency with C) because though it may
+  ;; correspond to an OS thread, it could be the case that the threading model has
+  ;; user-visible threads that do not map directly to OSs threads (or LWPs).
+  ;; Any use of THREAD-OS-THREAD from lisp should take care to ensure validity of
+  ;; the thread id by holding the INTERRUPTIONS-LOCK.
+  (os-thread 0 :type sb-vm:word)
   ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread.
   ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
   ;; due to possible unmapping on thread death.

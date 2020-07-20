@@ -75,10 +75,10 @@
 #-sb-thread (sb-ext:exit :code 104)
 
 (with-test (:name :thread-name-from-pthread)
-  (let* ((pthread (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
+  (let* ((pthread (sb-thread::thread-os-thread sb-thread:*current-thread*))
          (string-data-sap
           (alien-funcall (extern-alien "lisp_thread_name"
-                                       (function system-area-pointer system-area-pointer))
+                                       (function system-area-pointer unsigned))
                          pthread)))
     (assert (sap= (sb-sys:sap+ (vector-sap (sb-thread:thread-name sb-thread:*current-thread*))
                                (* -2 sb-vm:n-word-bytes))
