@@ -61,7 +61,7 @@
 #if defined(LISP_FEATURE_WIN32) || defined(OS_THREAD_STACK)
 # define IMMEDIATE_POST_MORTEM
 #else
-static struct thread *postmortem_thread;
+static __attribute__((unused)) struct thread *postmortem_thread;
 #endif
 
 #endif
@@ -72,7 +72,7 @@ struct thread *all_threads;
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
+static __attribute__((unused)) pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
@@ -198,11 +198,20 @@ static int sb_GetTID() { return syscall(SYS_gettid); }
 #define sb_GetTID() 0
 #endif
 
-static struct thread *alloc_thread_struct(void*,lispobj);
+// Only a single 'attributes' object is used if #+pauseless-threadstart.
+// This is ok because creation is synchronized by *MAKE-THREAD-LOCK*.
+#ifdef LISP_FEATURE_SB_THREAD
+pthread_attr_t new_lisp_thread_attr;
+#define init_shared_attr_object() (pthread_attr_init(&new_lisp_thread_attr)==0)
+#else
+#define init_shared_attr_object() (1)
+#endif
+struct thread *alloc_thread_struct(void*,lispobj);
 
 void create_main_lisp_thread(lispobj function) {
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
-    if(!th || arch_os_thread_init(th)==0) lose("can't create initial thread");
+    if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
+        lose("can't create initial thread");
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
     pthread_key_create(&specials, 0);
 #endif
@@ -260,7 +269,7 @@ void create_main_lisp_thread(lispobj function) {
  * not anymore, now that we properly call pthread_attr_destroy before
  * freeing the stack. */
 
-static void free_thread_struct(struct thread *th)
+void free_thread_struct(struct thread *th)
 {
 #if defined(LISP_FEATURE_WIN32)
     os_invalidate_free((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
@@ -282,7 +291,7 @@ schedule_thread_post_mortem(struct thread *corpse)
     free_thread_struct(corpse);
 }
 
-# else
+# elif !defined LISP_FEATURE_PAUSELESS_THREADSTART
 
 static void
 perform_thread_post_mortem(struct thread *post_mortem)
@@ -507,6 +516,37 @@ undo_init_new_thread(struct thread *th,
  */
 void* new_thread_trampoline(void* arg)
 {
+#ifdef LISP_FEATURE_PAUSELESS_THREADSTART
+
+    // 'arg' is an untagged pointer to an instance of SB-THREAD:THREAD
+    // which is currently pinned via *STARTING-THREADS*
+    // In that structure, the STARTUP-INFO slot holds a simple-vector
+    // which is pinned, and element 0 of the vector is also pinned.
+    struct thread_instance *lispthread = arg;
+    struct thread* th = (void*)lispthread->primitive_thread; // Pinned
+    struct vector* startup_info = VECTOR(lispthread->startup_info); // Pinned
+    gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
+    lispobj startfun = startup_info->data[0]; // Pinned
+    gc_assert(functionp(startfun));
+    // Nothing at a higher address than &arg needs to be scanned for ambiguous roots.
+    // For x86 + linux this optimization skips over about 800 words in the stack scan,
+    // and for x86-64 it skip about 550 words as observed via:
+    // fprintf(stderr, "%d non-lisp stack words\n",
+    //                 (int)((lispobj*)th->control_stack_end - (lispobj*)&arg));
+    th->control_stack_end = (lispobj*)&arg;
+    lispthread->stack_end = (lispobj)th->control_stack_end;
+    th->os_kernel_tid = sb_GetTID();
+    init_new_thread(th, 0, 0, 0);
+    // Passing the untagged pointer ensures 2 things:
+    // - that the pinning mechanism works as designed, and not just by accident.
+    // - that the initial stack does not contain a lisp pointer after it is not needed.
+    //   (a regression test asserts that not even a THREAD instance is on the stack)
+    long result = funcall1(startfun, (lispobj)lispthread);
+    // Close the GC region and unlink from all_threads
+    undo_init_new_thread(th, 0);
+
+#else // !PAUSELESS_THREADSTART
+
     struct thread *th = (struct thread *)arg;
     th->os_kernel_tid = sb_GetTID();
     int result;
@@ -528,6 +568,7 @@ void* new_thread_trampoline(void* arg)
 
 #ifndef OS_THREAD_STACK
     schedule_thread_post_mortem(th);
+#endif
 #endif
 
     FSHOW((stderr,"/exiting thread %p\n", thread_self()));
@@ -797,7 +838,7 @@ void release_all_threads_lock()
  * On sb-safepoint builds one page before the thread base is used for the foreign calls safepoint.
  */
 
-static struct thread *
+struct thread *
 alloc_thread_struct(void* spaces, lispobj start_routine) {
 #if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
@@ -997,6 +1038,8 @@ extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
                                   size_t __stacksize);
 #endif
 
+#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
+
 /* Call pthread_create() and return 1 for success, 0 for failure */
 boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 {
@@ -1075,6 +1118,8 @@ os_thread_t create_thread(lispobj start_routine) {
     return kid_tid;
 }
 
+#endif
+
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while
@@ -1092,12 +1137,19 @@ void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
     int status, lock_ret;
+    // There is no create_thread lock if pauseless start is enabled.
+    // And wouldn't the right fix for FreeBSD be to inhibit the stop-for-GC signal
+    // rather than acquire a lock? And why exactly there a deadlock ?
+    // That we don't endeavor to find these things out leads to never-ending
+    // accretion of dubious code that we'll not know when to remove.
+#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
     /* KLUDGE: Stopping the thread during pthread_create() causes deadlock
      * on FreeBSD. */
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock\n"));
     lock_ret = pthread_mutex_lock(&create_thread_lock);
     gc_assert(lock_ret == 0);
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock\n"));
+#endif
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
     /* keep threads from starting while the world is stopped. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);
@@ -1167,9 +1219,10 @@ void gc_start_the_world()
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
+#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
     lock_ret = pthread_mutex_unlock(&create_thread_lock);
     gc_assert(lock_ret == 0);
-
+#endif
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }

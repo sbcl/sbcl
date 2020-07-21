@@ -153,11 +153,23 @@
                 (t tree)))
         result)))
 
+(export 'avltree-list)
 (defun avltree-list (tree &optional (transducer #'avlnode-data))
   (let (result)
     (named-let recurse ((node tree))
       (when node
         (push (funcall transducer node) result)
+        (recurse (avlnode-left node))
+        (recurse (avlnode-right node))))
+    result))
+
+(defun avltree-filter (predicate tree)
+  (let (result)
+    (named-let recurse ((node tree))
+      (when node
+        (let ((value (funcall predicate node)))
+          (when value
+            (push value result)))
         (recurse (avlnode-left node))
         (recurse (avlnode-right node))))
     result))

@@ -3514,6 +3514,40 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 #endif
 
+    // Thread creation optionally no longer synchronizes the creating and
+    // created thread. When synchronized, the parent thread is responsible
+    // for pinning the start function for handoff to the created thread.
+    // When not synchronized, The startup parameters are pinned via this list
+    // which will always be NIL if the feature is not enabled.
+#ifdef STARTING_THREADS
+    lispobj pin_list = SYMBOL(STARTING_THREADS)->value;
+    for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
+        lispobj lispthread = CONS(pin_list)->car;
+        // It would be tempting to say that only the SB-THREAD:THREAD instance
+        // requires pinning - because right after we access it to extract the
+        // primitive thread, we link into all_threads - but it may be that the code
+        // emitted by the C compiler in new_thread_trampoline computes untagged pointers
+        // when accessing the vector and the start function, so those would not be
+        // seen as valid lisp pointers by the implicit pinning logic.
+        // And the precisely GC'd platforms would not pin anything from C code.
+        // The tests in 'threads.impure.lisp' are good at detecting omissions here.
+        if (lispthread) {
+            gc_assert(instancep(lispthread));
+            pin_exact_root(lispthread);
+            lispobj info = ((struct thread_instance*)
+                            (lispthread-INSTANCE_POINTER_LOWTAG))->startup_info;
+            if (info) {
+                gc_assert(simple_vector_p(info));
+                gc_assert(VECTOR(info)->length >= make_fixnum(1));
+                lispobj fun = VECTOR(info)->data[0];
+                gc_assert(functionp(fun));
+                pin_exact_root(info);
+                pin_exact_root(fun);
+            }
+        }
+    }
+#endif
+
     if (gencgc_verbose > 1)
         show_pinnedobj_count();
 

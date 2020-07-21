@@ -344,7 +344,13 @@ not supported."
        (let ()
          #+sb-thread
          (sb-impl::finalizer-thread-stop)
+         ;; Acquiring sb-thread::*make-thread-lock* prevents creation
+         ;; of new threads.
          (sb-thread::with-system-mutex (sb-thread::*make-thread-lock*)
+           ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
+           ;; Do that now so that the forked process has only the main thread
+           ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
+           #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
            (when (let ((avltree sb-thread::*all-threads*))
                    (or (sb-thread::avlnode-left avltree)
                        (sb-thread::avlnode-right avltree)))

@@ -130,7 +130,7 @@
         (context (sap-ref-sap args sb-vm:n-word-bytes)))
     (dx-flet ((callback ()
                 (funcall run-handler signal info context)))
-      (sb-thread::new-lisp-thread-trampoline thread nil #'callback nil))))
+      (sb-thread::run thread nil #'callback nil))))
 
 
 ;;;; default LISP signal handlers

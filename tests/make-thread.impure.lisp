@@ -1,0 +1,130 @@
+(in-package "SB-THREAD")
+
+;;; Test out-of-memory (or something) that goes wrong in pthread_create
+#+pauseless-threadstart ; no SB-THREAD::PTHREAD-CREATE symbol if not
+(test-util:with-test (:name :failed-thread-creation)
+  (let ((encapsulation
+          (compile nil
+                   '(lambda (realfun thread stack-base)
+                     (if (string= (sb-thread:thread-name thread) "finalizer")
+                         (funcall realfun thread stack-base)
+                         nil))))
+        (success))
+    (assert (null sb-thread::*starting-threads*))
+    (unwind-protect
+         (progn (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
+                (handler-case (sb-thread:make-thread #'list :name "thisfails")
+                  (error (e)
+                    (setq success (string= (write-to-string e)
+                                           "Could not create new OS thread.")))))
+      (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
+    (assert (equal sb-thread::*starting-threads* nil))
+    (assert (equal (sb-thread::avltree-list sb-thread::*all-threads*)
+                   (list sb-thread::*initial-thread*)))))
+
+(defun actually-get-stack-roots (current-sp
+                                 &key allwords (print t)
+                                 &aux (current-sp (descriptor-sap current-sp))
+                                      (roots))
+  (declare (type (member nil t :everything) allwords))
+  (without-gcing
+    (let* ((stack-low (get-lisp-obj-address sb-vm:*control-stack-start*))
+           (stack-high (get-lisp-obj-address sb-vm:*control-stack-end*))
+           (nwords (ash (- stack-high (sap-int current-sp)) (- sb-vm:word-shift)))
+           (array (make-array nwords :element-type 'sb-ext:word)))
+      (when print
+        (format t "SP=end-~dw (range = ~x..~x)~%" nwords stack-low stack-high))
+      (alien-funcall (extern-alien "memcpy" (function void system-area-pointer
+                                                      system-area-pointer unsigned))
+                     (vector-sap array) current-sp (* nwords sb-vm:n-word-bytes))
+      (loop for i downfrom (1- nwords) to 0 by 1 do
+        (let ((word (aref array i)))
+          (when (or (/= word sb-vm:nil-value) allwords)
+            (let ((baseptr (alien-funcall (extern-alien "search_all_gc_spaces" (function unsigned unsigned))
+                                          word)))
+              (cond ((/= baseptr 0) ; an object reference
+                     (let ((obj (sb-vm::reconstitute-object (%make-lisp-obj baseptr))))
+                       (when (and (code-component-p obj)
+                                  (= (logand word sb-vm:lowtag-mask) sb-vm:fun-pointer-lowtag))
+                         (dotimes (i (code-n-entries obj))
+                           (when (= (get-lisp-obj-address (%code-entry-point obj i)) word)
+                             (return (setq obj (%code-entry-point obj i))))))
+                       ;; interior pointers to objects that contain instructions are OK,
+                       ;; otherwise only correctly tagged pointers.
+                       (when (or (typep obj '(or fdefn code-component funcallable-instance))
+                                 (= (get-lisp-obj-address obj) word))
+                         (push obj roots)
+                         (when print
+                           (format t "~x = sp[~5d] = ~16x (~A) "
+                                   (sap-int (sap+ current-sp (ash i sb-vm:word-shift)))
+                                   i
+                                   word
+                                   (or (generation-of obj) #\S)) ; S is for static
+                           (let ((*print-pretty* nil))
+                             (cond ((consp obj) (format t "a cons"))
+                                   #+sb-fasteval
+                                   ((typep obj 'sb-interpreter::sexpr) (format t "a sexpr"))
+                                   ((arrayp obj) (format t "a ~s" (type-of obj)))
+                                   ((and (code-component-p obj)
+                                         (>= word (sap-int (code-instructions obj))))
+                                    (format t "PC in ~a" obj))
+                                   (t (format t "~a" obj))))
+                           (terpri)))))
+                    ((and print
+                          (or (eq allwords :everything) (and allwords (/= word 0))))
+                     (format t "~x = sp[~5d] = ~16x~%"
+                             (sap-int (sap+ current-sp (ash i sb-vm:word-shift)))
+                             i word)))))))))
+  (if print
+      (format t "~D roots~%" (length roots))
+      roots))
+(defun get-stack-roots (&rest rest)
+  (apply #'actually-get-stack-roots (%make-lisp-obj (sap-int (current-sp))) rest))
+
+(defstruct big-structure x)
+(defstruct other-big-structure x)
+(defun make-a-closure (arg options)
+  (lambda (&optional (z 0) y)
+    (declare (ignore y))
+    (test-util:opaque-identity
+     (format nil "Ahoy-hoy! ~d~%" (+ (big-structure-x arg) z)))
+    (apply #'get-stack-roots options)))
+(defun tryit (&rest options)
+  (join-thread
+   (make-thread (make-a-closure (make-big-structure :x 0) options)
+                :arguments (list 1 (make-other-big-structure)))))
+
+(defun make-a-closure-nontail (arg)
+  (lambda (&optional (z 0) y)
+    (declare (ignore y))
+    (get-stack-roots)
+    (test-util:opaque-identity
+     (format nil "Ahoy-hoy! ~d~%" (+ (big-structure-x arg) z)))
+    1))
+(defun tryit-nontail ()
+  (join-thread
+   (make-thread (make-a-closure-nontail (make-big-structure :x 0))
+                :arguments (list 1 (make-other-big-structure)))))
+
+;;; Test that reusing memory from an exited thread does not point to junk.
+;;; In fact, assert something stronger: there are no young objects
+;;; between the current SP and end of stack.
+(test-util:with-test (:name :expected-gc-roots
+                      :skipped-on (or :interpreter (not :pauseless-threadstart)))
+  (let ((list (tryit :print nil)))
+    ;; should be not many things pointed to by the stack
+    (assert (< (length list) #+x86    35   ; more junk, I don't know why
+                             #+x86-64 30)) ; less junk, I don't know why
+    ;; Either no objects are in GC generation 0, or all are, depending on
+    ;; whether CORE_PAGE_GENERATION has been set to 0 for testing.
+    (let ((n-objects-in-g0 (count 0 list :key #'sb-kernel:generation-of)))
+      (assert (or (= n-objects-in-g0 0)
+                  (= n-objects-in-g0 (length list)))))))
+
+;; lp#1595699
+(test-util:with-test (:name :start-thread-in-without-gcing
+                      :skipped-on (not :pauseless-threadstart))
+  (assert (eq (sb-thread:join-thread
+               (sb-sys:without-gcing
+                   (sb-thread:make-thread (lambda () 'hi))))
+              'hi)))

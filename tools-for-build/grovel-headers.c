@@ -262,6 +262,10 @@ main(int argc, char __attribute__((unused)) *argv[])
     printf("\n");
 
     printf(";;; signals\n");
+    defconstant("sizeof-sigset_t", sizeof (sigset_t));
+    defconstant("sig_block", SIG_BLOCK);
+    defconstant("sig_unblock", SIG_UNBLOCK);
+    defconstant("sig_setmask", SIG_SETMASK);
     defsignal("sigalrm", SIGALRM);
     defsignal("sigbus", SIGBUS);
     defsignal("sigchld", SIGCHLD);

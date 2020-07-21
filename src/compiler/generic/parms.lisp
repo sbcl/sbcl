@@ -208,7 +208,7 @@
     #-sb-thread *stepping*
 
     ;; threading support
-    #+sb-thread *free-tls-index*
+    #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
 
     ;; dynamic runtime linking support
     #+linkage-table +required-foreign-symbols+

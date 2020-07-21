@@ -242,6 +242,8 @@ Examples:
      (let ((cell (hash-table-culled-values hashtable)))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
+       ;; Possible TODO: when no other work remains, free the *JOINABLE-THREADS*,
+       ;; though MAKE-THREAD and JOIN-THREAD do that also, so there's no memory leak.
        (loop (unless cell (return-from scan-finalizers))
              (let ((actual (cas (hash-table-culled-values hashtable)
                                 cell (cdr cell))))

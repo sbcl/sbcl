@@ -243,6 +243,12 @@
              (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
                           target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
+        (let ((*readtable* *xc-readtable*)
+              (sb-xc:*features* target-feature-list))
+          (when (featurep '(:and :linux (:or :x86 :x86-64) :sb-thread
+                                 (:not (:or :sb-safepoint :sb-thruption))))
+            (format t "~&Adding :PAUSELESS-THREADSTART feature~%")
+            (push :pauseless-threadstart target-feature-list)))
         (when (and (member :x86 target-feature-list)
                    (member :int4-breakpoints target-feature-list))
           ;; 0xCE is a perfectly good 32-bit instruction,
@@ -287,6 +293,8 @@
 (let ((feature-compatibility-tests
        '(("(and sb-thread (not gencgc))"
           ":SB-THREAD requires :GENCGC")
+         ("(and pauseless-threadstart (not sb-thread))"
+          ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"

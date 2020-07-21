@@ -312,5 +312,16 @@ the alien callback for that function with the given alien type."
             (alien-funcall (extern-alien "release_all_threads_lock"
                                          (function void)))
             thread)))
+    #+pauseless-threadstart
+    (dx-let ((startup-info (vector nil ; trampoline is n/a
+                                   nil ; cell in *STARTING-THREADS* is n/a
+                                   #'sb-alien::enter-alien-callback
+                                   (list index return arguments)
+                                   nil nil))) ; sigmask + fpu state bits
+      (copy-primitive-thread-fields thread)
+      (setf (thread-startup-info thread) startup-info)
+      (update-all-threads (get-lisp-obj-address sb-vm:*control-stack-start*) thread)
+      (run))
+    #-pauseless-threadstart
     (dx-let ((args (list index return arguments)))
-      (new-lisp-thread-trampoline thread nil #'sb-alien::enter-alien-callback args))))
+      (run thread nil #'sb-alien::enter-alien-callback args))))

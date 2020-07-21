@@ -72,6 +72,14 @@ in future versions."
   ;; Usually this is a fixed amount below PRIMITIVE-THREAD, but the exact offset
   ;; varies by build configuration, and if #+win32 it is not related in any way.
   (stack-end 0 :type sb-vm:word)
+  ;; At the beginning of the thread's life, this is a vector of data required
+  ;; to start the user code. At the end, is it pointer to the 'struct thread'
+  ;; so that it can be either freed or reused.
+  (startup-info 0 :type (or fixnum (simple-vector 6)))
+  ;; Whether this thread should be returned in LIST-ALL-THREADS.
+  ;; This is almost-but-not-quite the same as what formerly
+  ;; might have been known as the %ALIVE-P flag.
+  (%visible 1 :type fixnum)
   (interruptions nil :type list)
   ;; On succesful execution of the thread's lambda a list of values.
   (result 0)

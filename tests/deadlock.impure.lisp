@@ -51,7 +51,14 @@
   (let ((born 0)
         (running 0)
         (died 0))
-    (setq running (sb-thread::avl-count tree))
+    #-pauseless-thread-start (setq running (sb-thread::avl-count tree))
+    #+pauseless-thread-start
+    (sb-int:dx-flet ((mapfun (node)
+                       (ecase (sb-thread::thread-%visible (sb-thread::avlnode-data node))
+                         (0 (incf born)) ; "can't happen" ?
+                         (1 (incf running))
+                         (-1 (incf died)))))
+      (avl-maptree #'mapfun tree))
     (let ((total (+ born running died)))
       (macrolet ((max-into (global mine)
                    `(let ((old ,global))

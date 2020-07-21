@@ -18,6 +18,7 @@
 #include "genesis/static-symbols.h"
 
 #include "genesis/thread.h"
+#include "genesis/thread-instance.h"
 #include "genesis/fdefn.h"
 #include "genesis/vector.h"
 #include "interrupt.h"
