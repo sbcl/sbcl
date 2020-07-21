@@ -26,7 +26,7 @@
 (eval-when (:compile-toplevel :load-toplevel)
   #+(and sb-thread sb-futex linux) (pushnew :futex-use-tid sb-xc:*features*))
 
-#+futex-use-tid
+#+linux
 (defmacro my-kernel-thread-id ()
   `(sb-ext:truly-the
     (unsigned-byte 32)
