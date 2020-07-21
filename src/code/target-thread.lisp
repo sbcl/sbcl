@@ -1978,6 +1978,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       ;; Grant ownership of THREAD's result lock to it now so that a THREAD-JOIN
       ;; right away can't prevent the kid from acquiring its own result lock.
       ;; (N.B.: Giving away mutex ownership is not something the public API allows)
+      ;; FIXME: this could be done more cleanly by a condition var to avoid reliance
+      ;; on the nonstandard operation of assigning ownership.
       (let ((m (thread-result-lock thread)))
         #+sb-futex (setf (mutex-state m) 1)
         (setf (mutex-%owner m) thread))

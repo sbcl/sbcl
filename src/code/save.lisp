@@ -301,12 +301,15 @@ sufficiently motivated to do lengthy fixes."
   (call-hooks "save" *save-hooks*)
   #+sb-wtimer
   (itimer-emulation-deinit)
+  ;; FIXME: this logic should probably be surrounded by the *MAKE-THREAD-LOCK*
+  ;; but introducing potential new sources of deadlock requires due diligence.
   #+sb-thread
   (progn
     ;; Terminate finalizer thread now, especially given that the thread runs
     ;; user-supplied code that might not even work in later steps of deinit.
     ;; See also the comment at definition of THREAD-EPHEMERAL-P.
     (finalizer-thread-stop)
+    #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
     (let ((threads (sb-thread:list-all-threads)))
       (when (cdr threads)
         ;; Despite calling FINALIZER-THREAD-STOP, an unlucky thread schedule
@@ -327,12 +330,17 @@ sufficiently motivated to do lengthy fixes."
             (sb-thread:join-thread finalizer)))
         ;; Regardless of what happened above, grab the all-threads list again.
         (setq threads (sb-thread:list-all-threads)))
-      (when (cdr threads)
-        (let* ((interactive (sb-thread::interactive-threads))
-               (other (set-difference threads interactive)))
-          (error 'save-with-multiple-threads-error
-                 :interactive-threads interactive
-                 :other-threads other)))))
+      (let ((starting
+              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
+                    (delete 0 sb-thread::*starting-threads*)))
+            (joinable sb-thread::*joinable-threads*))
+        (when (or (cdr threads) starting joinable)
+          (let* ((interactive (sb-thread::interactive-threads))
+                 (other (union (set-difference threads interactive)
+                               (union starting joinable))))
+            (error 'save-with-multiple-threads-error
+                   :interactive-threads interactive
+                   :other-threads other))))))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)

@@ -459,6 +459,9 @@ undo_init_new_thread(struct thread *th,
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
+    /* FIXME: this nests the free_pages_lock inside the all_threads_lock.
+     * There's no reason for that, so closing of regions should be done
+     * sooner to eliminate an ordering constraint. */
     ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
     ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);

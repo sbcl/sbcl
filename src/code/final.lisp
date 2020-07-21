@@ -359,6 +359,9 @@ Examples:
     ;; If it was NIL, it is latched at that state, so we can ignore it.
     (when (null thread)
       (return-from finalizer-thread-stop))
+    ;; If user calls SAVE-LISP-AND-DIE or SB-POSIX:FORK in a finalizer...
+    (when (eq sb-thread:*current-thread* *finalizer-thread*)
+      (error "Can't stop finalizer thread from inside finalizer thread"))
     (let ((oldval (cas *finalizer-thread* thread nil)))
       ;; If GC had started the thread, and it got to its main body only after
       ;; we observed *FINALIZER-THREAD* = T, then we could see a transition
