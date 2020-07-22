@@ -609,7 +609,7 @@
                 `(base-char-p ,object))
                ((= (cdar pairs) (1- sb-xc:char-code-limit))
                 `(characterp ,object))))
-        (let ((n-code (gensym "CODE")))
+        (let ((n-code (sb-xc:gensym "CODE")))
           `(and (characterp ,object)
                 (let ((,n-code (sb-xc:char-code ,object)))
                   (or
@@ -621,7 +621,7 @@
 (defun source-transform-simd-pack-typep (object type)
   (if (type= type (specifier-type 'simd-pack))
       `(simd-pack-p ,object)
-      (let ((n-tag (gensym "TAG")))
+      (let ((n-tag (sb-xc:gensym "TAG")))
         `(and
           (simd-pack-p ,object)
           (let ((,n-tag (%simd-pack-tag ,object)))
@@ -634,7 +634,7 @@
 (defun source-transform-simd-pack-256-typep (object type)
   (if (type= type (specifier-type 'simd-pack-256))
       `(simd-pack-256-p ,object)
-      (let ((n-tag (gensym "TAG")))
+      (let ((n-tag (sb-xc:gensym "TAG")))
         `(and
           (simd-pack-256-p ,object)
           (let ((,n-tag (%simd-pack-256-tag ,object)))
@@ -1059,7 +1059,7 @@
 (defun source-transform-typep (object type)
   (when (typep type 'type-specifier)
     (check-deprecated-type type))
-  (let ((name (gensym "OBJECT")))
+  (let ((name (sb-xc:gensym "OBJECT")))
     (multiple-value-bind (transform error)
         (%source-transform-typep name type)
       (if error

@@ -346,7 +346,7 @@ evaluated as a PROGN."
     (prog-expansion-from-let varlist body-decls 'let*)))
 
 (sb-xc:defmacro prog1 (result &body body)
-  (let ((n-result (gensym)))
+  (let ((n-result (sb-xc:gensym)))
     `(let ((,n-result ,result))
        (progn
          ,@body
@@ -386,7 +386,7 @@ evaluated as a PROGN."
            ;; Preserve non-toplevelness of the form!
            (let ((car (car forms))) (if nested car `(the t ,car))))
           (t
-           (let ((n-result (gensym)))
+           (let ((n-result (sb-xc:gensym)))
              `(let ((,n-result ,(first forms)))
                 (if ,n-result
                     ,n-result
@@ -574,7 +574,7 @@ invoked. In that case it will store into PLACE and start over."
            (setf ,place (check-type-error ',place ,place ',type
                                           ,@(and type-string
                                                  `(,type-string)))))
-        (let ((value (gensym)))
+        (let ((value (sb-xc:gensym)))
           `(do ((,value ,place ,place))
                ((typep ,value ',type))
              (setf ,place
@@ -1555,7 +1555,7 @@ symbol-case giving up: case=((V U) (F))
 (sb-xc:defmacro with-open-file ((stream filespec &rest options)
                                 &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let ((abortp (gensym)))
+    (let ((abortp (sb-xc:gensym)))
       `(let ((,stream (open ,filespec ,@options))
              (,abortp t))
          ,@decls
@@ -1658,8 +1658,8 @@ symbol-case giving up: case=((V U) (F))
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (binding* (((forms decls) (parse-body body nil))
-             (n-list (gensym "N-LIST"))
-             (start (gensym "START"))
+             (n-list (sb-xc:gensym "N-LIST"))
+             (start (sb-xc:gensym "START"))
              ((clist members clist-ok)
               (with-current-source-form (list)
                 (cond
