@@ -349,6 +349,23 @@ Examples:
 ;;; Make no attempt to drain the queue of pending finalizers.
 ;;; (When called from EXIT, the user must invoke a final GC if there is
 ;;; an expectation that GC-based things run. Similarly when saving a core)
+;;; There's a data race involved during SAVE-LISP-AND-DIE (or SB-POSIX:FORK)
+;;; because *FINALIZER-THREAD* is assigned by that thread itself which means that
+;;; it has to run before we can detect that it exists.
+;;; There are few remedies involving some combination of these steps:
+;;; - Assign a THREAD instance into *finalizer-thread* before it shows
+;;;   up in *ALL-THREADS*. If *FINALIZER-THREAD* has a value but is not in
+;;;   *ALL-THREADS*, then it may be blocked on the mutex. Can we terminate it?
+;;; - During save, acquire the *MAKE-THREAD-LOCK* to get a consistent view of
+;;;   which threads are starting and running.
+;;; - the :pauseless-threadstart code adds new threads to *ALL-THREADS*
+;;;   before starting the posix thread. We could look there.
+;;;   The important thing is to avoid thinking that there is a thread running
+;;;   when it doesn't have a posix thread ID yet.
+;;; - Does acquiring the *MAKE-THREAD-LOCK* before assigning *FINALIZER-THREAD*
+;;;   help anything? Perhaps.
+;;; But first I'd like to entirely eliminate the non-pauseless-threadstart code
+;;; so that we don't have to reason about two totally different solutions.
 (defun finalizer-thread-stop ()
   #+sb-thread
   (let ((thread *finalizer-thread*))

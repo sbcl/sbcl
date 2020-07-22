@@ -73,6 +73,10 @@
     '#(sb-impl::*exit-lock*
        sb-thread::*make-thread-lock*
        sb-thread::*initial-thread*
+       ;; Saving *JOINABLE-THREADS* could cause catastophic failure on restart.
+       ;; SAVE-LISP-AND-DIE should have cleaned up, but there's a timing problem
+       ;; with the finalizer thread, and I'm loathe to put in a SLEEP delay.
+       sb-thread::*joinable-threads*
        sb-thread::*foreign-thread*
        sb-thread::*all-threads*
        sb-thread::*session*
@@ -311,7 +315,6 @@ sufficiently motivated to do lengthy fixes."
     (finalizer-thread-stop)
     #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
     (let ((threads (sb-thread:list-all-threads)))
-      (when (cdr threads)
         ;; Despite calling FINALIZER-THREAD-STOP, an unlucky thread schedule
         ;; courtesy of the OS might notionally start the finalizer thread but not
         ;; run it until now. Suppose it barely got to its lisp trampoline,
@@ -322,25 +325,27 @@ sufficiently motivated to do lengthy fixes."
         ;; A newly started finalizer thread can do nothing but exit immediately
         ;; whenever *FINALIZER-THREAD* is NIL so we don't actually care
         ;; what that thread is doing at this point.
-        (let ((finalizer (find-if (lambda (x)
-                                    (and (sb-thread::thread-%ephemeral-p x)
-                                         (string= (sb-thread:thread-name x) "finalizer")))
-                                  threads)))
-          (when finalizer
-            (sb-thread:join-thread finalizer)))
-        ;; Regardless of what happened above, grab the all-threads list again.
-        (setq threads (sb-thread:list-all-threads)))
-      (let ((starting
-              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
-                    (delete 0 sb-thread::*starting-threads*)))
-            (joinable sb-thread::*joinable-threads*))
-        (when (or (cdr threads) starting joinable)
-          (let* ((interactive (sb-thread::interactive-threads))
-                 (other (union (set-difference threads interactive)
-                               (union starting joinable))))
-            (error 'save-with-multiple-threads-error
-                   :interactive-threads interactive
-                   :other-threads other))))))
+      (flet ((system-thread-p (thread)
+               (and (sb-thread::thread-%ephemeral-p thread)
+                    (string= (sb-thread:thread-name thread) "finalizer"))))
+        (when (cdr threads)
+          (let ((finalizer (find-if #'system-thread-p threads)))
+            (when finalizer
+              (sb-thread:join-thread finalizer)))
+          ;; Regardless of what happened above, grab the all-threads list again.
+          (setq threads (sb-thread:list-all-threads)))
+        (let ((starting
+                (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
+                      (delete 0 sb-thread::*starting-threads*)))
+              (joinable
+                (remove-if #'system-thread-p sb-thread::*joinable-threads*)))
+          (when (or (cdr threads) starting joinable)
+            (let* ((interactive (sb-thread::interactive-threads))
+                   (other (union (set-difference threads interactive)
+                                 (union starting joinable))))
+              (error 'save-with-multiple-threads-error
+                     :interactive-threads interactive
+                     :other-threads other)))))))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)

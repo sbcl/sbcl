@@ -287,6 +287,27 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *foreign-thread* nil)
 (sb-ext:define-load-time-global *make-thread-lock* nil)
 
+;;; *JOINABLE-THREADS* is a list of THREAD instances used only if #+pauseless-threadstart
+;;; I had attempted to construct the list using the thread's memory to create cons
+;;; cells but that turned out to be flawed- the cells must be freshly heap-allocated,
+;;; because ATOMIC-POP is vulnerable to the A/B/A problem if cells are reused.
+;;; Example: initial state: *JOINABLE-THREADS* -> node1 -> node2 -> node3.
+;;; After reading *JOINABLE-THREADS* we want to CAS it to node2.
+;;; If, after reading the variable, all of node1, node2, and node3 are popped
+;;; by another thread, and then node1 is reused, and made to point to node4,
+;;; then the new state is: *JOINABLE-THREADS* -> node1 -> node4
+;;; which looks like CAS(*joinable-threads*, node1, node2) should succeed,
+;;; but it should not. The LL/SC model would detect that, but CAS can not.
+;;;
+;;; A thread is pushed into *JOINABLE-THREADS* while still using its lisp stack.
+;;; This is fine, because the C code will perform a join, which will effectively
+;;; wait until the lisp thread is off its stack. It won't have to wait long,
+;;; because pushing into *JOINABLE-THREADS* is the last thing to happen in lisp.
+;;; In theory we could support some mode of keeping the memory while joining
+;;; the pthread, but we currently do not.
+(sb-ext:define-load-time-global *joinable-threads* nil)
+(declaim (list *joinable-threads*)) ; list of threads
+
 ;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
 (defmacro copy-primitive-thread-fields (this)
   `(setf (thread-primitive-thread ,this) (sap-int (current-thread-sap))
@@ -306,6 +327,7 @@ created and old ones may exit at any time."
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
     (setf *initial-thread* thread)
+    (setf *joinable-threads* nil)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
     (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -387,27 +409,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 ;;; but also the STARTUP-INFO of each thread is pinned.
 (sb-ext:define-load-time-global *starting-threads* nil)
 (declaim (list *starting-threads*)) ; list of threads
-
-;;; *JOINABLE-THREADS* is a list of THREAD instances used only if #+pauseless-threadstart
-;;; I had attempted to construct the list using the thread's memory to create cons
-;;; cells but that turned out to be flawed- the cells must be freshly heap-allocated,
-;;; because ATOMIC-POP is vulnerable to the A/B/A problem if cells are reused.
-;;; Example: initial state: *JOINABLE-THREADS* -> node1 -> node2 -> node3.
-;;; After reading *JOINABLE-THREADS* we want to CAS it to node2.
-;;; If, after reading the variable, all of node1, node2, and node3 are popped
-;;; by another thread, and then node1 is reused, and made to point to node4,
-;;; then the new state is: *JOINABLE-THREADS* -> node1 -> node4
-;;; which looks like CAS(*joinable-threads*, node1, node2) should succeed,
-;;; but it should not. The LL/SC model would detect that, but CAS can not.
-;;;
-;;; A thread is pushed into *JOINABLE-THREADS* while still using its lisp stack.
-;;; This is fine, because the C code will perform a join, which will effectively
-;;; wait until the lisp thread is off its stack. It won't have to wait long,
-;;; because pushing into *JOINABLE-THREADS* is the last thing to happen in lisp.
-;;; In theory we could support some mode of keeping the memory while joining
-;;; the pthread, but we currently do not.
-(sb-ext:define-load-time-global *joinable-threads* nil)
-(declaim (list *joinable-threads*)) ; list of threads
 
 #+(or sb-safepoint sb-thruption)
 (define-alien-routine "wake_thread"
