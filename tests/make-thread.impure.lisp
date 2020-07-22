@@ -90,9 +90,12 @@
      (format nil "Ahoy-hoy! ~d~%" (+ (big-structure-x arg) z)))
     (apply #'get-stack-roots options)))
 (defun tryit (&rest options)
-  (join-thread
-   (make-thread (make-a-closure (make-big-structure :x 0) options)
-                :arguments (list 1 (make-other-big-structure)))))
+  (let ((thread
+          (make-thread (make-a-closure (make-big-structure :x 0) options)
+                       :arguments (list 1 (make-other-big-structure)))))
+    ;; Sometimes the THREAD instance shows up in the list of objects
+    ;; on the stack, sometimes it doesn't. This is annoying, but work around it.
+    (remove thread (join-thread thread))))
 
 (defun make-a-closure-nontail (arg)
   (lambda (&optional (z 0) y)
