@@ -116,7 +116,7 @@
                       :skipped-on (or :interpreter (not :pauseless-threadstart)))
   (let ((list (tryit :print nil)))
     ;; should be not many things pointed to by the stack
-    (assert (< (length list) #+x86    35   ; more junk, I don't know why
+    (assert (< (length list) #+x86    38   ; more junk, I don't know why
                              #+x86-64 30)) ; less junk, I don't know why
     ;; Either no objects are in GC generation 0, or all are, depending on
     ;; whether CORE_PAGE_GENERATION has been set to 0 for testing.
