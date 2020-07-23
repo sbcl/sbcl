@@ -7,6 +7,21 @@ changes relative to sbcl-2.0.6:
     on a string filespec prior to issuing an open() system call.
   * minor incompatible change: PATHNAME is no longer a STRUCTURE-OBJECT.
   * documentation: HASH-FUNCTION is a function designator (lp#1888028)
+  * bug fix: eliminated a potential garbage-collector deadlock
+    when linking with TCMalloc.
+  * bug fix: foreign threads (those not made by SB-THREAD:MAKE-THREAD)
+    can not crash with a "GC_PENDING, but why?" error when returning
+    back from Lisp into the foreign caller.
+  * bug fix: sb-fasteval crashed trying to install a JIT-compiled
+    DEFSTRUCT accessor in a locked package.
+  * bug fix: removed misuse of putwc() which caused stdio streams
+    to drop characters.
+  * bug fix: the "maximum interrupt nesting depth exceeded" error
+    generated in the C runtime is significantly less likely to occur.
+  * bug fix: sb-sprof should no longer segfault from calling pthread_kill()
+    on a nonexistent thread.
+  * optimization: PPC64 on linux uses the __thread annotation on C variables
+    in preference to pthread_setspecific() and pthread_getspecific().
 
 changes in sbcl-2.0.6 relative to sbcl-2.0.5:
   * planned incompatible change: the defined symbols in the Metaobject
