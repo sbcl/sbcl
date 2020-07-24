@@ -299,13 +299,13 @@
     (cond ((= n-fixnum-tag-bits 1)
            (move y x)
            (inst shl y 1)
-           (inst cmov :o y (emit-constant (1+ sb-xc:most-positive-fixnum))))
+           (inst cmov :o y (emit-constant (1+ most-positive-fixnum))))
           (t
            ;; not worth optimizing into SHL. The processor doesn't set OF for
            ;; for shift count > 1 so we'd have to detect overflow differently.
            (inst imul y x (ash 1 n-fixnum-tag-bits))
            (inst jmp :no DONE)
-           (move y (emit-constant (1+ sb-xc:most-positive-fixnum)))))
+           (move y (emit-constant (1+ most-positive-fixnum)))))
     DONE))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+1)
@@ -313,13 +313,13 @@
     (cond ((= n-fixnum-tag-bits 1)
            (move y x)
            (inst shl y 1)
-           (inst cmov :o y (emit-constant (1- sb-xc:most-negative-fixnum))))
+           (inst cmov :o y (emit-constant (1- most-negative-fixnum))))
           (t
            ;; not worth optimizing into SHL. The processor doesn't set OF for
            ;; for shift count > 1 so we'd have to detect overflow differently.
            (inst imul y x (ash 1 n-fixnum-tag-bits))
            (inst jmp :no DONE)
-           (move y (emit-constant (1- sb-xc:most-negative-fixnum)))))
+           (move y (emit-constant (1- most-negative-fixnum)))))
     DONE))
 
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum

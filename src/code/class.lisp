@@ -950,7 +950,7 @@ between the ~A definition and the ~A definition"
      (integer
       :translation integer :inherits (rational real number) :prototype-form 0)
      (fixnum
-      :translation (integer ,sb-xc:most-negative-fixnum ,sb-xc:most-positive-fixnum)
+      :translation (integer ,most-negative-fixnum ,most-positive-fixnum)
       :inherits (integer rational real number)
       :codes ,(mapcar #'symbol-value sb-vm::fixnum-lowtags)
       :prototype-form 42)
@@ -958,7 +958,7 @@ between the ~A definition and the ~A definition"
       :translation (and integer (not fixnum))
       :inherits (integer rational real number)
       :codes (,sb-vm:bignum-widetag)
-      :prototype-form ,(1+ sb-xc:most-positive-fixnum))
+      :prototype-form ,(1+ most-positive-fixnum))
 
      (array :translation array :codes (,sb-vm:complex-array-widetag)
             :hierarchical-p nil

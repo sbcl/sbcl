@@ -279,7 +279,7 @@
 
 (defknown gcd (&rest integer) unsigned-byte
   (movable foldable flushable))
-(defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ sb-xc:most-positive-fixnum))
+(defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ most-positive-fixnum))
     (movable foldable flushable))
 
 (defknown lcm (&rest integer) unsigned-byte
@@ -726,7 +726,7 @@
     (:end (inhibit-flushing sequence-end nil))
     (:from-end t)
     (:key (function-designator ((nth-arg 1 :sequence t)))))
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable call))
 
 (defknown (position-if position-if-not)
@@ -735,21 +735,21 @@
    (:start (inhibit-flushing index 0))
     (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable call))
 
 (defknown (%bit-position/0 %bit-position/1) (simple-bit-vector t index index)
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable))
 (defknown (%bit-pos-fwd/0 %bit-pos-fwd/1 %bit-pos-rev/0 %bit-pos-rev/1)
   (simple-bit-vector index index)
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable))
 (defknown %bit-position (t simple-bit-vector t index index)
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable))
 (defknown (%bit-pos-fwd %bit-pos-rev) (t simple-bit-vector index index)
-  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (or (mod #.(1- array-dimension-limit)) null)
   (foldable flushable))
 
 (defknown count

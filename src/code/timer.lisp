@@ -205,7 +205,7 @@ from now. For timers with a repeat interval it returns true."
 ;;; real time conversion
 
 (defun delta->real (delta)
-  (floor (* delta sb-xc:internal-time-units-per-second)))
+  (floor (* delta internal-time-units-per-second)))
 
 ;;; Public interface
 
@@ -403,8 +403,8 @@ triggers."
   (let ((min-nsec 100000))
     (if (minusp time)
         (values 0 min-nsec)
-        (multiple-value-bind (s u) (floor time sb-xc:internal-time-units-per-second)
-          (setf u (floor (* (/ u sb-xc:internal-time-units-per-second)
+        (multiple-value-bind (s u) (floor time internal-time-units-per-second)
+          (setf u (floor (* (/ u internal-time-units-per-second)
                             #.(expt 10 9))))
           (if (and (= 0 s) (< u min-nsec))
               ;; 0 0 means "shut down the timer" for setitimer

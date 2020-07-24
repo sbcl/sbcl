@@ -384,7 +384,7 @@
                 ,(if (and (integer-type-p index-type)
                           (numeric-type-low index-type))
                      `(integer ,(numeric-type-low index-type)
-                               (,sb-xc:array-dimension-limit))
+                               (,array-dimension-limit))
                      `index))))))
 
 (deftransform %data-vector-and-index ((%array %index)

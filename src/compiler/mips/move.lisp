@@ -208,7 +208,7 @@
     (inst beq temp done)
     (inst sll y x n-fixnum-tag-bits)
 
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ most-positive-fixnum))
                    y)
     (inst b done)
     (inst nop)
@@ -225,7 +225,7 @@
     (inst beq temp done)
     (inst sll y x n-fixnum-tag-bits)
 
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- most-negative-fixnum))
                    y)
     (inst b done)
     (inst nop)

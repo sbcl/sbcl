@@ -103,7 +103,7 @@
     (sc-case value
      (immediate
       (let ((k (tn-value value)))
-        (inst mov result (fixnumize (if (= k sb-xc:most-negative-fixnum) k (- k))))))
+        (inst mov result (fixnumize (if (= k most-negative-fixnum) k (- k))))))
      (t
       (move result value)
       (inst neg result)))
@@ -149,7 +149,7 @@
                    (const (if (sc-is delta immediate)
                               (fixnumize ,(if (eq inherit 'cell-xsub)
                                               `(let ((x (tn-value delta)))
-                                                 (if (= x sb-xc:most-negative-fixnum)
+                                                 (if (= x most-negative-fixnum)
                                                      x (- x)))
                                               `(tn-value delta)))))
                    (retry (gen-label)))

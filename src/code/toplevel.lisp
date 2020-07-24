@@ -188,9 +188,9 @@ means to wait indefinitely.")
                                                     $1f9)))))))
     (declare (inline split-float))
     (typecase seconds
-      ((single-float $0f0 #.(float sb-xc:most-positive-fixnum $1f0))
+      ((single-float $0f0 #.(float most-positive-fixnum $1f0))
        (split-float))
-      ((double-float $0d0 #.(float sb-xc:most-positive-fixnum $1d0))
+      ((double-float $0d0 #.(float most-positive-fixnum $1d0))
        (split-float))
       (ratio
        (split-ratio-for-sleep seconds))
@@ -250,11 +250,11 @@ any non-negative real number."
             ;; use the largest representable value in that case.
             (timeout (or (seconds-to-maybe-internal-time seconds)
                          (* safe-internal-seconds-limit
-                            sb-xc:internal-time-units-per-second))))
+                            internal-time-units-per-second))))
         (labels ((sleep-for-a-bit (remaining)
                    (multiple-value-bind
                          (timeout-sec timeout-usec stop-sec stop-usec deadlinep)
-                       (decode-timeout (/ remaining sb-xc:internal-time-units-per-second))
+                       (decode-timeout (/ remaining internal-time-units-per-second))
                      (declare (ignore stop-sec stop-usec))
                      ;; Sleep until either the timeout or the deadline
                      ;; expires.

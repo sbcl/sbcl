@@ -119,7 +119,7 @@
                            (char= (char name 0) #\&)))))
              (check-suspicious (kind form)
                (and (probably-ll-keyword-p form)
-                    (member form sb-xc:lambda-list-keywords)
+                    (member form lambda-list-keywords)
                     (report-suspicious kind form)))
              (report-suspicious (kind what)
                (style-warn-once list "suspicious ~A ~S in lambda list: ~S."

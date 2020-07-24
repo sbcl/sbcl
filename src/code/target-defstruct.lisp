@@ -199,7 +199,7 @@
     (write name :stream stream)
     (do ((index 0 (1+ index))
          (limit (or (and (not *print-readably*) *print-length*)
-                    sb-xc:most-positive-fixnum))
+                    most-positive-fixnum))
          (remaining-slots (dd-slots dd) (cdr remaining-slots)))
         ((or (null remaining-slots) (>= index limit))
          (write-string (if remaining-slots " ...)" ")") stream))

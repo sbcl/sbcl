@@ -22,7 +22,7 @@
 
 ;;; like INDEX, but only up to half the maximum. Used by hash-table
 ;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
-(deftype index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
+(deftype index/2 () `(integer 0 (,(floor array-dimension-limit 2))))
 
 ;;; The high water mark is an element of the pairs vector, and not
 ;;; a slot in the table.

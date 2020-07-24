@@ -201,7 +201,75 @@
     ;;
     "BYTE" "BYTE-POSITION" "BYTE-SIZE"
     "DPB" "LDB" "LDB-TEST"
-    "DEPOSIT-FIELD" "MASK-FIELD"))
+    "DEPOSIT-FIELD" "MASK-FIELD"
+    ;;
+    ;; the constants (except for T and NIL which have
+    ;; a specially hacked correspondence between
+    ;; cross-compilation host Lisp and target Lisp)
+
+    ;; We include these here since there is no reason to reference
+    ;; host constants.
+    "ARRAY-DIMENSION-LIMIT"
+    "ARRAY-RANK-LIMIT"
+    "ARRAY-TOTAL-SIZE-LIMIT"
+    "BOOLE-1"
+    "BOOLE-2"
+    "BOOLE-AND"
+    "BOOLE-ANDC1"
+    "BOOLE-ANDC2"
+    "BOOLE-C1"
+    "BOOLE-C2"
+    "BOOLE-CLR"
+    "BOOLE-EQV"
+    "BOOLE-IOR"
+    "BOOLE-NAND"
+    "BOOLE-NOR"
+    "BOOLE-ORC1"
+    "BOOLE-ORC2"
+    "BOOLE-SET"
+    "BOOLE-XOR"
+    "CALL-ARGUMENTS-LIMIT"
+    "CHAR-CODE-LIMIT"
+    "DOUBLE-FLOAT-EPSILON"
+    "DOUBLE-FLOAT-NEGATIVE-EPSILON"
+    "INTERNAL-TIME-UNITS-PER-SECOND"
+    "LAMBDA-LIST-KEYWORDS"
+    "LAMBDA-PARAMETERS-LIMIT"
+    "LEAST-NEGATIVE-DOUBLE-FLOAT"
+    "LEAST-NEGATIVE-LONG-FLOAT"
+    "LEAST-NEGATIVE-NORMALIZED-DOUBLE-FLOAT"
+    "LEAST-NEGATIVE-NORMALIZED-LONG-FLOAT"
+    "LEAST-NEGATIVE-NORMALIZED-SHORT-FLOAT"
+    "LEAST-NEGATIVE-NORMALIZED-SINGLE-FLOAT"
+    "LEAST-NEGATIVE-SHORT-FLOAT"
+    "LEAST-NEGATIVE-SINGLE-FLOAT"
+    "LEAST-POSITIVE-DOUBLE-FLOAT"
+    "LEAST-POSITIVE-LONG-FLOAT"
+    "LEAST-POSITIVE-NORMALIZED-DOUBLE-FLOAT"
+    "LEAST-POSITIVE-NORMALIZED-LONG-FLOAT"
+    "LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT"
+    "LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT"
+    "LEAST-POSITIVE-SHORT-FLOAT"
+    "LEAST-POSITIVE-SINGLE-FLOAT"
+    "LONG-FLOAT-EPSILON"
+    "LONG-FLOAT-NEGATIVE-EPSILON"
+    "MOST-NEGATIVE-DOUBLE-FLOAT"
+    "MOST-NEGATIVE-FIXNUM"
+    "MOST-NEGATIVE-LONG-FLOAT"
+    "MOST-NEGATIVE-SHORT-FLOAT"
+    "MOST-NEGATIVE-SINGLE-FLOAT"
+    "MOST-POSITIVE-DOUBLE-FLOAT"
+    "MOST-POSITIVE-FIXNUM"
+    "MOST-POSITIVE-LONG-FLOAT"
+    "MOST-POSITIVE-SHORT-FLOAT"
+    "MOST-POSITIVE-SINGLE-FLOAT"
+    "MULTIPLE-VALUES-LIMIT"
+    "PI"
+    "SHORT-FLOAT-EPSILON"
+    "SHORT-FLOAT-NEGATIVE-EPSILON"
+    "SINGLE-FLOAT-EPSILON"
+    "SINGLE-FLOAT-NEGATIVE-EPSILON"
+    ))
 
 ;;; A symbol in the "dual personality" list refers to the symbol in CL unless
 ;;; package-prefixed with SB-XC:.  The main reason for not putting these
@@ -253,70 +321,7 @@
 (let ((package-name "SB-XC"))
   (dolist (name (append (append *undefineds* *dual-personality-math-symbols*)))
     (export (intern name package-name) package-name))
-  (dolist (name '(;; the constants (except for T and NIL which have
-                  ;; a specially hacked correspondence between
-                  ;; cross-compilation host Lisp and target Lisp)
-                  "ARRAY-DIMENSION-LIMIT"
-                  "ARRAY-RANK-LIMIT"
-                  "ARRAY-TOTAL-SIZE-LIMIT"
-                  "BOOLE-1"
-                  "BOOLE-2"
-                  "BOOLE-AND"
-                  "BOOLE-ANDC1"
-                  "BOOLE-ANDC2"
-                  "BOOLE-C1"
-                  "BOOLE-C2"
-                  "BOOLE-CLR"
-                  "BOOLE-EQV"
-                  "BOOLE-IOR"
-                  "BOOLE-NAND"
-                  "BOOLE-NOR"
-                  "BOOLE-ORC1"
-                  "BOOLE-ORC2"
-                  "BOOLE-SET"
-                  "BOOLE-XOR"
-                  "CALL-ARGUMENTS-LIMIT"
-                  "CHAR-CODE-LIMIT"
-                  "DOUBLE-FLOAT-EPSILON"
-                  "DOUBLE-FLOAT-NEGATIVE-EPSILON"
-                  "INTERNAL-TIME-UNITS-PER-SECOND"
-                  "LAMBDA-LIST-KEYWORDS"
-                  "LAMBDA-PARAMETERS-LIMIT"
-                  "LEAST-NEGATIVE-DOUBLE-FLOAT"
-                  "LEAST-NEGATIVE-LONG-FLOAT"
-                  "LEAST-NEGATIVE-NORMALIZED-DOUBLE-FLOAT"
-                  "LEAST-NEGATIVE-NORMALIZED-LONG-FLOAT"
-                  "LEAST-NEGATIVE-NORMALIZED-SHORT-FLOAT"
-                  "LEAST-NEGATIVE-NORMALIZED-SINGLE-FLOAT"
-                  "LEAST-NEGATIVE-SHORT-FLOAT"
-                  "LEAST-NEGATIVE-SINGLE-FLOAT"
-                  "LEAST-POSITIVE-DOUBLE-FLOAT"
-                  "LEAST-POSITIVE-LONG-FLOAT"
-                  "LEAST-POSITIVE-NORMALIZED-DOUBLE-FLOAT"
-                  "LEAST-POSITIVE-NORMALIZED-LONG-FLOAT"
-                  "LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT"
-                  "LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT"
-                  "LEAST-POSITIVE-SHORT-FLOAT"
-                  "LEAST-POSITIVE-SINGLE-FLOAT"
-                  "LONG-FLOAT-EPSILON"
-                  "LONG-FLOAT-NEGATIVE-EPSILON"
-                  "MOST-NEGATIVE-DOUBLE-FLOAT"
-                  "MOST-NEGATIVE-FIXNUM"
-                  "MOST-NEGATIVE-LONG-FLOAT"
-                  "MOST-NEGATIVE-SHORT-FLOAT"
-                  "MOST-NEGATIVE-SINGLE-FLOAT"
-                  "MOST-POSITIVE-DOUBLE-FLOAT"
-                  "MOST-POSITIVE-FIXNUM"
-                  "MOST-POSITIVE-LONG-FLOAT"
-                  "MOST-POSITIVE-SHORT-FLOAT"
-                  "MOST-POSITIVE-SINGLE-FLOAT"
-                  "MULTIPLE-VALUES-LIMIT"
-                  "PI"
-                  "SHORT-FLOAT-EPSILON"
-                  "SHORT-FLOAT-NEGATIVE-EPSILON"
-                  "SINGLE-FLOAT-EPSILON"
-                  "SINGLE-FLOAT-NEGATIVE-EPSILON"
-                  "*READ-DEFAULT-FLOAT-FORMAT*"
+  (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
 
                   "ARRAY-ELEMENT-TYPE"
                   "CHAR-CODE"
@@ -359,7 +364,7 @@
 
 ;;; Build a new package that exports a not-necessarily-strict subset of
 ;;; what the host CL exports. This deals with hosts that have too many
-;;; symbols exported froM CL.
+;;; symbols exported from CL.
 (let ((cl-model-package (make-package "XC-STRICT-CL" :use nil)))
   (flet ((new-external (x package &aux (s (intern x package)))
            (export s package)

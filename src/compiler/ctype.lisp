@@ -392,10 +392,10 @@ and no value was provided for it." name))))))))))
 (defstruct (approximate-fun-type (:copier nil))
   ;; the smallest and largest numbers of arguments that this function
   ;; has been called with.
-  (min-args sb-xc:call-arguments-limit
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+  (min-args call-arguments-limit
+            :type (integer 0 #.call-arguments-limit))
   (max-args 0
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+            :type (integer 0 #.call-arguments-limit))
   ;; a list of lists of the all the types that have been used in each
   ;; argument position
   (types () :type list)
@@ -413,7 +413,7 @@ and no value was provided for it." name))))))))))
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
   (position (missing-arg)
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+            :type (integer 0 #.call-arguments-limit))
   ;; a list of all the argument types that have been used with this keyword
   (types nil :type list)
   ;; true if this keyword has appeared only in calls with an obvious

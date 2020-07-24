@@ -111,7 +111,7 @@
                  (get-lisp-obj-address instance))))
     ;; perturb the address
     (logand (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 addr)
-            sb-xc:most-positive-fixnum)))
+            most-positive-fixnum)))
 
 (declaim (inline instance-sxhash))
 (defun instance-sxhash (instance)
@@ -442,7 +442,7 @@
                          ;; Access as unsigned. +X and -X hash differently because
                          ;; of 2's complement, so disregarding the sign bit is fine.
                          (mixf result (logand (%raw-instance-ref/word key i)
-                                              sb-xc:most-positive-fixnum)))
+                                              most-positive-fixnum)))
                         (,(1+index-of 'single-float)
                          ,(mix-float '(%raw-instance-ref/single key i) $0f0))
                         (,(1+index-of 'double-float)
@@ -524,8 +524,8 @@
            ;; it didn't.)
            (sxhash val)))
     (macrolet ((hash-float (type key)
-                 (let ((lo (coerce sb-xc:most-negative-fixnum type))
-                       (hi (coerce sb-xc:most-positive-fixnum type)))
+                 (let ((lo (coerce most-negative-fixnum type))
+                       (hi (coerce most-positive-fixnum type)))
                    `(let ((key ,key))
                       (cond ( ;; This clause allows FIXNUM-sized integer
                              ;; values to be handled without consing.
@@ -563,9 +563,9 @@
                   (double-float (hash-float double-float key))
                   #+long-float
                   (long-float (error "LONG-FLOAT not currently supported")))))
-       (rational (if (and (<= sb-xc:most-negative-double-float
+       (rational (if (and (<= most-negative-double-float
                               key
-                              sb-xc:most-positive-double-float)
+                              most-positive-double-float)
                           (= (coerce key 'double-float) key))
                      (sxhash-double-float (coerce key 'double-float))
                      (sxhash key)))
@@ -596,7 +596,7 @@
                (declare (fixnum depthoid))
                (cond ((atom x) (sxhash x))
                      ((zerop depthoid)
-                      #.(logand sb-xc:most-positive-fixnum #36Rglobaldbsxhashoid))
+                      #.(logand most-positive-fixnum #36Rglobaldbsxhashoid))
                      (t (mix (recurse (car x) (1- depthoid))
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))

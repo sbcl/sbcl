@@ -1644,7 +1644,7 @@ forms that explicitly control this kind of evaluation.")
   (show-restarts *debug-restarts* *debug-io*))
 
 (!def-debug-command "BACKTRACE" ()
- (print-backtrace :count (read-if-available sb-xc:most-positive-fixnum)))
+ (print-backtrace :count (read-if-available most-positive-fixnum)))
 
 (!def-debug-command "PRINT" ()
   (print-frame-call *current-frame* *debug-io*))

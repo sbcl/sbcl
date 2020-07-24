@@ -127,7 +127,7 @@
     (flet ((read-varint ()
              (loop for shift :of-type (integer 0 28) from 0 by 7 ; position in integer
                    for octet = (fast-read-byte)
-                   for accum :of-type (mod #.sb-xc:char-code-limit)
+                   for accum :of-type (mod #.char-code-limit)
                      = (logand octet #x7F)
                      then (logior (ash (logand octet #x7F) shift) accum)
                    unless (logbitp 7 octet) return accum)))

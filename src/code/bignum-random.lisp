@@ -38,7 +38,7 @@
 (declaim (inline concatenate-random-bignum))
 (defun concatenate-random-bignum (random-chunk bit-count state)
   (declare (type bignum-element-type random-chunk)
-           (type (integer 0 #.sb-xc:most-positive-fixnum) bit-count)
+           (type (integer 0 #.most-positive-fixnum) bit-count)
            (type random-state state))
   (let* ((n-total-bits (+ 1 n-random-chunk-bits bit-count)) ; sign bit
          (length (ceiling n-total-bits digit-size))
@@ -115,7 +115,7 @@
 ;;;   generate and compare the complete random number and risk to reject
 ;;;   it.
 (defun %random-bignum (arg state)
-  (declare (type (integer #.(1+ sb-xc:most-positive-fixnum)) arg)
+  (declare (type (integer #.(1+ most-positive-fixnum)) arg)
            (type random-state state)
            (inline bignum-lower-bits-zero-p))
   (let ((n-bits (bignum-integer-length arg)))

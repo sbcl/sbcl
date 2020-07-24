@@ -57,7 +57,7 @@
                               `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
                           (remove t sb-vm:*specialized-array-element-type-properties*
                                   :key 'sb-vm:saetp-specifier))))
-                `(((integer 0 ,sb-xc:array-dimension-limit)
+                `(((integer 0 ,array-dimension-limit)
                    object-not-array-dimension)
                   ;; Union of all unboxed array specializations,
                   ;; for type-checking the argument to VECTOR-SAP

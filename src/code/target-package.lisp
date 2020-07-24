@@ -211,7 +211,7 @@
                          (ash (ldb (byte pkgnick-index-bits 0) token) 1))))))
 
 ;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
-(define-load-time-global *package-names-cookie* sb-xc:most-negative-fixnum)
+(define-load-time-global *package-names-cookie* most-negative-fixnum)
 (declaim (fixnum *package-names-cookie*))
 
 (defmacro with-package-names ((table-var &key) &body body)

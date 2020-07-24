@@ -234,7 +234,7 @@
                 (integer
                  (cond ((and hi lo)
                         (dolist (spec
-                                  `((positive-fixnum 0 ,sb-xc:most-positive-fixnum)
+                                  `((positive-fixnum 0 ,most-positive-fixnum)
                                     ,@(ecase n-machine-word-bits
                                         (32
                                          `((unsigned-byte-31
@@ -246,8 +246,8 @@
                                             0 ,(1- (ash 1 63)))
                                            (unsigned-byte-64
                                             0 ,(1- (ash 1 64))))))
-                                    (fixnum ,sb-xc:most-negative-fixnum
-                                            ,sb-xc:most-positive-fixnum)
+                                    (fixnum ,most-negative-fixnum
+                                            ,most-positive-fixnum)
                                     ,(ecase n-machine-word-bits
                                        (32
                                         `(signed-byte-32 ,(ash -1 31)
@@ -255,8 +255,8 @@
                                        (64
                                         `(signed-byte-64 ,(ash -1 63)
                                                          ,(1- (ash 1 63))))))
-                                 (if (or (< hi sb-xc:most-negative-fixnum)
-                                         (> lo sb-xc:most-positive-fixnum))
+                                 (if (or (< hi most-negative-fixnum)
+                                         (> lo most-positive-fixnum))
                                      (part-of bignum)
                                      (part-of integer)))
                           (let ((type (car spec))
@@ -266,8 +266,8 @@
                               (return (values
                                        (primitive-type-or-lose type)
                                        (and (= lo min) (= hi max))))))))
-                       ((or (and hi (< hi sb-xc:most-negative-fixnum))
-                            (and lo (> lo sb-xc:most-positive-fixnum)))
+                       ((or (and hi (< hi most-negative-fixnum))
+                            (and lo (> lo most-positive-fixnum)))
                         (part-of bignum))
                        (t
                         (part-of integer))))

@@ -61,10 +61,10 @@
 ;;; a mask to extract the type from a data block header word
 (defconstant widetag-mask (1- (ash 1 n-widetag-bits)))
 
-(defconstant sb-xc:most-positive-fixnum
+(defconstant most-positive-fixnum
     (1- (ash 1 n-positive-fixnum-bits))
   "the fixnum closest in value to positive infinity")
-(defconstant sb-xc:most-negative-fixnum
+(defconstant most-negative-fixnum
     (ash -1 n-positive-fixnum-bits)
   "the fixnum closest in value to negative infinity")
 
@@ -76,7 +76,7 @@
   ;; leaving one bit for a GC mark bit.
   (ldb (byte (- n-word-bits n-widetag-bits 1) 0) -1))
 
-(defconstant sb-xc:char-code-limit #-sb-unicode 256 #+sb-unicode #x110000
+(defconstant char-code-limit #-sb-unicode 256 #+sb-unicode #x110000
   "the upper exclusive bound on values produced by CHAR-CODE")
 
 (defconstant base-char-code-limit #-sb-unicode 256 #+sb-unicode 128)
@@ -94,13 +94,13 @@
 (defconstant sb-kernel::internal-time-bits 61)
 
 (defconstant most-positive-exactly-single-float-fixnum
-  (min (expt 2 single-float-digits) sb-xc:most-positive-fixnum))
+  (min (expt 2 single-float-digits) most-positive-fixnum))
 (defconstant most-negative-exactly-single-float-fixnum
-  (max (- (expt 2 single-float-digits)) sb-xc:most-negative-fixnum))
+  (max (- (expt 2 single-float-digits)) most-negative-fixnum))
 (defconstant most-positive-exactly-double-float-fixnum
-  (min (expt 2 double-float-digits) sb-xc:most-positive-fixnum))
+  (min (expt 2 double-float-digits) most-positive-fixnum))
 (defconstant most-negative-exactly-double-float-fixnum
-  (max (- (expt 2 double-float-digits)) sb-xc:most-negative-fixnum))
+  (max (- (expt 2 double-float-digits)) most-negative-fixnum))
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
@@ -141,7 +141,7 @@
 #+sb-xc-host
 (defun fixnump (x)
   (and (integerp x)
-       (<= sb-xc:most-negative-fixnum x sb-xc:most-positive-fixnum)))
+       (<= most-negative-fixnum x most-positive-fixnum)))
 
 ;;; Helper macro for defining FIXUP-CODE-OBJECT so that its body
 ;;; can be the same between the host and target.

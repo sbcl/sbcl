@@ -32,12 +32,12 @@
     `((count nil
              nil
              (etypecase count
-               (null (1- sb-xc:most-positive-fixnum))
+               (null (1- most-positive-fixnum))
                (fixnum (max 0 count))
                (integer (if (minusp count)
                             0
-                            (1- sb-xc:most-positive-fixnum))))
-             (mod #.sb-xc:most-positive-fixnum))
+                            (1- most-positive-fixnum))))
+             (mod #.most-positive-fixnum))
       ;; Entries for {start,end}{,1,2}
       ,@(mapcan (lambda (names)
                   (destructuring-bind (start end length sequence) names

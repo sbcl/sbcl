@@ -127,7 +127,7 @@
   `(let ((bits (logand (single-float-bits x) ,(1- (ash 1 32)))))
      (logxor 66194023
              (sxhash (the sb-xc:fixnum
-                          (logand sb-xc:most-positive-fixnum
+                          (logand most-positive-fixnum
                                   (logxor bits (ash bits -7))))))))
 (deftransform sxhash ((x) (single-float)) '#.+sxhash-single-float-expr+)
 
@@ -138,16 +138,16 @@
           (hilo (logxor hi lo)))
      (logxor 475038542
              (sxhash (the fixnum
-                          (logand sb-xc:most-positive-fixnum
+                          (logand most-positive-fixnum
                                   (logxor hilo
                                           (ash hilo -7))))))))
 
 ;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
 ;;; simple.
 (defglobal +sxhash-fixnum-expr+
-  (let ((c (logand 1193941380939624010 sb-xc:most-positive-fixnum)))
+  (let ((c (logand 1193941380939624010 most-positive-fixnum)))
     ;; shift by -1 to get sign bit into hash
-    `(logand (logxor (ash x 4) (ash x -1) ,c) sb-xc:most-positive-fixnum)))
+    `(logand (logxor (ash x 4) (ash x -1) ,c) most-positive-fixnum)))
 (deftransform sxhash ((x) (fixnum)) '#.+sxhash-fixnum-expr+)
 
 ;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
@@ -155,13 +155,13 @@
 (defglobal +sxhash-double-float-expr+
   ;; logical negation of magic constant ensures that 0.0d0 hashes to something
   ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)
-  (let ((c (logandc1 1193941380939624010 sb-xc:most-positive-fixnum)))
+  (let ((c (logandc1 1193941380939624010 most-positive-fixnum)))
     `(let ((x (double-float-bits x)))
        ;; ensure we mix the sign bit into the hash
        (logand (logxor (ash x 4)
                        (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
                        ,c)
-               sb-xc:most-positive-fixnum))))
+               most-positive-fixnum))))
 
 (deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
 
@@ -211,7 +211,7 @@
                    (t
                     ;; (STRING X) could be a non-simple string, it's OK.
                     (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
-                                        sb-xc:most-positive-fixnum)))
+                                        most-positive-fixnum)))
                       (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
                       hash))))
             (sb-xc:fixnum #.+sxhash-fixnum-expr+)

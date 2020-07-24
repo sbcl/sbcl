@@ -19,7 +19,7 @@
                        digit-char-p))
 
 (deftype char-code ()
-  `(integer 0 (,sb-xc:char-code-limit)))
+  `(integer 0 (,char-code-limit)))
 
 (define-load-time-global **unicode-character-name-huffman-tree** ())
 

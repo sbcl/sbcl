@@ -232,10 +232,10 @@
     DONE))
 
 (define-vop (move-from-fixnum+1 move-from-fixnum+/-1)
-  (:variant (1+ sb-xc:most-positive-fixnum)))
+  (:variant (1+ most-positive-fixnum)))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+/-1)
-  (:variant (1- sb-xc:most-negative-fixnum)))
+  (:variant (1- most-negative-fixnum)))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may

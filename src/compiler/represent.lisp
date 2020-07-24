@@ -295,7 +295,7 @@
                             t)
 
 
-  (let ((min sb-xc:most-positive-fixnum)
+  (let ((min most-positive-fixnum)
         (min-scn nil)
         (unique nil))
     (dolist (scn scs)
@@ -594,12 +594,12 @@
       (cond ((not type)
              nil)
             ((csubtypep type
-                        (specifier-type `(integer ,sb-xc:most-negative-fixnum
-                                                  ,(1+ sb-xc:most-positive-fixnum))))
+                        (specifier-type `(integer ,most-negative-fixnum
+                                                  ,(1+ most-positive-fixnum))))
              (template-or-lose 'sb-vm::move-from-fixnum+1))
             ((csubtypep type
-                        (specifier-type `(integer ,(1- sb-xc:most-negative-fixnum)
-                                                  ,sb-xc:most-positive-fixnum)))
+                        (specifier-type `(integer ,(1- most-negative-fixnum)
+                                                  ,most-positive-fixnum)))
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
 (defun coerce-from-constant (x-tn-ref y)

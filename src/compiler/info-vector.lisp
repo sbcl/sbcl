@@ -150,7 +150,7 @@
 (defmacro make-info-descriptor (val shift)
   (if (> sb-vm:n-fixnum-bits 30)
       `(ash ,val ,shift)
-      `(logior (if (logbitp (- 29 ,shift) ,val) sb-xc:most-negative-fixnum 0)
+      `(logior (if (logbitp (- 29 ,shift) ,val) most-negative-fixnum 0)
                (ash ,val ,shift))))
 
 ;; Convert unpacked vector to packed vector.

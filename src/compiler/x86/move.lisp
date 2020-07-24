@@ -222,14 +222,14 @@
   (:generator 4
     (inst imul y x (ash 1 n-fixnum-tag-bits))
     (inst jmp :no done)
-    (inst mov y (emit-constant (1+ sb-xc:most-positive-fixnum)))
+    (inst mov y (emit-constant (1+ most-positive-fixnum)))
     done))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+1)
   (:generator 4
     (inst imul y x (ash 1 n-fixnum-tag-bits))
     (inst jmp :no done)
-    (inst mov y (emit-constant (1- sb-xc:most-negative-fixnum)))
+    (inst mov y (emit-constant (1- most-negative-fixnum)))
     done))
 
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum

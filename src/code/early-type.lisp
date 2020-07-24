@@ -314,13 +314,13 @@
              (rational (rational thing))
              ((float single-float)
               (cond #-sb-xc-host
-                    ((<= sb-xc:most-negative-single-float thing sb-xc:most-positive-single-float)
+                    ((<= most-negative-single-float thing most-positive-single-float)
                      (coerce thing 'single-float))
                     (t
                      (return-from coerce-numeric-bound))))
              (double-float
               (cond #-sb-xc-host
-                    ((<= sb-xc:most-negative-double-float thing sb-xc:most-positive-double-float)
+                    ((<= most-negative-double-float thing most-positive-double-float)
                      (coerce thing 'double-float))
                     (t
                      (return-from coerce-numeric-bound)))))))
@@ -428,14 +428,14 @@
                                                  :enumerable (if (and ,low ,high) t nil))
                           (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
-                   ((and (eql low 0) (eql high (1- sb-xc:array-dimension-limit)))
-                    (int-type 0 #.(1- sb-xc:array-dimension-limit))) ; INDEX type
+                   ((and (eql low 0) (eql high (1- array-dimension-limit)))
+                    (int-type 0 #.(1- array-dimension-limit))) ; INDEX type
                    ((null high)
                     (cond ((not low) (int-type nil nil))
                           ((eql low 0) (int-type 0 nil))
-                          ((eql low (1+ sb-xc:most-positive-fixnum))
+                          ((eql low (1+ most-positive-fixnum))
                            ;; positive bignum
-                           (int-type #.(1+ sb-xc:most-positive-fixnum) nil))))
+                           (int-type #.(1+ most-positive-fixnum) nil))))
                    ((or (eql high most-positive-word)
                         ;; is (1+ high) a power-of-2 ?
                         (and (typep high 'word) (zerop (logand (1+ high) high))))
@@ -445,9 +445,9 @@
                           ((and (< high most-positive-word) (eql low (lognot high)))
                            (svref (literal-ctype-vector *interned-signed-byte-types*)
                                   (integer-length (truly-the word high))))))
-                   ((and (not low) (eql high (1- sb-xc:most-negative-fixnum)))
+                   ((and (not low) (eql high (1- most-negative-fixnum)))
                     ;; negative bignum
-                    (int-type nil #.(1- sb-xc:most-negative-fixnum))))))
+                    (int-type nil #.(1- most-negative-fixnum))))))
           (rational
            (cond ((and (eq complexp :real) (bounds-unbounded-p low high))
                   (literal-ctype (interned-numeric-type nil :class 'rational)
@@ -497,10 +497,10 @@
                                     (setf pairs (cdr pairs)))
                           else do (return nil))
                     (cond
-                      ((>= low sb-xc:char-code-limit))
+                      ((>= low char-code-limit))
                       ((< high 0))
                       (t (push (cons (max 0 low)
-                                     (min high (1- sb-xc:char-code-limit)))
+                                     (min high (1- char-code-limit)))
                                result))))))))
     (unless pairs
       (return-from make-character-set-type *empty-type*))
@@ -514,14 +514,14 @@
         (let* ((pair (car pairs))
                (low (car pair))
                (high (cdr pair)))
-          (cond ((eql high (1- sb-xc:char-code-limit))
+          (cond ((eql high (1- char-code-limit))
                  (cond ((eql low 0)
-                        (range 0 #.(1- sb-xc:char-code-limit)
+                        (range 0 #.(1- char-code-limit)
                                (sb-vm::saetp-index-or-lose 'character)))
                        #+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
-                               #.(1- sb-xc:char-code-limit)))))
+                               #.(1- char-code-limit)))))
                 #+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
@@ -576,15 +576,15 @@
              ;; FIXNUM is its own thing, why? See comment in vm-array
              ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
              ((eql fixnum) ; One good kludge deserves another.
-              (integer-range sb-xc:most-negative-fixnum
-                             sb-xc:most-positive-fixnum))
+              (integer-range most-negative-fixnum
+                             most-positive-fixnum))
              ((member single-float double-float)
               (make-numeric-type :class 'float :format x :complexp :real))
              ((cons (eql complex))
               (make-numeric-type :class 'float :format (cadr x)
                                  :complexp :complex))
              ((eql character)
-              (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
+              (make-character-set-type `((0 . ,(1- char-code-limit)))))
              #+sb-unicode
              ((eql base-char)
               (make-character-set-type `((0 . ,(1- base-char-code-limit)))))

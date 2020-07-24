@@ -53,7 +53,7 @@
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
       (set-result (logxor result (ash result 15)))
-      (logand result sb-xc:most-positive-fixnum))))
+      (logand result most-positive-fixnum))))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)
@@ -122,10 +122,10 @@
   ;; search starting from 2^60*pi.  The multiplication should be
   ;; efficient no matter what the platform thanks to modular
   ;; arithmetic.
-  (let* ((mul (logand 3622009729038463111 sb-xc:most-positive-fixnum))
-         (xor (logand 608948948376289905 sb-xc:most-positive-fixnum))
-         (xy (logand (+ (* x mul) y) sb-xc:most-positive-fixnum)))
-    (logand (logxor xor xy (ash xy -5)) sb-xc:most-positive-fixnum)))
+  (let* ((mul (logand 3622009729038463111 most-positive-fixnum))
+         (xor (logand 608948948376289905 most-positive-fixnum))
+         (xy (logand (+ (* x mul) y) most-positive-fixnum)))
+    (logand (logxor xor xy (ash xy -5)) most-positive-fixnum)))
 
 ;;; Same as above, but don't mask computations to n-positive-fixnum-bits.
 (declaim (inline word-mix))
@@ -185,14 +185,14 @@
 ;;;   an extra right-shift to remove bits that lack any randomness. CACHE-MASK can be
 ;;;   reworked to examine bits other than at the low end.
 (defun hash-layout-name (name)
-  (let ((limit (1+ (ash sb-xc:most-positive-fixnum -1))))
+  (let ((limit (1+ (ash most-positive-fixnum -1))))
     (declare (notinline random))
     (logior (if (typep name '(and symbol (not null)))
                 (flet ((improve-hash (x)
                          (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 x)))
                   (mix (logand
                         (improve-hash (sb-impl::%sxhash-simple-string (symbol-name name)))
-                        sb-xc:most-positive-fixnum)
+                        most-positive-fixnum)
                        (let ((package (sb-xc:symbol-package name)))
                          (sb-impl::%sxhash-simple-string
                           ;; Must specifically look for CL package when cross-compiling

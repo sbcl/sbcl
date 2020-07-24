@@ -1002,10 +1002,10 @@ core and return a descriptor to it."
     (etypecase host-val
       (number
        ;; This case is intended to handle
-       ;; (DEFCONSTANT SB-XC:LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT
-       ;;              SB-XC:LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT) ; etc
+       ;; (DEFCONSTANT LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT
+       ;;              LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT) ; etc
        ;; Several uses of MOST-POSITIVE-FIXNUM come through here as well
-       ;; due to (DEFCONSTANT SB-XC:mumble-LIMIT sb-xc:most-positive-fixnum).
+       ;; due to (DEFCONSTANT mumble-LIMIT most-positive-fixnum).
        ;; That seems weird but doesn't seem to be a problem.
        ;; (i.e. why don't we just dump the fixnum?)
        (number-to-core host-val))

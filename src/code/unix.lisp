@@ -32,7 +32,7 @@
 (defun c-strings->string-list (c-strings)
   (declare (type (alien (* c-string)) c-strings))
   (let ((reversed-result nil))
-    (dotimes (i sb-xc:most-positive-fixnum (error "argh! can't happen"))
+    (dotimes (i most-positive-fixnum (error "argh! can't happen"))
       (declare (type index i))
       (let ((c-string (deref c-strings i)))
         (if c-string
@@ -42,7 +42,7 @@
 ;;;; Lisp types used by syscalls
 
 (deftype unix-pathname () 'simple-string)
-(deftype unix-fd () `(integer 0 ,sb-xc:most-positive-fixnum))
+(deftype unix-fd () `(integer 0 ,most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
 (deftype unix-pid () '(unsigned-byte 32))
@@ -1044,7 +1044,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; removed by hand.
 
 (defconstant micro-seconds-per-internal-time-unit
-  (/ 1000000 sb-xc:internal-time-units-per-second))
+  (/ 1000000 internal-time-units-per-second))
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
@@ -1133,7 +1133,7 @@ the UNIX epoch (January 1st 1970.)"
                ;; to sometimes return 1000000 exactly.)
                (type fixnum utime-usec stime-usec))
       (let ((result (+ (* (+ utime-sec stime-sec)
-                          sb-xc:internal-time-units-per-second)
+                          internal-time-units-per-second)
                        (floor (+ utime-usec
                                  stime-usec
                                  (floor micro-seconds-per-internal-time-unit 2))

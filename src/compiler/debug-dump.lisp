@@ -450,7 +450,7 @@
                         (neq (lambda-physenv fun)
                              (lambda-physenv (lambda-var-home var)))))
          ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
-         (large-fixnums (>= (integer-length sb-xc:most-positive-fixnum) 62))
+         (large-fixnums (>= (integer-length most-positive-fixnum) 62))
          more)
     (declare (type index flags))
     (when minimal

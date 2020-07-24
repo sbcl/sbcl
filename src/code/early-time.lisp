@@ -12,6 +12,6 @@
 
 (in-package "SB-IMPL")
 
-(defconstant sb-xc:internal-time-units-per-second 1000
+(defconstant internal-time-units-per-second 1000
   "The number of internal time units that fit into a second. See
 GET-INTERNAL-REAL-TIME and GET-INTERNAL-RUN-TIME.")

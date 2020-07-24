@@ -243,7 +243,7 @@
     ;;    a <= x <= a + 2^n - 1
     ;; is equivalent to unsigned
     ;;    ((x-a) >> n) = 0
-    (inst mov temp #.(- sb-xc:most-negative-fixnum))
+    (inst mov temp #.(- most-negative-fixnum))
     (inst add temp value)
     (inst shr temp n-fixnum-bits)))
 

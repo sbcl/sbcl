@@ -581,11 +581,11 @@
   (etypecase type
     (named-type
      (ecase (named-type-name type)
-       ((t *) sb-xc:call-arguments-limit)
+       ((t *) call-arguments-limit)
        ((nil) 0)))
     (values-type
      (if (values-type-rest type)
-         sb-xc:call-arguments-limit
+         call-arguments-limit
          (+ (length (values-type-optional type))
             (length (values-type-required type)))))))
 
@@ -1908,8 +1908,8 @@
                                   `(unsigned-byte ,high-length))
                                  (t
                                   `(mod ,(1+ high)))))
-                          ((and (= low sb-xc:most-negative-fixnum)
-                                (= high sb-xc:most-positive-fixnum))
+                          ((and (= low most-negative-fixnum)
+                                (= high most-positive-fixnum))
                            'fixnum)
                           ((and (= low (lognot high))
                                 (= high-count high-length)
@@ -2299,8 +2299,8 @@ used for a COMPLEX component.~:@>"
                 (if (listp bound) (list coerced) coerced))))
 
 (defun inner-coerce-real-bound (bound type upperp)
-  (let ((nl sb-xc:most-negative-long-float)
-        (pl sb-xc:most-positive-long-float))
+  (let ((nl most-negative-long-float)
+        (pl most-positive-long-float))
     (let ((nbound (if (listp bound) (car bound) bound)))
       (ecase type
         (rational
@@ -2320,10 +2320,10 @@ used for a COMPLEX component.~:@>"
             (make-bound (coerce nbound 'long-float)))))))))
 
 (defun inner-coerce-float-bound (bound type upperp)
-  (let ((nd sb-xc:most-negative-double-float)
-        (pd sb-xc:most-positive-double-float)
-        (ns sb-xc:most-negative-single-float)
-        (ps sb-xc:most-positive-single-float))
+  (let ((nd most-negative-double-float)
+        (pd most-positive-double-float)
+        (ns most-negative-single-float)
+        (ps most-positive-single-float))
     (let ((nbound (if (listp bound) (car bound) bound)))
       (ecase type
         (single-float
@@ -2444,11 +2444,11 @@ used for a COMPLEX component.~:@>"
            (let ((res
                    (cond
                      ((and format (subtypep format 'double-float))
-                      (if (sb-xc:<= sb-xc:most-negative-double-float cx sb-xc:most-positive-double-float)
+                      (if (sb-xc:<= most-negative-double-float cx most-positive-double-float)
                           (coerce cx format)
                           nil))
                      (t
-                      (if (sb-xc:<= sb-xc:most-negative-single-float cx sb-xc:most-positive-single-float)
+                      (if (sb-xc:<= most-negative-single-float cx most-positive-single-float)
                           ;; FIXME: bug #389
                           (coerce cx (or format 'single-float))
                           nil)))))
@@ -2920,17 +2920,17 @@ used for a COMPLEX component.~:@>"
     (integer
      (when (minusp dims)
        (error "Arrays can't have a negative number of dimensions: ~S" dims))
-     (when (>= dims sb-xc:array-rank-limit)
+     (when (>= dims array-rank-limit)
        (error "array type with too many dimensions: ~S" dims))
      (make-list dims :initial-element '*))
     (list
-     (when (>= (length dims) sb-xc:array-rank-limit)
+     (when (>= (length dims) array-rank-limit)
        (error "array type with too many dimensions: ~S" dims))
      (dolist (dim dims)
        (unless (eq dim '*)
          (unless (and (integerp dim)
                       (>= dim 0)
-                      (< dim sb-xc:array-dimension-limit))
+                      (< dim array-dimension-limit))
            (error "bad dimension in array type: ~S" dim))))
      dims)
     (t
@@ -3646,19 +3646,19 @@ used for a COMPLEX component.~:@>"
 ;;;; CHARACTER-SET types
 
 (def-type-translator character-set
-    (&optional (pairs `((0 . ,(1- sb-xc:char-code-limit)))))
+    (&optional (pairs `((0 . ,(1- char-code-limit)))))
   (make-character-set-type pairs))
 
 (define-type-method (character-set :negate) (type)
   (let ((pairs (character-set-type-pairs type)))
     (if (and (= (length pairs) 1)
              (= (caar pairs) 0)
-             (= (cdar pairs) (1- sb-xc:char-code-limit)))
+             (= (cdar pairs) (1- char-code-limit)))
         (make-negation-type type)
         (let ((not-character
                (make-negation-type
                 (make-character-set-type
-                 `((0 . ,(1- sb-xc:char-code-limit)))))))
+                 `((0 . ,(1- char-code-limit)))))))
           (type-union
            not-character
            (make-character-set-type
@@ -3669,9 +3669,9 @@ used for a COMPLEX component.~:@>"
                            (high1 (cdar tail) (cdar tail))
                            (low2 (caadr tail) (caadr tail)))
                           ((null (cdr tail))
-                           (when (< (cdar tail) (1- sb-xc:char-code-limit))
+                           (when (< (cdar tail) (1- char-code-limit))
                              (push (cons (1+ (cdar tail))
-                                         (1- sb-xc:char-code-limit))
+                                         (1- char-code-limit))
                                    not-pairs))
                            (nreverse not-pairs))
                        (push (cons (1+ high1) (1- low2)) not-pairs)))))))))

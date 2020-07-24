@@ -389,7 +389,7 @@ comments from CMU CL:
 (defun entry-report (entries cut-off compensated compare total-cost)
   (let ((counter (if (and cut-off (> (length entries) cut-off))
                      cut-off
-                     sb-xc:most-positive-fixnum)))
+                     most-positive-fixnum)))
   (dolist (entry entries)
     (let* ((cost (vop-stats-cost entry))
            (name (vop-stats-name entry))

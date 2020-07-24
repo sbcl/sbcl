@@ -185,7 +185,7 @@
            (exp-marker (if (and marker-pos
                                 (char-not-equal (char string marker-pos) #\E))
                            (char-upcase (char string marker-pos))
-                           (ecase *read-default-float-format*
+                           (ecase cl:*read-default-float-format*
                             ((cl:single-float cl:short-float) #\F)
                             ((cl:double-float cl:long-float)  #\D))))
            (significand (if marker-pos (subseq string 0 marker-pos) string))
@@ -714,28 +714,28 @@
 ;;; These use "#." so that they are dumped as literals rather than having to
 ;;; call read-from-string at load-time (and failing) due to the reader intercept.
 ;;      #define __FLT_MAX__ 3.40282347e+38F
-(defconstant sb-xc:most-positive-single-float
+(defconstant most-positive-single-float
   #.(make-flonum (read-from-string "+3.40282347F38") 'single-float))
-(defconstant sb-xc:most-negative-single-float
+(defconstant most-negative-single-float
   #.(make-flonum (read-from-string "-3.40282347F38") 'single-float))
 
 ;;      #define __DBL_MAX__ 1.7976931348623157e+308
-(defconstant sb-xc:most-positive-double-float
+(defconstant most-positive-double-float
   #.(make-flonum (read-from-string "+1.7976931348623157D308") 'double-float))
-(defconstant sb-xc:most-negative-double-float
+(defconstant most-negative-double-float
   #.(make-flonum (read-from-string "-1.7976931348623157D308") 'double-float))
 
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
-(defconstant sb-xc:pi
+(defconstant pi
   #.(make-flonum (read-from-string "3.14159265358979323846264338327950288419716939937511L0")
                  'double-float))
 
 (eval-when (:compile-toplevel :execute) (setq sb-cold::*choke-on-host-irrationals* t))
 
 ;;; These two constants are used in 'late-type'
-(defconstant sb-xc:most-positive-long-float sb-xc:most-positive-double-float)
-(defconstant sb-xc:most-negative-long-float sb-xc:most-negative-double-float)
+(defconstant most-positive-long-float most-positive-double-float)
+(defconstant most-negative-long-float most-negative-double-float)
 
 (defun substitute-minus-zero (list)
   (substitute $0.0d0
@@ -851,11 +851,11 @@
                (if (and (eq (flonum-format a) (flonum-format c))
                         (or (eq (flonum-format b) (flonum-format a))
                             (eq (flonum-format b) 'single-float)))
-                   (cond ((and (eql a sb-xc:most-negative-single-float)
-                               (eql c sb-xc:most-positive-single-float))
+                   (cond ((and (eql a most-negative-single-float)
+                               (eql c most-positive-single-float))
                           (not (float-infinity-p b)))
-                         ((and (eql a sb-xc:most-negative-double-float)
-                               (eql c sb-xc:most-positive-double-float))
+                         ((and (eql a most-negative-double-float)
+                               (eql c most-positive-double-float))
                           (not (float-infinity-p b)))
                          (t
                           (error "Unhandled")))

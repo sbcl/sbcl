@@ -32,7 +32,7 @@
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
   (the internal-time
-       (values (truncate (* seconds sb-xc:internal-time-units-per-second)))))
+       (values (truncate (* seconds internal-time-units-per-second)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute) ; for "#."
 (defconstant safe-internal-seconds-limit
@@ -46,7 +46,7 @@
   ;; #. is needed to make the value constant per se as opposed to
   ;; constant by decree, otherwise genesis runs into a problem.
   #.(floor (ash 1 (1- sb-kernel::internal-time-bits))
-           sb-xc:internal-time-units-per-second)))
+           internal-time-units-per-second)))
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
@@ -115,7 +115,7 @@ Experimental."
   "Returns internal time value TIME decoded into seconds and microseconds."
   (declare (type internal-time time))
   (multiple-value-bind (sec frac)
-      (truncate time sb-xc:internal-time-units-per-second)
+      (truncate time internal-time-units-per-second)
     (values sec (* frac sb-unix::micro-seconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)

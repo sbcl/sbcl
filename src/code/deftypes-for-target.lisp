@@ -169,9 +169,9 @@
   '(or list symbol classoid class))
 
 ;;; array rank, total size...
-(sb-xc:deftype array-rank () `(integer 0 (,sb-xc:array-rank-limit)))
+(sb-xc:deftype array-rank () `(integer 0 (,array-rank-limit)))
 (sb-xc:deftype array-total-size ()
-  `(integer 0 (,sb-xc:array-total-size-limit)))
+  `(integer 0 (,array-total-size-limit)))
 
 ;;; The range returned by SXHASH and PSXHASH
 ;;; Do not confuse this type with the type that EQ-HASH and related hash
@@ -179,7 +179,7 @@
 ;;; precludes us from using the entire fixnum range. Doing so avoids
 ;;; an extra AND operation, which is pretty much effectless in as much as
 ;;; the hash code is masked down to a much smaller value anyway.
-(sb-xc:deftype hash-code () `(integer 0 ,sb-xc:most-positive-fixnum))
+(sb-xc:deftype hash-code () `(integer 0 ,most-positive-fixnum))
 
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away
@@ -208,7 +208,7 @@
   '(or float (complex float)))
 
 ;;; character components
-(sb-xc:deftype char-code () `(integer 0 (,sb-xc:char-code-limit)))
+(sb-xc:deftype char-code () `(integer 0 (,char-code-limit)))
 
 ;;; a consed sequence result. If a vector, is a simple array.
 (sb-xc:deftype consed-sequence ()

@@ -160,7 +160,7 @@
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
-         (word-offset `(integer 0 ,(ceiling sb-xc:array-dimension-limit bytes-per-word)))
+         (word-offset `(integer 0 ,(ceiling array-dimension-limit bytes-per-word)))
          (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
          (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB-KERNEL")))

@@ -21,7 +21,7 @@
                       ((or (atom result)
                            (not (eq (car result) 'values)))
                        `(values ,result &optional))
-                      ((intersection (cdr result) sb-xc:lambda-list-keywords)
+                      ((intersection (cdr result) lambda-list-keywords)
                        result)
                       (t `(values ,@(cdr result) &optional)))))
     `(function ,args ,result)))

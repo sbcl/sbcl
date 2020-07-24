@@ -179,7 +179,7 @@
     ;; We could encode this with :Z and SHR, analogously to the signed-byte-32
     ;; case below -- as we do on x86-64 -- but that costs us an extra
     ;; register. Compromises...
-    (inst cmp value #.sb-xc:most-positive-fixnum)))
+    (inst cmp value #.most-positive-fixnum)))
 
 (define-vop (fixnump/signed-byte-32 type-predicate)
   (:args (value :scs (signed-reg)))
@@ -194,9 +194,9 @@
     ;; is equivalent to unsigned
     ;;    ((x-a) >> n) = 0
     (inst mov eax-tn value)
-    (inst sub eax-tn #.sb-xc:most-negative-fixnum)
-    (inst shr eax-tn #.(integer-length (- sb-xc:most-positive-fixnum
-                                          sb-xc:most-negative-fixnum)))))
+    (inst sub eax-tn #.most-negative-fixnum)
+    (inst shr eax-tn #.(integer-length (- most-positive-fixnum
+                                          most-negative-fixnum)))))
 
 ;;; A (SIGNED-BYTE 32) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.

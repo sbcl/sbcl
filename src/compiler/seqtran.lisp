@@ -1186,7 +1186,7 @@
             (j (+ ,dst-offset ,length) (1- j)))
            ((<= i ,src-offset))
          (declare (optimize (insert-array-bounds-checks 0))
-                  (type (integer 0 #.sb-xc:array-dimension-limit) j i))
+                  (type (integer 0 #.array-dimension-limit) j i))
          (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
 
 ;;; MAKE-SEQUENCE, SUBSEQ, COPY-SEQ
@@ -1461,7 +1461,7 @@
                            (and (constant-lvar-p from-end)
                                 (not (lvar-value from-end)))))
          (min-result (or constant-start2 0))
-         (max-result (or constant-end2 (1- sb-xc:array-dimension-limit)))
+         (max-result (or constant-end2 (1- array-dimension-limit)))
          (max2 (sequence-lvar-dimensions sequence2))
          (max-result (if (integerp max2)
                          (min max-result max2)
@@ -1497,7 +1497,7 @@
          (constant-end (and (constant-lvar-p end)
                             (lvar-value end)))
          (min-result (or constant-start 0))
-         (max-result (or constant-end (1- sb-xc:array-dimension-limit)))
+         (max-result (or constant-end (1- array-dimension-limit)))
          (max (sequence-lvar-dimensions sequence))
          (max-result (if (integerp max)
                          (min max-result max)

@@ -795,8 +795,8 @@ and the number of 0 bits if INTEGER is negative."
     (fixnum
      (logcount #-x86-64
                (truly-the (integer 0
-                                   #.(max sb-xc:most-positive-fixnum
-                                          (lognot sb-xc:most-negative-fixnum)))
+                                   #.(max most-positive-fixnum
+                                          (lognot most-negative-fixnum)))
                           (if (minusp (truly-the fixnum integer))
                               (lognot (truly-the fixnum integer))
                               integer))
@@ -1057,7 +1057,7 @@ and the number of 0 bits if INTEGER is negative."
                  (setq v (- temp)))
              (setq temp (- u v))
              (when (zerop temp)
-               (return (the (integer 0 #.(1+ sb-xc:most-positive-fixnum)) (ash u k)))))))
+               (return (the (integer 0 #.(1+ most-positive-fixnum)) (ash u k)))))))
       (declare (type (mod #.sb-vm:n-word-bits) k)
                (type sb-vm:signed-word u v)))))
 
@@ -1197,7 +1197,7 @@ and the number of 0 bits if INTEGER is negative."
                    (significant-half (ash ,arg (- (ash fourth-size 1))))
                    (significant-half-isqrt
                      (if-fixnum-p-truly-the
-                      (integer 1 #.(isqrt sb-xc:most-positive-fixnum))
+                      (integer 1 #.(isqrt most-positive-fixnum))
                       (,recurse significant-half)))
                    (zeroth-iteration (ash significant-half-isqrt
                                           fourth-size)))

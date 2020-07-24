@@ -401,7 +401,7 @@
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol ; Symbols in static and immobile space are immediate

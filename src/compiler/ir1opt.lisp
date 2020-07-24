@@ -1059,7 +1059,7 @@
                 (let ((original-lambda-list (second original-lambda)))
                   ;; KISS - the closure that you're passing can have 0 or more
                   ;; mandatory args and nothing else.
-                  (unless (intersection original-lambda-list sb-xc:lambda-list-keywords)
+                  (unless (intersection original-lambda-list lambda-list-keywords)
                     (push `(,tempname ,original-lambda-list
                              (%funcall ,(nth arg-spec received-args)
                                        ,@original-lambda-list))

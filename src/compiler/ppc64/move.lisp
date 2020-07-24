@@ -208,7 +208,7 @@
                       (2 '((inst addo x arg arg) (inst addo. y x x)))
                       (3 '((inst addo x arg arg) (inst addo x x x) (inst addo. y x x))))
                   (inst bns done) ; branch if no summary overflow
-                  (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum)) y)
+                  (load-constant vop (emit-constant (1+ most-positive-fixnum)) y)
                   DONE))))
   (define-move-from-fixnum+1))
 
@@ -221,7 +221,7 @@
                       (2 '((inst addo x arg arg) (inst addo. y x x)))
                       (3 '((inst addo x arg arg) (inst addo x x x) (inst addo. y x x))))
                   (inst bns done) ; branch if no summary overflow
-                  (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum)) y)
+                  (load-constant vop (emit-constant (1- most-negative-fixnum)) y)
                   DONE))))
   (define-move-from-fixnum-1))
 

@@ -16,7 +16,7 @@
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()
-  `(integer 0 ,sb-xc:array-dimension-limit))
+  `(integer 0 ,array-dimension-limit))
 
 ;;; a type used for indexing into sequences, and for related
 ;;; quantities like lengths of lists and other sequences.
@@ -35,13 +35,13 @@
 ;;; MOST-POSITIVE-FIXNUM lets the system know it can increment a value
 ;;; of type INDEX without having to worry about using a bignum to
 ;;; represent the result.
-(def!type index () `(integer 0 (,sb-xc:array-dimension-limit)))
+(def!type index () `(integer 0 (,array-dimension-limit)))
 
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the
 ;;; index leaving the loop range)
-(def!type index-or-minus-1 () `(integer -1 (,sb-xc:array-dimension-limit)))
+(def!type index-or-minus-1 () `(integer -1 (,array-dimension-limit)))
 
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))

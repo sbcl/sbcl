@@ -282,7 +282,7 @@
     (flushable movable))
 
 ;;; Allocate an array header with type code TYPE and rank RANK.
-(defknown make-array-header ((unsigned-byte 8) (mod #.sb-xc:array-rank-limit)) array
+(defknown make-array-header ((unsigned-byte 8) (mod #.array-rank-limit)) array
   (flushable movable))
 
 (defknown make-array-header* (&rest t) array (flushable movable))
@@ -616,12 +616,12 @@
 
 (defknown (%asin %atan)
   (double-float)
-  (double-float #.(coerce (sb-xc:- (sb-xc:/ sb-xc:pi 2)) 'double-float)
-                #.(coerce (sb-xc:/ sb-xc:pi 2) 'double-float))
+  (double-float #.(coerce (sb-xc:- (sb-xc:/ pi 2)) 'double-float)
+                #.(coerce (sb-xc:/ pi 2) 'double-float))
   (movable foldable flushable))
 
 (defknown (%acos)
-  (double-float) (double-float $0.0d0 #.(coerce sb-xc:pi 'double-float))
+  (double-float) (double-float $0.0d0 #.(coerce pi 'double-float))
   (movable foldable flushable))
 
 (defknown (%cosh)
@@ -646,8 +646,8 @@
 
 (defknown (%atan2)
   (double-float double-float)
-  (double-float #.(coerce (sb-xc:- sb-xc:pi) 'double-float)
-                #.(coerce sb-xc:pi 'double-float))
+  (double-float #.(coerce (sb-xc:- pi) 'double-float)
+                #.(coerce pi 'double-float))
   (movable foldable flushable))
 
 (defknown (%scalb)

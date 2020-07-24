@@ -345,7 +345,7 @@
 ;;;; Process time information
 
 (defconstant 100ns-per-internal-time-unit
-  (/ 10000000 sb-xc:internal-time-units-per-second))
+  (/ 10000000 internal-time-units-per-second))
 
 ;; FILETIME
 ;; The FILETIME structure is a 64-bit value representing the number of

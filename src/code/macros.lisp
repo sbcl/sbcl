@@ -824,8 +824,8 @@ symbol-case giving up: case=((V U) (F))
       (flet ((try-one-byte ()
                (let ((best-answer nil)
                      ;; "best" means smallest
-                     (best-max-bin-count sb-xc:most-positive-fixnum) ; sentinel value
-                     (best-average sb-xc:most-positive-fixnum))
+                     (best-max-bin-count most-positive-fixnum) ; sentinel value
+                     (best-average most-positive-fixnum))
                  (loop named try
                        for nbits from smallest-nbits to largest-nbits
                        do (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))
@@ -834,8 +834,8 @@ symbol-case giving up: case=((V U) (F))
                        finally (return-from try (values best-max-bin-count best-answer)))))
              (try-two-bytes ()
                (let ((best-answer nil)
-                     (best-max-bin-count sb-xc:most-positive-fixnum)
-                     (best-average sb-xc:most-positive-fixnum))
+                     (best-max-bin-count most-positive-fixnum)
+                     (best-average most-positive-fixnum))
                  (loop named try
                        for nbits from smallest-nbits to largest-nbits
                        do (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))

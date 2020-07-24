@@ -380,7 +380,7 @@ DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
   sb-vm:n-word-bits most-positive-word
-  sb-xc:most-positive-fixnum sb-xc:most-negative-fixnum)
+  most-positive-fixnum most-negative-fixnum)
   (expand-atomic-frob 'atomic-incf place diff env))
 
 (defmacro atomic-decf (&environment env place &optional (diff 1))
@@ -409,5 +409,5 @@ DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
   sb-vm:n-word-bits most-positive-word
-  sb-xc:most-negative-fixnum sb-xc:most-positive-fixnum)
+  most-negative-fixnum most-positive-fixnum)
   (expand-atomic-frob 'atomic-decf place diff env))

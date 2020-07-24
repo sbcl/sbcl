@@ -41,7 +41,7 @@
                                                   #+sb-unicode :size #+sb-unicode (length data))))
                       (loop for (source . target) in data
                             when (and #-sb-unicode
-                                      (< source sb-xc:char-code-limit))
+                                      (< source char-code-limit))
                             do (flet ((minimize (x)
                                         (case (length x)
                                           (1

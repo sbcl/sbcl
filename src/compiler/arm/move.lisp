@@ -237,7 +237,7 @@
     (inst adds temp x x)
     (inst adds :vc y temp temp)
     (inst b :vc DONE)
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ most-positive-fixnum))
                    y)
     DONE))
 
@@ -246,7 +246,7 @@
     (inst adds temp x x)
     (inst adds :vc y temp temp)
     (inst b :vc DONE)
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- most-negative-fixnum))
                    y)
     DONE))
 

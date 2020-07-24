@@ -88,7 +88,7 @@ distinct from the global value. Can also be SETF."
       (return-from compute-symbol-hash (sxhash nil)))
   ;; And make a symbol's hash not the same as (sxhash name) in general.
   (let ((sxhash (logxor (%sxhash-simple-substring string 0 length)
-                        sb-xc:most-positive-fixnum)))
+                        most-positive-fixnum)))
     ;; The low 32 bits of the word in memory should have at least a 1 bit somewhere.
     ;; If not, OR in a constant value.
     (if (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) sxhash)

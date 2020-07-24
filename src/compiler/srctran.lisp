@@ -158,7 +158,7 @@
       ;; Something fishy here- If THE is removed, OPERAND-RESTRICTION-OK
       ;; returns NIL because type inference on MAKE-LIST never happens.
       ;; But the fndb entry for %MAKE-LIST is right, so I'm slightly bewildered.
-      `(%make-list (the (integer 0 (,(1- sb-xc:array-dimension-limit))) ,length)
+      `(%make-list (the (integer 0 (,(1- array-dimension-limit))) ,length)
                    ,(second rest))
       (values nil t))) ; give up
 
@@ -472,7 +472,7 @@
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)
-      (sb-xc:<= sb-xc:most-negative-double-float x sb-xc:most-positive-double-float)))
+      (sb-xc:<= most-negative-double-float x most-positive-double-float)))
 
 (defun safe-single-coercion-p (x)
   (or (typep x 'single-float)
@@ -506,7 +506,7 @@
        #+x86
        (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
                           (integer (,most-positive-exactly-single-float-fixnum) *))))
-       (sb-xc:<= sb-xc:most-negative-single-float x sb-xc:most-positive-single-float))))
+       (sb-xc:<= most-negative-single-float x most-positive-single-float))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
 ;;; NIL if either is NIL. Otherwise bound is computed and the result
@@ -587,11 +587,11 @@
            xbound
            (list xbound))))
     ((sb-xc:subtypep type 'double-float)
-     (if (sb-xc:<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
+     (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
          (coerce val type)))
     ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
      ;; coerce to float returns a single-float
-     (if (sb-xc:<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
+     (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
          (coerce val type)))
     (t (coerce val type))))
 
@@ -604,16 +604,16 @@
               (list xbound)))
         (cond
           ((sb-xc:subtypep type 'double-float)
-           (if (sb-xc:<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
+           (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
                (coerce val type)
-               (if (sb-xc:< val sb-xc:most-negative-double-float)
-                   sb-xc:most-negative-double-float sb-xc:most-positive-double-float)))
+               (if (sb-xc:< val most-negative-double-float)
+                   most-negative-double-float most-positive-double-float)))
           ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
            ;; coerce to float returns a single-float
-           (if (sb-xc:<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
+           (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
                (coerce val type)
-               (if (sb-xc:< val sb-xc:most-negative-single-float)
-                   sb-xc:most-negative-single-float sb-xc:most-positive-single-float)))
+               (if (sb-xc:< val most-negative-single-float)
+                   most-negative-single-float most-positive-single-float)))
           (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.
@@ -1483,14 +1483,14 @@
   (flet ((ash-outer (n s)
            (when (and (fixnump s)
                       (<= s 64)
-                      (> s sb-xc:most-negative-fixnum))
+                      (> s most-negative-fixnum))
              (ash n s)))
          ;; KLUDGE: The bare 64's here should be related to
          ;; symbolic machine word size values somehow.
 
          (ash-inner (n s)
            (if (and (fixnump s)
-                    (> s sb-xc:most-negative-fixnum))
+                    (> s most-negative-fixnum))
              (ash n (min s 64))
              (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))
@@ -2300,7 +2300,7 @@
             `(mod ,base-char-code-limit)))
           (t
            (specifier-type
-            `(mod ,sb-xc:char-code-limit))))))
+            `(mod ,char-code-limit))))))
 
 (defoptimizer (code-char derive-type) ((code))
   (let ((type (lvar-type code)))
@@ -2690,22 +2690,22 @@
     (give-up-ir1-transform "BOOLE code is not a constant."))
   (let ((control (lvar-value op)))
     (case control
-      (#.sb-xc:boole-clr 0)
-      (#.sb-xc:boole-set -1)
-      (#.sb-xc:boole-1 'x)
-      (#.sb-xc:boole-2 'y)
-      (#.sb-xc:boole-c1 '(lognot x))
-      (#.sb-xc:boole-c2 '(lognot y))
-      (#.sb-xc:boole-and '(logand x y))
-      (#.sb-xc:boole-ior '(logior x y))
-      (#.sb-xc:boole-xor '(logxor x y))
-      (#.sb-xc:boole-eqv '(logeqv x y))
-      (#.sb-xc:boole-nand '(lognand x y))
-      (#.sb-xc:boole-nor '(lognor x y))
-      (#.sb-xc:boole-andc1 '(logandc1 x y))
-      (#.sb-xc:boole-andc2 '(logandc2 x y))
-      (#.sb-xc:boole-orc1 '(logorc1 x y))
-      (#.sb-xc:boole-orc2 '(logorc2 x y))
+      (#.boole-clr 0)
+      (#.boole-set -1)
+      (#.boole-1 'x)
+      (#.boole-2 'y)
+      (#.boole-c1 '(lognot x))
+      (#.boole-c2 '(lognot y))
+      (#.boole-and '(logand x y))
+      (#.boole-ior '(logior x y))
+      (#.boole-xor '(logxor x y))
+      (#.boole-eqv '(logeqv x y))
+      (#.boole-nand '(lognand x y))
+      (#.boole-nor '(lognor x y))
+      (#.boole-andc1 '(logandc1 x y))
+      (#.boole-andc2 '(logandc2 x y))
+      (#.boole-orc1 '(logorc1 x y))
+      (#.boole-orc2 '(logorc2 x y))
       (t
        (abort-ir1-transform "~S is an illegal control arg to BOOLE."
                             control)))))
@@ -4011,7 +4011,7 @@
                      ((and (typep (abs low)
                                   `(integer 0
                                             ,(min (expt 2 32)
-                                                  sb-xc:most-positive-fixnum)))
+                                                  most-positive-fixnum)))
                            ;; Get some extra points
                            (positive-primep (abs low)))
                       (pushnew (abs low) primes)))
@@ -4091,7 +4091,7 @@
      (case (let ((name (lvar-fun-name (combination-fun thing))))
              (or (modular-version-info name :untagged nil) name))
        ((+ -)
-        (let ((min sb-xc:most-positive-fixnum)
+        (let ((min most-positive-fixnum)
               (itype (specifier-type 'integer)))
           (dolist (arg (combination-args thing) min)
             (if (csubtypep (lvar-type arg) itype)
@@ -4118,7 +4118,7 @@
         0)))
     (integer
      (if (zerop thing)
-         sb-xc:most-positive-fixnum
+         most-positive-fixnum
          (do ((result 0 (1+ result))
               (num thing (ash num -1)))
              ((logbitp 0 num) result))))
@@ -4792,7 +4792,7 @@
                        (start-1 (1- ,',start))
                        (current-heap-size (- ,',end ,',start))
                        (keyfun ,keyfun))
-                   (declare (type (integer -1 #.(1- sb-xc:most-positive-fixnum))
+                   (declare (type (integer -1 #.(1- most-positive-fixnum))
                                   start-1))
                    (declare (type index current-heap-size))
                    (declare (type function keyfun))

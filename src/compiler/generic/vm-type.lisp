@@ -56,7 +56,7 @@
 (sb-xc:deftype internal-time () `(unsigned-byte ,internal-time-bits))
 
 (defconstant internal-seconds-limit
-    (floor (ash 1 internal-time-bits) sb-xc:internal-time-units-per-second))
+    (floor (ash 1 internal-time-bits) internal-time-units-per-second))
 (sb-xc:deftype internal-seconds () `(integer 0 ,internal-seconds-limit))
 
 (sb-xc:deftype bignum-element-type () 'sb-vm:word)
@@ -283,8 +283,8 @@
   (let (widetags remainder)
     ;; A little optimization for (OR BIGNUM other). Without this, there would
     ;; be a two-sided GENERIC-{<,>} test plus whatever test(s) "other" entails.
-    (let ((neg-bignum (specifier-type `(integer * (,sb-xc:most-negative-fixnum))))
-          (pos-bignum (specifier-type `(integer (,sb-xc:most-positive-fixnum) *))))
+    (let ((neg-bignum (specifier-type `(integer * (,most-negative-fixnum))))
+          (pos-bignum (specifier-type `(integer (,most-positive-fixnum) *))))
       (when (and (member neg-bignum types :test #'type=)
                  (member pos-bignum types :test #'type=))
         (push sb-vm:bignum-widetag widetags)

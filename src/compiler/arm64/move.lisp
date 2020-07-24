@@ -408,7 +408,7 @@
   (:generator 4
     (inst adds y x x)
     (inst b :vc DONE)
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ most-positive-fixnum))
                    y)
     DONE))
 
@@ -416,7 +416,7 @@
   (:generator 4
     (inst adds y x x)
     (inst b :vc DONE)
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- most-negative-fixnum))
                    y)
     DONE))
 

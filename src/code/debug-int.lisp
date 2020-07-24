@@ -1905,7 +1905,7 @@ register."
                                 prev-name)
                                (t (geti))))
                  ;; Keep the condition in sync with DUMP-1-VAR
-                 (large-fixnums (>= (integer-length sb-xc:most-positive-fixnum) 62))
+                 (large-fixnums (>= (integer-length most-positive-fixnum) 62))
                  (sc+offset (if deleted 0
                                 (if large-fixnums (ldb (byte 27 8) flags) (geti))))
                  (save-sc+offset (and save

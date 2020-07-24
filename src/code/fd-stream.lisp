@@ -1606,7 +1606,7 @@
           (let* ((stream ,name)
                  (size 0) (head 0) (byte 0) (char nil)
                  (decode-break-reason nil)
-                 (length (dotimes (count (1- sb-xc:array-dimension-limit) count)
+                 (length (dotimes (count (1- array-dimension-limit) count)
                            (setf decode-break-reason
                                  (block decode-break-reason
                                    (setf byte (sap-ref-8 sap head)

@@ -177,7 +177,7 @@ constructed.
 (declaim (sb-ext:freeze-type loop-minimax))
 
 (defconstant-eqx +loop-minimax-type-infinities-alist+
-    '((fixnum            sb-xc:most-positive-fixnum            sb-xc:most-negative-fixnum)
+    '((fixnum            most-positive-fixnum                  most-negative-fixnum)
       (single-float      sb-ext:single-float-positive-infinity sb-ext:single-float-negative-infinity)
       (double-float      sb-ext:double-float-positive-infinity sb-ext:double-float-negative-infinity))
   #'equal)

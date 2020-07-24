@@ -215,10 +215,10 @@
      (cond
        ((<= 0 object 1) 'bit)
        ((< object 0) 'fixnum)
-       (t `(integer 0 ,sb-xc:most-positive-fixnum))))
+       (t `(integer 0 ,most-positive-fixnum))))
     (integer
      (if (>= object 0)
-         `(integer ,(1+ sb-xc:most-positive-fixnum))
+         `(integer ,(1+ most-positive-fixnum))
          'bignum))
     (character
      (typecase object
