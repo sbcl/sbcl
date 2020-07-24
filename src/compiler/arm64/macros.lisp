@@ -232,7 +232,7 @@
         (inst add result-tn result-tn size)
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
-        #-sb-thread (inst str result-tn (@ null-tn (- boxed-region nil-value)))
+        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- boxed-region nil-value))))
         #+sb-thread (storew result-tn thread-tn thread-alloc-region-slot)
         ;; alloc_tramp uses tmp-tn for returning the result,
         ;; save on a move when possible
