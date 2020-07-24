@@ -2913,7 +2913,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                             ;; in the target Lisp but are propagated to C.
                             "SB-COREFILE"))
       (do-external-symbols (symbol (find-package package-name))
-        (when (constantp symbol)
+        (when (cl:constantp symbol)
           (let ((name (symbol-name symbol)))
             (labels ( ;; shared machinery
                      (record (string priority suffix)
@@ -3114,7 +3114,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (subseq name 0 (- (length name) (length strip))))))
        (list-sorted-tags (tail)
          (loop for symbol being the external-symbols of "SB-VM"
-               when (and (constantp symbol)
+               when (and (cl:constantp symbol)
                          (tailwise-equal (string symbol) tail))
                collect symbol into tags
                finally (return (sort tags #'< :key #'symbol-value))))

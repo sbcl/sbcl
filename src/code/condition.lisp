@@ -1003,7 +1003,7 @@
   ()
   (:default-initargs
       :references '((:ansi-cl :function make-array)
-                    (:ansi-cl :function sb-xc:upgraded-array-element-type))))
+                    (:ansi-cl :function upgraded-array-element-type))))
 
 (define-condition initial-element-mismatch-style-warning
     (array-initial-element-mismatch simple-style-warning)
@@ -1236,7 +1236,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                      "An attempt to access an array of element-type ~
                       NIL was made.  Congratulations!")))
   (:default-initargs
-      :references '((:ansi-cl :function sb-xc:upgraded-array-element-type)
+      :references '((:ansi-cl :function upgraded-array-element-type)
                     (:ansi-cl :section (15 1 2 1))
                     (:ansi-cl :section (15 1 2 2)))))
 
@@ -1367,7 +1367,7 @@ longer than permitted by the deadline."))
   ()
   (:default-initargs
    :format-control
-   #.(sb-xc:macroexpand-1 ; stuff in a literal #<fmt-control>
+   #.(macroexpand-1 ; stuff in a literal #<fmt-control>
       '(sb-format:tokens "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
      be both the name of a type and the name of a declaration"))
    :references '((:ansi-cl :section (3 8 21)))))

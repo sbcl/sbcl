@@ -196,7 +196,7 @@
                             * :important nil)
   `(symbol-hash* object 'non-null-symbol-p)) ; etc
 
-;;; To define SB-XC:SXHASH compatibly without repeating the logic in the transforms
+;;; To define SXHASH compatibly without repeating the logic in the transforms
 ;;; that define the numeric cases, we do some monkey business involving #. to paste
 ;;; in the expressions that the transforms would return.
 #+sb-xc-host

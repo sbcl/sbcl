@@ -37,14 +37,7 @@
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 
-;;;; cross-compiler-only versions of CL special variables, so that we
-;;;; don't have weird interactions with the host compiler
 
-(defvar sb-xc:*compile-file-pathname*)
-(defvar sb-xc:*compile-file-truename*)
-(defvar sb-xc:*compile-print*)
-(defvar sb-xc:*compile-verbose*)
-
 ;;;; miscellaneous types used both in the cross-compiler and on the target
 
 ;;;; FIXME: The INDEX and LAYOUT-DEPTHOID definitions probably belong

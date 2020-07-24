@@ -84,7 +84,7 @@
           (or *source-namestring*
               (when source-info
                 (make-file-info-namestring
-                 *compile-file-pathname*
+                 cl:*compile-file-pathname*
                  (get-toplevelish-file-info source-info)))))
          tlf-number
          form-number)

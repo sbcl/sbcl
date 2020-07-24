@@ -26,7 +26,7 @@
 (defun compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp)
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
-      (sb-xc:with-compilation-unit ()
+      (with-compilation-unit ()
         ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
         ;; few changes. Once things are stable, the shared bindings
         ;; probably be merged back together into some shared utility

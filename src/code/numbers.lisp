@@ -10,6 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
+
 ;;;; canonicalization utilities
 
 ;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is

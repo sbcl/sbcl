@@ -13,7 +13,7 @@
 
 ;;;; syntactic environment access
 
-(defun sb-xc:special-operator-p (symbol)
+(defun special-operator-p (symbol)
   "If the symbol globally names a special form, return T, otherwise NIL."
   (declare (symbol symbol))
   (eq (info :function :kind symbol) :special-form))
@@ -105,7 +105,7 @@
                   (values form nil))))
            ((and (listp form)
                  (let ((fn (car form)))
-                   (and (symbolp fn) (sb-xc:macro-function fn env))))
+                   (and (symbolp fn) (macro-function fn env))))
             (perform-expansion it))
            (t
             (values form nil)))))
@@ -117,7 +117,7 @@
    environment."
   (labels ((frob (form expanded)
              (multiple-value-bind (new-form newly-expanded-p)
-                 (sb-xc:macroexpand-1 form env)
+                 (macroexpand-1 form env)
                (if newly-expanded-p
                    (frob new-form t)
                    (values new-form expanded)))))
@@ -127,8 +127,8 @@
 (defun %macroexpand-1 (form &optional env)
   (if (or (atom form)
           (let ((op (car form)))
-            (not (and (symbolp op) (sb-xc:special-operator-p op)))))
-      (sb-xc:macroexpand-1 form env)
+            (not (and (symbolp op) (special-operator-p op)))))
+      (macroexpand-1 form env)
       (values form nil)))
 
 ;;; Like MACROEXPAND, but takes care not to expand special forms.

@@ -1126,7 +1126,7 @@ NOTE: This interface is experimental and subject to change."
     ((or symbol cons)
      (%check-deprecated-type type-specifier))
     (class
-     (let ((name (class-name type-specifier)))
+     (let ((name (cl:class-name type-specifier)))
        (when (and name (symbolp name)
                   (eq type-specifier (find-class name nil)))
          (%check-deprecated-type name))))))

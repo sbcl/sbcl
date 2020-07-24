@@ -85,7 +85,7 @@ EXPERIMENTAL: Interface subject to change."
   ;;    to use %MACROEXPAND[-1] so as not to lose the "truly-the"-ness
   ;; 2. if both a CAS expander and a macro exist, the CAS expander
   ;;    should be preferred before macroexpanding (just like SETF does)
-    (let ((expanded (sb-xc:macroexpand place environment)))
+    (let ((expanded (macroexpand place environment)))
       (flet ((invalid-place ()
            (error "Invalid place to CAS: ~S -> ~S" place expanded)))
       (unless (consp expanded)
@@ -114,7 +114,7 @@ EXPERIMENTAL: Interface subject to change."
                      (vals nil)
                      (args nil))
                  (dolist (x (reverse (cdr expanded)))
-                   (cond ((sb-xc:constantp x environment)
+                   (cond ((constantp x environment)
                           (push x args))
                          (t
                           (let ((tmp (gensymify x)))
@@ -232,7 +232,7 @@ been defined. (See SB-EXT:CAS for more information.)
 
 (define-cas-expander symbol-value (name &environment env)
   (multiple-value-bind (tmp val cname)
-      (if (sb-xc:constantp name env)
+      (if (constantp name env)
           (values nil nil (constant-form-value name env))
           (values (gensymify name) name nil))
     (let ((symbol (or tmp `',cname)))
@@ -265,7 +265,7 @@ been defined. (See SB-EXT:CAS for more information.)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun expand-atomic-frob
     (name specified-place diff env
-          &aux (place (sb-xc:macroexpand specified-place env)))
+          &aux (place (macroexpand specified-place env)))
        (declare (type (member atomic-incf atomic-decf) name))
   (flet ((invalid-place ()
            (error "Invalid first argument to ~S: ~S" name specified-place))

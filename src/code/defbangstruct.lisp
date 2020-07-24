@@ -53,7 +53,7 @@
     `(progn
        (sb-xc:defstruct ,@args)
        ,@(when supertype
-           `((aver (subtypep ',supertype 'structure!object))))
+           `((aver (cl:subtypep ',supertype 'structure!object))))
        (defstruct (,name
                    ,@(unless supertype '((:include structure!object)))
                    ,@(remove :pure options :key #'car))
@@ -69,7 +69,7 @@
 (defmacro sb-xc:defstruct (&rest args)
   `(push (make-delayed-defstruct ',args) *delayed-defstructs*))
 ;;; But instead it's this. No eval-when needed, since we LOAD this file.
-(setf (macro-function 'sb-xc:defstruct)
+(setf (cl:macro-function 'sb-xc:defstruct)
       (lambda (form environment)
         (declare (ignore environment))
         `(push (make-delayed-defstruct ',(cdr form)) *delayed-defstructs*)))

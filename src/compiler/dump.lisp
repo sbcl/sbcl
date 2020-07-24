@@ -272,8 +272,8 @@
                     compiled from ~S~%  ~
                     using ~A version ~A~%"
                    where
-                   (sb-xc:lisp-implementation-type)
-                   (sb-xc:lisp-implementation-version))))
+                   (lisp-implementation-type)
+                   (lisp-implementation-version))))
        stream)
       (dump-byte +fasl-header-string-stop-char-code+ res)
       ;; Finish the header by outputting fasl file implementation,
@@ -729,9 +729,9 @@
 ;;; tables.
 (defun dump-vector (x file)
   (let ((simple-version (if (array-header-p x)
-                            (sb-xc:coerce x `(simple-array
-                                              ,(array-element-type x)
-                                              (*)))
+                            (coerce x `(simple-array
+                                        ,(array-element-type x)
+                                        (*)))
                             x)))
     (typecase simple-version
       ;; On the host, take all strings to be simple-base-string.

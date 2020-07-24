@@ -586,10 +586,10 @@
        (if (coercion-loses-precision-p (car val) type)
            xbound
            (list xbound))))
-    ((sb-xc:subtypep type 'double-float)
+    ((subtypep type 'double-float)
      (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
          (coerce val type)))
-    ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
+    ((or (subtypep type 'single-float) (subtypep type 'float))
      ;; coerce to float returns a single-float
      (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
          (coerce val type)))
@@ -603,12 +603,12 @@
               xbound
               (list xbound)))
         (cond
-          ((sb-xc:subtypep type 'double-float)
+          ((subtypep type 'double-float)
            (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
                (coerce val type)
                (if (sb-xc:< val most-negative-double-float)
                    most-negative-double-float most-positive-double-float)))
-          ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
+          ((or (subtypep type 'single-float) (subtypep type 'float))
            ;; coerce to float returns a single-float
            (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
                (coerce val type)

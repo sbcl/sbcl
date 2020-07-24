@@ -304,7 +304,7 @@
          (fun (collect ((default-bindings)
                         (default-vals))
                 (dolist (default defaults)
-                  (if (sb-xc:constantp default)
+                  (if (constantp default)
                       (default-vals default)
                       (let ((var (sb-xc:gensym)))
                         (default-bindings `(,var ,default))
@@ -358,7 +358,7 @@
          (default (arg-info-default info))
          (supplied-p (arg-info-supplied-p info))
          (force (or force
-                    (not (sb-xc:constantp (arg-info-default info)))))
+                    (not (constantp (arg-info-default info)))))
          (ep (if supplied-p
                  (ir1-convert-hairy-args
                   res
@@ -636,7 +636,7 @@
     (dolist (key keys)
       (let* ((info (lambda-var-arg-info key))
              (default (arg-info-default info))
-             (hairy-default (not (sb-xc:constantp default)))
+             (hairy-default (not (constantp default)))
              (supplied-p (arg-info-supplied-p info))
              ;; was: (format nil "~A-DEFAULTING-TEMP" (leaf-source-name key))
              (n-val (make-symbol ".DEFAULTING-TEMP."))

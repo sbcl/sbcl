@@ -407,12 +407,12 @@
       (if (zerop length)
           #()
           (logically-readonlyize
-           (sb-xc:coerce seq
-                         `(simple-array
-                            ,(smallest-element-type (max max-positive
-                                                         (1- max-negative))
-                                                    (plusp max-negative))
-                            1)))))))
+           (coerce seq
+                   `(simple-array
+                     ,(smallest-element-type (max max-positive
+                                                  (1- max-negative))
+                                             (plusp max-negative))
+                     1)))))))
 
 (defun compact-vector (sequence)
   (cond ((and (= (length sequence) 1)

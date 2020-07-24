@@ -607,7 +607,7 @@
           :num-results ,num-results
           :ref-ordering ,ordering
           ,@(when (targets)
-              `(:targets ,(sb-xc:coerce (targets) `(vector ,te-type)))))))))
+              `(:targets ,(coerce (targets) `(vector ,te-type)))))))))
 
 (defun make-emit-function-and-friends (parse)
   `(:temps ,(compute-temporaries-description parse)

@@ -299,7 +299,7 @@
                 do (dolist (number numbers)
                      (write-var-integer (funcall encoder index number) vector))))
         (setf (aref result 0)
-              (sb-xc:coerce vector '(simple-array (unsigned-byte 8) 1))))
+              (coerce vector '(simple-array (unsigned-byte 8) 1))))
       ;; RESULT is adjustable. Make it simple.
       (coerce result 'simple-vector)))
 

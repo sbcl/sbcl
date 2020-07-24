@@ -336,7 +336,7 @@
             (destructuring-bind (symbol value) (matchp '((quote ?) ? . :ignore) (cdr form))
               `(progn (defconstant ,symbol ,value)
                       (sb-c::%defconstant ',symbol ,symbol nil))))
-           (sb-xc:defconstant ; we see this maro as well. The host expansion will not do,
+           (defconstant ; we see this macro as well. The host expansion will not do,
             ;; because it calls our %defconstant which does not assign the symbol a value.
             ;; It might be possible to change that now that we don't use CL: symbols.
             (destructuring-bind (symbol value) (cdr form)

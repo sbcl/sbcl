@@ -269,6 +269,27 @@
     "SHORT-FLOAT-NEGATIVE-EPSILON"
     "SINGLE-FLOAT-EPSILON"
     "SINGLE-FLOAT-NEGATIVE-EPSILON"
+
+    ;; The cross-compiler itself shouldn't really need to use the host
+    ;; versions of these in target code except in exceptional cases.
+    "COMPILE-FILE"
+    "COMPILE-FILE-PATHNAME"
+    "*COMPILE-FILE-PATHNAME*"
+    "*COMPILE-FILE-TRUENAME*"
+    "*COMPILE-PRINT*"
+    "*COMPILE-VERBOSE*"
+    "COMPILER-MACRO-FUNCTION"
+    "CONSTANTP"
+    "GET-SETF-EXPANSION"
+    "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
+    "MACRO-FUNCTION"
+    "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
+    "MAKE-LOAD-FORM-SAVING-SLOTS"
+    "SPECIAL-OPERATOR-P"
+    "SUBTYPEP"
+    "UPGRADED-ARRAY-ELEMENT-TYPE"
+    "UPGRADED-COMPLEX-PART-TYPE"
+    "WITH-COMPILATION-UNIT"
     ))
 
 ;;; A symbol in the "dual personality" list refers to the symbol in CL unless
@@ -322,38 +343,17 @@
   (dolist (name (append (append *undefineds* *dual-personality-math-symbols*)))
     (export (intern name package-name) package-name))
   (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
-
                   "ARRAY-ELEMENT-TYPE"
                   "CHAR-CODE"
                   "CODE-CHAR"
-                  "COMPILE-FILE"
-                  "COMPILE-FILE-PATHNAME"
-                  "*COMPILE-FILE-PATHNAME*"
-                  "*COMPILE-FILE-TRUENAME*"
-                  "*COMPILE-PRINT*"
-                  "*COMPILE-VERBOSE*"
-                  "COMPILER-MACRO-FUNCTION"
-                  "CONSTANTP"
-                  "DEFCONSTANT"
-                  "DEFINE-MODIFY-MACRO"
-                  "DEFINE-SETF-EXPANDER"
-                  "DEFMACRO" "DEFSETF" "DEFSTRUCT" "DEFTYPE"
+                  "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
                   "GENSYM" "*GENSYM-COUNTER*"
-                  "GET-SETF-EXPANSION"
-                  "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
-                  "MACRO-FUNCTION"
-                  "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
                   "MAKE-ARRAY"
                   "MAKE-LOAD-FORM"
-                  "MAKE-LOAD-FORM-SAVING-SLOTS"
                   "PROCLAIM"
                   "SIMPLE-VECTOR"
-                  "SPECIAL-OPERATOR-P"
-                  "SUBTYPEP"
                   "TYPE-OF" "TYPEP"
-                  "UPGRADED-ARRAY-ELEMENT-TYPE"
-                  "UPGRADED-COMPLEX-PART-TYPE"
-                  "WITH-COMPILATION-UNIT"))
+                  ))
       (export (intern name package-name) package-name)))
 
 (defun count-symbols (pkg)

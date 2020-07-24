@@ -783,7 +783,7 @@
 
 (defmacro deletef-in (next place item &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#-sb-xc-host get-setf-expansion #+sb-xc-host cl:get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
@@ -809,7 +809,7 @@
 ;;;
 (defmacro push-in (next item place &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#-sb-xc-host get-setf-expansion #+sb-xc-host cl:get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)

@@ -329,10 +329,10 @@
 #-sb-xc-host
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
-    (let ((constp (sb-xc:constantp expr)))
+    (let ((constp (constantp expr)))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb-xc:defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
+           (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
            ,@(unless constp
                `((push ',symbol sb-c::*!const-value-deferred*))))
          (eval-when (:load-toplevel)

@@ -43,11 +43,11 @@ tree structure resulting from the evaluation of EXPRESSION."
   ;; So install our expander even if it produces suboptimal code for the host.
   (defmacro named-ds-bind (&whole form &rest args)
     (declare (ignore args))
-    (funcall (sb-xc:macro-function 'named-ds-bind) form nil))
+    (funcall (macro-function 'named-ds-bind) form nil))
 
   ;; A similar problem in reverse: SB-XC:DEFMACRO's expansion uses NAMED-DS-BIND
   ;; which expands to BINDING* (from "early-extensions") that hand-written code
   ;; also wants to use. So expand it in the target by using the host's expander
   ;; until it gets seen again during make-host-2.
-  (setf (sb-xc:macro-function 'binding*)
+  (setf (macro-function 'binding*)
         (lambda (form env) (declare (ignore env)) (cl:macroexpand-1 form nil))))

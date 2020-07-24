@@ -343,7 +343,7 @@
           (lastn-macro unsigned-byte)))))))
 
 (define-compiler-macro last (&whole form list &optional (n 1) &environment env)
-  (if (sb-xc:constantp n env)
+  (if (constantp n env)
       (case (constant-form-value n env)
         (0 `(%last0 ,list))
         (1 `(%last1 ,list))

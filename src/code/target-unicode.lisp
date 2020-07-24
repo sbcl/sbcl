@@ -214,7 +214,7 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
          (block-index (ordered-ranges-position
                        code
-                       #.(sb-xc:coerce (sb-cold:read-from-file "output/block-ranges.lisp-expr")
+                       #.(coerce (sb-cold:read-from-file "output/block-ranges.lisp-expr")
                                        '(vector (unsigned-byte 32))))))
     (if block-index
         (aref #.(sb-cold:read-from-file "output/block-names.lisp-expr") block-index)
@@ -347,7 +347,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro coerce-to-ordered-ranges (array)
-    (sb-xc:coerce array '(vector (unsigned-byte 32)))))
+    (coerce array '(vector (unsigned-byte 32)))))
 
 (defun default-ignorable-p (character)
   "Returns T if CHARACTER is a Default_Ignorable_Code_Point"

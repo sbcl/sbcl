@@ -29,25 +29,25 @@
 ;;; FIXME: should probably have no value outside the compiler.
 (defvar *top-level-form-noted* nil)
 
-(defvar sb-xc:*compile-verbose* t
+(defvar *compile-verbose* t
   "The default for the :VERBOSE argument to COMPILE-FILE.")
-(defvar sb-xc:*compile-print* t
+(defvar *compile-print* t
   "The default for the :PRINT argument to COMPILE-FILE.")
 (defvar *compile-progress* nil
   "When this is true, the compiler prints to *STANDARD-OUTPUT* progress
   information about the phases of compilation of each function. (This
   is useful mainly in large block compilations.)")
 
-(defvar sb-xc:*compile-file-pathname* nil
+(defvar *compile-file-pathname* nil
   "The defaulted pathname of the file currently being compiled, or NIL if not
   compiling.")
-(defvar sb-xc:*compile-file-truename* nil
+(defvar *compile-file-truename* nil
   "The TRUENAME of the file currently being compiled, or NIL if not
   compiling.")
 
 (declaim (type (or pathname null)
-               sb-xc:*compile-file-pathname*
-               sb-xc:*compile-file-truename*))
+               *compile-file-pathname*
+               *compile-file-truename*))
 
 ;;; the SOURCE-INFO structure for the current compilation. This is
 ;;; null globally to indicate that we aren't currently in any
@@ -87,7 +87,7 @@
 
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
-(defmacro sb-xc:with-compilation-unit (options &body body)
+(defmacro with-compilation-unit (options &body body)
   "Affects compilations that take place within its dynamic extent. It is
 intended to be eg. wrapped around the compilation of all files in the same system.
 
@@ -701,7 +701,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (aver (eql (node-component (lambda-bind lambda)) component)))
 
   (let* ((*component-being-compiled* component))
-    (when (and sb-xc:*compile-print* (block-compile *compilation*))
+    (when (and *compile-print* (block-compile *compilation*))
       (with-compiler-io-syntax
         (compiler-mumble "~&; compiling ~A" (component-name component))))
 
@@ -869,8 +869,8 @@ necessary, since type inference may take arbitrarily long to converge.")
       (let* ((file-info (source-info-file-info info))
              (name (file-info-name file-info))
              (external-format (file-info-external-format file-info)))
-        (setf sb-xc:*compile-file-truename* name
-              sb-xc:*compile-file-pathname* (file-info-untruename file-info)
+        (setf *compile-file-truename* name
+              *compile-file-pathname* (file-info-untruename file-info)
               (source-info-stream info)
               (let ((stream
                      (open name
@@ -1232,7 +1232,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             result))))))
 
 (defun note-top-level-form (form &optional finalp)
-  (when sb-xc:*compile-print*
+  (when *compile-print*
     (cond ((not *top-level-form-noted*)
            (let ((*print-length* 2)
                  (*print-level* 2)
@@ -1241,7 +1241,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                (compiler-mumble "~&; processing ~S" form)))
            form)
           ((and finalp
-                (eq :top-level-forms sb-xc:*compile-print*)
+                (eq :top-level-forms *compile-print*)
                 (neq form *top-level-form-noted*))
            (let ((*print-length* 1)
                  (*print-level* 1)
@@ -1401,7 +1401,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                               ;; +SLOT-UNBOUND+ is not a constant,
                               ;; but is trivially dumpable.
                               (or (eql x 'sb-pcl:+slot-unbound+)
-                                  (sb-xc:constantp x)))
+                                  (constantp x)))
                             value-forms))
             (dolist (form value-forms)
               (unless (eq form 'sb-pcl:+slot-unbound+)
@@ -1595,8 +1595,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (let ((*package* (sane-package))
         (*readtable* *readtable*)
-        (sb-xc:*compile-file-pathname* nil) ; set by GET-SOURCE-STREAM
-        (sb-xc:*compile-file-truename* nil) ; "
+        (*compile-file-pathname* nil) ; set by GET-SOURCE-STREAM
+        (*compile-file-truename* nil) ; "
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
 
@@ -1630,7 +1630,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
-            (sb-xc:with-compilation-unit ()
+            (with-compilation-unit ()
               (with-world-lock ()
                 (setf (sb-fasl::fasl-output-source-info *compile-object*)
                       (debug-source-for-info info))
@@ -1650,7 +1650,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   ;; Dump the code coverage records into the fasl.
                    (with-source-paths
                     (fopcompile `(record-code-coverage
-                                  ',(namestring sb-xc:*compile-file-pathname*)
+                                  ',(namestring *compile-file-pathname*)
                                   ',(let (list)
                                       (maphash (lambda (k v)
                                                  (declare (ignore k))
@@ -1728,7 +1728,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
 ;;; that we don't overwrite it with known garbage.
-(defun sb-xc:compile-file
+(defun compile-file
     (input-file
      &key
 
@@ -1737,8 +1737,8 @@ necessary, since type inference may take arbitrarily long to converge.")
      ;; FIXME: ANSI doesn't seem to say anything about
      ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
      ;; function..
-     ((:verbose sb-xc:*compile-verbose*) sb-xc:*compile-verbose*)
-     ((:print sb-xc:*compile-print*) sb-xc:*compile-print*)
+     ((:verbose *compile-verbose*) *compile-verbose*)
+     ((:print *compile-print*) *compile-print*)
      ((:progress *compile-progress*) *compile-progress*)
      (external-format :default)
 
@@ -1810,7 +1810,7 @@ returning its filename.
         (progn
           (when output-file
             (setq output-file-name
-                  (sb-xc:compile-file-pathname input-file
+                  (compile-file-pathname input-file
                                                :output-file output-file))
             (setq fasl-output
                   (open-fasl-output output-file-name
@@ -1832,7 +1832,7 @@ returning its filename.
                                             (fasl-output-stream fasl-output)))
                             :if-exists :supersede :direction :output))))
 
-          (when sb-xc:*compile-verbose*
+          (when *compile-verbose*
             (print-compile-start-note source-info))
 
           (let ((*compile-object* fasl-output))
@@ -1845,15 +1845,15 @@ returning its filename.
         (close-fasl-output fasl-output abort-p)
         (setq output-file-name
               (pathname (fasl-output-stream fasl-output)))
-        (when (and (not abort-p) sb-xc:*compile-verbose*)
+        (when (and (not abort-p) *compile-verbose*)
           (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-name))))
 
       (when cfasl-output
         (close-fasl-output cfasl-output abort-p)
-        (when (and (not abort-p) sb-xc:*compile-verbose*)
+        (when (and (not abort-p) *compile-verbose*)
           (compiler-mumble "; wrote ~A~%" (namestring coutput-file-name))))
 
-      (when sb-xc:*compile-verbose*
+      (when *compile-verbose*
         (print-compile-end-note source-info (not abort-p)))
 
       ;; Don't nuke stdout if you use :trace-file *standard-output*
@@ -1893,10 +1893,10 @@ returning its filename.
 ;;; at the level of e.g. whether it returns logical pathname or a
 ;;; physical pathname. Patches to make it more correct are welcome.
 ;;; -- WHN 2000-12-09
-(defun sb-xc:compile-file-pathname (input-file
-                                    &key
-                                    (output-file nil output-file-p)
-                                    &allow-other-keys)
+(defun compile-file-pathname (input-file
+                              &key
+                                (output-file nil output-file-p)
+                              &allow-other-keys)
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
   (if output-file-p

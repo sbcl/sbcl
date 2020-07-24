@@ -640,7 +640,7 @@ has written, having proved that it is unreachable."))
 ;; The current approach is reliable, at a cost of ~3 words per function.
 ;;
 (defun warn-if-compiler-macro-dependency-problem (name)
-  (unless (sb-xc:compiler-macro-function name)
+  (unless (compiler-macro-function name)
     (let ((status (car (info :function :emitted-full-calls name)))) ; TODO use emitted-full-call-count?
       (when (and (integerp status) (oddp status))
         ;; Show the total number of calls, because otherwise the warning

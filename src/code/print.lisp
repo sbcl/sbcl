@@ -218,7 +218,7 @@ variable: an unreadable object representing the error is printed instead.")
   ;; This is exact for bases which are exactly a power-of-2, or an overestimate
   ;; otherwise, as mandated by the finite output stream.
   (let ((bits-per-char
-         (aref #.(sb-xc:coerce
+         (aref #.(coerce
                   ;; base 2 or base 3  = 1 bit per character
                   ;; base 4 .. base 7  = 2 bits per character
                   ;; base 8 .. base 15 = 3 bits per character, etc

@@ -42,7 +42,7 @@
 
 (macrolet ((frob ()
              (flet ((coerce-it (array)
-                      (sb-xc:coerce array '(simple-array (unsigned-byte 8) 1)))
+                      (coerce array '(simple-array (unsigned-byte 8) 1)))
                     (file (name type)
                       (let ((dir (sb-cold:prepend-genfile-path "output/")))
                         (make-pathname :directory (pathname-directory (merge-pathnames dir))

@@ -62,13 +62,13 @@
                   ;; and comparing it with the new one.
         (warn 'redefinition-with-defmacro :name name
               :new-function definition :new-location source-location))
-      (setf (sb-xc:macro-function name) definition)))
+      (setf (macro-function name) definition)))
   name)
 
 #+sb-xc-host
-(let ((real-expander (macro-function 'sb-xc:defmacro)))
+(let ((real-expander (cl:macro-function 'sb-xc:defmacro)))
   ;; Inform the cross-compiler how to expand SB-XC:DEFMACRO (= DEFMACRO).
-  (setf (sb-xc:macro-function 'sb-xc:defmacro)
+  (setf (macro-function 'sb-xc:defmacro)
         (lambda (form env)
           (declare (ignore env))
           ;; Since SB-KERNEL:LEXENV isn't compatible with the host,
@@ -77,5 +77,5 @@
           (funcall real-expander form nil)))
   ;; Building the cross-compiler should skip the compile-time-too
   ;; processing SB-XC:DEFMACRO.
-  (setf (macro-function 'sb-xc:defmacro)
+  (setf (cl:macro-function 'sb-xc:defmacro)
         (lambda (form env) `(let () ,(funcall real-expander form env)))))

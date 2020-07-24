@@ -440,7 +440,7 @@ evaluated as a PROGN."
   ;; form will take longer than can be described as adequate, as the
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
-  (let ((val (and (sb-xc:constantp n env) (constant-form-value n env))))
+  (let ((val (and (constantp n env) (constant-form-value n env))))
     (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64 riscv) ;; better DEFAULT-UNKNOWN-VALUES
                                           1000
                                           10))) ; Arbitrary limit.
@@ -491,13 +491,13 @@ evaluated as a PROGN."
     (let* ((func (if (listp test-form) (car test-form)))
            (new-test
             (if (and (typep func '(and symbol (not null)))
-                     (not (sb-xc:macro-function func env))
-                     (not (sb-xc:special-operator-p func))
+                     (not (macro-function func env))
+                     (not (special-operator-p func))
                      (proper-list-p (cdr test-form)))
                 ;; TEST-FORM is a function call. We do not attempt this
                 ;; if TEST-FORM is a macro invocation or special form.
                 `(,func ,@(mapcar (lambda (place)
-                                    (if (sb-xc:constantp place env)
+                                    (if (constantp place env)
                                         place
                                         (with-unique-names (temp)
                                           (bindings `(,temp ,place))
@@ -636,7 +636,7 @@ invoked. In that case it will store into PLACE and start over."
     (sb-c::warn-if-compiler-macro-dependency-problem name)
     ;; FIXME: warn about incompatible lambda list with
     ;; respect to parent function?
-    (setf (sb-xc:compiler-macro-function name) definition)
+    (setf (compiler-macro-function name) definition)
     name))
 
 ;;;; CASE, TYPECASE, and friends
@@ -1663,7 +1663,7 @@ symbol-case giving up: case=((V U) (F))
              ((clist members clist-ok)
               (with-current-source-form (list)
                 (cond
-                  ((sb-xc:constantp list env)
+                  ((constantp list env)
                    (binding* ((value (constant-form-value list env))
                               ((all dot) (list-members value :max-length 20)))
                      (when (eql dot t)
@@ -1674,7 +1674,7 @@ symbol-case giving up: case=((V U) (F))
                          (values value nil nil)
                          (values value all t))))
                   ((and (consp list) (eq 'list (car list))
-                        (every (lambda (arg) (sb-xc:constantp arg env)) (cdr list)))
+                        (every (lambda (arg) (constantp arg env)) (cdr list)))
                    (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
                      (values values values t)))
                   (t

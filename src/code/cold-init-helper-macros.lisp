@@ -75,7 +75,7 @@
       (case method
         ((nil) ; default
          (values '(cl:make-load-form-saving-slots obj :environment env)
-                 '(sb-xc:make-load-form-saving-slots obj :environment env)))
+                 '(make-load-form-saving-slots obj :environment env)))
         (t
          (assert (not (member :host usable-by)))
          (values nil `(funcall ,method obj env))))

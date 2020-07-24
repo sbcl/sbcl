@@ -191,7 +191,7 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-  (let ((*compile-print* nil))
+  (let ((cl:*compile-print* nil))
     (dolist (group sources)
       (handler-bind ((#+x86-64 warning #-x86-64 simple-warning
                       (lambda (c)

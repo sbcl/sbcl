@@ -46,8 +46,8 @@
 ;;; of value forms, a list of the single store-value form, a storing function,
 ;;; and an accessing function.
 (declaim (ftype (function (t &optional lexenv-designator))
-                sb-xc:get-setf-expansion))
-(defun sb-xc:get-setf-expansion (form &optional environment)
+                get-setf-expansion))
+(defun get-setf-expansion (form &optional environment)
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
@@ -68,7 +68,7 @@
           (multiple-value-bind (expansion expanded)
               ;; Previously this called %MACROEXPAND, but the two operations
               ;; are equivalent on atoms, so do the one that is "less".
-              (sb-xc:macroexpand-1 form environment)
+              (macroexpand-1 form environment)
             (if expanded
                 (retry expansion)
                 (let ((vals (newvals 1)))
@@ -186,7 +186,7 @@
                :setf (list (cadr place) value-form) it)))))
 
       (multiple-value-bind (temps vals newval setter)
-          (sb-xc:get-setf-expansion place env)
+          (get-setf-expansion place env)
         (car (gen-let* (mapcar #'list temps vals)
                        (gen-mv-bind newval value-form (forms-list setter)))))))
 
@@ -202,7 +202,7 @@
   (collect ((let*-bindings) (mv-bindings) (setters) (getters))
     (dolist (arg (butlast args))
       (multiple-value-bind (temps subforms store-vars setter getter)
-          (sb-xc:get-setf-expansion arg env)
+          (get-setf-expansion arg env)
         (let*-bindings (mapcar #'list  temps subforms))
         (mv-bindings store-vars)
         (setters setter)
@@ -239,7 +239,7 @@
                (when (and (not (symbolp place)) (eq operator 'psetq))
                  (%program-error "Place ~S in PSETQ is not a SYMBOL" place))
                (multiple-value-bind (temps vals stores setter)
-                   (sb-xc:get-setf-expansion place env)
+                   (get-setf-expansion place env)
                  (let*-bindings (mapcar #'list temps vals))
                  (mv-bindings (cons stores value-form))
                  (setters setter))))
@@ -276,7 +276,7 @@
     (collect ((let*-bindings) (mv-bindings) (setters) (getters))
       (dolist (arg args)
         (multiple-value-bind (temps subforms store-vars setter getter)
-            (sb-xc:get-setf-expansion arg env)
+            (get-setf-expansion arg env)
           (let*-bindings (mapcar #'list temps subforms))
           (mv-bindings store-vars)
           (setters setter)
@@ -321,7 +321,7 @@
   (if (symbolp (setq place (macroexpand-for-setf place env)))
       `(prog1 (car ,place) (setq ,place (cdr ,place)))
       (multiple-value-bind (temps vals stores setter getter)
-          (sb-xc:get-setf-expansion place env)
+          (get-setf-expansion place env)
         (let ((list (copy-symbol 'list))
               (ret (copy-symbol 'car)))
           `(let* (,@(mapcar #'list temps vals)
@@ -338,7 +338,7 @@
   remove the property specified by the indicator. Returns T if such a
   property was present, NIL if not."
   (multiple-value-bind (temps vals newval setter getter)
-      (sb-xc:get-setf-expansion place env)
+      (get-setf-expansion place env)
     (let* ((flag (make-symbol "FLAG"))
            (body `(multiple-value-bind (,(car newval) ,flag)
               ;; See ANSI 5.1.3 for why we do out-of-order evaluation
@@ -380,7 +380,7 @@
          (if (symbolp (setq place (macroexpand-for-setf place env)))
              `(setq ,place (,operator ,delta ,place))
              (multiple-value-bind (dummies vals newval setter getter)
-                 (sb-xc:get-setf-expansion place env)
+                 (get-setf-expansion place env)
                `(let* (,@(mapcar #'list dummies vals)
                        (,(car newval) (,operator ,delta ,getter))
                        ,@(cdr newval))
@@ -519,7 +519,7 @@
       (let ((mask 0) (bit 1))
         (dolist (form sexprs (values (temp-vars) (temp-vals) (call-arguments)
                                      mask))
-          (call-arguments (if (sb-xc:constantp form environment)
+          (call-arguments (if (constantp form environment)
                               (progn (next-name-hint) form) ; Skip one hint.
                               (let ((temp (nice-tempname form)))
                                 (setq mask (logior mask bit))
@@ -541,7 +541,7 @@
      (binding* (((before-temps before-vals before-args)
                  (collect-setf-temps before-arg-forms environment name-hints))
                 ((place-temps place-subforms stores setter getter)
-                 (sb-xc:get-setf-expansion place environment))
+                 (get-setf-expansion place environment))
                 ((after-temps after-vals after-args)
                  (if after-args-bindp
                      (collect-setf-temps after-arg-forms environment name-hints)
@@ -558,7 +558,7 @@
                            (every (lambda (x)
                                     (or (member x place-temps)
                                         (eq x newval-temp)
-                                        (sb-xc:constantp x environment)))
+                                        (constantp x environment)))
                                   (cdr setter)))))
          (setq newval-binding nil
                setter (substitute compute newval-temp setter)))
@@ -582,7 +582,7 @@
       ;; Perhaps it would be more elegant to keep the docstring attached
       ;; to the expander function, as for CAS?
       (make-macro-lambda `(setf-expander ,access-fn) lambda-list body
-                         'sb-xc:define-setf-expander access-fn
+                         'define-setf-expander access-fn
                          :doc-string-allowed :external)
     ;; Maybe kill docstring, but only under the cross-compiler.
     #+(and (not sb-doc) sb-xc-host) (setq doc nil)

@@ -1683,8 +1683,8 @@ extended <package-name>::<form-in-package> syntax."
            (inline token-buf-getchar)) ; makes for smaller code
   (let* ((fixnum-max-digits
           (macrolet ((maxdigits ()
-                       (sb-xc:coerce (integer-reader-safe-digits)
-                                     '(vector (unsigned-byte 8)))))
+                       (coerce (integer-reader-safe-digits)
+                               '(vector (unsigned-byte 8)))))
             (aref (maxdigits) (- base 2))))
          (base-power
           (macrolet ((base-powers ()

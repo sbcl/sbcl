@@ -928,7 +928,7 @@
                   (with-system-mutex ((hash-table-lock table))
                     (or (gethash spec table)
                         (progn #+sb-xc-host
-                               (when *compile-print*
+                               (when cl:*compile-print*
                                  (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec))
                                (setf (gethash spec table)
                                      (make-unknown-type :specifier spec))))))
@@ -1130,7 +1130,7 @@ expansion happened."
 ;;;
 #+sb-xc-host
 (labels ((xform (type-spec env parser)
-           (if (not (sb-xc:constantp type-spec env))
+           (if (not (constantp type-spec env))
                (values nil t)
                (let* ((expr (constant-form-value type-spec env))
                       (parse (funcall parser expr)))

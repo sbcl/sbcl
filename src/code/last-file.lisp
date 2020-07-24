@@ -29,7 +29,7 @@
 (defun check-compile-time-sxhashes ()
   (loop for (object . hash) across sb-c::*sxhash-crosscheck*
         unless (= (sxhash object) hash)
-        do (error "SB-XC:SXHASH computed wrong answer for ~S. Got ~x should be ~x"
+        do (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
                   object hash (sxhash object))))
 (check-compile-time-sxhashes)
 

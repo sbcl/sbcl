@@ -207,7 +207,7 @@
                                   (dsd-default slot))))
                 ;; Return T if value-form definitely does not satisfy
                 ;; the type-check for DSD. Return NIL if we can't decide.
-                (when (if (sb-xc:constantp initform)
+                (when (if (constantp initform)
                           (not (sb-xc:typep (constant-form-value initform)
                                             (dsd-type slot)))
                           ;; Find uses of nil-returning functions as defaults,
@@ -714,7 +714,7 @@ and no value was provided for it." name))))))))))
            ((lambda-var-arg-info arg)
             (let* ((info (lambda-var-arg-info arg))
                    (default (arg-info-default info))
-                   (def-type (when (sb-xc:constantp default)
+                   (def-type (when (constantp default)
                                (ctype-of (constant-form-value default)))))
               (ecase (arg-info-kind info)
                 (:keyword

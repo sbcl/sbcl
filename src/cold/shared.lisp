@@ -197,10 +197,10 @@
            (unuse-package ext "CL-USER")))
 
 #+cmu
-(setq *compile-print* nil) ; too much noise, can't see the actual warnings
+(setq cl:*compile-print* nil) ; too much noise, can't see the actual warnings
 #+sbcl
 (progn
-  (setq *compile-print* nil)
+  (setq cl:*compile-print* nil)
   (load "src/cold/muffler.lisp")
   ;; Let's just say we never care to see these.
   (declaim (sb-ext:muffle-conditions
@@ -546,7 +546,7 @@
          (ignore-failure-p (find :ignore-failure-p flags)))
     (declare (type function compile-file))
 
-    (ensure-directories-exist obj :verbose *compile-print*) ; host's value
+    (ensure-directories-exist obj :verbose cl:*compile-print*) ; host's value
 
     ;; We're about to set about building a new object file. First, we
     ;; delete any preexisting object file in order to avoid confusing

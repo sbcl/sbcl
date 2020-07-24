@@ -17,7 +17,7 @@
 
 ;; Return a bitmask representing the LIST of lambda list keywords.
 (defmacro lambda-list-keyword-mask (list)
-  (if (constantp list)
+  (if (cl:constantp list)
       ;; When invoked with a quoted constant, some flexibility
       ;; is allowed, in that the input may be a single symbol.
       (let ((val (#+sb-xc constant-form-value #-sb-xc eval list)))
@@ -413,7 +413,7 @@
                 (when (and (not silent) (vectorp parse)) ; is destructuring
                   (let ((default (and (cdr arg-specifier) ; have an explicit default
                                       (cadr arg-specifier))))
-                    (when (and (constantp default)
+                    (when (and (cl:constantp default)
                                (not (ds-lambda-list-match-p
                                      (#+sb-xc constant-form-value #-sb-xc eval
                                       default)
@@ -1056,7 +1056,7 @@
                             (pop plist)
                             (unless (or (keywordp key)
                                         (and (symbolp key)
-                                             (constantp key)
+                                             (cl:constantp key)
                                              (eq key (symbol-value key))))
                               (signal 'compiler-macro-keyword-problem
                                       :argument key))))

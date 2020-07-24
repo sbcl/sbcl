@@ -210,7 +210,7 @@
                 lz-compress))
 (defun lz-compress (input)
   (if (> (length input) +max-lz-size+)
-      (sb-xc:coerce input '(simple-array (unsigned-byte 8) (*)))
+      (coerce input '(simple-array (unsigned-byte 8) (*)))
       (let* ((length (length input))
              (output (make-array length
                                  :element-type '(unsigned-byte 8)
@@ -270,7 +270,7 @@
                                 (mask-signed-field 8 (the (unsigned-byte 8) x)))
                               input)
                     #+sb-xc-host
-                    (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
+                    (coerce output '(simple-array (unsigned-byte 8) (*)))
                     #-sb-xc-host
                     (%shrink-vector (%array-data output) (fill-pointer output)))))
           #+(or)

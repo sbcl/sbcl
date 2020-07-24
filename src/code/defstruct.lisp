@@ -926,7 +926,7 @@ unless :NAMED is also specified.")))
                  index (dsd-index included-slot))
            (when (and safe-p
                       (not (equal type (dsd-type included-slot)))
-                      (not (sb-xc:subtypep (dsd-type included-slot) type)))
+                      (not (subtypep (dsd-type included-slot) type)))
              (setf safe-p nil)))
           (t
            ;; Compute the index of this DSD. First decide whether the slot is raw.
@@ -1414,7 +1414,7 @@ or they must be declared locally notinline at each call site.~@:>"
       (dolist (name (intersection onames nnames))
         (let ((os (find name oslots :key #'dsd-name :test #'string=))
               (ns (find name nslots :key #'dsd-name :test #'string=)))
-          (unless (sb-xc:subtypep (dsd-type ns) (dsd-type os))
+          (unless (subtypep (dsd-type ns) (dsd-type os))
             (retyped name))
           (unless (and (= (dsd-index os) (dsd-index ns))
                        (eq (dsd-raw-type os) (dsd-raw-type ns)))
@@ -2194,8 +2194,8 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;  * (defmethod make-load-form ((x S) &optional e) (m-l-f-s-s x :slot-names '(a)))
 ;;; After these definitions, a dumped S will have 0 in slot B.
 ;;;
-(defun sb-xc:make-load-form-saving-slots (object &key (slot-names nil slot-names-p)
-                                                        environment)
+(defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p)
+                                                environment)
   (declare (ignore environment))
   (flet ((quote-p (thing) (not (self-evaluating-p thing))))
     (declare (inline quote-p))

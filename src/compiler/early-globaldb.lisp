@@ -313,8 +313,8 @@
          "Automagically generated boolean attribute setter. See
  !DEF-BOOLEAN-ATTRIBUTE."
          (multiple-value-bind (temps values stores setter getter)
-             (#+sb-xc-host get-setf-expansion
-              #-sb-xc-host sb-xc:get-setf-expansion place env)
+             (#+sb-xc-host cl:get-setf-expansion
+              #-sb-xc-host get-setf-expansion place env)
            (when (cdr stores)
              (error "multiple store variables for ~S" place))
            (let ((newval (sb-xc:gensym))

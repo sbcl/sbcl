@@ -15,8 +15,8 @@
 (defstruct (abstract-lexenv
              (:constructor nil) (:copier nil) (:predicate nil)))
 
-#-sb-fluid (declaim (inline sb-xc:constantp))
-(defun sb-xc:constantp (form &optional (environment nil envp))
+#-sb-fluid (declaim (inline constantp))
+(defun constantp (form &optional (environment nil envp))
   "True of any FORM that has a constant value: self-evaluating objects,
 keywords, defined constants, quote forms. Additionally the
 constant-foldability of some function calls and special forms is recognized.

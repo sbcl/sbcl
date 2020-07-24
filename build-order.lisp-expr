@@ -391,7 +391,7 @@
 
  ("src/code/class-init" :c-headers)
 
- ;; The DEFSTRUCT machinery needs SB-XC:SUBTYPEP, defined in
+ ;; The DEFSTRUCT machinery needs SUBTYPEP, defined in
  ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB-XC:PROCLAIM, defined in "src/compiler/proclaim"

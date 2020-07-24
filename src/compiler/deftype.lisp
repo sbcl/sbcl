@@ -41,7 +41,7 @@
                     (let ((expr `(progn ,@forms)))
                       ;; While CONSTANTP works early, %MACROEXPAND does not,
                       ;; so we can't pass ENV because it'd try to macroexpand.
-                      (if (sb-xc:constantp expr) expr)))
+                      (if (constantp expr) expr)))
                 #-sb-xc-host
                 (check-deprecated-type (constant-form-value it))
                 (values `(constant-type-expander ',name ,it) doc

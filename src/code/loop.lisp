@@ -185,7 +185,7 @@ constructed.
 (defun make-loop-minimax (answer-variable type)
   (let ((infinity-data (cdr (assoc type
                                    +loop-minimax-type-infinities-alist+
-                                   :test #'sb-xc:subtypep))))
+                                   :test #'subtypep))))
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
@@ -521,7 +521,7 @@ code to be loaded.
 ;;;; code analysis stuff
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
-  (let* ((constantp (sb-xc:constantp form))
+  (let* ((constantp (constantp form))
          (value (and constantp (constant-form-value form))))
     (when (and constantp expected-type)
       (unless (sb-xc:typep value expected-type)
@@ -576,7 +576,7 @@ code to be loaded.
                              &optional (default-type required-type))
   (if (null specified-type)
       default-type
-      (multiple-value-bind (a b) (sb-xc:subtypep specified-type required-type)
+      (multiple-value-bind (a b) (subtypep specified-type required-type)
         (cond ((not b)
                (loop-warn "LOOP couldn't verify that ~S is a subtype of the required type ~S."
                           specified-type required-type))
@@ -958,7 +958,7 @@ code to be loaded.
                                          desetq &aux (loop *loop*))
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
-         (unless (or (sb-xc:subtypep t dtype)
+         (unless (or (subtypep t dtype)
                      (and (eq (sb-xc:symbol-package name) *cl-package*)
                           (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization

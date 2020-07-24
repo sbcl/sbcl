@@ -1245,8 +1245,8 @@
             (warn-if-inline-failed/call fname (node-lexenv node) cell))
           (case *track-full-called-fnames*
             (:detailed
-             (when (boundp 'sb-xc:*compile-file-pathname*)
-               (pushnew sb-xc:*compile-file-pathname* (cdr cell)
+             (when (boundp '*compile-file-pathname*)
+               (pushnew *compile-file-pathname* (cdr cell)
                         :test #'equal)))
             (:very-detailed
              (pushnew (component-name *component-being-compiled*)
