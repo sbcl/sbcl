@@ -531,13 +531,21 @@ void* new_thread_trampoline(void* arg)
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
     lispobj startfun = startup_info->data[0]; // Pinned
     gc_assert(functionp(startfun));
+    // The lisp thread instance stores the stack end for one purpose only, for
+    // SB-EXT:STACK-ALLOCATED-P to quickly check whether an object is on _any_
+    // thread's stack using only the all-threads tree and not acquiring a lock
+    // on the primitive thread. This is the exactly-calculated end.
+    lispthread->stack_end = (lispobj)th->control_stack_end;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    // ... but GC can benefit from knowing that the _effective_ end of
+    // the ambiguous root range is not as high as the accessible end.
     // Nothing at a higher address than &arg needs to be scanned for ambiguous roots.
     // For x86 + linux this optimization skips over about 800 words in the stack scan,
     // and for x86-64 it skip about 550 words as observed via:
     // fprintf(stderr, "%d non-lisp stack words\n",
     //                 (int)((lispobj*)th->control_stack_end - (lispobj*)&arg));
     th->control_stack_end = (lispobj*)&arg;
-    lispthread->stack_end = (lispobj)th->control_stack_end;
+#endif
     th->os_kernel_tid = sb_GetTID();
     init_new_thread(th, 0, 0, 0);
     // Passing the untagged pointer ensures 2 things:
@@ -855,14 +863,14 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
      * on the alignment passed from os_validate, since that might
      * assume the current (e.g. 4k) pagesize, while we calculate with
      * the biggest (e.g. 64k) pagesize allowed by the ABI. */
-    boolean zeroize_stack_top = 0;
+    boolean zeroize_stack = 0;
     if (spaces) {
         // If reusing memory from a previously exited thread, start by removing
         // some old junk from the stack. This is imperfect since we only clear a little
         // at the top, but doing so enables diagnosing some garbage-retention issues
         // using a fine-toothed comb. It would not be possible at all to diagnose
         // if any newly started thread could refer a dead thread's heap objects.
-        zeroize_stack_top = 1;
+        zeroize_stack = 1;
     } else {
         spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE);
         if (!spaces) return NULL;
@@ -909,13 +917,31 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
         (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
 
-    // This is a little wasteful of cycles to pre-zero the pthread overhead (which in glibc
-    // resides at the highest stack addresses) comprising about 5kb, below which is the lisp
-    // stack. We don't need to zeroize above the lisp stack end, but we don't know exactly
-    // where that will be.  Zeroizing more than necessary is conservative, and helps ensure
-    // that garbage retention from reused stacks does not pose a huge problem.
-    if (zeroize_stack_top)
+    if (zeroize_stack) {
+#if GENCGC_IS_PRECISE
+    /* Clear the entire control stack. Without this I was able to induce a GC failure
+     * in a test which hammered on thread creation for hours. The control stack is
+     * scavenged before the heap, so a stale word could point to the start (or middle)
+     * of an object using a bad lowtag, for whatever object formerly was there.
+     * Then a wrong transport function would be called and (if it worked at all) would
+     * place a wrongly tagged FP into a word that might not be the base of an object.
+     * Assume for simplicity (as is true) that stacks grow upward if GENCGC_IS_PRECISE.
+     * This could just call scrub_thread_control_stack but the comment there says that
+     * it's a lame algorithm and only mostly right - it stops after (1<<12) words
+     * and checks if the next is nonzero, looping again if it isn't.
+     * There's no reason not to be exactly right here instead of probably right */
+        memset((char*)th->control_stack_start, 0,
+               // take off 2 pages because of the soft and hard guard pages
+               thread_control_stack_size - 2*os_vm_page_size);
+#else
+    /* This is a little wasteful of cycles to pre-zero the pthread overhead (which in glibc
+     * resides at the highest stack addresses) comprising about 5kb, below which is the lisp
+     * stack. We don't need to zeroize above the lisp stack end, but we don't know exactly
+     * where that will be.  Zeroizing more than necessary is conservative, and helps ensure
+     * that garbage retention from reused stacks does not pose a huge problem. */
         memset((char*)th->control_stack_end - 16384, 0, 16384);
+#endif
+    }
 
     th->control_stack_guard_page_protected = T;
     th->alien_stack_start=
