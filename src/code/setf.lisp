@@ -53,7 +53,7 @@
    for the new values, the setting function, and the accessing function."
   (named-let retry ((form form))
     (labels ((newvals (count)
-               (let ((sb-xc:*gensym-counter* 1))
+               (let ((*gensym-counter* 1))
                  (make-gensym-list count "NEW")))
              ;; Produce the expansion of a SETF form that calls either
              ;; #'(SETF name) or an inverse given by short form DEFSETF.

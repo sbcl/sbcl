@@ -182,7 +182,7 @@
                               ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
                               ;; but the cast kills DX allocation.
                               `(lambda (c) (funcall ,handler c)))))
-                          (name (let ((sb-xc:*gensym-counter*
+                          (name (let ((*gensym-counter*
                                        (length (cluster-entries))))
                                   (sb-xc:gensym "H"))))
                       (local-functions `(,name ,@(rest lexpr)))
