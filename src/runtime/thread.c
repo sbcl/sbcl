@@ -526,17 +526,17 @@ void* new_thread_trampoline(void* arg)
     // In that structure, the STARTUP-INFO slot holds a simple-vector
     // which is pinned, and element 0 of the vector is also pinned.
     struct thread_instance *lispthread = arg;
-    struct thread* th = (void*)lispthread->primitive_thread; // Pinned
-    struct vector* startup_info = VECTOR(lispthread->startup_info); // Pinned
+    struct thread* th = (void*)lispthread->primitive_thread; // 'lispthread' is pinned
+    struct vector* startup_info = VECTOR(lispthread->startup_info);
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
-    lispobj startfun = startup_info->data[0]; // Pinned
+    lispobj startfun = startup_info->data[0]; // 'startup_info' is pinned
     gc_assert(functionp(startfun));
     // The lisp thread instance stores the stack end for one purpose only, for
     // SB-EXT:STACK-ALLOCATED-P to quickly check whether an object is on _any_
     // thread's stack using only the all-threads tree and not acquiring a lock
     // on the primitive thread. This is the exactly-calculated end.
     lispthread->stack_end = (lispobj)th->control_stack_end;
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER
     // ... but GC can benefit from knowing that the _effective_ end of
     // the ambiguous root range is not as high as the accessible end.
     // Nothing at a higher address than &arg needs to be scanned for ambiguous roots.
@@ -544,6 +544,15 @@ void* new_thread_trampoline(void* arg)
     // and for x86-64 it skip about 550 words as observed via:
     // fprintf(stderr, "%d non-lisp stack words\n",
     //                 (int)((lispobj*)th->control_stack_end - (lispobj*)&arg));
+    // I'm not sure why ADDRESS_SANITIZER doesn't allow this optimization.
+    // Both of these assertions failed for me with the sanitizer enabled:
+    //    gc_assert(th->control_stack_start <= (lispobj*)&arg
+    //              && (lispobj*)&arg <= th->control_stack_end);
+    //    gc_assert(th->control_stack_start <= (lispobj*)&startup_info
+    //              && (lispobj*)&startup_info <= th->control_stack_end);
+    // It must subvert the "&" and "*" operators in a way that only it understands,
+    // while the stack pointer register is unperturbed.
+    // So why is it OK to take '&raise' in gencgc for the current thread?
     th->control_stack_end = (lispobj*)&arg;
 #endif
     th->os_kernel_tid = sb_GetTID();
@@ -552,7 +561,7 @@ void* new_thread_trampoline(void* arg)
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
     //   (a regression test asserts that not even a THREAD instance is on the stack)
-    long result = funcall1(startfun, (lispobj)lispthread);
+    long result = funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
     undo_init_new_thread(th, 0);
 
