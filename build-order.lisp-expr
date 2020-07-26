@@ -173,7 +173,7 @@
  ("src/code/string-hash" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/code/early-classoid" :c-headers)
- ("src/code/early-alieneval" :c-headers)  ; for funs and vars needed at build and run time
+ ("src/code/alieneval" :c-headers)
  ("src/code/target-error" :not-host)
 
  ;; "src/code/toplevel.lisp" is the first to need this. It's generated
@@ -357,11 +357,6 @@
 
  ("src/compiler/generic/primtype" :c-headers)
 
- ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
- ("src/code/host-alieneval")
-
- ;; can't be done until definition of e.g. DEFINE-ALIEN-TYPE-CLASS in
- ;; host-alieneval.lisp
  ("src/code/host-c-call")
 
  ;; SB-XC:DEFTYPE is needed in order to compile late-type
@@ -419,7 +414,7 @@
  ("src/code/hash-table" :c-headers)
  ("src/code/readtable")
  ("src/code/pathname" :not-host)
- ("src/code/host-pprint") ; defines QUEUED-OP needed by 'pprint'
+ ("src/code/host-pprint")
 
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")

@@ -1,4 +1,4 @@
-;;;; This file contains parts of the ALIEN implementation that
+;;;; This file contains parts of the Alien implementation that
 ;;;; are not part of the compiler.
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -570,6 +570,42 @@ null byte."
   (unless (local-alien-info-force-to-memory-p info)
     (error "~S isn't forced to memory. Something went wrong." alien))
   alien)
+
+
+;;;; the ADDR macro
+
+(defmacro addr (expr &environment env)
+  "Return an Alien pointer to the data addressed by Expr, which must be a call
+   to SLOT or DEREF, or a reference to an Alien variable."
+  (let ((form (%macroexpand expr env)))
+    (or (typecase form
+          (cons
+           (case (car form)
+             (slot
+              (cons '%slot-addr (cdr form)))
+             (deref
+              (cons '%deref-addr (cdr form)))
+             (%heap-alien
+              (cons '%heap-alien-addr (cdr form)))
+             (local-alien
+              (let ((info (let ((info-arg (second form)))
+                            (and (consp info-arg)
+                                 (eq (car info-arg) 'quote)
+                                 (second info-arg)))))
+                (unless (local-alien-info-p info)
+                  (error "Something is wrong, LOCAL-ALIEN-INFO not found: ~S"
+                         form))
+                (setf (local-alien-info-force-to-memory-p info) t))
+              (cons '%local-alien-addr (cdr form)))))
+          (symbol
+           (let ((kind (info :variable :kind form)))
+             (when (eq kind :alien)
+               `(%heap-alien-addr ',(info :variable :alien-info form))))))
+        (error "~S is not a valid L-value." form))))
+
+(push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
+      *!removable-symbols*)
+
 
 ;;;; the CAST macro
 

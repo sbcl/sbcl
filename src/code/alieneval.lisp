@@ -1,5 +1,5 @@
-;;;; the part of the Alien implementation which is needed at
-;;;; cross-compilation time
+;;;; This file contains parts of the Alien implementation that
+;;;; are not part of the compiler.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -12,7 +12,10 @@
 
 (in-package "SB-ALIEN")
 
-(/show0 "host-alieneval.lisp 15")
+#-sb-xc-host (sb-impl::define-thread-local *saved-fp* nil)
+
+(defvar *default-c-string-external-format* nil)
+
 
 ;;;; utility functions
 
@@ -27,8 +30,73 @@
         ((> bits 8) 16)
         ((> bits 1) 8)
         (t 1)))
+
 
 ;;;; ALIEN-TYPE-INFO stuff
+
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+
+(defstruct (alien-type-class (:copier nil))
+  (name nil :type symbol)
+  (defstruct-name nil :type symbol)
+  (include nil :type (or null alien-type-class))
+  (unparse nil :type (or null function))
+  (type= nil :type (or null function))
+  (lisp-rep nil :type (or null function))
+  (alien-rep nil :type (or null function))
+  (extract-gen nil :type (or null function))
+  (deposit-gen nil :type (or null function))
+  (naturalize-gen nil :type (or null function))
+  (deport-gen nil :type (or null function))
+  (deport-alloc-gen nil :type (or null function))
+  (deport-pin-p nil :type (or null function))
+  ;; Cast?
+  (arg-tn nil :type (or null function))
+  (result-tn nil :type (or null function))
+  (subtypep nil :type (or null function)))
+
+(defmethod print-object ((type-class alien-type-class) stream)
+  (print-unreadable-object (type-class stream :type t)
+    (prin1 (alien-type-class-name type-class) stream)))
+
+(defglobal *alien-type-classes* (make-hash-table :test 'eq)) ; keys are symbols
+
+(defun alien-type-class-or-lose (name)
+  (or (gethash name *alien-type-classes*)
+      (error "no alien type class ~S" name)))
+
+(defun create-alien-type-class-if-necessary (name defstruct-name include)
+  (let ((old (gethash name *alien-type-classes*))
+        (include (and include (alien-type-class-or-lose include))))
+    (if old
+        (setf (alien-type-class-include old) include)
+        (setf (gethash name *alien-type-classes*)
+              (make-alien-type-class :name name
+                                     :defstruct-name defstruct-name
+                                     :include include)))))
+
+(defconstant-eqx +method-slot-alist+
+  '((:unparse . alien-type-class-unparse)
+    (:type= . alien-type-class-type=)
+    (:subtypep . alien-type-class-subtypep)
+    (:lisp-rep . alien-type-class-lisp-rep)
+    (:alien-rep . alien-type-class-alien-rep)
+    (:extract-gen . alien-type-class-extract-gen)
+    (:deposit-gen . alien-type-class-deposit-gen)
+    (:naturalize-gen . alien-type-class-naturalize-gen)
+    (:deport-gen . alien-type-class-deport-gen)
+    (:deport-alloc-gen . alien-type-class-deport-alloc-gen)
+    (:deport-pin-p . alien-type-class-deport-pin-p)
+    ;; cast?
+    (:arg-tn . alien-type-class-arg-tn)
+    (:result-tn . alien-type-class-result-tn))
+  #'equal)
+
+(defun method-slot (method)
+  (cdr (or (assoc method +method-slot-alist+)
+           (error "no method ~S" method))))
+
+) ; EVAL-WHEN
 
 ;;; We define a keyword "BOA" constructor so that we can reference the
 ;;; slot names in init forms.
@@ -79,8 +147,42 @@
          ,@body)
        (setf (,(method-slot method) (alien-type-class-or-lose ',class))
              #',defun-name))))
+
+(defmacro invoke-alien-type-method (method type &rest args)
+  (let ((slot (method-slot method)))
+    (once-only ((type type))
+      `(funcall (do ((class (alien-type-class-or-lose (alien-type-class ,type))
+                            (alien-type-class-include class)))
+                    ((null class)
+                     (error "method ~S not defined for ~S"
+                            ',method (alien-type-class ,type)))
+                  (let ((fn (,slot class)))
+                    (when fn
+                      (return fn))))
+                ,type ,@args))))
+
+
+;;;; the root alien type
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (create-alien-type-class-if-necessary 'root 'alien-type nil))
+
+(defmethod print-object ((type alien-type) stream)
+  (print-unreadable-object (type stream :type t)
+    (sb-impl:print-type-specifier stream (unparse-alien-type type))))
+
 
 ;;;; type parsing and unparsing
+
+(defvar *new-auxiliary-types* nil)
+
+;;; Process stuff in a new scope.
+(defmacro with-auxiliary-alien-types (env &body body)
+  ``(symbol-macrolet ((&auxiliary-type-definitions&
+                       ,(append *new-auxiliary-types*
+                                (auxiliary-type-definitions ,env))))
+      ,(let ((*new-auxiliary-types* nil))
+         ,@body)))
 
 ;;; CMU CL used COMPILER-LET to bind *AUXILIARY-TYPE-DEFINITIONS*, and
 ;;; COMPILER-LET is no longer supported by ANSI or SBCL. Instead, we
@@ -152,6 +254,11 @@
       (when (info :alien-type kind name)
         (error "attempt to shadow definition of ~A ~S" kind name)))))
 
+;;; the list of record types that have already been unparsed. This is
+;;; used to keep from outputting the slots again if the same structure
+;;; shows up twice.
+(defvar *record-types-already-unparsed*)
+
 (defun unparse-alien-type (type)
   "Convert the alien-type structure TYPE back into a list specification of
    the type."
@@ -164,133 +271,77 @@
 ;;; *RECORD-TYPES-ALREADY-UNPARSED*.
 (defun %unparse-alien-type (type)
   (invoke-alien-type-method :unparse type))
+
 
 ;;;; alien type defining stuff
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun %define-alien-type-translator (name translator)
-    (setf (info :alien-type :kind name) :primitive)
-    (setf (info :alien-type :translator name) translator)
-    (clear-info :alien-type :definition name)
-    name))
+(defmacro define-alien-type-translator (name lambda-list &body body)
+  (let ((defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR"))
+        (macro-lambda
+         (make-macro-lambda nil lambda-list body
+                            'define-alien-type-translator name)))
+    `(progn
+       (defun ,defun-name ,(second macro-lambda) ,@(cddr macro-lambda))
+       (%define-alien-type-translator ',name #',defun-name))))
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun %def-auxiliary-alien-types (types source-location)
-    (dolist (info types)
-      ;; Clear up the type we're about to define from the toplevel
-      ;; *new-auxiliary-types* (local scopes take care of themselves).
-      ;; Unless this is done we never actually get back the full type
-      ;; from INFO, since the *new-auxiliary-types* have precendence.
-      (setf *new-auxiliary-types*
-            (remove info *new-auxiliary-types*
-                    :test (lambda (a b)
-                            (and (eq (first a) (first b))
-                                 (eq (second a) (second b))))))
-      (destructuring-bind (kind name defn) info
-        (let ((old (info :alien-type kind name)))
-          (unless (or (null old) (alien-type-= old defn))
-            (warn "redefining ~A ~S to be:~%  ~S,~%was:~%  ~S"
-                  kind name defn old)))
-        (setf (info :alien-type kind name) defn
-              (info :source-location :alien-type name) source-location))))
+(defun %define-alien-type-translator (name translator)
+  (setf (info :alien-type :kind name) :primitive)
+  (setf (info :alien-type :translator name) translator)
+  (clear-info :alien-type :definition name)
+  name)
 
-  (defun %define-alien-type (name new source-location)
-    (ecase (info :alien-type :kind name)
-      (:primitive
-       (error "~/sb-impl:print-type-specifier/ is a built-in alien type."
-              name))
-      (:defined
-       (let ((old (info :alien-type :definition name)))
-         (unless (or (null old) (alien-type-= new old))
-           (warn "redefining ~S to be:~% ~
+(defmacro define-alien-type (name type &environment env)
+  "Define the alien type NAME to be equivalent to TYPE. Name may be NIL for
+   STRUCT and UNION types, in which case the name is taken from the type
+   specifier."
+  (with-auxiliary-alien-types env
+    (let ((alien-type (parse-alien-type type env)))
+      `(eval-when (:compile-toplevel :load-toplevel :execute)
+         ,@(when *new-auxiliary-types*
+             `((%def-auxiliary-alien-types ',*new-auxiliary-types*
+                                           (sb-c:source-location))))
+         ,@(when name
+             `((%define-alien-type ',name ',alien-type (sb-c:source-location))))))))
+
+(defun %def-auxiliary-alien-types (types source-location)
+  (dolist (info types)
+    ;; Clear up the type we're about to define from the toplevel
+    ;; *new-auxiliary-types* (local scopes take care of themselves).
+    ;; Unless this is done we never actually get back the full type
+    ;; from INFO, since the *new-auxiliary-types* have precendence.
+    (setf *new-auxiliary-types*
+          (remove info *new-auxiliary-types*
+                  :test (lambda (a b)
+                          (and (eq (first a) (first b))
+                               (eq (second a) (second b))))))
+    (destructuring-bind (kind name defn) info
+      (let ((old (info :alien-type kind name)))
+        (unless (or (null old) (alien-type-= old defn))
+          (warn "redefining ~A ~S to be:~%  ~S,~%was:~%  ~S"
+                kind name defn old)))
+      (setf (info :alien-type kind name) defn
+            (info :source-location :alien-type name) source-location))))
+
+(defun %define-alien-type (name new source-location)
+  (ecase (info :alien-type :kind name)
+    (:primitive
+     (error "~/sb-impl:print-type-specifier/ is a built-in alien type."
+            name))
+    (:defined
+     (let ((old (info :alien-type :definition name)))
+       (unless (or (null old) (alien-type-= new old))
+         (warn "redefining ~S to be:~% ~
                    ~/sb-impl:print-type-specifier/,~%was~% ~
                    ~/sb-impl:print-type-specifier/"
-                 name
-                 (unparse-alien-type new)
-                 (unparse-alien-type old)))))
-      (:unknown))
-    (setf (info :alien-type :definition name) new)
-    (setf (info :alien-type :kind name) :defined)
-    (setf (info :source-location :alien-type name) source-location)
-    name))
-
-;;;; the root alien type
+               name
+               (unparse-alien-type new)
+               (unparse-alien-type old)))))
+    (:unknown))
+  (setf (info :alien-type :definition name) new)
+  (setf (info :alien-type :kind name) :defined)
+  (setf (info :source-location :alien-type name) source-location)
+  name)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (create-alien-type-class-if-necessary 'root 'alien-type nil))
-
-(defmethod print-object ((type alien-type) stream)
-  (print-unreadable-object (type stream :type t)
-    (sb-impl:print-type-specifier stream (unparse-alien-type type))))
-
-;;;; the SAP type
-
-(define-alien-type-class (system-area-pointer))
-
-(define-alien-type-translator system-area-pointer ()
-  (make-alien-system-area-pointer-type
-   :bits sb-vm:n-machine-word-bits))
-
-(define-alien-type-method (system-area-pointer :unparse) (type)
-  (declare (ignore type))
-  'system-area-pointer)
-
-(define-alien-type-method (system-area-pointer :lisp-rep) (type)
-  (declare (ignore type))
-  'system-area-pointer)
-
-(define-alien-type-method (system-area-pointer :alien-rep) (type context)
-  (declare (ignore type context))
-  'system-area-pointer)
-
-(define-alien-type-method (system-area-pointer :naturalize-gen) (type alien)
-  (declare (ignore type))
-  alien)
-
-(define-alien-type-method (system-area-pointer :deport-gen) (type object)
-  (declare (ignore type))
-  (/noshow "doing alien type method SYSTEM-AREA-POINTER :DEPORT-GEN" object)
-  object)
-
-(define-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
-  (declare (ignore type))
-  `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
-
-;;;; the ALIEN-VALUE type
-
-(define-alien-type-class (alien-value :include system-area-pointer))
-
-(define-alien-type-method (alien-value :lisp-rep) (type)
-  (declare (ignore type))
-  nil)
-
-(define-alien-type-method (alien-value :naturalize-gen) (type alien)
-  `(%sap-alien ,alien ',type))
-
-(define-alien-type-method (alien-value :deport-gen) (type value)
-  (declare (ignore type))
-  (/noshow "doing alien type method ALIEN-VALUE :DEPORT-GEN" value)
-  `(alien-sap ,value))
-
-;;; HEAP-ALIEN-INFO -- defstruct.
-;;;
-(defmethod print-object ((info heap-alien-info) stream)
-  (print-unreadable-object (info stream :type t)
-    (format stream "~S ~S~@[ (data)~]"
-            (heap-alien-info-alien-name info)
-            (unparse-alien-type (heap-alien-info-type info))
-            (heap-alien-info-datap info))))
-
-;;; The form to evaluate to produce the SAP pointing to where in the heap
-;;; it is.
-(defun heap-alien-info-sap-form (info)
-  `(foreign-symbol-sap ,(heap-alien-info-alien-name info)
-                       ,(heap-alien-info-datap info)))
-
-#-sb-xc-host ; No FOREIGN-SYMBOL-SAP
-(defun heap-alien-info-sap (info)
-  (foreign-symbol-sap (heap-alien-info-alien-name info)
-                      (heap-alien-info-datap info)))
 
 ;;;; Interfaces to the different methods
 
@@ -368,6 +419,7 @@
 ;;; details.
 (defun compute-alien-rep-type (type &optional (context :normal))
   (invoke-alien-type-method :alien-rep type context))
+
 
 ;;;; default methods
 
@@ -706,6 +758,57 @@
   `(sap-ref-double ,sap (/ ,offset sb-vm:n-byte-bits)))
 
 
+;;;; the SAP type
+
+(define-alien-type-class (system-area-pointer))
+
+(define-alien-type-translator system-area-pointer ()
+  (make-alien-system-area-pointer-type
+   :bits sb-vm:n-machine-word-bits))
+
+(define-alien-type-method (system-area-pointer :unparse) (type)
+  (declare (ignore type))
+  'system-area-pointer)
+
+(define-alien-type-method (system-area-pointer :lisp-rep) (type)
+  (declare (ignore type))
+  'system-area-pointer)
+
+(define-alien-type-method (system-area-pointer :alien-rep) (type context)
+  (declare (ignore type context))
+  'system-area-pointer)
+
+(define-alien-type-method (system-area-pointer :naturalize-gen) (type alien)
+  (declare (ignore type))
+  alien)
+
+(define-alien-type-method (system-area-pointer :deport-gen) (type object)
+  (declare (ignore type))
+  (/noshow "doing alien type method SYSTEM-AREA-POINTER :DEPORT-GEN" object)
+  object)
+
+(define-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
+  (declare (ignore type))
+  `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
+
+
+;;;; the ALIEN-VALUE type
+
+(define-alien-type-class (alien-value :include system-area-pointer))
+
+(define-alien-type-method (alien-value :lisp-rep) (type)
+  (declare (ignore type))
+  nil)
+
+(define-alien-type-method (alien-value :naturalize-gen) (type alien)
+  `(%sap-alien ,alien ',type))
+
+(define-alien-type-method (alien-value :deport-gen) (type value)
+  (declare (ignore type))
+  (/noshow "doing alien type method ALIEN-VALUE :DEPORT-GEN" value)
+  `(alien-sap ,value))
+
+
 ;;;; the POINTER type
 
 (define-alien-type-class (pointer :include (alien-value (bits
@@ -989,8 +1092,18 @@
                (or (memq type2 types) (match-fields types)))
              (let ((*alien-type-matches* (make-hash-table :test #'eq)))
                (match-fields))))))
+
 
 ;;;; the FUNCTION and VALUES alien types
+
+;;; not documented in CMU CL:-(
+;;;
+;;; reverse engineering observations:
+;;;   * seems to be set when translating return values
+;;;   * seems to enable the translation of (VALUES), which is the
+;;;     Lisp idiom for C's return type "void" (which is likely
+;;;     why it's set when when translating return values)
+(defvar *values-type-okay* nil)
 
 ;;; Calling-convention spec, typically one of predefined keywords.
 ;;; Add or remove as needed for target platform.  It makes sense to
@@ -1094,9 +1207,37 @@
        (every #'alien-type-=
               (alien-values-type-values type1)
               (alien-values-type-values type2))))
+
 
-;;;; a structure definition needed both in the target and in the
-;;;; cross-compilation host
+;;;; alien variables
+
+;;; Information describing a heap-allocated alien.
+(def!struct (heap-alien-info (:copier nil))
+  ;; The type of this alien.
+  (type (missing-arg) :type alien-type)
+  ;; Its name.
+  (alien-name (missing-arg) :type simple-string)
+  ;; Data or code?
+  (datap (missing-arg) :type boolean))
+(!set-load-form-method heap-alien-info (:xc :target))
+
+(defmethod print-object ((info heap-alien-info) stream)
+  (print-unreadable-object (info stream :type t)
+    (format stream "~S ~S~@[ (data)~]"
+            (heap-alien-info-alien-name info)
+            (unparse-alien-type (heap-alien-info-type info))
+            (heap-alien-info-datap info))))
+
+;;; The form to evaluate to produce the SAP pointing to where in the heap
+;;; it is.
+(defun heap-alien-info-sap-form (info)
+  `(foreign-symbol-sap ,(heap-alien-info-alien-name info)
+                       ,(heap-alien-info-datap info)))
+
+#-sb-xc-host ; No FOREIGN-SYMBOL-SAP
+(defun heap-alien-info-sap (info)
+  (foreign-symbol-sap (heap-alien-info-alien-name info)
+                      (heap-alien-info-datap info)))
 
 ;;; information about local aliens. The WITH-ALIEN macro builds one of
 ;;; these structures and LOCAL-ALIEN and friends communicate
@@ -1120,40 +1261,6 @@
             "~:[~;(forced to stack) ~]~S"
             (local-alien-info-force-to-memory-p info)
             (unparse-alien-type (local-alien-info-type info)))))
-
-;;;; the ADDR macro
-
-(sb-xc:defmacro addr (expr &environment env)
-  "Return an Alien pointer to the data addressed by Expr, which must be a call
-   to SLOT or DEREF, or a reference to an Alien variable."
-  (let ((form (%macroexpand expr env)))
-    (or (typecase form
-          (cons
-           (case (car form)
-             (slot
-              (cons '%slot-addr (cdr form)))
-             (deref
-              (cons '%deref-addr (cdr form)))
-             (%heap-alien
-              (cons '%heap-alien-addr (cdr form)))
-             (local-alien
-              (let ((info (let ((info-arg (second form)))
-                            (and (consp info-arg)
-                                 (eq (car info-arg) 'quote)
-                                 (second info-arg)))))
-                (unless (local-alien-info-p info)
-                  (error "Something is wrong, LOCAL-ALIEN-INFO not found: ~S"
-                         form))
-                (setf (local-alien-info-force-to-memory-p info) t))
-              (cons '%local-alien-addr (cdr form)))))
-          (symbol
-           (let ((kind (info :variable :kind form)))
-             (when (eq kind :alien)
-               `(%heap-alien-addr ',(info :variable :alien-info form))))))
-        (error "~S is not a valid L-value." form))))
-
-(push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
-      *!removable-symbols*)
 
 (in-package "SB-IMPL")
 
@@ -1170,6 +1277,8 @@
      (or (gethash extern table)
          (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
 
+(in-package "SB-ALIEN")
+
 ;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
 ;;; as opposed to C's "extern"). The table contains symbols known at
 ;;; the time that the program was built, but not symbols defined in
@@ -1179,4 +1288,20 @@
   (declaim (type hash-table *static-foreign-symbols*))
   (defvar *static-foreign-symbols* (make-hash-table :test 'equal)))
 
-(/show0 "host-alieneval.lisp end of file")
+#+sb-xc
+(defmacro maybe-with-pinned-objects (variables types &body body)
+  (declare (ignorable variables types))
+  (let ((pin-variables
+         ;; Only pin things on GENCGC, since on CHENEYGC it'd imply
+         ;; disabling the GC.  Which is something we don't want to do
+         ;; every time we're calling to C.
+         #+gencgc
+         (loop for variable in variables
+            for type in types
+            when (invoke-alien-type-method :deport-pin-p type)
+            collect variable)))
+    (if pin-variables
+        `(with-pinned-objects ,pin-variables
+           ,@body)
+        `(progn
+           ,@body))))

@@ -401,18 +401,6 @@ the stack without triggering overflow protection.")
 (sb-impl::define-thread-local *compilation*)
 (declaim (type compilation *compilation*))
 
-(in-package "SB-ALIEN")
-
-;;; Information describing a heap-allocated alien.
-(def!struct (heap-alien-info (:copier nil))
-  ;; The type of this alien.
-  (type (missing-arg) :type alien-type)
-  ;; Its name.
-  (alien-name (missing-arg) :type simple-string)
-  ;; Data or code?
-  (datap (missing-arg) :type boolean))
-(!set-load-form-method heap-alien-info (:xc :target))
-
 ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
 ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
 #+linux ; shadow space differs by OS
