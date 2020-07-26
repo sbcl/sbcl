@@ -1276,3 +1276,18 @@
          (unless allow-special
            (lose "special variable"))))
       (values name kind))))
+
+;; This is a variant of destructuring-bind that provides the name
+;; of the containing construct in generated error messages.
+(macrolet (#+sb-xc-host ; Bootstrap NAMED-DS-BIND
+           (named-ds-bind (name lambda-list expression &body body)
+             (declare (ignore name))
+               `(cl:destructuring-bind ,lambda-list ,expression ,@body)))
+  (defmacro named-ds-bind (name lambda-list expression &body body
+                                                       &environment env)
+    (declare (ignore env)) ; could be policy-sensitive (but isn't)
+    `(binding* ,(sb-c::expand-ds-bind lambda-list expression t nil name
+                 (and (eq (car name) :macro)
+                      (eq (cddr name) 'deftype)
+                      ''*))
+       ,@body)))

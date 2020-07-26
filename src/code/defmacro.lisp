@@ -79,3 +79,15 @@
   ;; processing SB-XC:DEFMACRO.
   (setf (cl:macro-function 'sb-xc:defmacro)
         (lambda (form env) `(let () ,(funcall real-expander form env)))))
+
+#+sb-xc-host
+(progn
+  (setf (macro-function 'named-ds-bind)
+        (lambda (form env) (declare (ignore env)) (cl:macroexpand-1 form nil)))
+
+  ;; SB-XC:DEFMACRO's expansion uses NAMED-DS-BIND which expands to
+  ;; BINDING* (from "early-extensions") that hand-written code also
+  ;; wants to use. So expand it in the target by using the host's
+  ;; expander until it gets seen again during make-host-2.
+  (setf (macro-function 'binding*)
+        (lambda (form env) (declare (ignore env)) (cl:macroexpand-1 form nil))))

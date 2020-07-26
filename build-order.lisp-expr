@@ -299,8 +299,6 @@
  ("src/compiler/vmdef" :c-headers)
 
  ("src/code/defmacro" :c-headers)
- ("src/code/destructuring-bind" :c-headers)
-
  ;; for e.g. !DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
  ("src/compiler/meta-vmdef" :c-headers)
