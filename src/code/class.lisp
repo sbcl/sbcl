@@ -529,12 +529,12 @@ between the ~A definition and the ~A definition"
                ;; modulo potential differences with respect to
                ;; conditions).
                #+sb-xc-host
-               (let ((old (class-of old-value))
-                     (new (class-of new-value)))
+               (let ((old (cl:class-of old-value))
+                     (new (cl:class-of new-value)))
                  (unless (eq old new)
                    (bug "Trying to change the metaclass of ~S from ~S to ~S in the ~
                             cross-compiler."
-                        name (class-name old) (class-name new))))
+                        name (cl:class-name old) (cl:class-name new))))
                #-sb-xc-host
                (let ((old (classoid-of old-value))
                      (new (classoid-of new-value)))
