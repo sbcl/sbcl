@@ -397,6 +397,11 @@ if [ "$sbcl_os" = "darwin" ] && [ "`/usr/sbin/sysctl -n hw.optional.x86_64`" = "
     guessed_sbcl_arch=x86-64
 fi
 
+# Under NetBSD, uname -m returns "evbarm" even if CPU is arm64.
+if [ "$sbcl_os" = "netbsd" ] && [ `uname -p` = "aarch64" ]; then
+    guessed_sbcl_arch=arm64
+fi
+
 echo //setting up CPU-architecture-dependent information
 if test -n "$SBCL_ARCH"
 then
