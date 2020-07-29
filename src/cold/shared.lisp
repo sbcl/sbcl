@@ -243,11 +243,11 @@
              (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
                           target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
+        #+nil
         (let ((*readtable* *xc-readtable*)
               (sb-xc:*features* target-feature-list))
           (when (featurep '(:and :linux (:or :x86 :x86-64) :sb-thread
                                  (:not (:or :sb-safepoint :sb-thruption))))
-            (format t "~&Adding :PAUSELESS-THREADSTART feature~%")
             (push :pauseless-threadstart target-feature-list)))
         (when (and (member :x86 target-feature-list)
                    (member :int4-breakpoints target-feature-list))
