@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.6:
+changes in sbcl-2.0.7 relative to sbcl-2.0.6:
   * minor incompatible change: SB-THREAD:THREAD-OS-TID returns NIL for
     a thread which has exited.
   * minor incompatible change: OPEN no longer calls TRUENAME implicitly
