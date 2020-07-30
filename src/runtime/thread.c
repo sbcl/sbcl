@@ -1034,6 +1034,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #endif
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     access_control_stack_pointer(th)=th->control_stack_start;
+    access_control_frame_pointer(th)=0;
 #endif
 
     th->interrupt_data->pending_handler = 0;
