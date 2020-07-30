@@ -6,7 +6,8 @@ changes relative to sbcl-2.0.6:
   * minor incompatible change: OPEN no longer calls TRUENAME implicitly
     on a string filespec prior to issuing an open() system call.
   * minor incompatible change: PATHNAME is no longer a STRUCTURE-OBJECT.
-  * documentation: HASH-FUNCTION is a function designator (lp#1888028)
+  * documentation: HASH-FUNCTION is a function designator.  (lp#1888028,
+    reported by Jacek Zlydach)
   * bug fix: eliminated a potential garbage-collector deadlock
     when linking with TCMalloc.
   * bug fix: foreign threads (those not made by SB-THREAD:MAKE-THREAD)
@@ -20,6 +21,17 @@ changes relative to sbcl-2.0.6:
     generated in the C runtime is significantly less likely to occur.
   * bug fix: sb-sprof should no longer segfault from calling pthread_kill()
     on a nonexistent thread.
+  * bug fix:  a portability issue arising from various build hosts
+    (lp#1886255, reported by Pierre Neidhart)
+  * bug fix: spurious compiler warnings from REDUCE with :INITIAL-VALUE.
+    (lp#1885515, reported by Michael South)
+  * bug fix: an inconsistency between class hierarchies and the type system
+    under some circumstances involving redefinition.  (lp#1886397, reported by
+    Atilla Lendvai)
+  * bug fix: the USE-VALUE restart for OPEN on non-existent files is more
+    likely to function as expected.  (lp#1886587)
+  * bug fix: various invalid inputs to ROTATE-BYTE no longer cause compiler
+    errors.  (lp#1887164, lp#1888152)
   * optimization: PPC64 on linux uses the __thread annotation on C variables
     in preference to pthread_setspecific() and pthread_getspecific().
 
