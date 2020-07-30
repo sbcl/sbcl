@@ -128,7 +128,7 @@
 
 ;;; where to put the different spaces
 ;;;
-;;; Note: Mostly these values are black magic, inherited from CMU CL
+;;; Note: Mostly these values are magic, inherited from CMU CL
 ;;; without any documentation. However, there were a few explanatory
 ;;; comments in the CMU CL sources:
 ;;;   * On Linux,

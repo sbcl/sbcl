@@ -12,7 +12,7 @@
 ;;;; more information.
 
 
-;;;; WHITE-BOX TESTS
+;;;; STRUCTURAL TESTS
 
 (shadowing-import 'assertoid:assert-error)
 (use-package "SB-THREAD")
@@ -888,7 +888,7 @@
               collect (make-thread #'subtypep-hash-cache-test)))
   (terpri))
 
-;;;; BLACK BOX TESTS
+;;;; FUNCTIONAL TESTS
 
 (with-test (:name (:parallel defclass))
   (write-line "WARNING, WILL HANG ON FAILURE!")

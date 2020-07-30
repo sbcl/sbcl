@@ -756,7 +756,7 @@ bootstrapping.
       ;; perhaps because of the way that STRUCTURE-OBJECT inherits
       ;; both from SLOT-OBJECT and from SB-KERNEL:INSTANCE. In an
       ;; effort to sweep such problems under the rug, we exclude these
-      ;; problem cases by blacklisting them here. -- WHN 2001-01-19
+      ;; problem cases here. -- WHN 2001-01-19
       ((eq specializer 'slot-object)
        (declare-type nil))
 

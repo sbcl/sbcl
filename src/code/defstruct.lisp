@@ -907,7 +907,7 @@ unless :NAMED is also specified.")))
     ;; But also, don't call SB-XC:TYPEP on a type-specifier because it does
     ;; not receive a type-context which specifies the proto-classoid.
     (when (and (typep type '(cons (eql or))) (member 'null type))
-      (setq ctype *universal-type*)) ; a little white lie
+      (setq ctype *universal-type*)) ; a harmless lie
 
     (unless ctype
       (let ((context (make-type-context type proto-classoid nil)))

@@ -219,12 +219,13 @@
                   :skipped-on :cheneygc)
   ;; The interpreters (both sb-eval and sb-fasteval) special-case
   ;; WITH-PINNED-OBJECTS as a "special form", because the x86oid
-  ;; version of WITH-PINNED-OBJECTS uses black magic that isn't
-  ;; supportable outside of the compiler.  The non-x86oid versions of
-  ;; WITH-PINNED-OBJECTS don't use black magic, but are overridden
-  ;; anyway.  But the special-case logic was, historically broken, and
-  ;; this affects all gencgc targets (cheneygc isn't affected because
-  ;; cheneygc WITH-PINNED-OBJECTS devolves to WITHOUT-GC>ING).
+  ;; version of WITH-PINNED-OBJECTS uses special functionality that
+  ;; isn't supportable outside of the compiler.  The non-x86oid
+  ;; versions of WITH-PINNED-OBJECTS don't use this special
+  ;; functionality, but are overridden anyway.  But the special-case
+  ;; logic was, historically broken, and this affects all gencgc
+  ;; targets (cheneygc isn't affected because cheneygc
+  ;; WITH-PINNED-OBJECTS devolves to WITHOUT-GCING).
   ;;
   ;; Our basic approach is to allocate some kind of object and stuff
   ;; it where it doesn't need to be on the control stack.  We then pin
