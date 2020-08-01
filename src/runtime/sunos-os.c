@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/param.h>
-#include <sys/utsname.h>
 
 #include "sbcl.h"
 #include "os.h"

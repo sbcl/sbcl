@@ -34,8 +34,6 @@
 #include "interr.h"
 #include "lispregs.h"
 #include "sbcl.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>

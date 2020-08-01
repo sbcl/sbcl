@@ -9,8 +9,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>

@@ -35,8 +35,6 @@
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
 
-#include <sys/socket.h>
-#include <sys/utsname.h>
 #include <errno.h>
 
 #include <sys/types.h>

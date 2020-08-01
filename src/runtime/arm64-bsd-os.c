@@ -25,8 +25,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 #include <machine/sysarch.h>
 
 #include <sys/types.h>
