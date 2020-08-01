@@ -22,7 +22,7 @@ changes in sbcl-2.0.7 relative to sbcl-2.0.6:
   * bug fix: sb-sprof should no longer segfault from calling pthread_kill()
     on a nonexistent thread.
   * bug fix:  a portability issue arising from various build hosts
-    (lp#1886255, reported by Pierre Neidhart)
+    (lp#1886255, reported by Pierre Neidhardt)
   * bug fix: spurious compiler warnings from REDUCE with :INITIAL-VALUE.
     (lp#1885515, reported by Michael South)
   * bug fix: an inconsistency between class hierarchies and the type system
