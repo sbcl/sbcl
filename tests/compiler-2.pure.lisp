@@ -2943,4 +2943,10 @@
   (checked-compile-and-assert
    ()
    `(lambda () (length (make-sequence '(string *) 10 :initial-element #\a)))
-       (() 10)))
+   (() 10)))
+
+(with-test (:name :constant-fold-unknown-types)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda ()
+      (oddp (the (or a b) -1)))))

@@ -38,6 +38,17 @@
              ;; check for EQL types and singleton numeric types
              (values (type-singleton-p type))))))
 
+(defun constant-lvar-ignore-types-p (thing)
+  (declare (type (or lvar null) thing))
+  (and (lvar-p thing)
+       (let* ((type (lvar-type thing))
+              (principal-lvar (principal-lvar thing))
+              (principal-use (lvar-uses principal-lvar)))
+         (or (and (ref-p principal-use)
+                  (constant-p (ref-leaf principal-use)))
+             ;; check for EQL types and singleton numeric types
+             (values (type-singleton-p type))))))
+
 ;;; Are all the uses constant?
 (defun constant-lvar-uses-p (thing)
   (declare (type (or lvar null) thing))
@@ -1684,11 +1695,11 @@
               (declare (ignore type lvars))
               (unless (if (eql (car annotation) 'function-designator)
                           (let ((fun (or (lvar-fun-name arg t)
-                                         (and (constant-lvar-p arg)
+                                         (and (constant-lvar-ignore-types-p arg)
                                               (lvar-value arg)))))
                             (and fun
                                  (constant-fold-arg-p fun)))
-                          (constant-lvar-p arg))
+                          (constant-lvar-ignore-types-p arg))
                 (return-from constant-fold-call-p)))
             combination
             info
@@ -1696,7 +1707,7 @@
               (return-from constant-fold-call-p)))
            t)
           (t
-           (every #'constant-lvar-p args)))))
+           (every #'constant-lvar-ignore-types-p args)))))
 
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. If there is an error during the
