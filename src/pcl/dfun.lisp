@@ -373,7 +373,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
      (lambda (new arg)
        (accessor-miss gf new arg dfun-info)))))
 
-#-sb-fluid (declaim (sb-ext:freeze-type dfun-info))
+(declaim (sb-ext:freeze-type dfun-info))
 
 (defun make-one-class-accessor-dfun (gf type wrapper index)
   (let ((emit (ecase type

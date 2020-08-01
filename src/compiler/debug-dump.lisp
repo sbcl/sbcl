@@ -77,7 +77,7 @@
                          (- posn (segment-header-skew segment))))))
   (values))
 
-#-sb-fluid (declaim (inline ir2-block-physenv))
+(declaim (inline ir2-block-physenv))
 (defun ir2-block-physenv (2block)
   (declare (type ir2-block 2block))
   (block-physenv (ir2-block-block 2block)))

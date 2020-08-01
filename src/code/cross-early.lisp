@@ -11,6 +11,19 @@
 
 (in-package "SB-IMPL")
 
+(defmacro sb-xc:declaim (&rest declaration-specifiers)
+  #+(or sb-devel sb-fluid)
+  (setq declaration-specifiers
+        (remove-if (lambda (declaration-specifier)
+                     (member (first declaration-specifier)
+                             '(#+sb-fluid inline
+                               #+sb-fluid maybe-inline
+                               #+sb-fluid sb-ext:freeze-type
+                               #+sb-devel start-block
+                               #+sb-devel end-block)))
+                   declaration-specifiers))
+  `(cl:declaim ,@declaration-specifiers))
+
 ;;; The STRUCTURE!OBJECT abstract class is the base of the hierarchy
 ;;; of objects that need to be identifiable as SBCL system objects
 ;;; in the host Lisp. This type does not exist in the target.

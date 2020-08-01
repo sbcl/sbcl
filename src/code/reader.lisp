@@ -173,12 +173,10 @@
 
 ;;; predicates for testing character attributes
 
-#-sb-fluid
-(progn
-  (declaim (inline whitespace[1]p whitespace[2]p))
-  (declaim (inline constituentp terminating-macrop))
-  (declaim (inline single-escape-p multiple-escape-p))
-  (declaim (inline token-delimiterp)))
+(declaim (inline whitespace[1]p whitespace[2]p))
+(declaim (inline constituentp terminating-macrop))
+(declaim (inline single-escape-p multiple-escape-p))
+(declaim (inline token-delimiterp))
 
 ;;; the [1] and [2] here refer to ANSI glossary entries for
 ;;; "whitespace".

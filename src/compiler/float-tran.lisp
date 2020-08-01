@@ -225,7 +225,7 @@
 ;;; Given a number X, create a form suitable as a bound for an
 ;;; interval. Make the bound open if OPEN-P is T. NIL remains NIL.
 ;;; FIXME: as this is a constructor, shouldn't it be named MAKE-BOUND?
-#-sb-fluid (declaim (inline set-bound))
+(declaim (inline set-bound))
 (defun set-bound (x open-p)
   (if (and x open-p) (list x) x))
 

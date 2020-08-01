@@ -339,6 +339,7 @@
                                     (ftype #'proclaim-ftype))
                             ctype type :declared)))
              (push raw-form *queued-proclaims*)))
+        #-sb-fluid
         (freeze-type
          (map-args #'process-freeze-type-declaration))
         ((start-block end-block)
@@ -371,7 +372,7 @@
         ((disable-package-locks enable-package-locks)
          (setq *disabled-package-locks*
                (process-package-lock-decl form *disabled-package-locks*)))
-        ((inline notinline maybe-inline)
+        ((#-sb-fluid inline notinline #-sb-fluid maybe-inline)
          (map-args #'process-inline-declaration kind))
         (deprecated
          (destructuring-bind (state since &rest things) args

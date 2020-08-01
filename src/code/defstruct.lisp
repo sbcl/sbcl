@@ -140,7 +140,7 @@
   ;; and we don't have structures whose slot indices run into the thousands.
   (bits 0 :type fixnum :read-only t)
   (default nil :read-only t))                    ; default value expression
-#-sb-fluid (declaim (freeze-type defstruct-slot-description))
+(declaim (freeze-type defstruct-slot-description))
 
 (eval-when (:compile-toplevel)
   ;; Ensure that rsd-index is representable in 3 bits. (Can easily be changed)

@@ -12,7 +12,6 @@
 (in-package "SB-IMPL")
 
 ;;; We compile some trivial character operations via inline expansion.
-#-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
                  alphanumericp))
 (declaim (maybe-inline upper-case-p lower-case-p both-case-p

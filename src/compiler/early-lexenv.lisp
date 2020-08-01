@@ -69,7 +69,7 @@
 
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
-#-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
+(declaim (inline internal-make-lexenv)) ; only called in one place
 (defstruct (lexenv
             (:include abstract-lexenv)
              (:print-function

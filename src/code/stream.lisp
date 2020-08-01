@@ -206,7 +206,7 @@
   (ef-char-size (get-external-format external-format)))
 
 ;;; Call the MISC method with the :FILE-POSITION operation.
-#-sb-fluid (declaim (inline ansi-stream-file-position))
+(declaim (inline ansi-stream-file-position))
 (defun ansi-stream-file-position (stream position)
   (declare (type stream stream))
   (declare (type (or index (alien sb-unix:unix-offset) (member nil :start :end))
@@ -334,7 +334,7 @@
             (progn (done-with-fast-read-char)
                    (eof-or-lose stream eof-error-p (values eof-value t))))))))
 
-#-sb-fluid (declaim (inline ansi-stream-read-line))
+(declaim (inline ansi-stream-read-line))
 (defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
   (declare (ignore recursive-p))
   (if (ansi-stream-cin-buffer stream)
@@ -385,9 +385,9 @@
 
 ;;; We proclaim them INLINE here, then proclaim them NOTINLINE later on,
 ;;; so, except in this file, they are not inline by default, but they can be.
-#-sb-fluid (declaim (inline read-char unread-char read-byte listen))
+(declaim (inline read-char unread-char read-byte listen))
 
-#-sb-fluid (declaim (inline ansi-stream-read-char))
+(declaim (inline ansi-stream-read-char))
 (defun ansi-stream-read-char (stream eof-error-p eof-value recursive-p)
   (declare (ignore recursive-p))
   (prepare-for-fast-read-char stream
@@ -409,7 +409,7 @@
               (eof-or-lose stream eof-error-p eof-value)
               (the character char))))))
 
-#-sb-fluid (declaim (inline ansi-stream-unread-char))
+(declaim (inline ansi-stream-unread-char))
 (defun ansi-stream-unread-char (character stream)
   (let ((index (1- (ansi-stream-in-index stream)))
         (buffer (ansi-stream-cin-buffer stream)))
@@ -435,7 +435,7 @@
         (stream-unread-char stream character)))
   nil)
 
-#-sb-fluid (declaim (inline ansi-stream-listen))
+(declaim (inline ansi-stream-listen))
 (defun ansi-stream-listen (stream)
   (or (/= (the fixnum (ansi-stream-in-index stream))
           +ansi-stream-in-buffer-length+)
@@ -453,7 +453,7 @@
         ;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
         (stream-listen stream))))
 
-#-sb-fluid (declaim (inline ansi-stream-read-char-no-hang))
+(declaim (inline ansi-stream-read-char-no-hang))
 (defun ansi-stream-read-char-no-hang (stream eof-error-p eof-value recursive-p)
   (if (funcall (ansi-stream-misc stream) stream :listen)
       ;; On T or :EOF get READ-CHAR to do the work.
@@ -475,7 +475,7 @@
               (eof-or-lose stream eof-error-p eof-value)
               (the (or character null) char))))))
 
-#-sb-fluid (declaim (inline ansi-stream-clear-input))
+(declaim (inline ansi-stream-clear-input))
 (defun ansi-stream-clear-input (stream)
   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
   (funcall (ansi-stream-misc stream) stream :clear-input))
@@ -489,7 +489,7 @@
         (stream-clear-input stream)))
   nil)
 
-#-sb-fluid (declaim (inline ansi-stream-read-byte))
+(declaim (inline ansi-stream-read-byte))
 (defun ansi-stream-read-byte (stream eof-error-p eof-value recursive-p)
   ;; Why the "recursive-p" parameter?  a-s-r-b is funcall'ed from
   ;; a-s-read-sequence and needs a lambda list that's congruent with
@@ -518,7 +518,7 @@
 ;;; some cases, but it wasn't being used in SBCL, so it was dropped.
 ;;; If we ever need it, it could be added later as a new variant N-BIN
 ;;; method (perhaps N-BIN-ASAP?) or something.
-#-sb-fluid (declaim (inline read-n-bytes))
+(declaim (inline read-n-bytes))
 (defun read-n-bytes (stream buffer start numbytes &optional (eof-error-p t))
   (if (ansi-stream-p stream)
       (ansi-stream-read-n-bytes stream buffer start numbytes eof-error-p)
@@ -681,7 +681,7 @@
   (with-out-stream stream (ansi-stream-out #\newline) (stream-terpri))
   nil)
 
-#-sb-fluid (declaim (inline ansi-stream-fresh-line))
+(declaim (inline ansi-stream-fresh-line))
 (defun ansi-stream-fresh-line (stream)
   (unless (eql (charpos stream) 0)
     (funcall (ansi-stream-out stream) stream #\newline)
@@ -695,7 +695,7 @@
         ;; must be Gray streams FUNDAMENTAL-STREAM
         (stream-fresh-line stream))))
 
-#-sb-fluid (declaim (inline ansi-stream-write-string))
+(declaim (inline ansi-stream-write-string))
 (defun ansi-stream-write-string (string stream start end)
   (with-array-data ((data string) (offset-start start)
                     (offset-end end)

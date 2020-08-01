@@ -1335,7 +1335,7 @@ bootstrapping.
 (defstruct (constant-method-call (:copier nil) (:include method-call))
   value)
 
-#-sb-fluid (declaim (sb-ext:freeze-type method-call))
+(declaim (sb-ext:freeze-type method-call))
 
 (defmacro invoke-method-call1 (function args cm-args)
   `(let ((.function. ,function)
@@ -1361,7 +1361,7 @@ bootstrapping.
              (:copier nil) (:include fast-method-call))
   value)
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-method-call))
+(declaim (sb-ext:freeze-type fast-method-call))
 
 ;; The two variants of INVOKE-FAST-METHOD-CALL differ in how REST-ARGs
 ;; are handled. The first one will get REST-ARG as a single list (as
@@ -1403,7 +1403,7 @@ bootstrapping.
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-instance-boundp))
+(declaim (sb-ext:freeze-type fast-instance-boundp))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *allow-emf-call-tracing-p* nil)
@@ -2075,7 +2075,7 @@ bootstrapping.
   (gf-info-c-a-m-emf-std-p t)
   gf-info-fast-mf-p)
 
-#-sb-fluid (declaim (sb-ext:freeze-type arg-info))
+(declaim (sb-ext:freeze-type arg-info))
 
 (defun arg-info-valid-p (arg-info)
   (not (null (arg-info-number-optional arg-info))))

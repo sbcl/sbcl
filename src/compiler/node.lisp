@@ -148,16 +148,16 @@
     (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
-#-sb-fluid (declaim (inline lvar-has-single-use-p))
+(declaim (inline lvar-has-single-use-p))
 (defun lvar-has-single-use-p (lvar)
   (typep (lvar-uses lvar) '(not list)))
 
 ;;; Return the unique node, delivering a value to LVAR.
-#-sb-fluid (declaim (inline lvar-use))
+(declaim (inline lvar-use))
 (defun lvar-use (lvar)
   (the (not list) (lvar-uses lvar)))
 
-#-sb-fluid (declaim (inline lvar-derived-type))
+(declaim (inline lvar-derived-type))
 (defun lvar-derived-type (lvar)
   (declare (type lvar lvar))
   (or (lvar-%derived-type lvar)
@@ -216,7 +216,7 @@
   ;; can null out this slot.
   (tail-p nil :type boolean))
 
-#-sb-fluid (declaim (inline node-block))
+(declaim (inline node-block))
 (defun node-block (node)
   (ctran-block (node-prev node)))
 
@@ -239,7 +239,7 @@
   ;; the value is unused.
   (lvar nil :type (or lvar null)))
 
-#-sb-fluid (declaim (inline node-dest))
+(declaim (inline node-dest))
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
 
@@ -1637,6 +1637,5 @@
 
 ;;;; Freeze some structure types to speed type testing.
 
-#-sb-fluid
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
                       physenv tail-set nlx-info leaf))

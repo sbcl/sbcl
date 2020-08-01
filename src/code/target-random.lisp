@@ -279,7 +279,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (declaim (start-block random %random-single-float %random-double-float
                       random-chunk big-random-chunk))
 
-#-sb-fluid (declaim (inline random-chunk))
+(declaim (inline random-chunk))
 #-x86
 (defun random-chunk (state)
   (declare (type random-state state))
@@ -308,7 +308,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type random-state state))
   (sb-vm::random-mt19937 (random-state-state state)))
 
-#-sb-fluid (declaim (inline big-random-chunk))
+(declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
   (declare (type random-state state))
   (logior (ash (random-chunk state) 32)
@@ -318,7 +318,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
 ;;; with random bits, then subtracting 1.0. This hides the fact that
 ;;; we have a hidden bit.
-#-sb-fluid (declaim (inline %random-single-float %random-double-float))
+(declaim (inline %random-single-float %random-double-float))
 (declaim (ftype (function ((single-float ($0f0)) random-state)
                           (single-float $0f0))
                 %random-single-float))
@@ -390,7 +390,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; as the speed gains due to needing fewer loop iterations are by far
 ;;; outweighted by the cost of the two divisions required (one to find
 ;;; the multiplier and one to bring the result into the correct range).
-#-sb-fluid (declaim (inline %random-fixnum))
+(declaim (inline %random-fixnum))
 (defun %random-fixnum (arg state)
   (declare (type (integer 1 #.most-positive-fixnum) arg)
            (type random-state state))

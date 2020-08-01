@@ -106,7 +106,7 @@
 
 ;;;; choosing an instruction
 
-#-sb-fluid (declaim (inline inst-matches-p choose-inst-specialization))
+(declaim (inline inst-matches-p choose-inst-specialization))
 
 ;;; Return non-NIL if all constant-bits in INST match CHUNK.
 (defun inst-matches-p (inst chunk)
@@ -288,7 +288,7 @@
 ;;; LRA layout (dual word aligned):
 ;;;     header-word
 
-#-sb-fluid (declaim (inline words-to-bytes))
+(declaim (inline words-to-bytes))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;;; Convert a word-offset NUM to a byte-offset.

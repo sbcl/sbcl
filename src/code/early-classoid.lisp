@@ -82,7 +82,7 @@
   ;; PURIFY).
   ;; This is only meaningful if DD-CLASS-P = T.
   (pure nil :type (member t nil)))
-#-sb-fluid (declaim (freeze-type defstruct-description))
+(declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 
 ;;;; basic LAYOUT stuff

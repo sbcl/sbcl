@@ -11,7 +11,6 @@
 
 (in-package "SB-VM")
 
-#-sb-fluid
 (declaim (inline adjustable-array-p
                  array-displacement))
 

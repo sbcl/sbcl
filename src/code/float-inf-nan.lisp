@@ -15,7 +15,6 @@
 
 (in-package "SB-KERNEL")
 
-#-sb-fluid
 (declaim (maybe-inline float-denormalized-p float-infinity-p float-nan-p
                        float-trapping-nan-p))
 

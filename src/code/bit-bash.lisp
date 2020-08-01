@@ -76,7 +76,7 @@
             (:little-endian
                (ash (ldb (byte (- n-word-bits count) 0) number) count)))))))
 
-#-sb-fluid (declaim (inline start-mask end-mask))
+(declaim (inline start-mask end-mask))
 
 ;;; Produce a mask that contains 1's for the COUNT "start" bits and
 ;;; 0's for the remaining "end" bits. Only the lower 5 bits of COUNT
@@ -94,7 +94,7 @@
   (declare (fixnum count))
   (shift-towards-end most-positive-word (- count)))
 
-#-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
+(declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
            (type index offset)

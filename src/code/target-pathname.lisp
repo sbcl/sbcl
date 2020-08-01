@@ -59,7 +59,7 @@
 ;;; Physical pathnames include all these slots and a device slot.
 
 ;;; We can't freeze HOST because later on we define either UNIX-HOST or WIN32-HOST.
-#-sb-fluid (declaim (freeze-type logical-host))
+(declaim (freeze-type logical-host))
 
 ;;; Utility functions
 

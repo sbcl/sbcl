@@ -516,7 +516,7 @@
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant real-lra-slot sb-vm:code-constants-offset)
 
-#-sb-fluid (declaim (inline control-stack-pointer-valid-p))
+(declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
   (declare (type system-area-pointer x))
   (let* (#-stack-grows-downward-not-upward
@@ -643,7 +643,7 @@
 ;;; address.
 ;;;
 ;;; XXX Could be a little smarter.
-#-sb-fluid (declaim (inline ra-pointer-valid-p))
+(declaim (inline ra-pointer-valid-p))
 (defun ra-pointer-valid-p (ra)
   (declare (type system-area-pointer ra))
   (and

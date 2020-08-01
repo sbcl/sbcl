@@ -31,7 +31,7 @@
 (declaim (freeze-type newline)
          (end-block))
 
-#-sb-fluid (declaim (inline index-posn posn-index posn-column))
+(declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
   (declare (type index index) (type pretty-stream stream)
            (values posn))

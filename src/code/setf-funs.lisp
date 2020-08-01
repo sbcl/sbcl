@@ -57,7 +57,7 @@
            (let ((type (type-specifier (global-ftype sym))))
              (aver (consp type))
              (list
-              #-sb-fluid `(declaim (inline (setf ,sym)))
+              `(declaim (inline (setf ,sym)))
               (compute-one-setter sym type))))
          (sort (res) #'string<)))))
 

@@ -429,7 +429,6 @@
 (defconstant +filetime-unit+ 10000000)
 (defconstant +common-lisp-epoch-filetime-seconds+ 9435484800)
 
-#-sb-fluid
 (declaim (inline get-time-of-day))
 (defun get-time-of-day ()
   "Return the number of seconds and microseconds since the beginning of the

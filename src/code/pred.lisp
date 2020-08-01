@@ -13,7 +13,7 @@
 
 ;;;; miscellaneous non-primitive predicates
 
-#-sb-fluid (declaim (inline streamp))
+(declaim (inline streamp))
 (defun streamp (stream)
   (typep stream 'stream))
 

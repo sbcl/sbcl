@@ -389,7 +389,7 @@
 ;;; determine what is evaluated next. If the ctran has no block, then
 ;;; we make it be in the block that the node is in. If the ctran heads
 ;;; its block, we end our block and link it to that block.
-#-sb-fluid (declaim (inline use-ctran))
+(declaim (inline use-ctran))
 (defun use-ctran (node ctran)
   (declare (type node node) (type ctran ctran))
   (if (eq (ctran-kind ctran) :unused)
@@ -451,7 +451,7 @@
            (setf (lvar-uses lvar) (list node (lvar-uses lvar)))))
     (reoptimize-lvar lvar)))
 
-#-sb-fluid(declaim (inline use-continuation))
+(declaim (inline use-continuation))
 (defun use-continuation (node ctran lvar)
   (use-ctran node ctran)
   (use-lvar node lvar))

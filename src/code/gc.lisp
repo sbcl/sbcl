@@ -15,7 +15,6 @@
 
 #+gencgc
 (define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) os-vm-size-t)
-#-sb-fluid
 (declaim (inline current-dynamic-space-start))
 (defun current-dynamic-space-start ()
   #+gencgc sb-vm:dynamic-space-start
@@ -27,7 +26,6 @@
   (defun dynamic-space-free-pointer ()
     (extern-alien "dynamic_space_free_pointer" system-area-pointer)))
 
-#-sb-fluid
 (declaim (inline dynamic-usage))
 #+gencgc
 (defun dynamic-usage ()

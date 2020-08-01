@@ -43,7 +43,7 @@
 
 ;;;; utilities for reading from fasl files
 
-#-sb-fluid (declaim (inline read-byte))
+(declaim (inline read-byte))
 
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.

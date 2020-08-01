@@ -67,7 +67,6 @@
 ;;;; KLUDGE: It's not clear that using bit-vectors would be any more efficient.
 ;;;; Perhaps the abstraction could go away. -- WHN 19991124
 
-#-sb-fluid
 (declaim (inline dchunk-or dchunk-and dchunk-clear dchunk-not
                  dchunk-make-mask dchunk-make-field
                  dchunk-extract
@@ -559,7 +558,7 @@
            `((lookup-label ,(maybe-listify numeric-forms)))
            numeric-forms)))))
 
-#-sb-fluid (declaim (inline bytes-to-bits))
+(declaim (inline bytes-to-bits))
 
 (defun bytes-to-bits (bytes)
   (declare (type disassem-length bytes))

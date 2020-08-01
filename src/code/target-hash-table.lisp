@@ -52,7 +52,7 @@
   (and (hash-table-weak-p ht)
        (decode-hash-table-weakness (ht-flags-weakness (hash-table-flags ht)))))
 
-#-sb-fluid (declaim (inline eq-hash))
+(declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values fixnum (member t nil)))
   ;; I think it would be ok to pick off SYMBOL here and use its hash slot
@@ -105,7 +105,7 @@
               ;; Consider picking off %INSTANCEP too before using EQ-HASH ?
               (eq-hash key)))))
 
-#-sb-fluid (declaim (inline equal-hash))
+(declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values fixnum (member t nil)))
   (typecase key

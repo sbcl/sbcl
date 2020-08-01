@@ -95,7 +95,7 @@
     (link-blocks node-block next-block)))
 
 ;;; an annotated lvar's primitive-type
-#-sb-fluid (declaim (inline lvar-ptype))
+(declaim (inline lvar-ptype))
 (defun lvar-ptype (lvar)
   (declare (type lvar lvar))
   (ir2-lvar-primitive-type (lvar-info lvar)))

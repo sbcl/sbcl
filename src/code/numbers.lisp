@@ -16,7 +16,7 @@
 ;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is
 ;;; used when we know that REALPART and IMAGPART are the same type, but
 ;;; rational canonicalization might still need to be done.
-#-sb-fluid (declaim (inline canonical-complex))
+(declaim (inline canonical-complex))
 (defun canonical-complex (realpart imagpart)
   (if (eql imagpart 0)
       realpart
@@ -36,7 +36,7 @@
 ;;; Given a numerator and denominator with the GCD already divided
 ;;; out, make a canonical rational. We make the denominator positive,
 ;;; and check whether it is 1.
-#-sb-fluid (declaim (inline build-ratio))
+(declaim (inline build-ratio))
 (defun build-ratio (num den)
   (multiple-value-bind (num den)
       (if (minusp den)
@@ -51,7 +51,7 @@
       (t (%make-ratio num den)))))
 
 ;;; Truncate X and Y, but bum the case where Y is 1.
-#-sb-fluid (declaim (inline maybe-truncate))
+(declaim (inline maybe-truncate))
 (defun maybe-truncate (x y)
   (if (eql y 1)
       x
@@ -418,7 +418,7 @@
 ;;; ROUND and FROUND are not declared inline since they seem too
 ;;; obscure and too big to inline-expand by default. Also, this gives
 ;;; the compiler a chance to pick off the unary float case.
-#-sb-fluid (declaim (inline fceiling ffloor ftruncate))
+(declaim (inline fceiling ffloor ftruncate))
 (defun ftruncate (number &optional (divisor 1))
   "Same as TRUNCATE, but returns first value as a float."
   (declare (explicit-check))

@@ -31,7 +31,7 @@
   ;; extent.
   (associated-conditions '() :type list))
 
-#-sb-fluid (declaim (freeze-type restart))
+(declaim (freeze-type restart))
 
 (defmacro with-condition-restarts
     (condition-form restarts-form &body body)
