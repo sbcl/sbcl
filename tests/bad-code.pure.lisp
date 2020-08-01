@@ -430,19 +430,27 @@
                         (search '(a . b) x))
                       :allow-warnings t))))
 
+(with-test (:name :improper-list.3)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                          (let ((x '(1 2 . 3)))
+                            (position c x)))
+                      :allow-warnings t))))
+
 (with-test (:name :call-nil)
   (checked-compile-and-assert
-   ()
-   `(lambda ()
-      (funcall nil))
-   (() (condition 'undefined-function)))
+      ()
+      `(lambda ()
+         (funcall nil))
+    (() (condition 'undefined-function)))
   (checked-compile-and-assert
-   ()
-   `(lambda (x)
-      (if x
-          10
-          (funcall x)))
-   ((nil) (condition 'undefined-function))))
+      ()
+      `(lambda (x)
+         (if x
+             10
+             (funcall x)))
+    ((nil) (condition 'undefined-function))))
 
 (with-test (:name (:valid-callable-argument :toplevel-xep))
   (assert (nth-value 2 (checked-compile `(lambda (l) (find-if (lambda ()) l))

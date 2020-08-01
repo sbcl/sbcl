@@ -2192,6 +2192,8 @@
                                              key test test-not)
                                        (t (or list vector) &rest t))
                 (when (and (constant-lvar-p sequence)
+                           (or (proper-sequence-p (lvar-value sequence))
+                               (give-up-ir1-transform))
                            (zerop (length (lvar-value sequence))))
                   (if (and test test-not)
                       ;; even though one kwd arg could legit be NIL, it's not interesting.
