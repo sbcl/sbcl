@@ -289,7 +289,7 @@
                  (dump-byte (char-code (aref string i)) res))))
         (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
         (dump-word +fasl-file-version+ res)
-        (dump-counted-string (sb-xc:lisp-implementation-version))
+        (dump-counted-string (lisp-implementation-version))
         (dump-counted-string (compute-features-affecting-fasl-format)))
       res)))
 
