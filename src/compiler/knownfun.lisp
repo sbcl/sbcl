@@ -427,12 +427,11 @@
                                        (process-dim (array-type-dimensions type))))
                        (t (return '*))))
                    (process-dim (dim)
-                     (let ((length (car dim)))
-                       (if (and (singleton-p dim)
-                                (integerp length))
+                     (if (typep dim '(cons integer null))
+                         (let ((length (car dim)))
                            (setf max (max max length)
-                                 min (min min length))
-                           (return '*)))))
+                                 min (min min length)))
+                         (return '*))))
             ;; If type derivation were able to notice that non-simple arrays can
             ;; be mutated (changing the type), we could safely use LVAR-TYPE on
             ;; any vector type. But it doesn't notice.

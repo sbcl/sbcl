@@ -2931,3 +2931,10 @@
     ((t nil) nil)
     ((nil t) nil)
     ((nil nil) nil)))
+
+(with-test (:name :sequence-lvar-dimensions-on-arrays)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x a)
+         (count a (make-string x :initial-element a)))
+    ((10 #\a) 10)))
