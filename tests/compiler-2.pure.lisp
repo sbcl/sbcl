@@ -2938,3 +2938,9 @@
       `(lambda (x a)
          (count a (make-string x :initial-element a)))
     ((10 #\a) 10)))
+
+(with-test (:name :length-transform-on-arrays)
+  (checked-compile-and-assert
+   ()
+   `(lambda () (length (make-sequence '(string *) 10 :initial-element #\a)))
+       (() 10)))

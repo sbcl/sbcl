@@ -1359,12 +1359,11 @@
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
   (let* ((vtype (lvar-type vector))
-         (dim (first (array-type-dimensions-or-give-up vtype))))
-    (when (eq dim '*)
+         (dim (array-type-dimensions-or-give-up vtype)))
+    (when (or (not (typep dim '(cons integer)))
+              (conservative-array-type-complexp vtype))
       (give-up-ir1-transform))
-    (when (conservative-array-type-complexp vtype)
-      (give-up-ir1-transform))
-    dim))
+    (first dim)))
 
 (defoptimizer (vector-length derive-type) ((vector))
   (let ((array-type (lvar-conservative-type vector))
