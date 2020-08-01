@@ -374,6 +374,8 @@ void signal_handler_callback(lispobj, int, void *, void *);
 
 #endif
 
+#define WITH_GC_AT_SAFEPOINTS_ONLY()
+
 extern void create_main_lisp_thread(lispobj);
 
 #ifdef LISP_FEATURE_SB_THREAD

@@ -779,9 +779,8 @@ callback_wrapper_trampoline(
     if (!th) {                  /* callback invoked in non-lisp thread */
         init_thread_data scribble;
         attach_os_thread(&scribble);
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+
         WITH_GC_AT_SAFEPOINTS_ONLY()
-#endif
         {
             funcall3(StaticSymbolFunction(ENTER_FOREIGN_CALLBACK), arg0,arg1,arg2);
         }
@@ -794,9 +793,7 @@ callback_wrapper_trampoline(
     th->carried_base_pointer = (os_context_register_t) *(((void**)arg2)-1);
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
     WITH_GC_AT_SAFEPOINTS_ONLY()
-#endif
     {
 #if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
         funcall_alien_callback(arg1, arg2, arg0, th);

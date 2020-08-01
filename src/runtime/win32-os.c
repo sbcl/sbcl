@@ -60,11 +60,6 @@
 #include "thread.h"
 #include "align.h"
 
-#ifndef LISP_FEATURE_SB_THREAD
-/* dummy definition to reduce ifdef clutter */
-#define WITH_GC_AT_SAFEPOINTS_ONLY() if (0) ; else
-#endif
-
 #include "gc.h"
 #include "gencgc-internal.h"
 #include <wincrypt.h>

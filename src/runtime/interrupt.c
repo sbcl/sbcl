@@ -1179,17 +1179,15 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * be available; should we copy it or was nobody using it anyway?)
          * then we should convert this to return-elsewhere */
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if !defined(LISP_FEATURE_SB_SAFEPOINT) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
         /* Leave deferrable signals blocked, the handler itself will
          * allow signals again when it sees fit. */
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* handler.lisp will hide from the GC, will be enabled in the handler itself.
          * Not a problem for the conservative GC. */
         unblock_gc_signals();
 #endif
-#else
+
         WITH_GC_AT_SAFEPOINTS_ONLY()
-#endif
         { // the block is needed for WITH_GC_AT_SAFEPOINTS_ONLY() to work
             DX_ALLOC_SAP(context_sap, context);
             DX_ALLOC_SAP(info_sap, info);
