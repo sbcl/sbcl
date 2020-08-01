@@ -148,7 +148,8 @@
                   t)
                  ((eq (block-flag current-block) flag)
                   t)
-                 ((eq (block-flag current-block) cycle))
+                 ((eq (block-flag current-block) cycle)
+                  nil)
                  ;; Don't go back past START-BLOCK.
                  ((not (eq current-block start-block))
                   (setf (block-flag current-block) cycle)

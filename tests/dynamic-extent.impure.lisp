@@ -1587,3 +1587,15 @@
     (assert-no-consing
      (with-output-to-string (*standard-output* s)
        (write-char #\x)))))
+
+(with-test (:name :cycles-without-dx-lvars)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f x z)
+      (let ((l (if x
+                   (loop while z)
+                   (list (list 1)))))
+        (declare (dynamic-extent l))
+        (funcall f l)))
+   (((lambda (l) (equal l '((1)))) nil nil) t)
+   (((lambda (l) (equal l nil)) t nil) t)))
