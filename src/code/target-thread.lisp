@@ -1185,24 +1185,30 @@ must be held by this thread during this call."
 ;;;; Semaphores
 
 (defstruct (semaphore (:copier nil)
-                      (:constructor make-semaphore
-                          (&key name ((:count %count) 0))))
+                      (:constructor %make-semaphore (%count mutex queue)))
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
-  (name    nil :type (or null string) :read-only t)
+  ;; We have two NAME slots to play with - no need for another in this object.
   (%count    0 :type (integer 0))
   (waitcount 0 :type sb-vm:word)
-  (mutex (make-mutex :name "semaphore lock") :read-only t
-                                             :type mutex)
-  (queue (make-waitqueue) :read-only t
-                          :type waitqueue))
+  (mutex nil :read-only t :type mutex)
+  (queue nil :read-only t :type waitqueue))
 (declaim (sb-ext:freeze-type semaphore))
 
-(setf (documentation 'semaphore-name 'function)
-      "The name of the semaphore INSTANCE. Setfable."
-      (documentation 'make-semaphore 'function)
-      "Create a semaphore with the supplied COUNT and NAME.")
+(defun make-semaphore (&key name (count 0))
+  "Create a semaphore with the supplied COUNT and NAME."
+  (declare (inline make-mutex make-waitqueue))
+  (%make-semaphore count
+                   (make-mutex :name name)
+                   (make-waitqueue :name name)))
+
+(defun semaphore-name (semaphore)
+  "The name of the semaphore INSTANCE. Setfable."
+  (waitqueue-name (semaphore-queue semaphore)))
+
+(defun (setf semaphore-name) (newval semaphore)
+  (setf (waitqueue-name (semaphore-queue semaphore)) newval))
 
 (defstruct (semaphore-notification (:constructor make-semaphore-notification ())
                                    (:copier nil))
@@ -2022,9 +2028,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 (define-alien-routine ("create_thread" %create-thread)
   unsigned (lisp-fun-address unsigned))
 (defun start-thread (thread function arguments)
-    (declare (inline make-semaphore
-                     make-waitqueue
-                     make-mutex))
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            #+(or win32 darwin)
            (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
