@@ -198,7 +198,10 @@
   ;; from keyword-pair to object is deferred until cold-init.
   (dovector (x (the simple-vector *info-types*))
     (when x (!register-meta-info x)))
-  #-sb-xc-host (setq *info-environment* (make-info-hashtable)))
+  #-sb-xc-host
+  (let ((h (make-info-hashtable)))
+    (setf (sb-thread:mutex-name (info-env-mutex h)) "globaldb")
+    (setq *info-environment* h)))
 
 ;;;; GET-INFO-VALUE
 

@@ -192,7 +192,7 @@
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
 ;;; Since multiple threads are executing tests, there is no reason to kill
 ;;; unrecognized threads.
-(sb-ext:define-load-time-global *output-mutex* (sb-thread:make-mutex))
+(sb-ext:define-load-time-global *output-mutex* (sb-thread:make-mutex :name "run-tests output"))
 (defun run-test-concurrently (test-spec)
   (destructuring-bind (test-body . name) test-spec
     (sb-thread:with-mutex (*output-mutex*)

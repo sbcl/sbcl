@@ -1367,7 +1367,7 @@ on this semaphore, then N of them is woken up."
   ;; the various operations on a session though.
   (threads nil)
   (interactive-threads nil)
-  (interactive-threads-queue (make-waitqueue)))
+  (interactive-threads-queue (make-waitqueue :name "session")))
 (declaim (sb-ext:freeze-type session))
 
 (defvar *session* nil)

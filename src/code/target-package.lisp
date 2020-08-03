@@ -1855,6 +1855,9 @@ PACKAGE."
         (cons (make-info-hashtable :comparator #'pkg-name=
                                    :hash-function #'sxhash)
               1))
+  (setf (sb-thread:mutex-name (info-env-mutex *package-names*)) "package names"
+        (sb-thread:mutex-name (info-env-mutex (car *package-nickname-ids*)))
+        "package nicknames")
   (with-package-names (names)
     (dolist (spec *!initial-symbols*)
       (let ((pkg (car spec)) (symbols (cdr spec)))
