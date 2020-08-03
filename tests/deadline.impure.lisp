@@ -313,7 +313,6 @@
     ;; to start running their bodies at the exact same time. If they don't do that,
     ;; then it's entirely possible that one thread gets run start to finish before
     ;; the other thread does anything at all.  So obviously the test will fail.
-    (setf (sb-kernel:%instance-ref gate 0) "gate sem") ; FIXME: we claim that NAME is SETFable
     (let ((m (sb-thread::semaphore-mutex gate)))
       (setf (sb-thread:mutex-name m) "gate sem mutex"))
     (let ((cv (sb-thread::semaphore-queue gate)))
