@@ -2117,15 +2117,15 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     unsigned int offset = code ? pc - (char*)code : 0;
     if (offset)
         corruption_warning_and_maybe_lose(
-            "Memory fault at %p (pc=%p [code %p+0x%X ID 0x%x], fp=%p, sp=%p) tid %#lx",
+            "Memory fault at %p (pc=%p [code %p+0x%X ID 0x%x], fp=%p, sp=%p)" THREAD_ID_LABEL,
             addr, pc, code, offset, code_serialno(code),
             os_context_frame_pointer(context),
-            *os_context_sp_addr(context), thread_self()); // = 0 if -sb-thread
+            *os_context_sp_addr(context), THREAD_ID_VALUE);
     else
         corruption_warning_and_maybe_lose(
-            "Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
+            "Memory fault at %p (pc=%p, fp=%p, sp=%p)" THREAD_ID_LABEL,
             addr, pc, os_context_frame_pointer(context),
-            *os_context_sp_addr(context), thread_self()); // = 0 if -sb-thread
+            *os_context_sp_addr(context), THREAD_ID_VALUE);
 #else
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
                                       addr, *os_context_pc_addr(context));

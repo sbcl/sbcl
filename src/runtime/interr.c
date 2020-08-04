@@ -99,10 +99,7 @@ void disable_lossage_handler(void)
 static
 void print_message(char *fmt, va_list ap)
 {
-    fprintf(stderr, " in SBCL pid %d",getpid());
-#if defined(LISP_FEATURE_SB_THREAD)
-    fprintf(stderr, "(tid %p)", (void*)thread_self());
-#endif
+    fprintf(stderr, " in SBCL pid %d" THREAD_ID_LABEL, getpid(), THREAD_ID_VALUE);
     if (fmt) {
         fprintf(stderr, ":\n");
         vfprintf(stderr, fmt, ap);

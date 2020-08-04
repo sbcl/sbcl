@@ -382,4 +382,16 @@ extern void create_main_lisp_thread(lispobj);
 extern pthread_mutex_t all_threads_lock;
 #endif
 
+#ifndef LISP_FEATURE_SB_THREAD
+# define THREAD_ID_LABEL ""
+# define THREAD_ID_VALUE 0
+#elif defined __linux__
+extern int sb_GetTID();
+# define THREAD_ID_LABEL " tid %d"
+# define THREAD_ID_VALUE (sb_GetTID())
+#else
+# define THREAD_ID_LABEL " pthread %p"
+# define THREAD_ID_VALUE ((void*)thread_self())
+#endif
+
 #endif /* _INCLUDE_THREAD_H_ */

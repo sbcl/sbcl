@@ -193,7 +193,7 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 
 #ifdef __linux__
 // gettid() was added in glibc 2.30 but we support older glibc
-static int sb_GetTID() { return syscall(SYS_gettid); }
+int sb_GetTID() { return syscall(SYS_gettid); }
 #else
 #define sb_GetTID() 0
 #endif
