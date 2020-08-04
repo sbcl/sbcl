@@ -9,12 +9,24 @@
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
 (let* ((non-target-features
+        ;;
+        ;; FIXME: I suspect that this list should be changed to its inverse-
+        ;; features that _SHOULD_ go into SB-IMPL:+INTERNAL-FEATURES+ and
+        ;; comments about the reasoning behind each, rather than features to
+        ;; discard and reasons they're not needed. The default assumption should be
+        ;; to drop any build-time feature that lacks a rationale to preserve it.
+        ;;
         '(;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
           :SB-AFTER-XC-CORE
           ;; CONS-PROFILING sets the initial compiler policy which persists
           ;; into the default baseline policy. It has no relevance post-build
           ;; in as much as policy can be changed later arbitrarily.
           :CONS-PROFILING
+          ;; Used by nothing after compiling 'target-thread'
+          :SB-FUTEX :FUTEX-USE-TID
+          ;; These affect the BREAK instruction emitter, but the C code is able
+          ;; to handle anything, and post-build we don't care which it is.
+          :UD2-BREAKPOINTS :INT4-BREAKPOINTS
           ;; Uses of OS-PROVIDES-DLOPEN and -DLADDR are confined to src/code/foreign.lisp
           :OS-PROVIDES-DLOPEN :OS-PROVIDES-DLADDR
           ;; more-or-less confined to serve-event, except for a test which now
