@@ -26,7 +26,44 @@
   (name   nil :type (or null simple-string))
   (%owner nil :type (or null thread)))
 
-(sb-xc:defstruct (thread (:constructor %make-thread (name %ephemeral-p))
+#+(or (not sb-thread) sb-futex)
+(sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
+  "Waitqueue type."
+  #+(and sb-thread sb-futex)
+  (token 0
+         ;; actually 32-bits, but it needs to be a raw slot and we don't have
+         ;; 32-bit raw slots on 64-bit machines.
+         #+futex-use-tid :type #+futex-use-tid sb-ext:word)
+  ;; If adding slots between TOKEN and NAME, please see futex_name() in linux_os.c
+  ;; which attempts to divine a string from a futex word address.
+  (name nil :type (or null string)))
+
+#+(and sb-thread (not sb-futex))
+(sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
+  "Waitqueue type."
+  (name nil :type (or null string))
+  ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
+  ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
+  ;; lock. In most cases this should be uncontested thanks to the mutex --
+  ;; the only case where that might not be true is when CONDITION-WAIT
+  ;; unwinds and %WAITQUEUE-DROP is called.
+  %owner
+  %head
+  %tail)
+
+(sb-xc:defstruct (semaphore (:copier nil)
+                            (:constructor %make-semaphore (%count mutex queue)))
+  "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
+should be considered an implementation detail, and may change in the
+future."
+  (%count    0 :type (integer 0))
+  (waitcount 0 :type sb-vm:word)
+  (mutex nil :read-only t :type mutex)
+  (queue nil :read-only t :type waitqueue))
+
+(declaim (sb-ext:freeze-type waitqueue semaphore))
+
+(sb-xc:defstruct (thread (:constructor %make-thread (name %ephemeral-p semaphore))
                          (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
@@ -81,19 +118,17 @@ in future versions."
   ;; might have been known as the %ALIVE-P flag.
   (%visible 1 :type fixnum)
   (interruptions nil :type list)
-  ;; On succesful execution of the thread's lambda a list of values.
-  (result 0)
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")
    :type mutex :read-only t)
-  (result-lock
-   (make-mutex :name "thread result lock")
-   :type (or null mutex) :read-only t)
+  ;; On succesful execution of the thread's lambda, a list of values.
+  (result 0)
+  (semaphore nil :type (or null semaphore))
   waiting-for)
 
 (sb-xc:defstruct (foreign-thread
                   (:copier nil)
-                  (:include thread (result-lock nil) (name "callback"))
+                  (:include thread (name "callback"))
                   (:constructor make-foreign-thread ())
                   (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
@@ -107,4 +142,4 @@ temporarily.")
   "Asynchronous signal handling thread."
   (signal-number nil :type integer))
 
-#-sb-xc-host (declaim (sb-ext:freeze-type mutex thread))
+(declaim (sb-ext:freeze-type mutex thread))

@@ -317,7 +317,8 @@ created and old ones may exit at any time."
   ;;; the global mutexes but not all of them?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
-  (let ((thread (%make-thread "main thread" nil)))
+  (let* ((name "main thread")
+         (thread (%make-thread name nil (make-semaphore :name name))))
     (copy-primitive-thread-fields thread)
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
@@ -325,7 +326,6 @@ created and old ones may exit at any time."
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
-    (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
     ;; threads doesn't work.
@@ -493,32 +493,6 @@ HOLDING-MUTEX-P."
   (sb-ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
-
-#+(or (not sb-thread) sb-futex)
-(defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
-  "Waitqueue type."
-  #+(and sb-thread sb-futex)
-  (token 0
-         ;; actually 32-bits, but it needs to be a raw slot and we don't have
-         ;; 32-bit raw slots on 64-bit machines.
-         #+futex-use-tid :type #+futex-use-tid sb-ext:word)
-  ;; If adding slots between TOKEN and NAME, please see futex_name() in linux_os.c
-  ;; which attempts to divine a string from a futex word address.
-  (name nil :type (or null string)))
-
-#+(and sb-thread (not sb-futex))
-(defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
-  "Waitqueue type."
-  (name nil :type (or null string))
-  ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
-  ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
-  ;; lock. In most cases this should be uncontested thanks to the mutex --
-  ;; the only case where that might not be true is when CONDITION-WAIT
-  ;; unwinds and %WAITQUEUE-DROP is called.
-  %owner
-  %head
-  %tail)
-(declaim (sb-ext:freeze-type waitqueue))
 
 ;;; Signals an error if owner of LOCK is waiting on a lock whose release
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
@@ -1180,18 +1154,6 @@ must be held by this thread during this call."
 
 ;;;; Semaphores
 
-(defstruct (semaphore (:copier nil)
-                      (:constructor %make-semaphore (%count mutex queue)))
-  "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
-should be considered an implementation detail, and may change in the
-future."
-  ;; We have two NAME slots to play with - no need for another in this object.
-  (%count    0 :type (integer 0))
-  (waitcount 0 :type sb-vm:word)
-  (mutex nil :read-only t :type mutex)
-  (queue nil :read-only t :type waitqueue))
-(declaim (sb-ext:freeze-type semaphore))
-
 (defun make-semaphore (&key name (count 0))
   "Create a semaphore with the supplied COUNT and NAME."
   (declare (inline make-mutex make-waitqueue))
@@ -1454,23 +1416,30 @@ on this semaphore, then N of them is woken up."
     (when *exit-in-process*
       (%exit))
     ;; Lisp-side cleanup
-    (let ((thread *current-thread*))
+    (let* ((thread *current-thread*)
+           (sem (thread-semaphore thread)))
       ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
       ;; That in turn caused a failure in GC because a fixnum is not a legal value
       ;; for the startup info when observed by GC.
       #+pauseless-threadstart (aver (not (memq thread *starting-threads*)))
-      ;; Stash the primitive thread SAP for reuse, but clobber the slot.
-      ;; This makes ALIVE-P return NIL.
+      ;; Stash the primitive thread SAP for reuse, but clobber the PRIMITIVE-THREAD
+      ;; slot which makes ALIVE-P return NIL.
+      ;; A minor TODO: can this lock acquire/release be moved to where we actually
+      ;; unmap the memory an do a pthread_join()? I would think so, because until then,
+      ;; there is no real harm in reading the memory.  In this state the pthread library
+      ;; will usually return ESRCH if you try to use the pthread id - it's a valid
+      ;; pointer, but it knows that it has no underlying OS thread.
       (with-interruptions-lock (thread)
-        (when (thread-result-lock thread) ; ordinary lisp thread, not FOREIGN-THREAD
+        (when sem ; ordinary lisp thread, not FOREIGN-THREAD
           (setf (thread-startup-info thread) ; use the "funny fixnum" representation
                 (%make-lisp-obj (thread-primitive-thread thread))))
-        ;; The memory range can exist without a pthread running yet, but the pthread
-        ;; can't exist without the memory range. By clobbering this SAP here,
-        ;; it is safe to manipulate the memory and/or the pthread from another thread
-        ;; that acquires the interruptions lock if the SAP reads as nonzero.
         (setf (thread-primitive-thread thread) 0)
         (barrier (:write)))
+      (when sem
+        (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
+        ;; We could increment by most-positive-fixnum, but that might just encourage
+        ;; bad usage (more than one attempted joiner)
+        (signal-semaphore sem))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
       ;; only to remove it right away.
@@ -1478,7 +1447,7 @@ on this semaphore, then N of them is woken up."
         (%delete-thread-from-session thread))
       (cond
         #+pauseless-threadstart ; If possible, logically remove from *ALL-THREADS*
-        ((thread-result-lock thread)
+        (sem
          ;; Tree pruning is the responsibility of thread creators, not dying threads.
          ;; Creators have to manipulate the tree anyway, and they need access to the old
          ;; structure to grab the memory.
@@ -1810,14 +1779,8 @@ session."
          (sb-ext:atomic-push *current-thread* (session-new-enrollees *session*))
 
          ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
-         ;; pure cargo-cultism. I have no idea how or why any of it works, but it's
-         ;; basically the body of CALL-WITH-MUTEX, minus the actual GRAB-MUTEX which
-         ;; has been done by the creating thread on behalf of the created thread,
-         ;; unless the current thread is a FOREIGN-THREAD.
-         (without-interrupts
-             (unwind-protect (with-local-interrupts ,@body)
-               (let ((mutex (thread-result-lock *current-thread*)))
-                 (when mutex (release-mutex mutex)))))))))
+         ;; pure cargo-cultism.
+         (without-interrupts (with-local-interrupts ,@body))))))
 ) ; end PROGN
 
 #-pauseless-threadstart
@@ -1899,18 +1862,19 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                  (arguments)
                  "Argument passed to ~S, ~S, is an improper list."
                  'make-thread arguments)
-         (start-thread (%make-thread name nil)
+         (start-thread (%make-thread name nil (make-semaphore :name name))
                        (coerce function 'function)
                        (ensure-list arguments))))
 
 ;;; System-internal use only
 #+sb-thread
 (defun make-ephemeral-thread (name function arguments)
-  (start-thread (%make-thread name t) function arguments))
+  (start-thread (%make-thread name t (make-semaphore :name name))
+                function arguments))
 
 ;;; The purpose of splitting out START-THREAD from MAKE-THREAD is that when
 ;;; starting the finalizer thread, we might be able to do:
-;;; (let ((thread (%make-thread "finalizer" t)))
+;;; (let ((thread (%make-thread "finalizer" t ...)))
 ;;;   (when (cas *finalizer-thread* nil thread)
 ;;;     (start-thread thread ...)
 ;;; which is possibly an improvement in two ways:
@@ -1981,14 +1945,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                         #-darwin 0))) ; otherwise, don't need to do that
       (setf (thread-primitive-thread thread) (sap-int thread-sap)
             (thread-startup-info thread) startup-info)
-      ;; Grant ownership of THREAD's result lock to it now so that a THREAD-JOIN
-      ;; right away can't prevent the kid from acquiring its own result lock.
-      ;; (N.B.: Giving away mutex ownership is not something the public API allows)
-      ;; FIXME: this could be done more cleanly by a condition var to avoid reliance
-      ;; on the nonstandard operation of assigning ownership.
-      (let ((m (thread-result-lock thread)))
-        #+sb-futex (setf (mutex-state m) 1)
-        (setf (mutex-%owner m) thread))
       ;; Add new thread to *ALL-THREADS* now so that if the creator asserts
       ;; something about "all" threads, it can find the new thread.
       ;; But there is a slight ploy involved: the thread does not appear in
@@ -2039,8 +1995,12 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
                   (init-thread-local-storage thread)
-                  (with-mutex ((thread-result-lock thread))
-                    (run thread setup-sem function arguments))))
+                  ;; I literally don't know what these WITH/WITHOUT wrappings are for,
+                  ;; but tests fail when removed.
+                  ;; It's the body of CALL-WITH-MUTEX omitting the grab and release.
+                  (without-interrupts
+                      (with-local-interrupts
+                          (run thread setup-sem function arguments)))))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
         (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
@@ -2077,41 +2037,29 @@ Trying to join the main thread causes JOIN-THREAD to block until
 TIMEOUT occurs or the process exits: when the main thread exits, the
 entire process exits.
 
+Consequences of trying to join a given target thread from multiple
+threads are undefined.
+
 NOTE: Return convention in case of a timeout is experimental and
 subject to change."
   (when (eq thread *current-thread*)
     (error 'join-thread-error :thread thread :problem :self-join))
 
+  ;; First, free up the pthread resources of any thread(s), not necessarily
+  ;; one we're tryinng to join.
   #+pauseless-threadstart
   (when (cddr *joinable-threads*) ; if strictly > 2 are joinable,
-    ;; release C structures of previously exited threads. We could pthread_join()
-    ;; all joinables while retaining the memory for a few, but I didn't want to
-    ;; deal separately with the memory and the pthread - it's both or none.
-    ;; And the pthread overhead is negligible in comparison to the 4MB
-    ;; allocation that we make per thread.
     (without-interrupts (join-pthread-joinables #'cddr)))
-
-  (let ((lock (thread-result-lock thread))
-        (got-it nil)
-        (problem :timeout))
-    (unless lock
-      (error 'join-thread-error :thread thread :problem :foreign))
-    (without-interrupts
-      (unwind-protect
-           (cond
-             ((not (setf got-it
-                         (allow-with-interrupts
-                           ;; Don't use the timeout if the thread is
-                           ;; not alive anymore.
-                           (grab-mutex lock :timeout (and (thread-alive-p thread)
-                                                          timeout))))))
-             ((listp (thread-result thread))
-              (return-from join-thread
-                (values-list (thread-result thread))))
-             (t
-              (setf problem :abort)))
-        (when got-it
-          (release-mutex lock))))
+  ;; No result semaphore indicates that there's nothing to wait for-
+  ;; the thread is either a foreign-thread, or finished running.
+  (let ((problem
+         (acond ((thread-semaphore thread)
+                 (if (wait-on-semaphore it :timeout timeout) nil :timeout))
+                ((typep thread 'foreign-thread) :foreign))))
+    (unless problem
+      (if (listp (thread-result thread))
+          (return-from join-thread (values-list (thread-result thread)))
+          (setq problem :abort)))
     (if defaultp
         (values default problem)
         (error 'join-thread-error :thread thread :problem problem))))
