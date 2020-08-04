@@ -285,7 +285,6 @@ created and old ones may exit at any time."
 ;;; Always keep one preallocated foreign thread instance so that a non-lisp thread
 ;;; doesn't need to cons anything prior to release of the all_threads lock.
 (sb-ext:define-load-time-global *foreign-thread* nil)
-(sb-ext:define-load-time-global *make-thread-lock* nil)
 
 ;;; *JOINABLE-THREADS* is a list of THREAD instances used only if #+pauseless-threadstart
 ;;; I had attempted to construct the list using the thread's memory to create cons
@@ -1552,6 +1551,8 @@ on this semaphore, then N of them is woken up."
         ;; Need to defer till others have joined, because when main
         ;; thread exits, we're gone. Can't use TERMINATE-THREAD -- would
         ;; get the exit code wrong.
+        ;; This isn't a problem if *forcibly-terminate-threads-on-exit* is NIL -
+        ;; the thread that calls EXIT provides the exit code. It's that simple.
         (when main
           (handler-case
               (interrupt-thread
@@ -1566,6 +1567,7 @@ on this semaphore, then N of them is woken up."
           ;; to calling OS-EXIT.
           (join-thread main :default t :timeout (time-left)))))))
 
+;;; Pretty much don't use this.  It has the same problems as %EXIT-OTHER-THREADS.
 (defun terminate-session ()
   "Kill all threads in session except for this one.  Does nothing if current
 thread is not the foreground thread."

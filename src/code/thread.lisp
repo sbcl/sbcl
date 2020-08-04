@@ -254,3 +254,5 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
                (funcall function))
           (when got-it
             (release-mutex lock)))))))
+
+(sb-ext:define-load-time-global *make-thread-lock* nil)

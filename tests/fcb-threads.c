@@ -39,3 +39,39 @@ int call_thing_from_threads(void* ptr, int n_threads, int n_calls)
     }
     return 0;
 }
+
+/// The code following is for the no-lockup-on-exit test, unrelated to the above
+
+#include <signal.h>
+#include <sys/time.h>
+#include <unistd.h>
+
+static pthread_mutex_t some_global_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void acquire_a_global_lock() {
+    pthread_mutex_lock(&some_global_lock);
+}
+void release_a_global_lock() {
+    pthread_mutex_unlock(&some_global_lock);
+}
+static void alarmclock_expired(int sig)
+{
+    char msg[] = "timed out\n";
+    write(2, msg, sizeof msg-1);
+    _exit(1);
+}
+
+/// Exit with failure if we can't exit within a set time.
+void prepare_exit_test(int seconds)
+{
+    struct sigaction sa;
+    sa.sa_handler = alarmclock_expired;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGALRM, &sa, 0);
+    struct itimerval it;
+    it.it_value.tv_sec = seconds;
+    it.it_value.tv_usec = 0;
+    it.it_interval.tv_sec = it.it_interval.tv_usec = 0;
+    setitimer(ITIMER_REAL, &it, 0);
+}
