@@ -243,6 +243,8 @@
              (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
                           target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
+        (when (featurep '(:and :sb-thread :sb-futex :linux) target-feature-list)
+          (pushnew :futex-use-tid target-feature-list))
         #+nil
         (let ((*readtable* *xc-readtable*)
               (sb-xc:*features* target-feature-list))

@@ -23,9 +23,6 @@
           with-session-lock
           with-spinlock))
 
-(eval-when (:compile-toplevel :load-toplevel)
-  #+(and sb-thread sb-futex linux) (pushnew :futex-use-tid sb-xc:*features*))
-
 #+linux
 (defmacro my-kernel-thread-id ()
   `(sb-ext:truly-the

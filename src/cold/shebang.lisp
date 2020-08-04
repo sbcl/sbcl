@@ -88,13 +88,15 @@
 
 ;;; We should never call this with a selector of :HOST any more,
 ;;; but I'm keeping it in case of emergency.
-(defun featurep (feature &aux (list sb-xc:*features*))
+;;; SB-XC:*FEATURES* might not be bound yet when computing derived features.
+(defun featurep (feature &optional (list sb-xc:*features*))
   (etypecase feature
     (symbol
      (if (string= feature "SBCL")
          (error "Testing SBCL as a target feature is obviously bogus")
          (member feature list :test #'eq)))
-    (cons (flet ((subfeature-in-list-p (subfeature) (featurep subfeature)))
+    (cons (flet ((subfeature-in-list-p (subfeature)
+                   (featurep subfeature list)))
             (ecase (first feature)
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
