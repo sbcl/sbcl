@@ -1435,11 +1435,6 @@ on this semaphore, then N of them is woken up."
                 (%make-lisp-obj (thread-primitive-thread thread))))
         (setf (thread-primitive-thread thread) 0)
         (barrier (:write)))
-      (when sem
-        (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
-        ;; We could increment by most-positive-fixnum, but that might just encourage
-        ;; bad usage (more than one attempted joiner)
-        (signal-semaphore sem))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
       ;; only to remove it right away.
@@ -1460,7 +1455,12 @@ on this semaphore, then N of them is woken up."
          ;; the memory allocation/deallocation is handled in C.
          ;; I would like to combine the recycle bin for foreign and lisp threads though.
          (delete-from-all-threads
-          (get-lisp-obj-address sb-vm:*control-stack-start*)))))))
+          (get-lisp-obj-address sb-vm:*control-stack-start*))))
+      (when sem
+        (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
+        ;; We could increment by most-positive-fixnum, but that might just encourage
+        ;; bad usage (more than one attempted joiner)
+        (signal-semaphore sem)))))
 
 ;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
 ;;; expect normal happy lisp integers, even if a bignum.
