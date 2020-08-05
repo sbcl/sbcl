@@ -245,12 +245,10 @@
              (arch (target-platform-keyword target-feature-list)))
         (when (featurep '(:and :sb-thread :sb-futex :linux) target-feature-list)
           (pushnew :futex-use-tid target-feature-list))
-        #+nil
-        (let ((*readtable* *xc-readtable*)
-              (sb-xc:*features* target-feature-list))
-          (when (featurep '(:and :linux (:or :x86 :x86-64) :sb-thread
-                                 (:not (:or :sb-safepoint :sb-thruption))))
-            (push :pauseless-threadstart target-feature-list)))
+        (when (featurep '(:and :linux (:or :x86 :x86-64) :sb-thread
+                               (:not (:or :sb-safepoint :sb-thruption)))
+                        target-feature-list)
+          (push :pauseless-threadstart target-feature-list))
         (when (and (member :x86 target-feature-list)
                    (member :int4-breakpoints target-feature-list))
           ;; 0xCE is a perfectly good 32-bit instruction,
