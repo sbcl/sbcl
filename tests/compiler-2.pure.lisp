@@ -2950,3 +2950,13 @@
    (:allow-style-warnings t)
    `(lambda ()
       (oddp (the (or a b) -1)))))
+
+(with-test (:name :dead-code-no-constant-fold-errors)
+  (assert
+   (typep (nth-value 4
+                     (checked-compile
+                      `(lambda (z)
+                         (when (and (eq z 0)
+                                    (not (eq z 0)))
+                           (/ 10 0)))))
+          '(cons sb-ext:code-deletion-note null))))

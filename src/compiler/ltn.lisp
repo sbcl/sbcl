@@ -198,6 +198,11 @@
            (setf (node-tail-p call) nil))))
   (values))
 
+(defun signal-delayed-combination-condition (call)
+  (let ((*compiler-error-context* call)
+        (delayed (combination-info call)))
+    (apply #'funcall delayed)))
+
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
 ;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
 ;;; recursion normally, since the IR2 convert method is going to want
@@ -225,6 +230,8 @@
        (setf (node-tail-p call) nil))
       (t
        (when (eq kind :error)
+         (when (basic-combination-info call)
+           (signal-delayed-combination-condition call))
          (setf (basic-combination-kind call) :full))
        (setf (basic-combination-info call) :full)
        (rewrite-full-call call))))

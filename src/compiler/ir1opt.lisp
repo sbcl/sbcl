@@ -1731,53 +1731,11 @@
                            (resolve-key-args args type)
                            args)))
           (args (mapcar #'value lvar-args)))
-     (multiple-value-bind (values win)
-         (careful-call fun-name
-                       args
-                       call
-                       ;; Note: CMU CL had COMPILER-WARN here, and that
-                       ;; seems more natural, but it's probably not.
-                       ;;
-                       ;; It's especially not while bug 173 exists:
-                       ;; Expressions like
-                       ;;   (COND (END
-                       ;;          (UNLESS (OR UNSAFE? (<= END SIZE)))
-                       ;;            ...))
-                       ;; can cause constant-folding TYPE-ERRORs (in
-                       ;; #'<=) when END can be proved to be NIL, even
-                       ;; though the code is perfectly legal and safe
-                       ;; because a NIL value of END means that the
-                       ;; #'<= will never be executed.
-                       ;;
-                       ;; Moreover, even without bug 173,
-                       ;; quite-possibly-valid code like
-                       ;;   (COND ((NONINLINED-PREDICATE END)
-                       ;;          (UNLESS (<= END SIZE))
-                       ;;            ...))
-                       ;; (where NONINLINED-PREDICATE is something the
-                       ;; compiler can't do at compile time, but which
-                       ;; turns out to make the #'<= expression
-                       ;; unreachable when END=NIL) could cause errors
-                       ;; when the compiler tries to constant-fold (<=
-                       ;; END SIZE).
-                       ;;
-                       ;; So, with or without bug 173, it'd be
-                       ;; unnecessarily evil to do a full
-                       ;; COMPILER-WARNING (and thus return FAILURE-P=T
-                       ;; from COMPILE-FILE) for legal code, so we we
-                       ;; use a wimpier COMPILE-STYLE-WARNING instead.
-                       #-sb-xc-host #'compiler-style-warn
-                       ;; On the other hand, for code we control, we
-                       ;; should be able to work around any bug
-                       ;; 173-related problems, and in particular we
-                       ;; want to be alerted to calls to our own
-                       ;; functions which aren't being folded away; a
-                       ;; COMPILER-WARNING is butch enough to stop the
-                       ;; SBCL build itself in its tracks.
-                       #+sb-xc-host #'compiler-warn
-                       "constant folding")
+     (multiple-value-bind (values win) (careful-call fun-name args)
        (cond ((not win)
-              (setf (combination-kind call) :error))
+              (setf (combination-kind call) :error
+                    (combination-info call)
+                    (list #'compiler-style-warn "Lisp error during consant folding:~%~A" values)))
              ((and (proper-list-of-length-p values 1))
               (replace-combination-with-constant (first values) call))
              (t (let ((dummies (make-gensym-list (length args))))

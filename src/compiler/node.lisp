@@ -1448,7 +1448,7 @@
   ;; Untrusted type we have asserted for this combination.
   (type-validated-for-leaf nil)
   ;; some kind of information attached to this node by the back end
-  ;; or by CHECK-IMPORTANT-RESULT
+  ;; or by CHECK-IMPORTANT-RESULT, or by anything else that may need to.
   (info nil)
   (step-info nil)
   ;; A plist of inline expansions

@@ -2824,28 +2824,18 @@ is :ANY, the function name is not checked."
 
 ;;; Apply a function to some arguments, returning a list of the values
 ;;; resulting of the evaluation. If an error is signalled during the
-;;; application, then we produce a warning message using WARN-FUN and
-;;; return NIL as our second value to indicate this. NODE is used as
-;;; the error context for any error message, and CONTEXT is a string
-;;; that is spliced into the warning.
-(declaim (ftype (sfunction ((or symbol function) list node function string)
-                          (values list boolean))
+;;; application, then return the condition and NIL as the
+;;; second value.
+(declaim (ftype (sfunction ((or symbol function) list)
+                          (values t boolean))
                 careful-call))
-(defun careful-call (function args node warn-fun context)
-  (declare (ignorable node warn-fun context))
-  ;; When cross-compiling, being "careful" is the wrong thing - our code should
-  ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
-  #+sb-xc-host
-  (values (multiple-value-list (apply function args)) t)
-  #-sb-xc-host
-  (values
-   (multiple-value-list
-    (handler-case (apply function args)
-      (error (condition)
-        (let ((*compiler-error-context* node))
-          (funcall warn-fun "Lisp error during ~A:~%~A" context condition)
-          (return-from careful-call (values nil nil))))))
-   t))
+(defun careful-call (function args)
+  (handler-case (values (multiple-value-list (apply function args)) t)
+    ;; When cross-compiling, being "careful" is the wrong thing - our code should
+    ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
+    #-sb-xc-host
+    (error (condition)
+      (values condition nil))))
 
 ;;; Variations of SPECIFIER-TYPE for parsing possibly wrong
 ;;; specifiers.
