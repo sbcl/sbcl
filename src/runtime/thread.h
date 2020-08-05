@@ -383,8 +383,10 @@ extern pthread_mutex_t all_threads_lock;
 #endif
 
 #ifndef LISP_FEATURE_SB_THREAD
-# define THREAD_ID_LABEL ""
-# define THREAD_ID_VALUE 0
+// Put in an empty conversion to avoid warning at the point of use:
+// "warning: too many arguments for format [-Wformat-extra-args]"
+# define THREAD_ID_LABEL "%s"
+# define THREAD_ID_VALUE ""
 #elif defined __linux__
 extern int sb_GetTID();
 # define THREAD_ID_LABEL " tid %d"
