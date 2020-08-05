@@ -606,16 +606,15 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
 static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
 {
   struct code* code;
-  int fi;
-  lispobj fn;
   if (gc_managed_addr_p((uword_t)pc) &&
-      (code = (void*)component_ptr_from_pc(pc)) != 0 &&
-      (fi = simple_fun_index_from_pc(code, pc)) >= 0 &&
-      is_lisp_pointer(fn = code->constants[fi*CODE_SLOTS_PER_SIMPLE_FUN])) {
-      fprintf(stderr, " %p [", pc);
-      print_entry_name(fn, stderr);
-      fprintf(stderr, "]\n");
-      return 1;
+      (code = (void*)component_ptr_from_pc(pc)) != 0) {
+      struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
+      if (df) {
+          fprintf(stderr, " %p [", pc);
+          print_entry_name(df->name, stderr);
+          fprintf(stderr, "]\n");
+          return 1;
+      }
   }
   return 0;
 }
@@ -625,11 +624,13 @@ static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
 #include <libunwind.h>
 #include "genesis/thread-instance.h"
 #include "genesis/mutex.h"
-static int backtrace_completion_pipe[2] = {-1,-1};
+static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};
 void libunwind_backtrace(struct thread *th, os_context_t *context)
 {
     char procname[100];
     fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
+#ifdef LISP_FEATURE_SB_THREAD
+    // the TLS area is not used if #-sb-thread. And if so, it must be "main thred"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->name != NIL) {
         fprintf(stderr, " (\"");
@@ -654,6 +655,7 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
         }
         putc('\n', stderr);
     }
+#endif
     unw_cursor_t cursor;
     // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
     // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
@@ -662,7 +664,7 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
     do {
         uword_t offset;
         char *pc;
-        unw_get_reg(&cursor, UNW_X86_64_RIP, (uword_t*)&pc);
+        unw_get_reg(&cursor, UNW_TDEP_IP, (uword_t*)&pc);
         if (print_lisp_fun_name(pc)) {
             // printed
         } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
@@ -676,6 +678,7 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
                                    siginfo_t __attribute__((unused)) *info,
                                    os_context_t *context)
 {
+#ifdef LISP_FEATURE_SB_THREAD
     if (backtrace_completion_pipe[1] >= 0) {
         libunwind_backtrace(current_thread, context);
         write(backtrace_completion_pipe[1], context /* any random byte */, 1);
@@ -705,5 +708,8 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
         close(backtrace_completion_pipe[0]);
         backtrace_completion_pipe[0] = backtrace_completion_pipe[1] = -1;
     }
+#else
+    libunwind_backtrace(arch_os_get_current_thread(), context);
+#endif
 }
 #endif

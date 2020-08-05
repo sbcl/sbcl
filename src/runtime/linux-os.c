@@ -445,7 +445,7 @@ os_install_interrupt_handlers(void)
     sigset_t ss;
     sigemptyset(&ss);
     sigaddset(&ss, SIGXCPU);
-    pthread_sigmask(SIG_UNBLOCK, &ss, 0);
+    thread_sigmask(SIG_UNBLOCK, &ss, 0);
 #endif
 }
 
