@@ -883,6 +883,8 @@
 ;;; LOGICAL-PATHAME was missing the specialized pathname comparator
 ;;; function in SB_KERNEL::LAYOUT-EQUALP-IMPL
 (with-test (:name :logical-pathname-equalp-method)
+  ;; PATHNAME is not a structure-object but uses the instance EQUALP case.
+  (assert (equalp (make-pathname) (make-pathname :version :newest)))
   (let ((s "#p\"sys:contrib/f[1-9].txt\""))
     (let ((a (read-from-string s)))
       ;; result shouldn't depend on the pathnames being EQ
