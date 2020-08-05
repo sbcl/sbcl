@@ -372,9 +372,9 @@ void detach_os_thread(init_thread_data *);
 void signal_handler_callback(lispobj, int, void *, void *);
 # endif
 
-#endif
-
+#else
 #define WITH_GC_AT_SAFEPOINTS_ONLY()
+#endif
 
 extern void create_main_lisp_thread(lispobj);
 
