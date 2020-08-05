@@ -54,6 +54,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                (multiple-value-bind (pid status) (sb-posix:wait)
                  (decf subprocess-count)
                  (let ((process (assoc pid subprocess-list)))
+                   (unless process
+                     (warn "Whoa! Process ~D is an unexpected child" pid)
+                     (return-from wait (wait)))
                    (setq subprocess-list (delete process subprocess-list))
                    (let ((code (ash status -8))
                          (filename (cadr process))
