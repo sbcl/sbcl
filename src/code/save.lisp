@@ -82,6 +82,18 @@
        sb-thread::*session*
        sb-kernel::*gc-epoch*))
 
+(defun start-lisp (toplevel)
+  (named-lambda start-lisp ()
+    (handling-end-of-the-world
+     (reinit)
+     ;; REINIT can not discern between a restarted image and a
+     ;; failure to save. It doesn't make a lot of sense to start
+     ;; a finalizer thread in the failed case, so we set the flag
+     ;; here, not in REINIT which would do it for both cases.
+     #+sb-thread (setq *finalizer-thread* t)
+     #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
+     (funcall toplevel))))
+
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
                                          (executable nil)
@@ -209,20 +221,11 @@ sufficiently motivated to do lengthy fixes."
           (return-from save-lisp-and-die))))
     (when (eql t compression)
       (setf compression -1))
-    (labels ((restart-lisp ()
-               (handling-end-of-the-world
-                 (reinit)
-                 ;; REINIT can not discern between a restarted image and a
-                 ;; failure to save. It doesn't make a lot of sense to start
-                 ;; a finalizer thread in the failed case, so we set the flag
-                 ;; here, not in REINIT which would do it for both cases.
-                 #+sb-thread (setq *finalizer-thread* t)
-                 #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
-                 (funcall toplevel)))
-             (foreign-bool (value)
-               (if value 1 0)))
+    (flet ((foreign-bool (value)
+             (if value 1 0)))
       (let ((name (native-namestring (physicalize-pathname core-file-name)
-                                     :as-file t)))
+                                     :as-file t))
+            (startfun (start-lisp toplevel)))
         (deinit)
         ;; FIXME: Would it be possible to unmix the PURIFY logic from this
         ;; function, and just do a GC :FULL T here? (Then if the user wanted
@@ -242,8 +245,8 @@ sufficiently motivated to do lengthy fixes."
                 sb-disassem::*disassem-inst-space* nil)
           ;; Save the restart function. Logically a passed argument, but can't be,
           ;; as it would require pinning around the whole save operation.
-          (with-pinned-objects (#'restart-lisp)
-            (setf lisp-init-function (get-lisp-obj-address #'restart-lisp)))
+          (with-pinned-objects (startfun)
+            (setf lisp-init-function (get-lisp-obj-address startfun)))
           ;; Do a destructive non-conservative GC, and then save a core.
           ;; A normal GC will leave huge amounts of storage unreclaimed
           ;; (over 50% on x86). This needs to be done by a single function
@@ -265,7 +268,7 @@ sufficiently motivated to do lengthy fixes."
           (if purify (purify :root-structures root-structures) (gc))
           (without-gcing
             (save name
-                  (get-lisp-obj-address #'restart-lisp)
+                  (get-lisp-obj-address startfun)
                   (foreign-bool executable)
                   (foreign-bool save-runtime-options)
                   (foreign-bool compression)
