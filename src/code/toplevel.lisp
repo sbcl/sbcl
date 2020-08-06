@@ -58,7 +58,7 @@ been specified on the command-line.")
          (%exit)))))
 
 (define-load-time-global *exit-lock* nil)
-(define-thread-local *exit-in-process* nil)
+(define-thread-local *exit-in-progress* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60
   "Default amount of seconds, if any, EXIT should wait for other
@@ -67,13 +67,13 @@ means to wait indefinitely.")
 
 (defun os-exit-handler (condition)
   (declare (ignore condition))
-  (os-exit *exit-in-process* :abort t))
+  (os-exit *exit-in-progress* :abort t))
 
 (defvar *exit-error-handler* #'os-exit-handler)
 
 (defun call-exit-hooks ()
-  (unless *exit-in-process*
-    (setf *exit-in-process* 0))
+  (unless *exit-in-progress*
+    (setf *exit-in-progress* 0))
   (handler-bind ((serious-condition *exit-error-handler*))
     (call-hooks "exit" *exit-hooks* :on-error :warn)))
 
@@ -146,7 +146,7 @@ means to wait indefinitely.")
   ;; If anything goes wrong, we will exit immediately and forcibly.
   (handler-bind ((serious-condition *exit-error-handler*))
     (let ((ok nil)
-          (code *exit-in-process*))
+          (code *exit-in-progress*))
       (if (consp code)
           ;; Another thread called EXIT, and passed the buck to us -- only
           ;; final call left to do.

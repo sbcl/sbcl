@@ -1410,7 +1410,7 @@ on this semaphore, then N of them is woken up."
 (defmacro handle-thread-exit ()
   '(progn
     (/show0 "HANDLING THREAD EXIT")
-    (when *exit-in-process*
+    (when *exit-in-progress*
       (%exit))
     ;; Lisp-side cleanup
     (let* ((thread *current-thread*)
@@ -1489,7 +1489,7 @@ on this semaphore, then N of them is woken up."
     (sb-impl::finalizer-thread-stop)
     (grab-mutex *make-thread-lock*)
     (let ((timeout sb-ext:*exit-timeout*)
-          (code *exit-in-process*)
+          (code *exit-in-progress*)
           (current *current-thread*)
           (joinees nil)
           (main nil))
@@ -1521,7 +1521,7 @@ on this semaphore, then N of them is woken up."
               (interrupt-thread
                main
                (lambda ()
-                 (setf *exit-in-process* (list code))
+                 (setf *exit-in-progress* (list code))
                  (throw 'sb-impl::%end-of-the-world t)))
             (interrupt-thread-error ()))
           ;; Normally this never finishes, as once the main-thread unwinds we
@@ -1832,7 +1832,7 @@ session."
                                        (sb-c::inspect-unwinding
                                         (apply-real-function)
                                         #'sb-di::catch-runaway-unwind))
-                                  (when *exit-in-process*
+                                  (when *exit-in-progress*
                                     (sb-impl::call-exit-hooks))))))
                        #+sb-safepoint (sb-kernel::gc-safepoint)
                        (setf (thread-result *current-thread*) list)))

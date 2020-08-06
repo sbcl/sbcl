@@ -316,12 +316,12 @@ Consequences are unspecified if serious conditions occur during EXIT
 excepting errors from *EXIT-HOOKS*, which cause warnings and stop
 execution of the hook that signaled, but otherwise allow the exit
 process to continue normally."
-  (if (or abort *exit-in-process*)
+  (if (or abort *exit-in-progress*)
       (os-exit (or code 1) :abort t)
       (let ((code (or code 0)))
         (with-deadline (:seconds nil :override t)
           (sb-thread:grab-mutex *exit-lock*))
-        (setf *exit-in-process* code
+        (setf *exit-in-progress* code
               *exit-timeout* timeout)
         (throw '%end-of-the-world t)))
   (critically-unreachable "After trying to die in EXIT."))
