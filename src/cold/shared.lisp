@@ -245,8 +245,7 @@
              (arch (target-platform-keyword target-feature-list)))
         (when (featurep '(:and :sb-thread :sb-futex :linux) target-feature-list)
           (pushnew :futex-use-tid target-feature-list))
-        (when (featurep '(:and :linux (:or :x86 :x86-64) :sb-thread
-                               (:not (:or :sb-safepoint :sb-thruption)))
+        (when (featurep '(:and :linux :sb-thread (:not :sb-safepoint))
                         target-feature-list)
           (push :pauseless-threadstart target-feature-list))
         (when (and (member :x86 target-feature-list)

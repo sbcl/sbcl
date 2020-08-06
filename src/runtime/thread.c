@@ -67,6 +67,8 @@ static __attribute__((unused)) struct thread *postmortem_thread;
 #endif
 
 int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads
+// exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
+os_vm_size_t thread_alien_stack_size = ALIEN_STACK_SIZE;
 struct thread *all_threads;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -530,14 +532,8 @@ void* new_thread_trampoline(void* arg)
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
     lispobj startfun = startup_info->data[0]; // 'startup_info' is pinned
     gc_assert(functionp(startfun));
-    // The lisp thread instance stores the stack end for one purpose only, for
-    // SB-EXT:STACK-ALLOCATED-P to quickly check whether an object is on _any_
-    // thread's stack using only the all-threads tree and not acquiring a lock
-    // on the primitive thread. This is the exactly-calculated end.
-    lispthread->stack_end = (lispobj)th->control_stack_end;
 #if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER
-    // ... but GC can benefit from knowing that the _effective_ end of
-    // the ambiguous root range is not as high as the accessible end.
+    // GC can benefit from knowing the _effective_ end of the ambiguous root range.
     // Nothing at a higher address than &arg needs to be scanned for ambiguous roots.
     // For x86 + linux this optimization skips over about 800 words in the stack scan,
     // and for x86-64 it skip about 550 words as observed via:
@@ -556,6 +552,16 @@ void* new_thread_trampoline(void* arg)
 #endif
     th->os_kernel_tid = sb_GetTID();
     init_new_thread(th, 0, 0, 0);
+    // The lisp thread instance stores the stack end for one purpose only, for
+    // SB-EXT:STACK-ALLOCATED-P to quickly check whether an object is on some
+    // thread's stack by looking only the all-threads tree and not acquiring a lock
+    // on any primitive thread.
+    // Storing through a pointer to lisp memory has to wait until linking to all_threads,
+    // lest the WP fault handler think this isn't a lisp thread. Consider a creating
+    // thread that made a THREAD instance which (on a precise GC architecture) gets
+    // moved to a protectable page. There's a window in which it could happen just
+    // after making the instance and before pushing it into *STARTING-THREADS*.
+    lispthread->stack_end = (lispobj)th->control_stack_end;
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.

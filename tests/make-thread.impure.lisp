@@ -28,15 +28,21 @@
                                       (roots))
   (declare (type (member nil t :everything) allwords))
   (without-gcing
-    (let* ((stack-low (get-lisp-obj-address sb-vm:*control-stack-start*))
-           (stack-high (get-lisp-obj-address sb-vm:*control-stack-end*))
-           (nwords (ash (- stack-high (sap-int current-sp)) (- sb-vm:word-shift)))
-           (array (make-array nwords :element-type 'sb-ext:word)))
+    (binding* ((stack-low (get-lisp-obj-address sb-vm:*control-stack-start*))
+               (stack-high (get-lisp-obj-address sb-vm:*control-stack-end*))
+               ((nwords copy-from direction base)
+                #+c-stack-is-control-stack ; growth direction is always down
+                (values (ash (- stack-high (sap-int current-sp)) (- sb-vm:word-shift))
+                        current-sp #\- "sp")
+                #-c-stack-is-control-stack ; growth direction is always up
+                (values (ash (- (sap-int current-sp) stack-low) (- sb-vm:word-shift))
+                        (int-sap stack-low) #\+ "base"))
+               (array (make-array nwords :element-type 'sb-ext:word)))
       (when print
-        (format t "SP=end-~dw (range = ~x..~x)~%" nwords stack-low stack-high))
+        (format t "SP=~a~dw (range = ~x..~x)~%" direction nwords stack-low stack-high))
       (alien-funcall (extern-alien "memcpy" (function void system-area-pointer
                                                       system-area-pointer unsigned))
-                     (vector-sap array) current-sp (* nwords sb-vm:n-word-bytes))
+                     (vector-sap array) copy-from (* nwords sb-vm:n-word-bytes))
       (loop for i downfrom (1- nwords) to 0 by 1 do
         (let ((word (aref array i)))
           (when (or (/= word sb-vm:nil-value) allwords)
@@ -44,27 +50,33 @@
                                           word)))
               (cond ((/= baseptr 0) ; an object reference
                      (let ((obj (sb-vm::reconstitute-object (%make-lisp-obj baseptr))))
-                       (when (and (code-component-p obj)
-                                  (= (logand word sb-vm:lowtag-mask) sb-vm:fun-pointer-lowtag))
-                         (dotimes (i (code-n-entries obj))
-                           (when (= (get-lisp-obj-address (%code-entry-point obj i)) word)
-                             (return (setq obj (%code-entry-point obj i))))))
+                       (when (code-component-p obj)
+                         (cond
+                          #+c-stack-is-control-stack
+                          ((= (logand word sb-vm:lowtag-mask) sb-vm:fun-pointer-lowtag)
+                           (dotimes (i (code-n-entries obj))
+                             (when (= (get-lisp-obj-address (%code-entry-point obj i)) word)
+                               (return (setq obj (%code-entry-point obj i))))))
+                          #-c-stack-is-control-stack ; i.e. does this backend have LRAs
+                          ((= (logand (sap-ref-word (int-sap (logandc2 word sb-vm:lowtag-mask)) 0)
+                                      sb-vm:widetag-mask) sb-vm:return-pc-widetag)
+                           (setq obj (%make-lisp-obj word)))))
                        ;; interior pointers to objects that contain instructions are OK,
                        ;; otherwise only correctly tagged pointers.
                        (when (or (typep obj '(or fdefn code-component funcallable-instance))
                                  (= (get-lisp-obj-address obj) word))
                          (push obj roots)
                          (when print
-                           (format t "~x = sp[~5d] = ~16x (~A) "
-                                   (sap-int (sap+ current-sp (ash i sb-vm:word-shift)))
-                                   i
-                                   word
+                           (format t "~x = ~a[~5d] = ~16x (~A) "
+                                   (sap-int (sap+ copy-from (ash i sb-vm:word-shift)))
+                                   base i word
                                    (or (generation-of obj) #\S)) ; S is for static
                            (let ((*print-pretty* nil))
                              (cond ((consp obj) (format t "a cons"))
                                    #+sb-fasteval
                                    ((typep obj 'sb-interpreter::sexpr) (format t "a sexpr"))
                                    ((arrayp obj) (format t "a ~s" (type-of obj)))
+                                   #+c-stack-is-control-stack
                                    ((and (code-component-p obj)
                                          (>= word (sap-int (code-instructions obj))))
                                     (format t "PC in ~a" obj))
@@ -72,9 +84,9 @@
                            (terpri)))))
                     ((and print
                           (or (eq allwords :everything) (and allwords (/= word 0))))
-                     (format t "~x = sp[~5d] = ~16x~%"
-                             (sap-int (sap+ current-sp (ash i sb-vm:word-shift)))
-                             i word)))))))))
+                     (format t "~x = ~a[~5d] = ~16x~%"
+                             (sap-int (sap+ copy-from (ash i sb-vm:word-shift)))
+                             base i word)))))))))
   (if print
       (format t "~D roots~%" (length roots))
       roots))
@@ -117,7 +129,8 @@
   (let ((list (tryit :print nil)))
     ;; should be not many things pointed to by the stack
     (assert (< (length list) #+x86    38   ; more junk, I don't know why
-                             #+x86-64 30)) ; less junk, I don't know why
+                             #+x86-64 30   ; less junk, I don't know why
+                             #-(or x86 x86-64) 44)) ; even more junk
     ;; Either no objects are in GC generation 0, or all are, depending on
     ;; whether CORE_PAGE_GENERATION has been set to 0 for testing.
     (let ((n-objects-in-g0 (count 0 list :key #'sb-kernel:generation-of)))

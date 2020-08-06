@@ -1658,13 +1658,23 @@ session."
 #+pauseless-threadstart ; new way
 (progn
 ;;; Return T if the thread was created
-(defun pthread-create (thread stack-base)
+(defun pthread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
   (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t)))
-    (and (= 0 (alien-funcall
-               (extern-alien "pthread_attr_setstack"
-                             (function int system-area-pointer unsigned unsigned))
-               attr stack-base (extern-alien "thread_control_stack_size" unsigned)))
+    (and (multiple-value-bind (c-stack-base c-stack-size)
+             #+c-stack-is-control-stack
+             (values (sap-ref-sap thread-sap (ash sb-vm::thread-control-stack-start-slot
+                                                  sb-vm:word-shift))
+                     (extern-alien "thread_control_stack_size" unsigned))
+             #-c-stack-is-control-stack
+             (values (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot
+                                                  sb-vm:word-shift))
+                     (extern-alien "thread_alien_stack_size" unsigned))
+           (= 0 (alien-funcall
+                 (extern-alien "pthread_attr_setstack"
+                               (function int system-area-pointer system-area-pointer
+                                         unsigned))
+                 attr c-stack-base c-stack-size)))
          (with-pinned-objects (thread)
            (= 0 (alien-funcall
                  (extern-alien "pthread_create"
@@ -1964,7 +1974,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; them, there should usually be only one item to delete from *STARTING-THREADS*.
         (let ((old (delete 0 *starting-threads*)))
           (setf *starting-threads* (rplacd cell old))
-          (setq created (pthread-create thread stack-base))
+          (setq created (pthread-create thread thread-sap))
           (cond (created ; Still holding the MAKE-THREAD-LOCK, expose thread in (LIST-ALL-THREADS).
                  ;; On CPUs where CAS can spuriously fail, this probably needs to loop and retry.
                  ;; It's ok if the thread changed 0 -> {1 | -1}, then failure here is correct.
