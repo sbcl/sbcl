@@ -162,8 +162,8 @@
                 (= (mismatch string "/dev/") 5) ; dev/null and dev/random
                 (= (mismatch string "/tmp/") 5)
                 (= (mismatch string "/var/tmp/") 9)
+                (= (mismatch string "/proc/self") 10)
                 (eql (search "/private/var/folders/" string) 0)
-                (string= string "/proc/self/maps")
                 (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
                                              "a.txt" "b.lisp"

@@ -577,3 +577,22 @@
 (with-test (:name (abort-thread :main-thread))
   (assert (main-thread-p))
   (assert-error (abort-thread) thread-error))
+
+;;; The OSes vary in how pthread_setname works.
+;;; According to https://stackoverflow.com/questions/2369738/how-to-set-the-name-of-a-thread-in-linux-pthreads
+;;;   // NetBSD: name + arg work like printf(name, arg)
+;;;   int pthread_setname_np(pthread_t thread, const char *name, void *arg);
+;;;   // FreeBSD & OpenBSD: function name is slightly different, and has no return value
+;;;   void pthread_set_name_np(pthread_t tid, const char *name);
+;;;   // Mac OS X: must be set from within the thread (can't specify thread ID)
+;;;   int pthread_setname_np(const char*);
+;;; Only Linux is implemented for now.
+(with-test (:name :os-thread-name :skipped-on (:not :linux))
+  (let ((thr
+         (make-thread
+          (lambda ()
+            (with-open-file (stream (format nil "/proc/self/task/~d/comm"
+                                            (thread-os-tid *current-thread*)))
+              (read-line stream)))
+          :name "testme")))
+    (assert (string= (join-thread thr) "testme"))))
