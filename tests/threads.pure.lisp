@@ -587,7 +587,7 @@
 ;;;   // Mac OS X: must be set from within the thread (can't specify thread ID)
 ;;;   int pthread_setname_np(const char*);
 ;;; Only Linux is implemented for now.
-(with-test (:name :os-thread-name :skipped-on (:not :linux))
+(with-test (:name :os-thread-name :skipped-on (:not (and :linux :sb-thread)))
   (let ((thr
          (make-thread
           (lambda ()
