@@ -66,8 +66,7 @@
 
 ;;; This variable is accessed by C code when saving. Export it to survive tree-shaker.
 ;;; The symbols in this set are clobbered just in time to avoid saving them to the core
-;;; but not so early that we kill the running image. (Though in fact if SAVE-ERROR
-;;; and hence REINIT is reached, we reassign them all anyway)
+;;; but not so early that we kill the running image.
 (export 'sb-kernel::*save-lisp-clobbered-globals* 'sb-kernel)
 (define-load-time-global sb-kernel::*save-lisp-clobbered-globals*
     '#(sb-impl::*exit-lock*
@@ -85,12 +84,7 @@
 (defun start-lisp (toplevel)
   (named-lambda start-lisp ()
     (handling-end-of-the-world
-     (reinit)
-     ;; REINIT can not discern between a restarted image and a
-     ;; failure to save. It doesn't make a lot of sense to start
-     ;; a finalizer thread in the failed case, so we set the flag
-     ;; here, not in REINIT which would do it for both cases.
-     #+sb-thread (setq *finalizer-thread* t)
+     (reinit t)
      #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
      (funcall toplevel))))
 
@@ -279,7 +273,7 @@ sufficiently motivated to do lengthy fixes."
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
     (restore-fd-streams)
-    (reinit)
+    (reinit nil)
     (error 'save-error)))
 
 (defun tune-image-for-dump ()

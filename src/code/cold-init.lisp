@@ -332,12 +332,14 @@ process to continue normally."
   (sb-thread::init-job-control)
   (sb-thread::get-foreground))
 
-(defun reinit ()
+(defun reinit (total)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
     ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated
     ;; can be called, as pretty much anything can assume that it is set.
-    (sb-thread::init-main-thread)
+    (when total ; newly started process, and not a failed save attempt
+      (sb-thread::init-main-thread)
+      #+sb-thread (setq *finalizer-thread* t))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed

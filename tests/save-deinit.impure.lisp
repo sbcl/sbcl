@@ -50,7 +50,7 @@
 (let (sb-impl::*streams-closed-by-slad*)
   (sb-impl::deinit)
   (sb-impl::restore-fd-streams)
-  (sb-impl::reinit))
+  (sb-impl::reinit nil))
 
 ;;; I think this test would be better as a shell test,
 ;;; so that we actually call SAVE-LISP-AND-DIE to see that it works.

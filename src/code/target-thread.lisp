@@ -311,10 +311,10 @@ created and old ones may exit at any time."
          (thread-os-thread ,this)
          (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))))
 
+;;; Not uncoincidentally, the variables assigned here are also
+;;; listed in SB-KERNEL::*SAVE-LISP-CLOBBERED-GLOBALS*
 (defun init-main-thread ()
   (/show0 "Entering INIT-MAIN-THREAD")
-  ;;; FIXME: is it purposeful or accidental that we recreate some of
-  ;;; the global mutexes but not all of them?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let* ((name "main thread")
@@ -326,9 +326,6 @@ created and old ones may exit at any time."
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
-    ;; Either *all-threads* is empty or it contains exactly one thread
-    ;; in case we are in reinit since saving core with multiple
-    ;; threads doesn't work.
     (setq *all-threads*
           (avl-insert nil (get-lisp-obj-address sb-vm:*control-stack-start*) thread))))
 
@@ -2449,45 +2446,26 @@ mechanism for inter-thread communication."
 ;;; Here's the problem: Some of the backends implement those semantics as dictated
 ;;; by globaldb - assigning into TLS even if the current TLS value is NO_TLS_VALUE;
 ;;; while others do not make use of that information, and will therefore assign into
-;;; the global value if the TLS value is NO_TLS_VALUE.
+;;; the symbol-global-value if the TLS value is NO_TLS_VALUE.
 ;;; This can not be "corrected" by genesis - there is no TLS when genesis executes.
-;;; The only way to do this reliably is to compute the address of the thread-local
-;;; storage slot, and use (SETF SAP-REF-LISPOBJ)
+;;; The only way to do this uniformly for all the platforms is to compute the address
+;;; of the thread-local storage slot, and use (SETF SAP-REF-LISPOBJ) on that.
 ;;; (Nor is #+(vop-translates ensure-symbol-tls-index) a reliable indicator that the
 ;;; SET vop will assign into a thread-local symbol that currently has no TLS value.)
-
-;;; Note also that this is called by REINIT, which _should_ reinitialize
-;;; the *CURRENT-THREAD* but should _NOT_ reinitialize anything else.
-;;; That's actually kind of weird, but it's necessary to ensure that *RESTART-CLUSTERS*
-;;; does not get clobbered if there were any restarts available.
-;;; There's a SAVE-LISP-AND-DIE test which asserts that you can resume
-;;; from a failed save.
-;;; It might behoove us to pass in a flag as to whether this is coming from REINIT,
-;;; but INIT-INITIAL-THREAD doesn't know either. We'd have to plumb a new flag
-;;; down all the way from SAVE.
 (defun init-thread-local-storage (thread)
   ;; In addition to wanting the expressly unsafe variant of SYMBOL-VALUE, any error
   ;; signaled such as invalid-arg-count would just go totally wrong at this point.
   (declare (optimize (safety 0)))
   #-sb-thread
-  ;; *CURRENT-THREAD* is known always bound, so BOUNDP would be T
-  ;; We need to see whether it's really boundp.
-  (if (unbound-marker-p *current-thread*)
-      (macrolet ((expand ()
-                   `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
-        (expand)))
+  (macrolet ((expand () `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
+    (expand))
   ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison's sake
   #+sb-thread
   (let ((sap (current-thread-sap)))
     (macrolet ((expand ()
-                 ;; As for uni-thread, *current-thread* is always-boundp,
-                 ;; but the C part of tls-init makes it zero initially
-                 ;; (in violation of the type). Check for that.
-                 `(if (= (sap-ref-word sap ,(info :variable :wired-tls '*current-thread*))
-                         0)
-                      (setf ,@(loop for (var form) in (cdr *thread-local-specials*)
-                                    for index = (info :variable :wired-tls var)
-                                    append `((sap-ref-lispobj sap ,index) ,form))))))
+                 `(setf ,@(loop for (var form) in (cdr *thread-local-specials*)
+                                for index = (info :variable :wired-tls var)
+                                append `((sap-ref-lispobj sap ,index) ,form)))))
       (expand)))
   ;; Straightforwardly assign *current-thread* because it's never the NO-TLS-VALUE marker.
   ;; I wonder how to to prevent user code from doing this, but it isn't a new problem per se.
