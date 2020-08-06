@@ -180,47 +180,34 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
 
 #ifndef LISP_FEATURE_WIN32
 static void
-add_handled_signals(sigset_t *sigset)
+resignal_to_lisp_thread(int signal, os_context_t *context)
 {
+    if (!sigismember(&deferrable_sigset,signal)) {
+        corruption_warning_and_maybe_lose
+#ifdef LISP_FEATURE_SB_THREAD
+            ("Received signal %d @ %lx in non-lisp"THREAD_ID_LABEL", resignaling to a lisp thread.",
+             signal, *os_context_pc_addr(context), THREAD_ID_VALUE);
+#else
+            ("Received signal %d in non-lisp thread, resignaling to a lisp thread.", signal);
+#endif
+    }
+    sigset_t sigset;
+    sigemptyset(&sigset);
     int i;
     for(i = 1; i < NSIG; i++) {
         if (!(ARE_SAME_HANDLER(interrupt_low_level_handlers[i], SIG_DFL)) ||
             !(ARE_SAME_HANDLER(interrupt_handlers[i].c, SIG_DFL))) {
-            sigaddset(sigset, i);
+            sigaddset(&sigset, i);
         }
     }
+    thread_sigmask(SIG_BLOCK, &sigset, 0);
+    // This arranges for every handled signal to be blocked on return from this
+    // handler invocation, presumably because that avoids further detours through
+    // this thread's handler for signals that we don't want it to handle.
+    sigmask_logior(os_context_sigmask_addr(context), &sigset);
+    kill(getpid(), signal);
 }
 #endif
-
-static boolean
-maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
-{
-#ifndef LISP_FEATURE_WIN32
-    if (!lisp_thread_p(context)) {
-        if (!(sigismember(&deferrable_sigset,signal))) {
-            corruption_warning_and_maybe_lose
-#ifdef LISP_FEATURE_SB_THREAD
-                ("Received signal %d in non-lisp thread %lu, resignalling to a lisp thread.",
-                 signal, pthread_self());
-#else
-            ("Received signal %d in non-lisp thread, resignalling to a lisp thread.",
-             signal);
-#endif
-        }
-        sigset_t sigset;
-        sigemptyset(&sigset);
-        add_handled_signals(&sigset);
-        thread_sigmask(SIG_BLOCK, &sigset, 0);
-        // This arranges for every handled signal to be blocked on return from this
-        // handler invocation, presumably because that avoids further detours through
-        // this thread's handler for signals that we don't want it to handle.
-        sigmask_logior(os_context_sigmask_addr(context), &sigset);
-        kill(getpid(), signal);
-        return 1;
-    } else
-#endif
-        return 0;
-}
 
 #if INSTALL_SIG_MEMORY_FAULT_HANDLER && defined(THREAD_SANITIZER)
 /* Under TSAN, any delivered signal blocks all other signals regardless of the
@@ -261,16 +248,20 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
  * kernel properly, so we fix it up ourselves in the
  * arch_os_get_context(..) function. -- CSR, 2002-07-23
  */
+#ifdef LISP_FEATURE_WIN32
+# define should_handle_in_this_thread(c) (1)
+#else
+# define should_handle_in_this_thread(c) lisp_thread_p(c)
+#endif
 #define SAVE_ERRNO(signal,context,void_context)                 \
     {                                                           \
         int _saved_errno = errno;                               \
         UNBLOCK_SIGSEGV();                                      \
         RESTORE_FP_CONTROL_WORD(context,void_context);          \
-        if (!maybe_resignal_to_lisp_thread(signal, context))    \
-        {
+        if (should_handle_in_this_thread(context)) {
 
 #define RESTORE_ERRNO                                           \
-        }                                                       \
+        } else resignal_to_lisp_thread(signal,void_context);    \
         errno = _saved_errno;                                   \
     }
 
