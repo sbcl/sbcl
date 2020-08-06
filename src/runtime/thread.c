@@ -422,8 +422,8 @@ init_new_thread(struct thread *th,
 }
 
 static void
-undo_init_new_thread(struct thread *th,
-                     init_thread_data __attribute__((unused)) *scribble)
+unregister_thread(struct thread *th,
+                  init_thread_data __attribute__((unused)) *scribble)
 {
     int lock_ret;
 
@@ -498,13 +498,12 @@ undo_init_new_thread(struct thread *th,
     /* Undo the association of the current pthread to its `struct thread',
      * such that we can call arch_os_get_current_thread() later in this
      * thread and cleanly get back NULL. */
-    /* FIXME: this seems to be prone to causing lossage of signals because
-     * until setting current_thread to NULL, lisp_thread_p() returns 1,
-     * so maybe_resignal_to_lisp_thread() would consider this thread ok to
-     * receive a signal if delivered to a non-lisp thread. But then we just
-     * block everything and disappear. It's essentially the same problem as
-     * the GC pending signal that has to be explicitly discarded, which is
-     * the right disposition of that signal, but not signals in general */
+    /* FIXME: what if, after we blocked signals, someone uses INTERRUPT-THREAD
+     * on this thread? It's no longer a lisp thread; I suspect the signal
+     * will be redirected to a lisp thread.
+     * Can anything else go wrong with other signals? Nothing else should
+     * direct signals specifically to this thread. Per-process signals are ok
+     * because the kernel picks a thread in which a signal isn't blocked */
 #ifdef LISP_FEATURE_GCC_TLS
     current_thread = NULL;
 #else
@@ -563,7 +562,7 @@ void* new_thread_trampoline(void* arg)
     //   (a regression test asserts that not even a THREAD instance is on the stack)
     long result = funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
-    undo_init_new_thread(th, 0);
+    unregister_thread(th, 0);
 
 #else // !PAUSELESS_THREADSTART
 
@@ -584,7 +583,7 @@ void* new_thread_trampoline(void* arg)
                     GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
                     0);
     result = funcall0(function);
-    undo_init_new_thread(th, &scribble);
+    unregister_thread(th, &scribble);
 
 #ifndef OS_THREAD_STACK
     schedule_thread_post_mortem(th);
@@ -724,10 +723,10 @@ detach_os_thread(init_thread_data *scribble)
     struct thread *th = arch_os_get_current_thread();
     odxprint(misc, "detach_os_thread: detaching");
 
-    undo_init_new_thread(th, scribble);
+    unregister_thread(th, scribble);
 
     /* We have to clear a STOP_FOR_GC signal if pending. Consider:
-     *  - on entry to undo_init_new_thread, we block all signals
+     *  - on entry to unregister_thread, we block all signals
      *  - simultaneously some other thread decides that it needs to initiate a GC
      *  - that thread observes that this thread exists in all_threads and sends
      *    STOP_FOR_GC, so it becomes pending but undeliverable in this thread
