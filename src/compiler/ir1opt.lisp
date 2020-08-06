@@ -1735,7 +1735,7 @@
        (cond ((not win)
               (setf (combination-kind call) :error
                     (combination-info call)
-                    (list #'compiler-style-warn "Lisp error during consant folding:~%~A" values)))
+                    (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values)))
              ((and (proper-list-of-length-p values 1))
               (replace-combination-with-constant (first values) call))
              (t (let ((dummies (make-gensym-list (length args))))
