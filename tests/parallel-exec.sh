@@ -53,14 +53,15 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                #+nil (format t "Runner is waiting on: ~S~%" subprocess-list)
                (multiple-value-bind (pid status) (sb-posix:wait)
                  (decf subprocess-count)
-                 (let ((process (assoc pid subprocess-list)))
+                 (let ((process (assoc pid subprocess-list))
+                       (code (ash status -8))
+                       (et))
                    (unless process
                      (warn "Whoa! Process ~D is an unexpected child" pid)
                      (return-from wait (wait)))
                    (setq subprocess-list (delete process subprocess-list))
-                   (let ((code (ash status -8))
-                         (filename (cadr process))
-                         (et (- (get-internal-real-time) (caddr process))))
+                   (destructuring-bind ((filename . iteration) start-time) (cdr process)
+                     (setq et (- (get-internal-real-time) start-time))
                      (when vop-summary-stats-p
                        (unless (sum-vop-usage (format nil "$logdir/~a.vop-usage" filename) t)
                          (when (or (search ".pure" filename) (search ".impure" filename))
@@ -68,8 +69,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (cond ((eq code 104)
                             (format t "~A: success (~d msec)~%" filename et))
                            (t
-                            (format t "~A: status ~D (~d msec)~%" filename code et)
-                            (push filename losing)))))))
+                            (format t "~A~@[[~d]~]: status ~D (~d msec)~%"
+                                      filename iteration code et)
+                            (push (list filename iteration pid) losing)))))))
              (sum-vop-usage (input deletep)
                (with-open-file (f input :if-does-not-exist nil)
                  ;; No vop coverage file from shell script tests or any test
@@ -122,7 +124,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    (exit :code (if (unexpected-failures) 1 104)))))
           (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))
           (incf subprocess-count)
-          (push (list pid (car file) (get-internal-real-time)) subprocess-list)))
+          (push (list pid file (get-internal-real-time)) subprocess-list)))
       (loop (if (plusp subprocess-count) (wait) (return)))
 
       (when vop-summary-stats-p
