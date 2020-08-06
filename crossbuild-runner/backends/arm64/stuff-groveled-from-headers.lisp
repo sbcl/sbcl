@@ -19,8 +19,6 @@
 (defconstant pollnval 32) ; #x20
 (defconstant pollerr 8) ; #x8
 (define-alien-type nfds-t (unsigned 64))
-;;; langinfo
-(defconstant codeset 14) ; #xe
 ;;; types, types, types
 (define-alien-type clock-t (signed 64))
 (define-alien-type dev-t (unsigned 64))
@@ -30,6 +28,7 @@
 (define-alien-type nlink-t (unsigned 32))
 (define-alien-type off-t (signed 64))
 (define-alien-type size-t (unsigned 64))
+(define-alien-type ssize-t (signed 64))
 (define-alien-type time-t (signed 64))
 (define-alien-type suseconds-t (signed 64))
 (define-alien-type uid-t (unsigned 32))
@@ -79,11 +78,13 @@
 (defconstant eio 5) ; #x5
 (defconstant eexist 17) ; #x11
 (defconstant eloop 40) ; #x28
-(defconstant espipe 29) ; #x1d
 (defconstant epipe 32) ; #x20
+(defconstant espipe 29) ; #x1d
 (defconstant ewouldblock 11) ; #xb
 
+(defconstant sc-nprocessors-onln 84) ; #x54
 ;;; for waitpid() in run-program.lisp
+(defconstant wcontinued 8) ; #x8
 (defconstant wnohang 1) ; #x1
 (defconstant wuntraced 2) ; #x2
 
@@ -91,6 +92,10 @@
 (defconstant tiocgpgrp 21519) ; #x540f
 
 ;;; signals
+(defconstant sizeof-sigset_t 128) ; #x80
+(defconstant sig_block 0) ; #x0
+(defconstant sig_unblock 1) ; #x1
+(defconstant sig_setmask 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 7) ; #x7
 (defconstant sigchld 17) ; #x11
