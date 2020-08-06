@@ -906,16 +906,18 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->lisp_thread = 0; // force it to be always-thread-local, of course
     th->tls_size = dynamic_values_bytes;
 #endif
-    uword_t* __attribute__((__unused__)) constants = (uword_t*)th;
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_LINUX
-    constants[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
+    tls[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
+#endif
+#ifdef LAYOUT_OF_FUNCTION
+    tls[THREAD_FUNCTION_LAYOUT_SLOT] = LAYOUT_OF_FUNCTION << 32;
 #endif
 #ifdef LISP_FEATURE_GENCGC
 #ifdef THREAD_VARYOBJ_CARD_MARKS_SLOT
     extern unsigned int* varyobj_page_touched_bits;
-    constants[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = VARYOBJ_SPACE_START;
-    constants[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
-    constants[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
+    tls[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = VARYOBJ_SPACE_START;
+    tls[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
+    tls[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
 #endif
     th->dynspace_addr       = DYNAMIC_SPACE_START;
     th->dynspace_card_count = page_table_pages;
@@ -960,9 +962,6 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
-#if defined(LAYOUT_OF_FUNCTION) && defined(LISP_FEATURE_SB_THREAD)
-    constants[THREAD_FUNCTION_LAYOUT_SLOT] = LAYOUT_OF_FUNCTION << 32;
-#endif
     // Once allocated, the allocation profiling buffer sticks around.
     // If present and enabled, assign into the new thread.
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
