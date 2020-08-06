@@ -898,9 +898,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
     // Refer to the ASCII art in the block comment above
     struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
+    lispobj* tls = (lispobj*)th;
 
 #ifdef LISP_FEATURE_SB_THREAD
-    lispobj* tls = (lispobj*)th;
     for(i = 0; i < (unsigned int)(dynamic_values_bytes/N_WORD_BYTES); i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
     th->lisp_thread = 0; // force it to be always-thread-local, of course
