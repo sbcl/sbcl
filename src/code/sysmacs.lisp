@@ -63,7 +63,7 @@ maintained."
                          (*interrupts-enabled* nil)
                          (*gc-inhibit* t))
                     (,without-gcing-body))
-               ;; This is not racy becuase maybe_defer_handler
+               ;; This is not racy because can_hande_now()
                ;; defers signals if *GC-INHIBIT* is NIL but there
                ;; is a pending gc or stop-for-gc.
                (when (or *interrupt-pending*

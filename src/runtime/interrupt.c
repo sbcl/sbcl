@@ -1233,9 +1233,9 @@ run_deferred_handler(struct interrupt_data *data, os_context_t *context)
 }
 
 #ifndef LISP_FEATURE_WIN32
-boolean
-maybe_defer_handler(void *handler, struct interrupt_data *data,
-                    int signal, siginfo_t *info, os_context_t *context)
+static boolean
+can_handle_now(void *handler, struct interrupt_data *data,
+               int signal, siginfo_t *info, os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
 
@@ -1246,7 +1246,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     if (thread->interrupt_data->pending_handler)
         lose("there is a pending handler already (PA)");
     if (data->gc_blocked_deferrables)
-        lose("maybe_defer_handler: gc_blocked_deferrables true");
+        lose("can_handle_now: gc_blocked_deferrables true");
 
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
@@ -1259,33 +1259,33 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     if ((read_TLS(INTERRUPTS_ENABLED,thread) == NIL) ||
         in_leaving_without_gcing_race_p(thread)) {
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%p,%d): deferred (RACE=%d)\n",
+                      "/can_handle_now(%p,%d): deferred (RACE=%d)\n",
                       handler,signal,
                       in_leaving_without_gcing_race_p(thread)));
         store_signal_data_for_later(data,handler,signal,info,context);
         write_TLS(INTERRUPT_PENDING, T,thread);
         check_interrupt_context_or_lose(context);
-        return 1;
+        return 0;
     }
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     if (arch_pseudo_atomic_atomic(context)) {
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%p,%d): deferred(PA)\n",
+                      "/can_handle_now(%p,%d): deferred(PA)\n",
                       handler,signal));
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         check_interrupt_context_or_lose(context);
-        return 1;
+        return 0;
     }
 
     check_interrupt_context_or_lose(context);
 
     FSHOW_SIGNAL((stderr,
-                  "/maybe_defer_handler(%p,%d): not deferred\n",
+                  "/can_handle_now(%p,%d): not deferred\n",
                   handler,signal));
-    return 0;
+    return 1;
 }
 
 static void
@@ -1324,7 +1324,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     SAVE_ERRNO(signal,context,void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
-    if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
+    if (can_handle_now(interrupt_handle_now, data, signal, info, context))
         interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
 }
@@ -1346,8 +1346,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
 
-    if(!maybe_defer_handler(low_level_interrupt_handle_now,data,
-                            signal,info,context))
+    if (can_handle_now(low_level_interrupt_handle_now, data, signal, info, context))
         low_level_interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
 }
