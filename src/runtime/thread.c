@@ -286,7 +286,7 @@ void free_thread_struct(struct thread *th)
  * If this feature is set, we are running on a stack managed by the OS,
  * and no fancy delays are required for anything.  Just do it.
  */
-static void
+static void __attribute__((__unused__))
 schedule_thread_post_mortem(struct thread *corpse)
 {
     pthread_detach(pthread_self());
@@ -521,33 +521,34 @@ unregister_thread(struct thread *th,
 void* new_thread_trampoline(void* arg)
 {
 #ifdef LISP_FEATURE_PAUSELESS_THREADSTART
-
-    // 'arg' is an untagged pointer to an instance of SB-THREAD:THREAD
-    // which is currently pinned via *STARTING-THREADS*
-    // In that structure, the STARTUP-INFO slot holds a simple-vector
-    // which is pinned, and element 0 of the vector is also pinned.
-    struct thread_instance *lispthread = arg;
-    struct thread* th = (void*)lispthread->primitive_thread; // 'lispthread' is pinned
-    struct vector* startup_info = VECTOR(lispthread->startup_info);
+    struct thread* th = arg;
+    // 'th->lisp_thread' remains valid despite not being in all_threads
+    // due to the pinning via *STARTING-THREADS*.
+    struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
+    struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
     lispobj startfun = startup_info->data[0]; // 'startup_info' is pinned
     gc_assert(functionp(startfun));
-#if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER
     // GC can benefit from knowing the _effective_ end of the ambiguous root range.
     // Nothing at a higher address than &arg needs to be scanned for ambiguous roots.
     // For x86 + linux this optimization skips over about 800 words in the stack scan,
     // and for x86-64 it skip about 550 words as observed via:
     // fprintf(stderr, "%d non-lisp stack words\n",
     //                 (int)((lispobj*)th->control_stack_end - (lispobj*)&arg));
-    // I'm not sure why ADDRESS_SANITIZER doesn't allow this optimization.
-    // Both of these assertions failed for me with the sanitizer enabled:
+    // ADDRESS_SANITIZER doesn't allow this optimization.
+    // Both of these assertions fail with the sanitizer enabled:
     //    gc_assert(th->control_stack_start <= (lispobj*)&arg
     //              && (lispobj*)&arg <= th->control_stack_end);
     //    gc_assert(th->control_stack_start <= (lispobj*)&startup_info
     //              && (lispobj*)&startup_info <= th->control_stack_end);
-    // It must subvert the "&" and "*" operators in a way that only it understands,
+    // It seems to subvert the "&" and "*" operators in a way that only it understands,
     // while the stack pointer register is unperturbed.
-    // So why is it OK to take '&raise' in gencgc for the current thread?
+    // (gencgc takes '&raise' for the current thread, but it disables the sanitizers)
+    // Additionally, if we've switched stacks (because OS_THREAD_STACK is defined)
+    // then '&arg' seems not to be ok either. I'm not sure why, because the change
+    // of stack was already done. FIXME: find out what's going on there.
+#if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER \
+    && !defined LISP_FEATURE_OS_THREAD_STACK
     th->control_stack_end = (lispobj*)&arg;
 #endif
     th->os_kernel_tid = sb_GetTID();
@@ -608,12 +609,7 @@ extern void* funcall1_switching_stack(void*, void *(*fun)(void *))
     ;
 
 void* new_thread_trampoline_switch_stack(void* arg) {
-    struct thread *th = (struct thread *)arg;
-    void* ret = funcall1_switching_stack(arg,  new_thread_trampoline);
-
-    schedule_thread_post_mortem(th);
-    return ret;
-
+    return funcall1_switching_stack(arg, new_thread_trampoline);
 }
 #endif
 
@@ -1177,21 +1173,9 @@ void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
     int status, lock_ret;
-    // There is no create_thread lock if pauseless start is enabled.
-    // And wouldn't the right fix for FreeBSD be to inhibit the stop-for-GC signal
-    // rather than acquire a lock? And why exactly there a deadlock ?
-    // That we don't endeavor to find these things out leads to never-ending
-    // accretion of dubious code that we'll not know when to remove.
-#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
-    /* KLUDGE: Stopping the thread during pthread_create() causes deadlock
-     * on FreeBSD. */
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock\n"));
-    lock_ret = pthread_mutex_lock(&create_thread_lock);
-    gc_assert(lock_ret == 0);
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock\n"));
-#endif
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
-    /* keep threads from starting while the world is stopped. */
+
+    /* Keep threads from registering with GC while the world is stopped. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
@@ -1259,10 +1243,6 @@ void gc_start_the_world()
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
-    lock_ret = pthread_mutex_unlock(&create_thread_lock);
-    gc_assert(lock_ret == 0);
-#endif
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }

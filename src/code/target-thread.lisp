@@ -1657,30 +1657,40 @@ session."
 ;;; Return T if the thread was created
 (defun pthread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
-  (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t)))
-    (and (multiple-value-bind (c-stack-base c-stack-size)
-             #+c-stack-is-control-stack
-             (values (sap-ref-sap thread-sap (ash sb-vm::thread-control-stack-start-slot
-                                                  sb-vm:word-shift))
-                     (extern-alien "thread_control_stack_size" unsigned))
-             #-c-stack-is-control-stack
-             (values (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot
-                                                  sb-vm:word-shift))
-                     (extern-alien "thread_alien_stack_size" unsigned))
-           (= 0 (alien-funcall
-                 (extern-alien "pthread_attr_setstack"
-                               (function int system-area-pointer system-area-pointer
-                                         unsigned))
-                 attr c-stack-base c-stack-size)))
+  (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t))
+        (c-tramp
+         (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
+                             #-os-thread-stack "new_thread_trampoline")))
+    (and (= 0 #+os-thread-stack
+              (alien-funcall (extern-alien "pthread_attr_setstacksize"
+                                           (function int system-area-pointer unsigned))
+                             attr sb-unix::pthread-min-stack)
+              #-os-thread-stack
+              (with-alien ((setstack (function int system-area-pointer system-area-pointer
+                                               unsigned) :extern "pthread_attr_setstack"))
+                #+c-stack-is-control-stack
+                (alien-funcall setstack attr
+                               (sap-ref-sap thread-sap (ash sb-vm::thread-control-stack-start-slot
+                                                            sb-vm:word-shift))
+                               (extern-alien "thread_control_stack_size" unsigned))
+                #-c-stack-is-control-stack
+                (alien-funcall setstack attr
+                               (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot
+                                                            sb-vm:word-shift))
+                               (extern-alien "thread_alien_stack_size" unsigned))))
+         ;; From "Workaround a problem ... on NetBSD" (git rev af8c4a2933)
+         ;; If I had to guess, it wrongly assumed existence of memory outside of
+         ;; the exactly provided stack bounds.
+         #+netbsd
+         (= 0 (with-alien ((setguard (function int system-area-pointer unsigned)
+                                     :extern "pthread_attr_setguardsize"))
+                (alien-funcall setguard attr 0)))
          (with-pinned-objects (thread)
            (= 0 (alien-funcall
                  (extern-alien "pthread_create"
                                (function int system-area-pointer system-area-pointer
-                                         system-area-pointer unsigned))
-                 (struct-slot-sap thread thread os-thread)
-                 attr
-                 (foreign-symbol-sap "new_thread_trampoline")
-                 (logandc2 (get-lisp-obj-address thread) sb-vm:lowtag-mask)))))))
+                                         system-area-pointer system-area-pointer))
+                 (struct-slot-sap thread thread os-thread) attr c-tramp thread-sap))))))
 
 (defmacro free-thread-struct (memory)
   `(alien-funcall (extern-alien "free_thread_struct" (function void system-area-pointer))
@@ -1773,9 +1783,6 @@ session."
                             (setf (thread-startup-info *current-thread*) 0)))))
        (flet ((unmask-signals ()
                 (let ((mask (svref (thread-startup-info *current-thread*) 4)))
-                  #+(or win32 darwin freebsd)
-                  (setf (sb-vm:floating-point-modes)
-                        (setf (thread-startup-info *current-thread*) 5))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,
                       ;; then restore exactly that mask.
@@ -1939,7 +1946,12 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
               ;; be no transient effect on the list of all threads. But it's indeterminate
               ;; whether the creating or created thread will make progress first,
               ;; so they both do this assignment.
-              (sb-ext:cas (thread-%visible new-thread) 0 1))
+              (setf (thread-%visible new-thread) 1)
+              ;; Foreign threads don't pass the saved FP modes, so the modes have to be
+              ;; restored here and not in RUN.
+              #+(or win32 darwin freebsd)
+              (setf (sb-vm:floating-point-modes)
+                    (svref (thread-startup-info *current-thread*) 5)))
             (run)))
          (saved-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
@@ -1985,6 +1997,12 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; them, there should usually be only one item to delete from *STARTING-THREADS*.
         (let ((old (delete 0 *starting-threads*)))
           (setf *starting-threads* (rplacd cell old))
+          (barrier (:write))
+          ;; Assign the thread's *CURRENT-THREAD*. This is GC-safe because
+          ;; the thread instance is pinned via *STARTING-THREADS*.
+          (setf (sap-ref-lispobj thread-sap (ash sb-vm::thread-lisp-thread-slot
+                                                 sb-vm:word-shift))
+                thread)
           (setq created (pthread-create thread thread-sap))
           (cond (created ; Still holding the MAKE-THREAD-LOCK, expose thread in (LIST-ALL-THREADS).
                  ;; On CPUs where CAS can spuriously fail, this probably needs to loop and retry.

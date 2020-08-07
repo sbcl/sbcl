@@ -64,8 +64,13 @@
   #include <sys/sysctl.h>
 #endif
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-  #include "pthreads_win32.h"
+#ifdef LISP_FEATURE_SB_THREAD
+# ifdef LISP_FEATURE_WIN32
+#  include "pthreads_win32.h"
+# elif defined LISP_FEATURE_OS_THREAD_STACK
+#  include <limits.h> // PTHREAD_STACK_MIN is possibly in here
+#  include <pthread.h> // instead of in here
+# endif
 #endif
 
 #include "wrap.h"
@@ -154,7 +159,12 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant ("rtld-now", RTLD_NOW);
     defconstant ("rtld-global", RTLD_GLOBAL);
 
-    printf("(in-package \"SB-UNIX\")\n\n");
+    printf("\n(in-package \"SB-UNIX\")\n\n");
+
+#if defined LISP_FEATURE_OS_THREAD_STACK
+    defconstant("pthread-min-stack", PTHREAD_STACK_MIN);
+    printf("\n");
+#endif
 
     printf(";;; select()\n");
     defconstant("fd-setsize", FD_SETSIZE);
