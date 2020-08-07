@@ -22,8 +22,8 @@
           ;; into the default baseline policy. It has no relevance post-build
           ;; in as much as policy can be changed later arbitrarily.
           :CONS-PROFILING
-          ;; Used by nothing after compiling 'target-thread'
-          :SB-FUTEX :FUTEX-USE-TID
+          ;; Used by nothing after compiling 'target-thread.lisp' or 'thread.c'
+          :SB-FUTEX :FUTEX-USE-TID :OS-THREAD-STACK
           ;; These affect the BREAK instruction emitter, but the C code is able
           ;; to handle anything, and post-build we don't care which it is.
           :UD2-BREAKPOINTS :INT4-BREAKPOINTS

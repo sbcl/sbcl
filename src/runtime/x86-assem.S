@@ -322,7 +322,7 @@ Lfp_rtn_value:
 	SIZE(GNAME(call_into_c))
 
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
 	TYPE(GNAME(funcall1_switching_stack))

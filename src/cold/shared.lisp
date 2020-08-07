@@ -248,6 +248,8 @@
         (when (featurep '(:and :linux :sb-thread (:not :sb-safepoint))
                         target-feature-list)
           (push :pauseless-threadstart target-feature-list))
+        (when (featurep '(:or :darwin :openbsd) target-feature-list)
+          (push :os-thread-stack target-feature-list))
         (when (and (member :x86 target-feature-list)
                    (member :int4-breakpoints target-feature-list))
           ;; 0xCE is a perfectly good 32-bit instruction,

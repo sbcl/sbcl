@@ -289,7 +289,7 @@ x:
 #endif
 	.text
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
 	GFUNCDEF(funcall1_switching_stack)
         /* The arguments are switched, funcall1_switching_stack(arg, function)
            to avoid shuffling registers

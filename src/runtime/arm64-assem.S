@@ -52,7 +52,7 @@
 #endif
 
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
 	.align 2
 	.global funcall1_switching_stack
 	.type	funcall1_switching_stack, %function

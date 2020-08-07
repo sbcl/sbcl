@@ -58,7 +58,7 @@
 #include <thread.h>
 #endif
 
-#if defined(LISP_FEATURE_WIN32) || defined(OS_THREAD_STACK)
+#if defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_OS_THREAD_STACK)
 # define IMMEDIATE_POST_MORTEM
 #else
 static __attribute__((unused)) struct thread *postmortem_thread;
@@ -591,7 +591,7 @@ void* new_thread_trampoline(void* arg)
     result = funcall0(function);
     unregister_thread(th, &scribble);
 
-#ifndef OS_THREAD_STACK
+#ifndef LISP_FEATURE_OS_THREAD_STACK
     schedule_thread_post_mortem(th);
 #endif
 #endif
@@ -600,7 +600,7 @@ void* new_thread_trampoline(void* arg)
     return (void*)(uintptr_t)result;
 }
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
 extern void* funcall1_switching_stack(void*, void *(*fun)(void *))
 # ifdef LISP_FEATURE_X86_64
     __attribute__((sysv_abi))
@@ -1104,7 +1104,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
        /* call_into_lisp_first_time switches the stack for the initial
         * thread. For the others, we use this. */
         if (
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
             pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
             (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
 #else
