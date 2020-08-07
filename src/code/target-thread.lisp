@@ -1817,10 +1817,11 @@ session."
             ;;  The pthread_setname_np() function can fail with the following error:
             ;;  ERANGE The length of the string ... exceeds the allowed limit."
             (when (and (typep name 'simple-base-string) (<= (length name) 15))
-              (alien-funcall (extern-alien "pthread_setname_np"
-                                           (function int unsigned system-area-pointer))
-                             (thread-os-thread *current-thread*)
-                             (vector-sap name))))
+              (with-pinned-objects (name)
+                (alien-funcall (extern-alien "pthread_setname_np"
+                                             (function int unsigned system-area-pointer))
+                               (thread-os-thread *current-thread*)
+                               (vector-sap name)))))
     ;; Using handling-end-of-the-world would be a bit tricky
     ;; due to other catches and interrupts, so we essentially
     ;; re-implement it here. Once and only once more.
