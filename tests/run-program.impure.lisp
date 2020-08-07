@@ -419,11 +419,24 @@
             :broken-on :sb-safepoint
             :skipped-on (or (not :sb-thread) :win32))
   (let* (stop
+         (delay-between-gc
+          (or #+freebsd
+              (let* ((p (run-program "sysctl" '("hw.model") :search t :output :stream))
+                     (output (process-output p))
+                     (result (read-line output)))
+                (close output)
+                ;; With the default delay of 0 using FreeBSD on QEMU this test never
+                ;; finished because the RUN-PROGRAM thread would never get scheduled
+                ;; after its first entry into the loop.
+                ;; It wasn't hung, it just wasn't getting CPU time. For me anyway.
+                (when (search "QEMU" result)
+                  .00000001)) ; 10 nanoseconds
+              0))
          (threads (list*
                    (sb-thread:make-thread (lambda ()
                                             (loop until stop
                                                   do
-                                                  (sleep 0)
+                                                  (sleep delay-between-gc)
                                                   (gc :full t))))
                    (loop repeat 3
                          collect

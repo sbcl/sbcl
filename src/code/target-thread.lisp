@@ -1773,6 +1773,9 @@ session."
                             (setf (thread-startup-info *current-thread*) 0)))))
        (flet ((unmask-signals ()
                 (let ((mask (svref (thread-startup-info *current-thread*) 4)))
+                  #+(or win32 darwin freebsd)
+                  (setf (sb-vm:floating-point-modes)
+                        (setf (thread-startup-info *current-thread*) 5))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,
                       ;; then restore exactly that mask.
@@ -2001,7 +2004,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   unsigned (lisp-fun-address unsigned))
 (defun start-thread (thread function arguments)
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
-           #+(or win32 darwin)
+           #+(or win32 darwin freebsd)
            (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
                           (sb-vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))

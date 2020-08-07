@@ -11,7 +11,11 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+(or (not sb-thread) win32) (sb-ext:exit :code 104)
+;;; This reliably fails with two crashes (both in the same run) on FreeBSD:
+;;;  - garbage_collect: no SP known for thread 0x802bea000 (OS 34367133952)
+;;;  - failed AVER: (NOT (SB-THREAD::AVL-FIND ADDR SB-THREAD::OLD))
+
+#+(or (not sb-thread) win32 freebsd) (sb-ext:exit :code 104)
 
 (if (probe-file "fcb-threads.so")
     ;; Assume the test automator built this for us
