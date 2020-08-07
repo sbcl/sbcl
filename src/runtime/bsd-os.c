@@ -301,6 +301,20 @@ os_install_interrupt_handlers(void)
                                                  sig_stop_for_gc_handler);
 # endif
 #endif
+
+#ifdef LISP_FEATURE_LIBUNWIND_BACKTRACE
+    // Use this only if you know what you're doing
+    void backtrace_lisp_threads(int, siginfo_t*, os_context_t*);
+    fprintf(stderr, "SIGXCPU (%d), will backtrace in all threads\n", SIGXCPU);
+    sigdelset(&deferrable_sigset, SIGXCPU);
+    sigdelset(&blockable_sigset, SIGXCPU);
+    undoably_install_low_level_interrupt_handler(SIGXCPU, backtrace_lisp_threads);
+    sigset_t ss;
+    sigemptyset(&ss);
+    sigaddset(&ss, SIGXCPU);
+    thread_sigmask(SIG_UNBLOCK, &ss, 0);
+#endif
+
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
