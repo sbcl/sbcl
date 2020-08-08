@@ -222,4 +222,9 @@
     defconstant("fd-setsize", 1024);
     printf("\n");
 
+    defconstant("sizeof-sigset_t", sizeof (sigset_t));
+    defconstant("sig_block", SIG_BLOCK);
+    defconstant("sig_unblock", SIG_UNBLOCK);
+    defconstant("sig_setmask", SIG_SETMASK);
+
 }
