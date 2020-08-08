@@ -626,11 +626,17 @@
 
 (with-test (:name :all-threads-have-abort-restart
                   :broken-on :win32)
-  (loop repeat 100 do
-        (let ((thread (make-kill-thread (lambda () (sleep 100000000)))))
-          (interrupt-thread thread (lambda ()
-                                     (assert (find-restart 'abort))))
-          (process-all-interrupts thread))))
+  ;; This test can fail with without the extra semaphore.
+  ;; See also TEST-INTERRUPT in test-util for further explanation.
+  (let* ((sem (make-semaphore))
+         (thread (make-kill-thread
+                  (lambda ()
+                    (signal-semaphore sem)
+                    (sleep 100000000)))))
+    (wait-on-semaphore sem)
+    (interrupt-thread thread (lambda ()
+                               (assert (find-restart 'abort))))
+    (process-all-interrupts thread)))
 
 (sb-ext:gc :full t)
 

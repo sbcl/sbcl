@@ -120,7 +120,25 @@
   (sb-ext:wait-for (null (sb-thread::thread-interruptions thread))))
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
-  (let ((child  (make-kill-thread function-to-interrupt)))
+  ;; Tests of interrupting a newly created thread can fail if the creator runs
+  ;; so quickly that it bypasses execution of the created thread. So the creator
+  ;; needs to wait, to have a facsimile of the situation prior to implementation
+  ;; of the so-called pauseless thread start feature.
+  ;; Wouldn't you know, it's just reintroducing a startup semaphore.
+  ;; And interruption tests are even more likely to fail with sb-thruption
+  ;; because sb-thruption is flawed: it presumes that there is enough synchronization
+  ;; between sender/receiver that checking the INVOKED variable (shared via a closure)
+  ;; makes any sense at all, which it doesn't. (In addition, it supposes that merely
+  ;; by polling at safepoints, interrupts somehow become safe, which is not true
+  ;; in general - it is only true of the GC "interrupt" delivered by the kernel
+  ;; when the safepoint page trap is hit.)
+  ;; Noneless, this tries to be robust enough to pass.
+  (let* ((sem (sb-thread:make-semaphore))
+         (child  (make-kill-thread
+                  (lambda ()
+                    (sb-thread:signal-semaphore sem)
+                    (funcall function-to-interrupt)))))
+    (sb-thread:wait-on-semaphore sem)
     (format t "interrupting child ~A~%" child)
     (sb-thread:interrupt-thread child
      (lambda ()
