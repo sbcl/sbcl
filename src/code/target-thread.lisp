@@ -1769,7 +1769,8 @@ session."
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
 (defun pthread-sigmask (how new old)
-  (alien-funcall (extern-alien "pthread_sigmask"
+  (alien-funcall (extern-alien #-win32 "pthread_sigmask"
+			       #+win32 "_sbcl_pthread_sigmask"
                                (function void int system-area-pointer system-area-pointer))
                  how
                  (cond ((system-area-pointer-p new) new)
