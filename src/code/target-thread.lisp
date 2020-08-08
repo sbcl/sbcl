@@ -1661,11 +1661,13 @@ session."
         (c-tramp
          (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
                              #-os-thread-stack "new_thread_trampoline")))
-    (and (= 0 #+os-thread-stack
+    (and (= 0 #+(or win32 os-thread-stack)
               (alien-funcall (extern-alien "pthread_attr_setstacksize"
                                            (function int system-area-pointer unsigned))
-                             attr sb-unix::pthread-min-stack)
-              #-os-thread-stack
+                             attr
+                             #+win32 (extern-alien "thread_control_stack_size" unsigned)
+                             #-win32 sb-unix::pthread-min-stack)
+              #-(or win32 os-thread-stack)
               (with-alien ((setstack (function int system-area-pointer system-area-pointer
                                                unsigned) :extern "pthread_attr_setstack"))
                 #+c-stack-is-control-stack
@@ -1923,7 +1925,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.
-;;; Also the create_thread_lock is not used in C.
 #+pauseless-threadstart
 (defun start-thread (thread function arguments)
   (let* ((trampoline

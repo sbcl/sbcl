@@ -245,8 +245,7 @@
              (arch (target-platform-keyword target-feature-list)))
         (when (featurep '(:and :sb-thread :sb-futex :linux) target-feature-list)
           (pushnew :futex-use-tid target-feature-list))
-        (when (featurep '(:and :sb-thread (:not :sb-safepoint)) target-feature-list)
-          (push :pauseless-threadstart target-feature-list))
+        (push :pauseless-threadstart target-feature-list) ; Pending removal.
         (when (featurep '(:or :darwin :openbsd) target-feature-list)
           (push :os-thread-stack target-feature-list))
         (when (and (member :x86 target-feature-list)
