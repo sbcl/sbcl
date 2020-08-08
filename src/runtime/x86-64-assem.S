@@ -89,6 +89,16 @@
 
 #define THREAD_BASE_REG %r13
 
+#ifdef LISP_FEATURE_WIN32
+#define CARG1 %rcx
+#define CARG2 %rdx
+#define CARG3 %r8
+#else
+#define CARG1 %rdi
+#define CARG2 %rsi
+#define CARG3 %rdx
+#endif
+	
 #ifdef LISP_FEATURE_OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
@@ -101,8 +111,16 @@ GNAME(funcall1_switching_stack):
         push    %rbp
         mov     %rsp,%rbp
 
-        mov     THREAD_CONTROL_STACK_END_OFFSET(%rdi),%rsp
-        call    *%rsi
+        mov     THREAD_CONTROL_STACK_END_OFFSET(CARG1),%rsp
+
+#ifdef LISP_FEATURE_WIN32	
+	/* _chkstk() is called at some unknown points and is
+           expecting that
+	*/
+	mov 	THREAD_CONTROL_STACK_START_OFFSET(CARG1), %rax
+	movq    %rax, %gs:16
+#endif
+        call    *CARG2
 
         mov     %rbp, %rsp
         pop     %rbp

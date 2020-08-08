@@ -245,7 +245,8 @@ void create_main_lisp_thread(lispobj function) {
     /* WIN32 has a special stack arrangement, calling
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
-#if !defined(LISP_FEATURE_WIN32) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+#if !(defined(LISP_FEATURE_WIN32) && !defined(OS_THREAD_STACK)) \
+    && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     call_into_lisp_first_time(function,args,0);
 #else
     funcall0(function);
@@ -482,14 +483,10 @@ void* new_thread_trampoline(void* arg)
 }
 
 #ifdef LISP_FEATURE_OS_THREAD_STACK
-extern void* funcall1_switching_stack(void*, void *(*fun)(void *))
-# ifdef LISP_FEATURE_X86_64
-    __attribute__((sysv_abi))
-# endif
-    ;
+extern void* funcall1_switching_stack(void*, void *(*fun)(void *));
 
-void* new_thread_trampoline_switch_stack(void* arg) {
-    return funcall1_switching_stack(arg, new_thread_trampoline);
+void* new_thread_trampoline_switch_stack(void* th) {
+    return funcall1_switching_stack(th, new_thread_trampoline);
 }
 #endif
 

@@ -40,44 +40,7 @@
 
 #include "validate.h"
 
-int arch_os_thread_init(struct thread *thread)
-{
-
-    void *cur_stack_end;
-    MEMORY_BASIC_INFORMATION stack_memory;
-
-    asm volatile ("mov %%gs:8,%0": "=r" (cur_stack_end));
-
-    /* Can't pull stack start from fs:4 or fs:8 or whatever,
-     * because that's only what currently has memory behind
-     * it from being used, so do a quick VirtualQuery() and
-     * grab the AllocationBase. -AB 2006/11/25
-     */
-
-    if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
-        fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-        lose("Could not query stack memory information.");
-    }
-
-    thread->control_stack_start = stack_memory.AllocationBase;
-    thread->control_stack_end = cur_stack_end;
-
-#ifndef LISP_FEATURE_SB_THREAD
-    /*
-     * Theoretically, threaded SBCL binds directly against
-     * the thread structure for these values. We don't do
-     * threads yet, but we'll probably do the same. We do
-     * need to reset these, though, because they were
-     * initialized based on the wrong stack space.
-     */
-    SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
-    SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
-#endif
-
-
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_setspecific(specials,thread); // FIXME: remove this line?
-#endif
+int arch_os_thread_init(struct thread *thread) {
     return 1;
 }
 
