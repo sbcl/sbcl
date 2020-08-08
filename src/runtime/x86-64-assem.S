@@ -25,9 +25,6 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
-#ifdef MEMORY_SANITIZER
-#include "genesis/symbol.h"
-#endif
 #include "genesis/ratio.h"
 #include "genesis/complex.h"
 
@@ -127,13 +124,6 @@ GNAME(call_into_lisp_first_time):
 GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
-#ifdef MEMORY_SANITIZER // Presumes GCC_TLS and SB_THREAD
-	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r8 // Clobberable
-	movq	%fs:(%r8), %r8
-	movq	%fs:0, %rax
-	leaq	__msan_param_tls@TPOFF(%rax), %rax
-	movq	%rax, THREAD_MSAN_PARAM_TLS_OFFSET(%r8)
-#endif
 	LOAD_PIC_VAR(all_threads, %rax)
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack

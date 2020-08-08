@@ -62,8 +62,8 @@ int arch_os_thread_init(struct thread *thread) {
     }
 #endif
 #ifdef MEMORY_SANITIZER
-    asm("movq %%fs:0, %0\n\tleaq __msan_param_tls@TPOFF(%0), %0"
-        : "=r" (thread->msan_param_tls));
+    extern __thread unsigned long __msan_param_tls[];
+    thread->msan_param_tls = (uword_t)&__msan_param_tls[0];
 #endif
     return 1;
 }
