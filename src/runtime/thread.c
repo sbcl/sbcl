@@ -456,7 +456,7 @@ void* new_thread_trampoline(void* arg)
     // then '&arg' seems not to be ok either. I'm not sure why, because the change
     // of stack was already done. FIXME: find out what's going on there.
 #if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER \
-    && !defined LISP_FEATURE_OS_THREAD_STACK
+    && !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_WIN32
     th->control_stack_end = (lispobj*)&arg;
 #endif
     th->os_kernel_tid = sb_GetTID();
