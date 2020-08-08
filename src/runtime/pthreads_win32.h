@@ -55,6 +55,8 @@ typedef int sigset_t;
 
 #define PTHREAD_DESTRUCTOR_ITERATIONS 4
 
+#define PTHREAD_STACK_MIN 0
+
 void pthreads_win32_init();
 
 /* 1 - Thread */
