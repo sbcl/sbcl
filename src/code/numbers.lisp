@@ -641,7 +641,7 @@ the first."
            (if (float-infinity-p x)
                ,infinite-x-finite-y
                (,op (rational x) y))))
-      (((foreach bignum ratio) float)
+      ((bignum float)
        (if (float-infinity-p y)
            ,infinite-y-finite-x
            (,op x (rational y))))))
