@@ -247,7 +247,7 @@
           (pushnew :futex-use-tid target-feature-list))
         (when (featurep '(:and :sb-thread (:not :sb-safepoint)) target-feature-list)
           (push :pauseless-threadstart target-feature-list))
-        (when (featurep '(:or :darwin :openbsd) target-feature-list)
+        (when (featurep '(:and :sb-thread (:or :darwin :openbsd)) target-feature-list)
           (push :os-thread-stack target-feature-list))
         (when (and (member :x86 target-feature-list)
                    (member :int4-breakpoints target-feature-list))
