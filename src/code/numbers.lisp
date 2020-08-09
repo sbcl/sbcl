@@ -602,7 +602,6 @@ the first."
            (,op x (coerce 0 '(dispatch-type x)))
            (if (float-infinity-p x)
                ,infinite-x-finite-y
-               ;; Likewise
                (make-fixnum-float-comparer ,(case op
                                               (> '<)
                                               (< '>)
@@ -612,7 +611,31 @@ the first."
        (,op (coerce x 'double-float) y))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
-      (((foreach single-float double-float #+long-float long-float) rational)
+      (((foreach single-float double-float #+long-float long-float) ratio)
+       (if (float-infinity-p x)
+           ,infinite-x-finite-y
+           ;; Avoid converting the float into a rational, since it
+           ;; will be taken apart later anyway.
+           (multiple-value-bind (bits exp) (integer-decode-float x)
+             (if (eql bits 0)
+                 (,op 0 y)
+                 (let ((int (if (minusp x) (- bits) bits)))
+                   (if (minusp exp)
+                       (,op (* int (denominator y))
+                            (* (numerator y) (ash 1 (- exp))))
+                       (,op (ash int exp) y)))))))
+      ((ratio (foreach single-float double-float))
+       (if (float-infinity-p y)
+           ,infinite-y-finite-x
+           (multiple-value-bind (bits exp) (integer-decode-float y)
+             (if (eql bits 0)
+                 (,op x 0)
+                 (let ((int (if (minusp y) (- bits) bits)))
+                   (if (minusp exp)
+                       (,op (* (numerator x) (ash 1 (- exp)))
+                            (* int (denominator x)))
+                       (,op x (ash int exp))))))))
+      (((foreach single-float double-float #+long-float long-float) bignum)
        (if (eql y 0)
            (,op x (coerce 0 '(dispatch-type x)))
            (if (float-infinity-p x)
