@@ -232,9 +232,10 @@
 
  ("src/code/bignum"     :not-host)
  ("src/code/number-dispatch" :not-host)
- ("src/code/float"      :not-host)
+ ("src/code/float-inf-nan"   :not-host)
  ("src/code/numbers"    :not-host)
  ("src/code/float-trap" :not-host)
+ ("src/code/float"      :not-host)
 
  ("src/code/irrat"      :not-host)
 
