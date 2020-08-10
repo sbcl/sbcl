@@ -563,7 +563,7 @@ void* new_thread_trampoline(void* arg)
     // thread that made a THREAD instance which (on a precise GC architecture) gets
     // moved to a protectable page. There's a window in which it could happen just
     // after making the instance and before pushing it into *STARTING-THREADS*.
-    lispthread->stack_end = (lispobj)th->control_stack_end;
+    lispthread->control_stack_end = (lispobj)th->control_stack_end;
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
