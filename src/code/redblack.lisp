@@ -180,9 +180,20 @@
          ((< (node-key tree) key) (setq tree (right tree)))
          (t (return tree)))))
 
+;;; Find a node with key less than or equal to KEY and as near it as possible.
 (defun find<= (key tree)
   (named-let recurse ((node tree) (best nil))
     (cond ((null node) best)
           ((< key (node-key node)) (recurse (left node) best))
           ((< (node-key node) key) (recurse (right node) node))
           (t node))))
+
+;;; Find a node with key greater than or equal to KEY and as near it as possible.
+(defun find>= (key tree)
+  (named-let recurse ((node tree) (best nil))
+    (cond ((null node) best)
+          ((< key (node-key node)) (recurse (left node) node))
+          ((< (node-key node) key) (recurse (right node) best))
+          (t node))))
+
+(export '(find>= find<=))
