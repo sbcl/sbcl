@@ -2260,6 +2260,8 @@
 ;;; check that non-trivial constants are EQ across different files: this is
 ;;; not something ANSI either guarantees or requires, but we want to do it
 ;;; anyways.
+(when (find-symbol "SORT-INLINE-CONSTANTS" "SB-VM")
+  (push :inline-constants *features*))
 (defconstant +share-me-1+ #-inline-constants 123.456d0 #+inline-constants nil)
 (defconstant +share-me-2+ "a string to share")
 (defconstant +share-me-3+ (vector 1 2 3))
