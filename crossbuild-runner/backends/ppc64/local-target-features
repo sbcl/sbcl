@@ -1,1 +1,1 @@
-:64-bit :gencgc :big-endian :sb-thread
+:gencgc :big-endian :sb-thread
