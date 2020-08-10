@@ -554,16 +554,6 @@ void* new_thread_trampoline(void* arg)
 #endif
     th->os_kernel_tid = sb_GetTID();
     init_new_thread(th, 0, 0, 0);
-    // The lisp thread instance stores the stack end for one purpose only, for
-    // SB-EXT:STACK-ALLOCATED-P to quickly check whether an object is on some
-    // thread's stack by looking only the all-threads tree and not acquiring a lock
-    // on any primitive thread.
-    // Storing through a pointer to lisp memory has to wait until linking to all_threads,
-    // lest the WP fault handler think this isn't a lisp thread. Consider a creating
-    // thread that made a THREAD instance which (on a precise GC architecture) gets
-    // moved to a protectable page. There's a window in which it could happen just
-    // after making the instance and before pushing it into *STARTING-THREADS*.
-    lispthread->control_stack_end = (lispobj)th->control_stack_end;
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
