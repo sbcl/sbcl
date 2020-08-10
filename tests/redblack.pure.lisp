@@ -6,6 +6,7 @@
                     color-of left right
                     node-key node-value data
                     find= find<=))
+(load "bbtree-test-util.lisp")
 
 (defun verify-invariants (root print)
   (unless root
@@ -211,3 +212,10 @@
   (dotimes (i n-items)
     (setq tree (redblack:insert tree i i)))
   tree)
+
+(defun test-rb-find-inexact (n-nodes n-iterations)
+  (bbtree-test:test-find-inexact-macro redblack:insert
+                                       find<= redblack:find>= node-key))
+
+(test-util:with-test (:name :rb-find-inexact)
+  (bbtree-test:exercise-find-inexact 'test-rb-find-inexact))
