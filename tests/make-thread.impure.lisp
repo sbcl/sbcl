@@ -125,8 +125,7 @@
 ;;; In fact, assert something stronger: there are no young objects
 ;;; between the current SP and end of stack.
 (test-util:with-test (:name :expected-gc-roots
-                      :skipped-on (or :interpreter (not :pauseless-threadstart))
-                      :fails-on (and :x86 :sb-fasteval))
+                      :skipped-on (or :interpreter (not :pauseless-threadstart)))
   (let ((list (tryit :print nil)))
     ;; should be not many things pointed to by the stack
     (assert (< (length list) #+x86    38   ; more junk, I don't know why
