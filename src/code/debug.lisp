@@ -470,7 +470,7 @@ information."
                                    (< a (sb-thread::thread-control-stack-end thread)))))
                   #+win32 ; exhaustive search
                   (dolist (thread (sb-thread:list-all-threads)) ; conses, but I don't care
-                    (when (sb-thread::in-stack-range-p)
+                    (when (in-stack-range-p)
                       (return thread)))
                   #-win32
                   ;; find a stack whose primitive-thread is nearest and above A.
