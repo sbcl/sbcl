@@ -630,7 +630,8 @@ assert_on_stack(struct thread *th, void *esp)
     if (on_altstack_p(th, esp))
         lose("thread %p: esp on altstack: %p", th, esp);
 #endif
-    lose("thread %p: bogus esp: %p", th, esp);
+    lose("thread %p: bogus esp: %p (range=%p..%p)", th, esp,
+         th->control_stack_start, th->control_stack_end);
 }
 
 // returns 0 if skipped, 1 otherwise
