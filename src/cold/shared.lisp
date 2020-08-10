@@ -309,6 +309,8 @@
           ":SB-SAFEPOINT not supported on selected architecture")
          ("(and sb-safepoint-strictly (not sb-safepoint))"
           ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")
+         ("(and os-thread-stack sb-safepoint)"
+          ":OS-THREAD-STACK and :SB-SAFEPOINT are incompatible")
          ("(not (or elf mach-o win32))"
           "No execute object file format feature defined")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")

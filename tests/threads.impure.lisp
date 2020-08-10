@@ -150,8 +150,10 @@
   (let ((old-threads (list-all-threads))
         (thread (make-thread
                  (lambda ()
+                   ;; I honestly have no idea what this is testing.
+                   ;; It seems to be nothing more than an implementation change detector test.
                    (assert (sb-thread::avl-find
-                            (sb-kernel:get-lisp-obj-address sb-vm:*control-stack-start*)
+                            (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
                             sb-thread::*all-threads*))
                    (sleep 2))))
         (new-threads (list-all-threads)))

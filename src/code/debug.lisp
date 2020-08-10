@@ -465,14 +465,19 @@ information."
                      (< a (get-lisp-obj-address sb-vm:*control-stack-end*)))
                 sb-thread:*current-thread*)
                (all-threads
-                ;; find a stack whose base is nearest and below A.
-                (awhen (sb-thread::avl-find<= a sb-thread::*all-threads*)
-                  (let ((thread (sb-thread::avlnode-data it)))
-                    (when (and (< a (sb-thread::thread-stack-end thread))
-                               ;; Make a final check that it's live.
-                               ;; It could die by the time this returns.
-                               (sb-thread:thread-alive-p thread))
-                      thread))))))))
+                (macrolet ((in-stack-range-p ()
+                             `(and (>= a (sb-thread::thread-control-stack-start thread))
+                                   (< a (sb-thread::thread-control-stack-end thread)))))
+                  #+win32 ; exhaustive search
+                  (dolist (thread (sb-thread:list-all-threads)) ; conses, but I don't care
+                    (when (sb-thread::in-stack-range-p)
+                      (return thread)))
+                  #-win32
+                  ;; find a stack whose primitive-thread is nearest and above A.
+                  (awhen (sb-thread::avl-find>= a sb-thread::*all-threads*)
+                    (let ((thread (sb-thread::avlnode-data it)))
+                      (when (in-stack-range-p)
+                        thread)))))))))
 
 ;;;; frame printing
 

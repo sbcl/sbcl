@@ -103,12 +103,13 @@ in future versions."
   ;; Any use of THREAD-OS-THREAD from lisp should take care to ensure validity of
   ;; the thread id by holding the INTERRUPTIONS-LOCK.
   (os-thread 0 :type sb-vm:word)
-  ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread.
-  ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
-  ;; due to possible unmapping on thread death.
+  ;; Keep a copy of the stack range for use in SB-EXT:STACK-ALLOCATED-P so that
+  ;; we don't have to read it from the primitive thread which is unsafe for any
+  ;; thread other than the current thread.
   ;; Usually this is a fixed amount below PRIMITIVE-THREAD, but the exact offset
   ;; varies by build configuration, and if #+win32 it is not related in any way.
-  (stack-end 0 :type sb-vm:word)
+  (control-stack-start 0 :type sb-vm:word)
+  (control-stack-end 0 :type sb-vm:word)
   ;; At the beginning of the thread's life, this is a vector of data required
   ;; to start the user code. At the end, is it pointer to the 'struct thread'
   ;; so that it can be either freed or reused.

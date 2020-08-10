@@ -320,7 +320,7 @@ the alien callback for that function with the given alien type."
                                    nil nil))) ; sigmask + fpu state bits
       (copy-primitive-thread-fields thread)
       (setf (thread-startup-info thread) startup-info)
-      (update-all-threads (get-lisp-obj-address sb-vm:*control-stack-start*) thread)
+      (update-all-threads (thread-primitive-thread thread) thread)
       (run))
     #-pauseless-threadstart
     (dx-let ((args (list index return arguments)))

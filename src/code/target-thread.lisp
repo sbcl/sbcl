@@ -229,8 +229,8 @@ an error in that case."
 ;;; Keep an AVL tree of threads ordered by stack base address. NIL is the empty tree.
 (sb-ext:define-load-time-global *all-threads* ())
 ;;; Ensure that THREAD is in *ALL-THREADS*.
-(defmacro update-all-threads (stack-base thread)
-  `(let ((addr ,stack-base))
+(defmacro update-all-threads (key thread)
+  `(let ((addr ,key))
      (barrier (:read))
      (let ((old *all-threads*))
        (loop
@@ -307,9 +307,11 @@ created and old ones may exit at any time."
 ;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
 (defmacro copy-primitive-thread-fields (this)
   `(setf (thread-primitive-thread ,this) (sap-int (current-thread-sap))
-         (thread-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)
          (thread-os-thread ,this)
          (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))))
+(defmacro set-thread-control-stack-slots (this)
+  `(setf (thread-control-stack-start ,this) (get-lisp-obj-address sb-vm:*control-stack-start*)
+         (thread-control-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)))
 
 ;;; Not uncoincidentally, the variables assigned here are also
 ;;; listed in SB-KERNEL::*SAVE-LISP-CLOBBERED-GLOBALS*
@@ -320,6 +322,7 @@ created and old ones may exit at any time."
   (let* ((name "main thread")
          (thread (%make-thread name nil (make-semaphore :name name))))
     (copy-primitive-thread-fields thread)
+    (set-thread-control-stack-slots thread)
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
@@ -327,7 +330,9 @@ created and old ones may exit at any time."
     (setf *joinable-threads* nil)
     #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
     (setq *all-threads*
-          (avl-insert nil (get-lisp-obj-address sb-vm:*control-stack-start*) thread))))
+          (avl-insert nil
+                      (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
+                      thread))))
 
 (defun main-thread ()
   "Returns the main thread of the process."
@@ -1414,6 +1419,8 @@ on this semaphore, then N of them is woken up."
       (%exit))
     ;; Lisp-side cleanup
     (let* ((thread *current-thread*)
+           ;; use the "funny fixnum" representation
+           (c-thread (%make-lisp-obj (thread-primitive-thread thread)))
            (sem (thread-semaphore thread)))
       ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
       ;; That in turn caused a failure in GC because a fixnum is not a legal value
@@ -1428,8 +1435,7 @@ on this semaphore, then N of them is woken up."
       ;; pointer, but it knows that it has no underlying OS thread.
       (with-interruptions-lock (thread)
         (when sem ; ordinary lisp thread, not FOREIGN-THREAD
-          (setf (thread-startup-info thread) ; use the "funny fixnum" representation
-                (%make-lisp-obj (thread-primitive-thread thread))))
+          (setf (thread-startup-info thread) c-thread))
         (setf (thread-primitive-thread thread) 0)
         (barrier (:write)))
       ;; After making the thread dead, remove from session. If this were done first,
@@ -1451,8 +1457,7 @@ on this semaphore, then N of them is woken up."
          ;; With #+pauseless-threadstart, this occurs for FOREIGN-THREAD because
          ;; the memory allocation/deallocation is handled in C.
          ;; I would like to combine the recycle bin for foreign and lisp threads though.
-         (delete-from-all-threads
-          (get-lisp-obj-address sb-vm:*control-stack-start*))))
+         (delete-from-all-threads (get-lisp-obj-address c-thread))))
       (when sem
         (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
         ;; We could increment by most-positive-fixnum, but that might just encourage
@@ -1462,6 +1467,7 @@ on this semaphore, then N of them is woken up."
 ;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
 ;;; expect normal happy lisp integers, even if a bignum.
 (defun delete-from-all-threads (addr)
+  (declare (type sb-vm:word addr))
   (barrier (:read))
   (let ((old *all-threads*))
     (loop
@@ -1702,8 +1708,7 @@ session."
   (let ((c-thread (descriptor-sap (thread-startup-info thread))))
     (setf (thread-startup-info thread) 0)
     ;; Clean up *ALL-THREADS*
-    (delete-from-all-threads
-     (sap-ref-word c-thread (ash sb-vm::thread-control-stack-start-slot sb-vm:word-shift)))
+    (delete-from-all-threads (sap-int c-thread))
     ;; Free the pthread resources
     (let ((posix-thread (thread-os-thread thread)))
       (alien-funcall (extern-alien "pthread_join" (function int unsigned unsigned))
@@ -1793,9 +1798,6 @@ session."
                       (sb-unix::unblock-deferrable-signals)))))
          ;; notinline keeps array off the call stack by getting it out of the curent frame
          (declare (notinline unmask-signals))
-
-         (sb-ext:atomic-push *current-thread* (session-new-enrollees *session*))
-
          ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
          ;; pure cargo-cultism.
          (without-interrupts (with-local-interrupts ,@body))))))
@@ -1807,7 +1809,7 @@ session."
      (macrolet ((unmask-signals () '(sb-unix::unblock-deferrable-signals))
                 (apply-real-function () '(apply function arguments)))
        (copy-primitive-thread-fields thread)
-       (update-all-threads (get-lisp-obj-address sb-vm:*control-stack-start*) thread)
+       (update-all-threads (thread-primitive-thread thread) thread)
        (sb-ext:atomic-push thread (session-new-enrollees *session*))
        (when setup-sem
          (signal-semaphore setup-sem)
@@ -1819,6 +1821,7 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (thread-trampoline-defining-macro
+  (set-thread-control-stack-slots *current-thread*)
   #+linux (let ((name (thread-name *current-thread*)))
             ;; "The thread name is a meaningful C language string, whose length is
             ;;  restricted to 16 characters, including the terminating null byte ('\0').
@@ -1964,9 +1967,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       (pthread-sigmask sb-unix::SIG_BLOCK (foreign-symbol-sap "deferrable_sigset" t)
                        saved-sigmask))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
-               (stack-base
-                (sap-ref-word thread-sap
-                              (ash sb-vm::thread-control-stack-start-slot sb-vm:word-shift)))
                (sigmask
                 (if (position 1 saved-sigmask) ; if there are any signals masked
                     (copy-seq saved-sigmask) ; heap-allocate to pass to the new thread
@@ -1974,9 +1974,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                (cell (list thread))
                (startup-info
                 (vector trampoline cell function arguments sigmask
-                        #+darwin ; pass fp modes, clearing the accrued exception bits
-                        (dpb 0 sb-vm:float-sticky-bits (sb-vm:floating-point-modes))
-                        #-darwin 0))) ; otherwise, don't need to do that
+                        ;; pass fp modes if neccessary, clearing the accrued exception bits
+                        (+ #+(or win32 darwin freebsd)
+                           (dpb 0 sb-vm:float-sticky-bits (sb-vm:floating-point-modes))))))
       (setf (thread-primitive-thread thread) (sap-int thread-sap)
             (thread-startup-info thread) startup-info)
       ;; Add new thread to *ALL-THREADS* now so that if the creator asserts
@@ -1984,7 +1984,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       ;; But there is a slight ploy involved: the thread does not appear in
       ;; (LIST-ALL-THREADS) until a POSIX thread is successfully started.
       (setf (thread-%visible thread) 0)
-      (update-all-threads stack-base thread)
+      (update-all-threads (sap-int thread-sap) thread)
+      (when *session*
+        (sb-ext:atomic-push thread (session-new-enrollees *session*)))
       ;; Absence of the startup semaphore notwithstanding, creation is synchronized
       ;; so that we can prevent new threads from starting, typically in SB-POSIX:FORK
       ;; or SAVE-LISP-AND-DIE.
@@ -2005,14 +2007,19 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                                                  sb-vm:word-shift))
                 thread)
           (setq created (pthread-create thread thread-sap))
-          (cond (created ; Still holding the MAKE-THREAD-LOCK, expose thread in (LIST-ALL-THREADS).
+          (cond (created
+                 ;; Still holding the MAKE-THREAD-LOCK, expose the thread in *all-threads*.
+                 ;; In this manner, anyone who acquires the MAKE-THREAD-LOCK can be sure that
+                 ;; (list-all-threads) enumerates every running thread.
                  ;; On CPUs where CAS can spuriously fail, this probably needs to loop and retry.
                  ;; It's ok if the thread changed 0 -> {1 | -1}, then failure here is correct.
                  (sb-ext:cas (thread-%visible thread) 0 1))
                 (t ; unlikely. Out of memory perhaps?
                  (setq *starting-threads* old)))))
       (unless created ; Remove side-effects of trying to create
-        (delete-from-all-threads stack-base)
+        (delete-from-all-threads (sap-int thread-sap))
+        (when *session*
+          (%delete-thread-from-session thread))
         (free-thread-struct thread-sap)))
     (with-pinned-objects (saved-sigmask)
       (pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
