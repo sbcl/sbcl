@@ -774,6 +774,15 @@
     (((foreach single-float double-float #+long-float long-float))
      (%unary-ftruncate number))))
 
+(declaim (inline first-bit-set))
+(defun first-bit-set (x)
+  (declare (word x))
+  #+x86-64
+  (truly-the (values (mod #.sb-vm:n-word-bits) &optional)
+             (%primitive sb-vm::unsigned-word-find-first-bit x))
+  #-x86-64
+  (1- (integer-length (logand x (- x)))))
+
 (defun rational (x)
   "RATIONAL produces a rational number for any real numeric argument. This is
   more efficient than RATIONALIZE, but it assumes that floating-point is
@@ -786,7 +795,19 @@
            0
            (let ((int (if (minusp x) (- bits) bits)))
              (if (minusp exp)
-                 (integer-/-integer int (ash 1 (- exp)))
+                 ;; Instead of division (which also involves GCD)
+                 ;; find the first set bit of the numerator and shift accordingly,
+                 ;; as the denominator is a power of two.
+                 (let* ((pexp (- exp))
+                        (set (first-bit-set bits))
+                        (shifted (ash int (- set))))
+                   (if (> pexp set)
+                       (%make-ratio shifted
+                                    (let ((shift (- pexp set)))
+                                      (if (< shift sb-vm:n-fixnum-bits)
+                                          (ash 1 shift)
+                                          (bignum-ashift-left-fixnum 1 shift))))
+                       (ash int exp)))
                  (ash int exp))))))
     ((rational) x)))
 
