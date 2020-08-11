@@ -46,7 +46,7 @@ ifdef LISP_FEATURE_LIBUNWIND_BACKTRACE
   OS_LIBS += -lunwind
 endif
 
-CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
+CFLAGS += -Wunused-parameter -Wimplicit-fallthrough -fno-omit-frame-pointer -momit-leaf-frame-pointer
 DISABLE_PIE=no
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE

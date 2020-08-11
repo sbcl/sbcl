@@ -98,8 +98,8 @@ static const char* classify_obj(lispobj ptr)
     switch(lowtag_of(ptr)) {
     case INSTANCE_POINTER_LOWTAG:
         name = instance_classoid_name(native_pointer(ptr));
-        if (widetag_of(name) == SIMPLE_BASE_STRING_WIDETAG)
-          return (char*)(name + 2);
+        if (widetag_of(name) == SIMPLE_BASE_STRING_WIDETAG) return (char*)(name + 2);
+        break;
     case LIST_POINTER_LOWTAG:
         return "cons";
     case FUN_POINTER_LOWTAG:

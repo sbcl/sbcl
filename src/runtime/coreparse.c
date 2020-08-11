@@ -417,6 +417,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // - Otherwise, the word might point to a relocated range,
             //   either the instance itself, or a trampoline in immobile space.
             adjust_word_at(where+1, adj);
+            /* FALLTHROUGH */
         case INSTANCE_WIDETAG:
             layout = (widetag == FUNCALLABLE_INSTANCE_WIDETAG) ?
                 funinstance_layout(where) : instance_layout(where);

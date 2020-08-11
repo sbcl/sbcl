@@ -301,6 +301,7 @@ uword_t sxhash_simple_string(struct vector* string)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     case SIMPLE_CHARACTER_STRING_WIDETAG:
         for(i=0;i<len;++i) MIX(char_string[i])
+        break;
 #endif
     case SIMPLE_BASE_STRING_WIDETAG:
         for(i=0;i<len;++i) MIX(base_string[i])
