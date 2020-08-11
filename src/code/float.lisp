@@ -776,10 +776,9 @@
 
 (declaim (inline first-bit-set))
 (defun first-bit-set (x)
-  (declare (word x))
   #+x86-64
   (truly-the (values (mod #.sb-vm:n-word-bits) &optional)
-             (%primitive sb-vm::unsigned-word-find-first-bit x))
+             (%primitive sb-vm::unsigned-word-find-first-bit (the word x)))
   #-x86-64
   (1- (integer-length (logand x (- x)))))
 
