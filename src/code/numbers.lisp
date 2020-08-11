@@ -655,6 +655,7 @@ the first."
                (< 'float-bignum->)
                (= 'float-bignum-=))
             y x)
+           #-64-bit
            (,op x (rational y))))))
   )                                     ; EVAL-WHEN
 
