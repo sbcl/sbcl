@@ -1452,7 +1452,7 @@
 ;; This could be used by way of a transform, though for now it's specifically
 ;; a helper for %LDB in the limited case that it recognizes as non-consing.
 (defun ldb-bignum=>fixnum (byte-size byte-pos bignum)
-  (declare (type (integer 0 #.sb-vm:n-fixnum-bits) byte-size)
+  (declare (type (integer 0 #.sb-vm:n-positive-fixnum-bits) byte-size)
            (type bit-index byte-pos))
   (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
     (let ((n-digits (%bignum-length bignum)))
@@ -1480,6 +1480,37 @@
                                            (%sign-digit bignum n-digits)))))
                        (ldb (byte low-part-size bit-index) ; low part
                             (%bignum-ref bignum word-index)))))))))
+
+;;; Basically shift the bignum right by byte-pos, but assumes it's
+;;; right at the end of the bignum.
+(defun last-bignum-part=>fixnum (byte-pos bignum)
+  (declare (type bit-index byte-pos)
+           (bignum bignum)
+           (optimize speed))
+  (let ((n-digits (%bignum-length bignum)))
+    (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
+      (cond ((<= (+ bit-index sb-vm:n-fixnum-bits) digit-size) ; contained in one word
+             (sb-c::mask-signed-field sb-vm:n-fixnum-bits
+                                      (ash (%bignum-ref bignum word-index) (- bit-index))))
+            (t
+             ;; At least one bit is obtained from each of two words,
+             ;; and not more than two words.
+             (let* ((low-part-size
+                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
+                                 (- digit-size bit-index)))
+                    (high-part-size
+                      (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
+                                 (- sb-vm:n-fixnum-bits low-part-size))))
+               (logior
+                (let ((word-index (1+ word-index)))
+                  (sb-c::mask-signed-field sb-vm:n-fixnum-bits
+                                           (if (< word-index n-digits) ; next word exists
+                                               (ash (%bignum-ref bignum word-index) low-part-size)
+                                               (truly-the word
+                                                          (mask-field (byte high-part-size low-part-size)
+                                                                      (%sign-digit bignum n-digits))))))
+                (ldb (byte low-part-size bit-index)
+                     (%bignum-ref bignum word-index)))))))))
 
 ;;;; TRUNCATE
 

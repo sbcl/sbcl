@@ -825,7 +825,7 @@
                   (sb-bignum::bignum-lower-bits-zero-p bignum exp)
                   (= int
                      (truly-the fixnum
-                                (sb-bignum::ldb-bignum=>fixnum sb-vm:n-fixnum-bits exp bignum))))))))))
+                                (sb-bignum::last-bignum-part=>fixnum exp bignum))))))))))
 
 #+64-bit
 (defun float-bignum-< (float bignum)
@@ -844,7 +844,7 @@
                ((minusp length-diff) (minusp float))
                (t
                 (let ((diff (- (truly-the fixnum
-                                          (sb-bignum::ldb-bignum=>fixnum sb-vm:n-fixnum-bits exp bignum))
+                                          (sb-bignum::last-bignum-part=>fixnum exp bignum))
                                int)))
                   (cond ((plusp diff) t)
                         ((minusp diff) nil)
@@ -868,7 +868,7 @@
                ((minusp length-diff) (not (minusp float)))
                (t
                 (let ((diff (- (truly-the fixnum
-                                          (sb-bignum::ldb-bignum=>fixnum sb-vm:n-fixnum-bits exp bignum))
+                                          (sb-bignum::last-bignum-part=>fixnum exp bignum))
                                int)))
                   (cond ((plusp diff) nil)
                         ((minusp diff) t)))))))))))
