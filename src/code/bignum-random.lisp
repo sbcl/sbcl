@@ -14,24 +14,6 @@
 
 (in-package "SB-BIGNUM")
 
-;;; Return T if the least significant N-BITS bits of BIGNUM are all
-;;; zero, else NIL. If the integer-length of BIGNUM is less than N-BITS,
-;;; the result is NIL, too.
-(declaim (inline bignum-lower-bits-zero-p))
-(defun bignum-lower-bits-zero-p (bignum n-bits)
-  (declare (type bignum bignum)
-           (type bit-index n-bits))
-  (multiple-value-bind (n-full-digits n-bits-partial-digit)
-      (floor n-bits digit-size)
-    (declare (type bignum-length n-full-digits))
-    (when (> (%bignum-length bignum) n-full-digits)
-      (dotimes (index n-full-digits)
-        (declare (type bignum-index index))
-        (unless (zerop (%bignum-ref bignum index))
-          (return-from bignum-lower-bits-zero-p nil)))
-      (zerop (logand (1- (ash 1 n-bits-partial-digit))
-                     (%bignum-ref bignum n-full-digits))))))
-
 ;;; Return a nonnegative integer of DIGIT-SIZE many pseudo random bits.
 (declaim (inline random-bignum-digit))
 (defun random-bignum-digit (state)
