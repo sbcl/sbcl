@@ -635,15 +635,26 @@ the first."
                        (,op (* (numerator x) (ash 1 (- exp)))
                             (* int (denominator x)))
                        (,op x (ash int exp))))))))
-      (((foreach single-float double-float #+long-float long-float) bignum)
-       (if (eql y 0)
-           (,op x (coerce 0 '(dispatch-type x)))
-           (if (float-infinity-p x)
-               ,infinite-x-finite-y
-               (,op (rational x) y))))
+      (((foreach single-float double-float) bignum)
+       (if (float-infinity-p x)
+           ,infinite-x-finite-y
+           #+64-bit
+           (,(case op
+               (> 'float-bignum->)
+               (< 'float-bignum-<)
+               (= 'float-bignum-=))
+            x y)
+           #-64-bit
+           (,op (rational x) y)))
       ((bignum float)
        (if (float-infinity-p y)
            ,infinite-y-finite-x
+           #+64-bit
+           (,(case op
+               (> 'float-bignum-<)
+               (< 'float-bignum->)
+               (= 'float-bignum-=))
+            y x)
            (,op x (rational y))))))
   )                                     ; EVAL-WHEN
 

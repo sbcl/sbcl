@@ -3,6 +3,7 @@
 changes relative to sbcl-2.0.7:
   * optimization: SB-THREAD:MAKE-THREAD is faster on most platforms.
   * optimization: faster RATIONAL when the result is a RATIO.
+  * optimization: improved cross-type comparisons (float/ratio/bignum).
 
 changes in sbcl-2.0.7 relative to sbcl-2.0.6:
   * minor incompatible change: SB-THREAD:THREAD-OS-TID returns NIL for
