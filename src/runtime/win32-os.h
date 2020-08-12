@@ -60,7 +60,15 @@ extern int os_number_of_processors;
 extern int win32_open_for_mmap(const char* file);
 extern FILE* win32_fopen_runtime();
 
+// 64-bit uses whatever TLS index the kernels gives us which we store in
+// 'thread_self_tls_index' to hold our thread-local value of the pointer
+// to struct thread.
+// 32-bit uses a quasi-arbitrary fixed TLS index that we try to claim on startup.
+// of the process. And we *also* redundantly allocate 'thread_self_tls_index'
+// as a different index holding the same pointer.
+#ifndef LISP_FEATURE_64_BIT
 #define OUR_TLS_INDEX 63
+#endif
 #define SIG_MEMORY_FAULT SIGSEGV
 
 #define SIG_STOP_FOR_GC (SIGRTMIN+1)

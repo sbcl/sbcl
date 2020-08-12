@@ -495,7 +495,9 @@ unregister_thread(struct thread *th,
                     sizeof(th->private_events.events[0])); ++i) {
       CloseHandle(th->private_events.events[i]);
     }
+#ifndef LISP_FEATURE_64_BIT
     TlsSetValue(OUR_TLS_INDEX,NULL);
+#endif
 #endif
 
     /* Undo the association of the current pthread to its `struct thread',
