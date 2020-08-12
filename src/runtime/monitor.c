@@ -492,18 +492,17 @@ catchers_cmd(char __attribute__((unused)) **ptr)
         printf("There are no active catchers!\n");
     else {
         while (catch != NULL) {
-            printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\t"
-                   "code: 0x%08lX\n\tentry: 0x%08lX\n\ttag: ",
-                   (long unsigned)catch,
-                   (long unsigned)(catch->uwp),
-                   (long unsigned)(catch->cfp),
+            printf("%p:\n\tuwp  : %p\n\tfp   : %p\n\t"
+                   "code : %p\n\tentry: %p\n\ttag: ",
+                   catch,
+                   catch->uwp,
+                   catch->cfp,
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-                   (long unsigned)component_ptr_from_pc((void*)catch->entry_pc)
-                       + OTHER_POINTER_LOWTAG,
+                   component_ptr_from_pc((void*)catch->entry_pc),
 #else
-                   (long unsigned)(catch->code),
+                   catch->code,
 #endif
-                   (long unsigned)(catch->entry_pc));
+                   (void*)(catch->entry_pc));
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;
         }

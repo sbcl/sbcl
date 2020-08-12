@@ -21,6 +21,14 @@
 #include "hopscotch.h"
 #include <stdint.h>
 #include <stdio.h>
+#ifdef LISP_FEATURE_WIN32
+/* I don't know where ffs() is prototyped */
+extern int ffs(int);
+#else
+/* https://www.freebsd.org/cgi/man.cgi?query=fls&sektion=3&manpath=FreeBSD+7.1-RELEASE
+   says strings.h */
+#include <strings.h>
+#endif
 #include "genesis/vector.h"
 #include "murmur_hash.h"
 
