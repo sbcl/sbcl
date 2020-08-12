@@ -123,13 +123,8 @@ typedef unsigned char boolean;
 
 /* TLS management internals */
 
-static DWORD thread_self_tls_index;
+DWORD thread_self_tls_index;
 
-static void (*tls_destructors[PTHREAD_KEYS_MAX])(void*);
-static boolean tls_used[PTHREAD_KEYS_MAX];
-static pthread_key_t tls_max_used_key;
-static pthread_mutex_t thread_key_lock = PTHREAD_MUTEX_INITIALIZER;
-static void tls_call_destructors();
 static pthread_t tls_impersonate(pthread_t other) {
   pthread_t old = pthread_self();
   TlsSetValue(thread_self_tls_index,other);
@@ -191,7 +186,7 @@ DWORD WINAPI Thread_Function(LPVOID param)
     pthread_mutex_unlock(&self->lock);
     pthread_mutex_destroy(&self->lock);
     pthread_cond_destroy(&self->cond);
-    tls_call_destructors();
+    if (self->cv_event) CloseHandle(self->cv_event);
 
     CloseHandle(self->handle);
 
@@ -271,76 +266,6 @@ int pthread_join(pthread_t thread, void **retval)
     *retval = thread->retval;
   pthread_mutex_unlock(&thread->lock);
   return 0;
-}
-
-/* We manage our own TSD instead of relying on system TLS for anything
-   other than pthread identity itself. Reasons: (1) Windows NT TLS
-   slots are expensive, (2) pthread identity migration requires only
-   one TLS slot assignment, instead of massive copying. */
-int pthread_key_create(pthread_key_t *key, void (*destructor)(void*))
-{
-  pthread_key_t index;
-  boolean success = 0;
-  pthread_mutex_lock(&thread_key_lock);
-  for (index = 0; index < PTHREAD_KEYS_MAX; ++index) {
-    if (!tls_used[index]) {
-      if (tls_max_used_key<index)
-        tls_max_used_key = index;
-      tls_destructors[index] = destructor;
-      tls_used[index] = 1;
-      success = 1;
-      break;
-    }
-  }
-  pthread_mutex_unlock(&thread_key_lock);
-
-  if (success) {
-    *key = index;
-    return 0;
-  } else {
-    return 1;
-  }
-}
-
-int pthread_key_delete(pthread_key_t key)
-{
-  /* tls_used flag is not a machine word. Let's lock, as there is no
-     atomic guarantee even on x86.  */
-  pthread_mutex_lock(&thread_key_lock);
-  tls_destructors[key] = 0;
-  /* No memory barrier here: application is responsible for proper
-     call sequence, and having the key around at this point is an
-     official UB.  */
-  tls_used[key] = 0;
-  pthread_mutex_unlock(&thread_key_lock);
-  return 0;
-}
-
-void  __attribute__((sysv_abi)) *pthread_getspecific(pthread_key_t key)
-{
-  return pthread_self()->specifics[key];
-}
-
-/* Internal function calling destructors for current pthread */
-static void tls_call_destructors()
-{
-  pthread_key_t key;
-  int i;
-  int called;
-
-  for (i = 0; i<PTHREAD_DESTRUCTOR_ITERATIONS; ++i) {
-    called = 0;
-    for (key = 0; key<=tls_max_used_key; ++key) {
-      void *cell = pthread_getspecific(key);
-      pthread_setspecific(key,NULL);
-      if (cell && tls_destructors[key]) {
-        (tls_destructors[key])(cell);
-        called = 1;
-      }
-    }
-    if (!called)
-      break;
-  }
 }
 
 /* TODO call signal handlers */
@@ -577,10 +502,6 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
 
 /* Condition variables implemented with events and wakeup queues. */
 
-/* Thread-local wakeup events are kept in TSD to avoid kernel object
-   creation on each call to pthread_cond_[timed]wait */
-static pthread_key_t cv_event_key;
-
 /* .info field in wakeup record is an "opportunistic" indicator that
    wakeup has happened. On timeout from WaitForSingleObject, thread
    doesn't know (1) whether to reset event, (2) whether to (try) to
@@ -616,17 +537,13 @@ static void fe_return_event(HANDLE handle)
     freelist_return(&event_freelist, (void*)handle);
 }
 
-static void cv_event_destroy(void* event)
-{
-  CloseHandle((HANDLE)event);
-}
-
 static HANDLE cv_default_event_get_fn()
 {
-  HANDLE event = pthread_getspecific(cv_event_key);
+  pthread_thread *self = pthread_self();
+  HANDLE event = self->cv_event;
   if (!event) {
     event = CreateEvent(NULL, FALSE, FALSE, NULL);
-    pthread_setspecific(cv_event_key, event);
+    self->cv_event = event;
   } else {
     /* ResetEvent(event); used to be here. Let's try without.  It's
        safe in pthread_cond_wait: if WaitForSingleObjectEx ever
@@ -927,7 +844,6 @@ void pthreads_win32_init()
     thread_self_tls_index = TlsAlloc();
     pthread_mutex_init(&mutex_init_lock, NULL);
     pthread_np_notice_thread();
-    pthread_key_create(&cv_event_key,cv_event_destroy);
     pthread_cond_init(&futex_pseudo_cond, NULL);
 }
 
@@ -937,7 +853,7 @@ VOID CALLBACK pthreads_win32_unnotice(void* parameter, BOOLEAN timerOrWait)
   pthread_t pth = parameter;
   pthread_t self = tls_impersonate(pth);
 
-  tls_call_destructors();
+  if (self->cv_event) CloseHandle(self->cv_event);
   CloseHandle(pth->handle);
 
   UnregisterWait(pth->wait_handle);

@@ -78,7 +78,7 @@ static __attribute__((unused)) pthread_mutex_t create_thread_lock = PTHREAD_MUTE
 
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
-#else
+#elif !defined LISP_FEATURE_WIN32
 pthread_key_t specials = 0;
 #endif
 #endif
@@ -210,23 +210,38 @@ pthread_attr_t new_lisp_thread_attr;
 #endif
 struct thread *alloc_thread_struct(void*,lispobj);
 
+#ifndef LISP_FEATURE_SB_THREAD
+# define ASSIGN_CURRENT_THREAD(dummy)
+#elif defined LISP_FEATURE_GCC_TLS
+# define ASSIGN_CURRENT_THREAD(x) current_thread = x
+#elif !defined LISP_FEATURE_WIN32
+# define ASSIGN_CURRENT_THREAD(x) pthread_setspecific(specials, x)
+#elif defined LISP_FEATURE_64_BIT
+# define ASSIGN_CURRENT_THREAD(x) \
+  ((struct pthread_thread*)TlsGetValue(thread_self_tls_index))->vm_thread = x
+#elif defined LISP_FEATURE_WIN32
+# define ASSIGN_CURRENT_THREAD(x) TlsSetValue(OUR_TLS_INDEX, x)
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+// Need a function callable from assembly code. The inline one won't do.
+// This is basically pthread_getspecific without an argument.
+void* get_current_vm_thread() {
+  return arch_os_get_current_thread();
+}
+#endif
+
 void create_main_lisp_thread(lispobj function) {
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&specials, 0);
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
 #endif
-#ifdef LISP_FEATURE_SB_THREAD
-# ifdef LISP_FEATURE_GCC_TLS
-    current_thread = th;
-# else
-    pthread_setspecific(specials, th);
-# endif
-#endif
+    ASSIGN_CURRENT_THREAD(th);
 #if defined THREADS_USING_GCSIGNAL && \
     (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
@@ -375,11 +390,7 @@ init_new_thread(struct thread *th,
 {
     int lock_ret;
 
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = th;
-#else
-    pthread_setspecific(specials, th);
-#endif
+    ASSIGN_CURRENT_THREAD(th);
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
         lose("arch_os_thread_init failed");
@@ -509,11 +520,7 @@ unregister_thread(struct thread *th,
      * Can anything else go wrong with other signals? Nothing else should
      * direct signals specifically to this thread. Per-process signals are ok
      * because the kernel picks a thread in which a signal isn't blocked */
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = NULL;
-#else
-    pthread_setspecific(specials, NULL);
-#endif
+    ASSIGN_CURRENT_THREAD(NULL);
 }
 
 /* this is the first thing that runs in the child (which is why the

@@ -190,7 +190,7 @@ static inline lispobj FdefnFun(lispobj fdefn)
 // FIXME: these names should be consistent with one another
 # ifdef LISP_FEATURE_GCC_TLS
 extern __thread struct thread *current_thread;
-# else
+# elif !defined LISP_FEATURE_WIN32
 extern pthread_key_t specials;
 #endif
 #endif
@@ -258,6 +258,10 @@ static inline struct thread *arch_os_get_current_thread(void)
     __asm__ volatile ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
     return me;
 
+#elif defined LISP_FEATURE_WIN32
+    struct pthread_thread* pthread = TlsGetValue(thread_self_tls_index);
+    return pthread ? pthread->vm_thread : 0;
+
 #else
 
 # if defined(LISP_FEATURE_X86)
@@ -294,6 +298,8 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 #ifdef LISP_FEATURE_SB_THREAD
 # ifdef LISP_FEATURE_GCC_TLS
     return current_thread != 0;
+# elif defined LISP_FEATURE_WIN32
+    return TlsGetValue(thread_self_tls_index) != 0;
 # else
     return pthread_getspecific(specials) != NULL;
 # endif

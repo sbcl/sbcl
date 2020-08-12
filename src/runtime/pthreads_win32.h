@@ -89,8 +89,7 @@ pthread_t pthread_self(void) __attribute__((__const__));
 pthread_t pthread_self(void);
 #endif
 
-typedef DWORD pthread_key_t;
-int pthread_key_create(pthread_key_t *key, void (*destructor)(void*));
+extern DWORD thread_self_tls_index;
 
 #define SIG_BLOCK 1
 #define SIG_UNBLOCK 2
@@ -192,6 +191,7 @@ typedef struct pthread_thread {
   pthread_fn start_routine;
   void* arg;
   HANDLE handle;
+  struct thread *vm_thread;
   pthread_cond_t *waiting_cond;
   void *futex_wakeup;
   sigset_t blocked_signal_set;
@@ -210,15 +210,8 @@ typedef struct pthread_thread {
   /* Thread TEB base (mostly informative/debugging) */
   void* teb;
 
-  /* Pthread TLS, detached from windows system TLS */
-  void *specifics[PTHREAD_KEYS_MAX];
+  HANDLE cv_event;
 } pthread_thread;
-
-static inline int pthread_setspecific(pthread_key_t key, const void *value)
-{
-  pthread_self()->specifics[key] = (void*)value;
-  return 0;
-}
 
 typedef struct {
   int bogus;
@@ -299,18 +292,6 @@ static inline int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *
     }
   }
   return 0;
-}
-
-/* Make speed-critical TLS access inline.
-
-   We don't check key range or validity here: (1) pthread spec is
-   explicit about undefined behavior for bogus keys, (2)
-   setspecific/getspecific should be as fast as possible.   */
-#define pthread_getspecific pthread_getspecific_np_inline
-
-static inline void *pthread_getspecific_np_inline(pthread_key_t key)
-{
-  return pthread_self()->specifics[key];
 }
 
 #ifdef PTHREAD_DEBUG_OUTPUT
