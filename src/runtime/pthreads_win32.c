@@ -129,20 +129,12 @@ pthread_t pthread_self()
   return (pthread_t)TlsGetValue(thread_self_tls_index);
 }
 
-const char * state_to_str(pthread_thread_state state)
-{
-  switch (state) {
-    case pthread_state_running: return "running";
-    case pthread_state_finished: return "finished";
-    case pthread_state_joined: return "joined";
-  default: return "unknown";
-  }
-}
-
 /* Thread function for [pthread_create]d threads.
 */
 DWORD WINAPI Thread_Function(LPVOID param)
 {
+    extern void free_thread_struct(struct thread *);
+
     pthread_t self = (pthread_t) param;
 
     self->teb = NtCurrentTeb();
@@ -150,21 +142,14 @@ DWORD WINAPI Thread_Function(LPVOID param)
     tls_impersonate(self);
     void* arg = self->arg;
     pthread_fn fn = self->start_routine;
-
-    self->retval = fn(arg);
-    pthread_mutex_lock(&self->lock);
-    self->state = pthread_state_finished;
-    pthread_cond_broadcast(&self->cond);
-    while (!self->detached && self->state != pthread_state_joined) {
-            pthread_cond_wait(&self->cond, &self->lock);
-    }
-    pthread_mutex_unlock(&self->lock);
-    pthread_mutex_destroy(&self->lock);
-    pthread_cond_destroy(&self->cond);
+    void * vm_thread = fn(arg);
+    // self->vm_thread was set to null (turning this into a non-lisp thread),
+    // but the thread function returned the address of the memory to free.
+    free_thread_struct(vm_thread);
     if (self->cv_event) CloseHandle(self->cv_event);
-
-    CloseHandle(self->handle);
-
+    HANDLE h = self->handle;
+    free(self);
+    CloseHandle(h);
     return 0;
 }
 
@@ -204,10 +189,6 @@ int pthread_create(pthread_t *thread, void *dummy,
     } else {
         sigemptyset(&pth->blocked_signal_set);
     }
-    pth->state = pthread_state_running;
-    pthread_mutex_init(&pth->lock, NULL);
-    pthread_cond_init(&pth->cond, NULL);
-    pth->detached = 0;
     if (thread) *thread = pth;
     ResumeThread(createdThread);
     return 0;
@@ -216,30 +197,6 @@ int pthread_create(pthread_t *thread, void *dummy,
 int pthread_equal(pthread_t thread1, pthread_t thread2)
 {
   return thread1 == thread2;
-}
-
-int pthread_detach(pthread_t thread)
-{
-  int retval = 0;
-  pthread_mutex_lock(&thread->lock);
-  thread->detached = 1;
-  pthread_cond_broadcast(&thread->cond);
-  pthread_mutex_unlock(&thread->lock);
-  return retval;
-}
-
-int pthread_join(pthread_t thread, void **retval)
-{
-  pthread_mutex_lock(&thread->lock);
-  while (thread->state != pthread_state_finished) {
-      pthread_cond_wait(&thread->cond, &thread->lock);
-  }
-  thread->state = pthread_state_joined;
-  pthread_cond_broadcast(&thread->cond);
-  if (retval)
-    *retval = thread->retval;
-  pthread_mutex_unlock(&thread->lock);
-  return 0;
 }
 
 /* TODO call signal handlers */
@@ -833,7 +790,6 @@ VOID CALLBACK pthreads_win32_unnotice(void* parameter, BOOLEAN timerOrWait)
   UnregisterWait(pth->wait_handle);
 
   tls_impersonate(self);
-  pthread_mutex_destroy(&pth->lock);
   free(pth);
 }
 
@@ -842,8 +798,6 @@ int pthread_np_notice_thread()
   if (!pthread_self()) {
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
     pth->teb = NtCurrentTeb();
-    pthread_mutex_init(&pth->lock,NULL);
-    pth->state = pthread_state_running;
 
     sigemptyset(&pth->blocked_signal_set);
 

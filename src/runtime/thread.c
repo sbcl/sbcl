@@ -567,7 +567,7 @@ void* new_thread_trampoline(void* arg)
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
     //   (a regression test asserts that not even a THREAD instance is on the stack)
-    long result = funcall1(startfun, (lispobj)lispthread); // both pinned
+    funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
     unregister_thread(th, 0);
 
@@ -575,7 +575,6 @@ void* new_thread_trampoline(void* arg)
 
     struct thread *th = (struct thread *)arg;
     th->os_kernel_tid = sb_GetTID();
-    int result;
     init_thread_data scribble;
 
     FSHOW((stderr,"/creating thread %p\n", thread_self()));
@@ -589,16 +588,24 @@ void* new_thread_trampoline(void* arg)
     init_new_thread(th, &scribble,
                     GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
                     0);
-    result = funcall0(function);
+    funcall0(function);
     unregister_thread(th, &scribble);
 
-#ifndef LISP_FEATURE_OS_THREAD_STACK
+    // OS_THREAD_STACK means we start on the OS-provided stack
+    // but switch to our chosen stack.
+    // win32 doesn't do that - it stays on the OS-provided stack
+    // and all cleanup is automatic
+#if !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_WIN32
     schedule_thread_post_mortem(th);
 #endif
 #endif
 
     FSHOW((stderr,"/exiting thread %p\n", thread_self()));
-    return (void*)(uintptr_t)result;
+#ifdef LISP_FEATURE_WIN32
+    return arg;
+#else
+    return 0; // keep people honest - result is unused
+#endif
 }
 
 #ifdef LISP_FEATURE_OS_THREAD_STACK
