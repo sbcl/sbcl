@@ -962,14 +962,12 @@ int pthread_np_notice_thread()
                     DUPLICATE_SAME_ACCESS);
     tls_impersonate(pth);
 
-    if (pthread_initialized) {
-      RegisterWaitForSingleObject(&pth->wait_handle,
+    RegisterWaitForSingleObject(&pth->wait_handle,
                                   pth->handle,
                                   pthreads_win32_unnotice,
                                   pth,
                                   INFINITE,
                                   WT_EXECUTEONLYONCE);
-    }
     return 1;
   } else {
     return 0;
