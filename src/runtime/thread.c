@@ -202,7 +202,7 @@ int sb_GetTID() { return syscall(SYS_gettid); }
 
 // Only a single 'attributes' object is used if #+pauseless-threadstart.
 // This is ok because creation is synchronized by *MAKE-THREAD-LOCK*.
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_WIN32
 pthread_attr_t new_lisp_thread_attr;
 #define init_shared_attr_object() (pthread_attr_init(&new_lisp_thread_attr)==0)
 #else

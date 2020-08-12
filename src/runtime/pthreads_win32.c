@@ -147,7 +147,7 @@ DWORD WINAPI Thread_Function(LPVOID param)
 
     self->teb = NtCurrentTeb();
 
-    pthread_t prev = tls_impersonate(self);
+    tls_impersonate(self);
     void* arg = self->arg;
     pthread_fn fn = self->start_routine;
 
@@ -189,7 +189,6 @@ int pthread_create(pthread_t *thread, void *dummy,
 {
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
     pthread_t self = pthread_self();
-    int i;
     HANDLE createdThread = NULL;
 
     extern size_t thread_control_stack_size;
@@ -895,7 +894,6 @@ int sigismember(const sigset_t *set, int signum)
 }
 int sigpending(sigset_t *set)
 {
-  int i;
   *set = InterlockedCompareExchange((volatile LONG*)&pthread_self()->pending_signal_set,
                                     0, 0);
   return 0;
@@ -914,7 +912,7 @@ futex_wait(volatile intptr_t *lock_word, intptr_t oldval, long sec, unsigned lon
   DWORD msec = sec<0 ? INFINITE : (sec*1000 + usec/1000);
   DWORD wfso;
   int result;
-  sigset_t pendset, blocked;
+  sigset_t pendset;
   int maybeINTR;
   int info = sec<0 ? WAKEUP_WAITING_NOTIMEOUT: WAKEUP_WAITING_TIMEOUT;
 
@@ -961,7 +959,6 @@ int
 futex_wake(volatile intptr_t *lock_word, int n)
 {
     pthread_cond_t *cv = &futex_pseudo_cond;
-    int result = 0;
     struct thread_wakeup *w, *prev;
     HANDLE postponed[128];
     int npostponed = 0,i;
@@ -972,7 +969,6 @@ futex_wake(volatile intptr_t *lock_word, int n)
     for (w = cv->first_wakeup, prev = NULL; w && n;) {
         if (w->uaddr == lock_word) {
             HANDLE event = w->event;
-            int oldinfo = w->info;
             w->info = WAKEUP_HAPPENED;
             if (cv->last_wakeup == w)
                 cv->last_wakeup = prev;
