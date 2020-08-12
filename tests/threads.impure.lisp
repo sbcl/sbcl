@@ -845,22 +845,23 @@
   ;; cheating, and might be hiding the underlying bug that the test is
   ;; exposing.  Let's review this later.
   (let* ((run t)
+         (output nil)
          (d1 (sb-thread:make-thread (lambda ()
                                       (loop while run
                                             do (defclass test-1 () ((a :initform :new-a)))
-                                            (write-char #\1)
+                                            (when output (write-char #\1))
                                             #-win32 (force-output)))
                                     :name "d1"))
          (d2 (sb-thread:make-thread (lambda ()
                                       (loop while run
                                             do (defclass test-2 () ((b :initform :new-b)))
-                                               (write-char #\2)
+                                               (when output (write-char #\2))
                                                #-win32 (force-output)))
                                     :name "d2"))
          (d3 (sb-thread:make-thread (lambda ()
                                       (loop while run
                                             do (defclass test-3 (test-1 test-2) ((c :initform :new-c)))
-                                               (write-char #\3)
+                                               (when output (write-char #\3))
                                                #-win32 (force-output)))
                                     :name "d3"))
          (i (sb-thread:make-thread (lambda ()
@@ -869,7 +870,7 @@
                                                 (assert (member (slot-value i 'a) '(:orig-a :new-a)))
                                                 (assert (member (slot-value i 'b) '(:orig-b :new-b)))
                                                 (assert (member (slot-value i 'c) '(:orig-c :new-c))))
-                                              (write-char #\i)
+                                              (when output (write-char #\i))
                                               #-win32 (force-output)))
                                    :name "i")))
     (format t "~%sleeping!~%")
@@ -878,7 +879,7 @@
     (setf run nil)
     (mapc (lambda (th)
             (sb-thread:join-thread th)
-            (format t "~%joined ~S~%" (sb-thread:thread-name th)))
+            (format t "~&joined ~S~%" (sb-thread:thread-name th)))
           (list d1 d2 d3 i))
     (force-output)))
 
