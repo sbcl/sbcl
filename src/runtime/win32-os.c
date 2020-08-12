@@ -642,6 +642,7 @@ void* os_dlsym_default(char* name)
 
 int os_preinit(char *argv[], char *envp[])
 {
+    pthreads_win32_init();
 #ifdef LISP_FEATURE_X86
     DWORD slots[TLS_MINIMUM_AVAILABLE];
     DWORD key;
@@ -666,9 +667,6 @@ int os_preinit(char *argv[], char *envp[])
         lose("TLS slot assertion failed: slot 63 is unavailable "
              "(last TlsAlloc() returned %u)",key);
     }
-#else
-    (void) argv; /* unused */
-    (void) envp; /* unused */
 #endif
     return 0;
 }

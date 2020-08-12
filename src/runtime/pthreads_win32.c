@@ -919,20 +919,16 @@ void pthread_unlock_structures()
   pthread_mutex_unlock(&mutex_init_lock);
 }
 
-static int pthread_initialized = 0;
-
 static pthread_cond_t futex_pseudo_cond;
 
 void pthreads_win32_init()
 {
-  if (!pthread_initialized) {
+
     thread_self_tls_index = TlsAlloc();
     pthread_mutex_init(&mutex_init_lock, NULL);
     pthread_np_notice_thread();
     pthread_key_create(&cv_event_key,cv_event_destroy);
     pthread_cond_init(&futex_pseudo_cond, NULL);
-    pthread_initialized = 1;
-  }
 }
 
 static

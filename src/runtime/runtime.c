@@ -447,9 +447,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
     memsize_options.present_in_core = 0;
 
     boolean have_hardwired_spaces = os_preinit(argv, envp);
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-    pthreads_win32_init();
-#endif
 
     interrupt_init();
     block_blockable_signals(0);
