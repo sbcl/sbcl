@@ -190,7 +190,7 @@ void os_link_runtime()
 
         if (entry_index == 0) {
 #ifdef LISP_FEATURE_WIN32
-            os_validate_recommit(LINKAGE_TABLE_SPACE_START, os_vm_page_size);
+            os_validate_recommit((void*)LINKAGE_TABLE_SPACE_START, os_vm_page_size);
 #endif
         }
         if (result) {

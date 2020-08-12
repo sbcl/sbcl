@@ -52,7 +52,7 @@ else
 endif
 
 CFLAGS =  -g -W -Wall \
-       -Wno-unused-function \
+       -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
        -fno-omit-frame-pointer \
        -O5 -m64 -DWINVER=0x0501 \
        -D__W32API_USE_DLLIMPORT__

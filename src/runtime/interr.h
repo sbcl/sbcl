@@ -40,7 +40,7 @@ extern void skip_internal_error (os_context_t *context);
  * We assume that it can be cast to 'long' which is a total KLUDGE
  */
 #define UNKNOWN_STACK_POINTER_ERROR(function_name, thread) \
-    lose(function_name": no SP known for thread %p (OS %ld)", \
-         thread, (long)thread->os_thread);
+    lose(function_name": no SP known for thread %p (pthread %p)", \
+         thread, (void*)thread->os_thread);
 
 #endif

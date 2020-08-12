@@ -694,9 +694,10 @@ allocation_tracker_counted(uword_t* sp)
         unsigned int index = claim_index(1);
         if (index == 0)
             index = 2; // reserved overflow counter for fixed-size alloc
+        uword_t disp = index * 8;
         // rewrite call into: LOCK INC QWORD PTR, [R11+n] ; opcode = 0xFF / 0
         uword_t new_inst =
-          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | ((index*8L) << 32);
+          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | (disp << 32);
         // Ensure atomicity of the write. A plain store would probably do,
         // but since this is self-modifying code, the most stringent memory
         // order is prudent.
@@ -728,14 +729,15 @@ allocation_tracker_sized(uword_t* sp)
         }
         // rewrite call into:
         //  LOCK INC QWORD PTR, [R11+n] ; opcode = 0xFF / 0
+        uword_t disp = index * 8;
         uword_t new_inst1 =
-          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | ((index * 8L) << 32);
+          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | (disp << 32);
         //  LOCK ADD [R11+n], Rxx ; opcode = 0x01
         prefix = 0x49 | ((prefix & 1) << 2); // 'b' bit becomes 'r' bit
         modrm  = 0x83 | (modrm & (7<<3)); // copy 'reg' into new modrm byte
+        disp = (1 + index) * 8;
         uword_t new_inst2 =
-          0xF0 | (prefix << 8) | (0x01 << 16) | ((long)modrm << 24)
-            | (((1 + index) * 8L) << 32);
+          0xF0 | (prefix << 8) | (0x01 << 16) | ((long)modrm << 24) | (disp << 32);
         // Overwrite the second instruction first, because as soon as the CALL
         // opcode is changed, fallthrough to the next instruction occurs.
         if (!__sync_bool_compare_and_swap(pc+1, word_after_pc, new_inst2) ||

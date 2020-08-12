@@ -178,7 +178,9 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
  * work for SIGSEGV and similar. It is good enough for timers, and
  * maybe all deferrables. */
 
-#ifndef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_WIN32
+#define resignal_to_lisp_thread(dummy1,dummy2) {}
+#else
 static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
@@ -2061,7 +2063,7 @@ void
 interrupt_init(void)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    int i;
+    int __attribute__((unused)) i;
     SHOW("entering interrupt_init()");
     sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
