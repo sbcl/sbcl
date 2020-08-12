@@ -15,8 +15,16 @@
 ;;;  - garbage_collect: no SP known for thread 0x802bea000 (OS 34367133952)
 ;;;  - failed AVER: (NOT (SB-THREAD::AVL-FIND ADDR SB-THREAD::OLD))
 
-#+(or (not sb-thread) win32 freebsd) (sb-ext:exit :code 104)
+#+(or (not sb-thread) freebsd) (sb-ext:exit :code 104)
 
+#+win32
+(with-scratch-file (solib "dll")
+  (sb-ext:run-program "gcc"
+                      `("-shared" "-o" ,solib "fcb-threads.c")
+                      :search t)
+  (sb-alien:load-shared-object solib))
+
+#-win32
 (if (probe-file "fcb-threads.so")
     ;; Assume the test automator built this for us
     (load-shared-object (truename "fcb-threads.so"))
@@ -35,26 +43,33 @@
 
 (defglobal *seen-threads* nil)
 
+;;; A variable commissioned by the department of needless and unnecessary redundancy department
+(defglobal *print-greetings-and-salutations* (or #+linux t))
+
 (sb-alien::define-alien-callback testcb int ((arg1 c-string) (arg2 double))
-  (let ((cell (assoc sb-thread:*current-thread* *seen-threads*)))
+  (let ((cell (assoc sb-thread:*current-thread* *seen-threads*))
+        (result (floor (* (length arg1) arg2))))
     (unless cell
       (let* ((thr sb-thread:*current-thread*)
              (string
-               (format nil "~s from ~s (~@[TID ~d~] C-thread ~x)~%"
-                       arg1 thr
+               (format nil "~s,~f from [~@[TID ~d ~]C-thread ~x] ~s => ~x~%"
+                       arg1 arg2
                        (or #+linux (sb-thread::thread-os-tid thr))
-                       (sb-thread::thread-primitive-thread thr))))
+                       (sb-thread::thread-primitive-thread thr)
+                       thr result)))
         ;; This WRITE kind of has to stay here for timing purposes -
         ;; With it, we get >100 GCs, without it only 3 or 4,
         ;; and the intent of the test is to exercise GC and foreign
         ;; calbacks together, which was formerly bug prone.
-        (sb-sys:with-pinned-objects (string)
-          (sb-unix:unix-write 1 (sb-sys:vector-sap string) 0 (length string)))
+        (when *print-greetings-and-salutations*
+          #+win32 (progn (write-string string) (force-output))
+          #-win32 (sb-sys:with-pinned-objects (string) ; avoid interleaved output this way
+                    (sb-unix:unix-write 1 (sb-sys:vector-sap string) 0 (length string))))
         (setq cell (cons thr (1- (floor arg2))))
         (atomic-push cell *seen-threads*)))
     (assert (eql (coerce (incf (cdr cell)) 'double-float)
-                 arg2)))
-  0)
+                 arg2))
+    result))
 
 (defglobal *keepon* t)
 (defglobal *n-gcs* 0)
@@ -67,14 +82,15 @@
              (loop
                (gc)
                (incf *n-gcs*)
-               (sleep .001)
+               (sleep .0001)
                (sb-thread:barrier (:read))
                (if (not *keepon*) (return)))))))
     (dotimes (i n-trials)
       (setq *keepon* t)
-      (alien-funcall (extern-alien "call_thing_from_threads"
-                                   (function int system-area-pointer int int))
-                     (alien-sap testcb) n-threads n-calls)
+      (with-alien ((testfun (function int system-area-pointer int int)
+                            :extern "call_thing_from_threads"))
+        (assert (eql (alien-funcall testfun (alien-sap testcb) n-threads n-calls)
+                     1)))
       (format t "GC'd ~d times~%" *n-gcs*)
       (setq *keepon* nil)
       (sb-thread:barrier (:write))
@@ -86,6 +102,10 @@
   (f 2 5 40)
   ;; one trial, 10 threads, 10 calls
   (f 1 10 10))
+
+;;; The rest of the tests can't run because one wants to use pthread_create
+;;; and the other wants to use sigaction.
+#+win32 (exit :code 104)
 
 ;;; Check that you get an error trying to join a foreign thread
 (defglobal *my-foreign-thread* nil)
