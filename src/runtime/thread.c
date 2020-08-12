@@ -1065,9 +1065,14 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+#ifdef LISP_FEATURE_WIN32
+#define pthread_attr_init(dummy) (0)
+#define pthread_attr_destroy(dummy)
+#else
 #ifndef __USE_XOPEN2K
 extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
                                   size_t __stacksize);
+#endif
 #endif
 
 #ifndef LISP_FEATURE_PAUSELESS_THREADSTART
@@ -1102,7 +1107,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 #else
 
 # ifdef LISP_FEATURE_WIN32
-            pthread_attr_setstacksize(&attr, thread_control_stack_size) ||
+            /* do nothing */
 # elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
             pthread_attr_setstack(&attr, th->control_stack_start, thread_control_stack_size) ||
 # else

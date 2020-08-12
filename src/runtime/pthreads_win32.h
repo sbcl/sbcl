@@ -63,21 +63,14 @@ void pthreads_win32_init();
 
 typedef struct pthread_thread* pthread_t;
 
-typedef struct pthread_attr_t {
-  unsigned int stack_size;
-} pthread_attr_t;
-
-int pthread_attr_init(pthread_attr_t *attr);
-int pthread_attr_destroy(pthread_attr_t *attr);
-int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize);
-int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
+typedef int pthread_attr_t; /* arbitrary */
 
 typedef void (*pthread_cleanup_fn)(void* arg);
 
 #define pthread_cleanup_push(fn, arg) { pthread_cleanup_fn __pthread_fn = fn; void *__pthread_arg = arg;
 #define pthread_cleanup_pop(execute) if (execute) __pthread_fn(__pthread_arg); }
 
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
+int pthread_create(pthread_t *thread, void *attr, void *(*start_routine) (void *), void *arg);
 int pthread_equal(pthread_t thread1, pthread_t thread2);
 int pthread_detach(pthread_t thread);
 int pthread_join(pthread_t thread, void **retval);

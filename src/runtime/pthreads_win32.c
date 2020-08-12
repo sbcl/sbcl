@@ -94,31 +94,6 @@ static void freelist_return(struct freelist *fl, void*data)
     pthread_mutex_unlock(&fl->lock);
 }
 
-int pthread_attr_init(pthread_attr_t *attr)
-{
-  attr->stack_size = 0;
-  return 0;
-}
-
-int pthread_attr_destroy(pthread_attr_t *attr)
-{
-  return 0;
-}
-
-int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize)
-{
-  fprintf(stderr, "pthread_attr_setstack called\n");
-  ExitProcess(1);
-  return 0;
-}
-
-int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
-{
-  attr->stack_size = stacksize;
-  return 0;
-}
-
-
 typedef unsigned char boolean;
 
 /* TLS management internals */
@@ -209,7 +184,7 @@ int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
   return 0;
 }
 
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+int pthread_create(pthread_t *thread, void *dummy,
                    void *(*start_routine) (void *), void *arg)
 {
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
@@ -217,8 +192,8 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
     int i;
     HANDLE createdThread = NULL;
 
-
-    createdThread = CreateThread(NULL, attr ? attr->stack_size : 0,
+    extern size_t thread_control_stack_size;
+    createdThread = CreateThread(NULL, thread_control_stack_size,
                                  Thread_Function, pth, CREATE_SUSPENDED, NULL);
     if (!createdThread) return 1;
     pth->handle = createdThread;
