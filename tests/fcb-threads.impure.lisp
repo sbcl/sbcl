@@ -103,8 +103,7 @@
   ;; one trial, 10 threads, 10 calls
   (f 1 10 10))
 
-;;; The rest of the tests can't run because one wants to use pthread_create
-;;; and the other wants to use sigaction.
+;;; The next test hasn't been made to run on windows, but should.
 #+win32 (exit :code 104)
 
 ;;; Check that you get an error trying to join a foreign thread
@@ -145,49 +144,3 @@
 (with-test (:name :try-join-foreign-thread)
   (assert (eq (tryjoiner) 'ok)))
 
-;;; Final test: EXIT does not lock up due to (simulated) C++ destructors
-;;; or free() or most anything else involved in stopping the main thread.
-;;; The point of the test is to mock a Lisp thread that uses foreign code
-;;; that uses malloc and free or equivalent from C++.
-;;; The behavior being tested is the effect of SB-THREAD:ABORT-THREAD on
-;;; a thread that happened to be just at that moment in the foreign code.
-;;; We can't - or don't need to - exactly replicate the behavior
-;;; of doing a lot of memory allocation. All we need to demonstrate is
-;;; that we won't interrupt a malloc() or free().
-(defglobal *should-i-keep-going* t)
-(defun mess-around-with-foreign-calls ()
-  ;; In reality the thread would not permanently own the lock, but this is the
-  ;; simplest way to simulate the random occurrence that it does own the lock
-  ;; exactly when terminated.
-  ;; So make it own the lock forever unless politely (i.e. not forcibly) terminated.
-  (alien-funcall (extern-alien "acquire_a_global_lock" (function void)))
-  (loop (sb-thread:barrier (:read))
-        (unless *should-i-keep-going* (return))
-        (sleep .75))
-  (format *error-output* "~&Worker thread politely exiting~%")
-  (alien-funcall (extern-alien "release_a_global_lock" (function void))))
-
-(sb-thread:make-thread #'mess-around-with-foreign-calls)
-
-(push (compile nil
-               '(lambda ()
-                 (format t "~&Invoked exit hook~%")
-                 (setq *should-i-keep-going* nil)))
-      *exit-hooks*)
-
-;;; The actual code under test involved C++ destructors that are
-;;; interposed between our call to OS-EXIT and the OS call per se.
-;;; Acquiring a globally shared mutex in OS-EXIT simulates that.
-(sb-int:encapsulate
- 'sb-sys:os-exit
- 'simulate-c++-destructors
- (lambda (realfun code &key abort)
-   (format t "~&Enter OS-EXIT ~s ~s~%" code abort)
-   (alien-funcall (extern-alien "acquire_a_global_lock" (function void)))
-   (alien-funcall (extern-alien "release_a_global_lock" (function void)))
-   (funcall realfun code :abort abort)))
-
-;;; Give ourselves 3 seconds to exit.
-(alien-funcall (extern-alien "prepare_exit_test" (function void int)) 3)
-(setq sb-ext:*forcibly-terminate-threads-on-exit* nil)
-(exit :code 104)
