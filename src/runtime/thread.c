@@ -231,12 +231,19 @@ void* get_current_vm_thread() {
 }
 #endif
 
+#ifdef LISP_FEATURE_DARWIN
+    extern pthread_key_t sigwait_bug_mitigation;
+#endif
+
 void create_main_lisp_thread(lispobj function) {
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&specials, 0);
+#endif
+#ifdef LISP_FEATURE_DARWIN
+    pthread_key_create(&sigwait_bug_mitigation, 0);
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
@@ -751,6 +758,17 @@ detach_os_thread(init_thread_data *scribble)
         int sig, rc;
         rc = sigwait(&gc_sigset, &sig);
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
+#ifdef LISP_FEATURE_DARWIN
+        sigpending(&pending);
+        if (sigismember(&pending, SIG_STOP_FOR_GC)) {
+            // fprintf(stderr, "Trying sigwait bug mitigation\n");
+            pthread_setspecific(sigwait_bug_mitigation, (void*)1);
+            sigfillset(&pending);
+            sigdelset(&pending, SIG_STOP_FOR_GC);
+            sigsuspend(&pending);
+            // fprintf(stderr, "Back from sigsuspend\n");
+        }
+#endif
     }
 #endif
     put_recyclebin_item(th);

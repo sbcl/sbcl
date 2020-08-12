@@ -74,34 +74,48 @@
 (defglobal *keepon* t)
 (defglobal *n-gcs* 0)
 
-(defun f (n-trials n-threads n-calls)
+(defun f (n-trials n-threads n-calls enable-gcing)
   (setq *n-gcs* 0)
   (let ((thr
-          (sb-thread:make-thread
-           (lambda()
-             (loop
+         (when enable-gcing
+           (sb-thread:make-thread
+            (lambda()
+              (loop
                (gc)
                (incf *n-gcs*)
                (sleep .0001)
                (sb-thread:barrier (:read))
-               (if (not *keepon*) (return)))))))
+               (if (not *keepon*) (return))))))))
     (dotimes (i n-trials)
       (setq *keepon* t)
       (with-alien ((testfun (function int system-area-pointer int int)
                             :extern "call_thing_from_threads"))
         (assert (eql (alien-funcall testfun (alien-sap testcb) n-threads n-calls)
                      1)))
-      (format t "GC'd ~d times~%" *n-gcs*)
       (setq *keepon* nil)
       (sb-thread:barrier (:write))
-      (sb-thread:join-thread thr))))
+      #+darwin
+      (with-alien ((count int :extern "sigwait_bug_mitigation_count"))
+        (when (plusp count)
+          (format t "Bug mitigation strategy applied ~D time~:P~%" count)
+          (setf count 0)))
+      (when thr
+        (sb-thread:join-thread thr)
+        (format t "GC'd ~d times~%" *n-gcs*)))))
+
+(with-test (:name :call-me-from-1-thread-no-gc
+                  :skipped-on (or :interpreter))
+  ;; smoke test and no GCing
+  (setq *print-greetings-and-salutations* t)
+  (f 1 1 1 nil)
+  (setq *print-greetings-and-salutations* nil))
 
 (with-test (:name :call-me-from-many-threads-and-gc
                   :skipped-on (or :interpreter :win32))
   ;; two trials, 5 threads, 40 calls each
-  (f 2 5 40)
+  (f 2 5 40 t)
   ;; one trial, 10 threads, 10 calls
-  (f 1 10 10))
+  (f 1 10 10 t))
 
 ;;; The next test hasn't been made to run on windows, but should.
 #+win32 (exit :code 104)
