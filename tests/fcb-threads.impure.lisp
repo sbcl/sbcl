@@ -34,7 +34,8 @@
     (with-scratch-file (solib "so")
       (sb-ext:run-program "/bin/sh"
                           `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                            "-o" ,solib "fcb-threads.c"))
+                            "-o" ,solib "fcb-threads.c")
+                          :output t :error :output)
       (sb-alien:load-shared-object solib)))
 
 (defglobal *counter* 0)
@@ -75,8 +76,9 @@
 (defglobal *n-gcs* 0)
 
 (defun f (n-trials n-threads n-calls enable-gcing)
-  (setq *n-gcs* 0)
-  (let ((thr
+  (dotimes (trialno n-trials)
+    (setq *n-gcs* 0)
+    (let ((gc-thr
          (when enable-gcing
            (sb-thread:make-thread
             (lambda()
@@ -86,7 +88,6 @@
                (sleep .0001)
                (sb-thread:barrier (:read))
                (if (not *keepon*) (return))))))))
-    (dotimes (i n-trials)
       (setq *keepon* t)
       (with-alien ((testfun (function int system-area-pointer int int)
                             :extern "call_thing_from_threads"))
@@ -99,9 +100,9 @@
         (when (plusp count)
           (format t "Bug mitigation strategy applied ~D time~:P~%" count)
           (setf count 0)))
-      (when thr
-        (sb-thread:join-thread thr)
-        (format t "GC'd ~d times~%" *n-gcs*)))))
+      (when gc-thr
+        (sb-thread:join-thread gc-thr)
+        (format t "Trial ~d: GC'd ~d times~%" (1+ trialno) *n-gcs*)))))
 
 (with-test (:name :call-me-from-1-thread-no-gc
                   :skipped-on (or :interpreter))
@@ -115,7 +116,12 @@
   ;; two trials, 5 threads, 40 calls each
   (f 2 5 40 t)
   ;; one trial, 10 threads, 10 calls
-  (f 1 10 10 t))
+  (f 1 10 10 t)
+  ;; Crank the number of trials up if you're trying to investigate
+  ;; flakes in this test. The larger number of calls is usually
+  ;; what gets it to fail.
+  ;; 5 trials, 5 threads, 200 calls each
+  (f 5 5 200 t))
 
 ;;; The next test hasn't been made to run on windows, but should.
 #+win32 (exit :code 104)

@@ -11,6 +11,7 @@
 #endif
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 struct thread_arg { void * funkyfun; int index; int n_calls; };
 
@@ -37,7 +38,7 @@ void* doThatThing(void* void_arg)
         int answer = lispfun(salutation, arg->index + i);
         if (answer != (arg->index + i) * strlen(salutation)) thread_result = 0;
     }
-    return thread_result;
+    return (void*)(uintptr_t)thread_result;
 }
 
 int call_thing_from_threads(void* ptr, int n_threads, int n_calls)
