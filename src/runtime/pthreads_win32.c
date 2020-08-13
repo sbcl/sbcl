@@ -100,10 +100,8 @@ typedef unsigned char boolean;
 
 DWORD thread_self_tls_index;
 
-static pthread_t tls_impersonate(pthread_t other) {
-  pthread_t old = pthread_self();
-  TlsSetValue(thread_self_tls_index,other);
-  return old;
+void set_thread_self(pthread_t thread) {
+  TlsSetValue(thread_self_tls_index, thread);
 }
 
 /* Thread identity, as much as pthreads are concerned, is determined
@@ -139,7 +137,7 @@ DWORD WINAPI Thread_Function(LPVOID param)
 
     self->teb = NtCurrentTeb();
 
-    tls_impersonate(self);
+    set_thread_self(self);
     void* arg = self->arg;
     pthread_fn fn = self->start_routine;
     void * vm_thread = fn(arg);
@@ -782,14 +780,12 @@ static
 VOID CALLBACK pthreads_win32_unnotice(void* parameter, BOOLEAN timerOrWait)
 {
   pthread_t pth = parameter;
-  pthread_t self = tls_impersonate(pth);
 
-  if (self->cv_event) CloseHandle(self->cv_event);
+  if (pth->cv_event) CloseHandle(pth->cv_event);
   CloseHandle(pth->handle);
 
   UnregisterWait(pth->wait_handle);
 
-  tls_impersonate(self);
   free(pth);
 }
 
@@ -804,7 +800,7 @@ int pthread_np_notice_thread()
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
                     GetCurrentProcess(), &pth->handle, 0, TRUE,
                     DUPLICATE_SAME_ACCESS);
-    tls_impersonate(pth);
+    set_thread_self(pth);
 
     RegisterWaitForSingleObject(&pth->wait_handle,
                                   pth->handle,
