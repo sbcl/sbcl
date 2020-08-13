@@ -112,7 +112,7 @@
   (setq *print-greetings-and-salutations* nil))
 
 (with-test (:name :call-me-from-many-threads-and-gc
-            :skipped-on :interpreter)
+            :skipped-on (or :interpreter (and :x86 :win32)))
   ;; two trials, 5 threads, 40 calls each
   (f 2 5 40 t)
   ;; one trial, 10 threads, 10 calls
