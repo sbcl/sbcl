@@ -1014,7 +1014,7 @@
     (with-open-file (s *test-path* :external-format :utf-32be)
       (assert (string= " ???? " (read-line s))))))
 
-(with-test (:name :invalid-external-format :fails-on :win32)
+(with-test (:name :invalid-external-format)
   (labels ((test-error (e)
              (assert (typep e 'error))
              (unless (equal "Undefined external-format: :BAD-FORMAT"
@@ -1023,7 +1023,7 @@
            (test (direction)
              (test-error
               (handler-case
-                  (open "/dev/null" :direction direction :external-format :bad-format
+                  (open #-win32 "/dev/null" #+win32 "nul" :direction direction :external-format :bad-format
                         :if-exists :overwrite)
                 (error (e) e)))))
     (test :input)
