@@ -165,7 +165,11 @@
 /* the CSP page sits right before the thread */
 #define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
+#define TRAP ud2
+#else
 #define TRAP int3
+#endif
 
 	.text
 	.globl	GNAME(all_threads)
