@@ -1712,7 +1712,10 @@ tty_maybe_initialize_unlocked(HANDLE handle)
         }
         pthread_cond_init(&ttyinput.cond_has_data,NULL);
         pthread_cond_init(&ttyinput.cond_has_client,NULL);
-        pthread_create(&ttyinput.thread,NULL,tty_read_line_server,NULL);
+        ttyinput.thread = CreateThread(NULL,
+                                       0, // stack size = default
+                                       tty_read_line_server, 0,
+                                       0, 0);
         ttyinput.initialized = 1;
     }
     return 1;

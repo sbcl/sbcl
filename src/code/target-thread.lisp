@@ -2026,9 +2026,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (if created thread (error "Could not create new OS thread."))))
 
 #+(and sb-thread (not pauseless-threadstart))
-(progn
-(define-alien-routine ("create_thread" %create-thread)
-  unsigned (lisp-fun-address unsigned))
 (defun start-thread (thread function arguments)
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            #+(or win32 darwin freebsd)
@@ -2056,12 +2053,13 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; INITIAL-FUNCTION to another thread.
         ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
         (with-system-mutex (*make-thread-lock*)
-          (if (zerop (setf (thread-os-thread thread)
-                           (%create-thread (get-lisp-obj-address #'start-routine))))
-              (setf thread nil)
-              (wait-on-semaphore setup-sem)))))
+          (with-alien ((create-thread (function unsigned unsigned)
+                                      :extern "create_thread"))
+            (if (eql (alien-funcall create-thread (get-lisp-obj-address #'start-routine))
+                     0)
+                (setq thread nil)
+                (wait-on-semaphore setup-sem))))))
     (or thread (error "Could not create a new thread.")))
-) ; end PROGN
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values

@@ -129,28 +129,6 @@ pthread_t pthread_self()
 
 /* Thread function for [pthread_create]d threads.
 */
-DWORD WINAPI Thread_Function(LPVOID param)
-{
-    extern void free_thread_struct(struct thread *);
-
-    pthread_t self = (pthread_t) param;
-
-    self->teb = NtCurrentTeb();
-
-    set_thread_self(self);
-    void* arg = self->arg;
-    pthread_fn fn = self->start_routine;
-    void * vm_thread = fn(arg);
-    // self->vm_thread was set to null (turning this into a non-lisp thread),
-    // but the thread function returned the address of the memory to free.
-    free_thread_struct(vm_thread);
-    if (self->cv_event) CloseHandle(self->cv_event);
-    HANDLE h = self->handle;
-    free(self);
-    CloseHandle(h);
-    return 0;
-}
-
 /* Signals */
 struct sigaction signal_handlers[NSIG];
 
@@ -165,31 +143,6 @@ int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
   }
   signal_handlers[signum] = newact;
   return 0;
-}
-
-int pthread_create(pthread_t *thread, void *dummy,
-                   void *(*start_routine) (void *), void *arg)
-{
-    pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
-    pthread_t self = pthread_self();
-    HANDLE createdThread = NULL;
-
-    extern size_t thread_control_stack_size;
-    createdThread = CreateThread(NULL, thread_control_stack_size,
-                                 Thread_Function, pth, CREATE_SUSPENDED, NULL);
-    if (!createdThread) return 1;
-    pth->handle = createdThread;
-
-    pth->start_routine = start_routine;
-    pth->arg = arg;
-    if (self) {
-        pth->blocked_signal_set = self->blocked_signal_set;
-    } else {
-        sigemptyset(&pth->blocked_signal_set);
-    }
-    if (thread) *thread = pth;
-    ResumeThread(createdThread);
-    return 0;
 }
 
 int pthread_equal(pthread_t thread1, pthread_t thread2)

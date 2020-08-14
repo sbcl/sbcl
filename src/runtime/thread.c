@@ -193,7 +193,9 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
-#ifdef __linux__
+#ifdef LISP_FEATURE_WIN32
+#define sb_GetTID() GetCurrentThreadId()
+#elif defined __linux__
 // gettid() was added in glibc 2.30 but we support older glibc
 int sb_GetTID() { return syscall(SYS_gettid); }
 #else
@@ -219,7 +221,7 @@ struct thread *alloc_thread_struct(void*,lispobj);
 #elif defined LISP_FEATURE_64_BIT
 # define ASSIGN_CURRENT_THREAD(x) \
   ((struct pthread_thread*)TlsGetValue(thread_self_tls_index))->vm_thread = x
-#elif defined LISP_FEATURE_WIN32
+#else
 # define ASSIGN_CURRENT_THREAD(x) TlsSetValue(OUR_TLS_INDEX, x)
 #endif
 
@@ -303,7 +305,7 @@ void free_thread_struct(struct thread *th)
 #endif
 }
 
-# if defined(IMMEDIATE_POST_MORTEM)
+# if !defined LISP_FEATURE_WIN32 && defined IMMEDIATE_POST_MORTEM
 
 /*
  * If this feature is set, we are running on a stack managed by the OS,
@@ -316,7 +318,7 @@ schedule_thread_post_mortem(struct thread *corpse)
     free_thread_struct(corpse);
 }
 
-# elif !defined LISP_FEATURE_PAUSELESS_THREADSTART
+# elif !defined LISP_FEATURE_WIN32 && !defined LISP_FEATURE_PAUSELESS_THREADSTART
 
 static void
 perform_thread_post_mortem(struct thread *post_mortem)
@@ -530,15 +532,38 @@ unregister_thread(struct thread *th,
     ASSIGN_CURRENT_THREAD(NULL);
 }
 
+#ifdef LISP_FEATURE_WIN32
+#define THREAD_TRAMPOLINE_PROLOGUE \
+    extern void set_thread_self(pthread_t thread); \
+    pthread_t self = (pthread_t) arg; \
+    self->teb = NtCurrentTeb(); \
+    set_thread_self(self); \
+    struct thread* th = self->vm_thread
+#define THREAD_TRAMPOLINE_EPILOGUE \
+    if (self->cv_event) CloseHandle(self->cv_event); \
+    free_thread_struct(th); \
+    HANDLE h = self->handle; \
+    free(self); \
+    CloseHandle(h)
+#else
+#define THREAD_TRAMPOLINE_PROLOGUE \
+    struct thread* th = arg
+#define THREAD_TRAMPOLINE_EPILOGUE
+#endif
+
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
  * lisp function after doing arch_os_thread_init and whatever other
  * bookkeeping needs to be done
  */
+#ifdef LISP_FEATURE_WIN32
+DWORD WINAPI new_thread_trampoline(LPVOID arg)
+#else
 void* new_thread_trampoline(void* arg)
+#endif
 {
+    THREAD_TRAMPOLINE_PROLOGUE;
 #ifdef LISP_FEATURE_PAUSELESS_THREADSTART
-    struct thread* th = arg;
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
@@ -580,7 +605,6 @@ void* new_thread_trampoline(void* arg)
 
 #else // !PAUSELESS_THREADSTART
 
-    struct thread *th = (struct thread *)arg;
     th->os_kernel_tid = sb_GetTID();
     init_thread_data scribble;
 
@@ -606,13 +630,8 @@ void* new_thread_trampoline(void* arg)
     schedule_thread_post_mortem(th);
 #endif
 #endif
-
-    FSHOW((stderr,"/exiting thread %p\n", thread_self()));
-#ifdef LISP_FEATURE_WIN32
-    return arg;
-#else
-    return 0; // keep people honest - result is unused
-#endif
+    THREAD_TRAMPOLINE_EPILOGUE;
+    return 0;
 }
 
 #ifdef LISP_FEATURE_OS_THREAD_STACK
@@ -1090,33 +1109,61 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
 #ifdef LISP_FEATURE_SB_THREAD
 
-#ifdef LISP_FEATURE_WIN32
-#define pthread_attr_init(dummy) (0)
-#define pthread_attr_destroy(dummy)
-#else
 #ifndef __USE_XOPEN2K
 extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
                                   size_t __stacksize);
 #endif
-#endif
 
 #ifndef LISP_FEATURE_PAUSELESS_THREADSTART
 
-/* Call pthread_create() and return 1 for success, 0 for failure */
-boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
+/* Allocate a thread structure, call pthread_create() or CreateThread(),
+ * and return 1 for success, 0 for failure */
+uword_t create_thread(lispobj start_routine)
 {
+    struct thread *th, *thread = arch_os_get_current_thread();
+
+    /* Must defend against async unwinds. */
+    if (read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
+        lose("create_thread is not safe when interrupts are enabled.");
+
+    /* Assuming that a fresh thread struct has no lisp objects in it,
+     * linking it to all_threads can be left to the thread itself
+     * without fear of gc lossage. 'start_routine' violates this
+     * assumption and must stay pinned until the child starts up. */
+    th = alloc_thread_struct(0, start_routine);
+    if (!th) return 0;
+
     /* The new thread inherits the restrictive signal mask set here,
      * and enables signals again when it is set up properly. */
     sigset_t oldset;
-    int retcode = 0;
     boolean success = 0;
 
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
-
+#ifdef LISP_FEATURE_WIN32
+    DWORD tid;
+    pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
+    // Theoretically you should tell the new thread a signal mask to restore
+    // after it finishes any uninterruptable setup code, but the way this worked
+    // on windows is that we passed the mask of blocked signals in the parent
+    // *after* blocking deferrables. It's immaterial what mask is passed
+    // because the thread will unblock all deferrables,
+    // and we don't really have posix signals anyway.
+    pth->blocked_signal_set = deferrable_sigset;
+    pth->vm_thread = th;
+    pth->handle = CreateThread(NULL, thread_control_stack_size,
+                               new_thread_trampoline, pth, 0, &tid);
+    success = pth->handle != NULL;
+    if (success)
+        th->os_thread = pth, th->os_kernel_tid = tid;
+    else
+        free(pth);
+#else
+    int retcode = 0;
     pthread_attr_t attr;
+    pthread_t kid_tid;
     if (pthread_attr_init(&attr) == 0) {
 
     /* See perform_thread_post_mortem for at least one reason why this lock is necessary */
@@ -1128,12 +1175,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         if (
 #ifdef LISP_FEATURE_OS_THREAD_STACK
             pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
-            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
+            (retcode = pthread_create(&kid_tid, &attr, new_thread_trampoline_switch_stack, th))
 #else
 
-# ifdef LISP_FEATURE_WIN32
-            /* do nothing */
-# elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             pthread_attr_setstack(&attr, th->control_stack_start, thread_control_stack_size) ||
 # else
             pthread_attr_setstack(&attr, th->alien_stack_start, ALIEN_STACK_SIZE) ||
@@ -1144,7 +1189,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
             pthread_attr_setguardsize(&attr, 0) ||
 # endif
 
-            (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))
+            (retcode = pthread_create(&kid_tid, &attr, new_thread_trampoline, th))
 #endif
             ) {
           perror("create_os_thread");
@@ -1156,28 +1201,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         pthread_attr_destroy(&attr);
     }
 
+#endif
     thread_sigmask(SIG_SETMASK,&oldset,0);
+    if (!success) free_thread_struct(th);
     return success;
-}
-
-os_thread_t create_thread(lispobj start_routine) {
-    struct thread *th, *thread = arch_os_get_current_thread();
-    os_thread_t kid_tid = 0;
-
-    /* Must defend against async unwinds. */
-    if (read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
-        lose("create_thread is not safe when interrupts are enabled.");
-
-    /* Assuming that a fresh thread struct has no lisp objects in it,
-     * linking it to all_threads can be left to the thread itself
-     * without fear of gc lossage. 'start_routine' violates this
-     * assumption and must stay pinned until the child starts up. */
-    th = alloc_thread_struct(0, start_routine);
-    if (th && !create_os_thread(th, &kid_tid)) {
-        free_thread_struct(th);
-        kid_tid = 0;
-    }
-    return kid_tid;
 }
 
 #endif
