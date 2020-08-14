@@ -198,10 +198,16 @@
 ;;; host CL package. This works around situations where the host has *more*
 ;;; symbols exported from CL than should be.
 (defun sb-xc:symbol-package (symbol)
-  (let ((p (cl:symbol-package symbol)))
+  (let ((p (cl:symbol-package symbol))
+        (name (string symbol)))
     (if (and p
-             (or (eq (find-symbol (string symbol) "XC-STRICT-CL") symbol)
-                 (eq (find-symbol (string symbol) "SB-XC") symbol)))
+             (or (eq (find-symbol name "XC-STRICT-CL") symbol)
+                 (eq (find-symbol name "SB-XC") symbol)
+                 ;; OK if the name of a symbol in the host CL package
+                 ;; is found in XC-STRICT-CL, even if the symbols
+                 ;; differ.
+                 (and (find-symbol name "XC-STRICT-CL")
+                      (eq (find-symbol name "CL") symbol))))
         *cl-package*
         p)))
 
