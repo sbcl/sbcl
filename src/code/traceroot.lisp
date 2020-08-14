@@ -34,13 +34,6 @@
      :all))
   0)
 
-;;; Given ADDR which is a pointer to a 'struct thread'
-;;; return the corresponding lisp thread.
-(defun find-lisp-thread-from-thread-struct (addr)
-  (declare (type sb-ext:word addr))
-  (sap-ref-lispobj (int-sap addr)
-                   (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift)))
-
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
 ;;;
@@ -89,8 +82,9 @@
                  (root-kind (car root)))
             (if (eq root-kind 0) ; heap object
                 (rplaca path :static)
-                (let* ((thread (find-lisp-thread-from-thread-struct
-                                (ash (cadr root) sb-vm:n-fixnum-tag-bits)))
+                (let* ((thread (sap-ref-lispobj
+                                (sb-int:descriptor-sap (cadr root))
+                                (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift)))
                        (extra (cddr root))
                        (symbol
                         (unless (eql root-kind 1)
@@ -171,9 +165,11 @@
                            &key
                            (:criterion (member :oldest :pseudo-static :static))
                            (:gc t)
+                           (:ignore list)
                            (:print (or boolean (eql :verbose)))))
                 search-roots))
-(defun search-roots (weak-pointers &key (criterion :oldest) (gc nil) (print t))
+(defun search-roots (weak-pointers &key (criterion :oldest) (gc nil)
+                                        (ignore nil) (print t))
   "Find roots keeping the targets of WEAK-POINTERS alive.
 
 WEAK-POINTERS must be a single SB-EXT:WEAK-POINTER or a list of those,
@@ -207,6 +203,10 @@ to be considered. Possible values are:
   :STATIC
      To find a root of an image-backed object, you want to stop only at
      a truly :STATIC object.
+
+IGNORE is a list of objects to treat as if nonexistent in the heap.
+It can often be useful for finding a path to an interned symbol other than
+through its package by specifying the package as an ignored object.
 
 PRINT controls whether discovered paths should be returned or
 printed. Possible values are
@@ -252,7 +252,9 @@ printed. Possible values are
 Experimental: subject to change without prior notice."
   (let* ((input (ensure-list weak-pointers))
          (output (make-array (length input)))
-         (param (cons input (cons :result output)))
+         (param (vector input
+                        (if ignore (coerce ignore 'simple-vector) 0)
+                        (cons :result output)))
          (criterion-value (ecase criterion
                             (:oldest 0)
                             (:pseudo-static 1)
@@ -270,7 +272,7 @@ Experimental: subject to change without prior notice."
               (extern-alien "prove_liveness" (function int unsigned int))
               (sb-kernel:get-lisp-obj-address param)
               criterion-value))))
-    (case (cadr param)
+    (case (car (elt param 2))
       (-1 (error "Input is not a proper list of weak pointers.")))
     (let ((paths (preprocess-traceroot-results input output)))
       (cond (print

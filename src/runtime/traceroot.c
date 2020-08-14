@@ -83,6 +83,7 @@ struct scan_state {
     // A hashmap from object to list of objects pointing to it
     struct hopscotch_table* inverted_heap;
     struct scratchpad scratchpad;
+    lispobj ignored_objects;
     int keep_leaves;
 };
 
@@ -700,6 +701,16 @@ static boolean record_ptr(lispobj* source, lispobj target,
     if (count_only) COUNT_POINTER(x) \
     else if (is_lisp_pointer(x) && relevant_ptr_p(x)) record_ptr(where,x,ss); }
 
+static boolean ignorep(lispobj* base_ptr,
+                       lispobj ignored_objects)
+{
+    int i;
+    for (i = fixnum_value(VECTOR(ignored_objects)->length)-1; i >= 0; --i)
+      if (native_pointer(VECTOR(ignored_objects)->data[i]) == base_ptr)
+          return 1;
+    return 0;
+}
+
 static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
 {
@@ -710,6 +721,10 @@ static uword_t build_refs(lispobj* where, lispobj* end,
 
     boolean count_only = !ss->record_ptrs;
     for ( ; where < end ; where += nwords ) {
+        if (ss->ignored_objects && ignorep(where, ss->ignored_objects)) {
+            nwords = OBJECT_SIZE(*where, where);
+            continue;
+        }
         ++n_objects;
         lispobj word = *where;
         if (!is_header(word)) {
@@ -843,10 +858,12 @@ static void scan_spaces(struct scan_state* ss)
 #define HASH_FUNCTION HOPSCOTCH_HASH_FUN_MIX
 
 static void* compute_heap_inverse(boolean keep_leaves,
+                                  lispobj ignored_objects,
                                   struct scratchpad* scratchpad)
 {
     struct scan_state ss;
     memset(&ss, 0, sizeof ss);
+    ss.ignored_objects = ignored_objects;
     ss.keep_leaves = keep_leaves;
     if (heap_trace_verbose) fprintf(stderr, "Pass 1: Counting heap objects...\n");
     scan_spaces(&ss);
@@ -931,6 +948,7 @@ static boolean finding_leaf_p(lispobj weak_pointers)
 static int trace_paths(void (*context_scanner)(),
                        lispobj weak_pointers, // list of inputs
                        lispobj paths, // vector of outputs
+                       lispobj ignore, // vector of ignored objects
                        int n_pins, lispobj* pins,
                        int criterion)
 {
@@ -950,7 +968,7 @@ static int trace_paths(void (*context_scanner)(),
                   ((i%8)==7||i==n_pins-1)?"\n":"");
     }
     inverted_heap = compute_heap_inverse(finding_leaf_p(weak_pointers),
-                                         &scratchpad);
+                                         ignore, &scratchpad);
     hopscotch_create(&visited, HASH_FUNCTION, 0, 32, 0);
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
     i = 0;
@@ -993,9 +1011,10 @@ int gc_prove_liveness(void(*context_scanner)(),
                       int criterion)
 {
     int n_watched = 0, n_live = 0, n_bad = 0, n_imm = 0, n_paths = 0;
-    lispobj input = CONS(objects)->car,
-            output = CONS(objects)->cdr,
-            paths = CONS(output)->cdr;
+    lispobj input  = VECTOR(objects)->data[0],
+            ignore = VECTOR(objects)->data[1],
+            output = VECTOR(objects)->data[2],
+            paths  = CONS(output)->cdr;
     lispobj list;
     for (list = input ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
         ++n_watched;
@@ -1040,7 +1059,7 @@ int gc_prove_liveness(void(*context_scanner)(),
             pins[i] = compute_lispobj((lispobj*)pins[i]);
         }
     }
-    n_paths = trace_paths(context_scanner, input, paths,
+    n_paths = trace_paths(context_scanner, input, paths, ignore,
                           n_pins, (lispobj*)pins, criterion);
     CONS(output)->car = make_fixnum(n_paths);
     return n_paths;
