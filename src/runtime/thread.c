@@ -601,7 +601,7 @@ void* new_thread_trampoline(void* arg)
     // then '&arg' seems not to be ok either. I'm not sure why, because the change
     // of stack was already done. FIXME: find out what's going on there.
 #if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER \
-    && !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_WIN32
+    && !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_SB_SAFEPOINT
     th->control_stack_end = (lispobj*)&arg;
 #endif
     th->os_kernel_tid = sb_GetTID();
@@ -1017,6 +1017,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 # ifdef LISP_FEATURE_WIN32
     th->carried_base_pointer = 0;
 # endif
+    // FIXME: this looks extremely bogus if the threads run on an OS-provided stack.
+    // Wouldn't it make more sense to set it to 0 and leave it to init_new_thread
+    // to set the value? (where would the main thread get it from?)
     th->csp_around_foreign_call = (lispobj *)th - 1;
 #endif
 
