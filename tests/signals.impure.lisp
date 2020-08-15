@@ -45,7 +45,8 @@
                   ;; (namely SLEEP) to produce known-good arguments, and
                   ;; even if we wanted to check argument validity,
                   ;; integration with `errno' is not to be expected.
-                  :skipped-on :win32)
+                  ;; And this hangs on darwin + safepoint.
+                  :skipped-on (or :win32 (:and :darwin :sb-safepoint)))
   (let* (saved-errno
          (returning nil)
          (timer (make-timer (lambda ()

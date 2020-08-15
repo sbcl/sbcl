@@ -1972,7 +1972,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 #if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     if(signal==SIG_MEMORY_FAULT) {
         sa.sa_flags |= SA_ONSTACK;
-# ifdef LISP_FEATURE_SB_SAFEPOINT
+# if defined LISP_FEATURE_SB_SAFEPOINT && !defined LISP_FEATURE_DARWIN
         sigaddset(&sa.sa_mask, SIGRTMIN);
         sigaddset(&sa.sa_mask, SIGRTMIN+1);
 # endif

@@ -670,7 +670,8 @@
       (assert (< (- (get-universal-time) time) 2)))))
 
 #-win32
-(with-test (:name (open :interrupt) :skipped-on :win32)
+(with-test (:name (open :interrupt)
+                  :skipped-on (or :win32 (:and :darwin :sb-safepoint)))
   (let ((to 0))
     (with-scratch-file (fifo)
            ;; Make a FIFO

@@ -564,6 +564,17 @@ void* new_thread_trampoline(void* arg)
 {
     THREAD_TRAMPOLINE_PROLOGUE;
 #ifdef LISP_FEATURE_PAUSELESS_THREADSTART
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    init_thread_data scribble;
+    // This "scribble" thing is really quite pointless because the original sigset_t
+    // was passed in the thread's startup info (unless no signals at all were blocked).
+    // And when terminating, why does anyone care what the signal mask was???
+    // Well, there's a big "however": '&scribble' is no mere pass-by-reference arg-
+    // it is actually used as an approximation of the C stack pointer.
+#define SCRIBBLE &scribble
+#else
+#define SCRIBBLE 0
+#endif
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
@@ -594,14 +605,14 @@ void* new_thread_trampoline(void* arg)
     th->control_stack_end = (lispobj*)&arg;
 #endif
     th->os_kernel_tid = sb_GetTID();
-    init_new_thread(th, 0, 0, 0);
+    init_new_thread(th, SCRIBBLE, 0, 0);
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
     //   (a regression test asserts that not even a THREAD instance is on the stack)
     funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
-    unregister_thread(th, 0);
+    unregister_thread(th, SCRIBBLE);
 
 #else // !PAUSELESS_THREADSTART
 

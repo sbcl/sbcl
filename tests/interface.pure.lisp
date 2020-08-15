@@ -108,7 +108,8 @@
                   :timeout)))))
 
 ;;; SLEEP should work with large integers as well
-(with-test (:name (sleep :pretty-much-forever))
+(with-test (:name (sleep :pretty-much-forever)
+            :skipped-on (:and :darwin :sb-safepoint)) ; hangs
   (assert (eq :timeout
               (handler-case
                   (sb-ext:with-timeout 1
