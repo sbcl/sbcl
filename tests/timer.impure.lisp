@@ -212,22 +212,6 @@
                       (mapc #'sb-thread:join-thread threads)))))
       (assert ok))))
 
-;;; FIXME: Since timeouts do not work on Windows this would loop
-;;; forever.
-(with-test (:name (:hash-cache :interrupt) :skipped-on :win32)
-  (let* ((type1 (random-type 500))
-         (type2 (random-type 500))
-         (wanted (subtypep type1 type2)))
-    (dotimes (i 100)
-      (block foo
-        (sb-ext:schedule-timer (sb-ext:make-timer
-                                (lambda ()
-                                  (assert (eq wanted (subtypep type1 type2)))
-                                    (return-from foo)))
-                               0.05)
-        (loop
-           (assert (eq wanted (subtypep type1 type2))))))))
-
 ;;; Used to hang occasionally at least on x86. Two bugs caused it:
 ;;; running out of stack (due to repeating timers being rescheduled
 ;;; before they ran) and dying threads were open interrupts.
