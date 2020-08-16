@@ -309,7 +309,7 @@
           (dolist (thread threads)
             (sched thread)))
         (loop for thread in threads
-              do (sb-thread:join-thread thread :timeout 20))))))
+              do (sb-thread:join-thread thread :timeout 40))))))
 
 ;; A timer with a repeat interval can be configured to "catch up" in
 ;; case of missed calls.
