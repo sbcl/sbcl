@@ -58,14 +58,6 @@
 #include <thread.h>
 #endif
 
-#if defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_OS_THREAD_STACK)
-# define IMMEDIATE_POST_MORTEM
-#else
-static __attribute__((unused)) struct thread *postmortem_thread;
-#endif
-
-#endif
-
 int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads
 // exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
 os_vm_size_t thread_alien_stack_size = ALIEN_STACK_SIZE;
@@ -287,15 +279,6 @@ void create_main_lisp_thread(lispobj function) {
 
 #ifdef LISP_FEATURE_SB_THREAD
 
-/* THREAD POST MORTEM CLEANUP
- *
- * Memory allocated for the thread stacks cannot be reclaimed while
- * the thread is still alive, so we need a mechanism for post mortem
- * cleanups. FIXME: We actually have two, for historical reasons as
- * the saying goes. Do we really need two? Nikodemus guesses that
- * not anymore, now that we properly call pthread_attr_destroy before
- * freeing the stack. */
-
 void free_thread_struct(struct thread *th)
 {
 #if defined(LISP_FEATURE_WIN32)
@@ -304,91 +287,6 @@ void free_thread_struct(struct thread *th)
     os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 #endif
 }
-
-# if !defined LISP_FEATURE_WIN32 && defined IMMEDIATE_POST_MORTEM
-
-/*
- * If this feature is set, we are running on a stack managed by the OS,
- * and no fancy delays are required for anything.  Just do it.
- */
-static void __attribute__((__unused__))
-schedule_thread_post_mortem(struct thread *corpse)
-{
-    pthread_detach(pthread_self());
-    free_thread_struct(corpse);
-}
-
-# elif !defined LISP_FEATURE_WIN32 && !defined LISP_FEATURE_PAUSELESS_THREADSTART
-
-static void
-perform_thread_post_mortem(struct thread *post_mortem)
-{
-    gc_assert(post_mortem);
-        /* The thread may exit before pthread_create() has finished
-           initialization and it may write into already unmapped
-           memory. This lock doesn't actually need to protect
-           anything, just to make sure that at least one call to
-           pthread_create() has finished.
-
-           Possible improvements: stash the address of the thread
-           struct for which a pthread is being created and don't lock
-           here if it's not the one being terminated. */
-    int result = pthread_mutex_lock(&create_thread_lock);
-    gc_assert(result == 0);
-    result = pthread_mutex_unlock(&create_thread_lock);
-    gc_assert(result == 0);
-
-    if ((result = pthread_join(post_mortem->os_thread, NULL))) {
-        lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
-             strerror(result));
-    }
-    free_thread_struct(post_mortem);
-}
-
-static inline struct thread*
-fifo_buffer_shift(struct thread** dest, struct thread* value)
-{
-#ifdef __ATOMIC_SEQ_CST
-    return __atomic_exchange_n(dest, value, __ATOMIC_SEQ_CST);
-#elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    /* I'd like to remove this case but I don't know whether MSVC has
-     * either of __atomic_exchange_n() or __sync_val_compare_and_swap() */
-    lispobj old_value;
-    asm volatile
-        ("lock xchg %0,(%1)"
-         : "=r" (old_value)
-         : "r" (dest), "0" (value)
-         : "memory");
-    return old_value;
-#else
-    // We don't want a compare-and-swap, but if that's all we have,
-    // then build an atomic exchange out of compare-and-swap
-    lispobj old =  *dest;
-    while (1) {
-        lispobj actual = __sync_val_compare_and_swap(dest, old, value);
-        if (actual == old)
-            return old;
-        old = actual;
-    }
-#endif
-}
-
-static void
-schedule_thread_post_mortem(struct thread *corpse)
-{
-    gc_assert(corpse);
-    // This strange little mechanism is a FIFO buffer of capacity 1.
-    // By stuffing one new thing in and reading the old one out, we ensure
-    // that at least one pthread_create() has completed by this point.
-    // In particular, the thread we're post-morteming must have completed
-    // because thread creation is completely serialized (which is
-    // somewhat unfortunate).
-    struct thread* previous = fifo_buffer_shift(&postmortem_thread, corpse);
-    if (previous) // any random thread which pre-deceased me
-        perform_thread_post_mortem(previous);
-}
-
-# endif /* !IMMEDIATE_POST_MORTEM */
 
 /* Note: scribble must be stack-allocated */
 static void
@@ -1121,16 +1019,8 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     return th;
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
-
-#ifndef __USE_XOPEN2K
-extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
-                                  size_t __stacksize);
-#endif
-
-#ifndef LISP_FEATURE_PAUSELESS_THREADSTART
-
-/* Allocate a thread structure, call pthread_create() or CreateThread(),
+#ifdef LISP_FEATURE_WIN32
+/* Allocate a thread structure, call CreateThread(),
  * and return 1 for success, 0 for failure */
 uword_t create_thread(lispobj start_routine)
 {
@@ -1156,7 +1046,6 @@ uword_t create_thread(lispobj start_routine)
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
-#ifdef LISP_FEATURE_WIN32
     DWORD tid;
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
     // Theoretically you should tell the new thread a signal mask to restore
@@ -1174,53 +1063,10 @@ uword_t create_thread(lispobj start_routine)
         th->os_thread = pth, th->os_kernel_tid = tid;
     else
         free(pth);
-#else
-    int retcode = 0;
-    pthread_attr_t attr;
-    pthread_t kid_tid;
-    if (pthread_attr_init(&attr) == 0) {
-
-    /* See perform_thread_post_mortem for at least one reason why this lock is necessary */
-        retcode = pthread_mutex_lock(&create_thread_lock);
-        gc_assert(retcode == 0);
-
-       /* call_into_lisp_first_time switches the stack for the initial
-        * thread. For the others, we use this. */
-        if (
-#ifdef LISP_FEATURE_OS_THREAD_STACK
-            pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
-            (retcode = pthread_create(&kid_tid, &attr, new_thread_trampoline_switch_stack, th))
-#else
-
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            pthread_attr_setstack(&attr, th->control_stack_start, thread_control_stack_size) ||
-# else
-            pthread_attr_setstack(&attr, th->alien_stack_start, ALIEN_STACK_SIZE) ||
-# endif
-# ifdef LISP_FEATURE_NETBSD
-            /* Even though the manpage says pthread_attr_setstack
-               would override the guard page, it's no longer true. */
-            pthread_attr_setguardsize(&attr, 0) ||
-# endif
-
-            (retcode = pthread_create(&kid_tid, &attr, new_thread_trampoline, th))
-#endif
-            ) {
-          perror("create_os_thread");
-        } else {
-          success = 1;
-        }
-        retcode = pthread_mutex_unlock(&create_thread_lock);
-        gc_assert(retcode == 0);
-        pthread_attr_destroy(&attr);
-    }
-
-#endif
     thread_sigmask(SIG_SETMASK,&oldset,0);
     if (!success) free_thread_struct(th);
     return success;
 }
-
 #endif
 
 /* stopping the world is a two-stage process.  From this thread we signal
