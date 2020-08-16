@@ -660,7 +660,13 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
     // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
     // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
     //  this routine is also safe to use from a signal handler."
-    unw_init_local(&cursor, context);
+    if (context) {
+        unw_init_local(&cursor, context);
+    } else {
+        unw_context_t here;
+        unw_getcontext(&here);
+        unw_init_local(&cursor, &here);
+    }
     do {
         uword_t offset;
         char *pc;
