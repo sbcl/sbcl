@@ -110,11 +110,8 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
        ;; bother anyone about that sad fact
        (declare (muffle-conditions compiler-note)
                 (optimize speed))
-       ;; FIXME: the saps are not gc safe
-       (let ((args-sap (int-sap
-                        (sb-kernel:get-lisp-obj-address args-pointer)))
-             (res-sap (int-sap
-                       (sb-kernel:get-lisp-obj-address result-pointer))))
+       (let ((args-sap (descriptor-sap args-pointer))
+             (res-sap (descriptor-sap result-pointer)))
          (declare (ignorable args-sap res-sap))
          (with-alien
              ,(loop
