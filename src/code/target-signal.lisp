@@ -67,6 +67,7 @@
 ;;; point instructions, certain system calls), hopefully ruling out the
 ;;; possibility that we would trigger it during allocation.
 
+;;; FIXME: terrible name. doesn't actually "enable" in the sense of unmasking.
 (defun enable-interrupt (signal handler &key synchronous)
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (/show0 "enable-interrupt")
@@ -99,16 +100,7 @@
                  ;; instead of what was supplied before as HANDLER. We can only hope that
                  ;; users don't pass the result of ENABLE-INTERRUPT as the argument to
                  ;; another call, as that would create a chain of closures.
-                 ;; I wonder if the fact that we at some point decided that we need
-                 ;; to allow signal nesting to about 1024 levels deep had anything
-                 ;; to do with this bug?
                  (the (or function fixnum) (aref ohandler 0)))))))))
-
-(defun default-interrupt (signal)
-  (enable-interrupt signal :default))
-
-(defun ignore-interrupt (signal)
-  (enable-interrupt signal :ignore))
 
 ;;;; Support for signal handlers which aren't.
 ;;;;
@@ -241,7 +233,6 @@
   #-sb-thruption
   (enable-interrupt sigpipe #'sigpipe-handler)
   (enable-interrupt sigchld #'sigchld-handler)
-  #+hpux (ignore-interrupt sigxcpu)
   #-sb-safepoint (unblock-gc-signals)
   (unblock-deferrable-signals)
   (values))
