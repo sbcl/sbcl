@@ -369,10 +369,8 @@ sigaddset_deferrable(sigset_t *s)
 #else
     sigaddset(s, SIGPOLL);
 #endif
-#ifndef LISP_FEATURE_HPUX
     sigaddset(s, SIGXCPU);
     sigaddset(s, SIGXFSZ);
-#endif
     sigaddset(s, SIGVTALRM);
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);

@@ -85,7 +85,6 @@
   (named-lambda start-lisp ()
     (handling-end-of-the-world
      (reinit t)
-     #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
      (funcall toplevel))))
 
 (defun save-lisp-and-die (core-file-name &key

@@ -18,11 +18,6 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-#ifdef LISP_FEATURE_HPUX
-struct tm *gmtime_r(const time_t *timer, struct tm *result);
-struct tm *localtime_r(const time_t *timer, struct tm *result);
-#endif
-
 int get_timezone(time_t when, boolean *dst)
 {
     struct tm ltm, gtm;

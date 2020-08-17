@@ -44,7 +44,7 @@
            :64-BIT ; choice of word size. 32-bit if absent
            :BIG-ENDIAN :LITTLE-ENDIAN ; endianness: pick one and only one
            :BSD :UNIX :LINUX :WIN32 :DARWIN :SUNOS :ANDROID ; OS: pick one or more
-           :FREEBSD :GNU-KFREEBSD :OPENBSD :NETBSD :DRAGONFLY :HAIKU :HPUX
+           :FREEBSD :GNU-KFREEBSD :OPENBSD :NETBSD :DRAGONFLY :HAIKU
            :MACH-O :ELF ; obj file format: pick zero or one
            ;; I would argue that this should not be exposed,
            ;; but I would also anticipate blowback from removing it.

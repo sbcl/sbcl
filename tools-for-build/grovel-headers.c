@@ -55,10 +55,6 @@
 #include <errno.h>
 #include <time.h>
 
-#ifdef LISP_FEATURE_HPUX
-#include <sys/bsdtty.h> /* for TIOCGPGRP */
-#endif
-
 #ifdef LISP_FEATURE_BSD
   #include <sys/param.h>
   #include <sys/sysctl.h>

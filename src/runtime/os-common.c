@@ -46,8 +46,7 @@ int install_sig_memory_fault_handler = INSTALL_SIG_MEMORY_FAULT_HANDLER;
 
 /* Except for os_zero, these routines are only called by Lisp code.
  * These routines may also be replaced by os-dependent versions
- * instead. See hpux-os.c for some useful restrictions on actual
- * usage. */
+ * instead. */
 
 #ifdef LISP_FEATURE_CHENEYGC
 void
@@ -235,14 +234,6 @@ gc_managed_heap_space_p(lispobj addr)
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
 {
     int fail = 0;
-#ifdef LISP_FEATURE_HPUX
-    // Revision afcfb8b5da said that mmap() didn't work on HPUX, changing to use read() instead.
-    // Strangely it also read 4K at a time into a buffer and used memcpy to transfer the buffer.
-    // I don't see why, and given the lack of explanation, I've simplified to 1 read.
-    fail = lseek(fd, offset, SEEK_SET) == (off_t)-1 || read(fd, addr, len) != (ssize_t)len;
-    // This looks bogus but harmlesss, so I'm leaving it.
-    os_flush_icache(addr, len);
-#else
     os_vm_address_t actual;
     actual = mmap(addr, len,
                   // If mapping to a random address, then the assumption is
@@ -260,7 +251,6 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
     } else if (addr && (addr != actual)) {
         fail = 1;
     }
-#endif
     if (fail)
         lose("load_core_bytes(%d,%zx,%p,%zx) failed", fd, offset, addr, len);
     return (void*)actual;

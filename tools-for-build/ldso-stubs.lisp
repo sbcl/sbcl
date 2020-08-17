@@ -154,7 +154,6 @@ ldso_stub__ ## fct: ;                           \\
                    "tanh"
                    "truncate"
                    "ttyname"
-                   #-hpux "tzname"
                    "unlink"
                    "utimes"
                    "waitpid"

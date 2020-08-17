@@ -258,8 +258,6 @@
       (logically-readonlyize (sb-c::sc-move-vops sc))
       (logically-readonlyize (sb-c::sc-move-costs sc))))
 
-  ; hppa heap is segmented, lisp and c uses a stub to call eachother
-  #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)

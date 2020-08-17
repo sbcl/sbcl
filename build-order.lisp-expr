@@ -218,7 +218,6 @@
 
  #+android ("src/code/android-os" :not-host)
  #+sunos ("src/code/sunos-os" :not-host)
- #+hpux  ("src/code/hpux-os"  :not-host)
  #+bsd   ("src/code/bsd-os"   :not-host)
  #+linux ("src/code/linux-os" :not-host)
  #+haiku ("src/code/haiku-os" :not-host)

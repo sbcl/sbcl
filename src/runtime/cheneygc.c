@@ -200,10 +200,6 @@ collect_garbage(generation_index_t ignore)
     /* Maybe FIXME: it's possible that we could significantly reduce
      * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or
      * similar os-dependent tricks here */
-#ifdef LISP_FEATURE_HPUX
-    /* hpux cant handle unmapping areas that are not 100% mapped */
-    clear_auto_gc_trigger();
-#endif
     os_zero((os_vm_address_t) from_space,
             (os_vm_size_t) dynamic_space_size);
 
@@ -393,7 +389,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     uword_t end = (uword_t)addr + length - 1;
     if (((uword_t)addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
         ((uword_t)addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
-#if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
+#if defined(SUNOS) || defined(SOLARIS)
         os_invalidate(addr, length);
 #else
         os_protect(addr, length, 0);
@@ -416,7 +412,7 @@ void clear_auto_gc_trigger(void)
     addr = (os_vm_address_t)current_auto_gc_trigger;
     length = dynamic_space_size + (os_vm_address_t)current_dynamic_space - addr;
 
-#if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
+#if defined(SUNOS) || defined(SOLARIS)
     /* don't want to force whole space into swapping mode... */
     os_validate(NOT_MOVABLE, addr, length);
 #else

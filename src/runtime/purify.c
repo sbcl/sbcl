@@ -733,9 +733,6 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" cleanup");
     fflush(stdout);
 #endif
-#ifdef LISP_FEATURE_HPUX
-    clear_auto_gc_trigger(); /* restore mmap as it was given by os */
-#endif
 
     os_zero((os_vm_address_t) current_dynamic_space, dynamic_space_size);
 

@@ -198,8 +198,6 @@
 
     #+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
-    #+hpux *c-lra*
-
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread
     #-sb-thread *control-stack-start* ; ditto

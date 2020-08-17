@@ -23,7 +23,6 @@
                   sb-vm:*control-stack-start*
                   sb-vm:*control-stack-end*
                   sb-vm:*binding-stack-start*
-                  #+(or hpux) sb-vm::*c-lra*
                   *allow-with-interrupts*
                   sb-unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*

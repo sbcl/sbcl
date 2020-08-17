@@ -116,7 +116,7 @@ Experimental."
                        :key #'shared-object-pathname
                        :test #'equal)))
         (when old
-          #-hpux (dlclose-or-lose old)
+          (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
           #+linkage-table
           (update-linkage-table t)
@@ -168,11 +168,10 @@ Experimental."
 (defun close-shared-objects ()
   (let (saved)
     (dolist (obj (reverse *shared-objects*))
-      #-hpux (dlclose-or-lose obj)
+      (dlclose-or-lose obj)
       (unless (shared-object-dont-save obj)
         (push obj saved)))
     (setf *shared-objects* saved))
-  #-hpux
   (dlclose-or-lose))
 
 ;;; This table is unsynchronized, but the only platforms that use it

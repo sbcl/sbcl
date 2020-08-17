@@ -423,7 +423,6 @@
         (ignore-errors (sb-posix:unlink name))))
   nil)
 
-#-hpux ; fix: cant handle c-vargs
 (deftest open.error.1
   (handler-case (sb-posix:open *test-directory* sb-posix::o-wronly)
     (sb-posix:syscall-error (c)
@@ -442,7 +441,7 @@
                sb-posix::o-nonblock))
   t)
 
-#-(or hpux win32 netbsd) ; fix: cant handle c-vargs
+#-(or win32 netbsd) ; fix: cant handle c-vargs
 (deftest fcntl.flock.1
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
@@ -697,7 +696,6 @@
   ;; Same thing, but with a very long link target (which doesn't have
   ;; to exist).  This tests the array adjustment in the wrapper,
   ;; provided that the target's length is long enough.
-  #-hpux ; arg2 to readlink is 80, and arg0 is larger than that
   (deftest readlink.2
       (let ((target-pathname (make-pathname
                               :name (make-string 255 :initial-element #\a)
@@ -836,9 +834,8 @@
           (delete-file temp))))
   t "mkstemp-1")
 
-;#-(or win32 sunos hpux)
 ;;;; mkdtemp is unimplemented on at least Solaris 10
-#-(or win32 hpux sunos)
+#-(or win32 sunos)
 ;;; But it is implemented on OpenSolaris 2008.11
 (deftest mkdtemp.1
     (let ((pathname

@@ -1,8 +1,8 @@
 ("sys/socket.h" "errno.h" "fcntl.h")
 
 ((:integer af-local
-           #+(or sunos solaris hpux) "AF_UNIX"
-           #-(or sunos solaris hpux) "AF_LOCAL"
+           #+(or sunos solaris) "AF_UNIX"
+           #-(or sunos solaris) "AF_LOCAL"
            "Local to host (pipes and file-domain).")
 
  (:integer ifnamsiz "IFNAMSIZ")

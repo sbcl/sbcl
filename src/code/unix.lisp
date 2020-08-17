@@ -387,17 +387,17 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #-(or android linux openbsd freebsd netbsd sunos darwin hpux dragonfly haiku)
+  #-(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
   #.(error "POSIX-GETCWD is not implemented.")
   (or
-   #+(or linux openbsd freebsd netbsd sunos darwin hpux dragonfly haiku)
+   #+(or linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
    (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                     (function (* char)
                                                               (* char)
                                                               size-t))
                                       nil
                                       #+(or linux openbsd freebsd netbsd darwin dragonfly haiku) 0
-                                      #+(or sunos hpux) 1025))
+                                      #+(or sunos) 1025))
    #+android
    (with-alien ((ptr (array char #.path-max)))
      ;; Older bionic versions do not have the above feature.

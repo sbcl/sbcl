@@ -305,9 +305,6 @@ case `uname` in
     CYGWIN* | WindowsNT | MINGW* | MSYS*)
         sbcl_os="win32"
         ;;
-    HP-UX)
-        sbcl_os="hpux"
-        ;;
     Haiku)
         sbcl_os="haiku"
         ;;
@@ -521,12 +518,6 @@ case "$sbcl_os" in
         link_or_copy Config.$sbcl_arch-linux Config
         link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
         link_or_copy linux-os.h target-os.h
-        ;;
-    hpux)
-        printf ' :unix :hpux :elf' >> $ltf
-        link_or_copy Config.$sbcl_arch-hpux Config
-        link_or_copy $sbcl_arch-hpux-os.h target-arch-os.h
-        link_or_copy hpux-os.h target-os.h
         ;;
     haiku)
         printf ' :unix :haiku :elf :int4-breakpoints' >> $ltf
