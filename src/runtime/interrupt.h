@@ -72,12 +72,7 @@ extern void maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset);
  *
  * -- NS 2007-01-29
  */
-union interrupt_handler {
-    lispobj lisp;
-    void (*c)(int, siginfo_t*, os_context_t*);
-};
-
-extern union interrupt_handler interrupt_handlers[NSIG];
+extern lispobj lisp_sig_handlers[NSIG];
 
 struct interrupt_data {
     /* signal information for pending signal.  pending_signal=0 when there
@@ -130,10 +125,7 @@ typedef void (*interrupt_handler_t)(int, siginfo_t *, os_context_t *);
 extern void undoably_install_low_level_interrupt_handler (
                         int signal,
                         interrupt_handler_t handler);
-extern uword_t install_handler(int signal,
-                               interrupt_handler_t handler,
-                               lispobj ohandler,
-                               int synchronous);
+extern void install_handler(int signal, lispobj handler, int synchronous);
 
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:

@@ -153,8 +153,7 @@ collect_garbage(generation_index_t ignore)
     printf("Scavenging interrupt handlers (%d bytes) ...\n",
            (int)sizeof(interrupt_handlers));
 #endif
-    scavenge((lispobj *) interrupt_handlers,
-             sizeof(interrupt_handlers) / sizeof(lispobj));
+    scavenge(lisp_sig_handlers, NSIG);
 
 #ifdef PRINTNOISE
     printf("Scavenging the control stack ...\n");

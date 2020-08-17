@@ -112,7 +112,7 @@ boolean internal_errors_enabled = 0;
 static
 void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
 #endif
-union interrupt_handler interrupt_handlers[NSIG];
+lispobj lisp_sig_handlers[NSIG];
 
 /* Under Linux on some architectures, we appear to have to restore the
  * FPU control word from the context, as after the signal is delivered
@@ -210,8 +210,8 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
     sigemptyset(&sigset);
     int i;
     for(i = 1; i < NSIG; i++) {
-        if (!(ARE_SAME_HANDLER(interrupt_low_level_handlers[i], SIG_DFL)) ||
-            !(ARE_SAME_HANDLER(interrupt_handlers[i].c, SIG_DFL))) {
+        if (!ARE_SAME_HANDLER(interrupt_low_level_handlers[i], SIG_DFL)
+            || lisp_sig_handlers[i] != NIL) {
             sigaddset(&sigset, i);
         }
     }
@@ -1145,7 +1145,9 @@ void
 interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
     boolean were_in_lisp;
-    union interrupt_handler handler;
+    lispobj handler = lisp_sig_handlers[signal];
+
+    if (!functionp(handler)) return;
 
     check_blockables_blocked_or_lose(0);
 
@@ -1154,32 +1156,12 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         check_interrupts_enabled_or_lose(context);
 #endif
 
-    handler = interrupt_handlers[signal];
-
-    if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
-        return;
-    }
-
     were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
     if (were_in_lisp)
     {
         fake_foreign_function_call(context);
     }
 
-    FSHOW_SIGNAL((stderr,
-                  "/entering interrupt_handle_now(%d, info, context)\n",
-                  signal));
-
-    if (ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-
-        /* This can happen if someone tries to ignore or default one
-         * of the signals we need for runtime support, and the runtime
-         * support decides to pass on it. */
-        lose("no handler for signal %d in interrupt_handle_now(..)", signal);
-
-        // BUG: if a C function pointer can be misaligned such that it
-        // looks to satisfy functionp() then we do the wrong thing.
-    } else if (functionp(handler.lisp)) {
         /* Once we've decided what to do about contexts in a
          * return-elsewhere world (the original context will no longer
          * be available; should we copy it or was nobody using it anyway?)
@@ -1200,31 +1182,16 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
             FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
 
-            funcall3(handler.lisp,
+            funcall3(handler,
                      make_fixnum(signal),
                      info_sap,
                      context_sap);
         }
-    } else {
-        /* This cannot happen in sane circumstances. */
-
-        FSHOW_SIGNAL((stderr,"/calling C-level handler\n"));
-
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-        /* Allow signals again. */
-        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-        (*handler.c)(signal, info, context);
-#endif
-    }
 
     if (were_in_lisp)
     {
         undo_fake_foreign_function_call(context); /* block signals again */
     }
-
-    FSHOW_SIGNAL((stderr,
-                  "/returning from interrupt_handle_now(%d, info, context)\n",
-                  signal));
 }
 
 /* This is called at the end of a critical section if the indications
@@ -1916,6 +1883,9 @@ spawn_signal_thread_handler(int signal, siginfo_t *info, void *void_context)
     pthread_attr_t attr;
     pthread_t th;
 
+    // This is total bullcrap. None of these functions are specified
+    // as being async-signal-safe, yet here were are in a signal handler
+    // trying to create a thread.
     if (pthread_attr_init(&attr))
         goto lost;
     if (pthread_attr_setstacksize(&attr, thread_control_stack_size))
@@ -1986,65 +1956,51 @@ undoably_install_low_level_interrupt_handler (int signal,
 #endif
 
 /* This is called from Lisp. */
-uword_t
-install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
-                lispobj ohandler, // (SIMPLE-VECTOR 1) as a tagged pointer
+void
+install_handler(int signal, lispobj handler,
                 int __attribute__((unused)) synchronous)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
 
     if (interrupt_low_level_handlers[signal]==0) {
-        if (handler == 0)
-            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))SIG_DFL;
-        else if ((lispobj)handler == 1)
-            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))SIG_IGN;
+        // Our "abstract" values for SIG_DFL and SIG_IGN are 0 and 1
+        // respectively which are probably the real values from signal.h
+        // but this way way don't need to put them in grovel-headers.c
+        if (fixnump(handler)) {
+            memset(&sa, 0, sizeof sa);
+            sa.sa_handler = handler ? SIG_IGN : SIG_DFL;
+            // assign the OS level action before clearing the lisp function.
+            // (If a signal were to be delivered to the C trampoline when the lisp
+            // function is NIL, we'd get the effect of :IGNORE regardless
+            // of what the default action should be)
+            sigaction(signal, &sa, NULL);
+            lisp_sig_handlers[signal] = NIL;
+            return;
+        }
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
-        else if (signal == SIGPROF)
+        if (signal == SIGPROF)
             sa.sa_sigaction = sigprof_handler_trampoline;
         else if (!synchronous)
             sa.sa_sigaction = spawn_signal_thread_handler;
+        else
 #endif
-        else if (sigismember(&deferrable_sigset, signal))
+        if (sigismember(&deferrable_sigset, signal))
             sa.sa_sigaction = maybe_now_maybe_later;
         else
             sa.sa_sigaction = interrupt_handle_now_handler;
 
         sa.sa_mask = blockable_sigset;
         sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
+        // ensure the C handler sees a lisp function before doing sigaction()
+        lisp_sig_handlers[signal] = handler;
         sigaction(signal, &sa, NULL);
+    } else {
+        // When there's a low-level handler, we must leave it alone.
+        // Give it the lisp function to call if it decides to forward a signal.
+        // SIG_IGN and SIG_DFL don't always do what you think in such case.
+        lisp_sig_handlers[signal] = functionp(handler) ? handler : NIL;
     }
-
-    // We can GC-safely read interrupt_low_level_handlers[signal] and assign
-    // into ohandler despite that the C stack and registers are not roots on
-    // precise GC. That is, if GC were to occur as depicted:
-    //   obj = old_handler
-    //   -- GC signal occurs here --
-    //   result = obj
-    // then the register or stack word holding 'obj' could be obsolete.
-    // But that won't happen- the STOP_FOR_GC signal is currently blocked
-    // due to the block_blockable_signals() at the top of this function.
-    // However, there is an unlikely other reason for a wrong result -
-    // if the C function address does not have at least N_FIXNUM_TAG_BITS
-    // of alignment, then we say that it was NIL instead of a fixnum.
-    lispobj obj = interrupt_handlers[signal].lisp;
-    uword_t result = -1;
-    if ((void*)obj == (void*)SIG_DFL)
-        result = 0;
-    else if ((void*)obj == (void*)SIG_IGN)
-        result = 1;
-    else if (ohandler) // only store into 'ohandler' when it was supplied
-        VECTOR(ohandler)->data[0] = (functionp(obj)||fixnump(obj)) ? obj : NIL;
-
-    interrupt_handlers[signal].c = handler;
-
-    // After the thread's signal mask is restored to the mask in 'old',
-    // it is not possible to GC-safely refer to a Lisp function from C code,
-    // which is to say, naively utilizing "return obj;" would be wrong.
-    return result;
-#else
-    /* Probably-wrong Win32 hack */
-    return 0;
 #endif
 }
 
@@ -2078,13 +2034,7 @@ interrupt_init(void)
 #ifndef LISP_FEATURE_WIN32
     /* Set up high level handler information. */
     for (i = 0; i < NSIG; i++) {
-        interrupt_handlers[i].c =
-            /* (The cast here blasts away the distinction between
-             * SA_SIGACTION-style three-argument handlers and
-             * signal(..)-style one-argument handlers, which is OK
-             * because it works to call the 1-argument form where the
-             * 3-argument form is expected.) */
-            (void (*)(int, siginfo_t*, os_context_t*))SIG_DFL;
+        lisp_sig_handlers[i] = NIL;
     }
     undoably_install_low_level_interrupt_handler(SIGABRT, sigabrt_handler);
 #endif

@@ -514,17 +514,27 @@ catchers_cmd(char __attribute__((unused)) **ptr)
 static void
 sigint_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *info,
-               os_context_t *context)
+               void *context)
 {
-    lose("\nSIGINT hit at 0x%08lX",
-         (unsigned long) *os_context_pc_addr(context));
+    extern void ldb_monitor();
+    fprintf(stderr, "\nSIGINT hit at %p\n", (void*)*os_context_pc_addr(context));
+    ldb_monitor();
+    fprintf(stderr, "Returning to lisp (if you're lucky).\n");
 }
 
 static int
 grab_sigs_cmd(char __attribute__((unused)) **ptr)
 {
+#ifdef LISP_FEATURE_WIN32
+    fprintf(stderr, "sorry no can do\n"); fflush(stderr);
+#else
     printf("Grabbing SIGINT.\n");
-    install_handler(SIGINT, sigint_handler, 0, 1);
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = sigint_handler;
+    sigaction(SIGINT, &sa, 0);
+#endif
     return 0;
 }
 

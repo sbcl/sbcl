@@ -3587,21 +3587,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 #endif
 
-    /* Scavenge the Lisp functions of the interrupt handlers, taking
-     * care to avoid SIG_DFL and SIG_IGN. */
-    for (i = 0; i < NSIG; i++) {
-        union interrupt_handler handler = interrupt_handlers[i];
-        if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
-            !ARE_SAME_HANDLER(handler.c, SIG_DFL) &&
-            // BUG: if a C function pointer can be misaligned such that it
-            // looks to satisfy functionp() then we do the wrong thing.
-            is_lisp_pointer(handler.lisp)) {
-            if (compacting_p())
-                scavenge((lispobj *)(interrupt_handlers + i), 1);
-            else
-                gc_mark_obj(handler.lisp);
-        }
-    }
+    /* Scavenge the Lisp functions of the interrupt handlers */
+    scavenge(lisp_sig_handlers, NSIG);
+
     /* Scavenge the binding stacks. */
     {
         struct thread *th;
@@ -4471,10 +4459,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     {
         int i;
         for (i=0; i<NSIG; ++i)
-            // BUG: if a C function pointer can be misaligned such that it
-            // looks to satisfy functionp() then we do the wrong thing.
-            if (functionp(interrupt_handlers[i].lisp))
-                interrupt_handlers[i].lisp = 0;
+            lisp_sig_handlers[i] = 0;
     }
 #endif
 

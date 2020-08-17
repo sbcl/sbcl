@@ -667,9 +667,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" handlers");
     fflush(stdout);
 #endif
-    pscav((lispobj *) interrupt_handlers,
-          sizeof(interrupt_handlers) / sizeof(lispobj),
-          0);
+    pscav(lisp_sig_handlers, NSIG, 0);
 
 #ifdef PRINTNOISE
     printf(" stack");
