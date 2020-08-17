@@ -136,8 +136,8 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGILL, sigill_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGILL, sigill_handler);
 }
 
 

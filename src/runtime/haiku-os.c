@@ -79,10 +79,9 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 os_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGSEGV, sigsegv_handler);
+    ll_install_handler(SIGSEGV, sigsegv_handler);
 #ifdef LISP_FEATURE_SB_THREAD
-    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
-                                                 sig_stop_for_gc_handler);
+    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
 #endif
 }
 

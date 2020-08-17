@@ -319,8 +319,8 @@ arch_install_interrupt_handlers()
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
 #if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-    undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGILL , sigill_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 #endif
     SHOW("returning from arch_install_interrupt_handlers()");
 }

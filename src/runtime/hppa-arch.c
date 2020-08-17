@@ -357,13 +357,13 @@ ignore_handler(int signal, siginfo_t *siginfo, os_context_t *context)
  * bypass the lisp interrupt handlers */
 void arch_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGILL,sigill_handler);
-    undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);
+    ll_install_handler(SIGTRAP,sigtrap_handler);
+    ll_install_handler(SIGILL,sigill_handler);
+    ll_install_handler(SIGFPE,sigfpe_handler);
     /* FIXME: beyond 2.4.19-pa4 this shouldn't be necessary. */
-    undoably_install_low_level_interrupt_handler(SIGBUS,sigbus_handler);
+    ll_install_handler(SIGBUS,sigbus_handler);
 #ifdef LISP_FEATURE_HPUX
-    undoably_install_low_level_interrupt_handler(SIGXCPU,ignore_handler);
-    undoably_install_low_level_interrupt_handler(SIGXFSZ,ignore_handler);
+    ll_install_handler(SIGXCPU,ignore_handler);
+    ll_install_handler(SIGXFSZ,ignore_handler);
 #endif
 }

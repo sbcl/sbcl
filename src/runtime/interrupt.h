@@ -122,9 +122,7 @@ extern void do_pending_interrupt(void);
 extern void sig_stop_for_gc_handler(int, siginfo_t*, os_context_t*);
 #endif
 typedef void (*interrupt_handler_t)(int, siginfo_t *, os_context_t *);
-extern void undoably_install_low_level_interrupt_handler (
-                        int signal,
-                        interrupt_handler_t handler);
+extern void ll_install_handler(int signal, interrupt_handler_t handler);
 extern void install_handler(int signal, lispobj handler, int synchronous);
 
 /* The void* casting here avoids having to mess with the various types

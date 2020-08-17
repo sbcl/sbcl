@@ -425,7 +425,7 @@ arch_set_fp_control(unsigned int fp)
 void
 arch_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
+    ll_install_handler(SIGTRAP,sigtrap_handler);
 }
 
 // Calls into C are mediated by the handwritten call_into_c routine

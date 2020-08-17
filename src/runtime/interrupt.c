@@ -1812,7 +1812,7 @@ extern void restore_sbcl_signals () {
     for (signal = 0; signal < NSIG; signal++) {
         interrupt_handler_t handler = interrupt_low_level_handlers[signal];
         if (handler) {
-            undoably_install_low_level_interrupt_handler(signal, handler);
+            ll_install_handler(signal, handler);
         }
     }
 }
@@ -1912,7 +1912,7 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 }
 
 void
-undoably_install_low_level_interrupt_handler (int signal,
+ll_install_handler (int signal,
                                               interrupt_handler_t handler)
 {
     struct sigaction sa;
@@ -2036,7 +2036,7 @@ interrupt_init(void)
     for (i = 0; i < NSIG; i++) {
         lisp_sig_handlers[i] = NIL;
     }
-    undoably_install_low_level_interrupt_handler(SIGABRT, sigabrt_handler);
+    ll_install_handler(SIGABRT, sigabrt_handler);
 #endif
     SHOW("returning from interrupt_init()");
 }

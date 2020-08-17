@@ -110,19 +110,17 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 os_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-                                                 sigsegv_handler);
+    ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
 
     /* OAOOM c.f. linux-os.c.
      * Should we have a reusable function gc_install_interrupt_handlers? */
 #ifdef LISP_FEATURE_SB_THREAD
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 #  ifdef LISP_FEATURE_SB_THRUPTION
-    undoably_install_low_level_interrupt_handler(SIGPIPE, thruption_handler);
+    ll_install_handler(SIGPIPE, thruption_handler);
 #  endif
 # else
-    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
-                                                 sig_stop_for_gc_handler);
+    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
 # endif
 #endif
 }

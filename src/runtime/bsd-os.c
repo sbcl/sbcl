@@ -280,10 +280,9 @@ os_install_interrupt_handlers(void)
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-                                                 mach_error_memory_fault_handler);
+    ll_install_handler(SIG_MEMORY_FAULT, mach_error_memory_fault_handler);
 #else
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+    ll_install_handler(SIG_MEMORY_FAULT,
 #if defined(LISP_FEATURE_FREEBSD) && !defined(__GLIBC__)
                                                  (__siginfohandler_t *)
 #endif
@@ -294,11 +293,10 @@ os_install_interrupt_handlers(void)
 #ifdef LISP_FEATURE_SB_THREAD
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 #  ifdef LISP_FEATURE_SB_THRUPTION
-    undoably_install_low_level_interrupt_handler(SIGPIPE, thruption_handler);
+    ll_install_handler(SIGPIPE, thruption_handler);
 #  endif
 # else
-    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
-                                                 sig_stop_for_gc_handler);
+    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
 # endif
 #endif
 
@@ -308,7 +306,7 @@ os_install_interrupt_handlers(void)
     fprintf(stderr, "SIGXCPU (%d), will backtrace in all threads\n", SIGXCPU);
     sigdelset(&deferrable_sigset, SIGXCPU);
     sigdelset(&blockable_sigset, SIGXCPU);
-    undoably_install_low_level_interrupt_handler(SIGXCPU, backtrace_lisp_threads);
+    ll_install_handler(SIGXCPU, backtrace_lisp_threads);
     sigset_t ss;
     sigemptyset(&ss);
     sigaddset(&ss, SIGXCPU);
@@ -335,8 +333,7 @@ void
 os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-                                                 sigsegv_handler);
+    ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
 }
 
 #endif /* defined GENCGC */
