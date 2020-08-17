@@ -1993,14 +1993,7 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
-    sigset_t old;
 
-    FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
-
-    block_blockable_signals(&old);
-
-    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%p\n",
-           interrupt_low_level_handlers[signal]));
     if (interrupt_low_level_handlers[signal]==0) {
         if (handler == 0)
             sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))SIG_DFL;
@@ -2044,10 +2037,6 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
         VECTOR(ohandler)->data[0] = (functionp(obj)||fixnump(obj)) ? obj : NIL;
 
     interrupt_handlers[signal].c = handler;
-
-    thread_sigmask(SIG_SETMASK, &old, 0);
-
-    FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 
     // After the thread's signal mask is restored to the mask in 'old',
     // it is not possible to GC-safely refer to a Lisp function from C code,

@@ -44,13 +44,35 @@
     nil))
 
 
-;;;; C routines that actually do all the work of establishing signal handlers
-(define-alien-routine ("install_handler" install-handler)
+;;;; This is merely a thin veneer on sigaction() for signal handled by lisp.
+;;;; Handlers that stay in C are installed in a slightly different way.
+(define-alien-routine ("install_handler" %sigaction)
   unsigned-long
   (signal int)
   (handler unsigned-long)
   (ohandler unsigned-long)
   (synchronous boolean))
+
+;;; Block signals while installing a signal handler. This is probably overly
+;;; paranoid, and we only need to block the signal being affected and the GC signal;
+;;; the former so there is no ambiguity as to which handler is invoked if that
+;;; signal arrives while changing the handler; the latter so that returning a lisp
+;;; function pointer from C is GC-safe (in case the only reference to a lisp function
+;;; is in the interrupt_handlers array) though even that seems unnecessary now
+;;; at least with conservative GC.
+;;; This is probably ok with #+sb-safepoint only on conservative GC.
+;;; Maye it should use WITHOUT-GCING in that case?
+(defmacro with-blockables-masked (&body body)
+  `(with-alien ((old (array char #.sb-unix::sizeof-sigset_t)))
+     #+sb-thread
+     (with-pinned-objects (old)
+       (let ((sap (sb-alien:alien-sap old)))
+         (alien-funcall (extern-alien "block_blockable_signals"
+                                      (function void system-area-pointer))
+                        sap)
+         (prog1 (progn ,@body)
+           #+sb-thread
+           (sb-thread::pthread-sigmask sb-unix::SIG_SETMASK sap nil))))))
 
 ;;;; interface to enabling and disabling signal handlers
 
@@ -70,20 +92,21 @@
 ;;; FIXME: terrible name. doesn't actually "enable" in the sense of unmasking.
 (defun enable-interrupt (signal handler &key synchronous)
   (declare (type (or function fixnum (member :default :ignore)) handler))
-  (/show0 "enable-interrupt")
-  (flet ((run-handler (&rest args)
-           (declare (truly-dynamic-extent args))
+  (with-blockables-masked (%install-handler signal handler synchronous)))
+
+(defun %install-handler (signal handler synchronous)
+  (flet ((run-handler (signo info-sap context-sap)
            #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
            (unblock-gc-signals)
            (in-interruption ()
-             (apply handler args))))
+             (funcall handler signo info-sap context-sap))))
     (dx-let ((ohandler (make-array 1 :initial-element nil)))
       ;; Pin OHANDLER in case the backend heap-allocates it
       (with-pinned-objects (#'run-handler ohandler)
         ;; 0 and 1 probably coincide with SIG_DFL and SIG_IGN, but those
         ;; constants are opaque. We use our own explicit translation
         ;; of them in the C install_handler() argument and return convention.
-        (let ((result (install-handler
+        (let ((result (%sigaction
                        signal
                        (case handler
                          (:default 0)
@@ -216,24 +239,22 @@
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
-  (enable-interrupt sigint #'sigint-handler)
-  (enable-interrupt sigterm #'sigterm-handler)
-  (enable-interrupt sigill #'sigill-handler :synchronous t)
-  #-(or linux android haiku)
-  (enable-interrupt sigemt #'sigemt-handler)
-  (enable-interrupt sigfpe #'sb-vm:sigfpe-handler :synchronous t)
-  (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
-      (enable-interrupt sigbus #'sigbus-handler :synchronous t)
-      (write-string ";;;; SIGBUS handler not installed
+  (with-blockables-masked
+    (%install-handler sigint #'sigint-handler nil)
+    (%install-handler sigterm #'sigterm-handler nil)
+    (%install-handler sigill #'sigill-handler t)
+    #-(or linux android haiku) (%install-handler sigemt #'sigemt-handler nil)
+    (%install-handler sigfpe #'sb-vm:sigfpe-handler t)
+    (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
+        (%install-handler sigbus #'sigbus-handler t)
+        (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
-  #-(or linux android)
-  (enable-interrupt sigsys #'sigsys-handler :synchronous t)
-  #-sb-wtimer
-  (enable-interrupt sigalrm #'sigalrm-handler)
-  #-sb-thruption
-  (enable-interrupt sigpipe #'sigpipe-handler)
-  (enable-interrupt sigchld #'sigchld-handler)
+    #-(or linux android) (%install-handler sigsys #'sigsys-handler t)
+    #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler nil)
+    #-sb-thruption (%install-handler sigpipe #'sigpipe-handler nil)
+    (%install-handler sigchld #'sigchld-handler nil))
   #-sb-safepoint (unblock-gc-signals)
+  ;; I don't see why deferrables would have ben blocked. This is essentially a no-op.
   (unblock-deferrable-signals)
   (values))
 
