@@ -1665,7 +1665,7 @@ struct {
     boolean in_progress;
 } ttyinput = {.lock = PTHREAD_MUTEX_INITIALIZER};
 
-static void*
+static unsigned long
 tty_read_line_server()
 {
     pthread_mutex_lock(&ttyinput.lock);
