@@ -31,10 +31,10 @@
 #define ENABLE_PAGE_PROTECTION 1
 #endif
 
-#ifdef LISP_FEATURE_CHENEYGC
+#if defined LISP_FEATURE_CHENEYGC || defined LISP_FEATURE_SB_SAFEPOINT
+// safepoint traps always require a signal handler
 #define INSTALL_SIG_MEMORY_FAULT_HANDLER 1
-#endif
-#ifdef LISP_FEATURE_GENCGC
+#elif defined LISP_FEATURE_GENCGC
 #define INSTALL_SIG_MEMORY_FAULT_HANDLER ENABLE_PAGE_PROTECTION
 #endif
 
