@@ -64,8 +64,8 @@
 ;;; Maye it should use WITHOUT-GCING in that case?
 (defmacro with-blockables-masked (&body body)
   #-sb-thread
-  (progn
-    ,@body)
+  `(progn
+     ,@body)
   #+sb-thread
   `(with-alien ((old (array char #.sb-unix::sizeof-sigset_t)))
      (with-pinned-objects (old)
