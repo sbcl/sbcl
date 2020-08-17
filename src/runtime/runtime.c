@@ -73,27 +73,6 @@ extern void *return_from_lisp_stub;
 #include "genesis/closure.h"
 #include "genesis/simple-fun.h"
 #endif
-
-
-/* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
-static void
-sigint_handler(int __attribute__((unused)) signal,
-               siginfo_t __attribute__((unused)) *info,
-               os_context_t *context)
-{
-    lose("\nSIGINT hit at 0x%08lX",
-         (unsigned long) *os_context_pc_addr(context));
-}
-
-/* (This is not static, because we want to be able to call it from
- * Lisp land.) */
-void
-sigint_init(void)
-{
-    SHOW("entering sigint_init()");
-    install_handler(SIGINT, sigint_handler, 0, 1);
-    SHOW("leaving sigint_init()");
-}
 
 /*
  * helper functions for dealing with command line args

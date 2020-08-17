@@ -510,13 +510,21 @@ catchers_cmd(char __attribute__((unused)) **ptr)
     return 0;
 }
 
+/* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
+static void
+sigint_handler(int __attribute__((unused)) signal,
+               siginfo_t __attribute__((unused)) *info,
+               os_context_t *context)
+{
+    lose("\nSIGINT hit at 0x%08lX",
+         (unsigned long) *os_context_pc_addr(context));
+}
+
 static int
 grab_sigs_cmd(char __attribute__((unused)) **ptr)
 {
-    extern void sigint_init(void);
-
-    printf("Grabbing signals.\n");
-    sigint_init();
+    printf("Grabbing SIGINT.\n");
+    install_handler(SIGINT, sigint_handler, 0, 1);
     return 0;
 }
 
