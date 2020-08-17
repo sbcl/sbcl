@@ -57,6 +57,7 @@
 #ifdef LISP_FEATURE_SUNOS
 #include <thread.h>
 #endif
+#endif
 
 int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads
 // exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
@@ -1018,7 +1019,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->stepping = 0;
     return th;
 }
-
+#ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_WIN32
 /* Allocate a thread structure, call CreateThread(),
  * and return 1 for success, 0 for failure */

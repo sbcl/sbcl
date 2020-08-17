@@ -63,15 +63,17 @@
 ;;; This is probably ok with #+sb-safepoint only on conservative GC.
 ;;; Maye it should use WITHOUT-GCING in that case?
 (defmacro with-blockables-masked (&body body)
+  #-sb-thread
+  (progn
+    ,@body)
+  #+sb-thread
   `(with-alien ((old (array char #.sb-unix::sizeof-sigset_t)))
-     #+sb-thread
      (with-pinned-objects (old)
        (let ((sap (sb-alien:alien-sap old)))
          (alien-funcall (extern-alien "block_blockable_signals"
                                       (function void system-area-pointer))
                         sap)
          (prog1 (progn ,@body)
-           #+sb-thread
            (sb-thread::pthread-sigmask sb-unix::SIG_SETMASK sap nil))))))
 
 ;;;; interface to enabling and disabling signal handlers
