@@ -357,11 +357,7 @@
                   "MAKE-LOAD-FORM"
                   "PROCLAIM"
                   "SIMPLE-VECTOR"
-                  "TYPE-OF" "TYPEP"
-
-                  "DEFCLASS"
-                  "DEFGENERIC"
-                  "DEFMETHOD"
+                  "TYPEP"
                   ))
       (export (intern name package-name) package-name)))
 
