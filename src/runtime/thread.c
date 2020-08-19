@@ -496,12 +496,14 @@ void* new_thread_trampoline(void* arg)
     // It seems to subvert the "&" and "*" operators in a way that only it understands,
     // while the stack pointer register is unperturbed.
     // (gencgc takes '&raise' for the current thread, but it disables the sanitizers)
-    // Additionally, if we've switched stacks (because OS_THREAD_STACK is defined)
-    // then '&arg' seems not to be ok either. I'm not sure why, because the change
-    // of stack was already done. FIXME: find out what's going on there.
+    //
+    // A stop-for-GC signal that hits after init_new_thread() releases the all_threads lock
+    // and returns control here needs to see in the interrupt context a stack pointer
+    // strictly below the computed th->control_stack_end. So make sure the value we pick
+    // is strictly above any value of SP that the interrupt context could have.
 #if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER \
-    && !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_SB_SAFEPOINT
-    th->control_stack_end = (lispobj*)&arg;
+    && !defined LISP_FEATURE_SB_SAFEPOINT
+    th->control_stack_end = (lispobj*)&arg + 1;
 #endif
     th->os_kernel_tid = sb_GetTID();
     init_new_thread(th, SCRIBBLE, 0, 0);
