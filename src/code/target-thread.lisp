@@ -1460,9 +1460,22 @@ on this semaphore, then N of them is woken up."
          (delete-from-all-threads (get-lisp-obj-address c-thread))))
       (when sem
         (setf (thread-semaphore thread) nil) ; nobody needs to wait on it now
-        ;; We could increment by most-positive-fixnum, but that might just encourage
-        ;; bad usage (more than one attempted joiner)
-        (signal-semaphore sem)))))
+        ;;
+        ;; We go out of our way to support something pthreads don't:
+        ;;  "The results of multiple simultaneous calls to pthread_join()
+        ;;   specifying the same target thread are undefined."
+        ;;   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html
+        ;; and for std::thread
+        ;;   "No synchronization is performed on *this itself. Concurrently calling join()
+        ;;    on the same thread object from multiple threads constitutes a data race
+        ;;    that results in undefined behavior."
+        ;;   - https://en.cppreference.com/w/cpp/thread/thread/join
+        ;; That's because (among other reasons), pthread_join deallocates memory.
+        ;; But in so far as our join does not equate to resource freeing, and our exit flag is
+        ;; our own kind of semaphore, we simply signal it using an arbitrarily huge count.
+        ;; See the comment in 'thread-structs.lisp' about why this isn't CONDITION-BROADCAST
+        ;; on a condition var. (Good luck trying to make this many threads)
+        (signal-semaphore sem 1000000)))))
 
 ;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
 ;;; expect normal happy lisp integers, even if a bignum.
@@ -2082,8 +2095,10 @@ Trying to join the main thread causes JOIN-THREAD to block until
 TIMEOUT occurs or the process exits: when the main thread exits, the
 entire process exits.
 
-Consequences of trying to join a given target thread from multiple
-threads are undefined.
+Users should not rely on the ability to join a chosen THREAD from more
+than one other thread simultaneously. Future changes to JOIN-THREAD may
+directly call the underlying thread library, and not all threading
+implementations consider such usage to be well-defined.
 
 NOTE: Return convention in case of a timeout is experimental and
 subject to change."
@@ -2097,14 +2112,27 @@ subject to change."
     (without-interrupts (join-pthread-joinables #'cddr)))
   ;; No result semaphore indicates that there's nothing to wait for-
   ;; the thread is either a foreign-thread, or finished running.
-  (let ((problem
-         (acond ((thread-semaphore thread)
-                 (if (wait-on-semaphore it :timeout timeout) nil :timeout))
+  (let* ((semaphore (thread-semaphore thread))
+         (problem
+          (cond (semaphore
+                 (if (wait-on-semaphore semaphore :timeout timeout) nil :timeout))
                 ((typep thread 'foreign-thread) :foreign))))
     (unless problem
-      (if (listp (thread-result thread))
-          (return-from join-thread (values-list (thread-result thread)))
-          (setq problem :abort)))
+      (cond ((listp (thread-result thread))
+             ;; Implementation note, were this to become a native pthread semaphore-
+             ;; we would need a sem_post() here to support concurrent join of THREAD
+             ;; from N>1 other threads, because the hypothetical sem_post() in HANDLE-THREAD-EXIT
+             ;; will only bump the count up by 1, and so at most 1 waiter would execute.
+             ;; [Alternatively - still hypothetically - HANDLE-THREAD-EXIT could sem_post()
+             ;; as many times as there are currently running threads, which seems iffy]
+             ;; And though it's potentially poor style to wait on a chosen thread from N>1 other
+             ;; threads, it happens, and users might rely on it, though POSIX specifically
+             ;; precludes that in the spec of pthread_join() which this isn't exactly.
+             ;; Also for what it's worth, the win32 WaitOnSingleObject and GetExitCodeThread
+             ;; APIs have no such prohibition as long as the object handle remains valid.
+             (return-from join-thread (values-list (thread-result thread))))
+            (t
+             (setq problem :abort))))
     (if defaultp
         (values default problem)
         (error 'join-thread-error :thread thread :problem problem))))

@@ -1,5 +1,19 @@
 #+(or (not sb-thread) win32) (sb-ext:exit :code 104)
 
+;;; Not an exactly an "exit hang" test, but there was a different hang
+;;; regarding concurrent JOIN-THREAD on 1 thread.
+;;; Even though POSIX threads would consider this to be undefined behavior with
+;;; its thread abstraction, it's not undefined behavior in SBCL (for now)
+;;; though I do think it's slightly suspicious to depend on this.
+(with-test (:name :concurrent-join-thread)
+  (let* ((other-guy (sb-thread:make-thread #'sleep :arguments .2 :name "sleepyhead"))
+         (joiners
+          (loop repeat 4
+                collect (sb-thread:make-thread #'sb-thread:join-thread
+                                               :arguments other-guy))))
+    ;; The joiners should all return
+    (mapc 'sb-thread:join-thread joiners)))
+
 ;;; This uses the same C source file as fcb-threads.
 ;;; This is OK in the parallel test runner because WITH-SCRATCH-FILE
 ;;; includes the PID in the temp file name.

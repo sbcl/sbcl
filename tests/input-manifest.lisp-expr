@@ -1,3 +1,6 @@
+;;; This comment might make sourceforge stop thinking that the file
+;;; is binary its diff view.
+;;; Or not.
 (("aprof.impure.lisp"
   "src/code/aprof.lisp"
   "src/code/shaketree.lisp")
@@ -38,6 +41,7 @@
  ("debug.impure.lisp" "tests/bug-414.lisp")
  ("defstruct.impure-cload.lisp" "tests/block-compile-defstruct-test.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
+ ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
