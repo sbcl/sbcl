@@ -1686,9 +1686,8 @@ static void fixup_space(lispobj* where, size_t n_words)
               if (needs_rehash)
                   KV_PAIRS_REHASH(data) |= make_fixnum(1);
               break;
-          } else {
-            // FALLTHROUGH_INTENDED
           }
+        // INTENTIONAL FALLTHROUGH
         // All the other array header widetags.
         case SIMPLE_ARRAY_WIDETAG:
 #ifdef COMPLEX_CHARACTER_STRING_WIDETAG
