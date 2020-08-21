@@ -195,6 +195,13 @@ int sb_GetTID() { return syscall(SYS_gettid); }
 #define sb_GetTID() 0
 #endif
 
+static int get_nonzero_tid()
+{
+    int tid = sb_GetTID();
+    gc_dcheck(tid != 0);
+    return tid;
+}
+
 // Only a single 'attributes' object is used if #+pauseless-threadstart.
 // This is ok because creation is synchronized by *MAKE-THREAD-LOCK*.
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_WIN32
@@ -250,7 +257,7 @@ void create_main_lisp_thread(lispobj function) {
     unblock_gc_signals();
 #endif
     link_thread(th);
-    th->os_kernel_tid = sb_GetTID();
+    th->os_kernel_tid = get_nonzero_tid();
     th->os_thread = thread_self();
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, NULL);
@@ -505,7 +512,7 @@ void* new_thread_trampoline(void* arg)
     && !defined LISP_FEATURE_SB_SAFEPOINT
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
-    th->os_kernel_tid = sb_GetTID();
+    th->os_kernel_tid = get_nonzero_tid();
     init_new_thread(th, SCRIBBLE, 0, 0);
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
@@ -517,7 +524,7 @@ void* new_thread_trampoline(void* arg)
 
 #else // !PAUSELESS_THREADSTART
 
-    th->os_kernel_tid = sb_GetTID();
+    th->os_kernel_tid = get_nonzero_tid();
     init_thread_data scribble;
 
     FSHOW((stderr,"/creating thread %p\n", thread_self()));
@@ -612,7 +619,7 @@ attach_os_thread(init_thread_data *scribble)
     unblock_gc_signals();
 #endif
 
-    th->os_kernel_tid = sb_GetTID();
+    th->os_kernel_tid = get_nonzero_tid();
     th->os_thread = pthread_self();
 
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)

@@ -23,7 +23,7 @@
           with-session-lock
           with-spinlock))
 
-#+linux
+#+(or linux win32)
 (defmacro my-kernel-thread-id ()
   `(sb-ext:truly-the
     (unsigned-byte 32)
@@ -469,7 +469,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 (setf (documentation 'make-mutex 'function) "Create a mutex."
       (documentation 'mutex-name 'function) "The name of the mutex. Setfable.")
 
-#+(and sb-thread sb-futex)
+#+sb-futex
 (progn
   (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
     ;; """ (Futexes are 32 bits in size on all platforms, including 64-bit systems.) """
@@ -673,7 +673,7 @@ returns NIL each time."
 
 (defun %try-mutex (mutex new-owner)
   (declare (type mutex mutex) (optimize (speed 3)))
-  #-(and sb-thread sb-futex)
+  #-sb-futex
   (progn
     (barrier (:read))
     (let ((old (mutex-%owner mutex)))
@@ -686,7 +686,7 @@ returns NIL each time."
       (and (not old)
            ;; Don't even bother to try to CAS if it looks bad.
            (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))
-  #+(and sb-thread sb-futex)
+  #+sb-futex
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
     (cond ((eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
                                                     +lock-free+
@@ -706,8 +706,7 @@ returns NIL each time."
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-  #-sb-futex
-  (declare (ignore to-sec to-usec))
+  (declare (ignorable to-sec to-usec))
   #-sb-futex
   (flet ((cas ()
            (loop repeat 100
@@ -862,7 +861,7 @@ IF-NOT-OWNER is :FORCE)."
       ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
       ;; barrier instead?
       (barrier (:memory)))
-    #+(and sb-thread sb-futex)
+    #+sb-futex
     (when old-owner
       ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
       ;; unsigned-byte type this can be used:
@@ -938,7 +937,7 @@ IF-NOT-OWNER is :FORCE)."
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
-#+(and sb-thread sb-futex)
+#+sb-futex
 (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (define-structure-slot-addressor waitqueue-token-address
       :structure waitqueue
@@ -978,11 +977,8 @@ IF-NOT-OWNER is :FORCE)."
                                (%%wait-for #'wakeup stop-sec stop-usec)))
                            :timeout)))
                #+sb-futex
-               (with-pinned-objects (queue
-                                     ;; No point in pinning ME if not taking the adddress.
-                                     #-futex-use-tid me)
-                 (setf (waitqueue-token queue) #+futex-use-tid (my-kernel-thread-id)
-                                               #-futex-use-tid me)
+               (with-pinned-objects (queue)
+                 (setf (waitqueue-token queue) (my-kernel-thread-id))
                  (release-mutex mutex)
                  ;; Now we go to sleep using futex-wait. If anyone else
                  ;; manages to grab MUTEX and call CONDITION-NOTIFY during
@@ -992,8 +988,7 @@ IF-NOT-OWNER is :FORCE)."
                  (setf status
                        (case (allow-with-interrupts
                                (futex-wait (waitqueue-token-address queue)
-                                           #+futex-use-tid (my-kernel-thread-id)
-                                           #-futex-use-tid (get-lisp-obj-address me)
+                                           (my-kernel-thread-id)
                                            ;; our way of saying "no
                                            ;; timeout":
                                            (or to-sec -1)
@@ -1127,15 +1122,13 @@ must be held by this thread during this call."
     (progn
       ;; No problem if >1 thread notifies during the comment in condition-wait:
       ;; as long as the value in queue-data isn't the waiting thread's id, it
-      ;; matters not what it is -- using the queue object itself is handy.
-      ;; But "handy" is not right (lp#1876825) if pointers are 64 bits,
-      ;; so then just use 0 which can not correspond to any thread.
+      ;; matters not what it is. We rely on kernel thread ID being nonzero.
       ;;
       ;; XXX we should do something to ensure that the result of this setf
       ;; is visible to all CPUs.
       ;;
       ;; ^-- surely futex_wake() involves a memory barrier?
-      (setf (waitqueue-token queue) #+futex-use-tid 0 #-futex-use-tid queue)
+      (setf (waitqueue-token queue) 0)
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n))
       nil)))

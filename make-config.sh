@@ -504,14 +504,8 @@ case "$sbcl_os" in
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
         case "$sbcl_arch" in
-	    mips | arm)
+	    mips | arm | x86 | x86-64)
 		printf ' :largefile' >> $ltf
-		;;
-            x86 | x86-64)
-		printf ' :sb-futex :largefile' >> $ltf
-		;;
-            ppc | ppc64 | arm64 | riscv)
-		printf ' :sb-futex' >> $ltf
 		;;
         esac
 
@@ -594,7 +588,6 @@ case "$sbcl_os" in
         # Optional features -- We enable them by default, but the build
         # ought to work perfectly without them:
         #
-        printf ' :sb-futex' >> $ltf
         printf ' :sb-qshow' >> $ltf
         #
         # Required features -- Some of these used to be optional, but

@@ -18,9 +18,7 @@
 (sb-xc:defstruct (mutex (:constructor make-mutex (&key name))
                         (:copier nil))
   "Mutex type."
-  ;; C code could (but doesn't currently) access the name
-  #+(and sb-thread sb-futex)
-  (state    0 :type fixnum)
+  #+sb-futex (state 0 :type fixnum)
   ;; If adding slots between STATE and NAME, please see futex_name() in linux_os.c
   ;; which attempts to divine a string from a futex word address.
   (name   nil :type (or null simple-string))
@@ -29,11 +27,9 @@
 #+(or (not sb-thread) sb-futex)
 (sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
-  #+(and sb-thread sb-futex)
-  (token 0
-         ;; actually 32-bits, but it needs to be a raw slot and we don't have
-         ;; 32-bit raw slots on 64-bit machines.
-         #+futex-use-tid :type #+futex-use-tid sb-ext:word)
+  ;; futex words are actually 32-bits, but it needs to be a raw slot and we don't have
+  ;; 32-bit raw slots on 64-bit machines.
+  #+sb-futex (token 0 :type sb-ext:word)
   ;; If adding slots between TOKEN and NAME, please see futex_name() in linux_os.c
   ;; which attempts to divine a string from a futex word address.
   (name nil :type (or null string)))
