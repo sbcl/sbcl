@@ -206,15 +206,14 @@ a simple-string (not necessarily unique) or NIL.")
               state
               values))))
 
-(defun print-lock (lock name owner stream)
-  (let ((*print-circle* t))
-    (print-unreadable-object (lock stream :type t :identity (not name))
+(defmethod print-object ((mutex mutex) stream)
+  (let ((name (mutex-name mutex))
+        (owner (mutex-owner mutex))
+        (*print-circle* t))
+    (print-unreadable-object (mutex stream :type t :identity (not name))
       (if owner
           (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
           (format stream "~@[~S ~](free)" name)))))
-
-(defmethod print-object ((mutex mutex) stream)
-  (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
 
 ;; NB: ephemeral threads must terminate strictly before the test of NTHREADS>1
 ;; in DEINIT, i.e. this is not a promise that the thread will terminate
@@ -484,15 +483,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (defconstant +lock-free+ 0)
   (defconstant +lock-taken+ 1)
   (defconstant +lock-contested+ 2))
-
-(defun mutex-owner (mutex)
-  "Current owner of the mutex, NIL if the mutex is free. Naturally,
-this is racy by design (another thread may acquire the mutex after
-this function returns), it is intended for informative purposes. For
-testing whether the current thread is holding a mutex see
-HOLDING-MUTEX-P."
-  ;; Make sure to get the current value.
-  (sb-ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
 

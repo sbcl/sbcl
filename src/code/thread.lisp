@@ -31,11 +31,22 @@ any time."
 stale value, use MUTEX-OWNER instead."
   (mutex-%owner mutex))
 
+(declaim (inline holding-mutex-p))
 (defun holding-mutex-p (mutex)
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
   (eq sb-thread:*current-thread* (mutex-%owner mutex)))
+
+(declaim (inline mutex-owner))
+(defun mutex-owner (mutex)
+  "Current owner of the mutex, NIL if the mutex is free. Naturally,
+this is racy by design (another thread may acquire the mutex after
+this function returns), it is intended for informative purposes. For
+testing whether the current thread is holding a mutex see
+HOLDING-MUTEX-P."
+  ;; Make sure to get the current value.
+  (sb-ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
 (defsetf mutex-value set-mutex-value)
 
@@ -231,13 +242,13 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (defun call-with-recursive-lock (function mutex waitp timeout)
     (declare (function function))
     (declare (dynamic-extent function))
-    (let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
+    (let ((had-it (holding-mutex-p mutex))
           (got-it nil))
       (without-interrupts
         (unwind-protect
-             (when (or inner-lock-p (setf got-it (allow-with-interrupts
-                                                   (grab-mutex mutex :waitp waitp
-                                                                     :timeout timeout))))
+             (when (or had-it
+                       (setf got-it (allow-with-interrupts
+                                     (grab-mutex mutex :waitp waitp :timeout timeout))))
                (with-local-interrupts (funcall function)))
           (when got-it
             (release-mutex mutex))))))
@@ -246,11 +257,10 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
     (declare (function function))
     (declare (dynamic-extent function))
     (without-interrupts
-      (let ((inner-lock-p (eq *current-thread* (mutex-owner lock)))
+      (let ((had-it (holding-mutex-p lock))
             (got-it nil))
         (unwind-protect
-             (when (or inner-lock-p
-                       (setf got-it (grab-mutex lock)))
+             (when (or had-it (setf got-it (grab-mutex lock)))
                (funcall function))
           (when got-it
             (release-mutex lock)))))))

@@ -2403,8 +2403,7 @@ bootstrapping.
     (cond
       ((eq **boot-state** 'complete)
        ;; Check that we are under the lock.
-       #+sb-thread
-       (aver (eq sb-thread:*current-thread* (sb-thread:mutex-owner (gf-lock gf))))
+       #+sb-thread (aver (sb-thread:holding-mutex-p (gf-lock gf)))
        (setf (safe-gf-dfun-state gf) new-state))
       (t
        (setf (clos-slots-ref (get-slots gf) +sgf-dfun-state-index+)
