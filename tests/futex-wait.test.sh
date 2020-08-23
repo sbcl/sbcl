@@ -2,8 +2,6 @@
 
 . ./subr.sh
 
-set -e
-
 run_sbcl --noinform <<EOF
   #+(and linux sb-thread) (exit :code 0) ; good
  (exit :code 1) ; otherwise
@@ -13,6 +11,8 @@ if [ $status != 0 ]; then # test can't be executed
     # we don't have a way to exit shell tests with "inapplicable" as the result
     exit $EXIT_TEST_WIN
 fi
+
+set -e
 
 tracelog=$TEST_FILESTEM.out
 
