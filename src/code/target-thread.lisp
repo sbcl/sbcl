@@ -477,12 +477,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     (define-structure-slot-addressor mutex-state-address
         :structure mutex
         :slot state
-        :byte-offset (+ #+(and 64-bit big-endian) 4)))
-  ;; Important: current code assumes these are fixnums or other
-  ;; lisp objects that don't need pinning.
-  (defconstant +lock-free+ 0)
-  (defconstant +lock-taken+ 1)
-  (defconstant +lock-contested+ 2))
+        :byte-offset (+ #+(and 64-bit big-endian) 4))))
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
 
@@ -678,17 +673,9 @@ returns NIL each time."
            (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))
   #+sb-futex
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-    (cond ((eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
-                                                    +lock-free+
-                                                    +lock-taken+))
-           ;; TODO: measure the speed difference of doing an ordinary store here.
-           ;; CAS is overkill but we would have to forgo the bug detection.
-           ;; Alternatively, we could use one double-wide CAS.
-           (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex) nil
-                                                (sb-ext:truly-the thread new-owner))))
-             (when prev
-               (bug "Old owner in free mutex: ~S" prev))
-             t))
+    (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
+           (setf (mutex-%owner mutex) (sb-ext:truly-the thread new-owner))
+           t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
           ((eq (mutex-%owner mutex) new-owner)
            (error "Recursive lock attempt ~S." mutex))))
 
@@ -716,42 +703,42 @@ returns NIL each time."
   #+sb-futex
   ;; This is a fairly direct translation of the Mutex 2 algorithm from
   ;; "Futexes are Tricky" by Ulrich Drepper.
-  (flet ((maybe (old)
-           (when (eql +lock-free+ old)
-             (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex)
-                                                  nil new-owner)))
-               (when prev
-                 (bug "Old owner in free mutex: ~S" prev))
-               (return-from %%wait-for-mutex t)))))
-    (prog ((old (sb-ext:compare-and-swap (mutex-state mutex)
-                                         +lock-free+ +lock-taken+)))
-       ;; Got it right off the bat?
-       (maybe old)
-     :retry
-       ;; Mark it as contested, and sleep. (Exception: it was just released.)
-       (when (or (eql +lock-contested+ old)
-                 (not (eql +lock-free+
-                           (sb-ext:compare-and-swap
-                            (mutex-state mutex) +lock-taken+ +lock-contested+))))
-         (when (eql 1 (with-pinned-objects (mutex)
-                        (futex-wait (mutex-state-address mutex)
-                                    (get-lisp-obj-address +lock-contested+)
-                                    (or to-sec -1)
-                                    (or to-usec 0))))
-           ;; -1 = EWOULDBLOCK, possibly spurious wakeup
-           ;;  0 = normal wakeup
-           ;;  1 = ETIMEDOUT ***DONE***
-           ;;  2 = EINTR, a spurious wakeup
-           (return-from %%wait-for-mutex nil)))
-       ;; Try to get it, still marking it as contested.
-       (maybe
-        (sb-ext:compare-and-swap (mutex-state mutex) +lock-free+ +lock-contested+))
-       ;; Update timeout if necessary.
-       (when stop-sec
-         (setf (values to-sec to-usec)
-               (sb-impl::relative-decoded-times stop-sec stop-usec)))
-       ;; Spin.
-       (go :retry))))
+  ;;
+  ;; void lock () {
+  ;;   int c;
+  ;;   if ((c = cmpxchg(val, 0, 1)) != 0)
+  ;;     do {
+  ;;       if (c == 2 || cmpxchg(val, 1, 2) != 0)
+  ;;         futex_wait(&val, 2);
+  ;;    } while ((c = cmpxchg(val, 0, 2)) != 0);
+  ;; }
+  ;;
+  (symbol-macrolet ((val (mutex-state mutex)))
+    (let ((c (sb-ext:cas val 0 1))) ; available -> taken
+      (unless (= c 0) ; Got it right off the bat?
+        (if (not stop-sec)
+            (loop ; untimed
+              ;; Mark it as contested, and sleep, unless it is now in state 0.
+              (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                (with-pinned-objects (mutex)
+                  (futex-wait (mutex-state-address mutex) 2 -1 0)))
+              ;; Try to get it, still marking it as contested.
+              (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
+            (loop ; same as above but check for timeout
+              (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                (if (eql 1 (with-pinned-objects (mutex)
+                             (futex-wait (mutex-state-address mutex) 2 to-sec to-usec)))
+                    ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                    ;;  0 = normal wakeup
+                    ;;  1 = ETIMEDOUT ***DONE***
+                    ;;  2 = EINTR, a spurious wakeup
+                    (return-from %%wait-for-mutex nil)))
+              (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
+              ;; Update timeout
+              (setf (values to-sec to-usec)
+                    (sb-impl::relative-decoded-times stop-sec stop-usec))))))
+    (setf (mutex-%owner mutex) new-owner)
+    t))
 
 #+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
@@ -853,21 +840,11 @@ IF-NOT-OWNER is :FORCE)."
       (barrier (:memory)))
     #+sb-futex
     (when old-owner
-      ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
-      ;; unsigned-byte type this can be used:
-      ;;
-      ;;     (let ((old (sb-ext:atomic-incf (mutex-state mutex) -1)))
-      ;;       (unless (eql old +lock-free+)
-      ;;         (setf (mutex-state mutex) +lock-free+)
-      ;;         (with-pinned-objects (mutex)
-      ;;           (futex-wake (mutex-state-address mutex) 1))))
-      (let ((old (sb-ext:compare-and-swap (mutex-state mutex)
-                                          +lock-taken+ +lock-free+)))
-        (when (eql old +lock-contested+)
-          (sb-ext:compare-and-swap (mutex-state mutex)
-                                   +lock-contested+ +lock-free+)
-          (with-pinned-objects (mutex)
-            (futex-wake (mutex-state-address mutex) 1))))
+      (unless (eql (sb-ext:atomic-decf (mutex-state mutex) 1) 1)
+        (setf (mutex-state mutex) 0)
+        (sb-thread:barrier (:write)) ; paranoid ?
+        (with-pinned-objects (mutex)
+            (futex-wake (mutex-state-address mutex) 1)))
       nil)))
 
 

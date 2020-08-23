@@ -18,7 +18,7 @@
 (sb-xc:defstruct (mutex (:constructor make-mutex (&key name))
                         (:copier nil))
   "Mutex type."
-  #+sb-futex (state 0 :type fixnum)
+  #+sb-futex (state 0 :type sb-vm:word)
   ;; If adding slots between STATE and NAME, please see futex_name() in linux_os.c
   ;; which attempts to divine a string from a futex word address.
   (name   nil :type (or null simple-string))
