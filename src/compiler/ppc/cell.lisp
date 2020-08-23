@@ -449,6 +449,15 @@
   (:translate %instance-cas)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
+(define-vop (%raw-instance-cas/word %instance-cas)
+  (:args (object)
+         (index)
+         (old-value :scs (unsigned-reg))
+         (new-value :scs (unsigned-reg)))
+  (:arg-types * tagged-num unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:translate %raw-instance-cas/word))
 
 
 ;;;; Code object frobbing.
