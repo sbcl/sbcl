@@ -26,7 +26,7 @@ do
   echo ":$arch" >> $ltf
   # x86-64 is tested as if #+win32
   if [ $arch != "x86-64" ]; then
-    echo ':unix :linux :elf :sb-futex' >> $ltf
+    echo ':unix :linux :elf' >> $ltf
   fi
   cat crossbuild-runner/backends/$arch/features >> $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf

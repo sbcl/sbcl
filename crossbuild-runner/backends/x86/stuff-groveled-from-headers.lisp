@@ -92,6 +92,10 @@
 (defconstant tiocgpgrp 21519) ; #x540f
 
 ;;; signals
+(defconstant sizeof-sigset_t 128) ; #x80
+(defconstant sig_block 0) ; #x0
+(defconstant sig_unblock 1) ; #x1
+(defconstant sig_setmask 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 7) ; #x7
 (defconstant sigchld 17) ; #x11
