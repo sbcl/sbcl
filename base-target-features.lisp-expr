@@ -51,12 +51,6 @@
  ;; our dialect
  :sbcl
 
- ;; Douglas Thomas Crosher's conservative generational GC (the only one
- ;; we currently support for X86).
- ;; :gencgc used to be here; CSR moved it into
- ;; local-target-features.lisp-expr via make-config.sh, as alpha,
- ;; sparc and ppc ports don't currently support it. -- CSR, 2002-02-21
-
  ;;
  ;; features present in this particular build
  ;;

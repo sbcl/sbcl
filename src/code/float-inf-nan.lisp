@@ -98,7 +98,7 @@
 (define-float-inf-or-nan-test float-trapping-nan-p
   "Return true if the float X is a trapping NaN (Not a Number)."
   ;; HPPA (and apparently MIPS) have trapping NaNs (SNaNs) with the
-  ;; trapping-nan-bit SET.  PPC, SPARC, Alpha, and x86 (and presumably
+  ;; trapping-nan-bit SET.  PPC, SPARC, and x86 (and presumably
   ;; x86-64, ARM, and ARM64) have trapping NaNs (SNaNs) with the
   ;; trapping-nan-bit CLEAR.  Note that the given implementation
   ;; considers infinities to be FLOAT-TRAPPING-NAN-P on most

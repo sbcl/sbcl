@@ -624,14 +624,6 @@ cd "$original_dir"
 # (define-feature :c-stack-grows-downwards-not-upwards (features)
 #   (member :x86 features))
 
-# KLUDGE: currently the x86 only works with the generational garbage
-# collector (indicated by the presence of :GENCGC in *FEATURES*) and
-# alpha, sparc and ppc with the stop'n'copy collector (indicated by
-# the absence of :GENCGC in *FEATURES*). This isn't a great
-# separation, but for now, rather than have :GENCGC in
-# base-target-features.lisp-expr, we add it into local-target-features
-# if we're building for x86. -- CSR, 2002-02-21 Then we do something
-# similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 case "$sbcl_arch" in
   x86)
     if [ "$sbcl_os" = "win32" ]; then

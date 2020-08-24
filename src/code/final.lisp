@@ -255,7 +255,7 @@ Examples:
               ;; so always load the vector again before dereferencing.
               (store **finalizer-store**)
               ;; I don't think we need a barrier; this has a data dependency
-              ;; on (CAR CELL) and STORE. (Alpha with threads, anyone?)
+              ;; on (CAR CELL) and STORE.
               (finalizers (svref store id))) ; [1] load
          (setf (svref store id) 0)           ; [2] store
          ;; The ID can be reused right away. Link it into the recycle list,

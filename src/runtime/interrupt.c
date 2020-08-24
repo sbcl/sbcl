@@ -33,10 +33,10 @@
  *   the value from interrupt_low_level_handlers[..], instead of the
  *   ordinary interrupt_handle_now(..) or interrupt_handle_later(..).
  *
- * o the SIGTRAP (Linux/Alpha) which Lisp code uses to handle breakpoints,
+ * o the SIGTRAP which Lisp code may uses to handle breakpoints,
  *   pseudo-atomic sections, and some classes of error (e.g. "function
  *   not defined").  This never goes anywhere near the Lisp handlers at all.
- *   See runtime/alpha-arch.c and code/signal.lisp
+ *   See src/code/signal.lisp
  *
  * - WHN 20000728, dan 20010128 */
 
