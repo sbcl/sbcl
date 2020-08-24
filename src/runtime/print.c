@@ -152,8 +152,6 @@ vodxprint_fun(const char *fmt, va_list args)
 #endif
     int original_errno = errno;
 
-    QSHOW_BLOCK;
-
     char buf[1024];
     int n = 0;
 
@@ -183,8 +181,6 @@ vodxprint_fun(const char *fmt, va_list args)
      * to.  Let's be safe: */
     fflush(stderr);
 #endif
-
-    QSHOW_UNBLOCK;
 
 #ifdef LISP_FEATURE_WIN32
     SetLastError(lastError);

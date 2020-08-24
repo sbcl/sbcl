@@ -80,13 +80,6 @@ void gc_state_unlock();
  * you are a developer and want to affect FSHOW behaviour.
  */
 
-/* Block blockable interrupts for each SHOW, if not 0.
- * (On Windows, this setting has no effect.)
- *
- * In principle, this is a "configuration option", but I am not aware of
- * any reason why or when it would be advantageous to disable it. */
-#define QSHOW_SIGNAL_SAFE 1
-
 /* Enable extra-verbose low-level debugging output for signals? (You
  * probably don't want this unless you're trying to debug very early
  * cold boot on a new machine, or one where you've just messed up
@@ -164,19 +157,6 @@ extern int gencgc_verbose;
 #endif
 
 void dyndebug_init(void);
-
-#if QSHOW_SIGNAL_SAFE == 1 && !defined(LISP_FEATURE_WIN32)
-
-extern sigset_t blockable_sigset;
-
-#define QSHOW_BLOCK                                             \
-        sigset_t oldset;                                        \
-        thread_sigmask(SIG_BLOCK, &blockable_sigset, &oldset)
-#define QSHOW_UNBLOCK thread_sigmask(SIG_SETMASK,&oldset,0)
-#else
-#define QSHOW_BLOCK
-#define QSHOW_UNBLOCK
-#endif
 
 /* The following macros duplicate the expansion of odxprint, because the
  * extra level of parentheses around `args' prevents us from
