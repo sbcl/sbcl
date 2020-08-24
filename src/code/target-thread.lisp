@@ -1900,7 +1900,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.
-;;; Also the create_thread_lock is not used in C.
 #+pauseless-threadstart
 (defun start-thread (thread function arguments)
   (let* ((trampoline

@@ -67,8 +67,6 @@ struct thread *all_threads;
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static __attribute__((unused)) pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
-
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
 #elif !defined LISP_FEATURE_WIN32
