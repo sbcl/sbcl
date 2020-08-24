@@ -778,11 +778,7 @@ static void print_fun_or_otherptr(lispobj obj)
 
     case SAP_WIDETAG:
         NEWLINE_OR_RETURN;
-#ifndef LISP_FEATURE_ALPHA
-        printf("0x%08lx", (unsigned long) *ptr);
-#else
-        printf("0x%016lx", *(lispobj*)(ptr+1));
-#endif
+        printf("%p", (void*)*ptr);
         break;
 
     case WEAK_POINTER_WIDETAG:
