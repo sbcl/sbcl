@@ -114,68 +114,58 @@ extern void globals_init(void);
 #else /* __ASSEMBLER__ */
 
 # ifdef LISP_FEATURE_MIPS
-#  ifdef __linux__
-#   define EXTERN(name,bytes) .globl name
-#  else
-#   define EXTERN(name,bytes) .extern name bytes
-#  endif
+#   define EXTERN(name) .globl name
 # endif
 /**/
 # ifdef LISP_FEATURE_SPARC
 #  ifdef SVR4
-#   define EXTERN(name,bytes) .global name
+#   define EXTERN(name) .global name
 #  else
-#   define EXTERN(name,bytes) .global _ ## name
+#   define EXTERN(name) .global _ ## name
 #  endif
 # endif
 /**/
 # ifdef LISP_FEATURE_ALPHA
 #  ifdef __linux__
-#   define EXTERN(name,bytes) .globl name
+#   define EXTERN(name) .globl name
 #  endif
 # endif
 /**/
 # if defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_PPC64)
 #  ifdef LISP_FEATURE_DARWIN
-#   define EXTERN(name,bytes) .globl _ ## name
+#   define EXTERN(name) .globl _ ## name
 #  else
-#   define EXTERN(name,bytes) .globl name
+#   define EXTERN(name) .globl name
 #  endif
 # endif
 /**/
 # if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-#  define EXTERN(name,bytes) .global name
+#  define EXTERN(name) .global name
 # endif
 /**/
 # if defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64)
-#   define EXTERN(name,bytes) .global name
-# endif
-
-# if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_X86_64)
-#  define POINTERSIZE 8
-# else
-#  define POINTERSIZE 4
+#   define EXTERN(name) .global name
 # endif
 
 # if defined(LISP_FEATURE_RISCV)
-#   define EXTERN(name,bytes) .globl name
+#   define EXTERN(name) .globl name
 # endif
 
 #ifndef LISP_FEATURE_SB_THREAD
-EXTERN(foreign_function_call_active, 4)
+EXTERN(foreign_function_call_active)
 #endif
 
 #if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-EXTERN(current_control_stack_pointer, POINTERSIZE)
+EXTERN(current_control_stack_pointer)
 #endif
-EXTERN(current_control_frame_pointer, POINTERSIZE)
+EXTERN(current_control_frame_pointer)
 # if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-EXTERN(current_binding_stack_pointer, POINTERSIZE)
+EXTERN(current_binding_stack_pointer)
 # endif
 // don't want an undefined C symbol for this in 'nm' output, it's confusing
 # if defined LISP_FEATURE_CHENEYGC && \
   !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
-EXTERN(dynamic_space_free_pointer, POINTERSIZE)
+EXTERN(dynamic_space_free_pointer)
 # endif
 
 #endif /* __ASSEMBLER__ */
