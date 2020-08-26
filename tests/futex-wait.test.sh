@@ -14,7 +14,7 @@ fi
 
 set -e
 
-tracelog=$TEST_FILESTEM.out
+tracelog=${TMPDIR:-/tmp}/$TEST_FILESTEM.out
 
 strace -f -e futex -e signal=\!sigsegv -o $tracelog \
   $SBCL_RUNTIME --core "$SBCL_CORE" $SBCL_ARGS <<EOF
