@@ -80,7 +80,8 @@ maybetime sh make-host-1.sh
 maybetime sh make-target-1.sh
 maybetime sh make-host-2.sh
 maybetime sh make-target-2.sh
-maybetime sh make-target-contrib.sh
+# `make-target-contrib.sh' is not Bourne Shell-compliant (for /bin/sh on Solaris 10)
+maybetime bash make-target-contrib.sh
 
 # contrib/Makefile shouldn't be counted in NCONTRIBS.
 # "find contrib/* -name Makefile" would still find contrib/./Makefile.
