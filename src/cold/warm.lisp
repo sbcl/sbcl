@@ -201,7 +201,16 @@
                                    (search "undefined variable"
                                            (write-to-string c :escape nil)))
                           (cerror "Finish warm compile ignoring the problem" c)))))
-        (with-compilation-unit () (do-srcs group)))))))
+        (with-compilation-unit ()
+          (do-srcs group)
+          ;; I do not know why #+sb-show gets several "undefined-type CLASS" warnings
+          ;; that #-sb-show doesn't. And CLASS is a reserved name not defined as yet,
+          ;; so we have to pretend that didn't happen, otherwise the warning about
+          ;; not being able to define CLASS as a type name breaks the build.
+          #+sb-show
+          (setq sb-c::*undefined-warnings*
+                (delete 'class sb-c::*undefined-warnings*
+                        :key #'sb-c::undefined-warning-name))))))))
 
 (when (hash-table-p sb-c::*static-vop-usage-counts*)
   (with-open-file (output "output/warm-vop-usage.txt"
