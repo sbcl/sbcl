@@ -70,7 +70,7 @@ if the symbol isn't found."
 
 ;;; Cleanups before saving a core
 (defun foreign-deinit ()
-  #+(and os-provides-dlopen (not linkage-table)) ; at most HPPA and Alpha now
+  #+(and os-provides-dlopen (not linkage-table)) ; at most HPPA
   (when (dynamic-foreign-symbols-p)
     (warn "~@<Saving cores with alien definitions referring to non-static ~
            foreign symbols is unsupported on this platform: references to ~

@@ -800,7 +800,7 @@ fake_foreign_function_call(os_context_t *context)
             (*os_context_register_addr(context, reg_ALLOC));
 /*     fprintf(stderr,"dynamic_space_free_pointer: %p\n", */
 /*             dynamic_space_free_pointer); */
-#if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_MIPS)
+#if defined(LISP_FEATURE_MIPS)
     if ((sword_t)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x", context);
     }

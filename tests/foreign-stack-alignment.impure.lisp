@@ -36,7 +36,6 @@
       #+(and ppc (not darwin)) 8
       #+(or arm64 x86 x86-64 riscv ppc64) 16
       #+sparc 8
-      #+alpha 16
       #+hppa 64
       (error "Unknown platform")))
 

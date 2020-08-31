@@ -516,18 +516,18 @@
   ;; of return values and override the naturalize method to perform
   ;; the sign extension (in compiler/target/c-call.lisp).
   (ecase context
-    ((:normal #-(or alpha x86 x86-64) :result)
+    ((:normal #-(or x86 x86-64) :result)
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
            (alien-integer-type-bits type)))
-    #+(or alpha x86 x86-64)
+    #+(or x86 x86-64)
     (:result
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
            (max (alien-integer-type-bits type)
                 sb-vm:n-machine-word-bits)))))
 
 ;;; As per the comment in the :ALIEN-REP method above, this is defined
-;;; elsewhere for alpha and x86oids.
-#-(or alpha x86 x86-64)
+;;; elsewhere for x86oids.
+#-(or x86 x86-64)
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)

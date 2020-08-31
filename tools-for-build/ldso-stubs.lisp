@@ -46,15 +46,6 @@
 #endif
 #include \"sbcl.h\""
 
-#+(and linux alpha) "
-#define LDSO_STUBIFY(fct)                       \\
-.globl ldso_stub__ ## fct ;                     \\
-        .type    ldso_stub__ ## fct,@function ; \\
-ldso_stub__ ## fct: ;                           \\
-        jmp fct ;                               \\
-.L ## fct ## e1: ;                              \\
-        .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
-
 #+hppa "
         .level  2.0
         .text"
@@ -174,9 +165,6 @@ ldso_stub__ ## fct: ;                           \\
                    "log"
                    "log10"
                    "sqrt")
-                 #+alpha
-                 '("ieee_get_fp_control"
-                   "ieee_set_fp_control")
                  ;; FIXME: After 1.0 this should be made
                  ;; #-linkage-table, as we only need these stubs if
                  ;; we don't have linkage-table. Done this way now to

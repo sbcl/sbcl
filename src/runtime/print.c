@@ -289,12 +289,7 @@ static void print_unknown(lispobj obj)
   printf("unknown object: %p", (void *)obj);
 }
 
-/* Except for Alpha, we define sword_t as intptr_t, and 32-bit Darwin
- * defines intptr_t as long, so the printf conversion is "ld", not "d".
- * Alpha (32-on-64) defines sword_t as s32, so we need just "d". */
-#ifdef LISP_FEATURE_ALPHA
-# define OBJ_FMTd "d"
-#elif defined(PRIdPTR)
+#ifdef PRIdPTR
 # define OBJ_FMTd PRIdPTR
 #else
 # error "Your inttypes.h is lame"
@@ -587,13 +582,8 @@ lispobj symbol_function(lispobj* symbol)
 
 static void print_fun_or_otherptr(lispobj obj)
 {
-#ifndef LISP_FEATURE_ALPHA
     lispobj *ptr;
     unsigned long header;
-#else
-    u32 *ptr;
-    u32 header;
-#endif
     int count, type, index;
     char buffer[16];
 

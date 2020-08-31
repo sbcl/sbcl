@@ -48,7 +48,7 @@
 (define-primitive-object (bignum :lowtag other-pointer-lowtag
                                  :widetag bignum-widetag
                                  :alloc-trans sb-bignum:%allocate-bignum)
-  (digits :rest-p t :c-type #-alpha "sword_t" #+alpha "u32"))
+  (digits :rest-p t :c-type "sword_t"))
 
 (define-primitive-object (ratio :type ratio
                                 :lowtag other-pointer-lowtag
@@ -140,7 +140,7 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (length :ref-trans sb-c::vector-length
           :type index)
-  (data :rest-p t :c-type #-alpha "uword_t" #+alpha "u32"))
+  (data :rest-p t :c-type "uword_t"))
 
 #|
 Code header representation:
@@ -235,7 +235,7 @@ during backtrace.
   ;;   pertain to undefined functions, FINs, and closures.
   ;; - all others store a native pointer to the function entry address
   ;;   or closure tramp
-  (raw-addr :c-type #-alpha "char *" #+alpha "u32"))
+  (raw-addr :c-type "char *"))
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
@@ -316,7 +316,7 @@ during backtrace.
                                        :alloc-trans make-weak-pointer)
   (value :ref-trans %weak-pointer-value :ref-known (flushable)
          :init :arg)
-  (next :c-type #-alpha "struct weak_pointer *" #+alpha "u32"))
+  (next :c-type "struct weak_pointer *"))
 
 ;;;; other non-heap data blocks
 
@@ -325,8 +325,8 @@ during backtrace.
   symbol) ;; on sb-thread, this is actually a tls-index
 
 (define-primitive-object (unwind-block)
-  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
-  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
+  (uwp :c-type "struct unwind_block *")
+  (cfp :c-type "lispobj *")
   #-(or x86 x86-64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
@@ -337,8 +337,8 @@ during backtrace.
   #+unbind-in-unwind current-catch)
 
 (define-primitive-object (catch-block)
-  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
-  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
+  (uwp :c-type "struct unwind_block *")
+  (cfp :c-type "lispobj *")
   #-(or x86 x86-64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
@@ -346,7 +346,7 @@ during backtrace.
   #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
   #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
   #+unbind-in-unwind bsp
-  (previous-catch :c-type #-alpha "struct catch_block *" #+alpha "u32")
+  (previous-catch :c-type "struct catch_block *")
   tag)
 
 ;;;; symbols

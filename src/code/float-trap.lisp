@@ -48,10 +48,10 @@
                   names)))
 ) ; EVAL-WHEN
 
-;;; interpreter stubs for floating point modes get/setters for the
-;;; alpha have been removed to alpha-vm.lisp, as they are implemented
-;;; in C rather than as VOPs. Likewise for x86-64 and mips.
-#-(or alpha x86-64 mips)
+;;; interpreter stubs for floating point modes get/setters for
+;;; some architectures have been removed, as they are implemented
+;;; in C rather than as VOPs.
+#-(or x86-64 mips)
 (progn
   (defun floating-point-modes ()
     (floating-point-modes))

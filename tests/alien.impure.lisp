@@ -375,8 +375,7 @@
 ;;; Skip for MSAN. Instead of returning 0, the intercepted malloc is configured
 ;;; to cause process termination by default on failure to allocate memory.
 (with-test (:name :malloc-failure
-                  :skipped-on :msan
-                  :fails-on :alpha) ;; Alpha has address space to burn
+                  :skipped-on :msan)
   (assert (eq :enomem
               (handler-case
                   (loop repeat 128

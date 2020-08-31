@@ -14,8 +14,7 @@
   ;; because we generate it using Lisp code, and we don't presume the target
   ;; to have a lisp implementation. So we generate it on the host by knowing
   ;; something about which Config files depend on ldso-stubs.
-  (when (or (member :alpha sb-xc:*features*)
-            (member :hppa sb-xc:*features*))
+  (when (member :hppa sb-xc:*features*)
     (let ((*readtable* *xc-readtable*)) (load "tools-for-build/ldso-stubs.lisp")))
 
   (setf *host-obj-prefix* "obj/from-host/")

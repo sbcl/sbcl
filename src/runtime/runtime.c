@@ -590,12 +590,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
         print_environment(argc, argv);
     }
     dyndebug_init();
-#ifdef LISP_FEATURE_ALPHA // When we remove Alpha, this #if can go away
-    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
-     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
-     * it must follow os_init(). -- WHN 2000-01-26 */
-    arch_init();
-#endif
     // FIXME: if the 'have' flag is 0 and you've disabled disabling of ASLR
     // then we haven't done an exec(), nor unmapped the mappings that were obtained
     // already obtained (if any) so it is unhelpful to try again here.

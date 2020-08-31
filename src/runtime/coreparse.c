@@ -864,13 +864,7 @@ process_directory(int count, struct ndir_entry *entry,
                   DYNAMIC_0_SPACE_START = addr = semispace_0_start;
                   current_dynamic_space = (lispobj*)addr;
                   // Request that much again now
-#ifdef LISP_FEATURE_ALPHA /* meaning: is this a 32-on-64 SBCL implementation */
-                  uword_t addr1 = (uword_t)os_validate(MOVABLE_LOW, 0, request);
-                  extern os_set_cheneygc_spaces(uword_t,uword_t);
-                  os_set_cheneygc_spaces(addr, addr1);
-#else
                   uword_t addr1 = (uword_t)os_allocate(request);
-#endif
                   uword_t semispace_1_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
                   uword_t semispace_1_end = ALIGN_DOWN(addr1 + request, BACKEND_PAGE_BYTES);
 

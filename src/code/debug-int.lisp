@@ -959,10 +959,7 @@
                ;; the C safepoint page
                (/ sb-c:+backend-page-bytes+ n-word-bytes)))
          (context-pointer
-           ;; The Alpha code is quite possibly wrong; I have no idea.
-           (sb-vm::current-thread-offset-sap
-            #-alpha n
-            #+alpha (* 2 n))))
+           (sb-vm::current-thread-offset-sap n)))
     (sb-alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; With :LINKAGE-TABLE symbols which come from the runtime go through
@@ -2386,13 +2383,8 @@ register."
                                 (int-sap
                                  (sb-vm:context-register escaped
                                                          sb-vm::nfp-offset))
-                                #-alpha
                                 (sap-ref-sap fp (* nfp-save-offset
-                                                   sb-vm:n-word-bytes))
-                                #+alpha
-                                (sb-vm::make-number-stack-pointer
-                                 (sap-ref-32 fp (* nfp-save-offset
-                                                   sb-vm:n-word-bytes))))))
+                                                   sb-vm:n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #+(or x86 x86-64)
@@ -2567,15 +2559,9 @@ register."
                                 (int-sap
                                  (sb-vm:context-register escaped
                                                          sb-vm::nfp-offset))
-                                #-alpha
                                 (sap-ref-sap fp
                                              (* nfp-save-offset
-                                                sb-vm:n-word-bytes))
-                                #+alpha
-                                (sb-vm::make-number-stack-pointer
-                                 (sap-ref-32 fp
-                                             (* nfp-save-offset
-                                                sb-vm:n-word-bytes))))))
+                                                sb-vm:n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #+(or x86 x86-64)

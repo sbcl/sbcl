@@ -212,27 +212,13 @@ typedef pthread_t os_thread_t;
 typedef pid_t os_thread_t;
 #endif
 
-#ifndef LISP_FEATURE_ALPHA
 typedef uintptr_t uword_t;
 typedef intptr_t  sword_t;
-#else
-/* The alpha32 port uses non-intptr-sized words */
-typedef u32 uword_t;
-typedef s32 sword_t;
-#endif
 
-/* FIXME: we do things this way because of the alpha32 port.  once
-   alpha64 has arrived, all this nastiness can go away */
-#if 64 == N_WORD_BITS
+/* FIXME: remove LOW_WORD macro */
 #define LOW_WORD(c) ((uintptr_t)c)
 #define OBJ_FMTX PRIxPTR
 typedef uintptr_t lispobj;
-#else
-#define OBJ_FMTX "x"
-#define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
-/* fake it on alpha32 */
-typedef unsigned int lispobj;
-#endif
 
 static inline int
 lowtag_of(lispobj obj)

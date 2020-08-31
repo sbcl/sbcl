@@ -151,17 +151,9 @@ dump_cmd(char **ptr)
     lispobj* next_object = decode ? (lispobj*)addr : 0;
 
     while (count-- > 0) {
-#ifndef LISP_FEATURE_ALPHA
         printf("%p: ", (os_vm_address_t) addr);
-#else
-        printf("0x%08X: ", (u32) addr);
-#endif
         if (force || gc_managed_addr_p((lispobj)addr)) {
-#ifndef LISP_FEATURE_ALPHA
             unsigned long *lptr = (unsigned long *)addr;
-#else
-            u32 *lptr = (u32 *)addr;
-#endif
             unsigned char *cptr = (unsigned char *)addr;
 
 #if N_WORD_BYTES == 8

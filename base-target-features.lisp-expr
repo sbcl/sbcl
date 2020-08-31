@@ -352,8 +352,6 @@
  ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
  ;;   :x86-64
  ;;      any x86-64 CPU running in 64-bit mode
- ;;   :alpha
- ;;      DEC/Compaq Alpha CPU
  ;;   :sparc
  ;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
  ;;   :ppc

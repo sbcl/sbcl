@@ -15,11 +15,7 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-#ifdef LISP_FEATURE_ALPHA
-typedef u32 core_entry_elt_t;
-#else
 typedef sword_t core_entry_elt_t;
-#endif
 
 struct ndir_entry {
     core_entry_elt_t identifier;

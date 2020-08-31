@@ -360,7 +360,6 @@ case `uname -m` in
     i86pc) guessed_sbcl_arch=x86 ;;
     *x86_64) guessed_sbcl_arch=x86-64 ;;
     amd64) guessed_sbcl_arch=x86-64 ;;
-    [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
     *ppc) guessed_sbcl_arch=ppc ;;
@@ -700,10 +699,10 @@ case "$sbcl_arch" in
     ;;
 esac
 
-# There are only two architectures that don't have linkage tables,
-# and they also don't run for half a dozen other reasons.
+# There is only one architecture that doesn't have :linkage-table
+# and also doesn't run for half a dozen other reasons.
 case "$sbcl_arch" in
-    alpha | hppa)  ;;
+    hppa)  ;;
     *) printf ' :linkage-table' >> $ltf
 esac
 

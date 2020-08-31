@@ -208,28 +208,16 @@ print_entry_points (struct code *code, FILE *f)
  * better not change. */
 
 struct call_frame {
-#ifndef LISP_FEATURE_ALPHA
         struct call_frame *old_cont;
-#else
-        u32 old_cont;
-#endif
         lispobj saved_lra;
         lispobj code;
         lispobj other_state[5];
 };
 
 struct call_info {
-#ifndef LISP_FEATURE_ALPHA
     struct call_frame *frame;
-#else
-    u32 frame;
-#endif
     int interrupted;
-#ifndef LISP_FEATURE_ALPHA
     struct code *code;
-#else
-    u32 code;
-#endif
     lispobj lra;
     int pc; /* Note: this is the trace file offset, not the actual pc. */
 };
@@ -312,11 +300,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     }
     if (info->code != NULL)
         info->pc = pc - (uword_t) info->code -
-#ifndef LISP_FEATURE_ALPHA
             (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
-#else
-            (HEADER_LENGTH(((struct code *)info->code)->header) * sizeof(lispobj));
-#endif
     else
         info->pc = 0;
 }
