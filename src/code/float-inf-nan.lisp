@@ -97,21 +97,20 @@
 
 (define-float-inf-or-nan-test float-trapping-nan-p
   "Return true if the float X is a trapping NaN (Not a Number)."
-  ;; HPPA (and apparently MIPS) have trapping NaNs (SNaNs) with the
-  ;; trapping-nan-bit SET.  PPC, SPARC, and x86 (and presumably
-  ;; x86-64, ARM, and ARM64) have trapping NaNs (SNaNs) with the
+  ;; MIPS has trapping NaNs (SNaNs) with the trapping-nan-bit SET.
+  ;; All the others have trapping NaNs (SNaNs) with the
   ;; trapping-nan-bit CLEAR.  Note that the given implementation
   ;; considers infinities to be FLOAT-TRAPPING-NAN-P on most
   ;; architectures.
 
   ;; SINGLE-FLOAT
-  #+(or mips hppa) (logbitp 22 bits)
-  #-(or mips hppa) (not (logbitp 22 bits))
+  #+mips (logbitp 22 bits)
+  #-mips (not (logbitp 22 bits))
 
   ;; DOUBLE-FLOAT
-  #+(or mips hppa) (logbitp 19 hi)
-  #+(and (not (or mips hppa)) 64-bit) (not (logbitp 51 bits))
-  #+(and (not (or mips hppa)) (not 64-bit)) (not (logbitp 19 hi))
+  #+mips (logbitp 19 hi)
+  #+(and (not mips) 64-bit) (not (logbitp 51 bits))
+  #+(and (not mips) (not 64-bit)) (not (logbitp 19 hi))
 
   ;; LONG-FLOAT (this code is dead anyway)
   #+(and long-float x86)

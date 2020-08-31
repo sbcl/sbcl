@@ -94,11 +94,7 @@ lispobj find_code(os_context_t *context)
 static long compute_offset(os_context_t *context, lispobj code)
 {
   if (code != NIL) {
-#ifdef LISP_FEATURE_HPPA
-        uword_t pc = *os_context_pc_addr(context) & ~3;
-#else
         uword_t pc = *os_context_pc_addr(context);
-#endif
         struct code *codeptr = (struct code *)native_pointer(code);
         uword_t code_start = (uword_t)code_text_start(codeptr);
         int offset;

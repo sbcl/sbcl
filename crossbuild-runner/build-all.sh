@@ -9,7 +9,7 @@ set -e
 # or a host machine on which to run its native compiler.
 
 if [ -z "$*" ]; then
-    targets="arm arm64 hppa mips ppc ppc64 riscv sparc x86 x86-64"
+    targets="arm arm64 mips ppc ppc64 riscv sparc x86 x86-64"
 else
     targets="$@"
 fi
@@ -30,10 +30,7 @@ do
   fi
   cat crossbuild-runner/backends/$arch/features >> $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf
-  case "$arch" in
-    hppa)  ;;
-    *) echo ':linkage-table' >> $ltf
-  esac
+  echo ':linkage-table' >> $ltf
   echo ')))' >> $ltf
 
   cp -fv crossbuild-runner/backends/$arch/stuff-groveled-from-headers.lisp \

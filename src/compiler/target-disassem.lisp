@@ -795,7 +795,7 @@
                            ;; FIXME: this is strictly redundant.
                            ;; You should combine fields in the prefilter
                            ;; so that the labeller receives a single byte.
-                           ;; AARCH64 and HPPA make use of this though.
+                           ;; AARCH64 makes use of this though.
                            (loop for i from 2 below item-length
                                  collect (extract-byte i)))))
                       dstate)))

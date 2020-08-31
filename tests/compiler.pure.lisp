@@ -4988,7 +4988,7 @@
                        x))))
 
 (with-test (:name (compile :copy-more-arg)
-                  :fails-on (or :hppa :mips :sparc))
+                  :fails-on (or :mips :sparc))
   ;; copy-more-arg might not copy in the right direction
   ;; when there are more fixed args than stack frame slots,
   ;; and thus end up splatting a single argument everywhere.

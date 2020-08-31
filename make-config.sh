@@ -367,8 +367,6 @@ case `uname -m` in
     ppc64le) guessed_sbcl_arch=ppc64 ;; # is ok because there was never 32-bit LE
     Power*Macintosh) guessed_sbcl_arch=ppc ;;
     ibmnws) guessed_sbcl_arch=ppc ;;
-    parisc*) guessed_sbcl_arch=hppa ;;
-    9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
     arm64) guessed_sbcl_arch=arm64 ;;
     *arm*) guessed_sbcl_arch=arm ;;
@@ -699,12 +697,7 @@ case "$sbcl_arch" in
     ;;
 esac
 
-# There is only one architecture that doesn't have :linkage-table
-# and also doesn't run for half a dozen other reasons.
-case "$sbcl_arch" in
-    hppa)  ;;
-    *) printf ' :linkage-table' >> $ltf
-esac
+printf ' :linkage-table' >> $ltf
 
 # Use a little C program to try to guess the endianness.  Ware
 # cross-compilers!

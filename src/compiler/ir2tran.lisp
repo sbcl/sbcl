@@ -1352,7 +1352,7 @@
               ;; not all backends have been updated yet.  On backends
               ;; that have not been updated, we still need to use
               ;; XEP-SETUP-SP here.
-              #+(or hppa mips sparc)
+              #+(or mips sparc)
               (vop xep-setup-sp node block)
               (vop copy-more-arg node block (optional-dispatch-max-args ef)
                    #+x86-64 verified))

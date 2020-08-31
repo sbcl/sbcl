@@ -358,8 +358,6 @@
  ;;      any PowerPC CPU
  ;;   :ppc64
  ;;      64-bit PowerPC CPU, ISA 2.06 (POWER7) or later
- ;;   :hppa
- ;;      any PA-RISC CPU
  ;;   :mips
  ;;      any MIPS CPU (in little-endian mode with :little-endian)
  ;;   :arm

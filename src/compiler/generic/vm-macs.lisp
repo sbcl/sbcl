@@ -181,8 +181,8 @@
 (deftype sc-offset () `(integer 0 (,sc-offset-limit)))
 
 (defconstant finite-sc-offset-limit
-  #-(or sparc hppa) 32
-  #+(or sparc hppa) 64)
+  #-(or sparc) 32
+  #+(or sparc) 64)
 (defconstant finite-sc-offset-bits
   (integer-length (1- finite-sc-offset-limit)))
 (deftype finite-sc-offset () `(integer 0 (,finite-sc-offset-limit)))

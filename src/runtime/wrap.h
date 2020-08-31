@@ -14,7 +14,7 @@
  *
  * FIXME: But of course we should fix the FFI so that we can use the
  * actual 64-bit values instead.  In fact, we probably have by now
- * (2003-10-03) on all working platforms except MIPS and HPPA; if some
+ * (2003-10-03) on all working platforms except MIPS; if some
  * motivated spark would simply fix those, this hack could go away.
  * -- CSR, 2003-10-03
  *

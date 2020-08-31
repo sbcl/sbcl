@@ -222,7 +222,6 @@
         (incf count)))
     (assert (= count 2))))
 
-;; Whoever deals with the Alpha and/or HPPA ports can make this test pass for them
 (with-test (:name :linkage-table-bogosity)
   (let ((strings (map 'list (lambda (x) (if (consp x) (car x) x))
                       sb-vm::+required-foreign-symbols+)))

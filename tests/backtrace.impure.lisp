@@ -189,7 +189,7 @@
 
   (with-test (:name (:backtrace :undefined-function :bug-346)
               :skipped-on :interpreter
-              ;; Failures on SPARC, and probably HPPA are due to
+              ;; Failures on SPARC are due to
               ;; not having a full and valid stack frame for the
               ;; undefined function frame.  See PPC
               ;; undefined_tramp for details.

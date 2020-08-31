@@ -805,12 +805,6 @@ fake_foreign_function_call(os_context_t *context)
         lose("dead in fake_foreign_function_call, context = %x", context);
     }
 #endif
-/* why doesnt PPC and SPARC do something like this: */
-#if defined(LISP_FEATURE_HPPA)
-    if ((sword_t)dynamic_space_free_pointer & 4) {
-        lose("dead in fake_foreign_function_call, context = %x, d_s_f_p = %x", context, dynamic_space_free_pointer);
-    }
-#endif
 #endif
 #ifdef reg_BSP
     set_binding_stack_pointer(thread,

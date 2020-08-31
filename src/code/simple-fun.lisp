@@ -392,7 +392,7 @@
   ;; and filler_obj_p() in the C code
   (eql (sb-vm::%code-boxed-size code-obj) 0))
 
-#+(or sparc hppa ppc64)
+#+(or sparc ppc64)
 (defun code-trailer-ref (code offset)
   (with-pinned-objects (code)
     (sap-ref-32 (int-sap (get-lisp-obj-address code))
