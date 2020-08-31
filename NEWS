@@ -1,9 +1,23 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.7:
+  * platform support:
+    ** added support for NetBSD/ARM64;
+    ** threads on Linux now have OS-visible names;
+    ** removed unnecessary emulation of pthread functions on Windows;
+    ** work around a sigwait() bug on Mac OS X;
+    ** allow safepoint build on Mac OS X, though it probably doesn't
+       work very well (reported by Chris Wagner, lp#1382811)
+    ** removed stub support for HPUX.
   * optimization: SB-THREAD:MAKE-THREAD is faster on most platforms.
   * optimization: faster RATIONAL when the result is a RATIO.
   * optimization: improved cross-type comparisons (float/ratio/bignum).
+  * bug fix: EQUALP on pathnames was wrong
+  * bug fixes: fix compiler issues in:
+    ** COUNT (lp#1889391)
+    ** VECTOR-LENGTH (lp#1888919)
+    ** constant-folding (lp#1888384)
+    ** FIND and POSITION (lp#1887316)
 
 changes in sbcl-2.0.7 relative to sbcl-2.0.6:
   * minor incompatible change: SB-THREAD:THREAD-OS-TID returns NIL for
