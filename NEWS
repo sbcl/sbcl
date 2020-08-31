@@ -1,7 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.8:
-  * incompatible change: DEC Alpha support has been removed.
+  * incompatible change: HPPA and DEC Alpha architecture
+    support has been removed.
   * minor incompatible change: the compiler signals a warning at
     compile-time when an initform of T, NIL or 0 does not match a
     STANDARD-CLASS slot's declared type.
