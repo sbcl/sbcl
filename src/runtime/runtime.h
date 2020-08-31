@@ -215,8 +215,6 @@ typedef pid_t os_thread_t;
 typedef uintptr_t uword_t;
 typedef intptr_t  sword_t;
 
-/* FIXME: remove LOW_WORD macro */
-#define LOW_WORD(c) ((uintptr_t)c)
 #define OBJ_FMTX PRIxPTR
 typedef uintptr_t lispobj;
 
@@ -347,7 +345,7 @@ native_pointer(lispobj obj)
 static inline lispobj
 make_lispobj(void *o, int low_tag)
 {
-    return LOW_WORD(o) | low_tag;
+    return (lispobj)o | low_tag;
 }
 
 #define MAKE_FIXNUM(n) (n << N_FIXNUM_TAG_BITS)

@@ -129,7 +129,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
 #define FIX_POINTER() { \
     lispobj *ptr = native_pointer(object); \
     if (forwarding_pointer_p(ptr)) \
-        *object_ptr = LOW_WORD(forwarding_pointer_value(ptr)); \
+        *object_ptr = forwarding_pointer_value(ptr); \
     else /* Scavenge that pointer. */ \
         scav_ptr[PTR_SCAVTAB_INDEX(object)](object_ptr, object);  \
     }
@@ -300,7 +300,7 @@ trans_code(struct code *code)
     gc_dcheck(widetag_of(&code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
-    lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
+    lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
     lispobj l_new_code = copy_large_object(l_code,
                                            code_total_nwords(code),
                                            CODE_PAGE_TYPE);
@@ -351,7 +351,7 @@ static lispobj
 trans_code_header(lispobj object)
 {
     struct code *ncode = trans_code((struct code *) native_pointer(object));
-    return (lispobj) LOW_WORD(ncode) | OTHER_POINTER_LOWTAG;
+    return make_lispobj(ncode, OTHER_POINTER_LOWTAG);
 }
 
 static sword_t
@@ -376,10 +376,9 @@ trans_return_pc_header(lispobj object)
     uword_t offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
 
     /* Transport the whole code object */
-    struct code *code = (struct code *) ((uword_t) return_pc - offset);
-    struct code *ncode = trans_code(code);
+    struct code *code = trans_code((struct code *) ((uword_t) return_pc - offset));
 
-    return ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
+    return make_lispobj((char*)code + offset, OTHER_POINTER_LOWTAG);
 }
 #endif /* RETURN_PC_WIDETAG */
 
@@ -422,10 +421,9 @@ trans_fun_header(lispobj object)
         (HeaderValue(fheader->header) & FUN_HEADER_NWORDS_MASK) * N_WORD_BYTES;
 
     /* Transport the whole code object */
-    struct code *code = (struct code *) ((uword_t) fheader - offset);
-    struct code *ncode = trans_code(code);
+    struct code *code = trans_code((struct code *) ((uword_t) fheader - offset));
 
-    return ((lispobj) LOW_WORD(ncode) + offset) | FUN_POINTER_LOWTAG;
+    return make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
 }
 
 
@@ -983,8 +981,7 @@ trans_weak_pointer(lispobj object)
 #define TEST_WEAK_CELL(cell, pointee, broken) \
     lispobj *native = native_pointer(pointee); \
     if (from_space_p(pointee)) \
-        cell = forwarding_pointer_p(native) ? \
-               LOW_WORD(forwarding_pointer_value(native)) : broken; \
+        cell = forwarding_pointer_p(native) ? forwarding_pointer_value(native) : broken; \
     else if (immobile_space_p(pointee)) { \
         if (immobile_obj_gen_bits(base_pointer(pointee)) == from_space) cell = broken; \
     }
@@ -2043,7 +2040,7 @@ scavenge_control_stack(struct thread *th)
             lispobj *ptr = native_pointer(object);
             if (forwarding_pointer_p(ptr)) {
                 /* Yes, there's a forwarding pointer. */
-                *object_ptr = LOW_WORD(forwarding_pointer_value(ptr));
+                *object_ptr = forwarding_pointer_value(ptr);
             } else {
                 /* Scavenge that pointer. */
                 long n_words_scavenged =

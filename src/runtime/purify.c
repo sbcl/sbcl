@@ -259,7 +259,7 @@ ptrans_code(lispobj thing)
 #endif
     /* Put in forwarding pointers for all the functions. */
     for_each_simple_fun(i, newfunc, new, 1, {
-        lispobj* old = (lispobj*)LOW_WORD((char*)newfunc - displacement);
+        lispobj* old = (lispobj*)((char*)newfunc - displacement);
         *old = make_lispobj(newfunc, FUN_POINTER_LOWTAG);
         pscav(&newfunc->self, 1, 1); // and fix the self-pointer now
     });
