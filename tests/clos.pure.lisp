@@ -39,18 +39,6 @@
       (declare (ignore value))
       (assert (not format-err)))))
 
-(with-test (:name (defclass :initform type-error))
-  (mapc (lambda (form)
-          (assert (nth-value 1 (checked-compile
-                                `(lambda () ,form) :allow-warnings t))))
-        '(;; Special-cased initforms
-          (defclass foo () ((%bar :type integer :initform t)))
-          (defclass foo () ((%bar :type integer :initform nil)))
-          (defclass foo () ((%bar :type boolean :initform 0)))
-          ;; Ordinary initforms
-          (defclass foo () ((%bar :type integer :initform (lisp-implementation-version))))
-          (defclass foo () ((%bar :type boolean :initform (random 2)))))))
-
 ;;; another not (user-)observable behaviour: make sure that
 ;;; sb-pcl::map-all-classes calls its function on each class once and
 ;;; exactly once.
