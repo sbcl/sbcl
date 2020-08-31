@@ -116,4 +116,4 @@
                   standard-reader-method standard-slot-definition
                   standard-writer-method update-dependent validate-superclass
                   writer-method-class))
-  (sb-impl::deprecate-export *package* symbol :early "2.0.7"))
+  (sb-impl::deprecate-export *package* symbol :late "2.0.7"))
