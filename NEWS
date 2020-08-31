@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.7:
+changes in sbcl-2.0.8 relative to sbcl-2.0.7:
   * platform support:
     ** added support for NetBSD/ARM64;
     ** threads on Linux now have OS-visible names;
