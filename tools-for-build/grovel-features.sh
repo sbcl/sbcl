@@ -6,29 +6,26 @@ cd ./tools-for-build > /dev/null
 
 # Assumes the presence of $1-test.c, which when built and
 # run should return with 104 if the feature is present.
+# We presumes that the build machine matches the target machine
+# in terms of a whether each feature presence test should pass.
 featurep() {
     bin="$1-test"
+    featurename=${2:-$1}
     rm -f $bin
     $GNUMAKE $bin -I ../src/runtime > /dev/null 2>&1 && echo "input" | ./$bin> /dev/null 2>&1
     if [ "$?" -eq 104 ]
     then
-        printf " :$1"
+        printf " :$featurename"
     fi
     rm -f $bin
 }
 
 # Adding a nonexistent link library to Config.*-win32 will fail,
-# so this needs its own recipe to detect the library.
+# so we pass -lSynchronization to the featurep test specifically
+# and not in the general make rule.
+# It will get added in by Config.*-win32 only if LISP_FEATURE_SB_FUTEX.
 if [ "$sbcl_os" = win32 ] ; then
-    bin=os-provides-wakebyaddr-test
-    rm -f $bin
-    # pass -f /dev/null to use only builtin Make recipes
-    LOADLIBES=-lSynchronization $GNUMAKE -f /dev/null $bin > /dev/null 2>&1
-    if [ "$?" -eq 0 ]
-    then
-        printf " :sb-futex"
-    fi
-    rm -f $bin
+   LOADLIBES=-lSynchronization featurep os-provides-wakebyaddr sb-futex
 fi
 
 # KLUDGE: ppc/darwin dlopen is special cased in make-config.sh, as
