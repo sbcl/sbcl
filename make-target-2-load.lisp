@@ -8,6 +8,10 @@
 
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
+;;; FIXME: these lists of constants inside the TLF cause all the keywords
+;;; to be retained in the inage, which break my means of rapid check for
+;;; what features are built in by saying, e.g. (apropos "FUTEX") and being
+;;; surprised that it's there when it shouldn't be.
 (let* ((non-target-features
         ;;
         ;; FIXME: I suspect that this list should be changed to its inverse-
@@ -23,7 +27,7 @@
           ;; in as much as policy can be changed later arbitrarily.
           :CONS-PROFILING
           ;; Used by nothing after compiling 'target-thread.lisp' or 'thread.c'
-          :SB-FUTEX :FUTEX-USE-TID :OS-THREAD-STACK
+          :SB-FUTEX :OS-THREAD-STACK
           ;; These affect the BREAK instruction emitter, but the C code is able
           ;; to handle anything, and post-build we don't care which it is.
           :UD2-BREAKPOINTS :INT4-BREAKPOINTS

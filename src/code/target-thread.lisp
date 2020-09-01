@@ -425,6 +425,19 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
   #+sb-futex
   (progn
+    (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+      (define-structure-slot-addressor mutex-state-address
+        ;; """ (Futexes are 32 bits in size on all platforms, including 64-bit systems.) """
+        ;; which means we need to add 4 bytes to get to the low 32 bits of the slot contents
+        ;; where we store state. This would be prettier if we had 32-bit raw slots.
+        :structure mutex
+        :slot state
+        :byte-offset (+ #+(and 64-bit big-endian) 4))
+      (define-structure-slot-addressor waitqueue-token-address
+        :structure waitqueue
+        :slot token
+        :byte-offset (+ #+(and 64-bit big-endian) 4)))
+
     (export 'futex-wake) ; for naughty users only
     (declaim (inline futex-wait futex-wake))
 
@@ -465,17 +478,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 (setf (documentation 'make-mutex 'function) "Create a mutex."
       (documentation 'mutex-name 'function) "The name of the mutex. Setfable.")
-
-#+sb-futex
-(progn
-  (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-    ;; """ (Futexes are 32 bits in size on all platforms, including 64-bit systems.) """
-    ;; which means we need to add 4 bytes to get to the low 32 bits of the slot contents
-    ;; where we store state. This would be prettier if we had 32-bit raw slots.
-    (define-structure-slot-addressor mutex-state-address
-        :structure mutex
-        :slot state
-        :byte-offset (+ #+(and 64-bit big-endian) 4))))
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
 
@@ -654,36 +656,82 @@ returns NIL each time."
                         0)))))
          ,@body))))
 
+;;; If you want to pick at runtime what kind of mutex to use, you can replace
+;;; this DEFCONSTANT with a DEFGLOBAL
+(defconstant futex-enabled (or #+sb-futex t))
+
 (defun %try-mutex (mutex new-owner)
   (declare (type mutex mutex) (optimize (speed 3)))
-  #-sb-futex
-  (progn
-    (barrier (:read))
-    (let ((old (mutex-%owner mutex)))
-      (when (eq new-owner old)
-        (error "Recursive lock attempt ~S." mutex))
-      #-sb-thread
-      (when old
-        (error "Strange deadlock on ~S in an unithreaded build?" mutex))
-      #-(and sb-thread sb-futex)
-      (and (not old)
-           ;; Don't even bother to try to CAS if it looks bad.
-           (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))
-  #+sb-futex
-    ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-    (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
-           (setf (mutex-%owner mutex) (sb-ext:truly-the thread new-owner))
-           t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
-          ((eq (mutex-%owner mutex) new-owner)
-           (error "Recursive lock attempt ~S." mutex))))
+  (cond #+sb-futex
+        (t
+         ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
+         (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
+                (setf (mutex-%owner mutex) (sb-ext:truly-the thread new-owner))
+                t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
+               ((eq (mutex-%owner mutex) new-owner)
+                (error "Recursive lock attempt ~S." mutex))))
+        #-sb-futex
+        (t
+         (barrier (:read))
+         (let ((old (mutex-%owner mutex)))
+           (when (eq new-owner old)
+             (error "Recursive lock attempt ~S." mutex))
+           #-sb-thread
+           (when old
+             (error "Strange deadlock on ~S in an unithreaded build?" mutex))
+           (and (not old)
+                ;; Don't even bother to try to CAS if it looks bad.
+                (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))))
 
 #+sb-thread
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (declare (ignorable to-sec to-usec))
-  #-sb-futex
-  (flet ((cas ()
+  (cond
+   #+sb-futex
+   (t
+    ;; This is a fairly direct translation of the Mutex 2 algorithm from
+    ;; "Futexes are Tricky" by Ulrich Drepper.
+    ;;
+    ;; void lock () {
+    ;;   int c;
+    ;;   if ((c = cmpxchg(val, 0, 1)) != 0)
+    ;;     do {
+    ;;       if (c == 2 || cmpxchg(val, 1, 2) != 0)
+    ;;         futex_wait(&val, 2);
+    ;;    } while ((c = cmpxchg(val, 0, 2)) != 0);
+    ;; }
+    ;;
+    (symbol-macrolet ((val (mutex-state mutex)))
+      (let ((c (sb-ext:cas val 0 1))) ; available -> taken
+        (unless (= c 0) ; Got it right off the bat?
+          (if (not stop-sec)
+              (loop ; untimed
+                ;; Mark it as contested, and sleep, unless it is now in state 0.
+                (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                  (with-pinned-objects (mutex)
+                    (futex-wait (mutex-state-address mutex) 2 -1 0)))
+                ;; Try to get it, still marking it as contested.
+                (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
+              (loop ; same as above but check for timeout
+                (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                  (if (eql 1 (with-pinned-objects (mutex)
+                               (futex-wait (mutex-state-address mutex) 2 to-sec to-usec)))
+                      ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                      ;;  0 = normal wakeup
+                      ;;  1 = ETIMEDOUT ***DONE***
+                      ;;  2 = EINTR, a spurious wakeup
+                      (return-from %%wait-for-mutex nil)))
+                (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
+                ;; Update timeout
+                (setf (values to-sec to-usec)
+                      (sb-impl::relative-decoded-times stop-sec stop-usec))))))
+      (setf (mutex-%owner mutex) new-owner)
+      t))
+   #-sb-futex
+   (t
+    (flet ((cas ()
            (loop repeat 100
                  when (and (progn
                              (barrier (:read))
@@ -696,47 +744,8 @@ returns NIL each time."
                     (sb-ext:spin-loop-hint))
            ;; Check for pending interrupts.
            (with-interrupts nil)))
-    (declare (dynamic-extent #'cas))
-    (%%wait-for #'cas stop-sec stop-usec))
-  #+sb-futex
-  ;; This is a fairly direct translation of the Mutex 2 algorithm from
-  ;; "Futexes are Tricky" by Ulrich Drepper.
-  ;;
-  ;; void lock () {
-  ;;   int c;
-  ;;   if ((c = cmpxchg(val, 0, 1)) != 0)
-  ;;     do {
-  ;;       if (c == 2 || cmpxchg(val, 1, 2) != 0)
-  ;;         futex_wait(&val, 2);
-  ;;    } while ((c = cmpxchg(val, 0, 2)) != 0);
-  ;; }
-  ;;
-  (symbol-macrolet ((val (mutex-state mutex)))
-    (let ((c (sb-ext:cas val 0 1))) ; available -> taken
-      (unless (= c 0) ; Got it right off the bat?
-        (if (not stop-sec)
-            (loop ; untimed
-              ;; Mark it as contested, and sleep, unless it is now in state 0.
-              (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
-                (with-pinned-objects (mutex)
-                  (futex-wait (mutex-state-address mutex) 2 -1 0)))
-              ;; Try to get it, still marking it as contested.
-              (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
-            (loop ; same as above but check for timeout
-              (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
-                (if (eql 1 (with-pinned-objects (mutex)
-                             (futex-wait (mutex-state-address mutex) 2 to-sec to-usec)))
-                    ;; -1 = EWOULDBLOCK, possibly spurious wakeup
-                    ;;  0 = normal wakeup
-                    ;;  1 = ETIMEDOUT ***DONE***
-                    ;;  2 = EINTR, a spurious wakeup
-                    (return-from %%wait-for-mutex nil)))
-              (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
-              ;; Update timeout
-              (setf (values to-sec to-usec)
-                    (sb-impl::relative-decoded-times stop-sec stop-usec))))))
-    (setf (mutex-%owner mutex) new-owner)
-    t))
+      (declare (dynamic-extent #'cas))
+      (%%wait-for #'cas stop-sec stop-usec)))))
 
 #+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
@@ -902,13 +911,6 @@ IF-NOT-OWNER is :FORCE)."
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
-#+sb-futex
-(locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (define-structure-slot-addressor waitqueue-token-address
-      :structure waitqueue
-      :slot token
-      :byte-offset (+ #+(and 64-bit big-endian) 4)))
-
 (declaim (inline %condition-wait))
 (defun %condition-wait (queue mutex
                         timeout to-sec to-usec stop-sec stop-usec deadlinep)
@@ -926,22 +928,9 @@ IF-NOT-OWNER is :FORCE)."
       ;; the mutex on our way out.
       (without-interrupts
         (unwind-protect
-             (progn
-               #-sb-futex
-               (progn
-                 (%with-cas-lock ((waitqueue-%owner queue))
-                   (%waitqueue-enqueue me queue))
-                 (release-mutex mutex)
-                 (setf status
-                       (or (flet ((wakeup ()
-                                    (barrier (:read))
-                                    (unless (eq queue (thread-waiting-for me))
-                                      :ok)))
-                             (declare (dynamic-extent #'wakeup))
-                             (allow-with-interrupts
-                               (%%wait-for #'wakeup stop-sec stop-usec)))
-                           :timeout)))
-               #+sb-futex
+            (cond
+             #+sb-futex
+             (t
                (with-pinned-objects (queue)
                  (setf (waitqueue-token queue) (my-kernel-thread-id))
                  (release-mutex mutex)
@@ -966,6 +955,20 @@ IF-NOT-OWNER is :FORCE)."
                           ;;  0 = normal wakeup
                           ;;  2 = EINTR, a spurious wakeup
                           :ok)))))
+             #-sb-futex
+             (t
+              (%with-cas-lock ((waitqueue-%owner queue))
+                 (%waitqueue-enqueue me queue))
+              (release-mutex mutex)
+              (setf status
+                       (or (flet ((wakeup ()
+                                    (barrier (:read))
+                                    (unless (eq queue (thread-waiting-for me))
+                                      :ok)))
+                             (declare (dynamic-extent #'wakeup))
+                             (allow-with-interrupts
+                               (%%wait-for #'wakeup stop-sec stop-usec)))
+                           :timeout))))
           #-sb-futex
           (%with-cas-lock ((waitqueue-%owner queue))
             (if (eq queue (thread-waiting-for me))
@@ -1079,12 +1082,9 @@ must be held by this thread during this call."
   #-sb-thread
   (error "Not supported in unithread builds.")
   #+sb-thread
-  (progn
-    #-sb-futex
-    (with-cas-lock ((waitqueue-%owner queue))
-      (%waitqueue-wakeup queue n))
-    #+sb-futex
-    (progn
+  (cond
+   #+sb-futex
+   (t
       ;; No problem if >1 thread notifies during the comment in condition-wait:
       ;; as long as the value in queue-data isn't the waiting thread's id, it
       ;; matters not what it is. We rely on kernel thread ID being nonzero.
@@ -1096,7 +1096,11 @@ must be held by this thread during this call."
       (setf (waitqueue-token queue) 0)
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n))
-      nil)))
+      nil)
+   #-sb-futex
+   (t
+    (with-cas-lock ((waitqueue-%owner queue))
+      (%waitqueue-wakeup queue n)))))
 
 
 (declaim (ftype (sfunction (waitqueue) null) condition-broadcast))

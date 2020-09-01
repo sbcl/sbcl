@@ -11,6 +11,16 @@
 
 (in-package "SB-THREAD")
 
+;;; It's possible to make futex/non-futex switchable at runtime by ensuring that
+;;; these synchronization primitive structs contain all the slots for the union
+;;; of any kind of backing object.  Some of the #+sb-futex/#-sb-futex cases in
+;;; target-thread also have to be changed to a COND rather than a compile-time test.
+;;; Among the uses of this would be to test real posix mutexes (with a finalizer on
+;;; each lisp-side proxy) or support older C APIs. Posix mutexes work nicely now
+;;; because finalizers are more efficient than they were, and when many threads
+;;; compete for a mutex, the pthread code seems to do a better job at reducing
+;;; cycles spent in the OS.
+
 ;;; N.B.: If you alter this definition, then you need to verify that FOP-FUNCALL
 ;;; in genesis can properly emulate MAKE-MUTEX for the altered structure,
 ;;; or even better, make sure that genesis can emulate any constructor,
@@ -24,7 +34,6 @@
   (name   nil :type (or null simple-string))
   (%owner nil :type (or null thread)))
 
-#+(or (not sb-thread) sb-futex)
 (sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
   ;; futex words are actually 32-bits, but it needs to be a raw slot and we don't have
@@ -32,20 +41,14 @@
   #+sb-futex (token 0 :type sb-ext:word)
   ;; If adding slots between TOKEN and NAME, please see futex_name() in linux_os.c
   ;; which attempts to divine a string from a futex word address.
-  (name nil :type (or null string)))
-
-#+(and sb-thread (not sb-futex))
-(sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
-  "Waitqueue type."
   (name nil :type (or null string))
   ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
   ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
   ;; lock. In most cases this should be uncontested thanks to the mutex --
   ;; the only case where that might not be true is when CONDITION-WAIT
   ;; unwinds and %WAITQUEUE-DROP is called.
-  %owner
-  %head
-  %tail)
+  . #+sb-futex nil
+    #-sb-futex (%owner %head %tail))
 
 (sb-xc:defstruct (semaphore (:copier nil)
                             (:constructor %make-semaphore (%count mutex queue)))
