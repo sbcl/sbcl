@@ -41,7 +41,6 @@ struct gcing_safety {
 
 int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
 void** os_get_csp(struct thread* th);
-void alloc_gc_page();
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
 
@@ -384,7 +383,9 @@ void signal_handler_callback(lispobj, int, void *, void *);
 
 extern void create_main_lisp_thread(lispobj);
 
-#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_WIN32
+extern CRITICAL_SECTION all_threads_lock;
+#elif defined LISP_FEATURE_SB_THREAD
 extern pthread_mutex_t all_threads_lock;
 #endif
 

@@ -30,8 +30,12 @@ boolean alloc_profiling;              // enabled flag
 #ifdef LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_SB_THREAD
 /* This lock is used to protect non-thread-local allocation. */
-static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef LISP_FEATURE_WIN32
+CRITICAL_SECTION code_allocator_lock, alloc_profiler_lock;
+#else
+static pthread_mutex_t code_allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 #endif
 lispobj alloc_code_object (unsigned total_words)
 {
@@ -51,12 +55,12 @@ lispobj alloc_code_object (unsigned total_words)
 
     /* Allocations of code are all serialized. We might also acquire
      * free_pages_lock depending on availability of space in the region */
-    int result = thread_mutex_lock(&allocation_lock);
+    int result = thread_mutex_lock(&code_allocator_lock);
     gc_assert(!result);
     struct code *code = (struct code *)
       lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1], total_words*N_WORD_BYTES,
                  CODE_PAGE_TYPE, th);
-    result = thread_mutex_unlock(&allocation_lock);
+    result = thread_mutex_unlock(&code_allocator_lock);
     gc_assert(!result);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;

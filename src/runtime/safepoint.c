@@ -106,8 +106,8 @@ const char* gc_phase_names[GC_NPHASES] = {
 #define SET_THREAD_STOP_PENDING(th,state) \
     write_TLS(STOP_FOR_GC_PENDING,state,th)
 #define WITH_ALL_THREADS_LOCK \
-    pthread_mutex_lock(&all_threads_lock); \
-    RUN_BODY_ONCE(all_threads_lock, pthread_mutex_unlock(&all_threads_lock))
+    thread_mutex_lock(&all_threads_lock); \
+    RUN_BODY_ONCE(all_threads_lock, thread_mutex_unlock(&all_threads_lock))
 #else
 #define CURRENT_THREAD_VAR(name)
 #define THREAD_STOP_PENDING(th) NIL
@@ -119,12 +119,6 @@ const char* gc_phase_names[GC_NPHASES] = {
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
  * definition goes here.  Fixme: (Why) don't these work for Windows?
  */
-void
-alloc_gc_page()
-{
-    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
-}
-
 void
 map_gc_page()
 {
@@ -142,15 +136,14 @@ unmap_gc_page()
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
-struct gc_state {
-#ifdef LISP_FEATURE_SB_THREAD
-    /* Flag: conditions are initialized */
-    boolean initialized;
-
+static struct gc_state {
+#ifdef LISP_FEATURE_WIN32
     /* Per-process lock for gc_state */
-    pthread_mutex_t lock;
-
+    CRITICAL_SECTION lock;;
     /* Conditions: one per phase */
+    CONDITION_VARIABLE phase_cond[GC_NPHASES];
+#else
+    pthread_mutex_t lock;
     pthread_cond_t phase_cond[GC_NPHASES];
 #endif
 
@@ -164,21 +157,32 @@ struct gc_state {
 
     /* Current GC phase */
     gc_phase_t phase;
-};
+} gc_state;
 
-static struct gc_state gc_state = {
-#ifdef LISP_FEATURE_SB_THREAD
-    .lock = PTHREAD_MUTEX_INITIALIZER,
+void safepoint_init()
+{
+    int i;
+# ifdef LISP_FEATURE_WIN32
+    extern void alloc_gc_page(void);
+    alloc_gc_page();
+    for (i=GC_NONE; i<GC_NPHASES; ++i)
+        InitializeConditionVariable(&gc_state.phase_cond[i]);
+    InitializeCriticalSection(&gc_state.lock);
+#else
+    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
+    for (i=GC_NONE; i<GC_NPHASES; ++i)
+        pthread_cond_init(&gc_state.phase_cond[i], NULL);
+    pthread_mutex_init(&gc_state.lock, NULL);
 #endif
-    .phase = GC_NONE,
-};
+    gc_state.phase = GC_NONE;
+}
 
 void
 gc_state_lock()
 {
     odxprint(safepoints,"GC state to be locked");
 #ifdef LISP_FEATURE_SB_THREAD
-    int result = pthread_mutex_lock(&gc_state.lock);
+    int result = thread_mutex_lock(&gc_state.lock);
     gc_assert(!result);
 #endif
     if (gc_state.master) {
@@ -189,14 +193,6 @@ gc_state_lock()
     }
     gc_assert(!gc_state.master);
     gc_state.master = arch_os_get_current_thread();
-#ifdef LISP_FEATURE_SB_THREAD
-    if (!gc_state.initialized) {
-        int i;
-        for (i=GC_NONE; i<GC_NPHASES; ++i)
-            pthread_cond_init(&gc_state.phase_cond[i],NULL);
-        gc_state.initialized = 1;
-    }
-#endif
     odxprint(safepoints,"GC state locked in phase %d (%s)",
              gc_state.phase, gc_phase_names[gc_state.phase]);
 }
@@ -209,7 +205,7 @@ gc_state_unlock()
     gc_assert(arch_os_get_current_thread()==gc_state.master);
     gc_state.master = NULL;
 #ifdef LISP_FEATURE_SB_THREAD
-    int result = pthread_mutex_unlock(&gc_state.lock);
+    int result = thread_mutex_unlock(&gc_state.lock);
     gc_assert(!result);
 #endif
     odxprint(safepoints,"%s","GC state unlocked");
@@ -226,7 +222,9 @@ gc_state_wait(gc_phase_t phase)
     gc_assert(gc_state.master == self);
     gc_state.master = NULL;
     while(gc_state.phase != phase && !(phase == GC_QUIET && (gc_state.phase > GC_QUIET))) {
-#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_WIN32
+        SleepConditionVariableCS(&gc_state.phase_cond[phase], &gc_state.lock, INFINITE);
+#elif defined LISP_FEATURE_SB_THREAD
         pthread_cond_wait(&gc_state.phase_cond[phase],&gc_state.lock);
 #else
         lose("gc_state_wait() blocks, but we're #-SB-THREAD");
@@ -456,7 +454,9 @@ static inline void gc_advance(gc_phase_t cur, gc_phase_t old) {
         gc_state.phase = gc_phase_next(gc_state.phase);
         odxprint(safepoints,"no blockers, direct advance to %d (%s)",gc_state.phase,gc_phase_names[gc_state.phase]);
         gc_handle_phase();
-#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_WIN32
+        WakeAllConditionVariable(&gc_state.phase_cond[gc_state.phase]);
+#elif defined LISP_FEATURE_SB_THREAD
         pthread_cond_broadcast(&gc_state.phase_cond[gc_state.phase]);
 #endif
     }
@@ -936,7 +936,7 @@ wake_thread_win32(struct thread *thread)
         return;
 
     wake_thread_io(thread);
-    pthread_mutex_unlock(&all_threads_lock);
+    thread_mutex_unlock(&all_threads_lock);
 
     WITH_GC_STATE_LOCK {
         if (gc_state.phase == GC_NONE) {
@@ -945,7 +945,7 @@ wake_thread_win32(struct thread *thread)
         }
     }
 
-    pthread_mutex_lock(&all_threads_lock);
+    thread_mutex_lock(&all_threads_lock);
     return;
 }
 # else

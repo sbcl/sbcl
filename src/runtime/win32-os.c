@@ -640,8 +640,27 @@ void* os_dlsym_default(char* name)
    started before _any_ TLS slot is allocated by libraries, and
    some C compiler vendors rely on this fact. */
 
+extern CRITICAL_SECTION code_allocator_lock, alloc_profiler_lock;
+static CRITICAL_SECTION interrupt_io_lock;
+
+struct {
+    console_char buffer[MAX_CONSOLE_TCHARS];
+    DWORD head, tail;
+    CRITICAL_SECTION lock;
+    CONDITION_VARIABLE cond_has_data;
+    CONDITION_VARIABLE cond_has_client;
+    pthread_t thread;
+    boolean initialized;
+    HANDLE handle;
+    boolean in_progress;
+} ttyinput;
+
 int os_preinit(char *argv[], char *envp[])
 {
+    InitializeCriticalSection(&code_allocator_lock);
+    InitializeCriticalSection(&alloc_profiler_lock);
+    InitializeCriticalSection(&interrupt_io_lock);
+    InitializeCriticalSection(&ttyinput.lock);
     pthreads_win32_init();
 #ifdef LISP_FEATURE_X86
     DWORD slots[TLS_MINIMUM_AVAILABLE];
@@ -1003,14 +1022,14 @@ is_some_thread_local_addr(os_vm_address_t addr)
     boolean result = 0;
 #ifdef LISP_FEATURE_SB_THREAD
     struct thread *th;
-    pthread_mutex_lock(&all_threads_lock);
+    thread_mutex_lock(&all_threads_lock);
     for_each_thread(th) {
         if(is_thread_local_addr(th,addr)) {
             result = 1;
             break;
         }
     }
-    pthread_mutex_unlock(&all_threads_lock);
+    thread_mutex_unlock(&all_threads_lock);
 #endif
     return result;
 }
@@ -1562,8 +1581,6 @@ boolean io_begin_interruptible(HANDLE handle)
     return 1;
 }
 
-static pthread_mutex_t interrupt_io_lock = PTHREAD_MUTEX_INITIALIZER;
-
 /* Unmark current thread as (probably) doing synchronous I/O; if an
  * I/O cancellation was requested, postpone it until next
  * io_begin_interruptible */
@@ -1572,10 +1589,10 @@ io_end_interruptible(HANDLE handle)
 {
     if (!ptr_CancelIoEx)
         return;
-    pthread_mutex_lock(&interrupt_io_lock);
+    thread_mutex_lock(&interrupt_io_lock);
     __sync_bool_compare_and_swap(&this_thread->synchronous_io_handle_and_flag,
                                  handle, 0);
-    pthread_mutex_unlock(&interrupt_io_lock);
+    thread_mutex_unlock(&interrupt_io_lock);
 }
 #define WITH_INTERRUPTIBLE_IO(handle)      \
     if (!io_begin_interruptible(handle)) { \
@@ -1653,30 +1670,18 @@ int console_handle_p(HANDLE handle)
  * entered.
  */
 
-struct {
-    console_char buffer[MAX_CONSOLE_TCHARS];
-    DWORD head, tail;
-    pthread_mutex_t lock;
-    pthread_cond_t cond_has_data;
-    pthread_cond_t cond_has_client;
-    pthread_t thread;
-    boolean initialized;
-    HANDLE handle;
-    boolean in_progress;
-} ttyinput = {.lock = PTHREAD_MUTEX_INITIALIZER};
-
 static unsigned long
 tty_read_line_server()
 {
-    pthread_mutex_lock(&ttyinput.lock);
+    thread_mutex_lock(&ttyinput.lock);
     while (ttyinput.handle) {
         DWORD nchars;
         BOOL ok;
 
         while (!ttyinput.in_progress)
-            pthread_cond_wait(&ttyinput.cond_has_client,&ttyinput.lock);
+          SleepConditionVariableCS(&ttyinput.cond_has_client,&ttyinput.lock,INFINITE);
 
-        pthread_mutex_unlock(&ttyinput.lock);
+        thread_mutex_unlock(&ttyinput.lock);
 #ifdef LISP_FEATURE_SB_UNICODE
         ok = ReadConsoleW(ttyinput.handle,
                           &ttyinput.buffer[ttyinput.tail],
@@ -1689,16 +1694,16 @@ tty_read_line_server()
                          &nchars,NULL);
 #endif
 
-        pthread_mutex_lock(&ttyinput.lock);
+        thread_mutex_lock(&ttyinput.lock);
 
         if (ok) {
             ttyinput.tail += nchars;
-            pthread_cond_broadcast(&ttyinput.cond_has_data);
+            WakeAllConditionVariable(&ttyinput.cond_has_data);
         }
         ttyinput.in_progress = 0;
     }
-    pthread_mutex_unlock(&ttyinput.lock);
-    return NULL;
+    thread_mutex_unlock(&ttyinput.lock);
+    return 0;
 }
 
 static boolean
@@ -1710,8 +1715,8 @@ tty_maybe_initialize_unlocked(HANDLE handle)
                              0,FALSE,DUPLICATE_SAME_ACCESS)) {
             return 0;
         }
-        pthread_cond_init(&ttyinput.cond_has_data,NULL);
-        pthread_cond_init(&ttyinput.cond_has_client,NULL);
+        InitializeConditionVariable(&ttyinput.cond_has_data);
+        InitializeConditionVariable(&ttyinput.cond_has_client);
         ttyinput.thread = CreateThread(NULL,
                                        0, // stack size = default
                                        tty_read_line_server, 0,
@@ -1727,7 +1732,7 @@ win32_tty_listen(HANDLE handle)
     boolean result = 0;
     INPUT_RECORD ir;
     DWORD nevents;
-    pthread_mutex_lock(&ttyinput.lock);
+    thread_mutex_lock(&ttyinput.lock);
     if (!tty_maybe_initialize_unlocked(handle))
         result = 0;
 
@@ -1739,11 +1744,11 @@ win32_tty_listen(HANDLE handle)
         } else {
             if (PeekConsoleInput(ttyinput.handle,&ir,1,&nevents) && nevents) {
                 ttyinput.in_progress = 1;
-                pthread_cond_broadcast(&ttyinput.cond_has_client);
+                WakeAllConditionVariable(&ttyinput.cond_has_client);
             }
         }
     }
-    pthread_mutex_unlock(&ttyinput.lock);
+    thread_mutex_unlock(&ttyinput.lock);
     return result;
 }
 
@@ -1759,7 +1764,7 @@ static int win32_read_console(HANDLE handle, void* buf, int count)
 
     count = nchars*sizeof(console_char);
 
-    pthread_mutex_lock(&ttyinput.lock);
+    thread_mutex_lock(&ttyinput.lock);
 
     if (!tty_maybe_initialize_unlocked(handle)) {
         result = -1;
@@ -1779,9 +1784,9 @@ static int win32_read_console(HANDLE handle, void* buf, int count)
                     /* We are to wait */
                     ttyinput.in_progress=1;
                     /* wake console reader */
-                    pthread_cond_broadcast(&ttyinput.cond_has_client);
+                    WakeAllConditionVariable(&ttyinput.cond_has_client);
                 }
-                pthread_cond_wait(&ttyinput.cond_has_data, &ttyinput.lock);
+                SleepConditionVariableCS(&ttyinput.cond_has_data, &ttyinput.lock, INFINITE);
                 io_end_interruptible(ttyinput.handle);
             }
         }
@@ -1816,7 +1821,7 @@ static int win32_read_console(HANDLE handle, void* buf, int count)
         }
     }
 unlock:
-    pthread_mutex_unlock(&ttyinput.lock);
+    thread_mutex_unlock(&ttyinput.lock);
     return result;
 }
 
@@ -1831,7 +1836,7 @@ win32_maybe_interrupt_io(void* thread)
 #endif
 
     if (ptr_CancelIoEx) {
-        pthread_mutex_lock(&interrupt_io_lock);
+        thread_mutex_lock(&interrupt_io_lock);
         HANDLE h = (HANDLE)
             InterlockedExchangePointer((volatile LPVOID *)
                                        &th->synchronous_io_handle_and_flag,
@@ -1839,9 +1844,9 @@ win32_maybe_interrupt_io(void* thread)
 
         if (h && (h!=INVALID_HANDLE_VALUE)) {
             if (console_handle_p(h)) {
-                pthread_mutex_lock(&ttyinput.lock);
-                pthread_cond_broadcast(&ttyinput.cond_has_data);
-                pthread_mutex_unlock(&ttyinput.lock);
+                thread_mutex_lock(&ttyinput.lock);
+                WakeAllConditionVariable(&ttyinput.cond_has_data);
+                thread_mutex_unlock(&ttyinput.lock);
                 done = 1;
                 goto unlock;
             }
@@ -1851,7 +1856,7 @@ win32_maybe_interrupt_io(void* thread)
             done |= !!ptr_CancelIoEx(h,NULL);
         }
     unlock:
-        pthread_mutex_unlock(&interrupt_io_lock);
+        thread_mutex_unlock(&interrupt_io_lock);
     }
     return done;
 }

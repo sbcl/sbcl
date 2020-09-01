@@ -123,7 +123,7 @@ typedef HANDLE (*cv_event_get_fn)();
 typedef void (*cv_event_return_fn)(HANDLE event);
 
 typedef struct pthread_cond_t {
-  pthread_mutex_t wakeup_lock;
+  CRITICAL_SECTION wakeup_lock;
   struct thread_wakeup *first_wakeup;
   struct thread_wakeup *last_wakeup;
   unsigned char alertable;

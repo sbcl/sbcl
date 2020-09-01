@@ -32,24 +32,20 @@ struct freelist_cell {
 
 struct freelist {
     void* (*create_fn)();
-    pthread_mutex_t lock;
+    CRITICAL_SECTION lock;
     struct freelist_cell * empty;
     struct freelist_cell * full;
     unsigned int count;
 };
 
-#define FREELIST_INITIALIZER(create_fn)                 \
-    {                                                   \
-        event_create, PTHREAD_MUTEX_INITIALIZER,        \
-            NULL, NULL, 0                               \
-            }                                           \
-
+#define mutex_lock(x) EnterCriticalSection(x)
+#define mutex_unlock(x) LeaveCriticalSection(x)
 
 static void* freelist_get(struct freelist *fl)
 {
     void* result = NULL;
     if (fl->full) {
-        pthread_mutex_lock(&fl->lock);
+        mutex_lock(&fl->lock);
         if (fl->full) {
             struct freelist_cell *cell = fl->full;
             fl->full = cell->next;
@@ -57,7 +53,7 @@ static void* freelist_get(struct freelist *fl)
             cell->next = fl->empty;
             fl->empty = cell;
         }
-        pthread_mutex_unlock(&fl->lock);
+        mutex_unlock(&fl->lock);
     }
     if (!result) {
         result = fl->create_fn();
@@ -69,13 +65,13 @@ static void freelist_return(struct freelist *fl, void*data)
 {
     struct freelist_cell* cell = NULL;
     if (fl->empty) {
-        pthread_mutex_lock(&fl->lock);
+        mutex_lock(&fl->lock);
         if (fl->empty) {
             cell = fl->empty;
             fl->empty = cell->next;
             goto add_locked;
         }
-        pthread_mutex_unlock(&fl->lock);
+        mutex_unlock(&fl->lock);
     }
     if (!cell) {
         int i,n=32;
@@ -85,13 +81,13 @@ static void freelist_return(struct freelist *fl, void*data)
         cell[i].next = NULL;
     }
 
-    pthread_mutex_lock(&fl->lock);
+    mutex_lock(&fl->lock);
     ++fl->count;
  add_locked:
     cell->data = data;
     cell->next = fl->full;
     fl->full = cell;
-    pthread_mutex_unlock(&fl->lock);
+    mutex_unlock(&fl->lock);
 }
 
 typedef unsigned char boolean;
@@ -172,7 +168,7 @@ int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
   return 0;
 }
 
-pthread_mutex_t mutex_init_lock;
+static CRITICAL_SECTION mutex_init_lock;
 
 int pthread_mutex_init(pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
 {
@@ -257,11 +253,11 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
   pthread_np_assert_live_mutex(mutex,"lock");
   if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
-    pthread_mutex_lock(&mutex_init_lock);
+    mutex_lock(&mutex_init_lock);
     if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
       pthread_mutex_init(mutex, NULL);
     }
-    pthread_mutex_unlock(&mutex_init_lock);
+    mutex_unlock(&mutex_init_lock);
   }
   EnterCriticalSection(&(*mutex)->cs);
   DEBUG_OWN(*mutex);
@@ -272,11 +268,11 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex)
 {
   pthread_np_assert_live_mutex(mutex,"trylock");
   if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
-    pthread_mutex_lock(&mutex_init_lock);
+    mutex_lock(&mutex_init_lock);
     if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
       pthread_mutex_init(mutex, NULL);
     }
-    pthread_mutex_unlock(&mutex_init_lock);
+    mutex_unlock(&mutex_init_lock);
   }
   if (TryEnterCriticalSection(&(*mutex)->cs)) {
       DEBUG_OWN(*mutex);
@@ -294,14 +290,14 @@ int pthread_mutex_lock_annotate_np(pthread_mutex_t *mutex, const char* file, int
   int contention = 0;
   pthread_np_assert_live_mutex(mutex,"lock");
   if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
-    pthread_mutex_lock(&mutex_init_lock);
+    mutex_lock(&mutex_init_lock);
     if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
       pthread_mutex_init(mutex, NULL);
       pthshow("Mutex #x%p: automatic initialization; #x%p %s +%d",
               mutex, *mutex,
               file, line);
     }
-    pthread_mutex_unlock(&mutex_init_lock);
+    mutex_unlock(&mutex_init_lock);
   }
   if ((*mutex)->owner) {
     pthshow("Mutex #x%p -> #x%p: contention; owned by #x%p, wanted by #x%p",
@@ -334,11 +330,11 @@ int pthread_mutex_trylock_annotate_np(pthread_mutex_t *mutex, const char* file, 
   int contention = 0;
   pthread_np_assert_live_mutex(mutex,"trylock");
   if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
-    pthread_mutex_lock(&mutex_init_lock);
+    mutex_lock(&mutex_init_lock);
     if (*mutex == PTHREAD_MUTEX_INITIALIZER) {
       pthread_mutex_init(mutex, NULL);
     }
-    pthread_mutex_unlock(&mutex_init_lock);
+    mutex_unlock(&mutex_init_lock);
   }
   if ((*mutex)->owner) {
     pthshow("Mutex #x%p -> #x%p: tried contention; owned by #x%p, wanted by #x%p",
@@ -398,7 +394,7 @@ static void* event_create()
     return (void*)CreateEvent(NULL,FALSE,FALSE,NULL);
 }
 
-static struct freelist event_freelist = FREELIST_INITIALIZER(event_create);
+static struct freelist event_freelist;
 
 
 unsigned int pthread_free_event_pool_size()
@@ -454,7 +450,7 @@ int pthread_cond_init(pthread_cond_t * cv, const pthread_condattr_t * attr)
 {
   if (!attr)
     attr = &cv_default_attr;
-  pthread_mutex_init(&cv->wakeup_lock, NULL);
+  InitializeCriticalSection(&cv->wakeup_lock);
   cv->first_wakeup = NULL;
   cv->last_wakeup = NULL;
   cv->alertable = attr->alertable;
@@ -483,7 +479,6 @@ int pthread_condattr_setevent_np(pthread_condattr_t *attr,
 
 int pthread_cond_destroy(pthread_cond_t *cv)
 {
-  pthread_mutex_destroy(&cv->wakeup_lock);
   return 0;
 }
 
@@ -498,7 +493,7 @@ int pthread_cond_broadcast(pthread_cond_t *cv)
      mutex unlock around waiting. */
   if (!cv->first_wakeup)
       return 0;
-  pthread_mutex_lock(&cv->wakeup_lock);
+  mutex_lock(&cv->wakeup_lock);
   while (cv->first_wakeup)
   {
     struct thread_wakeup * w = cv->first_wakeup;
@@ -515,7 +510,7 @@ int pthread_cond_broadcast(pthread_cond_t *cv)
     ++count;
   }
   cv->last_wakeup = NULL;
-  pthread_mutex_unlock(&cv->wakeup_lock);
+  mutex_unlock(&cv->wakeup_lock);
   for (i=0; i<npostponed; ++i)
       SetEvent(postponed[i]);
   return 0;
@@ -528,7 +523,7 @@ int pthread_cond_signal(pthread_cond_t *cv)
      mutex unlock around waiting. */
   if (!cv->first_wakeup)
       return 0;
-  pthread_mutex_lock(&cv->wakeup_lock);
+  mutex_lock(&cv->wakeup_lock);
   w = cv->first_wakeup;
   if (w) {
     HANDLE waitevent = w->event;
@@ -538,7 +533,7 @@ int pthread_cond_signal(pthread_cond_t *cv)
     w->info = WAKEUP_HAPPENED;
     SetEvent(waitevent);
   }
-  pthread_mutex_unlock(&cv->wakeup_lock);
+  mutex_unlock(&cv->wakeup_lock);
   return 0;
 }
 
@@ -547,10 +542,10 @@ int cv_wakeup_add(struct pthread_cond_t* cv, struct thread_wakeup* w)
 {
   HANDLE event;
   w->next = NULL;
-  pthread_mutex_lock(&cv->wakeup_lock);
+  mutex_lock(&cv->wakeup_lock);
   if (w->uaddr) {
       if (w->uval != *w->uaddr) {
-          pthread_mutex_unlock(&cv->wakeup_lock);
+          mutex_unlock(&cv->wakeup_lock);
           return 1;
       }
       pthread_self()->futex_wakeup = w;
@@ -572,7 +567,7 @@ int cv_wakeup_add(struct pthread_cond_t* cv, struct thread_wakeup* w)
     cv->first_wakeup = w;
     cv->last_wakeup = w;
   }
-  pthread_mutex_unlock(&cv->wakeup_lock);
+  mutex_unlock(&cv->wakeup_lock);
   return 0;
 }
 
@@ -582,7 +577,7 @@ int cv_wakeup_remove(struct pthread_cond_t* cv, struct thread_wakeup* w)
   int result = 0;
   if (w->info == WAKEUP_HAPPENED || w->info == WAKEUP_BY_INTERRUPT)
       goto finish;
-  pthread_mutex_lock(&cv->wakeup_lock);
+  mutex_lock(&cv->wakeup_lock);
   {
     if (w->info == WAKEUP_HAPPENED || w->info == WAKEUP_BY_INTERRUPT)
         goto unlock;
@@ -605,7 +600,7 @@ int cv_wakeup_remove(struct pthread_cond_t* cv, struct thread_wakeup* w)
     }
   }
  unlock:
-  pthread_mutex_unlock(&cv->wakeup_lock);
+  mutex_unlock(&cv->wakeup_lock);
  finish:
   return result;
 }
@@ -705,21 +700,10 @@ int sched_yield()
   return 0;
 }
 
-void pthread_lock_structures()
-{
-  pthread_mutex_lock(&mutex_init_lock);
-}
-
-void pthread_unlock_structures()
-{
-  pthread_mutex_unlock(&mutex_init_lock);
-}
-
 void pthreads_win32_init()
 {
-
     thread_self_tls_index = TlsAlloc();
-    pthread_mutex_init(&mutex_init_lock, NULL);
+    InitializeCriticalSection(&mutex_init_lock);
     pthread_np_notice_thread();
 }
 

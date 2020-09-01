@@ -65,13 +65,21 @@ os_vm_size_t thread_alien_stack_size = ALIEN_STACK_SIZE;
 struct thread *all_threads;
 
 #ifdef LISP_FEATURE_SB_THREAD
-pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
 #elif !defined LISP_FEATURE_WIN32
 pthread_key_t specials = 0;
 #endif
+
+#ifdef LISP_FEATURE_WIN32
+CRITICAL_SECTION all_threads_lock;
+static CRITICAL_SECTION recyclebin_lock;
+#else
+pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -236,6 +244,10 @@ void* get_current_vm_thread() {
 #endif
 
 void create_main_lisp_thread(lispobj function) {
+#ifdef LISP_FEATURE_WIN32
+    InitializeCriticalSection(&all_threads_lock);
+    InitializeCriticalSection(&recyclebin_lock);
+#endif
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
@@ -329,11 +341,11 @@ init_new_thread(struct thread *th,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     *th->csp_around_foreign_call = (lispobj)scribble;
 #endif
-    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     link_thread(th);
     if (!retain_all_threads_lock) {
-        lock_ret = pthread_mutex_unlock(&all_threads_lock);
+        lock_ret = thread_mutex_unlock(&all_threads_lock);
         gc_assert(lock_ret == 0);
     }
 
@@ -365,10 +377,10 @@ unregister_thread(struct thread *th,
     ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);
 #endif
     pop_gcing_safety(&scribble->safety);
-    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     unlink_thread(th);
-    lock_ret = pthread_mutex_unlock(&all_threads_lock);
+    lock_ret = thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
 #else
@@ -383,7 +395,7 @@ unregister_thread(struct thread *th,
      * thread, but since we are either exiting lisp code as a lisp
      * thread that is dying, or exiting lisp code to return to
      * former status as a C thread, it won't wait long. */
-    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
     /* FIXME: this nests the free_pages_lock inside the all_threads_lock.
@@ -394,7 +406,7 @@ unregister_thread(struct thread *th,
     ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);
 #endif
     unlink_thread(th);
-    pthread_mutex_unlock(&all_threads_lock);
+    thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
 #endif
@@ -560,36 +572,39 @@ void* new_thread_trampoline_switch_stack(void* th) {
 #endif
 
 static struct thread* recyclebin_threads;
-static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct thread* get_recyclebin_item()
 {
     struct thread* result = 0;
     int rc;
-    rc = pthread_mutex_lock(&recyclebin_lock);
+    rc = thread_mutex_lock(&recyclebin_lock);
     gc_assert(!rc);
     if (recyclebin_threads) {
         result = recyclebin_threads;
         recyclebin_threads = result->next;
     }
-    pthread_mutex_unlock(&recyclebin_lock);
+    thread_mutex_unlock(&recyclebin_lock);
     return result ? result->os_address : 0;
 }
 static void put_recyclebin_item(struct thread* th)
 {
     int rc;
-    rc = pthread_mutex_lock(&recyclebin_lock);
+    rc = thread_mutex_lock(&recyclebin_lock);
     gc_assert(!rc);
     th->next = recyclebin_threads;
     recyclebin_threads = th;
-    pthread_mutex_unlock(&recyclebin_lock);
+    thread_mutex_unlock(&recyclebin_lock);
 }
 void empty_thread_recyclebin()
 {
     if (!recyclebin_threads) return;
     sigset_t old;
     block_deferrable_signals(&old);
-    int rc = pthread_mutex_trylock(&recyclebin_lock);
-    if (!rc) { // no big deal if already locked (recursive GC?)
+    // no big deal if already locked (recursive GC?)
+#ifdef LISP_FEATURE_WIN32
+    if (TryEnterCriticalSection(&recyclebin_lock)) {
+#else
+    if (!pthread_mutex_trylock(&recyclebin_lock)) {
+#endif
         struct thread* this = recyclebin_threads;
         while (this) {
             struct thread* next = this->next;
@@ -597,7 +612,7 @@ void empty_thread_recyclebin()
             this = next;
         }
         recyclebin_threads = 0;
-        pthread_mutex_unlock(&recyclebin_lock);
+        thread_mutex_unlock(&recyclebin_lock);
     }
     thread_sigmask(SIG_SETMASK, &old, 0);
 }
@@ -764,7 +779,7 @@ callback_wrapper_trampoline(
 // Balance out the mutex_lock in attach_os_thread()
 void release_all_threads_lock()
 {
-    if (pthread_mutex_unlock(&all_threads_lock))
+    if (thread_mutex_unlock(&all_threads_lock))
         lose("ENTER-FOREIGN-CALLBACK bug");
 }
 
@@ -1097,7 +1112,7 @@ void gc_stop_the_world()
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
 
     /* Keep threads from registering with GC while the world is stopped. */
-    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock\n"));
@@ -1162,7 +1177,7 @@ void gc_start_the_world()
         }
     }
 
-    lock_ret = pthread_mutex_unlock(&all_threads_lock);
+    lock_ret = thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
@@ -1251,7 +1266,7 @@ kill_safely(os_thread_t os_thread, int signal)
         /* pthread_kill is not async signal safe and we don't want to be
          * interrupted while holding the lock. */
         block_deferrable_signals(&oldset);
-        pthread_mutex_lock(&all_threads_lock);
+        thread_mutex_lock(&all_threads_lock);
         for (thread = all_threads; thread; thread = thread->next) {
             if (thread->os_thread == os_thread) {
                 int status = pthread_kill(os_thread, signal);
@@ -1263,7 +1278,7 @@ kill_safely(os_thread_t os_thread, int signal)
                 break;
             }
         }
-        pthread_mutex_unlock(&all_threads_lock);
+        thread_mutex_unlock(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
         if (thread)
             return 0;

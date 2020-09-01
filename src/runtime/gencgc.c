@@ -29,7 +29,7 @@
 #include <inttypes.h>
 #include "sbcl.h"
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-#include "pthreads_win32.h"
+//
 #else
 #include <signal.h>
 #endif
@@ -350,7 +350,11 @@ page_index_t next_free_page; // upper (exclusive) bound on used page range
  * >1 thread at a time and must be thread-safe.  This lock must be
  * seized before all accesses to generations[] or to parts of
  * page_table[] that other threads may want to see */
+#ifdef LISP_FEATURE_WIN32
+static CRITICAL_SECTION free_pages_lock;
+#else
 static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 #endif
 
 extern os_vm_size_t gencgc_release_granularity;
@@ -3213,7 +3217,6 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
                             os_context_t __attribute__((unused)) *c)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    void **ptr;
     /* On Darwin the signal context isn't a contiguous block of memory,
      * so just preserve_pointering its contents won't be sufficient.
      */
@@ -3247,6 +3250,7 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
 #endif
 #endif
 #if !defined(LISP_FEATURE_WIN32)
+    void **ptr;
     for(ptr = ((void **)(c+1))-1; ptr>=(void **)c; ptr--) {
         proc((os_context_register_t)*ptr);
     }
@@ -4017,8 +4021,12 @@ collect_garbage(generation_index_t last_gen)
 void
 gc_init(void)
 {
+#ifdef LISP_FEATURE_WIN32
+    InitializeCriticalSection(&free_pages_lock);
+#endif
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
-    alloc_gc_page();
+    extern void safepoint_init(void);
+    safepoint_init();
 #endif
     // Verify that foo_BIT constants agree with the C compiler's bit packing
     // and that we can compute the correct adddress of the bitfields.
