@@ -663,9 +663,9 @@ int os_preinit(char *argv[], char *envp[])
         fprintf(stderr, "This binary was compiled for Windows 8 or later but you appear to be"
 " using 7 or earlier.\nRecompiling SBCL from source on the older release will"
 " probably work. See also\n"
-		"https://support.microsoft.com/en-us/help/4057281/windows-7-support-ended-on-january-14-2020\n");
-	fflush(stderr);
-	exit(1);
+                "https://support.microsoft.com/en-us/help/4057281/windows-7-support-ended-on-january-14-2020\n");
+        fflush(stderr);
+        exit(1);
     }
 #endif
     InitializeCriticalSection(&code_allocator_lock);
