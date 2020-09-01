@@ -1450,7 +1450,7 @@ veh(EXCEPTION_POINTERS *ep)
     EXCEPTION_DISPOSITION disp;
 
     RESTORING_ERRNO() {
-        if (!pthread_self())
+        if (!thread_self())
             return EXCEPTION_CONTINUE_SEARCH;
     }
 

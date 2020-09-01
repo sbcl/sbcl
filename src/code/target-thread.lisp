@@ -2117,6 +2117,7 @@ subject to change."
   ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
   ;; And raise() - as we use it - can't fail, so just ignore the result.
   ;; (The signal number is always SIGPIPE or SIGINT, and the process is obviously not dead)
+  ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
   #-sb-thread `(raise ,signal)
   #+sb-thread
   `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"

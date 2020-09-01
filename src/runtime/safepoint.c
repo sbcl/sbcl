@@ -921,8 +921,6 @@ wake_thread_io(struct thread * thread)
 void
 wake_thread_win32(struct thread *thread)
 {
-    struct thread *self = arch_os_get_current_thread();
-
     wake_thread_io(thread);
 
     if (read_TLS(THRUPTION_PENDING,thread)==T)

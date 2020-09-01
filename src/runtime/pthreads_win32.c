@@ -12,31 +12,9 @@
 
 DWORD thread_self_tls_index;
 
+#define thread_self() ((pthread_t)TlsGetValue(thread_self_tls_index))
 void set_thread_self(pthread_t thread) {
   TlsSetValue(thread_self_tls_index, thread);
-}
-
-/* Thread identity, as much as pthreads are concerned, is determined
-   by pthread_t structure that is stored in TLS slot
-   (thread_self_tls_index). This slot is reassigned when fibers are
-   switched with pthread_np API.
-
-   Two reasons for not using fiber-local storage for this purpose: (1)
-   Fls is too young: all other things work with Win2000, it requires
-   WinXP; (2) this implementation works also with threads that aren't
-   fibers, and it's a good thing.
-
-   There is one more case, besides fiber switching, when pthread_self
-   identity migrates between system threads: for non-main system
-   thread that is not [pthread_create]d, thread-specific data
-   destructors run in a thread from a system thread pool, after the
-   original thread dies. In order to provide compatibility with
-   classic pthread TSD, the system pool thread acquires dead thread's
-   identity for the duration of destructor calls.
-*/
-pthread_t pthread_self()
-{
-  return (pthread_t)TlsGetValue(thread_self_tls_index);
 }
 
 /* Thread function for [pthread_create]d threads.
@@ -57,15 +35,10 @@ int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
   return 0;
 }
 
-int pthread_equal(pthread_t thread1, pthread_t thread2)
-{
-  return thread1 == thread2;
-}
-
 /* TODO call signal handlers */
 int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-  pthread_t self = pthread_self();
+  pthread_t self = thread_self();
   if (oldset)
     *oldset = self->blocked_signal_set;
   if (set) {
@@ -104,7 +77,7 @@ void pthread_np_add_pending_signal(pthread_t thread, int signum)
  * DFL: ... or so the original comment claimed, but that was before
  * futexes.  Now that we wake up futexes, it's not entirely accurate
  * anymore, is it? */
-int pthread_kill(pthread_t thread, int signum)
+int sb_pthr_kill(pthread_t thread, int signum)
 {
   pthread_np_add_pending_signal(thread,signum);
   return 0;
@@ -153,7 +126,7 @@ VOID CALLBACK pthreads_win32_unnotice(void* parameter, BOOLEAN timerOrWait)
 
 int pthread_np_notice_thread()
 {
-  if (!pthread_self()) {
+  if (!thread_self()) {
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
     pth->teb = NtCurrentTeb();
 
@@ -206,7 +179,7 @@ int sigismember(const sigset_t *set, int signum)
 }
 int sigpending(sigset_t *set)
 {
-  *set = InterlockedCompareExchange((volatile LONG*)&pthread_self()->pending_signal_set,
+  *set = InterlockedCompareExchange((volatile LONG*)&thread_self()->pending_signal_set,
                                     0, 0);
   return 0;
 }

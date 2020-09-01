@@ -56,14 +56,7 @@ void pthreads_win32_init();
 
 typedef struct pthread_thread* pthread_t;
 
-int pthread_equal(pthread_t thread1, pthread_t thread2);
-int pthread_kill(pthread_t thread, int signum);
-
-#ifndef PTHREAD_INTERNALS
-pthread_t pthread_self(void) __attribute__((__const__));
-#else
-pthread_t pthread_self(void);
-#endif
+int sb_pthr_kill(pthread_t thread, int signum);
 
 extern DWORD thread_self_tls_index;
 
@@ -136,9 +129,10 @@ int sigismember(const sigset_t *set, int signum);
 typedef int sig_atomic_t;
 
 #ifndef PTHREAD_INTERNALS
+#define thread_self() ((pthread_t)TlsGetValue(thread_self_tls_index))
 static inline int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-  pthread_t self = pthread_self();
+  pthread_t self = thread_self();
   if (oldset)
     *oldset = self->blocked_signal_set;
   if (set) {

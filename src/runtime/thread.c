@@ -632,7 +632,7 @@ attach_os_thread(init_thread_data *scribble)
 #endif
 
     th->os_kernel_tid = get_nonzero_tid();
-    th->os_thread = pthread_self();
+    th->os_thread = thread_self();
 
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* On windows, arch_os_thread_init will take care of finding the
@@ -1254,13 +1254,30 @@ kill_safely(os_thread_t os_thread, int signal)
         /* From the linux man page on pthread_self() -
          * "variables  of  type  pthread_t  can't  portably be compared using
          *  the C equality operator (==); use pthread_equal(3) instead." */
-        if (thread_equal(os_thread, pthread_self())) {
-            pthread_kill(os_thread, signal);
+        if (thread_equal(os_thread, thread_self())) {
+            thread_kill(os_thread, signal);
 #ifdef LISP_FEATURE_WIN32
             check_pending_thruptions(NULL);
 #endif
             return 0;
         }
+
+        /* There are two problems with the comment below this one.
+         *
+         * - "... is not async signal safe" is based on obsolete information.
+         * https://www.man7.org/linux/man-pages/man7/signal-safety.7.html lists
+         *    pthread_kill(3)        Added in POSIX.1-2008 TC1
+         *
+         * - the comment is likely mistaken about the meaning of async-signal-safe:
+         *   "An async-signal-safe function is one that can be safely called
+         *    from within a signal handler."
+         * which is not what's happening here. Or should not be anyway,
+         * though in fact it would be async-signal safe, while ironically
+         * pthread_mutex_lock would NOT be safe.
+         * i.e. we had better not be in a signal handler.
+         *
+         * But kill_safely() is all kinds of bad, and shouldn't really be used.
+         */
 
         /* pthread_kill is not async signal safe and we don't want to be
          * interrupted while holding the lock. */
@@ -1268,7 +1285,7 @@ kill_safely(os_thread_t os_thread, int signal)
         thread_mutex_lock(&all_threads_lock);
         for (thread = all_threads; thread; thread = thread->next) {
             if (thread->os_thread == os_thread) {
-                int status = pthread_kill(os_thread, signal);
+                int status = thread_kill(os_thread, signal);
                 if (status)
                     lose("kill_safely: pthread_kill failed with %d", status);
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THRUPTION)

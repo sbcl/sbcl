@@ -1083,7 +1083,7 @@ struct vector* lisp_thread_name(os_thread_t os_thread)
 {
     struct thread* th;
     for_each_thread (th) {
-        if (pthread_equal(os_thread, th->os_thread)) {
+        if (thread_equal(os_thread, th->os_thread)) {
             struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
             return VECTOR(lispthread->name);
         }
