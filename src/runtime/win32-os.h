@@ -30,9 +30,6 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 #include "pthreads_win32.h"
-/* prevent inclusion of a mingw semaphore.h */
-#define CANNOT_USE_POSIX_SEM_T
-typedef sem_t os_sem_t;
 #else
 typedef void *siginfo_t;
 typedef int sigset_t;

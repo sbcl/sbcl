@@ -456,7 +456,6 @@ unregister_thread(struct thread *th,
     set_thread_self(self); \
     struct thread* th = self->vm_thread
 #define THREAD_TRAMPOLINE_EPILOGUE \
-    if (self->cv_event) CloseHandle(self->cv_event); \
     free_thread_struct(th); \
     HANDLE h = self->handle; \
     free(self); \
