@@ -657,6 +657,17 @@ struct {
 
 int os_preinit(char *argv[], char *envp[])
 {
+#ifdef LISP_FEATURE_SB_FUTEX
+    if (GetModuleHandle("API-MS-Win-Core-Synch-l1-2-0") == NULL) {
+        // calling lose() here loses. Such irony.
+        fprintf(stderr, "This binary was compiled for Windows 8 or later but you appear to be"
+" using 7 or earlier.\nRecompiling SBCL from source on the older release will"
+" probably work. See also\n"
+		"https://support.microsoft.com/en-us/help/4057281/windows-7-support-ended-on-january-14-2020\n");
+	fflush(stderr);
+	exit(1);
+    }
+#endif
     InitializeCriticalSection(&code_allocator_lock);
     InitializeCriticalSection(&alloc_profiler_lock);
     InitializeCriticalSection(&interrupt_io_lock);
