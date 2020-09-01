@@ -426,15 +426,13 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   #+sb-futex
   (progn
     (export 'futex-wake) ; for naughty users only
-    (declaim (inline futex-wait %futex-wait futex-wake))
-
-    (define-alien-routine ("futex_wait" %futex-wait) int
-      (word unsigned) (old-value #+linux (unsigned 32) #-linux unsigned)
-      (to-sec long) (to-usec unsigned-long))
+    (declaim (inline futex-wait futex-wake))
 
     (defun futex-wait (word old to-sec to-usec)
-      (with-interrupts
-        (%futex-wait word old to-sec to-usec)))
+      (with-alien ((%wait (function int unsigned (unsigned 32) long unsigned-long)
+                          :extern "futex_wait"))
+        (with-interrupts
+         (alien-funcall %wait word old to-sec to-usec))))
 
     (define-alien-routine "futex_wake"
         int (word unsigned) (n unsigned-long))))

@@ -42,6 +42,9 @@ OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
+ifdef LISP_FEATURE_SB_FUTEX
+  OS_LIBS += -lSynchronization
+endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
 

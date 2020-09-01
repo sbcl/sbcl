@@ -17,6 +17,20 @@ featurep() {
     rm -f $bin
 }
 
+# Adding a nonexistent link library to Config.*-win32 will fail,
+# so this needs its own recipe to detect the library.
+if [ "$sbcl_os" = win32 ] ; then
+    bin=os-provides-wakebyaddr-test
+    rm -f $bin
+    # pass -f /dev/null to use only builtin Make recipes
+    LOADLIBES=-lSynchronization $GNUMAKE -f /dev/null $bin > /dev/null 2>&1
+    if [ "$?" -eq 0 ]
+    then
+        printf " :sb-futex"
+    fi
+    rm -f $bin
+fi
+
 # KLUDGE: ppc/darwin dlopen is special cased in make-config.sh, as
 # we fake it with a shim.
 featurep os-provides-dlopen

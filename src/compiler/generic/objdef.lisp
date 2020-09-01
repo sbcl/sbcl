@@ -582,6 +582,7 @@ during backtrace.
   #+win32 (carried-base-pointer :c-type "os_context_register_t")
   #+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
+  #+(and win32 sb-futex) (waiting-on-address :c-type "void*")
   #+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; If we need the header slots, but they can't precede this structure

@@ -1826,6 +1826,10 @@ win32_maybe_interrupt_io(void* thread)
     struct thread *th = thread;
     boolean done = 0;
 
+#ifdef LISP_FEATURE_SB_FUTEX
+    if (th->waiting_on_address) WakeByAddressAll(th->waiting_on_address);
+#endif
+
     if (ptr_CancelIoEx) {
         pthread_mutex_lock(&interrupt_io_lock);
         HANDLE h = (HANDLE)
@@ -2163,6 +2167,33 @@ void
 os_cancel_wtimer(HANDLE handle)
 {
     CancelWaitableTimer(handle);
+}
+#endif
+
+#ifdef LISP_FEATURE_SB_FUTEX
+int
+futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
+{
+  DWORD timeout = sec < 0 ? INFINITE : (sec * 1000) + (usec / 1000);
+  struct thread* th = arch_os_get_current_thread();
+  th->waiting_on_address = lock_word;
+  int result = WaitOnAddress(lock_word, &oldval, 4, timeout);
+  th->waiting_on_address = 0;
+  if (result)
+      return 0;
+  if (GetLastError() == ERROR_TIMEOUT)
+      return 1;
+  return 0;
+}
+
+int
+futex_wake(PVOID lock_word, int n)
+{
+    if (n == 1)
+        WakeByAddressSingle(lock_word);
+    else
+        WakeByAddressAll(lock_word);
+    return 0;
 }
 #endif
 

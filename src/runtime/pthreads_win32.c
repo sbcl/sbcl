@@ -223,8 +223,6 @@ void pthread_np_add_pending_signal(pthread_t thread, int signum)
     asm("lock orl %1,%0":"=m"(thread->pending_signal_set):"r"(to_add));
 }
 
-static void futex_interrupt(pthread_t thread);
-
 /* This pthread_kill doesn't do anything to notify target pthread of a
  * new pending signal.
  *
@@ -234,7 +232,6 @@ static void futex_interrupt(pthread_t thread);
 int pthread_kill(pthread_t thread, int signum)
 {
   pthread_np_add_pending_signal(thread,signum);
-  futex_interrupt(thread);
   return 0;
 }
 
@@ -718,15 +715,12 @@ void pthread_unlock_structures()
   pthread_mutex_unlock(&mutex_init_lock);
 }
 
-static pthread_cond_t futex_pseudo_cond;
-
 void pthreads_win32_init()
 {
 
     thread_self_tls_index = TlsAlloc();
     pthread_mutex_init(&mutex_init_lock, NULL);
     pthread_np_notice_thread();
-    pthread_cond_init(&futex_pseudo_cond, NULL);
 }
 
 static
@@ -800,128 +794,6 @@ int sigpending(sigset_t *set)
   *set = InterlockedCompareExchange((volatile LONG*)&pthread_self()->pending_signal_set,
                                     0, 0);
   return 0;
-}
-
-
-#define FUTEX_EWOULDBLOCK 3
-#define FUTEX_EINTR 2
-#define FUTEX_ETIMEDOUT 1
-
-int
-futex_wait(volatile intptr_t *lock_word, intptr_t oldval, long sec, unsigned long usec)
-{
-  struct thread_wakeup w;
-  pthread_t self = pthread_self();
-  DWORD msec = sec<0 ? INFINITE : (sec*1000 + usec/1000);
-  DWORD wfso;
-  int result;
-  sigset_t pendset;
-  int maybeINTR;
-  int info = sec<0 ? WAKEUP_WAITING_NOTIMEOUT: WAKEUP_WAITING_TIMEOUT;
-
-  sigpending(&pendset);
-  if (pendset & ~self->blocked_signal_set)
-      return FUTEX_EINTR;
-  w.uaddr = lock_word;
-  w.uval = oldval;
-  w.info = info;
-
-  if (cv_wakeup_add(&futex_pseudo_cond,&w)) {
-      return FUTEX_EWOULDBLOCK;
-  }
-  self->futex_wakeup = &w;
-  do {
-      wfso = WaitForSingleObject(w.event, msec);
-  } while (wfso == WAIT_OBJECT_0 && w.info == info);
-  self->futex_wakeup = NULL;
-  sigpending(&pendset);
-  maybeINTR = (pendset & ~self->blocked_signal_set)? FUTEX_EINTR : 0;
-
-  switch(wfso) {
-  case WAIT_TIMEOUT:
-      if (!cv_wakeup_remove(&futex_pseudo_cond,&w)) {
-          /* timeout, but someone other removed wakeup. */
-          result = maybeINTR;
-          WaitForSingleObject(w.event,INFINITE);
-      } else {
-          result = FUTEX_ETIMEDOUT;
-      }
-      break;
-  case WAIT_OBJECT_0:
-      result = maybeINTR;
-      break;
-  default:
-      result = -1;
-      break;
-  }
-  futex_pseudo_cond.return_fn(w.event);
-  return result;
-}
-
-int
-futex_wake(volatile intptr_t *lock_word, int n)
-{
-    pthread_cond_t *cv = &futex_pseudo_cond;
-    struct thread_wakeup *w, *prev;
-    HANDLE postponed[128];
-    int npostponed = 0,i;
-
-    if (n==0) return 0;
-
-    pthread_mutex_lock(&cv->wakeup_lock);
-    for (w = cv->first_wakeup, prev = NULL; w && n;) {
-        if (w->uaddr == lock_word) {
-            HANDLE event = w->event;
-            w->info = WAKEUP_HAPPENED;
-            if (cv->last_wakeup == w)
-                cv->last_wakeup = prev;
-            w = w->next;
-            if (!prev) {
-                cv->first_wakeup = w;
-            } else {
-                prev->next = w;
-            }
-            n--;
-            postponed[npostponed++] = event;
-            if (npostponed == sizeof(postponed)/sizeof(postponed[0])) {
-                for (i=0; i<npostponed; ++i)
-                    SetEvent(postponed[i]);
-                npostponed = 0;
-            }
-        } else {
-            prev=w, w=w->next;
-        }
-    }
-    pthread_mutex_unlock(&cv->wakeup_lock);
-    for (i=0; i<npostponed; ++i)
-        SetEvent(postponed[i]);
-    return 0;
-}
-
-
-static void futex_interrupt(pthread_t thread)
-{
-    if (thread->futex_wakeup) {
-        pthread_cond_t *cv = &futex_pseudo_cond;
-        struct thread_wakeup *w;
-        HANDLE event;
-        pthread_mutex_lock(&cv->wakeup_lock);
-        if ((w = thread->futex_wakeup)) {
-            /* we are taking wakeup_lock recursively - ok with
-               CRITICAL_SECTIONs */
-            if (cv_wakeup_remove(&futex_pseudo_cond,w)) {
-                event = w->event;
-                w->info = WAKEUP_BY_INTERRUPT;
-                thread->futex_wakeup = NULL;
-            } else {
-                w = NULL;
-            }
-        }
-        if (w) {
-            SetEvent(event);
-        }
-        pthread_mutex_unlock(&cv->wakeup_lock);
-    }
 }
 
 void pthread_np_lose(int trace_depth, const char* fmt, ...)

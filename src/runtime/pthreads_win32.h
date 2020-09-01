@@ -219,10 +219,6 @@ int sigismember(const sigset_t *set, int signum);
 
 typedef int sig_atomic_t;
 
-/* Futexes */
-int futex_wait(volatile intptr_t *lock_word, intptr_t oldval, long sec, unsigned long usec);
-int futex_wake(volatile intptr_t *lock_word, int n);
-
 /* Debugging */
 void pthread_np_lose(int trace_depth, const char* fmt, ...);
 extern struct _pthread_mutex_info DEAD_MUTEX;
