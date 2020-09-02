@@ -43,7 +43,6 @@ fi
 # is its generation left enabled even for those builds.
 echo //building runtime system and symbol table file
 
-# The clean is needed for Darwin's readonlyspace hack.
 $GNUMAKE -C src/runtime clean
 # $GNUMAKE -C src/runtime depend
 $GNUMAKE $SBCL_MAKE_JOBS -C src/runtime all
