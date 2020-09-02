@@ -3526,8 +3526,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #ifdef STARTING_THREADS
     lispobj pin_list = SYMBOL(STARTING_THREADS)->value;
     for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
-        lispobj lispthread = CONS(pin_list)->car;
-        // It would be tempting to say that only the SB-THREAD:THREAD instance
+        lispobj thing = CONS(pin_list)->car;
+        // It might be tempting to say that only the SB-THREAD:THREAD instance
         // requires pinning - because right after we access it to extract the
         // primitive thread, we link into all_threads - but it may be that the code
         // emitted by the C compiler in new_thread_trampoline computes untagged pointers
@@ -3535,18 +3535,21 @@ garbage_collect_generation(generation_index_t generation, int raise)
         // seen as valid lisp pointers by the implicit pinning logic.
         // And the precisely GC'd platforms would not pin anything from C code.
         // The tests in 'threads.impure.lisp' are good at detecting omissions here.
-        if (lispthread) {
-            gc_assert(instancep(lispthread));
-            pin_exact_root(lispthread);
-            lispobj info = ((struct thread_instance*)
-                            (lispthread-INSTANCE_POINTER_LOWTAG))->startup_info;
-            if (info) {
+        if (thing) { // Nothing to worry about when 'thing' is already smashed
+            gc_assert(instancep(thing));
+            struct thread_instance *lispthread = (void*)(thing - INSTANCE_POINTER_LOWTAG);
+            lispobj info = lispthread->startup_info;
+            // INFO gets set to a fixnum when the thread is exiting. I *think* it won't
+            // ever be seen in the starting-threads list, but let's be cautious.
+            if (is_lisp_pointer(info)) {
                 gc_assert(simple_vector_p(info));
                 gc_assert(VECTOR(info)->length >= make_fixnum(1));
                 lispobj fun = VECTOR(info)->data[0];
                 gc_assert(functionp(fun));
+                pin_exact_root(thing);
                 pin_exact_root(info);
                 pin_exact_root(fun);
+                pin_exact_root(lispthread->name);
             }
         }
     }

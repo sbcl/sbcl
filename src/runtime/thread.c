@@ -9,6 +9,9 @@
  * files for more information.
  */
 
+#ifdef __linux__
+#define _GNU_SOURCE // for pthread_setname_np()
+#endif
 #include "sbcl.h"
 
 #include <stdlib.h>
@@ -493,6 +496,40 @@ void* new_thread_trampoline(void* arg)
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
+
+    /* Potentially set the externally-visible name of this thread,
+     * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
+     * https://github.com/llvm-mirror/llvm/blob/394ea6522c69c2668bf328fc923e1a11cd785265/lib/Support/Unix/Threading.inc
+     * which among other things, suggests that Linux might not even have the syscall */
+    lispobj name = lispthread->name; // pinned
+    if (other_pointer_p(name) &&
+        header_widetag(VECTOR(name)->header) == SIMPLE_BASE_STRING_WIDETAG) {
+#ifdef LISP_FEATURE_LINUX
+        /* "The thread name is a meaningful C language string, whose length is
+         *  restricted to 16 characters, including the terminating null byte ('\0').
+         *  The pthread_setname_np() function can fail with the following error:
+         *  ERANGE The length of the string ... exceeds the allowed limit." */
+        if (fixnum_value(VECTOR(name)->length) <= 15)
+            pthread_setname_np(pthread_self(), (char*)VECTOR(name)->data);
+#endif
+#ifdef LISP_FEATURE_NETBSD
+        /* This constant is an upper bound on the length including the NUL.
+         * Exceeding it will fail the call. It happens to be 32.
+         * Also, don't want to printf-format a name containing a '%' */
+        if (fixnum_value(VECTOR(name)->length) < PTHREAD_MAX_NAMELEN_NP)
+            pthread_setname_np(pthread_self(), "%s", (char*)VECTOR(name)->data);
+#endif
+#if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_OPENBSD
+        /* Some places document that the length limit is either 16 or 32,
+         * but my testing showed that 12.1 seems to accept any length */
+        pthread_set_name_np(pthread_self(), (char*)VECTOR(name)->data);
+#endif
+#ifdef LISP_FEATURE_DARWIN
+        if (fixnum_value(VECTOR(name)->length) < 64)
+            pthread_setname_np((char*)VECTOR(name)->data);
+#endif
+    }
+
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
     lispobj startfun = startup_info->data[0]; // 'startup_info' is pinned

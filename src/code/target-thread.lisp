@@ -1797,17 +1797,6 @@ session."
 #+sb-thread
 (thread-trampoline-defining-macro
   (set-thread-control-stack-slots *current-thread*)
-  #+linux (let ((name (thread-name *current-thread*)))
-            ;; "The thread name is a meaningful C language string, whose length is
-            ;;  restricted to 16 characters, including the terminating null byte ('\0').
-            ;;  The pthread_setname_np() function can fail with the following error:
-            ;;  ERANGE The length of the string ... exceeds the allowed limit."
-            (when (and (typep name 'simple-base-string) (<= (length name) 15))
-              (with-pinned-objects (name)
-                (alien-funcall (extern-alien "pthread_setname_np"
-                                             (function int unsigned system-area-pointer))
-                               (thread-os-thread *current-thread*)
-                               (vector-sap name)))))
     ;; Using handling-end-of-the-world would be a bit tricky
     ;; due to other catches and interrupts, so we essentially
     ;; re-implement it here. Once and only once more.
