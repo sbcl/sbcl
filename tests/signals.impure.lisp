@@ -64,7 +64,7 @@
     (loop until returning)
     (assert (= saved-errno (sb-unix::get-errno)))))
 
-#+(or sb-safepoint sb-thruption)
+#+sb-safepoint
 (sb-alien:define-alien-routine "kill_safely"
   int
   (sb-thread::os-thread unsigned)
@@ -80,11 +80,10 @@
   (assert (eq :condition
               (handler-case
                   (progn
-                    ;; KILL-SAFELY has C code for it only if (OR :SB-SAFEPOINT :SB-THRUPTION),
+                    ;; KILL-SAFELY exists only if :SB-SAFEPOINT,
                     ;; otherwise we directly call a POSIX function.
-                    #+(or sb-safepoint sb-thruption) (kill-safely (current-thread-os-thread)
-                                                                  sb-unix:sigint)
-                    #-(or sb-safepoint sb-thruption) (sb-thread::raise sb-unix:sigint)
+                    #+sb-safepoint (kill-safely (current-thread-os-thread) sb-unix:sigint)
+                    #-sb-safepoint (sb-thread::raise sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it

@@ -1239,7 +1239,7 @@ thread_yield()
 // there is a perfectly fine way of detecting validity of a pthread ID,
 // and even the link below to Ulrich Drepper's blog post says exactly what
 // to do. So why does this have anything to do with the all_threads_lock???
-#if defined LISP_FEATURE_SB_THRUPTION || defined LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_SB_SAFEPOINT
 int
 wake_thread(os_thread_t os_thread)
 {
@@ -1272,8 +1272,9 @@ int
 kill_safely(os_thread_t os_thread, int signal)
 {
     FSHOW_SIGNAL((stderr,"/kill_safely: %lu, %d\n", os_thread, signal));
-    {
-#ifdef LISP_FEATURE_SB_THREAD
+
+        // This indentation is wrong, but the code is cringey anyway
+
         sigset_t oldset;
         struct thread *thread;
         /* Frequent special case: resignalling to self.  The idea is
@@ -1337,31 +1338,5 @@ kill_safely(os_thread_t os_thread, int signal)
             return 0;
         else
             return -1;
-#elif defined(LISP_FEATURE_WIN32)
-        return 0;
-#else
-        int status;
-        if (os_thread != 0)
-            lose("kill_safely: who do you want to kill? %d?", os_thread);
-        /* Dubious (as in don't know why it works) workaround for the
-         * signal sometimes not being generated on darwin. */
-#ifdef LISP_FEATURE_DARWIN
-        {
-            sigset_t oldset;
-            sigprocmask(SIG_BLOCK, &deferrable_sigset, &oldset);
-            status = raise(signal);
-            sigprocmask(SIG_SETMASK,&oldset,0);
-        }
-#else
-        status = raise(signal);
-#endif
-        if (status == 0) {
-            return 0;
-        } else {
-            lose("cannot raise signal %d, %d %s",
-                 signal, status, strerror(errno));
-        }
-#endif
-    }
 }
 #endif

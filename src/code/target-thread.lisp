@@ -407,7 +407,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 (sb-ext:define-load-time-global *starting-threads* nil)
 (declaim (list *starting-threads*)) ; list of threads
 
-#+(or sb-safepoint sb-thruption)
+#+sb-safepoint
 (define-alien-routine "wake_thread"
   int
   (os-thread unsigned))
@@ -2271,7 +2271,7 @@ Short version: be careful out there."
   ;; which prevents thread exit since a thread needs to briefly acquire
   ;; that lock just prior to exit.
 
-  #-(or sb-safepoint sb-thruption) ; Good way
+  #-sb-safepoint ; Good way
   (unless (with-os-thread (os-thread thread)
             (enqueue nil)
             (pthread-kill os-thread sb-unix:sigpipe)
@@ -2281,7 +2281,7 @@ Short version: be careful out there."
   ;; Shiat way: call to C to acquire the all_threads lock and scan all_threads.
   ;; Beyond that there's the question of why INVOKED is ever set/examined. Seems fubar.
   ;; I have no friggin idea how sb-thruption is supposed to work.
-  #+(or sb-safepoint sb-thruption)
+  #+sb-safepoint
   (let ((os-thread
           ;; This causes an extra acquire/release cycle, and potentially conses a bignum
           ;; to hold a word.
