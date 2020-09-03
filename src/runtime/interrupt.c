@@ -178,7 +178,7 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
  * work for SIGSEGV and similar. It is good enough for timers, and
  * maybe all deferrables. */
 
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
 pthread_key_t sigwait_bug_mitigation;
 int sigwait_bug_mitigation_count;
 #endif
@@ -189,7 +189,7 @@ int sigwait_bug_mitigation_count;
 static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     if (signal == SIG_STOP_FOR_GC && pthread_getspecific(sigwait_bug_mitigation)) {
         // fprintf(stderr, "ignored a STOP_FOR_GC signal\n");
         __sync_fetch_and_add(&sigwait_bug_mitigation_count, 1);

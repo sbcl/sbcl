@@ -242,7 +242,7 @@ void* get_current_vm_thread() {
 }
 #endif
 
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     extern pthread_key_t sigwait_bug_mitigation;
 #endif
 
@@ -257,7 +257,7 @@ void create_main_lisp_thread(lispobj function) {
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&specials, 0);
 #endif
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     pthread_key_create(&sigwait_bug_mitigation, 0);
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
