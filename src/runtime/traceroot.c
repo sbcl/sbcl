@@ -1074,20 +1074,3 @@ int prove_liveness(lispobj objects, int criterion)
     extern int gc_n_stack_pins;
     return gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
 }
-
-#ifdef LISP_FEATURE_SB_THREAD
-/// Given a pthread identifier, return the lisp thread's string name.
-/// Caveat emptor: This doesn't acquire the all_threads_lock.
-/// Ironically perhaps, 'traceroot' no longer uses this, but it's nice to have.
-struct vector* lisp_thread_name(os_thread_t os_thread)
-{
-    struct thread* th;
-    for_each_thread (th) {
-        if (thread_equal(os_thread, th->os_thread)) {
-            struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
-            return VECTOR(lispthread->name);
-        }
-    }
-    return 0;
-}
-#endif
