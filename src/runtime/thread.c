@@ -691,6 +691,7 @@ attach_os_thread(init_thread_data *scribble)
     stack_addr = (char*)pthread_get_stackaddr_np(th->os_thread) - stack_size;
 # else
     pthread_attr_t attr;
+    pthread_attr_init(&attr);
 #   if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_DRAGONFLY
     pthread_attr_get_np(th->os_thread, &attr);
 #   else
