@@ -64,26 +64,19 @@
     (loop until returning)
     (assert (= saved-errno (sb-unix::get-errno)))))
 
-#+sb-safepoint
-(sb-alien:define-alien-routine "kill_safely"
-  int
-  (sb-thread::os-thread unsigned)
-  (signal int))
-(defun current-thread-os-thread ()
-  #+sb-thread (sb-thread::thread-os-thread sb-thread:*current-thread*)
-  #-sb-thread 0)
-
 ;; It is desirable to support C-c on Windows, but SIGINT
 ;; is not the mechanism to use on this platform.
+;; This test used to call kill_safely() in the C runtime if using safepoints,
+;; and perhaps at some point kill_safely() interacted with the safepoint state
+;; for POSIX (i.e. not win32), but it doesn't, at least not now.
+;; The special case in kill_safely() for the current thread is pthread_kill()
+;; and not a thing more, unless on win32, which skips this test.
 #-win32
 (with-test (:name :handle-interactive-interrupt)
   (assert (eq :condition
               (handler-case
                   (progn
-                    ;; KILL-SAFELY exists only if :SB-SAFEPOINT,
-                    ;; otherwise we directly call a POSIX function.
-                    #+sb-safepoint (kill-safely (current-thread-os-thread) sb-unix:sigint)
-                    #-sb-safepoint (sb-thread::raise sb-unix:sigint)
+                    (sb-thread::raise sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it
