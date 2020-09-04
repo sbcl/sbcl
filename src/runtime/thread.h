@@ -44,8 +44,6 @@ void** os_get_csp(struct thread* th);
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
 
-extern int kill_safely(os_thread_t os_thread, int signal);
-
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 
@@ -79,6 +77,7 @@ extern int dynamic_values_bytes;
 
 
 #ifdef LISP_FEATURE_SB_THREAD
+extern int kill_safely(os_thread_t os_thread, int signal);
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)
 #else
 /* there's some possibility a SSC could notice this never actually

@@ -486,9 +486,16 @@ during backtrace.
   ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
   ;;  adding pthread_t to the list of types that are not required to be arithmetic
   ;;  types, thus allowing pthread_t to be defined as a structure."
+  ;;
+  ;; Furthermore, it is technically possibly for a pthread_t to be smaller than a word
+  ;; (a 4-byte identifier, not a pointer, on 64-bit) but that seems not to be true
+  ;; for any system that we care about.
+  ;;
   ;; And this slot is badly named, it should be "Pthread" since it's the POSIX
   ;; (or emulated POSIX) thread object, not necessarily the OS's thread notion.
-  (os-thread :c-type "os_thread_t")
+  ;;
+  ;; For #-sb-thread, we don't define os_thread_t at all.
+  (os-thread :c-type #+sb-thread "os_thread_t" #-sb-thread "lispobj")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
