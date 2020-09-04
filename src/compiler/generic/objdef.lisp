@@ -540,16 +540,6 @@ during backtrace.
   (binding-stack-start :c-type "lispobj *" :pointer t
                        :special *binding-stack-start*)
 
-  #+(and sb-thread (not sb-safepoint))
-  (state-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-running-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-running-waitcount :c-type "int" :length 1)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-waitcount :c-type "int" :length 1)
   (control-stack-start :c-type "lispobj *" :pointer t
                        :special *control-stack-start*)
   (control-stack-end :c-type "lispobj *" :pointer t

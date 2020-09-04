@@ -1386,13 +1386,16 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         thread->interrupt_data->gc_blocked_deferrables = 0;
     }
 
-    if(thread_state(thread)!=STATE_RUNNING) {
-        // macOS warns if OBJ_FMTX is used to format a 'sword_t'
-        // which fixnum_value() returns.
-        lose("sig_stop_for_gc_handler: wrong thread state: %"OBJ_FMTX,
-             (lispobj)fixnum_value(thread->state));
-    }
+    /* No need to use an atomic memory load here - this thead "owns" its state
+     * for now, and nobody else touches it, the sole exception being that GC
+     * sets it to RUNNING. The loads inside thread_wait_until_not()
+     * are slightly more interesting from that perspective */
+    if (thread->state != STATE_RUNNING)
+        lose("stop_for_gc: bad thread state: %x", (int)thread->state);
 
+    /* We say that the thread is "stopped" as of now, but the blocking operation
+     * occurs below at thread_wait_until_not(STATE_STOPPED). Note that sem_post()
+     * is expressly permitted in signal handlers, and set_thread_state uses it */
     set_thread_state(thread, STATE_STOPPED, 0);
     FSHOW_SIGNAL((stderr,"suspended\n"));
 
@@ -1402,13 +1405,19 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * actually a must. */
     scrub_control_stack();
 
-    wait_for_thread_state_change(thread, STATE_STOPPED);
+    /* Now we wait on a semaphore, which, to be pedantic, is not specified as async-safe.
+     * Normally the way to implement a "suspend" operation is to issue any blocking
+     * syscall such as sigsuspend() or select(). Apparently every OS + C runtime that
+     * we wish to support has no problem with sem_wait() here in the signal handler. */
+    int my_state = thread_wait_until_not(STATE_STOPPED, thread);
     FSHOW_SIGNAL((stderr,"resumed\n"));
 
-    if(thread_state(thread)!=STATE_RUNNING) {
-        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %"OBJ_FMTX,
-             (lispobj)fixnum_value(thread_state(thread)));
-    }
+    /* The state can't go from STOPPED to DEAD because it's this thread is reading
+     * its own state, hence it must be running.
+     * (If we tried to observe a different thread, it could appear to change from
+     * STOPPED to DEAD, skipping RUNNING, because if you blink you might miss it) */
+    if (my_state != STATE_RUNNING)
+        lose("stop_for_gc: bad state on wakeup: %x", my_state);
 
     if (was_in_lisp) {
         undo_fake_foreign_function_call(context);

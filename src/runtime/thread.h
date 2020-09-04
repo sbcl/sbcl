@@ -24,14 +24,11 @@
 #include "interrupt.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
 
-#define STATE_RUNNING MAKE_FIXNUM(1)
-#define STATE_STOPPED MAKE_FIXNUM(2)
-#define STATE_DEAD MAKE_FIXNUM(3)
+enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 
 #ifdef LISP_FEATURE_SB_THREAD
-lispobj thread_state(struct thread *thread);
 void set_thread_state(struct thread *thread, lispobj state, boolean);
-void wait_for_thread_state_change(struct thread *thread, lispobj state);
+int thread_wait_until_not(int state, struct thread *thread);
 #endif
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -44,9 +41,6 @@ void** os_get_csp(struct thread* th);
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
 
-#define THREAD_SLOT_OFFSET_WORDS(c) \
- (offsetof(struct thread,c)/(sizeof (struct thread *)))
-
 /* The thread struct is generated from lisp during genesis and it
  * needs to know the sizes of all its members, but some types may have
  * arbitrary lengths, thus the pointers are stored instead. This
@@ -54,12 +48,22 @@ void assert_on_stack(struct thread *th, void *esp);
  * pointers can be later shoved into the thread struct. */
 struct nonpointer_thread_data
 {
-#ifdef LISP_FEATURE_SB_THREAD
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
+    // 'state_sem' is a binary semaphore used just like a mutex.
+    // I guess we figure that semaphores are OK to use in signal handlers (which is
+    // technically false), whereas a mutex would be more certainly wrong?
     os_sem_t state_sem;
+    // These are basically "gates" a la SB-CONCURRENCY:GATE. They might be better
+    // as condition variables, but condvars are not allowed in signal handlers.
+    // Strictly speaking, sem_wait isn't either, but it seems to work.
     os_sem_t state_not_running_sem;
     os_sem_t state_not_stopped_sem;
-#endif
+    // We count waiters on each gate to know how many times to sem_post() to open them.
+    // The counts themselves are protected against concurrent access by 'state_sem'.
+    // Since we're not constrained by compiler/generic/objdef any more, we can
+    // make these "only" 4 bytes each, instead of lispwords.
+    uint32_t state_not_running_waitcount;
+    uint32_t state_not_stopped_waitcount;
 #endif
     struct interrupt_data interrupt_data;
 };
