@@ -2245,8 +2245,9 @@ Short version: be careful out there."
   ;; so we use the death lock to keep the thread alive, unless it already isn't.
   ;;
   (when (with-deathlok (thread c-thread)
+          (declare (ignorable c-thread))
           ;; Return T if couldn't interrupt.
-          (cond ((eql c-thread 0) t)
+          (cond #+sb-thread ((eql c-thread 0) t)
                 (t
                  (enqueue)
                  #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigpipe)
