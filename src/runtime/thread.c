@@ -898,16 +898,18 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     /* Aligning up is safe as THREAD_STRUCT_SIZE has
      * THREAD_ALIGNMENT_BYTES padding. */
     char *aligned_spaces = PTR_ALIGN_UP(spaces, THREAD_ALIGNMENT_BYTES);
-    char* csp_page=
-        (aligned_spaces+
-         thread_control_stack_size+
-         BINDING_STACK_SIZE+
-         ALIEN_STACK_SIZE +
-         (MAX_INTERRUPTS*sizeof(os_context_t*)));
+    char* csp_page = aligned_spaces + thread_control_stack_size +
+                     BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
-    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
+    struct thread *th =
+        (void*)(csp_page + THREAD_CSP_PAGE_SIZE + N_WORD_BYTES*MAX_INTERRUPTS);
     __attribute((unused)) lispobj* tls = (lispobj*)th;
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    // Out of caution I'm supposing that the last thread to use this memory
+    // might have left this page as read-only. Could it? I have no idea.
+    os_protect(csp_page, THREAD_CSP_PAGE_SIZE, OS_VM_PROT_READ|OS_VM_PROT_WRITE);
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
     for(i = 0; i < (unsigned int)(dynamic_values_bytes/N_WORD_BYTES); i++)
