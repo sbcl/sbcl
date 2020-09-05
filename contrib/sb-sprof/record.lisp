@@ -341,8 +341,10 @@ EXPERIMENTAL: Interface subject to change."
       (unless (sb-thread:mutex-owner lock)
         (sb-thread::with-system-mutex (lock)
           (dolist (thread (profiled-threads))
-            (sb-thread:with-os-thread (os-thread thread)
-              (sb-thread::pthread-kill os-thread sb-unix:sigprof))))))
+            (sb-thread:with-deathlok (thread c-thread)
+              (unless (= c-thread 0)
+                (sb-thread:pthread-kill (sb-thread::thread-os-thread thread)
+                                        sb-unix:sigprof)))))))
     #-sb-thread
     (unix-kill 0 sb-unix:sigprof))
 

@@ -19,7 +19,7 @@
           raise
           release-spinlock
           spinlock
-          with-os-thread
+          with-deathlok
           with-session-lock
           with-spinlock))
 
@@ -406,11 +406,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 ;;; but also the STARTUP-INFO of each thread is pinned.
 (sb-ext:define-load-time-global *starting-threads* nil)
 (declaim (list *starting-threads*)) ; list of threads
-
-#+sb-safepoint
-(define-alien-routine "wake_thread"
-  int
-  (os-thread unsigned))
 
 #+sb-thread
 (progn
@@ -1365,9 +1360,13 @@ on this semaphore, then N of them is woken up."
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
-(defmacro with-interruptions-lock ((thread) &body body)
+;;; WITH-DEATHLOK ensures that the 'struct thread' and/or OS thread won't go away
+;;; by synchronizing with HANDLE-THREAD-EXIT.
+(defmacro with-deathlok ((thread &optional c-thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))
-     ,@body))
+     ,@(if c-thread
+           `((let ((,c-thread (thread-primitive-thread ,thread))) ,@body))
+           body)))
 
 #+sb-thread
 (progn
@@ -1395,7 +1394,7 @@ on this semaphore, then N of them is woken up."
       ;; there is no real harm in reading the memory.  In this state the pthread library
       ;; will usually return ESRCH if you try to use the pthread id - it's a valid
       ;; pointer, but it knows that it has no underlying OS thread.
-      (with-interruptions-lock (thread)
+      (with-deathlok (thread)
         (when sem ; ordinary lisp thread, not FOREIGN-THREAD
           (setf (thread-startup-info thread) c-thread))
         (setf (thread-primitive-thread thread) 0)
@@ -1685,10 +1684,9 @@ session."
     ;; Clean up *ALL-THREADS*
     (delete-from-all-threads (sap-int c-thread))
     ;; Free the pthread resources
-    (let ((posix-thread (thread-os-thread thread)))
-      (alien-funcall (extern-alien "pthread_join" (function int unsigned unsigned))
-                     posix-thread 0) ; no result pointer
-      (setf (thread-os-thread thread) 0))
+    (alien-funcall (extern-alien "pthread_join" (function int unsigned unsigned))
+                   (thread-os-thread thread) 0) ; no result pointer
+    (setf (thread-os-thread thread) 0)
     (cond (dispose
            (free-thread-struct c-thread)
            nil)
@@ -2117,7 +2115,7 @@ subject to change."
 ;;; Called from the signal handler.
 #-(or sb-thruption win32)
 (defun run-interruption ()
-  (let ((interruption (with-interruptions-lock (*current-thread*)
+  (let ((interruption (with-deathlok (*current-thread*)
                         (pop (thread-interruptions *current-thread*)))))
     ;; If there is more to do, then resignal and let the normal
     ;; interrupt deferral mechanism take care of the rest. From the
@@ -2133,7 +2131,7 @@ subject to change."
 #+sb-thruption
 (defun run-interruption (*current-internal-error-context*)
   (in-interruption () ;the non-thruption code does this in the signal handler
-    (let ((interruption (with-interruptions-lock (*current-thread*)
+    (let ((interruption (with-deathlok (*current-thread*)
                           (pop (thread-interruptions *current-thread*)))))
       (when interruption
         (funcall interruption)
@@ -2156,33 +2154,13 @@ subject to change."
         ;; -- DFL
         (setf *thruption-pending* t)))))
 
-(defmacro with-c-thread ((c-thread thread) &body body)
-  `(with-interruptions-lock (,thread)
-     (let ((,c-thread (thread-primitive-thread ,thread)))
-       ,@body)))
-
-;;; A macro to extract the pthread id out of the thread's C memory
-;;; while ensuring that the thread can't exit.
-;;; Invokes BODY only if the pthread ID is valid.
-(defmacro with-os-thread ((os-thread thread) &body body)
-  #+sb-thread
-  `(let ((lisp-thread ,thread))
-     (with-c-thread (c-thread lisp-thread)
-       (unless (= c-thread 0)
-         (let ((,os-thread (thread-os-thread lisp-thread)))
-           ,@body))))
-  #-sb-thread
-  `(let ((lisp-thread ,thread) (,os-thread 0))
-     (declare (ignorable lisp-thread ,os-thread))
-     ,@body))
-
 #+linux
 (defun thread-os-tid (thread)
   (declare (ignorable thread))
   #+sb-thread
   (if (eq *current-thread* thread)
       (my-kernel-thread-id)
-      (with-c-thread (c-thread thread)
+      (with-deathlok (thread c-thread)
         (unless (= c-thread 0)
           (sap-ref-32 (int-sap c-thread)
                       (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
@@ -2246,59 +2224,49 @@ the state of a thread:
   (interrupt-thread thread #'break)
 
 Short version: be careful out there."
-  #+(and (not sb-thread) win32)
-  (with-interrupt-bindings
-    (with-interrupts (funcall function)))
-  #-(and (not sb-thread) win32)
-  (macrolet ((enqueue (set-invoked)
+  (macrolet ((enqueue ()
                ;; Append to the end of the interruptions queue. It's
                ;; O(N), but it does not hurt to slow interruptors down a
                ;; bit when the queue gets long.
               `(setf (thread-interruptions thread)
                      (append (thread-interruptions thread)
                              (list (lambda ()
-                                     ,@(if set-invoked '((setf invoked t)))
-                                     (barrier (:memory))
+                                     (barrier (:memory)) ; why???
                                      (without-interrupts
                                        (allow-with-interrupts
                                         (funcall function)))))))))
-
   ;; POSIX says:
   ;; "If an application attempts to use a thread ID whose lifetime has ended,
   ;;  the behavior is undefined."
-  ;; We have two ways of handling this, the good way and the shiat way.
-  ;; The good way is to pthread_kill() while holding the interruptions lock,
-  ;; which prevents thread exit since a thread needs to briefly acquire
-  ;; that lock just prior to exit.
-
-  #-sb-safepoint ; Good way
-  (unless (with-os-thread (os-thread thread)
-            (enqueue nil)
-            (pthread-kill os-thread sb-unix:sigpipe)
-            t)
-    (error 'interrupt-thread-error :thread thread))
-
-  ;; Shiat way: call to C to acquire the all_threads lock and scan all_threads.
-  ;; Beyond that there's the question of why INVOKED is ever set/examined. Seems fubar.
-  ;; I have no friggin idea how sb-thruption is supposed to work.
-  #+sb-safepoint
-  (let ((os-thread
-          ;; This causes an extra acquire/release cycle, and potentially conses a bignum
-          ;; to hold a word.
-          ;; Anybody who builds with these features should feel free to improve it.
-          (with-os-thread (os-thread thread) os-thread)))
-    (cond ((not os-thread)
-           (error 'interrupt-thread-error :thread thread))
-          (t
-           (let (invoked)
-             (with-interruptions-lock (thread)
-               (enqueue t))
-             (when (and (minusp (wake-thread os-thread))
-                        ;; The interrupt queue has been processed by
-                        ;; some other interrupt.
-                        (progn (barrier (:memory))
-                               (not invoked)))
-               (error 'interrupt-thread-error :thread thread))))))))
+  ;; so we use the death lock to keep the thread alive, unless it already isn't.
+  ;;
+  ;; KNOWN BUG: With safepoints, when interrupting *CURRENT-THREAD*, we invoke
+  ;; the interrupt synchronously, despite being effectively in the extent of a
+  ;; WITHOUT-INTERRUPTS courtesy of WITH-SYSTEM-MUTEX. Hence we can't pop the
+  ;; the interruptions queue without getting a recursive lock attempt
+  ;; unless the interruptions lock is a different lock from the death lock.
+  ;;
+  ;; On non-safepoint builds, the signal will be deferred even if it delivered
+  ;; to *CURRENT-THREAD*. i.e. there will be no possibility of recursion on
+  ;; the interruptions lock. So that and the death lock are one and the same.
+  ;;
+  ;; I would imagine that this behavioral discrepancy is responsible for the
+  ;; differences in the regression suite as to which tests are expected to fail.
+  ;;
+  (when (with-deathlok (thread c-thread)
+          ;; Return T if couldn't interrupt.
+          (cond ((eql c-thread 0) t)
+                (t
+                 (enqueue)
+                 #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigpipe)
+                 #+sb-safepoint
+                 (with-alien ((wake (function void system-area-pointer)
+                                    :extern "wake_thread"))
+                   (with-pinned-objects (thread)
+                     (alien-funcall wake (sap+ (int-sap (get-lisp-obj-address thread))
+                                               (- sb-vm:instance-pointer-lowtag)))))
+                 nil)))
+    (error 'interrupt-thread-error :thread thread))))
 
 (defun terminate-thread (thread)
   "Terminate the thread identified by THREAD, by interrupting it and
@@ -2354,7 +2322,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
 
   (defun %symbol-value-in-thread (symbol thread)
-    (with-c-thread (c-thread thread)
+    (with-deathlok (thread c-thread)
       (if (/= c-thread 0)
           (let ((val (sap-ref-lispobj (int-sap c-thread) (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
@@ -2364,7 +2332,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    (with-c-thread (c-thread thread)
+    (with-deathlok (thread c-thread)
       (if (/= c-thread 0)
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)

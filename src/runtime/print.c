@@ -156,10 +156,7 @@ vodxprint_fun(const char *fmt, va_list args)
     int n = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
-    struct thread *arch_os_get_current_thread(void);
-    struct thread *self = arch_os_get_current_thread();
-    void *pth = self ? (void *) self->os_thread : 0;
-    snprintf(buf, sizeof(buf), "[%p/%p] ", self, pth);
+    snprintf(buf, sizeof(buf), "[%p] ", (void*)thread_self());
     n = strlen(buf);
 #endif
 

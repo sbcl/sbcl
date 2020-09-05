@@ -1243,26 +1243,7 @@ thread_yield()
 #endif
 }
 
-// The code is extremely trashy and a good candidate for removal/cleanup
-// but I don't understand this feature combination well enough to do so.
-// The part of it we need to keep is the GC state interaction, though
-// as can plainly be seen from the "good" case of SB-THREAD::INTERRUPT-THREAD
-// there is a perfectly fine way of detecting validity of a pthread ID,
-// and even the link below to Ulrich Drepper's blog post says exactly what
-// to do. So why does this have anything to do with the all_threads_lock???
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-int
-wake_thread(os_thread_t os_thread)
-{
-#if defined(LISP_FEATURE_WIN32)
-    return kill_safely(os_thread, 1);
-#elif !defined(LISP_FEATURE_SB_THRUPTION)
-    return kill_safely(os_thread, SIGPIPE);
-#else
-    return wake_thread_posix(os_thread);
-#endif
-}
-
 /* If the thread id given does not belong to a running thread (it has
  * exited or never even existed) pthread_kill _may_ fail with ESRCH,
  * but it is also allowed to just segfault, see
@@ -1279,19 +1260,12 @@ wake_thread(os_thread_t os_thread)
  * Note (DFL, 2011-06-22): At the time of writing, this function is only
  * used for INTERRUPT-THREAD, hence the wake_thread special-case for
  * Windows is OK. */
-int
-kill_safely(os_thread_t os_thread, int signal)
+void wake_thread(struct thread_instance* lispthread)
 {
-    FSHOW_SIGNAL((stderr,"/kill_safely: %lu, %d\n", os_thread, signal));
+#ifdef LISP_FEATURE_WIN32
+        /* META: why is this comment about safepoint builds mentioning
+         * gc_stop_the_world() ? Never the twain shall meet. */
 
-        // This indentation is wrong, but the code is cringey anyway
-
-        sigset_t oldset;
-        struct thread *thread;
-        /* Frequent special case: resignalling to self.  The idea is
-         * that leave_region safepoint will acknowledge the signal, so
-         * there is no need to take locks, roll thread to safepoint
-         * etc. */
         /* Kludge (on safepoint builds): At the moment, this isn't just
          * an optimization; rather it masks the fact that
          * gc_stop_the_world() grabs the all_threads mutex without
@@ -1300,54 +1274,30 @@ kill_safely(os_thread_t os_thread, int signal)
          * would go wrong.  Why are we running interruptions while
          * stopping the world though?  Test case is (:ASYNC-UNWIND
          * :SPECIALS), especially with s/10/100/ in both loops. */
-        /* From the linux man page on pthread_self() -
-         * "variables  of  type  pthread_t  can't  portably be compared using
-         *  the C equality operator (==); use pthread_equal(3) instead." */
-        if (thread_equal(os_thread, thread_self())) {
-            thread_kill(os_thread, signal);
-#ifdef LISP_FEATURE_WIN32
+
+        /* Frequent special case: resignalling to self.  The idea is
+         * that leave_region safepoint will acknowledge the signal, so
+         * there is no need to take locks, roll thread to safepoint
+         * etc. */
+        struct thread* thread = (void*)lispthread->primitive_thread;
+        if (thread == arch_os_get_current_thread()) {
+            sb_pthr_kill(thread->os_thread, SIGPIPE); // can't fail
             check_pending_thruptions(NULL);
-#endif
-            return 0;
+            return;
         }
-
-        /* There are two problems with the comment below this one.
-         *
-         * - "... is not async signal safe" is based on obsolete information.
-         * https://www.man7.org/linux/man-pages/man7/signal-safety.7.html lists
-         *    pthread_kill(3)        Added in POSIX.1-2008 TC1
-         *
-         * - the comment is likely mistaken about the meaning of async-signal-safe:
-         *   "An async-signal-safe function is one that can be safely called
-         *    from within a signal handler."
-         * which is not what's happening here. Or should not be anyway,
-         * though in fact it would be async-signal safe, while ironically
-         * pthread_mutex_lock would NOT be safe.
-         * i.e. we had better not be in a signal handler.
-         *
-         * But kill_safely() is all kinds of bad, and shouldn't really be used.
-         */
-
-        /* pthread_kill is not async signal safe and we don't want to be
-         * interrupted while holding the lock. */
+        // block_deferrables + mutex_lock looks very unnecessary here,
+        // but without them, make-target-contrib hangs in bsd-sockets.
+        sigset_t oldset;
         block_deferrable_signals(&oldset);
         thread_mutex_lock(&all_threads_lock);
-        for (thread = all_threads; thread; thread = thread->next) {
-            if (thread->os_thread == os_thread) {
-                int status = thread_kill(os_thread, signal);
-                if (status)
-                    lose("kill_safely: pthread_kill failed with %d", status);
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THRUPTION)
-                wake_thread_win32(thread);
-#endif
-                break;
-            }
-        }
+        sb_pthr_kill(thread->os_thread, SIGPIPE); // can't fail
+        wake_thread_impl(lispthread);
         thread_mutex_unlock(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
-        if (thread)
-            return 0;
-        else
-            return -1;
+#elif defined LISP_FEATURE_SB_THRUPTION
+    wake_thread_impl(lispthread);
+#else
+    pthread_kill(lispthread->os_thread, SIGPIPE);
+#endif
 }
 #endif

@@ -918,9 +918,9 @@ wake_thread_io(struct thread * thread)
     win32_maybe_interrupt_io(thread);
 }
 
-void
-wake_thread_win32(struct thread *thread)
+void wake_thread_impl(struct thread_instance *lispthread)
 {
+    struct thread* thread = (void*)lispthread->primitive_thread;
     wake_thread_io(thread);
 
     if (read_TLS(THRUPTION_PENDING,thread)==T)
@@ -947,20 +947,18 @@ wake_thread_win32(struct thread *thread)
     return;
 }
 # else
-int
-wake_thread_posix(os_thread_t os_thread)
+void wake_thread_impl(struct thread_instance *lispthread)
 {
-    int found = 0;
-    struct thread *thread;
+    struct thread *thread = (void*)lispthread->primitive_thread;
     struct thread *self = arch_os_get_current_thread();
 
     /* Must not and need not attempt to signal ourselves while we're the
      * STW initiator. */
-    if (self->os_thread == os_thread) {
+    if (thread == self) {
         write_TLS(THRUPTION_PENDING,T,self);
         while (check_pending_thruptions(0 /* ignore the sigmask */))
             ;
-        return 0;
+        return;
     }
 
     /* We are not in a signal handler here, so need to block signals
@@ -973,13 +971,14 @@ wake_thread_posix(os_thread_t os_thread)
             odxprint(safepoints, "wake_thread_posix: invoking");
             gc_advance(GC_INVOKED,GC_NONE);
             {
+                /* I do not know whether WITH_ALL_THREADS_LOCK was only to avoid
+                 * hitting wild pointers in the loop over threads (gone now)
+                 * or whether it _also_ had an effect on the safepoint state.
+                 * Out of caution I'm leaving it in despite removing the loop */
+
                 /* only if in foreign code, notify using signal */
                 WITH_ALL_THREADS_LOCK {
-                    for_each_thread (thread)
-                        if (thread->os_thread == os_thread) {
-                            /* it's still alive... */
-                            found = 1;
-
+                    do {
                             odxprint(safepoints, "wake_thread_posix: found");
                             write_TLS(THRUPTION_PENDING,T,thread);
                             if (read_TLS(GC_PENDING,thread) == T
@@ -990,36 +989,21 @@ wake_thread_posix(os_thread_t os_thread)
                                 odxprint(safepoints, "wake_thread_posix: kill");
                                 /* ... and in foreign code.  Push it into a safety
                                  * transition. */
-                                int status = pthread_kill(os_thread, SIGPIPE);
+                                int status = pthread_kill((pthread_t)lispthread->os_thread, SIGPIPE);
                                 if (status)
                                     lose("wake_thread_posix: pthread_kill failed with %d",
                                          status);
                             }
-                            break;
-                        }
+                    } while(0);
                 }
             }
             gc_advance(GC_NONE,GC_INVOKED);
         } else {
             odxprint(safepoints, "wake_thread_posix: passive");
-            /* We are not able to wake the thread up actively, but maybe
-             * some other thread will take care of it.  Kludge: Unless it is
-             * in foreign code.  Let's at least try to get our return value
-             * right. */
-            WITH_ALL_THREADS_LOCK {
-                for_each_thread (thread)
-                    if (thread->os_thread == os_thread) {
-                        write_TLS(THRUPTION_PENDING,T,thread);
-                        found = 1;
-                        break;
-                    }
-            }
+            write_TLS(THRUPTION_PENDING, T, thread);
         }
     }
-
-    odxprint(safepoints, "wake_thread_posix leaving, found=%d", found);
     thread_sigmask(SIG_SETMASK, &oldset, 0);
-    return found ? 0 : -1;
 }
 #endif /* !LISP_FEATURE_WIN32 */
 #endif /* LISP_FEATURE_SB_THRUPTION */

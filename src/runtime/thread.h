@@ -335,12 +335,8 @@ void thread_interrupted(os_context_t *ctx);
 extern void thread_register_gc_trigger();
 
 # ifdef LISP_FEATURE_SB_THRUPTION
-int wake_thread(os_thread_t os_thread);
-#  ifdef LISP_FEATURE_WIN32
-void wake_thread_win32(struct thread *thread);
-#  else
-int wake_thread_posix(os_thread_t os_thread);
-#  endif
+void wake_thread(struct thread_instance*),
+     wake_thread_impl(struct thread_instance*);
 # endif
 
 static inline
