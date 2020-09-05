@@ -479,7 +479,7 @@ unregister_thread(struct thread *th,
  * bookkeeping needs to be done
  */
 #ifdef LISP_FEATURE_WIN32
-DWORD WINAPI new_thread_trampoline(LPVOID arg)
+__stdcall unsigned int new_thread_trampoline(LPVOID arg)
 #else
 void* new_thread_trampoline(void* arg)
 #endif
@@ -1082,7 +1082,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #ifdef LISP_FEATURE_WIN32
 /* Allocate a thread structure, call CreateThread(),
  * and return 1 for success, 0 for failure */
-uword_t create_thread(lispobj start_routine)
+uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
 {
     struct thread *th, *thread = arch_os_get_current_thread();
 
@@ -1106,8 +1106,9 @@ uword_t create_thread(lispobj start_routine)
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
-    DWORD tid;
+    unsigned int tid;
     pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
+    gc_assert(pth != NULL);
     // Theoretically you should tell the new thread a signal mask to restore
     // after it finishes any uninterruptable setup code, but the way this worked
     // on windows is that we passed the mask of blocked signals in the parent
@@ -1116,15 +1117,22 @@ uword_t create_thread(lispobj start_routine)
     // and we don't really have posix signals anyway.
     pth->blocked_signal_set = deferrable_sigset;
     pth->vm_thread = th;
-    pth->handle = CreateThread(NULL, thread_control_stack_size,
-                               new_thread_trampoline, pth, 0, &tid);
-    success = pth->handle != NULL;
-    if (success)
-        th->os_thread = pth, th->os_kernel_tid = tid;
-    else
+    // It's somewhat customary in the win32 API to start threads as suspended.
+    pth->handle = (HANDLE)
+      _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, pth,
+                     CREATE_SUSPENDED, &tid);
+    success = (pth->handle != NULL);
+    if (success) {
+        // TOO MANY DIFFERENT THREAD STRUCTURES, CAN WE * PUHLEASE * SIMPLIFY!?
+        instance->primitive_thread = (lispobj)th;
+        th->os_thread = pth;
+        th->os_kernel_tid = tid;
+        ResumeThread(pth->handle);
+    } else {
         free(pth);
+        free_thread_struct(th);
+    }
     thread_sigmask(SIG_SETMASK,&oldset,0);
-    if (!success) free_thread_struct(th);
     return success;
 }
 #endif
@@ -1281,7 +1289,7 @@ void wake_thread(struct thread_instance* lispthread)
          * etc. */
         struct thread* thread = (void*)lispthread->primitive_thread;
         if (thread == arch_os_get_current_thread()) {
-            sb_pthr_kill(thread->os_thread, SIGPIPE); // can't fail
+            sb_pthr_kill(thread->os_thread, 1); // can't fail
             check_pending_thruptions(NULL);
             return;
         }
@@ -1290,8 +1298,10 @@ void wake_thread(struct thread_instance* lispthread)
         sigset_t oldset;
         block_deferrable_signals(&oldset);
         thread_mutex_lock(&all_threads_lock);
-        sb_pthr_kill(thread->os_thread, SIGPIPE); // can't fail
+        sb_pthr_kill(thread->os_thread, 1); // can't fail
+# ifdef LISP_FEATURE_SB_THRUPTION
         wake_thread_impl(lispthread);
+# endif
         thread_mutex_unlock(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
 #elif defined LISP_FEATURE_SB_THRUPTION

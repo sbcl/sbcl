@@ -2014,12 +2014,16 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; INITIAL-FUNCTION to another thread.
         ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
         (with-system-mutex (*make-thread-lock*)
-          (with-alien ((create-thread (function unsigned unsigned)
+          (with-alien ((create-thread (function unsigned unsigned unsigned)
                                       :extern "create_thread"))
-            (if (eql (alien-funcall create-thread (get-lisp-obj-address #'start-routine))
-                     0)
-                (setq thread nil)
-                (wait-on-semaphore setup-sem))))))
+            (with-pinned-objects (thread #'start-routine)
+              (if (eql (alien-funcall create-thread
+                                      (- (get-lisp-obj-address thread)
+                                         sb-vm:instance-pointer-lowtag)
+                                      (get-lisp-obj-address #'start-routine))
+                       0)
+                  (setq thread nil)
+                  (wait-on-semaphore setup-sem)))))))
     (or thread (error "Could not create a new thread.")))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
@@ -2239,19 +2243,6 @@ Short version: be careful out there."
   ;; "If an application attempts to use a thread ID whose lifetime has ended,
   ;;  the behavior is undefined."
   ;; so we use the death lock to keep the thread alive, unless it already isn't.
-  ;;
-  ;; KNOWN BUG: With safepoints, when interrupting *CURRENT-THREAD*, we invoke
-  ;; the interrupt synchronously, despite being effectively in the extent of a
-  ;; WITHOUT-INTERRUPTS courtesy of WITH-SYSTEM-MUTEX. Hence we can't pop the
-  ;; the interruptions queue without getting a recursive lock attempt
-  ;; unless the interruptions lock is a different lock from the death lock.
-  ;;
-  ;; On non-safepoint builds, the signal will be deferred even if it delivered
-  ;; to *CURRENT-THREAD*. i.e. there will be no possibility of recursion on
-  ;; the interruptions lock. So that and the death lock are one and the same.
-  ;;
-  ;; I would imagine that this behavioral discrepancy is responsible for the
-  ;; differences in the regression suite as to which tests are expected to fail.
   ;;
   (when (with-deathlok (thread c-thread)
           ;; Return T if couldn't interrupt.
