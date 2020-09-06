@@ -156,7 +156,7 @@ vodxprint_fun(const char *fmt, va_list args)
     int n = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
-    snprintf(buf, sizeof(buf), "[%p] ", (void*)thread_self());
+    snprintf(buf, sizeof(buf), "["THREAD_ID_LABEL"] ", THREAD_ID_VALUE);
     n = strlen(buf);
 #endif
 

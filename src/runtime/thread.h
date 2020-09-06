@@ -393,6 +393,9 @@ extern pthread_mutex_t all_threads_lock;
 // "warning: too many arguments for format [-Wformat-extra-args]"
 # define THREAD_ID_LABEL "%s"
 # define THREAD_ID_VALUE ""
+#elif defined LISP_FEATURE_WIN32
+# define THREAD_ID_LABEL "%ld"
+# define THREAD_ID_VALUE (GetCurrentThreadId())
 #elif defined __linux__
 extern int sb_GetTID();
 # define THREAD_ID_LABEL " tid %d"
