@@ -958,6 +958,7 @@ many elements are copied."
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
 
+(declaim (inline nreverse-word-specialized-vector))
 (defun nreverse-word-specialized-vector (vector start end)
   (do ((left-index start (1+ left-index))
        (right-index (1- end) (1- right-index)))
