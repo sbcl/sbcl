@@ -649,7 +649,7 @@ struct {
     CRITICAL_SECTION lock;
     CONDITION_VARIABLE cond_has_data;
     CONDITION_VARIABLE cond_has_client;
-    pthread_t thread;
+    HANDLE thread;
     boolean initialized;
     HANDLE handle;
     boolean in_progress;
@@ -1681,8 +1681,7 @@ int console_handle_p(HANDLE handle)
  * entered.
  */
 
-static unsigned long
-tty_read_line_server()
+static __stdcall unsigned int tty_read_line_server(LPVOID arg)
 {
     thread_mutex_lock(&ttyinput.lock);
     while (ttyinput.handle) {
@@ -1728,10 +1727,11 @@ tty_maybe_initialize_unlocked(HANDLE handle)
         }
         InitializeConditionVariable(&ttyinput.cond_has_data);
         InitializeConditionVariable(&ttyinput.cond_has_client);
-        ttyinput.thread = CreateThread(NULL,
-                                       0, // stack size = default
-                                       tty_read_line_server, 0,
-                                       0, 0);
+        ttyinput.thread =
+          (HANDLE)_beginthreadex(NULL,
+                                 0, // stack size = default
+                                 tty_read_line_server, 0,
+                                 0, 0);
         ttyinput.initialized = 1;
     }
     return 1;
