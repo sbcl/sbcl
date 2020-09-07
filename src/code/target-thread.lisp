@@ -278,9 +278,6 @@ created and old ones may exit at any time."
   (int-sap 0))
 
 (sb-ext:define-load-time-global *initial-thread* nil)
-;;; Always keep one preallocated foreign thread instance so that a non-lisp thread
-;;; doesn't need to cons anything prior to release of the all_threads lock.
-(sb-ext:define-load-time-global *foreign-thread* nil)
 
 ;;; *JOINABLE-THREADS* is a list of THREAD instances used only if #+pauseless-threadstart
 ;;; I had attempted to construct the list using the thread's memory to create cons
@@ -327,7 +324,6 @@ created and old ones may exit at any time."
     (init-thread-local-storage thread)
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
-    #-sb-safepoint (setq *foreign-thread* (make-foreign-thread))
     (setq *all-threads*
           (avl-insert nil
                       (sb-thread::thread-primitive-thread sb-thread:*current-thread*)

@@ -76,7 +76,6 @@
        ;; SAVE-LISP-AND-DIE should have cleaned up, but there's a timing problem
        ;; with the finalizer thread, and I'm loathe to put in a SLEEP delay.
        sb-thread::*joinable-threads*
-       sb-thread::*foreign-thread*
        sb-thread::*all-threads*
        sb-thread::*session*
        sb-kernel::*gc-epoch*))

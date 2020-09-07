@@ -78,9 +78,11 @@ pthread_key_t specials = 0;
 #ifdef LISP_FEATURE_WIN32
 CRITICAL_SECTION all_threads_lock;
 static CRITICAL_SECTION recyclebin_lock;
+static CRITICAL_SECTION in_gc_lock;
 #else
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t in_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #endif
@@ -253,6 +255,7 @@ void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
     InitializeCriticalSection(&recyclebin_lock);
+    InitializeCriticalSection(&in_gc_lock);
 #endif
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
@@ -316,8 +319,7 @@ void free_thread_struct(struct thread *th)
 static void
 init_new_thread(struct thread *th,
                 init_thread_data __attribute__((unused)) *scribble,
-                int guardp,
-                int retain_all_threads_lock)
+                int guardp)
 {
     int lock_ret;
 
@@ -350,10 +352,7 @@ init_new_thread(struct thread *th,
     lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     link_thread(th);
-    if (!retain_all_threads_lock) {
-        lock_ret = thread_mutex_unlock(&all_threads_lock);
-        gc_assert(lock_ret == 0);
-    }
+    thread_mutex_unlock(&all_threads_lock);
 
     /* Kludge: Changed the order of some steps between the safepoint/
      * non-safepoint versions of this code.  Can we unify this more?
@@ -563,7 +562,7 @@ void* new_thread_trampoline(void* arg)
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
     th->os_kernel_tid = get_nonzero_tid();
-    init_new_thread(th, SCRIBBLE, 0, 0);
+    init_new_thread(th, SCRIBBLE, 0);
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
@@ -586,8 +585,7 @@ void* new_thread_trampoline(void* arg)
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     init_new_thread(th, &scribble,
-                    GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
-                    0);
+                    GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
     funcall0(function);
     unregister_thread(th, &scribble);
 
@@ -709,16 +707,12 @@ attach_os_thread(init_thread_data *scribble)
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    const int retain_lock = 0;
-#else
-    const int retain_lock = 1;
-#endif
+    /* We don't protect the control stack when adopting a foreign thread
+     * because we wouldn't know where to put the guard */
     init_new_thread(th, scribble,
                     /* recycled memory already had mprotect() done,
                      * so avoid 2 syscalls when possible */
-                    recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK,
-                    retain_lock);
+                    recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
 }
 
 void
@@ -815,13 +809,6 @@ callback_wrapper_trampoline(
         funcall3(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), arg0,arg1,arg2);
 #endif
     }
-}
-
-// Balance out the mutex_lock in attach_os_thread()
-void release_all_threads_lock()
-{
-    if (thread_mutex_unlock(&all_threads_lock))
-        lose("ENTER-FOREIGN-CALLBACK bug");
 }
 
 #endif /* LISP_FEATURE_SB_THREAD */
@@ -1135,6 +1122,14 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
     thread_sigmask(SIG_SETMASK,&oldset,0);
     return success;
 }
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+int try_acquire_gc_lock() { return TryEnterCriticalSection(&in_gc_lock); }
+void release_gc_lock() { LeaveCriticalSection(&in_gc_lock); }
+#else
+int try_acquire_gc_lock() { return !pthread_mutex_trylock(&in_gc_lock); }
+void release_gc_lock() { pthread_mutex_unlock(&in_gc_lock); }
 #endif
 
 /* stopping the world is a two-stage process.  From this thread we signal

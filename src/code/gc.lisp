@@ -147,7 +147,13 @@ statistics are appended to it."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(define-load-time-global *already-in-gc* (sb-thread:make-mutex :name "GC lock"))
+(defmacro try-acquire-gc-lock (&rest forms)
+  #-sb-thread `(progn ,@forms t)
+  #+sb-thread
+  `(when (eql (alien-funcall (extern-alien "try_acquire_gc_lock" (function int))) 1)
+     ,@forms
+     (alien-funcall (extern-alien "release_gc_lock" (function void)))
+     t))
 
 (defun sub-gc (gen)
   (cond (*gc-inhibit*
@@ -193,8 +199,6 @@ statistics are appended to it."
            ;; Let's make sure we're not interrupted and that none of
            ;; the deadline or deadlock detection stuff triggers.
            (without-interrupts
-             (sb-thread::without-thread-waiting-for
-                 (:already-without-interrupts t)
                (let ((sb-impl::*deadline* nil)
                      (epoch *gc-epoch*))
                  (loop
@@ -208,10 +212,9 @@ statistics are appended to it."
                     ;; execute the remainder of the GC: stopping the
                     ;; world with interrupts disabled is the mother of
                     ;; all critical sections.
-                    (cond ((sb-thread:with-mutex (*already-in-gc* :wait-p nil)
+                    (cond ((try-acquire-gc-lock
                              (unsafe-clear-roots gen)
-                             (gc-stop-the-world)
-                             t)
+                             (gc-stop-the-world))
                            ;; Success! GC.
                            (perform-gc)
                            ;; Return, but leave *gc-pending* as is: we
@@ -238,7 +241,7 @@ statistics are appended to it."
                   ;; runtime.
                   (when (and (eql gen 0)
                              (neq epoch *gc-pending*))
-                    (return 0))))))))))
+                    (return 0)))))))))
 
 (defun post-gc ()
   ;; Outside the mutex, interrupts may be enabled: these may cause
