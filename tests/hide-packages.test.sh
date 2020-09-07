@@ -60,7 +60,6 @@ run_sbcl <<EOF
 ;;; That it doesn't pass doesn't mean the packages aren't hidden correctly.
 ;;; It just means the test is inadequate.
 #-(or x86 x86-64) (exit)
-#-sb-thread (exit) ;; doesn't pass for some reason
 #+sb-devel (exit)
 
 ;;; Does not pass with interpreter
@@ -88,7 +87,8 @@ run_sbcl <<EOF
      (let ((name (package-name package)))
        (rename-package name (concatenate 'string "HIDDEN-" name)))))
   ;; The package hashtable lazily removes keys. Force it do to do so now.
-  (sb-impl::%rebuild-package-names sb-kernel::*package-names*))
+  (sb-impl::%rebuild-package-names sb-kernel::*package-names*)
+  (sb-sys:scrub-control-stack))
 
 ;;; Place all the strings we want to search for onto the stack.
 ;;; This little rearrangement here is a hack which causes the last item in
