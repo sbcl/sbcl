@@ -1094,28 +1094,4 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 }
 #endif /* LISP_FEATURE_WIN32 */
 
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-void
-signal_handler_callback(lispobj run_handler, int signo, void *info, void *ctx)
-{
-    init_thread_data scribble;
-    void *args[2];
-    DX_ALLOC_SAP(args_sap, args);
-
-    args[0] = info;
-    args[1] = ctx;
-
-    attach_os_thread(&scribble);
-
-    odxprint(misc, "callback from signal handler thread for: %d\n", signo);
-    WITH_GC_AT_SAFEPOINTS_ONLY() {
-        funcall3(StaticSymbolFunction(SIGNAL_HANDLER_CALLBACK),
-                 run_handler, make_fixnum(signo), args_sap);
-    }
-
-    detach_os_thread(&scribble);
-    return;
-}
-#endif
-
 #endif /* LISP_FEATURE_SB_SAFEPOINT -- entire file */

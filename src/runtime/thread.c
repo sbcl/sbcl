@@ -655,8 +655,7 @@ void empty_thread_recyclebin()
     thread_sigmask(SIG_SETMASK, &old, 0);
 }
 
-void
-attach_os_thread(init_thread_data *scribble)
+static void attach_os_thread(init_thread_data *scribble)
 {
     block_deferrable_signals(&scribble->oldset);
     void* recycled_memory = get_recyclebin_item();
@@ -715,11 +714,9 @@ attach_os_thread(init_thread_data *scribble)
                     recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
 }
 
-void
-detach_os_thread(init_thread_data *scribble)
+static void detach_os_thread(init_thread_data *scribble)
 {
     struct thread *th = arch_os_get_current_thread();
-    odxprint(misc, "detach_os_thread: detaching");
 
     unregister_thread(th, scribble);
 

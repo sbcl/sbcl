@@ -298,6 +298,8 @@
           ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thruption (not sb-safepoint))" ":SB-THRUPTION requires :SB-SAFEPOINT")
+         ("(and unix sb-safepoint-strictly)"
+          ":SB-SAFEPOINT-STRICTLY not supported on this platform")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"
@@ -343,7 +345,7 @@
         (push (second test) failed-test-descriptions))))
   (when failed-test-descriptions
     (error "Feature compatibility check failed, ~S"
-           failed-test-descriptions)))
+           (reverse failed-test-descriptions))))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 

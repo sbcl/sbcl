@@ -81,7 +81,6 @@ extern int dynamic_values_bytes;
 
 
 #ifdef LISP_FEATURE_SB_THREAD
-extern int kill_safely(os_thread_t os_thread, int signal);
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)
 #else
 /* there's some possibility a SSC could notice this never actually
@@ -367,14 +366,6 @@ void pop_gcing_safety(struct gcing_safety *from)
     WITH_GC_AT_SAFEPOINTS_ONLY_hygenic(sbcl__gc_safety)
 
 int check_pending_thruptions(os_context_t *ctx);
-
-void attach_os_thread(init_thread_data *);
-void detach_os_thread(init_thread_data *);
-
-# if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-
-void signal_handler_callback(lispobj, int, void *, void *);
-# endif
 
 #else
 #define WITH_GC_AT_SAFEPOINTS_ONLY()
