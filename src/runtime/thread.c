@@ -968,21 +968,20 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 # ifdef LISP_FEATURE_WIN32
     th->carried_base_pointer = 0;
 # endif
-    // FIXME: this looks extremely bogus if the threads run on an OS-provided stack.
-    // Wouldn't it make more sense to set it to 0 and leave it to init_new_thread
-    // to set the value? (where would the main thread get it from?)
+    // this is too weird. csp_around_foreign_call is always just one word prior
+    // to the end of the safepoint page. The slot should probably be named
+    // csp_around_foreign_call_ptr, but why even bother storing a constant at all?
     th->csp_around_foreign_call = (lispobj *)th - 1;
 #endif
 
     struct nonpointer_thread_data *nonpointer_data = thread_semaphores(th);
+    memset(nonpointer_data, 0, sizeof *nonpointer_data);
     th->interrupt_data = &nonpointer_data->interrupt_data;
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
     os_sem_init(&nonpointer_data->state_sem, 1);
     os_sem_init(&nonpointer_data->state_not_running_sem, 0);
     os_sem_init(&nonpointer_data->state_not_stopped_sem, 0);
-    nonpointer_data->state_not_running_waitcount = 0;
-    nonpointer_data->state_not_stopped_waitcount = 0;
 #endif
 
     th->state=STATE_RUNNING;
