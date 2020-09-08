@@ -101,7 +101,8 @@ in future versions."
   ;; user-visible threads that do not map directly to OSs threads (or LWPs).
   ;; Any use of THREAD-OS-THREAD from lisp should take care to ensure validity of
   ;; the thread id by holding the INTERRUPTIONS-LOCK.
-  (os-thread 0 :type sb-vm:word)
+  ;; Not needed for win32 threads.
+  #-win32 (os-thread 0 :type sb-vm:word)
   ;; Keep a copy of the stack range for use in SB-EXT:STACK-ALLOCATED-P so that
   ;; we don't have to read it from the primitive thread which is unsafe for any
   ;; thread other than the current thread.

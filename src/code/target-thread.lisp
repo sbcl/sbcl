@@ -302,9 +302,12 @@ created and old ones may exit at any time."
 
 ;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
 (defmacro copy-primitive-thread-fields (this)
-  `(setf (thread-primitive-thread ,this) (sap-int (current-thread-sap))
-         (thread-os-thread ,this)
-         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))))
+  `(progn
+     (setf (thread-primitive-thread ,this) (sap-int (current-thread-sap)))
+     #-win32
+     (setf (thread-os-thread ,this)
+           (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))))
+
 (defmacro set-thread-control-stack-slots (this)
   `(setf (thread-control-stack-start ,this) (get-lisp-obj-address sb-vm:*control-stack-start*)
          (thread-control-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)))

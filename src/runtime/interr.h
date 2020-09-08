@@ -25,6 +25,12 @@ extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);
 extern void skip_internal_error (os_context_t *context);
 
+#ifdef LISP_FEATURE_WIN32
+/* thread ID is a more useful identifer than thread handle */
+#define UNKNOWN_STACK_POINTER_ERROR(function_name, thread) \
+    lose(function_name": no SP known for thread %p (ID %p)", \
+         thread, (void*)thread->os_kernel_tid);
+#else
 /* Portably printf()ing a pthread_t is tricky. It has to be printed
  * as opaque bytes by taking &id and sizeof id.
  * As the man page says:
@@ -37,10 +43,11 @@ extern void skip_internal_error (os_context_t *context);
  *   pthread_t to the list of types that are not required to be arithmetic types,
  *   thus allowing pthread_t to be defined as a structure."
  *
- * We assume that it can be cast to 'long' which is a total KLUDGE
+ * We assume that it can be cast to 'void*'
  */
 #define UNKNOWN_STACK_POINTER_ERROR(function_name, thread) \
     lose(function_name": no SP known for thread %p (pthread %p)", \
          thread, (void*)thread->os_thread);
+#endif
 
 #endif
