@@ -4,6 +4,7 @@
 
 #ifdef _WIN32
 # include <handleapi.h>
+# include <process.h>
 # include <processthreadsapi.h>
 # include <synchapi.h> // for WaitForSingleObject
 #else
@@ -22,7 +23,39 @@ char *salutations[8] = {
 int sharedvar;
 
 #ifdef _WIN32
-long unsigned int doThatThing(void* void_arg)
+__stdcall unsigned int perftest_thread(LPVOID void_arg)
+#else
+void* perftest_thread(void* void_arg)
+#endif
+{
+    struct thread_arg* arg = void_arg;
+    int (*lispfun)() = arg->funkyfun;
+    int ncalls = arg->n_calls;
+    int i;
+    for (i=0; i<ncalls; ++i) lispfun();
+    return 0;
+}
+
+int minimal_perftest(void* ptr, int n_calls)
+{
+  struct thread_arg arg;
+  arg.funkyfun = ptr;
+  arg.n_calls = n_calls;
+#ifdef _WIN32
+  HANDLE thr;
+  thr = (HANDLE)_beginthreadex(NULL, 0, perftest_thread, &arg, 0, NULL);
+  WaitForSingleObject(thr,0xffffffff);
+  CloseHandle(thr);
+#else
+  pthread_t thr;
+  pthread_create(&thr, 0, perftest_thread, &arg);
+  pthread_join(thr,0);
+#endif
+  return 0;
+}
+
+#ifdef _WIN32
+__stdcall unsigned int doThatThing(void* void_arg)
 #else
 void* doThatThing(void* void_arg)
 #endif
@@ -63,7 +96,7 @@ int call_thing_from_threads(void* ptr, int n_threads, int n_calls)
         threads[i].arg.index = i + 1;
         threads[i].arg.n_calls = n_calls;
 #ifdef _WIN32
-        threads[i].handle = CreateThread(NULL, 0, doThatThing, &threads[i].arg, 0, NULL);
+        threads[i].handle = (HANDLE)_beginthreadex(NULL, 0, doThatThing, &threads[i].arg, 0, NULL);
 #else
         pthread_create(&threads[i].pthread_id, 0, doThatThing, &threads[i].arg);
 #endif

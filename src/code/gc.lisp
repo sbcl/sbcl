@@ -254,8 +254,12 @@ statistics are appended to it."
   ;;
   ;; KLUDGE: Don't run the hooks in GC's if:
   ;;
-  ;; A) this thread is dying, so that user-code never runs with
-  ;;    (thread-alive-p *current-thread*) => nil
+  ;; A) this thread is dying or just born, so that user-code never runs with
+  ;;    (thread-alive-p *current-thread*) => nil.
+  ;;    The just-born case can happen with foreign threads that are unlucky
+  ;;    enough to be elected to perform GC just as they begin executing
+  ;;    ENTER-FOREIGN-CALLBACK. This definitely seems to happen with sb-safepoint.
+  ;;    I'm not sure whether it can happen without sb-safepoint.
   ;;
   ;; B) interrupts are disabled somewhere up the call chain since we
   ;;    don't want to run user code in such a case.
@@ -266,7 +270,10 @@ statistics are appended to it."
   ;; but it's not permissible to invoke CONDITION-NOTIFY from a
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
-  (when (sb-thread:thread-alive-p sb-thread:*current-thread*)
+  (when (and
+         #+sb-thread (/= 0 (sap-int (sb-vm::current-thread-offset-sap
+                                     sb-vm::thread-lisp-thread-slot)))
+         (sb-thread:thread-alive-p sb-thread:*current-thread*))
     #+sb-thread (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
     (let ((threadp #+sb-thread (%instancep sb-impl::*finalizer-thread*)))
       (when threadp

@@ -38,6 +38,14 @@
                           :output t :error :output)
       (sb-alien:load-shared-object solib)))
 
+;;;; Just exercise a ton of calls from 1 thread
+(sb-alien::define-alien-callback perftestcb int () 0)
+(defun trivial-call-test (n)
+  (with-alien ((testfun (function int system-area-pointer int) :extern "minimal_perftest"))
+    (alien-funcall testfun (alien-sap perftestcb) n)))
+(time (trivial-call-test 200000))
+
+;;;;
 (defglobal *counter* 0)
 (declaim (fixnum *counter*))
 (defglobal *ok* (list t))
