@@ -2,8 +2,6 @@
 #define WIN32_PTHREAD_INCLUDED
 
 #include <time.h>
-#include <errno.h>
-#include <sys/types.h>
 
 #ifndef _SIGSET_T
 typedef int sigset_t;
@@ -12,7 +10,6 @@ typedef int sigset_t;
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <stdint.h>
 
 /* 0 - Misc */
 
@@ -50,22 +47,11 @@ typedef int sigset_t;
 #define NSIG 32     /* maximum signal number + 1 */
 #endif
 
-void pthreads_win32_init();
-
 /* 1 - Thread */
-
-typedef struct pthread_thread* pthread_t;
-
-int sb_pthr_kill(pthread_t thread, int signum);
-
-extern DWORD thread_self_tls_index;
 
 #define SIG_BLOCK 1
 #define SIG_UNBLOCK 2
 #define SIG_SETMASK 3
-#ifdef PTHREAD_INTERNALS
-int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
-#endif
 
 #ifndef _TIMESPEC_DEFINED
 typedef struct timespec {
@@ -80,20 +66,6 @@ typedef struct timespec {
 #endif
 
 int sched_yield();
-
-typedef struct pthread_thread {
-  HANDLE handle;
-  struct thread *vm_thread;
-  sigset_t blocked_signal_set;
-  volatile sigset_t pending_signal_set;
-
-  /* For noticed foreign threads, wait_handle contains a result of
-     RegisterWaitForSingleObject. */
-  HANDLE wait_handle;
-
-  /* Thread TEB base (mostly informative/debugging) */
-  void* teb;
-} pthread_thread;
 
 typedef struct {
   int bogus;
@@ -114,42 +86,10 @@ int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
 
 int sigpending(sigset_t *set);
 
-void pthread_np_add_pending_signal(pthread_t thread, int signum);
-void pthread_np_remove_pending_signal(pthread_t thread, int signum);
-sigset_t pthread_np_other_thread_sigpending(pthread_t thread);
-
-int pthread_np_notice_thread();
-
 int sigemptyset(sigset_t *set);
 int sigfillset(sigset_t *set);
 int sigaddset(sigset_t *set, int signum);
 int sigdelset(sigset_t *set, int signum);
 int sigismember(const sigset_t *set, int signum);
 
-typedef int sig_atomic_t;
-
-#ifndef PTHREAD_INTERNALS
-#define thread_self() ((pthread_t)TlsGetValue(thread_self_tls_index))
-static inline int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
-{
-  pthread_t self = thread_self();
-  if (oldset)
-    *oldset = self->blocked_signal_set;
-  if (set) {
-    switch (how) {
-      case SIG_BLOCK:
-        self->blocked_signal_set |= *set;
-        break;
-      case SIG_UNBLOCK:
-        self->blocked_signal_set &= ~(*set);
-        break;
-      case SIG_SETMASK:
-        self->blocked_signal_set = *set;
-        break;
-    }
-  }
-  return 0;
-}
-
-#endif  /* !PTHREAD_INTERNALS */
 #endif  /* WIN32_PTHREAD_INCLUDED */

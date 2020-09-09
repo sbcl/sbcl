@@ -104,9 +104,6 @@ link_thread(struct thread *th)
     all_threads=th;
 }
 
-// This is needed even if not sb-thread.
-#define thread_semaphores(thread) (void *)((char*)thread + dynamic_values_bytes)
-
 #ifdef LISP_FEATURE_SB_THREAD
 static void
 unlink_thread(struct thread *th)
@@ -127,7 +124,7 @@ void
 set_thread_state(struct thread *thread, lispobj state,
                  boolean signals_already_blocked) // for foreign thread
 {
-    struct nonpointer_thread_data *semaphores = thread_semaphores(thread);
+    struct nonpointer_thread_data *semaphores = nonpointer_data(thread);
     int i, waitcount = 0;
     sigset_t old;
     // If we've already masked the blockable signals we can avoid two syscalls here.
@@ -161,7 +158,7 @@ set_thread_state(struct thread *thread, lispobj state,
 int thread_wait_until_not(int undesired_state,
                           struct thread *thread)
 {
-    struct nonpointer_thread_data *semaphores = thread_semaphores(thread);
+    struct nonpointer_thread_data *semaphores = nonpointer_data(thread);
     sigset_t old;
     os_sem_t *wait_sem;
     block_blockable_signals(&old);
@@ -226,15 +223,21 @@ pthread_attr_t new_lisp_thread_attr;
 #endif
 struct thread *alloc_thread_struct(void*,lispobj);
 
+#ifdef LISP_FEATURE_WIN32
+#define ASSOCIATE_OS_THREAD(thread) \
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), \
+                    GetCurrentProcess(), (LPHANDLE)&thread->os_thread, 0, TRUE, \
+                    DUPLICATE_SAME_ACCESS)
+#else
+#define ASSOCIATE_OS_THREAD(thread) thread->os_thread = thread_self()
+#endif
+
 #ifndef LISP_FEATURE_SB_THREAD
 # define ASSIGN_CURRENT_THREAD(dummy)
 #elif defined LISP_FEATURE_GCC_TLS
 # define ASSIGN_CURRENT_THREAD(x) current_thread = x
 #elif !defined LISP_FEATURE_WIN32
 # define ASSIGN_CURRENT_THREAD(x) pthread_setspecific(specials, x)
-#elif defined LISP_FEATURE_64_BIT
-# define ASSIGN_CURRENT_THREAD(x) \
-  ((struct pthread_thread*)TlsGetValue(thread_self_tls_index))->vm_thread = x
 #else
 # define ASSIGN_CURRENT_THREAD(x) TlsSetValue(OUR_TLS_INDEX, x)
 #endif
@@ -269,6 +272,7 @@ void create_main_lisp_thread(lispobj function) {
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
 #endif
+    ASSOCIATE_OS_THREAD(th);
     ASSIGN_CURRENT_THREAD(th);
 #if defined THREADS_USING_GCSIGNAL && \
     (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
@@ -277,7 +281,7 @@ void create_main_lisp_thread(lispobj function) {
 #endif
     link_thread(th);
     th->os_kernel_tid = get_nonzero_tid();
-    th->os_thread = thread_self();
+
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, NULL);
 #endif
@@ -328,8 +332,6 @@ init_new_thread(struct thread *th,
         /* FIXME: handle error */
         lose("arch_os_thread_init failed");
     }
-
-    th->os_thread = thread_self();
 
 #define GUARD_CONTROL_STACK 1
 #define GUARD_BINDING_STACK 2
@@ -419,7 +421,7 @@ unregister_thread(struct thread *th,
     arch_os_thread_cleanup(th);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    struct nonpointer_thread_data *semaphores = thread_semaphores(th);
+    struct nonpointer_thread_data *semaphores = nonpointer_data(th);
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
@@ -431,15 +433,13 @@ unregister_thread(struct thread *th,
 #endif
 
 #if defined(LISP_FEATURE_WIN32)
+    CloseHandle((HANDLE)th->os_thread);
     int i;
     for (i = 0; i<
              (int) (sizeof(th->private_events.events)/
                     sizeof(th->private_events.events[0])); ++i) {
       CloseHandle(th->private_events.events[i]);
     }
-#ifndef LISP_FEATURE_64_BIT
-    TlsSetValue(OUR_TLS_INDEX,NULL);
-#endif
 #endif
 
     /* Undo the association of the current pthread to its `struct thread',
@@ -454,24 +454,6 @@ unregister_thread(struct thread *th,
     ASSIGN_CURRENT_THREAD(NULL);
 }
 
-#ifdef LISP_FEATURE_WIN32
-#define THREAD_TRAMPOLINE_PROLOGUE \
-    extern void set_thread_self(pthread_t thread); \
-    pthread_t self = (pthread_t) arg; \
-    self->teb = NtCurrentTeb(); \
-    set_thread_self(self); \
-    struct thread* th = self->vm_thread
-#define THREAD_TRAMPOLINE_EPILOGUE \
-    free_thread_struct(th); \
-    HANDLE h = self->handle; \
-    free(self); \
-    CloseHandle(h)
-#else
-#define THREAD_TRAMPOLINE_PROLOGUE \
-    struct thread* th = arg
-#define THREAD_TRAMPOLINE_EPILOGUE
-#endif
-
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
  * lisp function after doing arch_os_thread_init and whatever other
@@ -483,7 +465,9 @@ __stdcall unsigned int new_thread_trampoline(LPVOID arg)
 void* new_thread_trampoline(void* arg)
 #endif
 {
-    THREAD_TRAMPOLINE_PROLOGUE;
+    struct thread* th = arg;
+    ASSOCIATE_OS_THREAD(th);
+
 #ifdef LISP_FEATURE_PAUSELESS_THREADSTART
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     init_thread_data scribble;
@@ -576,28 +560,17 @@ void* new_thread_trampoline(void* arg)
     th->os_kernel_tid = get_nonzero_tid();
     init_thread_data scribble;
 
-    FSHOW((stderr,"/creating thread %p\n", thread_self()));
-    check_deferrables_blocked_or_lose(0);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    check_gc_signals_unblocked_or_lose(0);
-#endif
-
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     init_new_thread(th, &scribble,
                     GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
     funcall0(function);
     unregister_thread(th, &scribble);
+#ifdef LISP_FEATURE_WIN32
+    free_thread_struct(th); // no recycling of 'struct thread'
+#endif
 
-    // OS_THREAD_STACK means we start on the OS-provided stack
-    // but switch to our chosen stack.
-    // win32 doesn't do that - it stays on the OS-provided stack
-    // and all cleanup is automatic
-#if !defined LISP_FEATURE_OS_THREAD_STACK && !defined LISP_FEATURE_WIN32
-    schedule_thread_post_mortem(th);
 #endif
-#endif
-    THREAD_TRAMPOLINE_EPILOGUE;
     return 0;
 }
 
@@ -657,7 +630,9 @@ void empty_thread_recyclebin()
 
 static void attach_os_thread(init_thread_data *scribble)
 {
+#ifndef LISP_FEATURE_WIN32 // native threads have no signal maskk
     block_deferrable_signals(&scribble->oldset);
+#endif
     void* recycled_memory = get_recyclebin_item();
     struct thread *th = alloc_thread_struct(recycled_memory,
                                             NO_TLS_VALUE_MARKER_WIDETAG);
@@ -670,7 +645,14 @@ static void attach_os_thread(init_thread_data *scribble)
 #endif
 
     th->os_kernel_tid = get_nonzero_tid();
-    th->os_thread = thread_self();
+    /* win32: While ASSOCIATE_OS_THREAD performs a relatively expensive DuplicateHandle(),
+     * simplicity here is preferable to the complexity entailed by memoizing the handle
+     * in a TLS slot and registering a waiter on the foreign thread to close to handle.
+     * In contrast to the previous approach, the new handle is closed in detach_os_thread(),
+     * and if C calls lisp again in this thread... then lather, rinse, repeat.
+     * A benchmark based on 'fcb-threads.impure' shows that we're still 8x faster
+     * at callback entry than the code as it was prior to git rev 91f86339b4 */
+    ASSOCIATE_OS_THREAD(th);
 
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* On windows, arch_os_thread_init will take care of finding the
@@ -755,7 +737,9 @@ static void detach_os_thread(init_thread_data *scribble)
     }
 #endif
     put_recyclebin_item(th);
+#ifndef LISP_FEATURE_WIN32 // native threads have no signal mask
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
+#endif
 }
 
 #if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
@@ -777,9 +761,6 @@ callback_wrapper_trampoline(
 #endif
     lispobj arg0, lispobj arg1, lispobj arg2)
 {
-#if defined(LISP_FEATURE_WIN32)
-    pthread_np_notice_thread();
-#endif
     struct thread* th = arch_os_get_current_thread();
     if (!th) {                  /* callback invoked in non-lisp thread */
         init_thread_data scribble;
@@ -971,11 +952,12 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->csp_around_foreign_call = (lispobj *)th - 1;
 #endif
 
-    struct nonpointer_thread_data *nonpointer_data = thread_semaphores(th);
+    struct nonpointer_thread_data *nonpointer_data = nonpointer_data(th);
     memset(nonpointer_data, 0, sizeof *nonpointer_data);
     th->interrupt_data = &nonpointer_data->interrupt_data;
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
+    memset(nonpointer_data, 0, sizeof *nonpointer_data);
     os_sem_init(&nonpointer_data->state_sem, 1);
     os_sem_init(&nonpointer_data->state_not_running_sem, 0);
     os_sem_init(&nonpointer_data->state_not_stopped_sem, 0);
@@ -1067,10 +1049,10 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
  * and return 1 for success, 0 for failure */
 uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
 {
-    struct thread *th, *thread = arch_os_get_current_thread();
+    struct thread *th;
 
     /* Must defend against async unwinds. */
-    if (read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
+    if (read_TLS(INTERRUPTS_ENABLED, arch_os_get_current_thread()) != NIL)
         lose("create_thread is not safe when interrupts are enabled.");
 
     /* Assuming that a fresh thread struct has no lisp objects in it,
@@ -1083,36 +1065,31 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
     /* The new thread inherits the restrictive signal mask set here,
      * and enables signals again when it is set up properly. */
     sigset_t oldset;
-    boolean success = 0;
 
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
     unsigned int tid;
-    pthread_t pth = (pthread_t)calloc(sizeof(pthread_thread),1);
-    gc_assert(pth != NULL);
     // Theoretically you should tell the new thread a signal mask to restore
     // after it finishes any uninterruptable setup code, but the way this worked
     // on windows is that we passed the mask of blocked signals in the parent
     // *after* blocking deferrables. It's immaterial what mask is passed
     // because the thread will unblock all deferrables,
     // and we don't really have posix signals anyway.
-    pth->blocked_signal_set = deferrable_sigset;
-    pth->vm_thread = th;
+    struct nonpointer_thread_data *data = nonpointer_data(th);
+    data->blocked_signal_set = deferrable_sigset;
+    data->pending_signal_set = 0;
     // It's somewhat customary in the win32 API to start threads as suspended.
-    pth->handle = (HANDLE)
-      _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, pth,
+    th->os_thread =
+      _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
                      CREATE_SUSPENDED, &tid);
-    success = (pth->handle != NULL);
+    boolean success = th->os_thread != 0;
     if (success) {
-        // TOO MANY DIFFERENT THREAD STRUCTURES, CAN WE * PUHLEASE * SIMPLIFY!?
         instance->primitive_thread = (lispobj)th;
-        th->os_thread = pth;
         th->os_kernel_tid = tid;
-        ResumeThread(pth->handle);
+        ResumeThread((HANDLE)th->os_thread);
     } else {
-        free(pth);
         free_thread_struct(th);
     }
     thread_sigmask(SIG_SETMASK,&oldset,0);
@@ -1280,7 +1257,7 @@ void wake_thread(struct thread_instance* lispthread)
          * etc. */
         struct thread* thread = (void*)lispthread->primitive_thread;
         if (thread == arch_os_get_current_thread()) {
-            sb_pthr_kill(thread->os_thread, 1); // can't fail
+            sb_pthr_kill(thread, 1); // can't fail
             check_pending_thruptions(NULL);
             return;
         }
@@ -1289,7 +1266,7 @@ void wake_thread(struct thread_instance* lispthread)
         sigset_t oldset;
         block_deferrable_signals(&oldset);
         thread_mutex_lock(&all_threads_lock);
-        sb_pthr_kill(thread->os_thread, 1); // can't fail
+        sb_pthr_kill(thread, 1); // can't fail
 # ifdef LISP_FEATURE_SB_THRUPTION
         wake_thread_impl(lispthread);
 # endif

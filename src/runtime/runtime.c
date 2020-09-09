@@ -423,7 +423,12 @@ sbcl_main(int argc, char *argv[], char *envp[])
     boolean have_hardwired_spaces = os_preinit(argv, envp);
 
     interrupt_init();
+#ifndef LISP_FEATURE_WIN32
+    /* Not sure why anyone sends signals to this process so early.
+     * But win32 models the signal mask as part of 'struct thread'
+     * which doesn't exist yet, so don't do this */
     block_blockable_signals(0);
+#endif
 
     /* Check early to see if this executable has an embedded core,
      * which also populates runtime_options if the core has runtime

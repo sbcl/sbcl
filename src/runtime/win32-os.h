@@ -58,12 +58,14 @@ extern int win32_open_for_mmap(const char* file);
 extern FILE* win32_fopen_runtime();
 
 // 64-bit uses whatever TLS index the kernels gives us which we store in
-// 'thread_self_tls_index' to hold our thread-local value of the pointer
+// 'sbcl_thread_tls_index' to hold our thread-local value of the pointer
 // to struct thread.
 // 32-bit uses a quasi-arbitrary fixed TLS index that we try to claim on startup.
-// of the process. And we *also* redundantly allocate 'thread_self_tls_index'
-// as a different index holding the same pointer.
-#ifndef LISP_FEATURE_64_BIT
+// of the process.
+#ifdef LISP_FEATURE_64_BIT
+extern DWORD sbcl_thread_tls_index;
+#define OUR_TLS_INDEX sbcl_thread_tls_index
+#else
 #define OUR_TLS_INDEX 63
 #endif
 #define SIG_MEMORY_FAULT SIGSEGV
@@ -85,8 +87,6 @@ void os_invalidate_free(os_vm_address_t addr, os_vm_size_t len);
 
 boolean win32_maybe_interrupt_io(void* thread);
 
-struct thread;
-void** os_get_csp(struct thread* th);
-
+int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 
 #endif  /* SBCL_INCLUDED_WIN32_OS_H */

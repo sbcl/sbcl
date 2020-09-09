@@ -210,10 +210,6 @@ typedef signed int s32;
 
 #include <sys/types.h>
 
-#ifdef LISP_FEATURE_SB_THREAD
-typedef pthread_t os_thread_t;
-#endif
-
 typedef uintptr_t uword_t;
 typedef intptr_t  sword_t;
 

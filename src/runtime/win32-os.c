@@ -655,6 +655,12 @@ struct {
     boolean in_progress;
 } ttyinput;
 
+#ifdef LISP_FEATURE_64_BIT
+// 32-bit uses a hardwired value (63) as this index because codegen
+// usese %FS:[a_constant] to get CURRENT-THREAD-SAP, etc.
+DWORD sbcl_thread_tls_index;
+#endif
+
 int os_preinit(char *argv[], char *envp[])
 {
 #ifdef LISP_FEATURE_SB_FUTEX
@@ -672,7 +678,6 @@ int os_preinit(char *argv[], char *envp[])
     InitializeCriticalSection(&alloc_profiler_lock);
     InitializeCriticalSection(&interrupt_io_lock);
     InitializeCriticalSection(&ttyinput.lock);
-    pthreads_win32_init();
 #ifdef LISP_FEATURE_X86
     DWORD slots[TLS_MINIMUM_AVAILABLE];
     DWORD key;
@@ -697,6 +702,8 @@ int os_preinit(char *argv[], char *envp[])
         lose("TLS slot assertion failed: slot 63 is unavailable "
              "(last TlsAlloc() returned %u)",key);
     }
+#else
+    OUR_TLS_INDEX = TlsAlloc();
 #endif
     return 0;
 }
@@ -1377,9 +1384,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     os_context_t context, *ctx = &context;
     context.win32_context = win32_context;
-#if defined(LISP_FEATURE_SB_THREAD)
-    context.sigmask = self ? self->os_thread->blocked_signal_set : 0;
-#endif
+    context.sigmask = self ? nonpointer_data(self)->blocked_signal_set : 0;
 
     os_context_register_t oldbp = 0;
     if (self) {
@@ -1450,7 +1455,7 @@ veh(EXCEPTION_POINTERS *ep)
     EXCEPTION_DISPOSITION disp;
 
     RESTORING_ERRNO() {
-        if (!thread_self())
+        if (!arch_os_get_current_thread())
             return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -1862,7 +1867,7 @@ win32_maybe_interrupt_io(void* thread)
                 goto unlock;
             }
             if (ptr_CancelSynchronousIo) {
-                done = !!ptr_CancelSynchronousIo(th->os_thread->handle);
+                done = !!ptr_CancelSynchronousIo((HANDLE)th->os_thread);
             }
             done |= !!ptr_CancelIoEx(h,NULL);
         }
@@ -2212,5 +2217,95 @@ futex_wake(PVOID lock_word, int n)
     return 0;
 }
 #endif
+
+int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+  struct nonpointer_thread_data* self = nonpointer_data(arch_os_get_current_thread());
+  if (oldset)
+    *oldset = self->blocked_signal_set;
+  if (set) {
+    switch (how) {
+      case SIG_BLOCK:
+        self->blocked_signal_set |= *set;
+        break;
+      case SIG_UNBLOCK:
+        self->blocked_signal_set &= ~(*set);
+        break;
+      case SIG_SETMASK:
+        self->blocked_signal_set = *set;
+        break;
+    }
+  }
+  return 0;
+}
+
+int sb_pthr_kill(struct thread* thread, int signum)
+{
+    __sync_fetch_and_or(&nonpointer_data(thread)->pending_signal_set, 1<<signum);
+    return 0;
+}
+
+int sigpending(sigset_t *set)
+{
+    struct nonpointer_thread_data* data = nonpointer_data(arch_os_get_current_thread());
+    *set = InterlockedCompareExchange((volatile LONG*)&data->pending_signal_set,
+                                      0, 0);
+    return 0;
+}
+
+/* Signals */
+struct sigaction signal_handlers[NSIG];
+
+/* Never called for now */
+int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
+{
+  struct sigaction newact = *act;
+  if (oldact)
+    *oldact = signal_handlers[signum];
+  if (!(newact.sa_flags & SA_SIGINFO)) {
+      newact.sa_sigaction = (typeof(newact.sa_sigaction))newact.sa_handler;
+  }
+  signal_handlers[signum] = newact;
+  return 0;
+}
+
+int sched_yield()
+{
+  /* http://stackoverflow.com/questions/1383943/switchtothread-vs-sleep1
+     SwitchToThread(); was here. Unsure what's better for us, just trying.. */
+
+  if(!SwitchToThread())
+      Sleep(0);
+  return 0;
+}
+
+int sigemptyset(sigset_t *set)
+{
+  *set = 0;
+  return 0;
+}
+
+int sigfillset(sigset_t *set)
+{
+  *set = 0xfffffffful;
+  return 0;
+}
+
+int sigaddset(sigset_t *set, int signum)
+{
+  *set |= 1 << signum;
+  return 0;
+}
+
+int sigdelset(sigset_t *set, int signum)
+{
+  *set &= ~(1 << signum);
+  return 0;
+}
+
+int sigismember(const sigset_t *set, int signum)
+{
+  return (*set & (1 << signum)) != 0;
+}
 
 /* EOF */

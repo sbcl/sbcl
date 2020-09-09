@@ -66,7 +66,14 @@ struct nonpointer_thread_data
     uint32_t state_not_stopped_waitcount;
 #endif
     struct interrupt_data interrupt_data;
+#ifdef LISP_FEATURE_WIN32
+    // these are different from the masks that interrupt_data holds
+    sigset_t pending_signal_set;
+    sigset_t blocked_signal_set;
+#endif
 };
+#define nonpointer_data(thread) \
+  ((struct nonpointer_thread_data*)((char*)thread + dynamic_values_bytes))
 
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
@@ -242,6 +249,7 @@ static inline int calc_altstack_size(struct thread* thread) {
 #if defined(LISP_FEATURE_WIN32)
 static inline struct thread* arch_os_get_current_thread()
     __attribute__((__const__));
+int sb_pthr_kill(struct thread* thread, int signum);
 #endif
 
 /* This is clearly per-arch and possibly even per-OS code, but we can't
@@ -255,13 +263,13 @@ static inline struct thread *arch_os_get_current_thread(void)
      return all_threads;
 
 #elif defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_WIN32)
+    // FIXME: why not use TlsGetvalue(OUR_TLS_INDEX) here?
     register struct thread *me=0;
     __asm__ volatile ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
     return me;
 
 #elif defined LISP_FEATURE_WIN32
-    struct pthread_thread* pthread = TlsGetValue(thread_self_tls_index);
-    return pthread ? pthread->vm_thread : 0;
+    return (struct thread*)TlsGetValue(OUR_TLS_INDEX);
 
 #else
 
@@ -300,7 +308,7 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 # ifdef LISP_FEATURE_GCC_TLS
     return current_thread != 0;
 # elif defined LISP_FEATURE_WIN32
-    return TlsGetValue(thread_self_tls_index) != 0;
+    return TlsGetValue(OUR_TLS_INDEX) != 0;
 # else
     return pthread_getspecific(specials) != NULL;
 # endif

@@ -494,8 +494,8 @@ during backtrace.
   ;; And this slot is badly named, it should be "Pthread" since it's the POSIX
   ;; (or emulated POSIX) thread object, not necessarily the OS's thread notion.
   ;;
-  ;; For #-sb-thread, we don't define os_thread_t at all.
-  (os-thread :c-type #+sb-thread "os_thread_t" #-sb-thread "lispobj")
+  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj"
+                     #-(or win32 (not sb-thread)) "pthread_t")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
