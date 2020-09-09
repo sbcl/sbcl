@@ -8,10 +8,6 @@
 
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
-;;; FIXME: these lists of constants inside the TLF cause all the keywords
-;;; to be retained in the inage, which break my means of rapid check for
-;;; what features are built in by saying, e.g. (apropos "FUTEX") and being
-;;; surprised that it's there when it shouldn't be.
 (let* ((non-target-features
         ;;
         ;; FIXME: I suspect that this list should be changed to its inverse-
@@ -20,7 +16,10 @@
         ;; discard and reasons they're not needed. The default assumption should be
         ;; to drop any build-time feature that lacks a rationale to preserve it.
         ;;
-        '(;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
+        ;; READ-FROM-STRING prevents making references to
+        ;; all these keywords from the source form itself.
+	(read-from-string "
+         (;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
           :SB-AFTER-XC-CORE
           ;; CONS-PROFILING sets the initial compiler policy which persists
           ;; into the default baseline policy. It has no relevance post-build
@@ -36,15 +35,16 @@
           ;; more-or-less confined to serve-event, except for a test which now
           ;; detects whether COMPUTE-POLLFDS is defined and therefore testable.
           :OS-PROVIDES-POLL
-          ;; The final batch of symbols is strictly for C. The prefix of
-          ;; "LISP_FEATURE_" on the corresponding #define is unfortunate.
+          ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
+          ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP
           :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
-          :OS-PROVIDES-BLKSIZE-T)) ; only for 'src/runtime/wrap.h'
+          :OS-PROVIDES-BLKSIZE-T)")) ; only for 'src/runtime/wrap.h'
        (public-features
         (cons
          sb-impl::!sbcl-architecture
-         '(:COMMON-LISP :SBCL :ANSI-CL :IEEE-FLOATING-POINT
+	 (read-from-string "
+          (:COMMON-LISP :SBCL :ANSI-CL :IEEE-FLOATING-POINT
            :64-BIT ; choice of word size. 32-bit if absent
            :BIG-ENDIAN :LITTLE-ENDIAN ; endianness: pick one and only one
            :BSD :UNIX :LINUX :WIN32 :DARWIN :SUNOS :ANDROID ; OS: pick one or more
@@ -71,7 +71,7 @@
            :PACKAGE-LOCAL-NICKNAMES
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
-           :SB-FLUID :SB-DEVEL)))
+           :SB-FLUID :SB-DEVEL)")))
        (removable-features
         (append non-target-features public-features)))
   (defconstant sb-impl:+internal-features+
