@@ -18,7 +18,7 @@
         ;;
         ;; READ-FROM-STRING prevents making references to
         ;; all these keywords from the source form itself.
-	(read-from-string "
+        (read-from-string "
          (;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
           :SB-AFTER-XC-CORE
           ;; CONS-PROFILING sets the initial compiler policy which persists
@@ -43,7 +43,7 @@
        (public-features
         (cons
          sb-impl::!sbcl-architecture
-	 (read-from-string "
+         (read-from-string "
           (:COMMON-LISP :SBCL :ANSI-CL :IEEE-FLOATING-POINT
            :64-BIT ; choice of word size. 32-bit if absent
            :BIG-ENDIAN :LITTLE-ENDIAN ; endianness: pick one and only one

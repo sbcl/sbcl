@@ -2664,8 +2664,15 @@
              ;; Combinations have nil-fun-returned-error
              (setf (cast-%type-check cast) nil))
             (t
-             (let ((context (node-source-form cast))
-                   (detail (lvar-all-sources (cast-value cast))))
+             (let* ((source-form (node-source-form cast))
+                    (detail (lvar-all-sources (cast-value cast)))
+                    (context (cast-context cast))
+                    (context (if (opaque-box-p context)
+                                 (opaque-box-value context)
+                                 context))
+                    (context (if (local-call-context-p context)
+                                 (local-call-context-var context)
+                                 context)))
                (unless (cast-silent-conflict cast)
                  (filter-lvar
                   value
@@ -2683,17 +2690,16 @@
                                                                  ',(type-specifier atype)
                                                                  ',(type-specifier value-type)
                                                                  ',detail
-                                                                 ',(compile-time-type-error-context context)
-                                                                 ',(cast-context cast))))
-                         ,(internal-type-error-call dummy-sym atype
-                                                    (cast-context cast))
+                                                                 ',(compile-time-type-error-context source-form)
+                                                                 ',context)))
+                         ,(internal-type-error-call dummy-sym atype context)
                          ,dummy-sym))
                     `(%compile-time-type-error 'dummy
                                                ',(type-specifier atype)
                                                ',(type-specifier value-type)
                                                ',detail
-                                               ',(compile-time-type-error-context context)
-                                               ',(cast-context cast)))))
+                                               ',(compile-time-type-error-context source-form)
+                                               ',context))))
              ;; KLUDGE: FILTER-LVAR does not work for non-returning
              ;; functions, so we declare the return type of
              ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type

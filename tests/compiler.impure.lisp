@@ -3068,3 +3068,8 @@
 (with-test (:name :fopcompile-specials)
   (ctu:file-compile
    "(locally (declare (special foo)) (print foo))"))
+
+(with-test (:name :local-call-context)
+  (ctu:file-compile
+   "(lambda (&optional b) (declare (type integer b)) b)"
+   :load t))
