@@ -356,7 +356,13 @@ fractional bits."
       (dolist (op '(sin cos tan))
         (dolist (val `(,(coerce most-positive-fixnum 'double-float)
                        ,@(loop for v = most-positive-double-float
-                               then (expt v 4/5)
+                               ;; EXPT calls %POW which directly calls the libm pow() function.
+                               ;; Some libm's might internally cause an *expected* overflow on
+                               ;; certain inputs. So instead of computing an answer for
+                               ;; (EXPT 1.7976931348623157d308 4/5) it would trap.
+                               ;; I'll bet that's why we disabled the test on openbsd,
+                               ;; but I don't care to find out.
+                               then (sb-int:with-float-traps-masked (:overflow) (expt v 4/5))
                                while (> v (expt 2 50))
                                collect v)
                        ;; The following values cover all eight combinations
