@@ -350,7 +350,7 @@ not supported."
            ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
            ;; Do that now so that the forked process has only the main thread
            ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
-           (sb-thread::%dispose-thread-structs)
+           #+sb-thread (sb-thread::%dispose-thread-structs)
            (when (let ((avltree sb-thread::*all-threads*))
                    (or (sb-thread::avlnode-left avltree)
                        (sb-thread::avlnode-right avltree)))
