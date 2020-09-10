@@ -455,6 +455,7 @@
         :ignore-failure-p))
  ("src/compiler/ir1util")
  ("src/compiler/callable-args")
+ ("src/compiler/locall")
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
 
@@ -468,7 +469,7 @@
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
- ("src/compiler/locall")
+
  ("src/compiler/dfo")
  ("src/compiler/dce")
  ("src/compiler/checkgen")
