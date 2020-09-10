@@ -358,14 +358,12 @@ Examples:
 ;;;   *ALL-THREADS*, then it may be blocked on the mutex. Can we terminate it?
 ;;; - During save, acquire the *MAKE-THREAD-LOCK* to get a consistent view of
 ;;;   which threads are starting and running.
-;;; - the :pauseless-threadstart code adds new threads to *ALL-THREADS*
-;;;   before starting the posix thread. We could look there.
+;;; - new threads are added to *ALL-THREADS* before starting the posix thread.
+;;;   We could look there.
 ;;;   The important thing is to avoid thinking that there is a thread running
 ;;;   when it doesn't have a posix thread ID yet.
 ;;; - Does acquiring the *MAKE-THREAD-LOCK* before assigning *FINALIZER-THREAD*
 ;;;   help anything? Perhaps.
-;;; But first I'd like to entirely eliminate the non-pauseless-threadstart code
-;;; so that we don't have to reason about two totally different solutions.
 (defun finalizer-thread-stop ()
   #+sb-thread
   (let ((thread *finalizer-thread*))

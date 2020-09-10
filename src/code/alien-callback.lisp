@@ -293,7 +293,6 @@ the alien callback for that function with the given alien type."
 #+sb-thread
 (defun enter-foreign-callback (index return arguments)
   (let ((thread (init-thread-local-storage (make-foreign-thread))))
-    #+pauseless-threadstart
     (dx-let ((startup-info (vector nil ; trampoline is n/a
                                    nil ; cell in *STARTING-THREADS* is n/a
                                    #'sb-alien::enter-alien-callback
@@ -302,7 +301,4 @@ the alien callback for that function with the given alien type."
       (copy-primitive-thread-fields thread)
       (setf (thread-startup-info thread) startup-info)
       (update-all-threads (thread-primitive-thread thread) thread)
-      (run))
-    #-pauseless-threadstart
-    (dx-let ((args (list index return arguments)))
-      (run thread nil #'sb-alien::enter-alien-callback args))))
+      (run))))

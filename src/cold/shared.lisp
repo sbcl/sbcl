@@ -246,8 +246,6 @@
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         (when (featurep '(:and :sb-thread :linux) target-feature-list)
           (pushnew :sb-futex target-feature-list))
-        (when (featurep '(:and :sb-thread (:not :win32)) target-feature-list)
-          (push :pauseless-threadstart target-feature-list))
         (when (featurep '(:and :sb-thread (:or :darwin :openbsd)) target-feature-list)
           (push :os-thread-stack target-feature-list))
         (when (and (member :x86 target-feature-list)
@@ -294,8 +292,6 @@
 (let ((feature-compatibility-tests
        '(("(and sb-thread (not gencgc))"
           ":SB-THREAD requires :GENCGC")
-         ("(and pauseless-threadstart (not sb-thread))"
-          ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thruption (not sb-safepoint))" ":SB-THRUPTION requires :SB-SAFEPOINT")
          ("(and unix sb-safepoint-strictly)"

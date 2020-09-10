@@ -1,23 +1,23 @@
 (in-package "SB-THREAD")
 
 ;;; Test out-of-memory (or something) that goes wrong in pthread_create
-#+pauseless-threadstart ; no SB-THREAD::PTHREAD-CREATE symbol if not
+#+sb-thread ; missing symbols otherwise
 (test-util:with-test (:name :failed-thread-creation)
   (let ((encapsulation
           (compile nil
-                   '(lambda (realfun thread stack-base)
+                   '(lambda (realfun thread sap)
                      (if (string= (sb-thread:thread-name thread) "finalizer")
-                         (funcall realfun thread stack-base)
+                         (funcall realfun thread sap)
                          nil))))
         (success))
     (assert (null sb-thread::*starting-threads*))
     (unwind-protect
-         (progn (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
+         (progn (sb-int:encapsulate 'sb-thread::os-thread-create 'test encapsulation)
                 (handler-case (sb-thread:make-thread #'list :name "thisfails")
                   (error (e)
                     (setq success (string= (write-to-string e)
                                            "Could not create new OS thread.")))))
-      (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
+      (sb-int:unencapsulate 'sb-thread::os-thread-create 'test))
     (assert (equal sb-thread::*starting-threads* nil))
     (assert (equal (sb-thread::avltree-list sb-thread::*all-threads*)
                    (list sb-thread::*initial-thread*)))))
@@ -125,7 +125,8 @@
 ;;; In fact, assert something stronger: there are no young objects
 ;;; between the current SP and end of stack.
 (test-util:with-test (:name :expected-gc-roots
-                      :skipped-on (or :interpreter (not :pauseless-threadstart)))
+                      :skipped-on :interpreter
+                      :fails-on :win32)
   (let ((list (tryit :print nil)))
     ;; should be not many things pointed to by the stack
     (assert (< (length list) #+x86    38   ; more junk, I don't know why
@@ -139,7 +140,7 @@
 
 ;; lp#1595699
 (test-util:with-test (:name :start-thread-in-without-gcing
-                      :skipped-on (not :pauseless-threadstart))
+                      :skipped-on (not :sb-thread))
   (assert (eq (sb-thread:join-thread
                (sb-sys:without-gcing
                    (sb-thread:make-thread (lambda () 'hi))))
