@@ -312,11 +312,7 @@ void create_main_lisp_thread(lispobj function) {
 
 void free_thread_struct(struct thread *th)
 {
-#if defined(LISP_FEATURE_WIN32)
-    os_invalidate_free((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
-#else
     os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
-#endif
 }
 
 /* Note: scribble must be stack-allocated */

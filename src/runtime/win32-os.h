@@ -83,9 +83,8 @@ struct lisp_exception_frame {
 void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
 char *dirname(char *path);
 
-void os_invalidate_free(os_vm_address_t addr, os_vm_size_t len);
-
 boolean win32_maybe_interrupt_io(void* thread);
+void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len);
 
 int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 

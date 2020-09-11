@@ -605,6 +605,9 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
             lose("madvise failed");
     } else
 #endif
+#ifdef LISP_FEATURE_WIN32
+        os_revalidate_bzero(addr, length);
+#else
     {
         void *new_addr;
         os_invalidate(addr, length);
@@ -614,6 +617,7 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
                  addr, new_addr);
         }
     }
+#endif
 }
 
 /*

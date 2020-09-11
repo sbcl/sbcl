@@ -797,8 +797,6 @@ static inline boolean local_thread_stack_address_p(os_vm_address_t address)
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
-    MEMORY_BASIC_INFORMATION mem_info;
-
     if (!addr) {
         /* the simple case first */
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
@@ -806,38 +804,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
             AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
     }
 
-    if (!AVERLAX(VirtualQuery(addr, &mem_info, sizeof mem_info)))
-        return 0;
-
-    if ((mem_info.State == MEM_RESERVE) && (mem_info.RegionSize >= len)) {
-        /* It would be correct to return here. However, support for Wine
-         * is beneficial, and Wine has a strange behavior in this
-         * department. It reports all memory below KERNEL32.DLL as
-         * reserved, but disallows MEM_COMMIT.
-         *
-         * Let's work around it: reserve the region we need for a second
-         * time. The second reservation is documented to fail on normal NT
-         * family, but it will succeed on Wine if this region is
-         * actually free.
-         */
-        VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-        /* If it is wine, the second call has succeeded, and now the region
-         * is really reserved. */
-        return addr;
-    }
-
-    DWORD mode;
-    if (mem_info.State == MEM_RESERVE) {
-        fprintf(stderr, "validation of reserved space too short.\n");
-        fflush(stderr);
-        /* Oddly, we do not treat this assertion as fatal; hence also the
-         * provision for MEM_RESERVE in the following code, I suppose: */
-        mode = MEM_COMMIT;
-    } else {
-        mode = MEM_RESERVE;
-    }
-
-    os_vm_address_t actual = VirtualAlloc(addr, len, mode, PAGE_EXECUTE_READWRITE);
+    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 
     if (!actual) {
         if (!(attributes & MOVABLE)) {
@@ -848,81 +815,22 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
             return 0;
         }
 
-        return AVERLAX(VirtualAlloc(NULL, len, mode, PAGE_EXECUTE_READWRITE));
+        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     }
 
     return actual;
 }
 
-/*
- * For os_invalidate(), we merely decommit the memory rather than
- * freeing the address space. This loses when freeing per-thread
- * data and related memory since it leaks address space.
- *
- * So far the original comment (author unknown).  It used to continue as
- * follows:
- *
- *   It's not too lossy, however, since the two scenarios I'm aware of
- *   are fd-stream buffers, which are pooled rather than torched, and
- *   thread information, which I hope to pool (since windows creates
- *   threads at its own whim, and we probably want to be able to have
- *   them callback without funky magic on the part of the user, and
- *   full-on thread allocation is fairly heavyweight).
- *
- * But: As it turns out, we are no longer content with decommitting
- * without freeing, and have now grown a second function
- * os_invalidate_free(), sort of a really_os_invalidate().
- *
- * As discussed on #lisp, this is not a satisfactory solution, and probably
- * ought to be rectified in the following way:
- *
- *  - Any cases currently going through the non-freeing version of
- *    os_invalidate() are ultimately meant for zero-filling applications.
- *    Replace those use cases with an os_revalidate_bzero() or similarly
- *    named function, which explicitly takes care of that aspect of
- *    the semantics.
- *
- *  - The remaining uses of os_invalidate should actually free, and once
- *    the above is implemented, we can rename os_invalidate_free back to
- *    just os_invalidate().
- *
- * So far the new plan, as yet unimplemented. -- DFL
- */
+void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
+    AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
+    AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+}
 
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
+    /* FIXME: Change to MEM_RELEASE once hopscotch doesn't depend on this */
     AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
-}
-
-void
-os_invalidate_free(os_vm_address_t addr,
-                   os_vm_size_t __attribute__((__unused__)) len)
-{
-    AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
-}
-
-void
-os_invalidate_free_by_any_address(os_vm_address_t addr,
-                                  os_vm_size_t __attribute__((__unused__)) len)
-{
-    MEMORY_BASIC_INFORMATION minfo;
-    AVERLAX(VirtualQuery(addr, &minfo, sizeof minfo));
-    AVERLAX(minfo.AllocationBase);
-    AVERLAX(VirtualFree(minfo.AllocationBase, 0, MEM_RELEASE));
-}
-
-/* os_validate doesn't commit, i.e. doesn't actually "validate" in the
- * sense that we could start using the space afterwards.  Usually it's
- * load_core_bytes or Lisp code that will run into that, in which case we recommit
- * elsewhere in this file.  For cases where C wants to write into newly
- * os_validate()d memory, it needs to commit it explicitly first:
- */
-os_vm_address_t
-os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
-{
-    return
-        AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
 /*
@@ -938,10 +846,6 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
 
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
 {
-
-    AVER(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE)||
-         VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT,
-                      PAGE_EXECUTE_READWRITE));
 #ifdef LISP_FEATURE_64_BIT
     CRT_AVER_NONNEGATIVE(_lseeki64(fd, offset, SEEK_SET));
 #else
@@ -976,79 +880,11 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     DWORD old_prot;
 
     DWORD new_prot = os_protect_modes[prot];
-    AVER(VirtualProtect(address, length, new_prot, &old_prot)||
-         (VirtualAlloc(address, length, MEM_COMMIT, new_prot) &&
-          VirtualProtect(address, length, new_prot, &old_prot)));
+    AVER(VirtualProtect(address, length, new_prot, &old_prot));
     odxprint(misc,"Protecting %p + %p vmaccess %d "
              "newprot %08x oldprot %08x",
              address,length,prot,new_prot,old_prot);
 }
-
-/* FIXME: Now that FOO_END, rather than FOO_SIZE, is the fundamental
- * description of a space, we could probably punt this and just do
- * (FOO_START <= x && x < FOO_END) everywhere it's called. */
-static boolean
-in_range_p(lispobj a, lispobj sbeg, size_t slen)
-{
-    char* beg = (char*)((uword_t)sbeg);
-    char* end = (char*)((uword_t)sbeg) + slen;
-    char* adr = (char*)a;
-    return (adr >= beg && adr < end);
-}
-
-boolean
-is_linkage_table_addr(os_vm_address_t addr)
-{
-    return in_range_p((lispobj)addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
-}
-
-static boolean is_some_thread_local_addr(os_vm_address_t addr);
-
-boolean
-gc_managed_addr_p(lispobj addr)
-{
-    if(gc_managed_heap_space_p(addr) ||
-       is_some_thread_local_addr((os_vm_address_t)addr))
-        return 1;
-    return 0;
-}
-
-/* test if an address is within thread-local space */
-static boolean
-is_thread_local_addr(struct thread* th, os_vm_address_t addr)
-{
-    /* Assuming that this is correct, it would warrant further comment,
-     * I think.  Based on what our call site is doing, we have been
-     * tasked to check for the address of a lisp object; not merely any
-     * foreign address within the thread's area.  Indeed, this used to
-     * be a check for control and binding stack only, rather than the
-     * full thread "struct".  So shouldn't the THREAD_STRUCT_SIZE rather
-     * be (thread_control_stack_size+BINDING_STACK_SIZE) instead?  That
-     * would also do away with the LISP_FEATURE_SB_THREAD case.  Or does
-     * it simply not matter?  --DFL */
-    ptrdiff_t diff = ((char*)th->os_address)-(char*)addr;
-    return diff > (ptrdiff_t)0 && diff < (ptrdiff_t)THREAD_STRUCT_SIZE
-        ;
-}
-
-static boolean
-is_some_thread_local_addr(os_vm_address_t addr)
-{
-    boolean result = 0;
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *th;
-    thread_mutex_lock(&all_threads_lock);
-    for_each_thread(th) {
-        if(is_thread_local_addr(th,addr)) {
-            result = 1;
-            break;
-        }
-    }
-    thread_mutex_unlock(&all_threads_lock);
-#endif
-    return result;
-}
-
 
 /* A tiny bit of interrupt.c state we want our paws on. */
 extern boolean internal_errors_enabled;
@@ -1184,14 +1020,6 @@ handle_access_violation(os_context_t *ctx,
              exception_record->ExceptionInformation[0]);
 #endif
 
-    /* Stack: This case takes care of our various stack exhaustion
-     * protect pages (with the notable exception of the control stack!). */
-    if (self && local_thread_stack_address_p(fault_address)) {
-        if (handle_guard_page_triggered(ctx, fault_address))
-            return 0; /* gc safety? */
-        goto try_recommit;
-    }
-
     /* Safepoint pages */
 #ifdef LISP_FEATURE_SB_THREAD
     if (fault_address == (void *) GC_SAFEPOINT_TRAP_ADDR) {
@@ -1206,65 +1034,21 @@ handle_access_violation(os_context_t *ctx,
 #endif
 
     /* dynamic space */
-    page_index_t index = find_page_index(fault_address);
-    if (index != -1) {
-        /*
-         * Now, if the page is supposedly write-protected and this
-         * is a write, tell the gc that it's been hit.
-         */
-        if (page_table[index].write_protected) {
-            gencgc_handle_wp_violation(fault_address);
-        } else {
-            AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
-                              os_vm_page_size,
-                              MEM_COMMIT, PAGE_EXECUTE_READWRITE));
-        }
+    if (gencgc_handle_wp_violation(fault_address)) {
         return 0;
-    } else {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        extern int immobile_space_handle_wp_violation(void*);
-        if (immobile_space_handle_wp_violation(fault_address)) {
-            return 0;
-        }
-#endif
     }
 
-    if (fault_address == undefined_alien_address)
-        return -1;
-
-    /* linkage table or a "valid_lisp_addr" outside of dynamic space (?) */
-    if (is_linkage_table_addr(fault_address)
-        || gc_managed_addr_p((lispobj)fault_address))
-        goto try_recommit;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    extern int immobile_space_handle_wp_violation(void*);
+    if (immobile_space_handle_wp_violation(fault_address)) {
+        return 0;
+    }
+#endif
+    if (handle_guard_page_triggered(ctx, fault_address)) {
+        return 0;
+    }
 
     return -1;
-
-try_recommit:
-    /* First use of a new page, lets get some memory for it. */
-
-#if defined(LISP_FEATURE_X86)
-    AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
-                      os_vm_page_size,
-                      MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-         ||(fprintf(stderr,"Unable to recommit addr %p eip 0x%08lx\n",
-                    fault_address, win32_context->Eip) &&
-            (c_level_backtrace("BT",5),
-             fake_foreign_function_call(ctx),
-             lose("Lispy backtrace"),
-             0)));
-#else
-    AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
-                      os_vm_page_size,
-                      MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-         ||(fprintf(stderr,"Unable to recommit addr %p eip %p\n",
-                    fault_address, (void*)win32_context->Rip) &&
-            (c_level_backtrace("BT",5),
-             fake_foreign_function_call(ctx),
-             lose("Lispy backtrace"),
-             0)));
-#endif
-
-    return 0;
 }
 
 static void

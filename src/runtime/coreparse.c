@@ -180,12 +180,6 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
     unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
     int ret;
 
-# ifdef LISP_FEATURE_WIN32
-    /* Ensure the memory is committed so zlib doesn't segfault trying to
-       inflate. */
-    os_validate_recommit(addr, len);
-# endif
-
     if (-1 == lseek(fd, offset, SEEK_SET)) {
         lose("Unable to lseek() on corefile");
     }

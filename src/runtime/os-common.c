@@ -187,11 +187,6 @@ void os_link_runtime()
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
 
-        if (entry_index == 0) {
-#ifdef LISP_FEATURE_WIN32
-            os_validate_recommit((void*)LINKAGE_TABLE_SPACE_START, os_vm_page_size);
-#endif
-        }
         if (result) {
             arch_write_linkage_table_entry(entry_index, result, datap);
         } else { // startup might or might not work. ymmv
@@ -255,6 +250,7 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
         lose("load_core_bytes(%d,%zx,%p,%zx) failed", fd, offset, addr, len);
     return (void*)actual;
 }
+#endif
 
 boolean
 gc_managed_addr_p(lispobj addr)
@@ -274,4 +270,4 @@ gc_managed_addr_p(lispobj addr)
     return 0;
 }
 
-#endif
+
