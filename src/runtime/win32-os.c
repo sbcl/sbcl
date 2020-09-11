@@ -772,33 +772,10 @@ static inline boolean local_thread_stack_address_p(os_vm_address_t address)
            ((u64)address < (u64)this_thread->control_stack_end))));
 }
 
-/*
- * So we have three fun scenarios here.
- *
- * First, we could be being called to reserve the memory areas
- * during initialization (prior to loading the core file).
- *
- * Second, we could be being called by the GC to commit a page
- * that has just been decommitted (for easy zero-fill).
- *
- * Third, we could be being called by create_thread_struct()
- * in order to create the sundry and various stacks.
- *
- * The third case is easy to pick out because it passes an
- * addr of 0.
- *
- * The second case is easy to pick out because it will be for
- * a range of memory that is MEM_RESERVE rather than MEM_FREE.
- *
- * The second case is also an easy implement, because we leave
- * the memory as reserved (since we do lazy commits).
- */
-
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     if (!addr) {
-        /* the simple case first */
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
         return
             AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
