@@ -155,6 +155,19 @@ static sword_t get_val4(tableptr ht, int index) { return ((int32_t*)ht->values)[
 static sword_t get_val2(tableptr ht, int index) { return ((int16_t*)ht->values)[index]; }
 static sword_t get_val1(tableptr ht, int index) { return ((int8_t *)ht->values)[index]; }
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+
+// We can safely use malloc + free because there should be no
+// problem of holding a malloc lock from another thread.
+#define cached_allocate(n) calloc(1,n)
+#define cached_deallocate(ptr,size) free(ptr)
+void hopscotch_init() { }
+
+#else
+
+/// We can't safely use malloc because the stop-for-GC signal might be received
+/// in the midst of a malloc while holding a global malloc lock.
+
 /// Hopscotch storage allocation granularity.
 /// Our usual value of "page size" is the GC page size, which is
 /// coarser than necessary (cf {target}/backend-parms.lisp).
@@ -249,6 +262,7 @@ static void cached_deallocate(char* mem, uword_t zero_fill_length)
     memset(mem, 0, zero_fill_length);
     cached_alloc[line] = mem;
 }
+#endif
 
 /* Initialize 'ht' for 'size' logical bins with a max hop of 'hop_range'.
  * 'valuesp' makes a hash-map if true; a hash-set if false.
@@ -277,9 +291,13 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
     uword_t storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
         + sizeof (int) * size; // hop bitmasks
 
-    if (ht->keys)
+    if (ht->keys) {
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+        // the usable size is a private-but-visible aspect of the memory block
+        // if not using malloc(). But with malloc we can't really ask the question.
         gc_assert(usable_size(ht->keys) >= storage_size);
-    else
+#endif
+    } else
         ht->keys = (uword_t*)cached_allocate(storage_size);
 
     ht->mem_size  = storage_size;
