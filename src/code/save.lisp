@@ -308,7 +308,7 @@ sufficiently motivated to do lengthy fixes."
     ;; user-supplied code that might not even work in later steps of deinit.
     ;; See also the comment at definition of THREAD-EPHEMERAL-P.
     (finalizer-thread-stop)
-    (sb-thread::%dispose-thread-structs)
+    #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
     (let ((threads (sb-thread:list-all-threads)))
         ;; Despite calling FINALIZER-THREAD-STOP, an unlucky thread schedule
         ;; courtesy of the OS might notionally start the finalizer thread but not
