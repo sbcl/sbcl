@@ -349,7 +349,7 @@ init_new_thread(struct thread *th,
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
      * it is not). */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    *th->csp_around_foreign_call = (lispobj)scribble;
+    csp_around_foreign_call(th) = (lispobj)scribble;
 #endif
     lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -942,15 +942,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     // If present and enabled, assign into the new thread.
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
 # ifdef LISP_FEATURE_WIN32
     th->carried_base_pointer = 0;
 # endif
-    // this is too weird. csp_around_foreign_call is always just one word prior
-    // to the end of the safepoint page. The slot should probably be named
-    // csp_around_foreign_call_ptr, but why even bother storing a constant at all?
-    th->csp_around_foreign_call = (lispobj *)th - 1;
-#endif
 
     struct nonpointer_thread_data *nonpointer_data = nonpointer_data(th);
     memset(nonpointer_data, 0, sizeof *nonpointer_data);

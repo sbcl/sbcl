@@ -269,7 +269,7 @@ set_csp_from_context(struct thread *self, os_context_t *ctx)
      * disconcerting. */
     void **sp = (void **) access_control_stack_pointer(self);
 #endif
-    *self->csp_around_foreign_call = (lispobj) sp;
+    csp_around_foreign_call(self) = (lispobj) sp;
 }
 
 
@@ -309,11 +309,11 @@ thread_blocks_gc(struct thread *thread)
 static inline boolean
 set_thread_csp_access(struct thread* p, boolean writable)
 {
-    os_protect((char *) p->csp_around_foreign_call + N_WORD_BYTES - THREAD_CSP_PAGE_SIZE,
+    os_protect((char *) p - THREAD_CSP_PAGE_SIZE,
                THREAD_CSP_PAGE_SIZE,
                writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
                : (OS_VM_PROT_READ));
-    return !!*p->csp_around_foreign_call;
+    return csp_around_foreign_call(p) != 0;
 }
 
 static inline void gc_notify_early()
@@ -336,7 +336,7 @@ static inline void gc_notify_early()
              * thread. */
             if (p==gc_state.collector)
                 continue;
-            odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
+            odxprint(safepoints,"notifying thread %p csp %p",p,csp_around_foreign_call(p));
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
                 /* Threads "in-lisp" block leaving GC_MESSAGE, as we
@@ -370,7 +370,7 @@ static inline void gc_notify_final()
         for_each_thread(p) {
             if (p == gc_state.collector)
                 continue;
-            odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
+            odxprint(safepoints,"notifying thread %p csp %p",p,csp_around_foreign_call(p));
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
                 gc_state.phase_wait[GC_SETTLED]++;
@@ -706,7 +706,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
                 /* ??? Isn't this already T? */
                 write_TLS(GC_PENDING,T,self);
             }
-            *self->csp_around_foreign_call = 0;
+            csp_around_foreign_call(self) = 0;
             check_gc_and_thruptions = 1;
         } else {
             /* This thread isn't a candidate for running the GC
@@ -727,7 +727,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
                     gc_advance(GC_NONE,gc_state.phase);
                 else
                     gc_state_wait(GC_NONE);
-                *self->csp_around_foreign_call = 0;
+                csp_around_foreign_call(self) = 0;
                 check_gc_and_thruptions = 1;
             } else {
                 /* This thread has GC_INHIBIT set, meaning that it's
@@ -789,7 +789,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
                     gc_advance(GC_NONE,gc_state.phase);
                 else
                     gc_state_wait(GC_NONE);
-                *self->csp_around_foreign_call = 0;
+                csp_around_foreign_call(self) = 0;
             } else {
                 /* This thread has GC_INHIBIT set, meaning that it's
                  * within a WITHOUT-GCING, so advance from wherever we
@@ -1009,13 +1009,12 @@ void wake_thread_impl(struct thread_instance *lispthread)
 
 void* os_get_csp(struct thread* th)
 {
-    FSHOW_SIGNAL((stderr, "Thread %p has CSP *(%p) == %p, stack [%p,%p]\n",
+    FSHOW_SIGNAL((stderr, "Thread %p has CSP %p, stack [%p,%p]\n",
                   th,
-                  th->csp_around_foreign_call,
-                  *(void**)th->csp_around_foreign_call,
+                  (void*)csp_around_foreign_call(th),
                   th->control_stack_start,
                   th->control_stack_end));
-    return *(void**)th->csp_around_foreign_call;
+    return (void*)csp_around_foreign_call(th);
 }
 
 
@@ -1039,9 +1038,9 @@ thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
 #endif
 
     /* In C code.  As a rule, we assume that running thruptions is OK. */
-    *self->csp_around_foreign_call = 0;
+    csp_around_foreign_call(self) = 0;
     thread_in_lisp_raised(ctx);
-    *self->csp_around_foreign_call = (intptr_t) transition_sp;
+    csp_around_foreign_call(self) = (intptr_t) transition_sp;
 }
 # endif
 
@@ -1077,7 +1076,7 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
         return 1;
     }
 
-    if (fault_address == (os_vm_address_t) self->csp_around_foreign_call) {
+    if (1+(lispobj*)fault_address == (lispobj*)self) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         arrange_return_to_c_function(ctx, handle_csp_safepoint_violation, 0);
 #else

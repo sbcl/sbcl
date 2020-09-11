@@ -346,13 +346,15 @@ void wake_thread(struct thread_instance*),
      wake_thread_impl(struct thread_instance*);
 # endif
 
+#define csp_around_foreign_call(thread) *(((lispobj*)thread) - 1)
+
 static inline
 void push_gcing_safety(struct gcing_safety *into)
 {
     struct thread* th = arch_os_get_current_thread();
     asm volatile ("");
-    into->csp_around_foreign_call = *th->csp_around_foreign_call;
-    *th->csp_around_foreign_call = 0;
+    into->csp_around_foreign_call = csp_around_foreign_call(th);
+    csp_around_foreign_call(th) = 0;
     asm volatile ("");
 }
 
@@ -361,7 +363,7 @@ void pop_gcing_safety(struct gcing_safety *from)
 {
     struct thread* th = arch_os_get_current_thread();
     asm volatile ("");
-    *th->csp_around_foreign_call = from->csp_around_foreign_call;
+    csp_around_foreign_call(th) = from->csp_around_foreign_call;
     asm volatile ("");
 }
 
