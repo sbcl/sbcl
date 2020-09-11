@@ -869,14 +869,14 @@
     (dotimes (i 10)
       (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
     (let ((dir (posix-getenv #+win32 "TMP" #+unix "TMPDIR"))
-	  (file (format nil "sbcl~d~a~@[.~a~]"
-			(sb-unix:unix-getpid) a extension)))
+          (file (format nil "sbcl~d~a~@[.~a~]"
+                        (sb-unix:unix-getpid) a extension)))
       (if dir
-	  (namestring
-	   (merge-pathnames
-	    file (truename (parse-native-namestring dir nil *default-pathname-defaults*
-						    :as-directory t))))
-	  (concatenate 'string "/tmp/" file)))))
+          (namestring
+           (merge-pathnames
+            file (truename (parse-native-namestring dir nil *default-pathname-defaults*
+                                                    :as-directory t))))
+          (concatenate 'string "/tmp/" file)))))
 
 (defmacro with-scratch-file ((var &optional extension) &body forms)
   (sb-int:with-unique-names (tempname)

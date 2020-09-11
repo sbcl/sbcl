@@ -1028,9 +1028,6 @@ is_thread_local_addr(struct thread* th, os_vm_address_t addr)
      * it simply not matter?  --DFL */
     ptrdiff_t diff = ((char*)th->os_address)-(char*)addr;
     return diff > (ptrdiff_t)0 && diff < (ptrdiff_t)THREAD_STRUCT_SIZE
-#ifdef LISP_FEATURE_SB_THREAD
-        && addr != (os_vm_address_t) th->csp_around_foreign_call
-#endif
         ;
 }
 
@@ -1202,7 +1199,7 @@ handle_access_violation(os_context_t *ctx,
         return 0;
     }
 
-    if ((((u64)fault_address) == ((u64)self->csp_around_foreign_call))){
+    if (1+(lispobj*)fault_address == (lispobj*)self) {
         thread_in_safety_transition(ctx);
         return 0;
     }
