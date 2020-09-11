@@ -733,7 +733,8 @@
 
 (defun scratch-dir-truename ()
   (with-scratch-file (name)
-    (truename (make-pathname :directory (pathname-directory name)))))
+    (truename (make-pathname :directory (pathname-directory name)
+                             :device (pathname-device name)))))
 
 (with-test (:name (delete-file logical-pathname))
   (setf (logical-pathname-translations "SB-TEST")
