@@ -868,17 +868,15 @@
   (let ((a (make-array 10 :element-type 'character)))
     (dotimes (i 10)
       (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
-    ;; not sure where to write files on win32. this is no worse than what it was
-    #+win32 (format nil "~a~@[.~a~]" a extension)
-    #-win32 (let ((dir (posix-getenv "TMPDIR"))
-                  (file (format nil "sbcl~d~a~@[.~a~]"
-                                (sb-unix:unix-getpid) a extension)))
-              (if dir
-                  (namestring
-                   (merge-pathnames
-                    file (truename (parse-native-namestring dir nil *default-pathname-defaults*
-                                                            :as-directory t))))
-                  (concatenate 'string "/tmp/" file)))))
+    (let ((dir (posix-getenv #+win32 "TMP" #+unix "TMPDIR"))
+	  (file (format nil "sbcl~d~a~@[.~a~]"
+			(sb-unix:unix-getpid) a extension)))
+      (if dir
+	  (namestring
+	   (merge-pathnames
+	    file (truename (parse-native-namestring dir nil *default-pathname-defaults*
+						    :as-directory t))))
+	  (concatenate 'string "/tmp/" file)))))
 
 (defmacro with-scratch-file ((var &optional extension) &body forms)
   (sb-int:with-unique-names (tempname)
