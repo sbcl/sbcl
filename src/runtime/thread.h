@@ -37,7 +37,7 @@ struct gcing_safety {
 };
 
 int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
-void** os_get_csp(struct thread* th);
+void* os_get_csp(struct thread* th);
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
 

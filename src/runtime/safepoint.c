@@ -1007,16 +1007,15 @@ void wake_thread_impl(struct thread_instance *lispthread)
 #endif /* !LISP_FEATURE_WIN32 */
 #endif /* LISP_FEATURE_SB_THRUPTION */
 
-void**
-os_get_csp(struct thread* th)
+void* os_get_csp(struct thread* th)
 {
     FSHOW_SIGNAL((stderr, "Thread %p has CSP *(%p) == %p, stack [%p,%p]\n",
                   th,
                   th->csp_around_foreign_call,
-                  *(void***)th->csp_around_foreign_call,
+                  *(void**)th->csp_around_foreign_call,
                   th->control_stack_start,
                   th->control_stack_end));
-    return *(void***)th->csp_around_foreign_call;
+    return *(void**)th->csp_around_foreign_call;
 }
 
 

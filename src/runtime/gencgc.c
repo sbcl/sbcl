@@ -3405,7 +3405,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
              * at.  For threads that were running Lisp code, the pitstop
              * and edge functions maintain this value within the
              * interrupt or exception handler. */
-            esp = (void*)os_get_csp(th);
+            esp = os_get_csp(th);
             assert_on_stack(th, esp);
 
             /* And on platforms with interrupts: scavenge ctx registers. */
