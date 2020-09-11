@@ -2086,7 +2086,7 @@
 (defknown class-name (class) symbol (flushable))
 
 (defknown finalize
-    (t (function-designator () * :no-function-conversion t) &key (:dont-save t))
+    (t (function-designator () *) &key (:dont-save t))
     *)
 
 (defknown (sb-impl::%with-standard-io-syntax

@@ -110,3 +110,29 @@
             do (assert (find k *weak-pointers* :key #'weak-pointer-value)))
     (dolist (wp *weak-pointers*)
       (assert (gethash (weak-pointer-value wp) hash-table)))))
+
+;;; A super-smart GC and/or compiler might prove that the object passed to
+;;; FINALIZE is instantly garbage. Like maybe (FINALIZE (CONS 1 2) 'somefun)
+;;; with the object otherwise unreachable. And so the system might reasonably
+;;; call #'SOMEFUN right away. Hence it had better be a function so that the
+;;; error isn't just shoved over to the finalizer thread.
+;;; Also, as a special case caught by the general case, I'd rather not see NILs
+;;; in the finalizer table, because NIL could never be defined as a function.
+(with-test (:name :finalizer-funarg)
+  ;; The :no-function-conversion option in fndb was removed, for two reasons:
+  ;; - unlike with SET-MACRO-CHARACTER there is no "inquiry" function that you
+  ;;   could use to determine what symbol was given as the funarg.
+  ;;   Whereas I prefer lazy resolution in readtables because GET-MACRO-CHARACTER
+  ;;   should return 'FUN if that's what you had set, and not #'FUN.
+  ;; - I can't particularly see anyone making the claim that a weird use such as
+  ;;   (FINALIZE (CONS 1 2) 'STRING=))) should not emit e a warning about #'STRING=
+  ;;   being funcalled with zero args when it should receive two.
+  (assert (nth-value 1 (compile nil '(lambda () (finalize (cons 1 2) 'string=)))))
+  ;; I make this mistake sometimes in GC testing - forgetting to wrap
+  ;; a FORMAT in a LAMBDA. So this had better fail early and often.
+  (assert-error (finalize (cons 'a 'b) (format t "The object died~%")))
+  ;; This too, even if you think this is a little different, because
+  ;; you _could_ define this function. But it's not different.
+  ;; The attempted call to #'no-function-for-you may arbitrarily occur
+  ;; (in theory) as soon as the system is able to detect garbage.
+  (assert-error (finalize (cons 1 2) 'no-function-for-you)))

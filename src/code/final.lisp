@@ -43,7 +43,8 @@
 (declaim (simple-vector **finalizer-store**))
 
 (defun finalize (object function &key dont-save
-                        &aux (item (if dont-save (list function) function)))
+                        &aux (function (%coerce-callable-to-fun function))
+                             (item (if dont-save (list function) function)))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -158,7 +159,9 @@ Examples:
   ;; finalizers can in practice almost never be run, as pseudo-static objects
   ;; don't die, making this more-or-less an exercise in futility.
   (with-finalizer-store (old-store)
-    (without-gcing
+    ;; This doesn't need WITHOUT-GCING. MAPHASH will never present its funarg
+    ;; with a culled entry. GC during the MAPHASH could remove some items
+    ;; before we get to them, and that's fantastic.
       (let ((new-store
               (make-finalizer-store (max (1+ (finalizer-max-id old-store))
                                          +finalizers-initial-size+)))
@@ -181,7 +184,7 @@ Examples:
                  old-objects)
         (clrhash old-objects)
         (fill old-store 0)
-        (setq **finalizer-store** new-store)))))
+        (setq **finalizer-store** new-store))))
 
 ;;; Replace the finalizer store with a copy.  Tenured (gen6 = pseudo-static)
 ;;; vectors are problematic in many ways for gencgc, unless immutable.
