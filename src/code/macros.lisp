@@ -12,7 +12,7 @@
 (in-package "SB-IMPL")
 
 
-;;;; Destructing-bind
+;;;; Destructuring-bind
 
 (sb-xc:defmacro destructuring-bind (lambda-list expression &body body
                                                            &environment env)
