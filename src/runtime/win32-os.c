@@ -763,15 +763,6 @@ void os_init(char __attribute__((__unused__)) *argv[],
     runtime_module_handle = (HMODULE)win32_get_module_handle_by_address(&runtime_module_handle);
 }
 
-static inline boolean local_thread_stack_address_p(os_vm_address_t address)
-{
-    return this_thread &&
-        (((((u64)address >= (u64)this_thread->os_address) &&
-           ((u64)address < ((u64)this_thread)-THREAD_CSP_PAGE_SIZE))||
-          (((u64)address >= (u64)this_thread->control_stack_start)&&
-           ((u64)address < (u64)this_thread->control_stack_end))));
-}
-
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
