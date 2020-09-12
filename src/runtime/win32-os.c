@@ -823,7 +823,6 @@ void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    /* FIXME: Change to MEM_RELEASE once hopscotch doesn't depend on this */
     AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
 }
 
