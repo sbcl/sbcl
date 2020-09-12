@@ -180,6 +180,12 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
     unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
     int ret;
 
+# ifdef LISP_FEATURE_WIN32
+    /* Ensure the memory is committed so zlib doesn't segfault trying to
+       inflate. */
+    os_commit_memory(addr, len);
+# endif
+
     if (-1 == lseek(fd, offset, SEEK_SET)) {
         lose("Unable to lseek() on corefile");
     }
@@ -830,8 +836,17 @@ process_directory(int count, struct ndir_entry *entry,
             else
 #endif
             if (request) {
-                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                            (os_vm_address_t)addr, request);
+#ifdef LISP_FEATURE_WIN32
+                if (id == DYNAMIC_CORE_SPACE_ID) {
+                    addr = (os_vm_address_t)os_validate_nocommit(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                                         (os_vm_address_t)addr, request);
+                }
+                else
+#endif
+                {
+                    addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                                (os_vm_address_t)addr, request);
+                }
                 if (!addr) {
                     lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
                          (lispobj)request, id);

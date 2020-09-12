@@ -789,6 +789,32 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     return actual;
 }
 
+os_vm_address_t
+os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
+{
+    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+    if (!actual) {
+        if (!(attributes & MOVABLE)) {
+            fprintf(stderr,
+                    "VirtualAlloc: wanted %lu bytes at %p, actually mapped at %p\n",
+                    (unsigned long) len, addr, actual);
+            fflush(stderr);
+            return 0;
+        }
+        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    }
+
+    return actual;
+}
+
+void* os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
+{
+    return
+        AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+}
+
+
 void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
     AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
     AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
@@ -798,7 +824,7 @@ void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     /* FIXME: Change to MEM_RELEASE once hopscotch doesn't depend on this */
-    AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
+    AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
 }
 
 /*
@@ -814,6 +840,7 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
 {
+    os_commit_memory(addr, len);
 #ifdef LISP_FEATURE_64_BIT
     CRT_AVER_NONNEGATIVE(_lseeki64(fd, offset, SEEK_SET));
 #else
@@ -828,7 +855,6 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
         len -= count;
         CRT_AVER(count == to_read);
     }
-
     return (void*)0;
 }
 static DWORD os_protect_modes[8] = {
@@ -848,7 +874,9 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     DWORD old_prot;
 
     DWORD new_prot = os_protect_modes[prot];
-    AVER(VirtualProtect(address, length, new_prot, &old_prot));
+    AVER(VirtualProtect(address, length, new_prot, &old_prot)||
+         (VirtualAlloc(address, length, MEM_COMMIT, new_prot) &&
+          VirtualProtect(address, length, new_prot, &old_prot)));
     odxprint(misc,"Protecting %p + %p vmaccess %d "
              "newprot %08x oldprot %08x",
              address,length,prot,new_prot,old_prot);
@@ -1002,6 +1030,16 @@ handle_access_violation(os_context_t *ctx,
 #endif
 
     /* dynamic space */
+    if (DYNAMIC_SPACE_START <= (lispobj)fault_address &&
+        (lispobj)fault_address < (DYNAMIC_SPACE_START + dynamic_space_size)) {
+        MEMORY_BASIC_INFORMATION mem_info;
+        if (AVERLAX(VirtualQuery(fault_address, &mem_info, sizeof mem_info)) &&
+            mem_info.State == MEM_RESERVE) {
+            os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
+                             os_vm_page_size);
+            return 0;
+        }
+    }
     if (gencgc_handle_wp_violation(fault_address)) {
         return 0;
     }
