@@ -15,6 +15,8 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
+#include "lispobj.h"
+
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
 # include "pthreads_win32.h"
 #else
@@ -192,11 +194,7 @@ void dyndebug_init(void);
 
 #include <sys/types.h>
 
-typedef uintptr_t uword_t;
-typedef intptr_t  sword_t;
-
 #define OBJ_FMTX PRIxPTR
-typedef uintptr_t lispobj;
 
 static inline int
 lowtag_of(lispobj obj)

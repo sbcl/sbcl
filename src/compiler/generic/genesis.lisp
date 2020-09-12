@@ -3130,6 +3130,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (write-string "," out))
              (terpri out)))
          (write-line "};" out)))
+    (format out "#include <stddef.h>~%") ; for NULL
     (write-tags "static " "-LOWTAG" sb-vm:lowtag-limit 0)
     ;; this -2 shift depends on every OTHER-IMMEDIATE-?-LOWTAG
     ;; ending with the same 2 bits. (#b10)
@@ -3170,40 +3171,46 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (slots (sb-vm:primitive-object-slots obj))
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
   ;; writing primitive object layouts
-    (format t "#ifndef __ASSEMBLER__~2%")
-    (when (eq name 'sb-vm::thread)
-      (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
-      (dolist (x sb-vm::*thread-header-slot-names*)
-        (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
-          (format t "#define ~a ~d~%"
-                  (c-name (string s)) (symbol-value s))))
-      (terpri))
-    (format t "struct ~A {~%" c-name)
-    (when (sb-vm:primitive-object-widetag obj)
-      (format t "    lispobj header;~%"))
-    (dolist (slot slots)
-      (format t "    ~A ~A~@[[1]~];~%"
-              (getf (sb-vm:slot-options slot) :c-type "lispobj")
-              (c-name (string-downcase (sb-vm:slot-name slot)))
-              (sb-vm:slot-rest-p slot)))
-    (format t "};~%")
-    (when (member name '(cons vector symbol fdefn))
-      (write-cast-operator name c-name lowtag))
-    (format t "~%#else /* __ASSEMBLER__ */~2%")
-    (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
-    (format t " * so they work directly on tagged addresses. */~2%")
-    (dolist (slot slots)
-      (format t "#define ~A_~A_OFFSET ~D~%"
-              (c-symbol-name name)
-              (c-symbol-name (sb-vm:slot-name slot))
-              (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag)))
-    (format t "#define ~A_SIZE ~d~%"
-            (string-upcase c-name) (sb-vm:primitive-object-length obj)))
-  (format t "~%#endif /* __ASSEMBLER__ */~2%"))
+    (flet ((output-c ()
+             (when (eq name 'sb-vm::thread)
+               (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
+               (dolist (x sb-vm::*thread-header-slot-names*)
+                 (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
+                   (format t "#define ~a ~d~%"
+                           (c-name (string s)) (symbol-value s))))
+               (terpri))
+             (format t "struct ~A {~%" c-name)
+             (when (sb-vm:primitive-object-widetag obj)
+               (format t "    lispobj header;~%"))
+             (dolist (slot slots)
+               (format t "    ~A ~A~@[[1]~];~%"
+                       (getf (sb-vm:slot-options slot) :c-type "lispobj")
+                       (c-name (string-downcase (sb-vm:slot-name slot)))
+                       (sb-vm:slot-rest-p slot)))
+             (format t "};~%")
+             (when (member name '(cons vector symbol fdefn))
+               (write-cast-operator name c-name lowtag)))
+           (output-asm ()
+             (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
+             (format t " * so they work directly on tagged addresses. */~2%")
+             (dolist (slot slots)
+               (format t "#define ~A_~A_OFFSET ~D~%"
+                       (c-symbol-name name)
+                       (c-symbol-name (sb-vm:slot-name slot))
+                       (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag)))
+             (format t "#define ~A_SIZE ~d~%"
+                     (string-upcase c-name) (sb-vm:primitive-object-length obj))))
+      (format t "#ifdef __ASSEMBLER__~2%")
+      (output-asm)
+      (format t "~%#else /* __ASSEMBLER__ */~2%")
+      (format t "#include \"lispobj.h\"~%")
+      (output-c)
+      (format t "~%#endif /* __ASSEMBLER__ */~%"))))
 
 (defun write-structure-object (dd *standard-output* &optional structname)
   (flet ((cstring (designator) (c-name (string-downcase designator))))
     (format t "#ifndef __ASSEMBLER__~2%")
+    (format t "#include \"lispobj.h\"~%")
     (format t "struct ~A {~%" (or structname (cstring (dd-name dd))))
     (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
@@ -3846,19 +3853,40 @@ III. initially undefined function references (alphabetically):
         (ensure-directories-exist filename)
         (with-open-file (stream filename :direction :output :if-exists :supersede)
           (write-makefile-features stream)))
+      (write-c-headers c-header-dir-name))))
 
-      (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
-                   (let ((headerp (if (and (stringp name) (position #\. name)) nil ".h")))
-                     `(with-open-file (stream (format nil "~A/~A~@[~A~]"
-                                                      c-header-dir-name ,name ,headerp)
-                                              :direction :output :if-exists :supersede)
-                         (write-boilerplate stream)
-                         ,(when headerp
-                            `(format stream
-                                     "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~:*~A~%"
-                                     (c-name (string-upcase ,name))))
-                         ,@body
-                         ,(when headerp `(format stream "#endif~%"))))))
+(defun write-c-headers (c-header-dir-name)
+  (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
+               `(actually-out-to ,name (lambda (stream) ,@body))))
+    (flet ((actually-out-to (name lambda)
+             ;; A file gets a '.inc' extension, not '.h' for either or both
+             ;; of two reasons:
+             ;; - if it isn't self-contained, meaning that in order to #include it,
+             ;;   the consumer of it has to know something about which other headers
+             ;;   need to be #included first.
+             ;; - it is not intended to be directly consumed because any use would
+             ;;   typically need to wrap each slot in some small calculation
+             ;;   such as native_pointer(), but we don't want to embed the wrapper
+             ;;   accessors into the autogenerated header. So there would instead be
+             ;;   a "src/runtime/foo.h" which includes "src/runtime/genesis/foo.inc"
+             ;; 'thread.h' and 'gc-tables.h' violate the naming convention
+             ;; by being non-self-contained.
+                 (let* ((extension
+                         (cond ((and (stringp name) (position #\. name)) nil)
+                               (t ".h")))
+                        (inclusion-guardp
+                         (string= extension ".h")))
+                  (with-open-file (stream (format nil "~A/~A~@[~A~]"
+                                                  c-header-dir-name name extension)
+                                          :direction :output :if-exists :supersede)
+                    (write-boilerplate stream)
+                    (when inclusion-guardp
+                      (format stream
+                              "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~:*~A~%"
+                              (c-name (string-upcase name))))
+                    (funcall lambda stream)
+                    (when inclusion-guardp
+                      (format stream "#endif~%"))))))
         (out-to "config" (write-config-h stream))
         (out-to "constants" (write-constants-h stream))
         (out-to "regnames" (write-regnames-h stream))
@@ -3888,7 +3916,7 @@ III. initially undefined function references (alphabetically):
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
           (write-thread-init stream))
         (out-to "static-symbols" (write-static-symbols stream))
-        (out-to "sc-offset" (write-sc+offset-coding stream))))))
+        (out-to "sc-offset" (write-sc+offset-coding stream)))))
 
 ;;; Invert the action of HOST-CONSTANT-TO-CORE. If STRICTP is given as NIL,
 ;;; then we can produce a host object even if it is not a faithful rendition.

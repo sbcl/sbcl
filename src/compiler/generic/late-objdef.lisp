@@ -127,6 +127,7 @@
 
 #+sb-xc-host
 (defun write-gc-tables (stream)
+  (format stream "#include \"lispobj.h\"~%")
   ;; Compute a bitmask of all specialized vector types,
   ;; not including array headers, for maybe_adjust_large_object().
   (let ((min #xff) (bits 0))
@@ -135,14 +136,14 @@
         (let ((widetag (saetp-typecode saetp)))
           (setf min (min widetag min)
                 bits (logior bits (ash 1 (ash widetag -2)))))))
-    (format stream "static inline boolean specialized_vector_widetag_p(unsigned char widetag) {
+    (format stream "static inline int specialized_vector_widetag_p(unsigned char widetag) {
   return widetag>=0x~X && (0x~8,'0XU >> ((widetag-0x80)>>2)) & 1;~%}~%"
             min (ldb (byte 32 32) bits))
     ;; Union in the bits for other unboxed object types.
     (dolist (entry *scav/trans/size*)
       (when (string= (second entry) "unboxed")
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
-    (format stream "static inline boolean leaf_obj_widetag_p(unsigned char widetag) {~%")
+    (format stream "static inline int leaf_obj_widetag_p(unsigned char widetag) {~%")
     #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
     #-64-bit (format stream "  int bit = widetag>>2;
   return (bit<32 ? 0x~XU >> bit : 0x~XU >> (bit-32)) & 1;"
