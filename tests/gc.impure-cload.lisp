@@ -27,8 +27,9 @@
 ;;; page on which the open flag should be removed.
 ;;; Strangely, the assertion that caught this was far removed from the
 ;;; point of failure, in conservative_root_p()
-(with-test (:name :gc-region-pickup :skipped-on (not (or :x86 :x86-64)))
-  ;; apparently can fail on linux with larger card size)
+(with-test (:name :gc-region-pickup :skipped-on (not (or :x86 :x86-64))
+                  ;; (and apparently can also fail on linux with larger card size)
+                  :fails-on (and :win32 :x86))
   (flet ((allocate-code-bytes (nbytes)
            ;; Make a code component occupying exactly NBYTES bytes in total.
            (assert (zerop (mod nbytes (* 2 sb-vm:n-word-bytes))))

@@ -789,10 +789,11 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     return actual;
 }
 
+/* Used to allocate the dynamic space, as it may be very large. Dynamically comitted by os_commit_memory in handle_access_violation */
 os_vm_address_t
 os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
-    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
     if (!actual) {
         if (!(attributes & MOVABLE)) {
