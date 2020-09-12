@@ -32,7 +32,7 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 
 void arch_skip_instruction(os_context_t *context)
 {
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
     unsigned code = trap_instruction >> 5 & 0xFF;
     *os_context_pc_addr(context) += 4;
     switch (code)
@@ -119,7 +119,7 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
     unsigned code = trap_instruction >> 5 & 0xFF;
     if ((trap_instruction >> 21) != 0x6A1) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler() (PC: %p)",

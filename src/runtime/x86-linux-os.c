@@ -88,7 +88,7 @@ int arch_os_thread_init(struct thread *thread) {
 }
 
 struct thread *debug_get_fs() {
-    register u32 fs;
+    register uint32_t fs;
     __asm__ __volatile__ ("movl %%fs,%0" : "=r" (fs)  : );
     return (struct thread *)fs;
 }

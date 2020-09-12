@@ -138,7 +138,7 @@ static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
 
     if (trap_instruction != 0xe7ffdefe) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",

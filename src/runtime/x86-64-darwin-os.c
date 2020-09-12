@@ -121,9 +121,9 @@ boolean will_exhaust_stack(struct thread * th, x86_thread_state64_t *context, in
 }
 
 /* Modify a context to push new data on its stack. */
-void push_context(u64 data, x86_thread_state64_t *context)
+void push_context(uint64_t data, x86_thread_state64_t *context)
 {
-    u64* stack_pointer = (u64*)context->rsp - 1;
+    uint64_t* stack_pointer = (uint64_t*)context->rsp - 1;
 
     context->rsp = (__uint64_t) stack_pointer;
     *stack_pointer = data;
@@ -183,12 +183,12 @@ void call_signal_emulator_in_context(x86_thread_state64_t *context,
 
     align_context_stack(context);
     push_context(context->rip, context);
-    context->rdi = (u64) mcontext;
+    context->rdi = (uint64_t) mcontext;
     context->rsi = signal;
-    context->rdx = (u64) addr;
-    context->rcx = (u64) handler;
+    context->rdx = (uint64_t) addr;
+    context->rcx = (uint64_t) handler;
 
-    context->rip = (u64) signal_emulation_wrapper;
+    context->rip = (uint64_t) signal_emulation_wrapper;
 }
 
 /* Call CONTROL_STACK_EXHAUSTED_ERROR directly, without emulating
@@ -198,15 +198,15 @@ void call_stack_exhausted_in_context(x86_thread_state64_t *context)
 {
     align_context_stack(context);
     push_context(context->rip, context);
-    context->rdi = (u64) StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR);
-    context->rip = (u64) funcall0;
+    context->rdi = (uint64_t) StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR);
+    context->rip = (uint64_t) funcall0;
 }
 
 #if defined DUMP_CONTEXT
 void dump_context(x86_thread_state64_t *context)
 {
     int i;
-    u64 *stack_pointer;
+    uint64_t *stack_pointer;
 
     printf("rax: %08lx  rcx: %08lx  rdx: %08lx  rbx: %08lx\n",
            context->rax, context->rcx, context->rdx, context->rbx);
@@ -219,7 +219,7 @@ void dump_context(x86_thread_state64_t *context)
            context->cs, context->ds, context->rs,
            context->ss, context->fs, context->gs);
 
-    stack_pointer = (u64 *)context->rsp;
+    stack_pointer = (uint64_t *)context->rsp;
     for (i = 0; i < 48; i+=4) {
         printf("%08x:  %08x %08x %08x %08x\n",
                context->rsp + (i * 4),
@@ -328,7 +328,7 @@ catch_exception_raise(mach_port_t exception_port,
         break;
     case EXC_BAD_INSTRUCTION:
 
-        if (*((u64 *)thread_state.rip) == 0xffffffffffff0b0f) {
+        if (*((uint64_t *)thread_state.rip) == 0xffffffffffff0b0f) {
             /* Fake sigreturn. See the end of signal_emulation_wrapper() */
 
             /* Apply any modifications done to the context, */

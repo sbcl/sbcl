@@ -467,7 +467,7 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
     boolean handle_it = 0;
     unsigned prev_inst;
     if ((code & ~(31 << 16)) == ((3<<26)|(4<<21))) { // mask out RA for test
-        prev_inst= ((u32*)pc)[-1];
+        prev_inst= ((uint32_t*)pc)[-1];
         int16_t disp = (prev_inst & 0xFFFF);
         handle_it = (prev_inst >> 26) == 32 // a load
           // RT of the load must be RA of the trap
@@ -554,7 +554,7 @@ arch_handle_after_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    unsigned int code = *((uint32_t *)(*os_context_pc_addr(context)));
     int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
@@ -591,7 +591,7 @@ static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
   uword_t pc = *os_context_pc_addr(context);
-  unsigned int code = *(u32*)pc;
+  unsigned int code = *(uint32_t*)pc;
 
 #ifdef LISP_FEATURE_SIGILL_TRAPS
     if (signal == SIGILL) {

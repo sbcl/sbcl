@@ -184,24 +184,6 @@ void dyndebug_init(void);
 # define FSHOW_SIGNAL(args)
 #endif
 
-/* KLUDGE: These are in theory machine-dependent and OS-dependent, but
- * in practice the "foo int" definitions work for all the machines
- * that SBCL runs on as of 0.6.7. If we port to the Alpha or some
- * other non-32-bit machine we'll probably need real machine-dependent
- * and OS-dependent definitions again. */
-/* even on alpha, int happens to be 4 bytes.  long is longer. */
-/* FIXME: these names really shouldn't reflect their length and this
-   is not quite right for some of the FFI stuff */
-#if defined(LISP_FEATURE_WIN32)&&defined(LISP_FEATURE_X86_64)
-typedef unsigned long long u64;
-typedef signed long long s64;
-#else
-typedef unsigned long u64;
-typedef signed long s64;
-#endif
-typedef unsigned int u32;
-typedef signed int s32;
-
 #ifdef _WIN64
 #define AMD64_SYSV_ABI __attribute__((sysv_abi))
 #else

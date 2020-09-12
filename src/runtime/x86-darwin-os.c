@@ -144,11 +144,11 @@ void update_thread_state_from_context(x86_thread_state32_t *thread_state,
 }
 
 /* Modify a context to push new data on its stack. */
-void push_context(u32 data, x86_thread_state32_t *thread_state)
+void push_context(uint32_t data, x86_thread_state32_t *thread_state)
 {
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
-    stack_pointer = (u32*) thread_state->ESP;
+    stack_pointer = (uint32_t*) thread_state->ESP;
     *(--stack_pointer) = data;
     thread_state->ESP = (unsigned int) stack_pointer;
 }
@@ -187,7 +187,7 @@ void *stack_allocate(x86_thread_state32_t *thread_state, size_t size)
     /* round up size to 16byte multiple */
     size = (size + 15) & -16;
 
-    thread_state->ESP = ((u32)thread_state->ESP) - size;
+    thread_state->ESP = ((uint32_t)thread_state->ESP) - size;
 
     return (void *)thread_state->ESP;
 }
@@ -204,7 +204,7 @@ void call_c_function_in_context(x86_thread_state32_t *thread_state,
 {
     va_list ap;
     int i;
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
     /* Set up to restore stack on exit. */
     open_stack_allocation(thread_state);
@@ -214,13 +214,13 @@ void call_c_function_in_context(x86_thread_state32_t *thread_state,
         push_context(0, thread_state);
     }
 
-    thread_state->ESP = ((u32)thread_state->ESP) - nargs * 4;
-    stack_pointer = (u32 *)thread_state->ESP;
+    thread_state->ESP = ((uint32_t)thread_state->ESP) - nargs * 4;
+    stack_pointer = (uint32_t *)thread_state->ESP;
 
     va_start(ap, nargs);
     for (i = 0; i < nargs; i++) {
-        //push_context(va_arg(ap, u32), thread_state);
-        stack_pointer[i] = va_arg(ap, u32);
+        //push_context(va_arg(ap, uint32_t), thread_state);
+        stack_pointer[i] = va_arg(ap, uint32_t);
     }
     va_end(ap);
 
@@ -317,7 +317,7 @@ void call_handler_on_thread(mach_port_t thread,
 void dump_context(x86_thread_state32_t *thread_state)
 {
     int i;
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
     printf("eax: %08lx  ecx: %08lx  edx: %08lx  ebx: %08lx\n",
            thread_state->EAX, thread_state->ECX, thread_state->EDX, thread_state->EAX);
@@ -334,7 +334,7 @@ void dump_context(x86_thread_state32_t *thread_state)
            thread_state->FS,
            thread_state->GS);
 
-    stack_pointer = (u32 *)thread_state->ESP;
+    stack_pointer = (uint32_t *)thread_state->ESP;
     for (i = 0; i < 48; i+=4) {
         printf("%08x:  %08x %08x %08x %08x\n",
                thread_state->ESP + (i * 4),

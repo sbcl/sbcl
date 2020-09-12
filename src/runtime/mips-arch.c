@@ -383,7 +383,7 @@ arch_handle_after_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((u32 *)(os_context_pc(context)));
+    unsigned int code = *((uint32_t *)(os_context_pc(context)));
     int register_offset = code >> 16 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);

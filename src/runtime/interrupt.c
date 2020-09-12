@@ -1512,11 +1512,11 @@ arrange_return_to_c_function(os_context_t *context,
      */
 
 #ifndef LISP_FEATURE_DARWIN
-    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
+    uint32_t *sp=(uint32_t *)*os_context_register_addr(context,reg_ESP);
 #endif
 
 #if defined(LISP_FEATURE_DARWIN)
-    u32 *register_save_area = (u32 *)os_allocate(0x40);
+    uint32_t *register_save_area = (uint32_t *)os_allocate(0x40);
 
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function,
                   *os_context_register_addr(context,reg_ESP)));
@@ -1548,7 +1548,7 @@ arrange_return_to_c_function(os_context_t *context,
 #else
 
     /* return address for call_into_lisp: */
-    *(sp-15) = (u32)post_signal_tramp;
+    *(sp-15) = (uint32_t)post_signal_tramp;
     *(sp-14) = function;        /* args for call_into_lisp : function*/
     *(sp-13) = 0;               /*                           arg array */
     *(sp-12) = 0;               /*                           no. args */
@@ -1571,10 +1571,10 @@ arrange_return_to_c_function(os_context_t *context,
 #endif
 
 #elif defined(LISP_FEATURE_X86_64)
-    u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
+    uword_t *sp=(uint64_t *)*os_context_register_addr(context,reg_RSP);
 
     /* return address for call_into_lisp: */
-    *(sp-18) = (u64)post_signal_tramp;
+    *(sp-18) = (uint64_t)post_signal_tramp;
 
     *(sp-17)=*os_context_register_addr(context,reg_R15);
     *(sp-16)=*os_context_register_addr(context,reg_R14);

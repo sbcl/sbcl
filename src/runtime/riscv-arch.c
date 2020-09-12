@@ -121,14 +121,14 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
 
     if (trap_instruction != 0x100073) {
         lose("Unrecognized trap instruction %08x in sigtrap_handler()",
              trap_instruction);
     }
 
-    u32 code = *((u32 *)(4 + *os_context_pc_addr(context)));
+    uint32_t code = *((uint32_t *)(4 + *os_context_pc_addr(context)));
 
     if (code == trap_PendingInterrupt) {
       arch_skip_instruction(context);

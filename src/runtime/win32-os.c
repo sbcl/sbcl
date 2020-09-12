@@ -476,7 +476,7 @@ void unmap_gc_page()
  * Of course, this name-parsing trick lacks conceptual clarity; we're
  * going to get rid of it eventually. */
 
-u32 os_get_build_time_shared_libraries(u32 excl_maximum,
+uint32_t os_get_build_time_shared_libraries(uint32_t excl_maximum,
                                        void* opt_root,
                                        void** opt_store_handles,
                                        const char *opt_store_names[])
@@ -492,7 +492,7 @@ u32 os_get_build_time_shared_libraries(u32 excl_maximum,
 
     void* check_duplicates[excl_maximum];
 
-    if ((*(u32*)base_magic_location)!=0x4550) {
+    if ((*(uint32_t*)base_magic_location)!=0x4550) {
         /* We don't need this DLL thingie _that_ much. If the world
          * has changed to a degree where PE magic isn't found, let's
          * silently return `no libraries detected'. */
@@ -511,7 +511,7 @@ u32 os_get_build_time_shared_libraries(u32 excl_maximum,
             &image_optional_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
         IMAGE_IMPORT_DESCRIPTOR* image_import_descriptor =
             base + image_import_direntry->VirtualAddress;
-        u32 nlibrary, j;
+        uint32_t nlibrary, j;
 
         for (nlibrary=0u; nlibrary < excl_maximum
                           && image_import_descriptor->FirstThunk;
@@ -579,7 +579,7 @@ u32 os_get_build_time_shared_libraries(u32 excl_maximum,
     }
 }
 
-static u32 buildTimeImageCount = 0;
+static uint32_t buildTimeImageCount = 0;
 static void* buildTimeImages[16];
 
 /* Resolve symbols against the executable and its build-time dependencies */

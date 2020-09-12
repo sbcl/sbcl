@@ -226,7 +226,7 @@ void skip_internal_error (os_context_t *context) {
     // value, and therefore shifting right by 13 bits extracts a 0.
     // Internal error number 0 has 0 arguments, so we skip nothing in the varint
     // decoder loop, which is the right thing for the wrong reason.
-    u32 trap_instruction = *(u32 *)ptr;
+    uint32_t trap_instruction = *(uint32_t *)ptr;
     unsigned char code = trap_instruction >> 13 & 0xFF;
     ptr += 4;
 #else
@@ -258,7 +258,7 @@ describe_internal_error(os_context_t *context)
     unsigned char code;
 
 #ifdef LISP_FEATURE_ARM64
-    u32 trap_instruction = *(u32 *)ptr;
+    uint32_t trap_instruction = *(uint32_t *)ptr;
     code = trap_instruction >> 13 & 0xFF;
     ptr += 4;
 #else
