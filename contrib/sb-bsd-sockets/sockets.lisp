@@ -177,8 +177,8 @@ directly instantiated.")))
                                    ((or (eql element-type 'character) (eql element-type 'base-char))
                                     (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
                                    (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
-                     (apply #'values buffer len (multiple-value-list
-                                                 (bits-of-sockaddr socket sockaddr))))
+                     (multiple-value-call #'values buffer len
+                       (bits-of-sockaddr socket sockaddr)))
                  (:interrupted nil)))
           (sb-alien:free-alien copy-buffer))))))
 
