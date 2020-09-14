@@ -1532,7 +1532,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
 
     boolean rehash = 0;
-    boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;
+    boolean save_culled_values = (hash_table->flags & make_fixnum(4)) != 0;
     // I'm slightly confused as to why we can't (or don't) compute the
     // 'should rehash' flag while scavenging the weak k/v vector.
     // I believe the explanation is this: for weak-key-AND-value tables, the vector
