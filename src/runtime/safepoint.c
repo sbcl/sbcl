@@ -530,7 +530,7 @@ thread_may_thrupt(os_context_t *ctx)
         return 0;
 
 #ifdef LISP_FEATURE_WIN32
-    if (deferrables_blocked_p(&nonpointer_data(self)->blocked_signal_set))
+    if (deferrables_blocked_p(&thread_extra_data(self)->blocked_signal_set))
         return 0;
 #else
     /* ctx is NULL if the caller wants to ignore the sigmask. */
@@ -554,8 +554,8 @@ check_pending_thruptions(os_context_t *ctx)
     /* On Windows, wake_thread/kill_safely does not set THRUPTION_PENDING
      * in the self-kill case; instead we do it here while also clearing the
      * "signal". */
-    if (nonpointer_data(p)->pending_signal_set)
-        if (__sync_fetch_and_and(&nonpointer_data(p)->pending_signal_set,0))
+    if (thread_extra_data(p)->pending_signal_set)
+        if (__sync_fetch_and_and(&thread_extra_data(p)->pending_signal_set,0))
             write_TLS(THRUPTION_PENDING, T, p);
 #endif
 
@@ -566,8 +566,8 @@ check_pending_thruptions(os_context_t *ctx)
     write_TLS(THRUPTION_PENDING, NIL, p);
 
 #ifdef LISP_FEATURE_WIN32
-    oldset = nonpointer_data(p)->blocked_signal_set;
-    nonpointer_data(p)->blocked_signal_set = deferrable_sigset;
+    oldset = thread_extra_data(p)->blocked_signal_set;
+    thread_extra_data(p)->blocked_signal_set = deferrable_sigset;
 #else
     sigset_t oldset;
     block_deferrable_signals(&oldset);
@@ -588,7 +588,7 @@ check_pending_thruptions(os_context_t *ctx)
         undo_fake_foreign_function_call(ctx);
 
 #ifdef LISP_FEATURE_WIN32
-    nonpointer_data(p)->blocked_signal_set = oldset;
+    thread_extra_data(p)->blocked_signal_set = oldset;
     if (ctx) ctx->sigmask = oldset;
 #else
     thread_sigmask(SIG_SETMASK, &oldset, 0);

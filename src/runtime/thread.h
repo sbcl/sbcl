@@ -46,8 +46,9 @@ void assert_on_stack(struct thread *th, void *esp);
  * arbitrary lengths, thus the pointers are stored instead. This
  * structure is used to help allocation of those types, so that the
  * pointers can be later shoved into the thread struct. */
-struct nonpointer_thread_data
+struct extra_thread_data
 {
+    struct interrupt_data interrupt_data;
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
     // 'state_sem' is a binary semaphore used just like a mutex.
     // I guess we figure that semaphores are OK to use in signal handlers (which is
@@ -65,15 +66,15 @@ struct nonpointer_thread_data
     uint32_t state_not_running_waitcount;
     uint32_t state_not_stopped_waitcount;
 #endif
-    struct interrupt_data interrupt_data;
 #ifdef LISP_FEATURE_WIN32
     // these are different from the masks that interrupt_data holds
     sigset_t pending_signal_set;
     sigset_t blocked_signal_set;
 #endif
 };
-#define nonpointer_data(thread) \
-  ((struct nonpointer_thread_data*)((char*)thread + dynamic_values_bytes))
+#define thread_extra_data(thread) \
+  ((struct extra_thread_data*)((char*)(thread) + dynamic_values_bytes))
+#define thread_interrupt_data(thread) thread_extra_data(thread)->interrupt_data
 
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
@@ -221,7 +222,7 @@ extern pthread_key_t specials;
 
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \
-                            sizeof(struct nonpointer_thread_data) +     \
+                            sizeof(struct extra_thread_data) +                 \
                             (MAX_INTERRUPTS*sizeof(os_context_t*)) +    \
                             dynamic_values_bytes +                      \
                             ALT_STACK_SIZE +                            \
@@ -234,7 +235,7 @@ static inline void* calc_altstack_base(struct thread* thread) {
     // Refer to the picture in the comment above create_thread_struct().
     // Always return the lower limit as the base even if stack grows down.
     return ((char*) thread) + dynamic_values_bytes
-        + ALIGN_UP(sizeof (struct nonpointer_thread_data), N_WORD_BYTES);
+        + ALIGN_UP(sizeof (struct extra_thread_data), N_WORD_BYTES);
 }
 static inline void* calc_altstack_end(struct thread* thread) {
     return (char*)thread->os_address + THREAD_STRUCT_SIZE;

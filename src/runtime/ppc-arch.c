@@ -400,8 +400,7 @@ handle_allocation_trap(os_context_t * context)
     char *memory;
     {
         extern lispobj *alloc(sword_t), *alloc_list(sword_t);
-        struct interrupt_data *data =
-            arch_os_get_current_thread()->interrupt_data;
+        struct interrupt_data *data = &thread_interrupt_data(arch_os_get_current_thread());
         data->allocation_trap_context = context;
         memory = (char*)(alloc_trap_p < 0 ? alloc_list(size) : alloc(size));
         data->allocation_trap_context = 0;

@@ -470,7 +470,7 @@ void
 describe_thread_state(void)
 {
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
 #ifndef LISP_FEATURE_WIN32
     sigset_t mask;
     get_current_sigmask(&mask);

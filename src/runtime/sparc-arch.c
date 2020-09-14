@@ -291,8 +291,7 @@ arch_handle_allocation_trap(os_context_t *context)
      */
     lispobj* memory;
     {
-        struct interrupt_data *data =
-            arch_os_get_current_thread()->interrupt_data;
+        struct interrupt_data *data = &thread_interrupt_data(arch_os_get_current_thread());
         data->allocation_trap_context = context;
         extern lispobj *alloc(sword_t), *alloc_list(sword_t);
         memory = (rd & 1) ? alloc_list(size) : alloc(size);

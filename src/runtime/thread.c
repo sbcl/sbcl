@@ -124,7 +124,7 @@ void
 set_thread_state(struct thread *thread, lispobj state,
                  boolean signals_already_blocked) // for foreign thread
 {
-    struct nonpointer_thread_data *semaphores = nonpointer_data(thread);
+    struct extra_thread_data *semaphores = thread_extra_data(thread);
     int i, waitcount = 0;
     sigset_t old;
     // If we've already masked the blockable signals we can avoid two syscalls here.
@@ -158,7 +158,7 @@ set_thread_state(struct thread *thread, lispobj state,
 int thread_wait_until_not(int undesired_state,
                           struct thread *thread)
 {
-    struct nonpointer_thread_data *semaphores = nonpointer_data(thread);
+    struct extra_thread_data *semaphores = thread_extra_data(thread);
     sigset_t old;
     os_sem_t *wait_sem;
     block_blockable_signals(&old);
@@ -417,7 +417,7 @@ unregister_thread(struct thread *th,
     arch_os_thread_cleanup(th);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    struct nonpointer_thread_data *semaphores = nonpointer_data(th);
+    struct extra_thread_data *semaphores = thread_extra_data(th);
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
@@ -805,7 +805,7 @@ callback_wrapper_trampoline(
  *
  *  |  (*) interrupt contexts and Lisp TLS |   (**) altstack           |
  *  |-----------|--------------------------|------------|--------------|
- *  | interrupt | struct + dynamically     | nonpointer |   sigstack   |
+ *  | interrupt | struct + dynamically     |    extra   |   sigstack   |
  *  | contexts  | thread   assigned TLS    |     data   |              |
  *  +-----------+--------------------------|------------+--------------|
  *  | 1K words  | <--- TLS_SIZE words ---> | ~200 bytes | 32*SIGSTKSZ  |
@@ -816,14 +816,14 @@ callback_wrapper_trampoline(
  *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
  *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
  *   (5) = per_thread_data.     size = (MAX_INTERRUPTS + TLS_SIZE) words
- *   (6) = nonpointer_thread_data and signal stack.
+ *   (6) = arbitrarily-sized "extra" data and signal stack.
  *
  *   (0) and (1) may coincide; (4) and (5) may coincide
  *
  *   - Lisp TLS overlaps 'struct thread' so that the first N (~30) words
  *     have preassigned TLS indices.
  *
- *   - nonpointer data are not in 'struct thread' because placing them there
+ *   - "extra" data are not in 'struct thread' because placing them there
  *     makes it tough to calculate addresses in 'struct thread' from Lisp.
  *     (Every 'struct thread' slot has a known size)
  *
@@ -942,15 +942,13 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->carried_base_pointer = 0;
 # endif
 
-    struct nonpointer_thread_data *nonpointer_data = nonpointer_data(th);
-    memset(nonpointer_data, 0, sizeof *nonpointer_data);
-    th->interrupt_data = &nonpointer_data->interrupt_data;
+    struct extra_thread_data *extra_data = thread_extra_data(th);
+    memset(extra_data, 0, sizeof *extra_data);
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
-    memset(nonpointer_data, 0, sizeof *nonpointer_data);
-    os_sem_init(&nonpointer_data->state_sem, 1);
-    os_sem_init(&nonpointer_data->state_not_running_sem, 0);
-    os_sem_init(&nonpointer_data->state_not_stopped_sem, 0);
+    os_sem_init(&extra_data->state_sem, 1);
+    os_sem_init(&extra_data->state_not_running_sem, 0);
+    os_sem_init(&extra_data->state_not_stopped_sem, 0);
 #endif
 
     th->state=STATE_RUNNING;
@@ -1004,10 +1002,10 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     access_control_frame_pointer(th)=0;
 #endif
 
-    th->interrupt_data->pending_handler = 0;
-    th->interrupt_data->gc_blocked_deferrables = 0;
+    thread_interrupt_data(th).pending_handler = 0;
+    thread_interrupt_data(th).gc_blocked_deferrables = 0;
 #if GENCGC_IS_PRECISE
-    th->interrupt_data->allocation_trap_context = 0;
+    thread_interrupt_data(th).allocation_trap_context = 0;
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1067,7 +1065,7 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
     // *after* blocking deferrables. It's immaterial what mask is passed
     // because the thread will unblock all deferrables,
     // and we don't really have posix signals anyway.
-    struct nonpointer_thread_data *data = nonpointer_data(th);
+    struct extra_thread_data *data = thread_extra_data(th);
     data->blocked_signal_set = deferrable_sigset;
     data->pending_signal_set = 0;
     // It's somewhat customary in the win32 API to start threads as suspended.

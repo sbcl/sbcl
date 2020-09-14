@@ -1171,7 +1171,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     os_context_t context, *ctx = &context;
     context.win32_context = win32_context;
-    context.sigmask = self ? nonpointer_data(self)->blocked_signal_set : 0;
+    context.sigmask = self ? thread_extra_data(self)->blocked_signal_set : 0;
 
     os_context_register_t oldbp = 0;
     if (self) {
@@ -2007,7 +2007,7 @@ futex_wake(PVOID lock_word, int n)
 
 int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-  struct nonpointer_thread_data* self = nonpointer_data(arch_os_get_current_thread());
+  struct extra_thread_data* self = thread_extra_data(arch_os_get_current_thread());
   if (oldset)
     *oldset = self->blocked_signal_set;
   if (set) {
@@ -2028,13 +2028,13 @@ int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 
 int sb_pthr_kill(struct thread* thread, int signum)
 {
-    __sync_fetch_and_or(&nonpointer_data(thread)->pending_signal_set, 1<<signum);
+    __sync_fetch_and_or(&thread_extra_data(thread)->pending_signal_set, 1<<signum);
     return 0;
 }
 
 int sigpending(sigset_t *set)
 {
-    struct nonpointer_thread_data* data = nonpointer_data(arch_os_get_current_thread());
+    struct extra_thread_data* data = thread_extra_data(arch_os_get_current_thread());
     *set = InterlockedCompareExchange((volatile LONG*)&data->pending_signal_set,
                                       0, 0);
     return 0;

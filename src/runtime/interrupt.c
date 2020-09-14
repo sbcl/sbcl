@@ -584,7 +584,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
 {
 #ifndef LISP_FEATURE_WIN32
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
     sigset_t oldset;
     /* Obviously, this function is called when signals may not be
      * blocked. Let's make sure we are not interrupted. */
@@ -641,7 +641,7 @@ check_interrupt_context_or_lose(os_context_t *context)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
     int interrupt_deferred_p = (data->pending_handler != 0);
     int interrupt_pending = (read_TLS(INTERRUPT_PENDING,thread) != NIL);
     sigset_t *sigset = os_context_sigmask_addr(context);
@@ -944,8 +944,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 boolean
 interrupt_handler_pending_p(void)
 {
-    struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(arch_os_get_current_thread());
     return (data->pending_handler != 0);
 }
 
@@ -971,7 +970,7 @@ interrupt_handle_pending(os_context_t *context)
      * pending asynchronous tasks. */
 
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
 
     if (arch_pseudo_atomic_atomic(context)) {
         lose("Handling pending interrupt in pseudo atomic.");
@@ -1219,7 +1218,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending");
-    if (thread->interrupt_data->pending_handler)
+    if (thread_interrupt_data(thread).pending_handler)
         lose("there is a pending handler already (PA)");
     if (data->gc_blocked_deferrables)
         lose("can_handle_now: gc_blocked_deferrables true");
@@ -1299,7 +1298,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     SAVE_ERRNO(signal,context,void_context);
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
     if (can_handle_now(interrupt_handle_now, data, signal, info, context))
         interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
@@ -1320,7 +1319,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     SAVE_ERRNO(signal,context,void_context);
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
 
     if (can_handle_now(low_level_interrupt_handle_now, data, signal, info, context))
         low_level_interrupt_handle_now(signal, info, context);
@@ -1378,12 +1377,12 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * pseudo_atomic_interrupted but without a pending interrupt or
      * GC. GC_BLOCKED_DEFERRABLES is also left at 1. So let's tidy it
      * up. */
-    if (thread->interrupt_data->gc_blocked_deferrables) {
+    if (thread_interrupt_data(thread).gc_blocked_deferrables) {
         FSHOW_SIGNAL((stderr,"cleaning up after gc_blocked_deferrables\n"));
         clear_pseudo_atomic_interrupted(thread);
-        sigcopyset(os_context_sigmask_addr(context),
-                   &thread->interrupt_data->pending_mask);
-        thread->interrupt_data->gc_blocked_deferrables = 0;
+        struct interrupt_data *interrupt_data = &thread_interrupt_data(thread);
+        sigcopyset(os_context_sigmask_addr(context), &interrupt_data->pending_mask);
+        interrupt_data->gc_blocked_deferrables = 0;
     }
 
     /* No need to use an atomic memory load here - this thead "owns" its state
@@ -1571,7 +1570,7 @@ arrange_return_to_c_function(os_context_t *context,
 #endif
 
 #elif defined(LISP_FEATURE_X86_64)
-    uword_t *sp=(uint64_t *)*os_context_register_addr(context,reg_RSP);
+    uword_t *sp=(uword_t *)*os_context_register_addr(context,reg_RSP);
 
     /* return address for call_into_lisp: */
     *(sp-18) = (uint64_t)post_signal_tramp;

@@ -4184,7 +4184,7 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
                  * look up the most context if it's from a trap. */
                 {
                     os_context_t *context =
-                        thread->interrupt_data->allocation_trap_context;
+                        thread_interrupt_data(thread).allocation_trap_context;
                     maybe_save_gc_mask_and_block_deferrables
                         (context ? os_context_sigmask_addr(context) : NULL);
                 }
