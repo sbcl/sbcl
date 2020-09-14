@@ -11,9 +11,6 @@
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 #endif
-#ifdef LISP_FEATURE_WIN32
-#include "win32-thread-private-events.h"
-#endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 
@@ -70,6 +67,15 @@ struct extra_thread_data
     // these are different from the masks that interrupt_data holds
     sigset_t pending_signal_set;
     sigset_t blocked_signal_set;
+#define NUM_PRIVATE_EVENTS 2
+#define thread_private_events(th,i) thread_extra_data(th)->private_events[i]
+    HANDLE private_events[NUM_PRIVATE_EVENTS];
+    // Context base pointer for running on top of system libraries built using
+    // -fomit-frame-pointer.  Currently truly required and implemented only
+    // for (and win32 x86-64),
+    os_context_register_t carried_base_pointer;
+    HANDLE synchronous_io_handle_and_flag;
+    void* waiting_on_address; // used only if #+sb-futex
 #endif
 };
 #define thread_extra_data(thread) \

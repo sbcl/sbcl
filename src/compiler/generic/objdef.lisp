@@ -545,7 +545,6 @@ during backtrace.
   (control-stack-end :c-type "lispobj *" :pointer t
                      :special *control-stack-end*)
   (control-stack-guard-page-protected)
-  #+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :pointer t)
   (prev :c-type "struct thread *" :pointer t)
   (next :c-type "struct thread *" :pointer t)
@@ -570,13 +569,6 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
-  ;; Context base pointer for running on top of system libraries built using
-  ;; -fomit-frame-pointer.  Currently truly required and implemented only
-  ;; for (and win32 x86-64), but could be generalized to other platforms if
-  ;; needed:
-  #+win32 (carried-base-pointer :c-type "os_context_register_t")
-  #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
-  #+(and win32 sb-futex) (waiting-on-address :c-type "void*")
   #+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; If we need the header slots, but they can't precede this structure

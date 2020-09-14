@@ -913,7 +913,7 @@ void gc_start_the_world()
 void
 wake_thread_io(struct thread * thread)
 {
-    SetEvent(thread->private_events.events[1]);
+    SetEvent(thread_private_events(thread,1));
     win32_maybe_interrupt_io(thread);
 }
 

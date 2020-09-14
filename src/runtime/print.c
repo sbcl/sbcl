@@ -209,9 +209,6 @@ fshow_fun(void __attribute__((__unused__)) *ignored,
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h" /* genesis/thread.h needs this */
 #endif
-#if defined(LISP_FEATURE_WIN32)
-# include "win32-thread-private-events.h" /* genesis/thread.h needs this */
-#endif
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"

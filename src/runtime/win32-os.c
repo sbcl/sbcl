@@ -1175,8 +1175,8 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     os_context_register_t oldbp = 0;
     if (self) {
-        oldbp = self ? self->carried_base_pointer : 0;
-        self->carried_base_pointer
+        oldbp = self ? thread_extra_data(self)->carried_base_pointer : 0;
+        thread_extra_data(self)->carried_base_pointer
             = (os_context_register_t) voidreg(win32_context, bp);
     }
 
@@ -1223,7 +1223,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         signal_internal_error_or_lose(ctx, exception_record, fault_address);
 
     if (self)
-        self->carried_base_pointer = oldbp;
+        thread_extra_data(self)->carried_base_pointer = oldbp;
 
     errno = lastErrno;
     SetLastError(lastError);
@@ -1265,7 +1265,7 @@ os_context_register_t
 carry_frame_pointer(os_context_register_t default_value)
 {
     struct thread* self = arch_os_get_current_thread();
-    os_context_register_t bp = self->carried_base_pointer;
+    os_context_register_t bp = thread_extra_data(self)->carried_base_pointer;
     return bp ? bp : default_value;
 }
 
@@ -1375,10 +1375,10 @@ boolean io_begin_interruptible(HANDLE handle)
     if (!ptr_CancelIoEx)
         return 1;
 
-    if (!__sync_bool_compare_and_swap(&this_thread->synchronous_io_handle_and_flag,
+    if (!__sync_bool_compare_and_swap(&thread_extra_data(this_thread)->synchronous_io_handle_and_flag,
                                       0, handle)) {
-        ResetEvent(this_thread->private_events.events[0]);
-        this_thread->synchronous_io_handle_and_flag = 0;
+        ResetEvent(thread_private_events(this_thread,0));
+        thread_extra_data(this_thread)->synchronous_io_handle_and_flag = 0;
         return 0;
     }
     return 1;
@@ -1393,7 +1393,7 @@ io_end_interruptible(HANDLE handle)
     if (!ptr_CancelIoEx)
         return;
     thread_mutex_lock(&interrupt_io_lock);
-    __sync_bool_compare_and_swap(&this_thread->synchronous_io_handle_and_flag,
+    __sync_bool_compare_and_swap(&thread_extra_data(this_thread)->synchronous_io_handle_and_flag,
                                  handle, 0);
     thread_mutex_unlock(&interrupt_io_lock);
 }
@@ -1635,14 +1635,15 @@ win32_maybe_interrupt_io(void* thread)
     boolean done = 0;
 
 #ifdef LISP_FEATURE_SB_FUTEX
-    if (th->waiting_on_address) WakeByAddressAll(th->waiting_on_address);
+    if (thread_extra_data(th)->waiting_on_address)
+        WakeByAddressAll(thread_extra_data(th)->waiting_on_address);
 #endif
 
     if (ptr_CancelIoEx) {
         thread_mutex_lock(&interrupt_io_lock);
         HANDLE h = (HANDLE)
             InterlockedExchangePointer((volatile LPVOID *)
-                                       &th->synchronous_io_handle_and_flag,
+                                       &thread_extra_data(th)->synchronous_io_handle_and_flag,
                                        (LPVOID)INVALID_HANDLE_VALUE);
 
         if (h && (h!=INVALID_HANDLE_VALUE)) {
@@ -1716,7 +1717,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
         return win32_write_console(handle,buf,count);
     }
 
-    overlapped.hEvent = self->private_events.events[0];
+    overlapped.hEvent = thread_private_events(self,0);
     seekable = SetFilePointerEx(handle,
                                 zero_large_offset,
                                 &file_position,
@@ -1747,7 +1748,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
             errno = errorCode;
             return -1;
         } else {
-            if(WaitForMultipleObjects(2,self->private_events.events,
+            if(WaitForMultipleObjects(2,thread_extra_data(self)->private_events,
                                       FALSE,INFINITE) != WAIT_OBJECT_0) {
                 CancelIo(handle);
                 waitInGOR = TRUE;
@@ -1791,7 +1792,7 @@ win32_unix_read(HANDLE handle, void * buf, int count)
         return win32_read_console(handle, buf, count);
     }
 
-    overlapped.hEvent = self->private_events.events[0];
+    overlapped.hEvent = thread_private_events(self,0);
     /* If it has a position, we won't try overlapped */
     seekable = SetFilePointerEx(handle,
                                 zero_large_offset,
@@ -1833,7 +1834,7 @@ win32_unix_read(HANDLE handle, void * buf, int count)
             return -1;
         } else {
             int ret;
-            if( (ret = WaitForMultipleObjects(2,self->private_events.events,
+            if( (ret = WaitForMultipleObjects(2,thread_extra_data(self)->private_events,
                                               FALSE,INFINITE)) != WAIT_OBJECT_0) {
                 CancelIo(handle);
                 waitInGOR = TRUE;
@@ -1911,7 +1912,7 @@ win32_wait_object_or_signal(HANDLE waitFor)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = arch_os_get_current_thread();
-    HANDLE handles[] = {waitFor, self->private_events.events[1]};
+    HANDLE handles[] = {waitFor, thread_private_events(self,1)};
     return
         WaitForMultipleObjects(2,handles, FALSE, INFINITE);
 #else
@@ -1924,7 +1925,7 @@ win32_wait_for_multiple_objects_or_signal(HANDLE *handles, DWORD count)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = arch_os_get_current_thread();
-    handles[count] = self->private_events.events[1];
+    handles[count] = thread_private_events(self,1);
     return
         WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE);
 #else
@@ -1984,9 +1985,9 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
   DWORD timeout = sec < 0 ? INFINITE : (sec * 1000) + (usec / 1000);
   struct thread* th = arch_os_get_current_thread();
-  th->waiting_on_address = lock_word;
+  thread_extra_data(th)->waiting_on_address = lock_word;
   int result = WaitOnAddress(lock_word, &oldval, 4, timeout);
-  th->waiting_on_address = 0;
+  thread_extra_data(th)->waiting_on_address = 0;
   if (result)
       return 0;
   if (GetLastError() == ERROR_TIMEOUT)

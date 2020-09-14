@@ -431,11 +431,8 @@ unregister_thread(struct thread *th,
 #if defined(LISP_FEATURE_WIN32)
     CloseHandle((HANDLE)th->os_thread);
     int i;
-    for (i = 0; i<
-             (int) (sizeof(th->private_events.events)/
-                    sizeof(th->private_events.events[0])); ++i) {
-      CloseHandle(th->private_events.events[i]);
-    }
+    for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
+        CloseHandle(thread_private_events(th,i));
 #endif
 
     /* Undo the association of the current pthread to its `struct thread',
@@ -772,7 +769,7 @@ callback_wrapper_trampoline(
 
 #ifdef LISP_FEATURE_WIN32
     /* arg2 is the pointer to a return value, which sits on the stack */
-    th->carried_base_pointer = (os_context_register_t) *(((void**)arg2)-1);
+    thread_extra_data(th)->carried_base_pointer = (os_context_register_t) *(((void**)arg2)-1);
 #endif
 
     WITH_GC_AT_SAFEPOINTS_ONLY()
@@ -939,7 +936,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
 # ifdef LISP_FEATURE_WIN32
-    th->carried_base_pointer = 0;
+    thread_extra_data(th)->carried_base_pointer = 0;
 # endif
 
     struct extra_thread_data *extra_data = thread_extra_data(th);
@@ -1022,11 +1019,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->no_tls_value_marker = start_routine;
 
 #if defined(LISP_FEATURE_WIN32)
-    for (i = 0; i<sizeof(th->private_events.events)/
-           sizeof(th->private_events.events[0]); ++i) {
-      th->private_events.events[i] = CreateEvent(NULL,FALSE,FALSE,NULL);
-    }
-    th->synchronous_io_handle_and_flag = 0;
+    for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
+        thread_private_events(th,i) = CreateEvent(NULL,FALSE,FALSE,NULL);
+    thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
 #endif
     th->stepping = 0;
     return th;
