@@ -838,7 +838,7 @@ process_directory(int count, struct ndir_entry *entry,
             if (request) {
 #ifdef LISP_FEATURE_WIN32
                 if (id == DYNAMIC_CORE_SPACE_ID) {
-                    addr = (os_vm_address_t)os_validate_nocommit(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                    addr = (uword_t)os_validate_nocommit(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                                          (os_vm_address_t)addr, request);
                 }
                 else
