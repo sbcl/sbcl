@@ -203,6 +203,11 @@
 
 #+sb-safepoint
 (defun emit-safepoint ()
+  ;; FIXME: need to get the node and policy to decide not to emit this safepoint.
+  ;; Also, it would be good to emit only the last of consecutive safepoints in
+  ;; straight-line code, e.g. (LIST (LIST X Y) (LIST Z W)) should emit 1 safepoint
+  ;; not 3, even if we consider it 3 separate pointer bumps.
+  ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
   (inst test :byte rax-tn (ea (- static-space-start gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)

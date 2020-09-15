@@ -1474,7 +1474,7 @@
       (setf (ir2-physenv-environment-start env) lab)
       (vop note-environment-start node block lab)
       #+sb-safepoint
-      (unless (policy fun (>= inhibit-safepoints 2))
+      (when (policy fun (/= insert-safepoints 0))
         (vop sb-vm::insert-safepoint node block))))
 
   (values))
@@ -2205,7 +2205,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                              (member (loop-kind (block-loop block))
                                      '(:natural :strange))
                              (eq block (loop-head (block-loop block)))
-                             (policy first-node (< inhibit-safepoints 2)))
+                             (policy first-node (/= insert-safepoints 0)))
                     (vop sb-vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
             (incf num))))))

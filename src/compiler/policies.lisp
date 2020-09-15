@@ -142,10 +142,10 @@ debugger.")
   ("no" "no" "yes" "yes"))
 
 #+sb-safepoint
-(define-optimization-quality inhibit-safepoints
-    0
-  ("no" "no" "yes" "yes")
-  "When disabled, the compiler will insert safepoints at strategic
+(define-optimization-quality insert-safepoints
+    1
+  ("no" "yes" "yes" "yes")
+  "When enabled, the compiler will insert safepoints at strategic
 points (loop edges, function prologues) to ensure that potentially
 long-running code can be interrupted.
 

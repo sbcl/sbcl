@@ -300,6 +300,11 @@
   ;; GC understands
   #+sb-safepoint
   (let ((label (gen-label)))
+    ;; This looks unnecessary. GC can look at the stack word physically below
+    ;; the CSP-around-foreign-call, which must be a PC pointing into the lisp caller.
+    ;; A more interesting question would arise if we had callee-saved registers
+    ;; within lisp code, which we don't at the moment. If we did, those
+    ;; wouldn't be anywhere on the stack unless C code decides to save them.
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
     (move pc-save rax))
@@ -320,26 +325,31 @@
                         while tn-ref
                         count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
                                   'float-registers))))
+
+  ;; Store SP in thread struct, unless the enclosing block says not to
   #+sb-safepoint
-  ;; Store SP in thread struct
-  (storew rsp-tn thread-base-tn thread-saved-csp-offset)
+  (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
+    (storew rsp-tn thread-base-tn thread-saved-csp-offset))
+
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
+
   ;; From immobile space we use the "CALL rel32" format to the linkage
   ;; table jump, and from dynamic space we use "CALL [ea]" format
   ;; where ea is the address of the linkage table entry's operand.
   ;; So while the former is a jump to a jump, we can optimize out
   ;; one jump in a statically linked executable.
-
   (inst call (cond ((tn-p fun) fun)
                    ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
                    (t (ea (make-fixup fun :foreign 8)))))
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
   #+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
+
+  ;; Zero the saved CSP, unless this code shouldn't ever stop for GC
   #+sb-safepoint
-  ;; Zero the saved CSP
-  (inst xor (object-slot-ea thread-base-tn thread-saved-csp-offset 0)
-        rsp-tn))
+  (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
+    (inst xor (object-slot-ea thread-base-tn thread-saved-csp-offset 0)
+          rsp-tn)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
