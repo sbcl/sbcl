@@ -613,17 +613,14 @@
 
 (defun code-header-from-pc (pc)
   (declare (system-area-pointer pc))
-  (macrolet ((heap-scan ()
-               `(let ((component-ptr
-                       (sb-alien:alien-funcall
-                        (sb-alien:extern-alien
-                         "component_ptr_from_pc"
-                         (function system-area-pointer system-area-pointer))
-                        pc)))
-                  (unless (sap= component-ptr (int-sap 0))
-                    (%make-lisp-obj
-                     (logior (sap-int component-ptr) sb-vm:other-pointer-lowtag))))))
-    (without-gcing (heap-scan))))
+  (with-code-pages-pinned (:dynamic)
+    (let ((base-ptr
+           (sb-alien:alien-funcall
+            (sb-alien:extern-alien "component_ptr_from_pc"
+                                   (function sb-alien:unsigned system-area-pointer))
+            pc)))
+      (unless (= base-ptr 0)
+        (%make-lisp-obj (logior base-ptr sb-vm:other-pointer-lowtag))))))
 
 ;;;; (OR X86 X86-64) support
 
@@ -1025,8 +1022,7 @@
       (unless (control-stack-pointer-valid-p cfp)
         (return (values nil nil nil t)))
       (when (sap= frame-pointer cfp)
-        (without-gcing
-          (/noshow0 "in WITHOUT-GCING")
+        (with-code-pages-pinned (:dynamic)
           (return (escaped-frame-from-context context)))))))
 
 #+(or x86 x86-64)
@@ -3528,7 +3524,7 @@ register."
       (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
         (setf (code-header-ref code-object real-lra-slot) code
               (code-header-ref code-object (1+ real-lra-slot)) offset)
-        ;; Holy hell, returning a SAP looks GC-unsafe, but it's sort of OK.
+        ;; Holy hell, returning a SAP looks GC-unsafe, but it's OK.
         ;; It points into CODE-OBJECT which is implicitly pinned.
         ;; WITHOUT-GCING which formerly enclosed this function was disingenuous
         ;; because we escaped from its scope when returning the SAP.

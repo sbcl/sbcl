@@ -624,7 +624,7 @@
     (rewind-current-segment dstate segment)
 
     ;; Do not pin anything yet if using cheneygc, as that would inhibit GC
-    ;; with a larger scope than intended.
+    ;; with a larger scope than strictly necessary.
     (with-pinned-objects (#+gencgc (seg-object (dstate-segment dstate))
                           #+gencgc dstate) ; for SAP access to SCRATCH-BUF
      #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))

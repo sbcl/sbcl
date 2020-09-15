@@ -139,6 +139,31 @@
    (let ((thread (sb-thread:make-thread (lambda () (sb-ext:gc)))))
      (loop while (sb-thread:thread-alive-p thread)))))
 
+(defglobal *some-object-handles* nil)
+(defun make-some-objects ()
+  (declare (notinline format))
+  (let* ((string-one (format nil "~a~a~a" "pot" "ayt" "o"))
+         (string-two (concatenate 'string "two " string-one))
+         (afunction
+          (let (#+immobile-space (sb-c::*compile-to-memory-space* :dynamic))
+            (compile nil `(sb-int:named-lambda ,string-two (x) (coerce x 'float))))))
+    (setq *some-object-handles*
+          (list (sb-kernel:get-lisp-obj-address afunction)
+                (sb-kernel:get-lisp-obj-address string-one)
+                (sb-kernel:get-lisp-obj-address string-two)))))
+#+gencgc
+(with-test (:name :pin-all-code-with-gc-enabled)
+  #+sb-thread (sb-thread:join-thread (sb-thread:make-thread #'make-some-objects))
+  #-sb-thread (progn (make-some-objects) (sb-sys:scrub-control-stack))
+  (sb-sys:with-code-pages-pinned (:dynamic) (gc))
+  ;; this should not fail to find FUN at its old address
+  (let ((fun (sb-kernel:make-lisp-obj (first *some-object-handles*))))
+    ;; this should fail to find a string at its old address
+    (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (second *some-object-handles*) nil))))
+    ;; this should similarly fail- STRING-TWO was transitively reachable but movable
+    (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (third *some-object-handles*) nil))))
+    (assert (string= (sb-kernel:%simple-fun-name fun) "two potayto"))))
+
 (with-test (:name :without-gcing)
   (let ((gc-happend nil))
     (push (lambda () (setq gc-happend t)) sb-ext:*after-gc-hooks*)

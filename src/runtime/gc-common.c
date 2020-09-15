@@ -288,10 +288,13 @@ scav_fun_pointer(lispobj *where, lispobj object)
     return 1;
 }
 
-
+extern int pin_all_dynamic_space_code;
 static struct code *
 trans_code(struct code *code)
 {
+#ifdef LISP_FEATURE_GENCGC
+    gc_dcheck(!pin_all_dynamic_space_code);
+#endif
     /* if object has already been transported, just return pointer */
     if (forwarding_pointer_p((lispobj *)code)) {
         return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));

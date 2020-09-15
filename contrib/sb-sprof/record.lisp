@@ -370,7 +370,8 @@ EXPERIMENTAL: Interface subject to change."
                  ;; pointless there -- though it may be that our mach magic is
                  ;; partially to blame?
                  (or (not (eq :cpu profiling)) (profiled-thread-p self)))
-        (sb-thread::with-system-mutex (*profiler-lock* :without-gcing t)
+        (with-code-pages-pinned (:dynamic)
+         (sb-thread::with-system-mutex (*profiler-lock*)
           (let ((samples *samples*)
                 ;; Don't touch the circularity hash-table
                 *print-circle*)
@@ -423,7 +424,7 @@ EXPERIMENTAL: Interface subject to change."
               ;; Reset thread-local allocation counter before interrupts
               ;; are enabled.
               (when (eq t sb-vm::*alloc-signal*)
-                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples)))))))))
+                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples))))))))))
     nil))
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper

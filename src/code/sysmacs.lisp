@@ -15,6 +15,7 @@
 
 (defvar *in-without-gcing*)
 (defvar *gc-inhibit*)
+(defvar *gc-pin-code-pages*)
 
 ;;; When the dynamic usage increases beyond this amount, the system
 ;;; notes that a garbage collection needs to occur by setting

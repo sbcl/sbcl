@@ -1684,6 +1684,8 @@ static inline boolean plausible_tag_p(lispobj addr)
         && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
 }
 
+#define is_code(type) ((type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
+
 #if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
@@ -1696,7 +1698,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
-    boolean enforce_lowtag = (page->type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE;
+    boolean enforce_lowtag = !is_code(page->type);
 
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
         (!is_lisp_pointer(addr) && enforce_lowtag) ||
@@ -2364,7 +2366,7 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
     if (!ENABLE_PAGE_PROTECTION) return;
     page_index_t i;
     for (i=first_page+1; i <= last_page; ++i) // last_page is inclusive
-        gc_assert((page_table[i].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE);
+        gc_assert(is_code(page_table[i].type));
 
     lispobj* where = start;
     for (; where < limit; where += sizetab[widetag_of(where)](where)) {
@@ -2459,8 +2461,7 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                     heap_scavenge(start, limit);
                     /* Now scan the pages and write protect those that
                      * don't have pointers to younger generations. */
-                    if (CODE_PAGES_USE_SOFT_PROTECTION &&
-                        (page_table[i].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE) {
+                    if (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[i].type)) {
                         update_code_writeprotection(i, last_page, start, limit);
                     } else {
                         page_index_t j;
@@ -3263,6 +3264,8 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
 }
 #endif
 
+int pin_all_dynamic_space_code;
+
 static void
 move_pinned_pages_to_newspace()
 {
@@ -3274,8 +3277,9 @@ move_pinned_pages_to_newspace()
 
     for (i = 0; i < next_free_page; i++) {
         /* 'pinned' is cleared lazily, so test the 'gen' field as well. */
-        if (page_table[i].gen == from_space
-            && page_table[i].pinned && page_single_obj_p(i)) {
+        if (page_table[i].gen == from_space && page_table[i].pinned &&
+            (page_single_obj_p(i) || (is_code(page_table[i].type)
+                                      && pin_all_dynamic_space_code))) {
             page_table[i].gen = new_space;
             /* And since we're moving the pages wholesale, also adjust
              * the generation allocation counters. */
@@ -3327,6 +3331,18 @@ garbage_collect_generation(generation_index_t generation, int raise)
     // for traceroot, which reads n_stack_pins from the previous GC cycle
     gc_n_stack_pins = 0;;
 
+#ifdef LISP_FEATURE_SB_THREAD
+    pin_all_dynamic_space_code = 0;
+    for_each_thread(th) {
+        if (th->state != STATE_DEAD && (read_TLS(GC_PIN_CODE_PAGES, th) & make_fixnum(1))) {
+            pin_all_dynamic_space_code = 1;
+            break;
+        }
+    }
+#else
+    pin_all_dynamic_space_code = read_TLS(GC_PIN_CODE_PAGES, 0) & make_fixnum(1);
+#endif
+
     /* Set the global src and dest. generations */
     if (generation < PSEUDO_STATIC_GENERATION) {
 
@@ -3347,9 +3363,19 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * This will also obviate the extra test at the comment
      * "pinned is cleared lazily" in move_pinned_pages_to_newspace().
      */
-        for (i = 0; i < next_free_page; i++)
-            if(page_table[i].gen==from_space)
-                page_table[i].pinned = 0;
+        if (pin_all_dynamic_space_code) {
+          /* This needs to happen before ambiguous root pinning, as the mechanisms
+           * overlap in a way that all-code pinning wouldn't do the right thing if flipped.
+           * Code objects should never get into the pins table in this case */
+          for (i = 0; i < next_free_page; i++) {
+              if (page_table[i].gen == from_space)
+                  page_table[i].pinned = page_bytes_used(i) != 0
+                                         && is_code(page_table[i].type);
+          }
+        } else {
+          for (i = 0; i < next_free_page; i++)
+              if (page_table[i].gen == from_space) page_table[i].pinned = 0;
+        }
 
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
@@ -3360,6 +3386,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
             unprotect_oldspace();
 
     } else { // "full" [sic] GC
+
+        gc_assert(!pin_all_dynamic_space_code); // not supported (but could be)
 
         /* This is a full mark-and-sweep of all generations without compacting
          * and without returning free space to the allocator. The intent is to
@@ -4326,7 +4354,7 @@ gencgc_handle_wp_violation(void* fault_addr)
 
     } else {
 #if CODE_PAGES_USE_SOFT_PROTECTION
-        gc_assert((page_table[page_index].type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE);
+        gc_assert(!is_code(page_table[page_index].type));
 #endif
         // There can not be an open region. gc_close_region() does not attempt
         // to flip that bit atomically. Other threads in the wp violation handler
@@ -4654,8 +4682,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
         // So just watch out for empty pages and code.  Unboxed object pages
         // will get unprotected on demand.
 #define non_protectable_page_p(x) !page_bytes_used(x) || \
-              (CODE_PAGES_USE_SOFT_PROTECTION && \
-               (page_table[x].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
+          (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[x].type))
         page_index_t start = 0, end;
         // cf. write_protect_generation_pages()
         while (start  < next_free_page) {

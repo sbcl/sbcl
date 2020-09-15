@@ -61,3 +61,32 @@ garbage collection."
   #+(and gencgc (or x86 x86-64))
   `(dx-let ((.cell. (cons nil nil)))
      (macrolet ((,name (arg) `(rplaca .cell. ,arg))) ,@body)))
+
+;;; Allow GC within the body, but pin (for some definition of "pin") all code.
+;;; There are two different behaviors:
+;;;
+;;; - If SPACE is :DYNAMIC, then no code object in the dynamic-space may move or die,
+;;;   but immobile-space code objects may die, in the absence of any (ambiguous or exact)
+;;;   reference. This mode of pinning prevents object movement, which only implies
+;;;   preventing death in as much as those are inextricably the same concept.
+;;;
+;;; - If SPACE is :IMMOBILE, then the GC is not allowed to do anything that affects the
+;;;   freelists in the mark-and-sweep code space. This prevents death, and of course
+;;;   the non-movement is implicit. Dynamic-space code is unnaffected.
+;;;   The use-case it to provide mutual exclusion of the allocator and collector.
+;;;   ** THIS MODE IS NOT IMPLEMENTED YET ***
+;;;
+;;; The two may not be specified simultaneously, however, nesting may occur, and
+;;; should behave as expected, taking the union of the requests into account.
+;;; e.g. one could imagine that during a backtrace - hence with :DYNAMIC space
+;;; code pinned - it might be necessary to JIT-compile a method for PRINT-OBJECT
+;;; which might pin :IMMOBILE space code.
+;;;
+(defmacro with-code-pages-pinned ((space) &body body)
+  #+gencgc `(let ((*gc-pin-code-pages*
+                   (logior *gc-pin-code-pages*
+                           ,(ecase space
+                              (:dynamic 1)
+                              #+immobile-space (:immobile 2)))))
+              ,@body)
+  #+cheneygc `(without-gcing ,@body))
