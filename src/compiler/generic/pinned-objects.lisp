@@ -83,10 +83,11 @@ garbage collection."
 ;;; which might pin :IMMOBILE space code.
 ;;;
 (defmacro with-code-pages-pinned ((space) &body body)
+  #+cheneygc (declare (ignore space))
   #+gencgc `(let ((*gc-pin-code-pages*
-                   (logior *gc-pin-code-pages*
-                           ,(ecase space
-                              (:dynamic 1)
-                              #+immobile-space (:immobile 2)))))
+                    (logior *gc-pin-code-pages*
+                            ,(ecase space
+                               (:dynamic 1)
+                               #+immobile-space (:immobile 2)))))
               ,@body)
   #+cheneygc `(without-gcing ,@body))
