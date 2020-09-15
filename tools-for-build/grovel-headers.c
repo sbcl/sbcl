@@ -145,7 +145,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 \n\
 ");
 #ifdef _WIN32
-    #include "grovel-headers-win32.h"
+    #include "grovel-headers-win32.inc"
 #else
     printf("(in-package \"SB-ALIEN\")\n\n");
 
