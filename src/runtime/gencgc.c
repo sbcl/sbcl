@@ -1686,6 +1686,29 @@ static inline boolean plausible_tag_p(lispobj addr)
 
 #define is_code(type) ((type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
 
+/* Return true if and only if everything on the specified page is NOT subject
+ * to evacuation, i.e. either the page is not in 'from_space', or is entirely
+ * pinned.  "Entirely pinned" is predicated on being marked as pinned,
+ * and satisfying one of two additional criteria:
+ *   1. the page is a single-object page
+ *   2. the page contains only code, and all code objects are pinned.
+ *
+ * A non-large-object page that is marked "pinned" does not suffice
+ * to be considered entirely pinned if it contains other than code.
+ *
+ * (I would have named this "wholly_pinned_p" were it not for the additional
+ * check about from_space, because that's kind of a misnomer in as much as
+ * pinning pertains only to fromspace.)
+ */
+int pin_all_dynamic_space_code;
+static inline int not_condemned_p(page_index_t page)
+{
+    return (page_table[page].gen != from_space)
+        || (page_table[page].pinned &&
+            (page_single_obj_p(page) ||
+             (is_code(page_table[page].type) && pin_all_dynamic_space_code)));
+}
+
 #if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
@@ -1702,8 +1725,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
         (!is_lisp_pointer(addr) && enforce_lowtag) ||
-        (compacting_p() && (page->gen != from_space ||
-                            (page->pinned && (page->type & SINGLE_OBJECT_FLAG)))))
+        (compacting_p() && not_condemned_p(addr_page_index)))
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
@@ -1776,8 +1798,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     // quick check 1: within from_space and within page usage
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
-        (compacting_p() && (page->gen != from_space ||
-                            (page->pinned && (page->type & SINGLE_OBJECT_FLAG)))))
+        (compacting_p() && not_condemned_p(addr_page_index)))
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
@@ -2058,7 +2079,14 @@ wipe_nonpinned_words()
 
 /* Add 'object' to the hashtable, and if the object is a code component,
  * then also add all of the embedded simple-funs.
- * The rationale for the extra work on code components is that without it,
+ * It is OK to call this function on an object which is already pinned-
+ * it will do nothing.
+ * But it is not OK to call this if the object is not one which merits
+ * pinning in the first place. i.e. It MUST be an object in from_space
+ * and moreover must be in the condemned set, which means that it can't
+ * be a code object if pin_all_dynamic_space_code is 1.
+ *
+ * The rationale for doing some extra work on code components is that without it,
  * every test of pinned_p() on an object would have to check if the pointer
  * is to a simple-fun - entailing an extra read of the header - and mapping
  * to its code component if so.  Since more calls to pinned_p occur than to
@@ -2168,21 +2196,29 @@ preserve_pointer(void *addr)
 #endif
 
 /* Pin an unambiguous descriptor object which may or may not be a pointer.
- * Ignore objects with immediate lowtags */
+ * Ignore immediate objects, and heuristically skip some objects that are
+ * known to be pinned without looking in pinned_objects.
+ * pin_object() will always do the right thing and ignore multiple
+ * calls with the same object in the same collection pass.
+ */
 static void __attribute__((unused)) pin_exact_root(lispobj obj)
 {
+    // These tests are performed in approximate order of quickness to check.
+
+    // 1. pointerness
     if (!is_lisp_pointer(obj)) return;
+    // 2. If not moving, then pinning is irrelevant. 'obj' is a-priori live given
+    //    the reference from *PINNED-OBJECTS*, and obviously it won't move.
+    if (!compacting_p()) return;
+    // 3. If pointing off-heap, why are you pinning? Just ignore it.
+    // Would this need to do anything if immobile-space were ported
+    // to the precise GC platforms. FIXME?
     page_index_t page = find_page_index((void*)obj);
     if (page < 0) return;
+    // 4. Ignore if not in the condemned set.
+    if (not_condemned_p(page)) return;
 
-    /* If we're in precise gencgc (non-x86oid as of this writing) then
-     * we are only called on valid object pointers in the first place,
-     * so we just have to do a bounds-check against the heap, a
-     * generation check, and the already-pinned check. */
-    if (compacting_p() && (page_table[page].gen != from_space ||
-                            (page_single_obj_p(page) &&
-                             page_table[page].pinned)))
-        return;
+    // Never try to pin an interior pointer - always use base pointers.
     lispobj *object_start = native_pointer(obj);
     switch (widetag_of(object_start)) {
     case SIMPLE_FUN_WIDETAG:
@@ -3264,8 +3300,6 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
 }
 #endif
 
-int pin_all_dynamic_space_code;
-
 static void
 move_pinned_pages_to_newspace()
 {
@@ -3578,9 +3612,20 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 gc_assert(VECTOR(info)->length >= make_fixnum(1));
                 lispobj fun = VECTOR(info)->data[0];
                 gc_assert(functionp(fun));
+#ifdef LISP_FEATURE_X86_64
+                // slight KLUDGE: 'fun' is a simple-fun in immobile-space,
+                // and pin_exact_root() doesn't work. In all probability 'fun'
+                // is pseudo-static, but let's use the right pinning function.
+                // (This line of code is so rarely executed that it doesn't
+                // impact performance to search for the object)
+                preserve_pointer((void*)fun);
+#else
+                pin_exact_root(fun);
+#endif
+                // pin_exact_root is more efficient than preserve_pointer()
+                // because it does not search for the object.
                 pin_exact_root(thing);
                 pin_exact_root(info);
-                pin_exact_root(fun);
                 pin_exact_root(lispthread->name);
             }
         }
