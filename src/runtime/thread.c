@@ -1156,7 +1156,7 @@ void gc_stop_the_world()
     }
     for_each_thread(th) {
         if (th != me) {
-            int state = thread_wait_until_not(STATE_RUNNING, th);
+            __attribute__((unused)) int state = thread_wait_until_not(STATE_RUNNING, th);
             gc_assert(state != STATE_RUNNING);
         }
     }
