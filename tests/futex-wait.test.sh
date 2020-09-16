@@ -3,11 +3,16 @@
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
-  #+(and linux sb-thread) (exit :code 0) ; good
- (exit :code 1) ; otherwise
+ ;; The desired output differs by many factors, but an arbitrary slop allowance
+ ;; could let the old bug creep back in.
+ ;; (Also, this should probably skip the test if 'strace' isn't installed)
+ #+(and linux sb-thread) (exit :code #+(or x86 x86-64) 30
+                                     #-(or x86 x86-64) 100)
+ ;; can't run the test
+ (exit :code 0)
 EOF
-status=$?
-if [ $status != 0 ]; then # test can't be executed
+expect_test_outcome=$?
+if [ $expect_test_outcome -eq 0 ] ; then # test can't be executed
     # we don't have a way to exit shell tests with "inapplicable" as the result
     exit $EXIT_TEST_WIN
 fi
@@ -73,7 +78,8 @@ strace -f -e futex -e signal=\!sigsegv -o $tracelog \
                   (sb-kernel:get-dsd-index sb-thread::mutex sb-thread::state))
                sb-vm:n-word-bytes)
             sb-vm:instance-pointer-lowtag)))
-    (sb-thread::futex-wake (+ (sb-kernel:get-lisp-obj-address *m*) disp)
+    (sb-thread::futex-wake (+ (sb-kernel:get-lisp-obj-address *m*) disp
+                              #+(and 64-bit big-endian) 4)
                            1)))
 
 (format t "~&looks like mutex state is ~d~%" (sb-thread::mutex-state *m*))
@@ -87,7 +93,7 @@ EOF
 n=`awk 'END{print NR}' < $tracelog`
 rm $tracelog
 
-if [ $n -lt 30 ]
+if [ $n -le $expect_test_outcome ]
 then
   exit $EXIT_TEST_WIN
 fi
