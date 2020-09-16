@@ -711,7 +711,8 @@ status slot."
                     status-hook
                     (external-format :default)
                     directory
-                    #+win32 (escape-arguments t))
+                    #+win32 (escape-arguments t)
+                    #+win32 (window nil))
   "RUN-PROGRAM creates a new process specified by PROGRAM.
 ARGS are passed as the arguments to the program.
 
@@ -801,7 +802,16 @@ Users Manual for details about the PROCESS structure.
 
    Windows specific options:
    :ESCAPE-ARGUMENTS (default T)
-      Controls escaping of the arguments passed to CreateProcess."
+      Controls escaping of the arguments passed to CreateProcess.
+   :WINDOW (default NIL)
+      When NIL, the subprocess decides how it will display its window. The
+      following options control how the subprocess window should be displayed:
+      :HIDE, :SHOW-NORMAL, :SHOW-MAXIMIZED, :SHOW-MINIMIZED, :SHOW-NO-ACTIVATE,
+      :SHOW-MIN-NO-ACTIVE, :SHOW-NA.
+      Note: console application subprocesses may or may not display a console
+      window depending on whether the SBCL runtime is itself a console or GUI
+      application. Invoke CMD /C START to consistently display a console window
+      or use the :WINDOW :HIDE option to consistently hide the console window."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
@@ -876,7 +886,8 @@ Users Manual for details about the PROCESS structure.
                                   progname
                                   args
                                   stdin stdout stderr
-                                  search environment-vec directory))
+                                  search environment-vec directory
+                                  window))
                                #-win32
                                (with-args (args-vec args)
                                  (with-system-mutex (*spawn-lock*)

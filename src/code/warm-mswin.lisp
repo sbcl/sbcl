@@ -32,7 +32,16 @@
       (stdout handle)
       (stderr handle)))
 
+(defconstant +startf-use-show-window+ #x001)
 (defconstant +startf-use-std-handles+ #x100)
+
+(defconstant +sw-hide+               0)
+(defconstant +sw-show-normal+        1)
+(defconstant +sw-show-minimized+     2)
+(defconstant +sw-show-maximized+     3)
+(defconstant +sw-show-no-activate+   4)
+(defconstant +sw-show-min-no-active+ 7)
+(defconstant +sw-show-na+            8)
 
 (define-alien-routine ("CreateProcessW" create-process) lispbool
   (application-name system-string)
@@ -45,8 +54,6 @@
   (current-directory system-string)
   (startup-info (* t))
   (process-information (* t)))
-
-
 
 (defun search-path (partial-name)
   "Searh executable using the system path"
@@ -76,7 +83,7 @@
   (process handle)
   (exit-code uint))
 
-(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory)
+(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory window)
   (let ((std-handles (multiple-value-list (get-std-handles)))
         (inheritp nil))
     (flet ((maybe-std-handle (arg)
@@ -94,7 +101,17 @@
               (slot startup-info 'reserved1) nil
               (slot startup-info 'reserved2) 0
               (slot startup-info 'reserved3) nil
-              (slot startup-info 'flags) (if inheritp +startf-use-std-handles+ 0))
+              (slot startup-info 'show-window) (ecase window
+                                                 (:hide +sw-hide+)
+                                                 (:show-normal +sw-show-normal+)
+                                                 (:show-maximized +sw-show-maximized+)
+                                                 (:show-minimized +sw-show-minimized+)
+                                                 (:show-no-activate +sw-show-no-activate+)
+                                                 (:show-min-no-active +sw-show-min-no-active+)
+                                                 (:show-na +sw-show-na+)
+                                                 ((nil) 0))
+              (slot startup-info 'flags) (logior (if inheritp +startf-use-std-handles+ 0)
+                                                 (if window +startf-use-show-window+ 0)))
         (without-interrupts
           ;; KLUDGE: pass null image file name when searchp is true.
           ;; This way, file extension gets resolved by OS if omitted.
