@@ -204,6 +204,18 @@
   (declare (ignore signal code context))
   (sb-impl::get-processes-status-changes))
 
+(defmacro pthread-sigmask (how new old)
+  `(let ((how ,how) (new ,new) (old ,old))
+     (alien-funcall (extern-alien #+(and unix sb-thread) "pthread_sigmask"
+                                  #+(and unix (not sb-thread)) "sigprocmask"
+                                  #+win32 "_sbcl_pthread_sigmask"
+                                  (function void int system-area-pointer system-area-pointer))
+                    how
+                    (cond ((system-area-pointer-p new) new)
+                          (new (vector-sap new))
+                          (t (int-sap 0)))
+                    (if old (vector-sap old) (int-sap 0)))))
+
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
   (%install-handler sigint #'sigint-handler nil)
@@ -219,9 +231,12 @@
   #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler nil)
   #-sb-thruption (%install-handler sigpipe #'sigpipe-handler nil)
   (%install-handler sigchld #'sigchld-handler nil)
-  #-sb-safepoint (unblock-gc-signals)
-  ;; I don't see why deferrables would have ben blocked. This is essentially a no-op.
-  (unblock-deferrable-signals)
+  ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
+  ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.
+  (dx-let ((mask (make-array sb-unix::sizeof-sigset_t :element-type '(unsigned-byte 8)
+                                                      :initial-element 0)))
+    (with-pinned-objects (mask)
+      (pthread-sigmask sb-unix::SIG_SETMASK mask nil)))
   (values))
 
 ;;;; etc.

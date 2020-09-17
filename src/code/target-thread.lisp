@@ -1743,16 +1743,6 @@ session."
           (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
-(defun pthread-sigmask (how new old)
-  (alien-funcall (extern-alien #-win32 "pthread_sigmask"
-                               #+win32 "_sbcl_pthread_sigmask"
-                               (function void int system-area-pointer system-area-pointer))
-                 how
-                 (cond ((system-area-pointer-p new) new)
-                       (new (vector-sap new))
-                       (t (int-sap 0)))
-                 (if old (vector-sap old) (int-sap 0))))
-
 (defmacro thread-trampoline-defining-macro (&body body) ; NEW WAY
   `(defun run ()
      (macrolet ((apply-real-function ()
@@ -1765,7 +1755,7 @@ session."
                       ;; If the original mask (at thread creation time) was provided,
                       ;; then restore exactly that mask.
                       (with-pinned-objects (mask)
-                        (pthread-sigmask sb-unix::SIG_SETMASK mask nil))
+                        (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK mask nil))
                       ;; Otherwise just do the usual thing
                       (sb-unix::unblock-deferrable-signals)))))
          ;; notinline keeps array off the call stack by getting it out of the curent frame
@@ -1924,8 +1914,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     ;; Block deferrables to ensure that the new thread is unaffected by signals
     ;; before the various interrupt-related special vars are set up.
     (with-pinned-objects (saved-sigmask)
-      (pthread-sigmask sb-unix::SIG_BLOCK (foreign-symbol-sap "deferrable_sigset" t)
-                       saved-sigmask))
+      (sb-unix::pthread-sigmask sb-unix::SIG_BLOCK
+                                (foreign-symbol-sap "deferrable_sigset" t)
+                                saved-sigmask))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
                (sigmask
                 (if (position 1 saved-sigmask) ; if there are any signals masked
@@ -1982,7 +1973,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
           (%delete-thread-from-session thread))
         (free-thread-struct thread-sap)))
     (with-pinned-objects (saved-sigmask)
-      (pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
+      (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
     (if created thread (error "Could not create new OS thread."))))
 
 #+(and sb-thread (not pauseless-threadstart))
