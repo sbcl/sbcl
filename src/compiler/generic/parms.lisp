@@ -229,7 +229,29 @@
 ;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about
 ;;; the choice of this number. Rather than have to two copies
 ;;; of the comment, please see that file before adjusting this.
-(defconstant max-interrupts 1024)
+;;; I think most of the need for a ridiculously large value stemmed from
+;;; receive-pending-interrupt after a pseudo-atomic code section.
+;;; If that trapped into GC, and then ran finalizers in POST-GC (while still
+;;; in a signal handler), which consed, which caused the need for another GC,
+;;; you'd receive a nested interrupt, as the GC trap was still on the stack
+;;; not having returned to "user" code yet. [See example in src/code/final]
+;;;
+;;; But now that #+sb-thread creates a dedicated finalizer thread, nesting
+;;; seems unlikely to occur, because "your" code doesn't get a chance to run again
+;;; until after the interrupt returns. And the finalizer thread won't invoke
+;;; run-pending-finalizers in post-GC, it will just pick up the next finalizer
+;;; in due turn. You could potentially force a nested GC by consing a lot in
+;;; a post-GC hook, but if you do that, your hook function is badly behaved
+;;; and you should fix it.
+;;;
+;;; One more thing: some math is involved because the actual number of context
+;;; pointers is this constant MINUS the number of slots accessible via THREAD-BASE-TN
+;;; at a negative displacement, which happens to be 16.  So this number is adjusted
+;;; up by 16 from the amount that you want it to be.  I should fix the whacky math,
+;;; but at the moment, THREAD_STRUCT_SIZE does not add space for negatively-indexed
+;;; thread slots, it just steals them from the interrupt context pointer array.
+(defconstant max-interrupts #+sb-thread 24 #-sb-thread 1024)
+
 ;;; Thread slots accessed at negative indices relative to struct thread.
 ;;; These slots encroach on the interrupt contexts- the maximum that
 ;;; can actually be stored is decreased by this amount.
