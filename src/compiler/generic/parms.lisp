@@ -250,7 +250,11 @@
 ;;; up by 16 from the amount that you want it to be.  I should fix the whacky math,
 ;;; but at the moment, THREAD_STRUCT_SIZE does not add space for negatively-indexed
 ;;; thread slots, it just steals them from the interrupt context pointer array.
-(defconstant max-interrupts #+sb-thread 24 #-sb-thread 1024)
+(defconstant max-interrupts
+  #+(and sb-thread (not sb-safepoint)) 24 ; "reasonable" value
+  #+(or (not sb-thread) ; no threads: deep nesting occurs as explained above
+        ;; FIXME: win32 is quite clearly broken if this number is lowered.
+        sb-safepoint) 1024)
 
 ;;; Thread slots accessed at negative indices relative to struct thread.
 ;;; These slots encroach on the interrupt contexts- the maximum that
