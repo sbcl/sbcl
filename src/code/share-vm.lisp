@@ -19,7 +19,7 @@
     #+(or x86 x86-64)
     `(progn ,@body)
     #-(or x86 x86-64)
-    `(with-pinned-objects ((without-gcing
+    `(with-pinned-objects ((with-code-pages-pinned (:dynamic)
                              (sb-di::code-object-from-context ,context)))
        ,@body))
 
