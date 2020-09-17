@@ -1262,7 +1262,7 @@ void wake_thread(struct thread_instance* lispthread)
 #elif defined LISP_FEATURE_SB_THRUPTION
     wake_thread_impl(lispthread);
 #else
-    pthread_kill(lispthread->os_thread, SIGPIPE);
+    pthread_kill(lispthread->os_thread, SIGURG);
 #endif
 }
 #endif

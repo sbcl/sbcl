@@ -149,7 +149,7 @@
   (flet ((interrupt-it ()
            ;; SB-KERNEL:*CURRENT-INTERNAL-ERROR-CONTEXT* will
            ;; either be bound in this thread by SIGINT-HANDLER or
-           ;; in the target thread by SIGPIPE-HANDLER.
+           ;; in the target thread by SIGURG-HANDLER.
            (with-alien ((context (* os-context-t)
                                  sb-kernel:*current-internal-error-context*))
              (with-interrupts
@@ -164,9 +164,9 @@
     (let ((target (sb-thread::foreground-thread)))
       ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
       ;; interrupt right away, because deferrables are blocked.  Rather,
-      ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
+      ;; the kernel would arrange for the SIGURG to hit when the SIGINT
       ;; handler is done.  However, on safepoint builds, we don't use
-      ;; SIGPIPE and lack an appropriate mechanism to handle pending
+      ;; SIGURG and lack an appropriate mechanism to handle pending
       ;; thruptions upon exit from signal handlers (and this situation is
       ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
       ;; explicitly at the end).  Only as long as safepoint builds pretend
@@ -190,12 +190,12 @@
   (exit))
 
 #-sb-thruption
-;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
+;;; SIGURG is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
-;;; nothing to do so it's safe to receive spurious SIGPIPEs coming
+;;; nothing to do so it's safe to receive spurious SIGURGs coming
 ;;; from the kernel.
-(defun sigpipe-handler (signal code sb-kernel:*current-internal-error-context*)
+(defun sigurg-handler (signal code sb-kernel:*current-internal-error-context*)
   (declare (ignore signal code))
   (sb-thread::run-interruption))
 
@@ -229,7 +229,7 @@
 " sb-sys:*stderr*))
   #-(or linux android) (%install-handler sigsys #'sigsys-handler t)
   #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler nil)
-  #-sb-thruption (%install-handler sigpipe #'sigpipe-handler nil)
+  #-sb-thruption (%install-handler sigurg #'sigurg-handler nil)
   (%install-handler sigchld #'sigchld-handler nil)
   ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
   ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.

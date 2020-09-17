@@ -100,3 +100,16 @@
              (sb-ext:with-timeout 0.1 (sleep 1) t))))
      (sb-ext:timeout ()
        nil))))
+
+#+unix
+(with-test (:name :ignore-sigpipe)
+  (multiple-value-bind (read-side write-side) (sb-unix:unix-pipe)
+    (sb-unix:unix-close read-side)
+    (sb-sys:enable-interrupt sb-unix:sigpipe :ignore)
+    (let ((buffer "x"))
+      (sb-sys:with-pinned-objects (buffer)
+        (multiple-value-bind (nbytes errno)
+            (sb-unix:unix-write write-side buffer 0 1)
+          (assert (and (null nbytes)
+                       (= errno sb-unix:epipe))))))
+    (sb-unix:unix-close write-side)))

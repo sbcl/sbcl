@@ -2097,7 +2097,7 @@ subject to change."
   (declare (ignorable os-thread))
   ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
   ;; And raise() - as we use it - can't fail, so just ignore the result.
-  ;; (The signal number is always SIGPIPE or SIGINT, and the process is obviously not dead)
+  ;; (The signal number is always SIGURG or SIGINT, and the process is obviously not dead)
   ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
   #-sb-thread `(raise ,signal)
   #+sb-thread
@@ -2116,7 +2116,7 @@ subject to change."
     ;; OS's point of view the signal we are in the handler for is no
     ;; longer pending, so the signal will not be lost.
     (when (thread-interruptions *current-thread*)
-      (raise sb-unix:sigpipe))
+      (raise sb-unix:sigurg))
     ;; FIXME: does this really respect the promised ordering of interruptions?
     ;; It looks backwards to raise first and run the popped function second.
     (when interruption
@@ -2240,7 +2240,12 @@ Short version: be careful out there."
           (cond #+sb-thread ((eql c-thread 0) t)
                 (t
                  (enqueue)
-                 #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigpipe)
+                 ;; We use SIGURG because it satisfies a lot of requirements that
+                 ;; other people have thought about more than we have.
+                 ;; See https://golang.org/src/runtime/signal_unix.go where they describe
+                 ;; which signal works best for their sigPreempt.
+                 ;; It's basically the same use-case as here.
+                 #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigurg)
                  #+sb-safepoint
                  (with-alien ((wake (function void system-area-pointer)
                                     :extern "wake_thread"))

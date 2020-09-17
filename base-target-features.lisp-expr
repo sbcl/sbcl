@@ -301,7 +301,7 @@
  ;; can be interrupted safely, instead of using a signal for this
  ;; purpose.  Enable this feature in addition to :SB-SAFEPOINT to enable
  ;; such behaviour.
- ;; (Replaces use of SIGPIPE, except to wake up syscalls.)
+ ;; (Replaces use of SIGURG, except to wake up syscalls.)
  ; :sb-thruption
 
  ;; When compiling with safepoints and thruptions, the TIMER facility

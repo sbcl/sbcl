@@ -110,7 +110,7 @@ means to wait indefinitely.")
 ;;; Hence *all* threads (including non-Lisp) are permanently stuck waiting on
 ;;; a lock that is not owned by any running thread.
 ;;;
-;;; I tried to remedy this by having the SIGPIPE signal handler silently discard
+;;; I tried to remedy this by having the SIGURG signal handler silently discard
 ;;; a signal if interrupted at a non-Lisp program counter, but that presumes the
 ;;; call stack is never Lisp -> C -> Lisp, which first of all means that the handler
 ;;; needs to be entirely in C (if called from TERMINATE-THREAD) and secondly requires

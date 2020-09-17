@@ -359,7 +359,6 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGINT);
     sigaddset(s, SIGTERM);
     sigaddset(s, SIGQUIT);
-    sigaddset(s, SIGPIPE);
     sigaddset(s, SIGALRM);
     sigaddset(s, SIGURG);
     sigaddset(s, SIGTSTP);
@@ -391,6 +390,11 @@ sigaddset_blockable(sigset_t *sigset)
 {
     sigaddset_deferrable(sigset);
     sigaddset_gc(sigset);
+    // SIGPIPE is *NOT* an asynchronous signal. In normal usage you receive this signal
+    // synchronously in response to a system call. As such we do not place it in the
+    // deferrable set, but it _is_ blockable. If you're doing something wherein SIGPIPE
+    // interrupts a pseudo-atomic section, then you're doing something wrong for sure.
+    sigaddset(sigset, SIGPIPE);
 }
 
 /* initialized in interrupt_init */
@@ -1831,8 +1835,7 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 }
 
 void
-ll_install_handler (int signal,
-                                              interrupt_handler_t handler)
+ll_install_handler (int signal, interrupt_handler_t handler)
 {
     struct sigaction sa;
 
@@ -1852,7 +1855,7 @@ ll_install_handler (int signal,
      * but we don't actually want to defer it.  And if we put it only
      * into blockable_sigset, we'd have to special-case it around thread
      * creation at least. */
-    if (signal == SIGPIPE)
+    if (signal == SIGURG)
         sa.sa_sigaction = low_level_handle_now_handler;
 #endif
 
@@ -1886,7 +1889,7 @@ install_handler(int signal, lispobj handler,
         // Our "abstract" values for SIG_DFL and SIG_IGN are 0 and 1
         // respectively which are probably the real values from signal.h
         // but this way way don't need to put them in grovel-headers.c
-        if (fixnump(handler)) {
+        if (handler== 0 || handler==1) {
             memset(&sa, 0, sizeof sa);
             sa.sa_handler = handler ? SIG_IGN : SIG_DFL;
             // assign the OS level action before clearing the lisp function.

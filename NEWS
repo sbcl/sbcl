@@ -6,6 +6,10 @@ changes relative to sbcl-2.0.8:
   * minor incompatible change: the compiler signals a warning at
     compile-time when an initform of T, NIL or 0 does not match a
     STANDARD-CLASS slot's declared type.
+  * minor incompatible change: the runtime no longer uses SIGPIPE internally,
+    so the signal is deliverable to user code as is customary. Ignoring the
+    signal - in lieu of the OS default of process termination - is obtainable
+    via (SB-SYS:ENABLE-INTERRUPT SB-UNIX:SIGPIPE :IGNORE).
 
 changes in sbcl-2.0.8 relative to sbcl-2.0.7:
   * platform support:

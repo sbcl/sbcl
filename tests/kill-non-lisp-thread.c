@@ -18,5 +18,5 @@ kill_non_lisp_thread(void)
         perror("pthread_create");
         exit(1);
     }
-    pthread_kill(kid, SIGPIPE);
+    pthread_kill(kid, SIGURG);
 }

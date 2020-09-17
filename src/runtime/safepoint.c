@@ -988,7 +988,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
                                 odxprint(safepoints, "wake_thread_posix: kill");
                                 /* ... and in foreign code.  Push it into a safety
                                  * transition. */
-                                int status = pthread_kill((pthread_t)lispthread->os_thread, SIGPIPE);
+                                int status = pthread_kill((pthread_t)lispthread->os_thread, SIGURG);
                                 if (status)
                                     lose("wake_thread_posix: pthread_kill failed with %d",
                                          status);

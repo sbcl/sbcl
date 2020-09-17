@@ -293,7 +293,7 @@ os_install_interrupt_handlers(void)
 #ifdef LISP_FEATURE_SB_THREAD
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 #  ifdef LISP_FEATURE_SB_THRUPTION
-    ll_install_handler(SIGPIPE, thruption_handler);
+    ll_install_handler(SIGURG, thruption_handler);
 #  endif
 # else
     ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
