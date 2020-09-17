@@ -440,8 +440,7 @@ check_blockables_unblocked_or_lose(sigset_t *sigset)
 #endif
 }
 
-void
-check_blockables_blocked_or_lose(sigset_t *sigset)
+static void assert_blockables_blocked()
 {
 #if !defined(LISP_FEATURE_WIN32)
     /* On Windows, there are no actual signals, but since the win32 port
@@ -462,7 +461,7 @@ check_blockables_blocked_or_lose(sigset_t *sigset)
      * So we merely skip this assertion.
      *   -- DFL, trying to expand on a comment by AK.
      */
-    if (!blockables_blocked_p(sigset))
+    if (!blockables_blocked_p(0))
         lose("blockables unblocked");
 #endif
 }
@@ -781,14 +780,10 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 
 /* Stores the context for gc to scavange and builds fake stack
  * frames. */
-void
-fake_foreign_function_call(os_context_t *context)
+void fake_foreign_function_call_noassert(os_context_t *context)
 {
     int context_index;
     struct thread *thread=arch_os_get_current_thread();
-
-    /* context_index incrementing must not be interrupted */
-    check_blockables_blocked_or_lose(0);
 
 #ifdef reg_ALLOC
 #ifdef LISP_FEATURE_SB_THREAD
@@ -841,6 +836,12 @@ fake_foreign_function_call(os_context_t *context)
      * code. */
     foreign_function_call_active_p(thread) = 1;
 #endif
+}
+void fake_foreign_function_call(os_context_t *context)
+{
+    /* context_index incrementing must not be interrupted */
+    assert_blockables_blocked();
+    fake_foreign_function_call_noassert(context);
 }
 
 /* blocks all blockable signals.  If you are calling from a signal handler,
@@ -978,7 +979,7 @@ interrupt_handle_pending(os_context_t *context)
 
     FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
-    check_blockables_blocked_or_lose(0);
+    assert_blockables_blocked();
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /*
      * (On safepoint builds, there is no gc_blocked_deferrables nor
@@ -1076,7 +1077,7 @@ interrupt_handle_pending(os_context_t *context)
             lose("Trapping to run pending handler while GC in progress.");
         }
 
-        check_blockables_blocked_or_lose(0);
+        assert_blockables_blocked();
 
         /* No GC shall be lost. If SUB_GC triggers another GC then
          * that should be handled on the spot. */
@@ -1142,7 +1143,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
     if (!functionp(handler)) return;
 
-    check_blockables_blocked_or_lose(0);
+    assert_blockables_blocked();
 
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (sigismember(&deferrable_sigset,signal))
@@ -1152,7 +1153,9 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
     were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
     if (were_in_lisp)
     {
-        fake_foreign_function_call(context);
+        // Use the variant of fake_ffc that doesn't do another pthread_sigmask syscall,
+        // as we've just asserted that signals are blocked.
+        fake_foreign_function_call_noassert(context);
     }
 
         /* Once we've decided what to do about contexts in a
@@ -1214,7 +1217,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
 {
     struct thread *thread=arch_os_get_current_thread();
 
-    check_blockables_blocked_or_lose(0);
+    assert_blockables_blocked();
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending");
@@ -1309,7 +1312,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
                                os_context_t *context)
 {
     /* No FP control fixage needed, caller has done that. */
-    check_blockables_blocked_or_lose(0);
+    assert_blockables_blocked();
     check_interrupts_enabled_or_lose(context);
     (*interrupt_low_level_handlers[signal])(signal, info, context);
 }
