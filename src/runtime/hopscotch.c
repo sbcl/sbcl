@@ -159,6 +159,7 @@ static sword_t get_val1(tableptr ht, int index) { return ((int8_t *)ht->values)[
 
 // We can safely use malloc + free because there should be no
 // problem of holding a malloc lock from another thread.
+#include <stdlib.h>
 #define cached_allocate(n) calloc(1,n)
 #define cached_deallocate(ptr,size) free(ptr)
 void hopscotch_init() { }
