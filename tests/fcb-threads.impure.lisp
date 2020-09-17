@@ -55,7 +55,9 @@
 ;;; A variable commissioned by the department of needless and unnecessary redundancy department
 (defglobal *print-greetings-and-salutations* (or #+linux t))
 
+(defglobal *semaphore* nil)
 (sb-alien::define-alien-callback testcb int ((arg1 c-string) (arg2 double))
+  (when *semaphore* (sb-thread:signal-semaphore *semaphore*))
   (let ((cell (assoc sb-thread:*current-thread* *seen-threads*))
         (result (floor (* (length arg1) arg2))))
     (unless cell
@@ -86,16 +88,31 @@
 (defun f (n-trials n-threads n-calls enable-gcing)
   (dotimes (trialno n-trials)
     (setq *n-gcs* 0)
-    (let ((gc-thr
-         (when enable-gcing
+    (setq *semaphore* (sb-thread:make-semaphore))
+    (let ((watchdog-thread
            (sb-thread:make-thread
-            (lambda()
-              (loop
-               (gc)
-               (incf *n-gcs*)
-               (sleep .0001)
-               (sb-thread:barrier (:read))
-               (if (not *keepon*) (return))))))))
+            (lambda ()
+              ;; Each trial, when it works, takes between .01 to .4 sec
+              ;; (which is a tremendous spread),
+              ;; so after 4 seconds (10x more than needed), say it failed.
+              (let ((result
+                     (sb-thread:wait-on-semaphore *semaphore*
+                                                  :n (* n-threads n-calls)
+                                                  :timeout 4)))
+                (if result
+                    (format t "OK!~%")
+                    (sb-sys:os-exit 1))))))
+          (gc-thr
+           (when enable-gcing
+             (sb-thread:make-thread
+              (lambda()
+                (loop
+                 (gc)
+                 (incf *n-gcs*)
+                 (sleep .0001)
+                 (sb-thread:barrier (:read))
+                 (if (not *keepon*) (return)))))))
+          (start (get-internal-real-time)))
       (setq *keepon* t)
       (with-alien ((testfun (function int system-area-pointer int int)
                             :extern "call_thing_from_threads"))
@@ -103,14 +120,18 @@
                      1)))
       (setq *keepon* nil)
       (sb-thread:barrier (:write))
-      #+darwin
-      (with-alien ((count int :extern "sigwait_bug_mitigation_count"))
-        (when (plusp count)
-          (format t "Bug mitigation strategy applied ~D time~:P~%" count)
-          (setf count 0)))
-      (when gc-thr
-        (sb-thread:join-thread gc-thr)
-        (format t "Trial ~d: GC'd ~d times~%" (1+ trialno) *n-gcs*)))))
+      (let ((stop (get-internal-real-time)))
+        #+darwin
+        (with-alien ((count int :extern "sigwait_bug_mitigation_count"))
+          (when (plusp count)
+            (format t "Bug mitigation strategy applied ~D time~:P~%" count)
+            (setf count 0)))
+        (sb-thread:join-thread watchdog-thread)
+        (when gc-thr
+          (sb-thread:join-thread gc-thr)
+          (format t "Trial ~d: GC'd ~d times (Elapsed=~f sec)~%"
+                  (1+ trialno) *n-gcs*
+                  (/ (- stop start) internal-time-units-per-second)))))))
 
 (with-test (:name :call-me-from-1-thread-no-gc
                   :skipped-on (or :interpreter))

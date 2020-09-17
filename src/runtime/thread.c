@@ -723,6 +723,10 @@ static void detach_os_thread(init_thread_data *scribble)
             pthread_setspecific(sigwait_bug_mitigation, (void*)1);
             sigfillset(&pending);
             sigdelset(&pending, SIG_STOP_FOR_GC);
+            // This might hang forever now, because the signal disappears
+            // despite that we just observed it to be pending.
+            // Basically you're screwed one way or the other - either
+            // by a spurious signal or a lost signal.
             sigsuspend(&pending);
             // fprintf(stderr, "Back from sigsuspend\n");
         }
