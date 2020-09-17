@@ -41,10 +41,15 @@ void assert_on_stack(struct thread *th, void *esp);
 /* The thread struct is generated from lisp during genesis and it
  * needs to know the sizes of all its members, but some types may have
  * arbitrary lengths, thus the pointers are stored instead. This
- * structure is used to help allocation of those types, so that the
- * pointers can be later shoved into the thread struct. */
+ * structure is used to help allocation of those types.
+ * This structure is located at an address computable based on a 'struct thread'
+ * so there is no need for a pointer from one to the other */
 struct extra_thread_data
 {
+    // Lisp needs to be able to access this array. KEEP IT AS THE FIRST FIELD!
+    os_context_t* sigcontexts[MAX_INTERRUPTS];
+
+    // Data from here down are never looked at from Lisp.
     struct interrupt_data interrupt_data;
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
     // 'state_sem' is a binary semaphore used just like a mutex.
@@ -80,6 +85,7 @@ struct extra_thread_data
 };
 #define thread_extra_data(thread) \
   ((struct extra_thread_data*)((char*)(thread) + dynamic_values_bytes))
+#define nth_interrupt_context(n,thread) thread_extra_data(thread)->sigcontexts[n]
 #define thread_interrupt_data(thread) thread_extra_data(thread)->interrupt_data
 
 extern struct thread *all_threads;
@@ -222,15 +228,11 @@ extern pthread_key_t specials;
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
 
-/* context 0 is the word immediately before the thread struct, and so on. */
-#define nth_interrupt_context(n,thread) \
-      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(THREAD_HEADER_SLOTS+n+1)]
-
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \
-                            sizeof(struct extra_thread_data) +                 \
-                            (MAX_INTERRUPTS*sizeof(os_context_t*)) +    \
                             dynamic_values_bytes +                      \
+                            (THREAD_HEADER_SLOTS*N_WORD_BYTES) +        \
+                            sizeof (struct extra_thread_data) +         \
                             ALT_STACK_SIZE +                            \
                             THREAD_ALIGNMENT_BYTES +                    \
                             THREAD_CSP_PAGE_SIZE)

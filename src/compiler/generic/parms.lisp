@@ -243,24 +243,13 @@
 ;;; in due turn. You could potentially force a nested GC by consing a lot in
 ;;; a post-GC hook, but if you do that, your hook function is badly behaved
 ;;; and you should fix it.
-;;;
-;;; One more thing: some math is involved because the actual number of context
-;;; pointers is this constant MINUS the number of slots accessible via THREAD-BASE-TN
-;;; at a negative displacement, which happens to be 16.  So this number is adjusted
-;;; up by 16 from the amount that you want it to be.  I should fix the whacky math,
-;;; but at the moment, THREAD_STRUCT_SIZE does not add space for negatively-indexed
-;;; thread slots, it just steals them from the interrupt context pointer array.
 (defconstant max-interrupts
-  #+(and sb-thread (not sb-safepoint)) 24 ; "reasonable" value
-  #+(or (not sb-thread) ; no threads: deep nesting occurs as explained above
-        ;; FIXME: win32 is quite clearly broken if this number is lowered.
-        sb-safepoint) 1024)
+  #+sb-thread    8  ; reasonable value
+  #-sb-thread 1024) ; crazy value
 
 ;;; Thread slots accessed at negative indices relative to struct thread.
-;;; These slots encroach on the interrupt contexts- the maximum that
-;;; can actually be stored is decreased by this amount.
-;;; sb-safepoint puts the safepoint page immediately preceding the
-;;; thread structure, so this trick doesn't work.
+;;; sb-safepoint needs to access one word below thread-base-tn for the
+;;; foreign call safepoint trap word, so this trick doesn't work.
 (defconstant thread-header-slots
   (+ #+(and x86-64 (not sb-safepoint)) 16))
 

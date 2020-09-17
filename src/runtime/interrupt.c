@@ -824,10 +824,8 @@ void fake_foreign_function_call_noassert(os_context_t *context)
     context_index =
         fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
-    if (context_index >= (MAX_INTERRUPTS-THREAD_HEADER_SLOTS)) {
-        lose("maximum interrupt nesting depth (%d) exceeded",
-             MAX_INTERRUPTS-THREAD_HEADER_SLOTS);
-    }
+    if (context_index >= MAX_INTERRUPTS)
+        lose("maximum interrupt nesting depth (%d) exceeded", MAX_INTERRUPTS);
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
                   make_fixnum(context_index + 1),thread);

@@ -949,15 +949,13 @@
 
 (defun nth-interrupt-context (n)
   (declare (muffle-conditions compiler-note))
-  (declare (type (mod #.(- sb-vm:max-interrupts sb-vm::thread-header-slots)) n)
+  (declare (type (mod #.sb-vm:max-interrupts) n)
            (optimize (speed 3) (safety 0)))
-  (let* ((n (- -1 (+ sb-vm::thread-header-slots n)
-               #+sb-safepoint
-               ;; the C safepoint page
-               (/ sb-c:+backend-page-bytes+ n-word-bytes)))
-         (context-pointer
-           (sb-vm::current-thread-offset-sap n)))
-    (sb-alien:sap-alien context-pointer (* os-context-t))))
+  (let ((tls-words (ash (sb-alien:extern-alien "dynamic_values_bytes"
+                                               (sb-alien:unsigned 32))
+                        (- sb-vm:word-shift))))
+    (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
+                        (* os-context-t))))
 
 ;;; With :LINKAGE-TABLE symbols which come from the runtime go through
 ;;; an indirection table, but the debugger needs to know the actual

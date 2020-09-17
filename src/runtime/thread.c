@@ -804,19 +804,19 @@ callback_wrapper_trampoline(
  *   |...|------------------------------------------------------------|
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
- *  |  (*) interrupt contexts and Lisp TLS |   (**) altstack           |
- *  |-----------|--------------------------|------------|--------------|
- *  | interrupt | struct + dynamically     |    extra   |   sigstack   |
- *  | contexts  | thread   assigned TLS    |     data   |              |
- *  +-----------+--------------------------|------------+--------------|
- *  | 1K words  | <--- TLS_SIZE words ---> | ~200 bytes | 32*SIGSTKSZ  |
- *              ^ thread base
+ *  |              Lisp TLS             |   (**) altstack         |
+ *  |-----------------------------------|----------|--------------|
+ *  | thread + struct + dynamically     |   extra  |   sigstack   |
+ *  | header   thread   assigned TLS    |   data   |              |
+ *  +---------+-------------------------|----------+--------------|
+ *  |         | <--- TLS_SIZE words --> |   ~1kb   | 32*SIGSTKSZ  |
+ *            ^ thread base
  *
  *   (1) = control stack start. default size shown
  *   (2) = binding stack start. size = BINDING_STACK_SIZE
  *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
  *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
- *   (5) = per_thread_data.     size = (MAX_INTERRUPTS + TLS_SIZE) words
+ *   (5) = per_thread_data.     size = (THREAD_HEADER_SLOTS+TLS_SIZE) words
  *   (6) = arbitrarily-sized "extra" data and signal stack.
  *
  *   (0) and (1) may coincide; (4) and (5) may coincide
@@ -864,8 +864,8 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
                      BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
-    struct thread *th =
-        (void*)(csp_page + THREAD_CSP_PAGE_SIZE + N_WORD_BYTES*MAX_INTERRUPTS);
+    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE
+                                + THREAD_HEADER_SLOTS*N_WORD_BYTES);
     __attribute((unused)) lispobj* tls = (lispobj*)th;
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     // Out of caution I'm supposing that the last thread to use this memory
