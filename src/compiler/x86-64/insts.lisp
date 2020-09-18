@@ -1738,7 +1738,7 @@
 ;;; The disassembler additionally correctly matches encoding variants
 ;;; that the assembler doesn't generate, for example 4E90 prints as NOP
 ;;; and 4F90 as XCHG RAX, R8 (both because REX.R and REX.X are ignored).
-(define-instruction xchg (segment operand1 operand2)
+(define-instruction xchg (segment maybe-size operand1 &optional operand2)
   ;; This printer matches all patterns that encode exchanging RAX with
   ;; R8, EAX with R8D, or AX with R8W. These consist of the opcode #x90
   ;; with a REX prefix with REX.B = 1, and possibly the #x66 prefix.
@@ -1751,7 +1751,16 @@
   ;; Register/Memory with Register.
   (:printer reg-reg/mem ((op #b1000011)))
   (:emitter
-   (let ((size (matching-operand-size operand1 operand2)))
+   ;; Not parsing a :LOCK prefix is ok, because:
+   ;;   "If a memory operand is referenced, the processor’s locking protocol is automatically
+   ;;    implemented for the duration of the exchange operation, regardless of the presence
+   ;;    or absence of the LOCK prefix or of the value of the IOPL."
+   (let ((size (cond (operand2
+                      (aver (is-size-p maybe-size))
+                      maybe-size)
+                     (t
+                      (setq operand2 operand1 operand1 maybe-size)
+                      (matching-operand-size operand1 operand2)))))
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte))
                          (gpr-p something)
