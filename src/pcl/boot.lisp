@@ -1649,48 +1649,6 @@ bootstrapping.
            (let ,rebindings
              ,@body)))))
 
-;;; CMUCL comment (Gerd Moellmann):
-;;;
-;;; The standard says it's an error if CALL-NEXT-METHOD is called with
-;;; arguments, and the set of methods applicable to those arguments is
-;;; different from the set of methods applicable to the original
-;;; method arguments.  (According to Barry Margolin, this rule was
-;;; probably added to ensure that before and around methods are always
-;;; run before primary methods.)
-;;;
-;;; This could be optimized for the case that the generic function
-;;; doesn't have hairy methods, does have standard method combination,
-;;; is a standard generic function, there are no methods defined on it
-;;; for COMPUTE-APPLICABLE-METHODS and probably a lot more of such
-;;; preconditions.  That looks hairy and is probably not worth it,
-;;; because this check will never be fast.
-(defun %check-cnm-args (cnm-args orig-args method-cell)
-  ;; 1. Check for no arguments.
-  (when cnm-args
-    (let* ((gf (method-generic-function (car method-cell)))
-           (nreq (generic-function-nreq gf)))
-      (declare (fixnum nreq))
-      ;; 2. Requirement arguments pairwise: if all are EQL, the applicable
-      ;; methods must be the same. This takes care of the relatively common
-      ;; case of twiddling with &KEY arguments without being horribly
-      ;; expensive.
-      (unless (do ((orig orig-args (cdr orig))
-                   (args cnm-args (cdr args))
-                   (n nreq (1- nreq)))
-                  ((zerop n) t)
-                (unless (and orig args (eql (car orig) (car args)))
-                  (return nil)))
-        ;; 3. Only then do the full check.
-        (let ((omethods (compute-applicable-methods gf orig-args))
-              (nmethods (compute-applicable-methods gf cnm-args)))
-          (unless (equal omethods nmethods)
-            (error "~@<The set of methods ~S applicable to argument~P ~
-                    ~{~S~^, ~} to call-next-method is different from ~
-                    the set of methods ~S applicable to the original ~
-                    method argument~P ~{~S~^, ~}.~@:>"
-                   nmethods (length cnm-args) cnm-args omethods
-                   (length orig-args) orig-args)))))))
-
 ;; FIXME: replacing this entire mess with DESTRUCTURING-BIND would correct
 ;; problems similar to those already solved by a correct implementation
 ;; of DESTRUCTURING-BIND, such as incorrect binding order:
@@ -2073,7 +2031,9 @@ bootstrapping.
 
   gf-info-static-c-a-m-emf
   (gf-info-c-a-m-emf-std-p t)
-  gf-info-fast-mf-p)
+  gf-info-fast-mf-p
+
+  gf-info-cnm-checker)
 
 (declaim (sb-ext:freeze-type arg-info))
 

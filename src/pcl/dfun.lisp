@@ -1697,6 +1697,15 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defun update-dfun (generic-function &optional dfun cache info)
   (let ((early-p (early-gf-p generic-function)))
     (flet ((update ()
+             ;; If GENERIC-FUNCTION has a CALL-NEXT-METHOD argument
+             ;; checker, the methods of the checker (the checker is a
+             ;; generic function, each method caches a computation for
+             ;; a combination of original and C-N-M argument classes)
+             ;; must be re-computed.
+             (when (eq **boot-state** 'complete)
+               (let ((checker (gf-info-cnm-checker (gf-arg-info generic-function))))
+                 (when checker
+                   (remove-methods checker))))
              ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
              ;; access it, and so that it's there for eg. future cache updates.
              (set-dfun generic-function dfun cache info)

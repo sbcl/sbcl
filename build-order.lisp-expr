@@ -763,6 +763,7 @@
   "src/pcl/fsc"
   "src/pcl/methods"
   "src/pcl/fixup"
+  "src/pcl/call-next-method"
   "src/pcl/defcombin"
   "src/pcl/ctypes"
   "src/pcl/env"

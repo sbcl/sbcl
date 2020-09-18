@@ -10,6 +10,9 @@ changes relative to sbcl-2.0.8:
     so the signal is deliverable to user code as is customary. Ignoring the
     signal - in lieu of the OS default of process termination - is obtainable
     via (SB-SYS:ENABLE-INTERRUPT SB-UNIX:SIGPIPE :IGNORE).
+  * optimization: CALL-NEXT-METHOD with supplied arguments in required
+    positions is now faster if the supplied arguments are EQL to the original
+    arguments and also if they are not EQL.
 
 changes in sbcl-2.0.8 relative to sbcl-2.0.7:
   * platform support:
