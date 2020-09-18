@@ -177,6 +177,10 @@
 ;;;     Note these spaces grow from low to high addresses.
 (defvar *binding-stack-pointer*)
 
+;;; Bit indices into *CPU-FEATURE-BITS*
+(defconstant cpu-has-ymm-registers   1)
+(defconstant cpu-has-popcnt          2)
+
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
     #+(and immobile-space (not sb-thread)) function-layout
@@ -184,7 +188,7 @@
      ;; interrupt handling
     #-sb-thread *pseudo-atomic-bits*     ; ditto
     #-sb-thread *binding-stack-pointer* ; ditto
-    *cpuid-fn1-ecx*)
+    *cpu-feature-bits*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

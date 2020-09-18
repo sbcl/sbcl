@@ -40,7 +40,6 @@
 #define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
 
-unsigned int cpuid_fn1_ecx;
 int avx_supported = 0, avx2_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
@@ -77,6 +76,7 @@ static void xgetbv(unsigned *eax, unsigned *edx)
 void tune_asm_routines_for_microarch(void)
 {
     unsigned int eax, ebx, ecx, edx;
+    unsigned int cpuid_fn1_ecx = 0;
 
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
     if (eax >= 1) { // see if we can execute basic id function 1
@@ -94,7 +94,13 @@ void tune_asm_routines_for_microarch(void)
             }
         }
     }
-    SetSymbolValue(CPUID_FN1_ECX, (lispobj)make_fixnum(cpuid_fn1_ecx), 0);
+    int our_cpu_feature_bits = 0;
+    // avx2_supported gets copied into bit 1 of *CPU-FEATURE-BITS*
+    if (avx2_supported) our_cpu_feature_bits |= 1;
+    // POPCNT = ECX bit 23, which gets copied into bit 2 in *CPU-FEATURE-BITS*
+    if (cpuid_fn1_ecx & (1<<23)) our_cpu_feature_bits |= 2;
+    SetSymbolValue(CPU_FEATURE_BITS, make_fixnum(our_cpu_feature_bits), 0);
+
     // I don't know if this works on Windows
 #ifndef _MSC_VER
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
@@ -113,6 +119,7 @@ void tune_asm_routines_for_microarch(void)
 void untune_asm_routines_for_microarch(void)
 {
     asm_routine_poke(VECTOR_FILL_T, 0x12, 0xEB); // Change JL to JMP
+    SetSymbolValue(CPU_FEATURE_BITS, 0, 0);
 }
 
 #ifndef _WIN64

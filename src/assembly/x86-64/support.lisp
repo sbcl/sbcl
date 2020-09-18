@@ -9,6 +9,11 @@
 
 (in-package "SB-VM")
 
+(defun test-cpu-feature (feature-bit)
+  (multiple-value-bind (byte bit)
+      (floor (+ feature-bit n-fixnum-tag-bits) n-byte-bits)
+    (inst test :byte (static-symbol-value-ea '*cpu-feature-bits* byte) (ash 1 bit))))
+
 (defun invoke-asm-routine (inst routine vop)
   (declare (ignorable vop))
   (let ((fixup

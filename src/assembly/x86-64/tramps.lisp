@@ -137,8 +137,7 @@
 (define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
   #+avx2
   (progn
-    (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
-    (inst test :byte (ea temp-reg-tn) 1)
+    (test-cpu-feature cpu-has-ymm-registers)
     (inst jmp :z call-preserving-xmm-only)
     (with-registers-preserved (lisp ymm :except r11-tn)
       (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
@@ -156,8 +155,7 @@
   ()
   #+avx2
   (progn
-    (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
-    (inst test :byte (ea temp-reg-tn) 1)
+    (test-cpu-feature cpu-has-ymm-registers)
     (inst jmp :z call-preserving-xmm-only)
     (with-registers-preserved (lisp ymm :except r11-tn)
       (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
@@ -173,8 +171,7 @@
 (define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
   #+avx2
   (progn
-    (inst mov temp-reg-tn (ea (make-fixup "avx2_supported" :foreign-dataref)))
-    (inst test :byte (ea temp-reg-tn) 1)
+    (test-cpu-feature cpu-has-ymm-registers)
     (inst jmp :z call-preserving-xmm-only)
     (with-registers-preserved (lisp ymm :except r11-tn)
       (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1

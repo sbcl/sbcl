@@ -301,11 +301,7 @@
                  (inst not rdx)
                  POSITIVE))
            (unless (memq :popcnt *backend-subfeatures*)
-             ;; POPCNT = ECX bit 23
-             (multiple-value-bind (byte bit) (floor (+ 23 n-fixnum-tag-bits)
-                                                    n-byte-bits)
-               (inst test :byte
-                     (static-symbol-value-ea '*cpuid-fn1-ecx* byte) (ash 1 bit)))
+             (test-cpu-feature cpu-has-popcnt)
              (inst jmp :z slow))
            ;; Intel's implementation of POPCNT on some models treats it as
            ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
