@@ -1752,7 +1752,7 @@
   (:printer reg-reg/mem ((op #b1000011)))
   (:emitter
    ;; Not parsing a :LOCK prefix is ok, because:
-   ;;   "If a memory operand is referenced, the processor’s locking protocol is automatically
+   ;;   "If a memory operand is referenced, the processor's locking protocol is automatically
    ;;    implemented for the duration of the exchange operation, regardless of the presence
    ;;    or absence of the LOCK prefix or of the value of the IOPL."
    (let ((size (cond (operand2
