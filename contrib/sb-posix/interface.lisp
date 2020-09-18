@@ -510,11 +510,9 @@ not supported."
 (define-call "mlockall" int minusp (flags int))
 (define-call "munlockall" int minusp)
 
-#-win32
-(define-call "getpagesize" int minusp)
-#+win32
-;;; KLUDGE: This could be taken from GetSystemInfo
-(export (defun getpagesize () 4096))
+(export 'getpagesize)
+(declaim (inline getpagesize))
+(defun getpagesize () (extern-alien "os_reported_page_size" (unsigned 32)))
 
 ;;; passwd database
 ;; The docstrings are copied from the descriptions in SUSv3,

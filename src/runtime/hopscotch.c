@@ -186,7 +186,7 @@ char* cached_alloc[N_CACHED_ALLOCS];
 void hopscotch_init() // Called once on runtime startup, from gc_init().
 {
     // Prefill the cache with 2 entries, each the size of a kernel page.
-    int n_bytes_per_slice = getpagesize();
+    int n_bytes_per_slice = os_reported_page_size;
     int n_bytes_total = N_CACHED_ALLOCS * n_bytes_per_slice;
     char* mem = hopscotch_allocate(n_bytes_total);
     gc_assert(mem);

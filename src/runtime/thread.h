@@ -219,7 +219,8 @@ extern pthread_key_t specials;
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 # define THREAD_CSP_PAGE_SIZE 0
 #else
-# define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
+extern int os_reported_page_size;
+# define THREAD_CSP_PAGE_SIZE os_reported_page_size
 #endif
 
 #if defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
@@ -228,14 +229,14 @@ extern pthread_key_t specials;
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
 
-#define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
-                            ALIEN_STACK_SIZE +                          \
-                            dynamic_values_bytes +                      \
-                            (THREAD_HEADER_SLOTS*N_WORD_BYTES) +        \
-                            sizeof (struct extra_thread_data) +         \
-                            ALT_STACK_SIZE +                            \
-                            THREAD_ALIGNMENT_BYTES +                    \
-                            THREAD_CSP_PAGE_SIZE)
+/* As a helpful reminder of how this calculation arises, the summands should
+ * correspond, in the correct order, to the picture in thread.c */
+#define THREAD_STRUCT_SIZE \
+  (THREAD_ALIGNMENT_BYTES + \
+   thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
+   THREAD_CSP_PAGE_SIZE + \
+   (THREAD_HEADER_SLOTS*N_WORD_BYTES) + dynamic_values_bytes + \
+   sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
 
 /* sigaltstack() - "Signal stacks are automatically adjusted
  * for the direction of stack growth and alignment requirements." */
