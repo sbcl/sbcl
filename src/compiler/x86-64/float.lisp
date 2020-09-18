@@ -284,7 +284,7 @@
                       (,sc
                        (move y x))
                       (,stack-sc
-                       (if (= (tn-offset fp) esp-offset)
+                       (if (= (tn-offset fp) rsp-offset)
                            (let* ((offset (tn-byte-offset y))
                                   (ea (ea offset fp)))
                              ,@(ecase format

@@ -130,7 +130,7 @@
              (if (eql val 0) (zeroize y) (inst mov y val)))
            (move y x)))
       ((control-stack)
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            ;; C-call
            (storew (encode-value-if-immediate x) fp (tn-offset y))
            ;; Lisp stack
@@ -378,7 +378,7 @@
       ((signed-reg unsigned-reg)
        (move y x))
       ((signed-stack unsigned-stack)
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-word-arg :move-arg

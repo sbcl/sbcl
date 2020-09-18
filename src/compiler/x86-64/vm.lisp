@@ -54,7 +54,7 @@
   (define-gprs t *qword-regs* +qword-register-names+
     #("RAX" "RCX" "RDX" "RBX" "RSP" "RBP" "RSI" "RDI"
       "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15"))
-  (define-gprs t *dword-regs* +dword-register-names+
+  (define-gprs nil *dword-regs* +dword-register-names+
     #("EAX" "ECX" "EDX"  "EBX"  "ESP"  "EBP"  "ESI"  "EDI"
       "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D"))
   (define-gprs nil *word-regs* +word-register-names+

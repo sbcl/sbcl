@@ -380,7 +380,9 @@ EXPERIMENTAL: Interface subject to change."
                           (samples-max-samples samples)))
               (with-alien ((scp (* os-context-t) :local scp))
                 (let* ((pc-ptr (sb-vm:context-pc scp))
-                       (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
+                       (fp (sb-vm::context-register scp
+                                                    #+x86-64 #.sb-vm::rbp-offset
+                                                    #+x86 #.sb-vm::ebp-offset)))
                   ;; foreign code might not have a useful frame
                   ;; pointer in ebp/rbp, so make sure it looks
                   ;; reasonable before walking the stack

@@ -108,7 +108,7 @@
       (character-reg
        (move y x))
       (character-stack
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-character-arg :move-arg

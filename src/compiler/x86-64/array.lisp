@@ -296,7 +296,7 @@
          (:arg-types ,type positive-fixnum (:constant (integer 0 0)))
          (:results (result :scs (unsigned-reg) :from (:argument 0)))
          (:result-types positive-fixnum)
-         (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
+         (:temporary (:sc unsigned-reg :offset rcx-offset) ecx)
          (:generator 20
            (aver (zerop offset))
            (move ecx index)
@@ -346,7 +346,7 @@
          (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg) word-index)
          (:temporary (:sc unsigned-reg) old)
-         (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
+         (:temporary (:sc unsigned-reg :offset rcx-offset) ecx)
          (:generator 25
            (aver (zerop offset))
            (move word-index index)

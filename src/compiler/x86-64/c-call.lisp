@@ -73,8 +73,8 @@
 
 (defun result-reg-offset (slot)
   (ecase slot
-    (0 eax-offset)
-    (1 edx-offset)))
+    (0 rax-offset)
+    (1 rdx-offset)))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
@@ -124,7 +124,7 @@
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
-      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number esp-offset)
+      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number rsp-offset)
               (* (arg-state-stack-frame-size arg-state) n-word-bytes)
               (arg-tns)
               (invoke-alien-type-method :result-tn

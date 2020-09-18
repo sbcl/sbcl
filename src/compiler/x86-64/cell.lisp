@@ -937,13 +937,13 @@
                  (new-hi :scs (descriptor-reg any-reg) :target ecx))
           (:results (result-lo :scs (descriptor-reg any-reg))
                     (result-hi :scs (descriptor-reg any-reg)))
-          (:temporary (:sc unsigned-reg :offset eax-offset
+          (:temporary (:sc unsigned-reg :offset rax-offset
                        :from (:argument 2) :to (:result 0)) eax)
-          (:temporary (:sc unsigned-reg :offset edx-offset
+          (:temporary (:sc unsigned-reg :offset rdx-offset
                        :from (:argument 3) :to (:result 0)) edx)
-          (:temporary (:sc unsigned-reg :offset ebx-offset
+          (:temporary (:sc unsigned-reg :offset rbx-offset
                        :from (:argument 4) :to (:result 0)) ebx)
-          (:temporary (:sc unsigned-reg :offset ecx-offset
+          (:temporary (:sc unsigned-reg :offset rcx-offset
                        :from (:argument 5) :to (:result 0)) ecx)
           (:generator 7
            (generate-dblcas ,memory-operand

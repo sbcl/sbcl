@@ -3470,7 +3470,8 @@ register."
   (let ((ocfp (int-sap (sb-vm:context-register
                         scp
                         #-(or x86 x86-64) sb-vm::ocfp-offset
-                        #+(or x86 x86-64) sb-vm::ebx-offset)))
+                        #+x86-64 sb-vm::rbx-offset
+                        #+x86 sb-vm::ebx-offset)))
         (nargs (boxed-context-register scp sb-vm::nargs-offset))
         (reg-arg-offsets '#.sb-vm::*register-arg-offsets*)
         (results nil))
