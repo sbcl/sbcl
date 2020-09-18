@@ -219,7 +219,6 @@ extern pthread_key_t specials;
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 # define THREAD_CSP_PAGE_SIZE 0
 #else
-extern int os_reported_page_size;
 # define THREAD_CSP_PAGE_SIZE os_reported_page_size
 #endif
 

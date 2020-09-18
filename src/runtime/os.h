@@ -233,4 +233,6 @@ extern char *os_get_runtime_executable_path();
    void os_sem_destroy(os_sem_t *sem);
 #endif
 
+extern int os_reported_page_size;
+
 #endif
