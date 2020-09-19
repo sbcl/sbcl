@@ -201,7 +201,12 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     } else
 #endif
     {
+        os_vm_address_t requested = addr;
         addr = mmap(addr, len, protection, flags, -1, 0);
+        if (requested && requested != addr && !(attributes & MOVABLE)) {
+            return 0;
+        }
+
     }
 
     if (addr == MAP_FAILED) {

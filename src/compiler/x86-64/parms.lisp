@@ -135,7 +135,7 @@
 ;;; run under the default 512M data size limit.
 
 #-linux
-(!gencgc-space-setup #x20000000
+(!gencgc-space-setup #-darwin #x20000000 #+darwin #x50000000
                      #-win32 :read-only-space-size #-win32 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
