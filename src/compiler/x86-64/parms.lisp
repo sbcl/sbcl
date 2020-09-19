@@ -124,7 +124,7 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-#+linux
+#+(or linux darwin)
 (!gencgc-space-setup #x50000000
                      :read-only-space-size 0
                      :fixedobj-space-size #.(* 30 1024 1024)
@@ -134,8 +134,8 @@
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
 ;;; run under the default 512M data size limit.
 
-#-linux
-(!gencgc-space-setup #-darwin #x20000000 #+darwin #x50000000
+#-(or linux darwin)
+(!gencgc-space-setup #x20000000
                      #-win32 :read-only-space-size #-win32 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
