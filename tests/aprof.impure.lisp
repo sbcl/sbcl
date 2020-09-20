@@ -11,19 +11,21 @@
 
 #-(and x86-64 sb-thread) (sb-ext:exit :code 104) ;; not implemented elsewhere
 
+(defstruct fruitbasket x y z)
 (with-test (:name :aprof-smoketest-struct
+                  :skipped-on :darwin
             ;; reverse-engineering the allocation instructions fails but should not
             :fails-on (not :immobile-space))
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" ()
-                (declare (inline sb-thread:make-mutex)
+                (declare (inline make-fruitbasket)
                          (optimize sb-c::instrument-consing))
-                (loop repeat 50 collect (sb-thread:make-mutex))))
+                (loop repeat 50 collect (make-fruitbasket))))
             :stream nil)))
     (assert (= nbytes
-               (* 50 (+ (sb-vm::primitive-object-size (sb-thread:make-mutex))
+               (* 50 (+ (sb-vm::primitive-object-size (make-fruitbasket))
                         (* 2 sb-vm:n-word-bytes))))))) ; cons cells
 
 (with-test (:name :aprof-smoketest-non-constant-size-vector

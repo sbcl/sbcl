@@ -13,6 +13,7 @@
                                :allow-failure t)))
   (assert (not (constantp '(block 1 10)))))
 
+(sb-ext:defglobal *some-global-var* nil)
 (with-test (:name (constantp progv))
   (assert
    (not (constantp '(progv '(*s*) nil *s*))))
@@ -31,8 +32,9 @@
   (assert
    (not (constantp '(progv '(pi) '(10) 10))))
   (assert
-   (not (constantp '(progv '(sb-c::**world-lock**) '(10) 10)))))
+   (not (constantp '(progv '(*some-global-var*) '(10) 10)))))
 
+(declaim (muffle-conditions style-warning)) ; unknown type ABC
 (with-test (:name (constantp the))
   (assert
    (not (constantp '(the (satisfies eval) 10))))
