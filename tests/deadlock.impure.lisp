@@ -1,5 +1,142 @@
 #-sb-thread (sb-ext:exit :code 104)
 
+(import '(sb-thread:join-thread
+          sb-thread:make-mutex
+          sb-thread:make-semaphore
+          sb-thread:make-thread
+          sb-thread:signal-semaphore
+          sb-thread:thread-deadlock
+          sb-thread:wait-on-semaphore
+          sb-thread:with-mutex))
+
+(with-test (:name :deadlock-detection.1)
+  (loop
+    repeat 1000
+    do (flet ((test (ma mb sa sb)
+                (lambda ()
+                  (handler-case
+                      (with-mutex (ma)
+                        (signal-semaphore sa)
+                        (wait-on-semaphore sb)
+                        (with-mutex (mb)
+                          :ok))
+                    (thread-deadlock (e)
+                      ;; (assert (plusp (length ...))) prevents
+                      ;; flushing.
+                      (assert (plusp (length (princ-to-string e))))
+                      :deadlock)))))
+         (let* ((m1 (make-mutex :name "M1"))
+                (m2 (make-mutex :name "M2"))
+                (s1 (make-semaphore :name "S1"))
+                (s2 (make-semaphore :name "S2"))
+                (t1 (make-thread (test m1 m2 s1 s2) :name "T1"))
+                (t2 (make-thread (test m2 m1 s2 s1) :name "T2")))
+           ;; One will deadlock, and the other will then complete normally.
+           (let ((res (list (join-thread t1)
+                            (join-thread t2))))
+             (assert (or (equal '(:deadlock :ok) res)
+                         (equal '(:ok :deadlock) res))))))))
+
+(with-test (:name :deadlock-detection.2)
+  (let* ((m1 (make-mutex :name "M1"))
+         (m2 (make-mutex :name "M2"))
+         (s1 (make-semaphore :name "S1"))
+         (s2 (make-semaphore :name "S2"))
+         (t1 (make-thread
+              (lambda ()
+                (with-mutex (m1)
+                  (signal-semaphore s1)
+                  (wait-on-semaphore s2)
+                  (with-mutex (m2)
+                    :ok)))
+              :name "T1")))
+    (prog (err)
+     :retry
+       (handler-bind ((thread-deadlock
+                       (lambda (e)
+                         (unless err
+                           ;; Make sure we can print the condition
+                           ;; while it's active
+                           (let ((*print-circle* nil))
+                             (setf err (princ-to-string e)))
+                           (go :retry)))))
+         (when err
+           (sleep 1))
+         (assert (eq :ok (with-mutex (m2)
+                           (unless err
+                             (signal-semaphore s2)
+                             (wait-on-semaphore s1)
+                             (sleep 1))
+                           (with-mutex (m1)
+                             :ok)))))
+       (assert (stringp err)))
+    (assert (eq :ok (join-thread t1)))))
+
+(with-test (:name :deadlock-detection.3)
+  (let* ((m1 (make-mutex :name "M1"))
+         (m2 (make-mutex :name "M2"))
+         (s1 (make-semaphore :name "S1"))
+         (s2 (make-semaphore :name "S2"))
+         (t1 (make-thread
+              (lambda ()
+                (with-mutex (m1)
+                  (signal-semaphore s1)
+                  (wait-on-semaphore s2)
+                  (with-mutex (m2)
+                    :ok)))
+              :name "T1")))
+    ;; Currently we don't consider it a deadlock
+    ;; if there is a timeout in the chain.
+    (assert (eq :deadline
+                (handler-case
+                    (with-mutex (m2)
+                      (signal-semaphore s2)
+                      (wait-on-semaphore s1)
+                      (sleep 1)
+                      (sb-sys:with-deadline (:seconds 0.1)
+                        (with-mutex (m1)
+                          :ok)))
+                  (sb-sys:deadline-timeout ()
+                    :deadline)
+                  (thread-deadlock ()
+                    :deadlock))))
+    (assert (eq :ok (join-thread t1)))))
+
+(with-test (:name (:deadlock-detection :interrupts)
+            :broken-on :win32)
+  (let* ((m1 (sb-thread:make-mutex :name "M1"))
+         (m2 (sb-thread:make-mutex :name "M2"))
+         (t1-can-go (sb-thread:make-semaphore :name "T1 can go"))
+         (t2-can-go (sb-thread:make-semaphore :name "T2 can go"))
+         (t1 (sb-thread:make-thread
+              (lambda ()
+                (sb-thread:with-mutex (m1)
+                  (sb-thread:wait-on-semaphore t1-can-go)
+                  :ok1))
+              :name "T1"))
+         (t2 (sb-thread:make-thread
+              (lambda ()
+                (sb-ext:wait-for (eq t1 (sb-thread:mutex-owner m1)))
+                (sb-thread:with-mutex (m1 :wait-p t)
+                  (sb-thread:wait-on-semaphore t2-can-go)
+                  :ok2))
+              :name "T2")))
+    (sb-ext:wait-for (eq m1 (sb-thread::thread-waiting-for t2)))
+    (sb-thread:interrupt-thread t2 (lambda ()
+                                     (sb-thread:with-mutex (m2 :wait-p t)
+                                       (sb-ext:wait-for
+                                        (eq m2 (sb-thread::thread-waiting-for t1)))
+                                       (sb-thread:signal-semaphore t2-can-go))))
+    (sb-ext:wait-for (eq t2 (sb-thread:mutex-owner m2)))
+    (sb-thread:interrupt-thread t1 (lambda ()
+                                     (sb-thread:with-mutex (m2 :wait-p t)
+                                       (sb-thread:signal-semaphore t1-can-go))))
+    ;; both threads should finish without a deadlock or deadlock
+    ;; detection error
+    (let ((res (list (sb-thread:join-thread t1)
+                     (sb-thread:join-thread t2))))
+      (assert (equal '(:ok1 :ok2) res)))))
+
 (with-test (:name (:deadlock-detection :gc))
   ;; To semi-reliably trigger the error (in SBCL's where)
   ;; it was present you had to run this for > 30 seconds,

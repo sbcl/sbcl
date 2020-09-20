@@ -873,41 +873,6 @@
           (list d1 d2 d3 i))
     (force-output)))
 
-(with-test (:name (:deadlock-detection :interrupts)
-            :broken-on :win32)
-  (let* ((m1 (sb-thread:make-mutex :name "M1"))
-         (m2 (sb-thread:make-mutex :name "M2"))
-         (t1-can-go (sb-thread:make-semaphore :name "T1 can go"))
-         (t2-can-go (sb-thread:make-semaphore :name "T2 can go"))
-         (t1 (sb-thread:make-thread
-              (lambda ()
-                (sb-thread:with-mutex (m1)
-                  (sb-thread:wait-on-semaphore t1-can-go)
-                  :ok1))
-              :name "T1"))
-         (t2 (sb-thread:make-thread
-              (lambda ()
-                (sb-ext:wait-for (eq t1 (sb-thread:mutex-owner m1)))
-                (sb-thread:with-mutex (m1 :wait-p t)
-                  (sb-thread:wait-on-semaphore t2-can-go)
-                  :ok2))
-              :name "T2")))
-    (sb-ext:wait-for (eq m1 (sb-thread::thread-waiting-for t2)))
-    (sb-thread:interrupt-thread t2 (lambda ()
-                                     (sb-thread:with-mutex (m2 :wait-p t)
-                                       (sb-ext:wait-for
-                                        (eq m2 (sb-thread::thread-waiting-for t1)))
-                                       (sb-thread:signal-semaphore t2-can-go))))
-    (sb-ext:wait-for (eq t2 (sb-thread:mutex-owner m2)))
-    (sb-thread:interrupt-thread t1 (lambda ()
-                                     (sb-thread:with-mutex (m2 :wait-p t)
-                                       (sb-thread:signal-semaphore t1-can-go))))
-    ;; both threads should finish without a deadlock or deadlock
-    ;; detection error
-    (let ((res (list (sb-thread:join-thread t1)
-                     (sb-thread:join-thread t2))))
-      (assert (equal '(:ok1 :ok2) res)))))
-
 (with-test (:name :spinlock-api)
   (handler-bind ((warning #'error))
     (destructuring-bind (with make get release)
