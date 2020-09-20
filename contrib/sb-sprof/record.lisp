@@ -200,7 +200,7 @@ EXPERIMENTAL: Interface subject to change."
   (etypecase info
     ;; Assembly routines or foreign functions don't move around, so
     ;; we've stored a raw PC
-    ((or null sb-kernel:code-component string)
+    ((or null sb-kernel:code-component string symbol)
      pc-or-offset)
     ;; Lisp functions might move, so we've stored a offset from the
     ;; start of the code component.
