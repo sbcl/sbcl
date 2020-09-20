@@ -439,7 +439,7 @@
             (setf (aref replacements fdefn-index) nil))))
       (let ((stored-locs (if any-ambiguous
                              (make-array fdefns-count :initial-element nil))))
-        (sb-thread::with-system-mutex (sb-c::*static-linker-lock*)
+        (with-system-mutex (sb-c::*static-linker-lock*)
           (dolist (fixup fixups)
             (binding* ((fdefn-index (car fixup) :exit-if-null)
                        (offset (cdr fixup))

@@ -313,7 +313,7 @@
   (let ((table (specializer-method-table self))
         (object (specializer-object self)))
     (if create
-        (sb-thread::with-system-mutex ((hash-table-lock table))
+        (with-system-mutex ((hash-table-lock table))
           (ensure-gethash object table (cons nil nil)))
         ;; FIXME: in the CREATE case we're locking, because we might be inserting,
         ;; and must ensure mutual exclusion with other writers. Fine,

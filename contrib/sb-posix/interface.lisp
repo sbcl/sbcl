@@ -346,7 +346,7 @@ not supported."
          (sb-impl::finalizer-thread-stop)
          ;; Acquiring sb-thread::*make-thread-lock* prevents creation
          ;; of new threads.
-         (sb-thread::with-system-mutex (sb-thread::*make-thread-lock*)
+         (sb-int:with-system-mutex (sb-thread::*make-thread-lock*)
            ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
            ;; Do that now so that the forked process has only the main thread
            ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.

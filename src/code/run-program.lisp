@@ -165,7 +165,7 @@
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
 (defmacro with-active-processes-lock (() &body body)
-  `(sb-thread::with-system-mutex (*active-processes-lock*)
+  `(with-system-mutex (*active-processes-lock*)
      ,@body))
 
 (deftype process-status ()
@@ -871,7 +871,7 @@ Users Manual for details about the PROCESS structure.
                        (with-open-pty ((pty-name pty-stream) (pty cookie))
                          (setf (values child #+win32 handle)
                                #+win32
-                               (sb-thread::with-system-mutex (*spawn-lock*)
+                               (with-system-mutex (*spawn-lock*)
                                  (sb-win32::mswin-spawn
                                   progname
                                   args
@@ -879,7 +879,7 @@ Users Manual for details about the PROCESS structure.
                                   search environment-vec directory))
                                #-win32
                                (with-args (args-vec args)
-                                 (sb-thread::with-system-mutex (*spawn-lock*)
+                                 (with-system-mutex (*spawn-lock*)
                                    (spawn progname args-vec
                                           stdin stdout stderr
                                           (if search 1 0)

@@ -342,7 +342,7 @@ EXPERIMENTAL: Interface subject to change."
       ;; Don't flood the system with more interrupts if the last
       ;; set is still being delivered.
       (unless (sb-thread:mutex-owner lock)
-        (sb-thread::with-system-mutex (lock)
+        (with-system-mutex (lock)
           (dolist (thread (profiled-threads))
             (sb-thread:with-deathlok (thread c-thread)
               (unless (= c-thread 0)
@@ -374,7 +374,7 @@ EXPERIMENTAL: Interface subject to change."
                  ;; partially to blame?
                  (or (not (eq :cpu profiling)) (profiled-thread-p self)))
         (with-code-pages-pinned (:dynamic)
-         (sb-thread::with-system-mutex (*profiler-lock*)
+         (with-system-mutex (*profiler-lock*)
           (let ((samples *samples*)
                 ;; Don't touch the circularity hash-table
                 *print-circle*)

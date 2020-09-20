@@ -24,7 +24,7 @@
   ;; To think about why it is OK to leave GC enabled, consider that
   ;; neither GC nor another thread will examine static space above the
   ;; current value of *STATIC-SPACE-FREE-POINTER*.
-  (or (sb-thread::with-system-mutex (*allocator-mutex*)
+  (or (with-system-mutex (*allocator-mutex*)
         (let* ((pointer *static-space-free-pointer*)
                (nbytes (pad-data-block (+ words vector-data-offset)))
                (new-pointer (sap+ pointer nbytes)))
@@ -278,7 +278,7 @@
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
-  (sb-thread::with-system-mutex (*allocator-mutex* :without-gcing t)
+  (with-system-mutex (*allocator-mutex* :without-gcing t)
    (unless (zerop varyobj-holes)
      ;; If deferred sweep needs to happen, do so now.
      ;; Concurrency could potentially be improved here: at most one thread

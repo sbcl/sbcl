@@ -509,7 +509,7 @@
     (or (let ((result (lookup (car *fdefns*))))
           (when (fdefn-p result) result))
         (when constructor ; double-check w/lock before inserting
-          (sb-thread::with-system-mutex (*fdefns-lock*)
+          (with-system-mutex (*fdefns-lock*)
             (let* ((fdefns *fdefns*)
                    (vector (car fdefns))
                    (result (lookup vector)))

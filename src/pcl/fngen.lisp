@@ -94,7 +94,7 @@
 
 (defun ensure-fgen (test gensyms generator generator-lambda system)
   (let ((table *fgens*))
-    (sb-thread::with-system-mutex ((hash-table-lock table))
+    (with-system-mutex ((hash-table-lock table))
       (let ((old (gethash test table)))
         (cond (old
                (setf (fgen-generator old) generator)
@@ -108,7 +108,7 @@
 (defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
          (table *fgens*)
-         (fgen (sb-thread::with-system-mutex ((hash-table-lock table))
+         (fgen (with-system-mutex ((hash-table-lock table))
                  (gethash test table))))
     (if fgen
         (fgen-generator fgen)

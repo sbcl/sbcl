@@ -68,14 +68,14 @@
     "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 HOST-NAME may also be an IP address in dotted quad notation or some other
 weird stuff - see gethostbyname(3) for the details."
-    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
       (make-host-ent (sockint::gethostbyname host-name))))
 
   (defun get-host-by-address (address)
     "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
  (integer 0 255), or signals a NAME-SERVICE-ERROR. See gethostbyaddr(3)
  for details."
-    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
       (sockint::with-in-addr packed-addr ()
         (let ((addr-vector (coerce address 'vector)))
           (loop for i from 0 below (length addr-vector)

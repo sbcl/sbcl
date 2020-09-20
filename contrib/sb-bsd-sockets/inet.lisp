@@ -134,7 +134,7 @@ a list of protocol aliases"
                       (go :error)
                       (return-from getprotobyname (protoent-to-values ent))))))
          #+sb-thread
-         (sb-thread::with-system-mutex (**getprotoby-lock**)
+         (sb-int:with-system-mutex (**getprotoby-lock**)
            (get-it))
          #-sb-thread
          (get-it))
