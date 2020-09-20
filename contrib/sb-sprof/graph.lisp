@@ -266,8 +266,7 @@
        (multiple-value-bind (start end)
            (code-bounds info)
          (values
-          (%make-node :name (or (sb-disassem::find-assembler-routine start)
-                                (format nil "~a" info))
+          (%make-node :name (format nil "~a" info)
                       :debug-info info
                       :start-pc-or-offset start
                       :end-pc-or-offset end)
@@ -277,12 +276,11 @@
               (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
               (start-offset (sb-c::compiled-debug-fun-start-pc cdf))
               (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
-              (component (sb-di::compiled-debug-fun-component info))
-              (start-pc (code-start component)))
+              (component (sb-di::compiled-debug-fun-component info)))
          ;; Call graphs are mostly useless unless we somehow
          ;; distinguish a gazillion different (LAMBDA ())'s.
          (when (equal name '(lambda ()))
-           (setf name (format nil "Unknown component: #x~x" start-pc)))
+           (setf name (format nil "~a in ~a" name component)))
          (values (%make-node :name (clean-name name)
                              :debug-info info
                              :start-pc-or-offset start-offset
@@ -291,6 +289,9 @@
       (sb-di::debug-fun
        (%make-node :name (clean-name (sb-di::debug-fun-name info))
                    :debug-info info))
+      (symbol
+       (%make-node :name (string info)
+                   :debug-info sb-fasl:*assembler-routines*))
       (t
        (%make-node :name (coerce info 'string)
                    :debug-info info)))))

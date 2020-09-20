@@ -257,14 +257,17 @@ EXPERIMENTAL: Interface subject to change."
 (defun debug-info (pc)
   (declare (type system-area-pointer pc)
            (muffle-conditions compiler-note))
-  (let ((code (sb-di::code-header-from-pc pc)))
+  (let ((code (sb-di::code-header-from-pc pc))
+        (pc-int (sap-int pc)))
     (cond ((not code)
            (let ((name (sap-foreign-symbol pc)))
              (if name
                  (values (format nil "foreign function ~a" name)
-                         (sap-int pc)
-                         :foreign)
-                 (values nil (sap-int pc) :foreign))))
+                         pc-int :foreign)
+                 (values nil pc-int :foreign))))
+          ((eq code sb-fasl:*assembler-routines*)
+           (values (sb-disassem::find-assembler-routine pc-int)
+                   pc-int :asm-routine))
           (t
            (let* ((code-header-len (* (sb-kernel:code-header-words code)
                                       sb-vm:n-word-bytes))
@@ -277,15 +280,15 @@ EXPERIMENTAL: Interface subject to change."
                   (di (unless (typep (sb-kernel:%code-debug-info code)
                                      'sb-c::compiled-debug-info)
                         (return-from debug-info
-                          (values code (sap-int pc)))))
-                  (pc-offset (- (sap-int pc)
+                          (values code pc-int nil))))
+                  (pc-offset (- pc-int
                                 (- (sb-kernel:get-lisp-obj-address code)
                                    sb-vm:other-pointer-lowtag)
                                 code-header-len))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
              #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
-                    (values code (sap-int pc) nil))
+                    (values code pc-int nil))
                    (df
                     ;; The code component might be moved by the GC. Store
                     ;; a PC offset, and reconstruct the data in

@@ -121,7 +121,7 @@
                (accrued-percent (samples-percent call-graph accrued-count)))
           (incf total-count count)
           (incf total-percent percent)
-          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  ~s~%"
+          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  "
                   (incf i)
                   count
                   percent
@@ -129,8 +129,10 @@
                   accrued-percent
                   total-count
                   total-percent
-                  (or (node-call-count node) "-")
-                  (node-name node))
+                  (or (node-call-count node) "-"))
+          (if (stringp (node-name node))
+              (format t "~a~%" (node-name node))
+              (format t "~s~%" (node-name node)))
           (finish-output)))
       (print-separator)
       (format t "~&     ~6d ~5,1f~36a elsewhere~%"
@@ -145,8 +147,12 @@
     (do-vertices (node call-graph)
       (when (cycle-p node)
         (flet ((print-info (indent index count percent name)
-                 (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
-                         count percent indent name index)))
+                 (format t "~&~6d ~5,1f ~11@t ~V@t  "
+                         count percent indent)
+                 (if (stringp name)
+                     (format t "~a" name)
+                     (format t "~s" name))
+                 (format t " [~d]~%" index)))
           (print-separator)
           (format t "~&~6d ~5,1f                ~a...~%"
                   (node-count node)
@@ -168,8 +174,12 @@
     (flet ((find-call (from to)
              (find to (node-edges from) :key #'call-vertex))
            (print-info (indent index count percent name)
-             (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
-                     count percent indent name index)))
+             (format t "~&~6d ~5,1f ~11@t ~V@t  "
+                     count percent indent)
+             (if (stringp name)
+                 (format t "~a" name)
+                 (format t "~s" name))
+             (format t " [~d]~%" index)))
       (format t "~&                               Callers~%")
       (format t "~&                 Total.     Function~%")
       (format t "~& Count     %  Count     %      Callees~%")
@@ -185,13 +195,15 @@
                         (samples-percent call-graph (call-count call))
                         (node-name caller))))
         ;; Print the node itself.
-        (format t "~&~6d ~5,1f ~6d ~5,1f   ~s [~d]~%"
+        (format t "~&~6d ~5,1f ~6d ~5,1f   "
                 (node-count node)
                 (samples-percent call-graph (node-count node))
                 (node-accrued-count node)
-                (samples-percent call-graph (node-accrued-count node))
-                (node-name node)
-                (node-index node))
+                (samples-percent call-graph (node-accrued-count node)))
+        (if (stringp (node-name node))
+            (format t "~a" (node-name node))
+            (format t "~s" (node-name node)))
+        (format t " [~d]~%" (node-index node))
         ;; Print callees.
         (do-edges (call called node)
           (print-info 4 (node-index called)
