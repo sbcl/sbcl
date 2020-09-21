@@ -157,12 +157,20 @@ static struct gc_state {
 
     /* Current GC phase */
     gc_phase_t phase;
-} gc_state;
+} gc_state
+#ifdef LISP_FEATURE_UNIX
+           = { PTHREAD_MUTEX_INITIALIZER,
+               { PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER,
+                 PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER, PTHREAD_COND_INITIALIZER,
+                 PTHREAD_COND_INITIALIZER },
+               { 0, 0, 0, 0, 0, 0, 0 }, NULL, NULL, GC_NONE }
+#endif
+    ;
 
 void safepoint_init()
 {
-    int i;
 # ifdef LISP_FEATURE_WIN32
+    int i;
     extern void alloc_gc_page(void);
     alloc_gc_page();
     for (i=GC_NONE; i<GC_NPHASES; ++i)
@@ -170,9 +178,6 @@ void safepoint_init()
     InitializeCriticalSection(&gc_state.lock);
 #else
     os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
-    for (i=GC_NONE; i<GC_NPHASES; ++i)
-        pthread_cond_init(&gc_state.phase_cond[i], NULL);
-    pthread_mutex_init(&gc_state.lock, NULL);
 #endif
     gc_state.phase = GC_NONE;
 }
