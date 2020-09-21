@@ -63,7 +63,7 @@ static os_vm_size_t max_allocation_size;
 
 #if defined LISP_FEATURE_FREEBSD
 #include <sys/sysctl.h>
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#ifdef LISP_FEATURE_SB_FUTEX
 #include <sys/umtx.h>
 #endif
 
@@ -453,7 +453,7 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX)
+#ifdef LISP_FEATURE_SB_FUTEX
 int
 futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 {
@@ -500,8 +500,7 @@ static void dragonfly_init()
 }
 
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) \
-    && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#ifdef LISP_FEATURE_SB_FUTEX
 int
 futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 {

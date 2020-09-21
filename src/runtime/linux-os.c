@@ -62,7 +62,7 @@ int personality (unsigned long);
 #include <sys/personality.h>
 #endif
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#ifdef LISP_FEATURE_SB_FUTEX
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
@@ -265,7 +265,7 @@ futex_wake(int *lock_word, int n)
 void os_init(char __attribute__((unused)) *argv[],
              char __attribute__((unused)) *envp[])
 {
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#ifdef LISP_FEATURE_SB_FUTEX
     futex_init();
 #endif
 
