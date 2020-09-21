@@ -933,8 +933,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->alien_stack_start=
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     set_binding_stack_pointer(th,th->binding_stack_start);
-    th->this=th;
-    th->os_thread=0;
+    th->this = th;
+    th->os_kernel_tid = 0;
+    th->os_thread = 0;
     // Once allocated, the allocation profiling buffer sticks around.
     // If present and enabled, assign into the new thread.
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
