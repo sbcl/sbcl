@@ -453,8 +453,7 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) \
-    && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX)
 int
 futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 {
@@ -462,30 +461,24 @@ futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
     int ret;
 
     if (sec < 0)
-        ret = umtx_wait((void *)lock_word, oldval, NULL);
+        ret = _umtx_op((void *)lock_word, UMTX_OP_WAIT, oldval, 0, 0);
     else {
         timeout.tv_sec = sec;
         timeout.tv_nsec = usec * 1000;
-        ret = umtx_wait((void *)lock_word, oldval, &timeout);
+        ret = _umtx_op((void *)lock_word, UMTX_OP_WAIT, oldval, (void*)sizeof timeout, &timeout);
     }
-
-    switch (ret) {
-    case 0:
-        return 0;
-    case ETIMEDOUT:
-        return 1;
-    case EINTR:
-        return 2;
-    default:
-        /* EWOULDBLOCK and others, need to check the lock */
-        return -1;
-    }
+    if (ret == 0) return 0;
+    // technically we would not need to check any of the error codes if the lisp side
+    // could just avoid looping if there is no time remaining.
+    if (errno == ETIMEDOUT) return 1;
+    if (errno == EINTR) return 2;
+    return -1;
 }
 
 int
 futex_wake(int *lock_word, int n)
 {
-    return umtx_wake((void *)lock_word, n);
+    return _umtx_op((void *)lock_word, UMTX_OP_WAKE, n, 0, 0);
 }
 #endif
 #endif /* __FreeBSD__ */

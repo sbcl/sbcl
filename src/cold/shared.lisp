@@ -244,7 +244,7 @@
                           target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
-        (when (featurep '(:and :sb-thread :linux) target-feature-list)
+        (when (featurep '(:and :sb-thread (:or :linux :freebsd)) target-feature-list)
           (pushnew :sb-futex target-feature-list))
         (when (featurep '(:and :sb-thread (:not :win32)) target-feature-list)
           (push :pauseless-threadstart target-feature-list))

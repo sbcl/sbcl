@@ -48,23 +48,34 @@
    (assert (not (thread-alive-p thread)))))
 
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
+;;; BUT: Such a claim is without much merit. Even if a wait is not "interrupted",
+;;; the very definition of spurious wakeup is that return from the wait happens
+;;; for ANY reason - users of condition variables must ALWAYS anticipate needing
+;;; to loop over a condition-wait.
 
 (with-test (:name :without-interrupts+condition-wait
             :skipped-on (not :sb-thread)
             :broken-on :win32)
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
+         (actually-wakeup nil)
          (thread (make-thread (lambda ()
                                 (sb-sys:without-interrupts
                                   (with-mutex (lock)
-                                    (condition-wait queue lock)))))))
-    (sleep 1)
+                                    (loop
+                                     (condition-wait queue lock)
+                                     (if actually-wakeup (return)))))))))
+    (sleep .25)
     (assert (thread-alive-p thread))
+    ;; this is the supposed "interrupt that doesn't interrupt",
+    ;; but it _is_ permitted to wake the condition variable.
     (terminate-thread thread)
-    (sleep 1)
+    (sleep .5)
     (assert (thread-alive-p thread))
+    (setq actually-wakeup t)
+    (sb-thread:barrier (:write))
     (condition-notify queue)
-    (sleep 1)
+    (sleep .25)
     (assert (not (thread-alive-p thread)))))
 
 ;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS

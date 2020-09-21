@@ -28,6 +28,9 @@
   `(sb-ext:truly-the
     (unsigned-byte 32)
     (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-kernel-tid-slot))))
+;; using the pthread_id seems fine, the umtx interface uses word-sized values
+#+freebsd
+(defmacro my-kernel-thread-id () `(thread-primitive-thread *current-thread*))
 
 ;;; CAS Lock
 ;;;
@@ -435,14 +438,15 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     (export 'futex-wake) ; for naughty users only
     (declaim (inline futex-wait futex-wake))
 
-    (defun futex-wait (word old to-sec to-usec)
-      (with-alien ((%wait (function int unsigned (unsigned 32) long unsigned-long)
+    (defun futex-wait (word-addr oldval to-sec to-usec)
+      (with-alien ((%wait (function int unsigned
+                                    #+freebsd unsigned #-freebsd (unsigned 32)
+                                    long unsigned-long)
                           :extern "futex_wait"))
         (with-interrupts
-         (alien-funcall %wait word old to-sec to-usec))))
+         (alien-funcall %wait word-addr oldval to-sec to-usec))))
 
-    (define-alien-routine "futex_wake"
-        int (word unsigned) (n unsigned-long))))
+    (define-alien-routine "futex_wake" int (word-addr unsigned) (n unsigned-long))))
 
 (defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
   (with-unique-names (n-thread n-lock new n-timeout)
