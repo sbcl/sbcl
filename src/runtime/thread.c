@@ -202,6 +202,9 @@ int thread_wait_until_not(int undesired_state,
 #elif defined __linux__
 // gettid() was added in glibc 2.30 but we support older glibc
 int sb_GetTID() { return syscall(SYS_gettid); }
+#elif defined __DragonFly__
+#include <sys/lwp.h>
+lwpid_t sb_GetTID() { return lwp_gettid(); }
 #else
 #define sb_GetTID() 0
 #endif
