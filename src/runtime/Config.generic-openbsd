@@ -16,12 +16,3 @@ ifdef LISP_FEATURE_SB_THREAD
 CFLAGS += -pthread
 OS_LIBS += -pthread
 endif
-
-ifeq ($(DISABLE_PIE),yes)
-ifneq ($(shell $(CC) -dM -E - < /dev/null 2>/dev/null | grep -e '__clang__'),)
-CFLAGS += -fno-pie
-LINKFLAGS += -nopie
-LDFLAGS += -nopie
-__LDFLAGS__ += -nopie
-endif
-endif

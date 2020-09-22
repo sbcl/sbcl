@@ -47,29 +47,7 @@ include genesis/Makefile.features
 # symlink to Config-foo.
 # Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
 # OS_SRC, OS_LIBS, OS_CLEAN_FILES
-DISABLE_PIE=yes
 include Config
-
-# Disable PIE by default.
-# We mostly do not care any more where the C code is located, and would
-# prefer that C toolchain default be used, however, the limited address
-# space in 32-bit architectures make it tricky to permit the .text segment
-# to be placed arbitrarily if there is any risk of not being able to
-# allocate the lisp readonly and static spaces on account of collision.
-ifeq ($(DISABLE_PIE),yes)
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
-CFLAGS += -fno-pie
-LINKFLAGS += -no-pie
-LDFLAGS += -no-pie
-__LDFLAGS__ += -no-pie
-endif
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
-CFLAGS += -fno-pie
-LINKFLAGS += -nopie
-LDFLAGS += -nopie
-__LDFLAGS__ += -nopie
-endif
-endif
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coalesce.c coreparse.c    \
 	dynbind.c funcall.c gc-common.c globals.c hopscotch.c           \

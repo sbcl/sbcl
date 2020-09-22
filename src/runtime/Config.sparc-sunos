@@ -14,10 +14,6 @@ CFLAGS += -DSVR4 -D_REENTRANT
 ASFLAGS = -g -DSVR4 -Wa,-xarch=v8plus
 #LINKFLAGS += -v
 NM = nm -t x -p 
-# This next line has nothing to do with disabling PIE. It has only to
-# do with the problem that "grep" on the build machine I'm using can't
-# parse "-e '[^f]nopie" and so gets an error in GNUmakefile.
-DISABLE_PIE=no
 
 ASSEM_SRC = sparc-assem.S
 ARCH_SRC = sparc-arch.c
