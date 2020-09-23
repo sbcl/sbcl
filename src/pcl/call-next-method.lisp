@@ -93,15 +93,26 @@
                 (unless (eql (car orig) (car args))
                   (return nil)))
         ;; 3. Only then make a cnm args checker and do the full check.
-        (let ((result (%use-cnm-checker gf nreq cnm-args orig-args)))
-          (when result
-            (destructuring-bind (cnm-methods . orig-methods) result
-              (error "~@<The set of methods ~S applicable to argument~P ~
-                      ~{~S~^, ~} to call-next-method is different from ~
-                      the set of methods ~S applicable to the original ~
-                      method argument~P ~{~S~^, ~}.~@:>"
-                     cnm-methods (length cnm-args) cnm-args
-                     orig-methods (length orig-args) orig-args))))))))
+        ;; Disabled until problems with EQL specializers and method
+        ;; "shadowing" are worked out.
+        #+(or) (let ((result (%use-cnm-checker gf nreq cnm-args orig-args)))
+                 (when result
+                   (destructuring-bind (cnm-methods . orig-methods) result
+                     (error "~@<The set of methods ~S applicable to argument~P ~
+                             ~{~S~^, ~} to call-next-method is different from ~
+                             the set of methods ~S applicable to the original ~
+                             method argument~P ~{~S~^, ~}.~@:>"
+                            cnm-methods (length cnm-args) cnm-args
+                            orig-methods (length orig-args) orig-args))))
+        (let ((orig-methods (compute-applicable-methods gf orig-args))
+              (cnm-methods (compute-applicable-methods gf cnm-args)))
+          (unless (equal orig-methods cnm-methods)
+           (error "~@<The set of methods ~S applicable to argument~P ~
+                   ~{~S~^, ~} to call-next-method is different from ~
+                   the set of methods ~S applicable to the original ~
+                   method argument~P ~{~S~^, ~}.~@:>"
+                   cnm-methods (length cnm-args) cnm-args
+                   orig-methods (length orig-args) orig-args)))))))
 
 ;;; CALL-NEXT-METHOD argument checker application
 
