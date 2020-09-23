@@ -14,6 +14,36 @@
 ;;; CALL-NEXT-METHOD arguments are only fully checked on high safety.
 (declaim (optimize (safety 3)))
 
+;;; Utilities
+;;;
+;;; It makes sense to cover all permutations of arguments since the
+;;; order of calls can affect the construction of the CALL-NEXT-METHOD
+;;; argument checker.
+
+;;; Assumes unique elements in SEQUENCE.
+(defun map-permutations (function sequence)
+  (labels ((rec (partial-permutation remainder)
+             (if (null remainder)
+                 (funcall function partial-permutation)
+                 (map nil (lambda (element)
+                            (rec (list* element partial-permutation)
+                                 (remove element remainder)))
+                      remainder))))
+    (rec '() sequence)))
+
+;;; RESET-FUNCTION is used to reset the generic function between
+;;; permutations so caches are built up from scratch according to the
+;;; following call sequence.
+(defun map-test-case-permutations (reset-function check-function test-cases)
+  (map-permutations
+   (lambda (permutation)
+     (funcall reset-function)
+     (map nil (lambda (arguments-and-expected)
+                (destructuring-bind (arguments expected) arguments-and-expected
+                  (funcall check-function arguments expected)))
+          permutation))
+   test-cases))
+
 ;;; Make sure CALL-NEXT-METHOD calls that result in different sets of
 ;;; applicable methods signal errors.
 
@@ -28,10 +58,19 @@
     (list 'cons (call-next-method (rest thing)))))
 
 (with-test (:name (call-next-method :different-applicable-methods))
-  (assert (equal (different-applicable-methods '(1 2 3)) '(cons (list (t (3))))))
-  (assert-error (different-applicable-methods '(1 2)))
-  (assert-error (different-applicable-methods '(1)))
-  (assert (equal (different-applicable-methods nil) '(null nil))))
+  (map-test-case-permutations
+   (lambda ()
+     (sb-pcl::update-dfun #'different-applicable-methods ))
+   (lambda (arguments expected)
+     (flet ((do-it ()
+              (apply #'different-applicable-methods arguments)))
+       (case expected
+         (error (assert-error (do-it)))
+         (t (assert (equal (do-it) expected))))))
+   '((((1 2 3)) (cons (list (t (3)))))
+     (((1 2))   error)
+     (((1))     error)
+     ((nil)     (null nil)))))
 
 ;;; Test calling the next method with non-EQL arguments of the same
 ;;; class.
@@ -47,6 +86,49 @@
     (list 'integer (call-next-method (1+ x)))))
 
 (with-test (:name (call-next-method :same-applicable-methods :non-eql-arguments))
-  (assert (equal (non-eql-arguments 1) '(integer (real (number (t 4))))))
-  (assert (equal (non-eql-arguments 1/2) '(real (number (t 5/2)))))
-  (assert (equal (non-eql-arguments #C(1 2)) '(number (t #C(2 2))))))
+  (map-test-case-permutations
+   (lambda ()
+     (sb-pcl::update-dfun #'non-eql-arguments))
+   (lambda (arguments expected)
+     (assert (equal (apply #'non-eql-arguments arguments) expected)))
+   '(((1)       (integer (real (number (t 4)))))
+     ((1/2)     (real (number (t 5/2))))
+     ((#C(1 2)) (number (t #C(2 2)))))))
+
+;;; Test EQL specializers which always require a dedicated method in
+;;; the CALL-NEXT-METHOD argument checker.
+
+(defgeneric eql-specializer (x)
+  (:method ((x t))
+    (list 't x))
+  (:method ((x number))
+    (list 'number (call-next-method (1+ x))))
+  (:method ((x real))
+    (list 'real (call-next-method (1+ x))))
+  (:method ((x integer))
+    (list 'integer (call-next-method (1+ x))))
+  (:method ((x (eql 4)))
+    (list 'eql 4 (call-next-method (1+ x))))
+  (:method ((x (eql 5)))
+    (list 'eql 5 (call-next-method (1+ x)))))
+
+(with-test (:name (call-next-method :eql-specializer))
+  (map-test-case-permutations
+   (lambda ()
+     (sb-pcl::update-dfun #'eql-specializer))
+   (lambda (arguments expected)
+     (flet ((do-it ()
+              (apply #'eql-specializer arguments)))
+       (case expected
+         (error (assert-error (do-it)))
+         (t (assert (equal (do-it) expected))))))
+   '(((0)       (integer (real (number (t 3)))))
+     ((1)       error)
+     ;; ((2)       error) ; too slow otherwise (exponential scaling)
+     ((3)       error)
+     ;; ((4)       error)
+     ((5)       error)
+     ((6)       (integer (real (number (t 9)))))
+     ((1/2)     (real (number (t 5/2))))
+     ((#C(1 2)) (number (t #C(2 2))))
+     ((:foo)    (t :foo)))))
