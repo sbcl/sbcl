@@ -885,7 +885,7 @@ static void* compute_heap_inverse(boolean keep_leaves,
     // Add one pointer due to inability to use the first
     // two words of the scratchpad.
     uword_t scratchpad_min_size = (1 + ss.n_pointers) * 2 * sizeof (uint32_t);
-    int pagesize = getpagesize();
+    int pagesize = os_reported_page_size;
     uword_t scratchpad_size = ALIGN_UP(scratchpad_min_size, pagesize);
     ss.scratchpad.base = os_allocate(scratchpad_size);
     gc_assert(ss.scratchpad.base);
