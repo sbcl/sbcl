@@ -1061,12 +1061,12 @@ handle_csp_safepoint_violation(lispobj fun, lispobj *args, int nargs);
 int
 handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 {
+    struct thread *self = arch_os_get_current_thread();
+    
     FSHOW_SIGNAL((stderr, "fault_address = %p, sp = %p, &csp = %p\n",
                   fault_address,
-                  GC_SAFEPOINT_TRAP_ADDR,
-                  arch_os_get_current_thread()->csp_around_foreign_call));
+                  GC_SAFEPOINT_TRAP_ADDR, csp_around_foreign_call(self)));
 
-    struct thread *self = arch_os_get_current_thread();
 
     if (fault_address == (os_vm_address_t) GC_SAFEPOINT_TRAP_ADDR) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
