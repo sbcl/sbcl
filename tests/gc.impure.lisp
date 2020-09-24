@@ -460,3 +460,38 @@
     (sb-sys:with-pinned-objects (rest)
       (sb-ext:gc :full t)
       (assert (and (equal list rest) t)))))
+
+(defun use-up-thread-region ()
+  ;; cons until the thread-local allocation buffer uses up a page
+  (loop
+   (let* ((c (cons 1 2))
+          (end (+ (sb-kernel:get-lisp-obj-address c)
+                  (- sb-vm:list-pointer-lowtag)
+                  (* 2 sb-vm:n-word-bytes))))
+     (when (zerop (logand end (1- sb-vm:gencgc-card-bytes)))
+       (return)))))
+(defglobal *go* nil)
+
+#+sb-thread
+(with-test (:name :c-call-save-p)
+  (let* ((fun (compile nil '(lambda (a b c d e f g h i j k l m)
+		             (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+		             (setq *go* t)
+		             #+win32
+		             (alien-funcall (extern-alien "Sleep" (function void int))  300)
+		             #-win32
+		             (alien-funcall (extern-alien "sb_nanosleep" (function void int int)) 0 300000000)
+		             (values a b c d e f g h i j k l m))))
+	 (thr (sb-thread:make-thread (lambda ()
+				       (let ((args #1=(list (LIST 'A) (LIST 'B) (LIST 'C)
+							    (LIST 'D) (LIST 'E) (LIST 'F) (LIST 'G)
+							    (LIST 'H) (LIST 'I) (LIST 'J) (LIST 'K)
+							    (LIST 'L) (LIST 'M))))
+					 (use-up-thread-region)
+					 (apply fun
+						args))))))
+    (loop (sb-thread:barrier (:read))
+          (if *go* (return))
+          (sleep .1))
+    (gc)
+    (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))

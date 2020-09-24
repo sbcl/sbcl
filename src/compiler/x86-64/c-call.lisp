@@ -246,6 +246,12 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun destroyed-c-registers ()
+    ;; Safepoints do not save interrupt contexts to be scanned during
+    ;; GCing, it only looks at the stack, so if a register isn't
+    ;; spilled it won't be visible to the GC.
+    #+sb-safepoint
+    '((:save-p t))
+    #-sb-safepoint
     (let ((gprs (list rcx-offset rdx-offset
                       #-win32 rsi-offset #-win32 rdi-offset
                       r8-offset r9-offset r10-offset r11-offset))
