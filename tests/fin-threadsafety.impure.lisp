@@ -39,28 +39,28 @@
   ;; against setting the funcallable-instance function to a closure
   ;; (because the code and lexenv were set separately).
   (let ((fun (sb-kernel:%make-funcallable-instance 0))
+        (stop nil)
         (condition nil))
     (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
     (flet ((changer ()
-             (loop (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
+             (loop (sb-thread:barrier (:read))
+                   (when stop (return))
+                   (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
                    (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-two)))
            (test ()
-             (handler-case (loop (funcall fun))
+             (handler-case (loop (sb-thread:barrier (:read))
+                                 (when stop (return))
+                                 (funcall fun))
                (serious-condition (c) (setf condition c)))))
-      (let ((changer (make-thread #'changer))
-            (test (make-thread #'test)))
-        (handler-case
-            (progn
+      (let ((changer (make-thread #'changer :name "changer"))
+            (test (make-thread #'test :name "test")))
               ;; The two closures above are fairly carefully crafted
               ;; so that if given the wrong lexenv they will tend to
               ;; do some serious damage, but it is of course difficult
               ;; to predict where the various bits and pieces will be
               ;; allocated.  Five seconds failed fairly reliably on
               ;; both my x86 and x86-64 systems.  -- CSR, 2006-09-27.
-              (sb-ext:with-timeout 5
-                (wait-for-threads (list test)))
-              (error "~@<test thread got condition:~2I~_~A~@:>" condition))
-          (sb-ext:timeout ()
-            (terminate-thread changer)
-            (terminate-thread test)
-            (wait-for-threads (list changer test))))))))
+        (sleep 5)
+        (setq stop t)
+        (sb-thread:barrier (:write))
+        (wait-for-threads (list changer test))))))
