@@ -285,15 +285,8 @@ static inline gc_phase_t gc_phase_next(gc_phase_t old) {
 static inline boolean
 thread_blocks_gc(struct thread *thread)
 {
-    /* Note that, unlike thread_may_gc(), this may be called on
-     * another thread, and that other thread may be in any state */
-
-    boolean inhibit = (read_TLS(GC_INHIBIT,thread)==T)||
-        (read_TLS(IN_WITHOUT_GCING,thread)==IN_WITHOUT_GCING);
-
-    return inhibit;
+    return read_TLS(GC_INHIBIT,thread)==T;
 }
-
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
    flag (Lisp Stack Top) of the thread `p'. The flag may be modified
    if `writable' is true.
@@ -491,17 +484,6 @@ thread_register_gc_trigger()
     }
 }
 
-static inline int
-thread_may_gc()
-{
-    /* Thread may gc if all of these are true:
-     * 1) GC_INHIBIT == NIL  (outside of protected part of without-gcing)
-     * Note that we are in a safepoint here, which is always outside of PA. */
-
-    CURRENT_THREAD_VAR(self);
-    return (read_TLS(GC_INHIBIT, self) == NIL);
-}
-
 #ifdef LISP_FEATURE_SB_THRUPTION
 static inline int
 thread_may_thrupt(os_context_t *ctx)
@@ -652,7 +634,7 @@ check_pending_gc(os_context_t *ctx)
          (read_TLS(GC_PENDING,self) == NIL))) {
         write_TLS(IN_SAFEPOINT,NIL,self);
     }
-    if (thread_may_gc() && (read_TLS(IN_SAFEPOINT, self) == NIL)) {
+    if (!thread_blocks_gc(self) && (read_TLS(IN_SAFEPOINT, self) == NIL)) {
         if (read_TLS(GC_PENDING, self) == T) {
             lispobj gc_happened = NIL;
 
@@ -688,8 +670,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     WITH_GC_STATE_LOCK {
         if (gc_state.phase == GC_FLIGHT &&
             read_TLS(GC_PENDING,self)==T &&
-            !thread_blocks_gc(self) &&
-            thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
+            !thread_blocks_gc(self) && read_TLS(IN_SAFEPOINT,self)!=T) {
             /* Some thread (possibly even this one) that does not have
              * GC_INHIBIT set has noticed that a GC is warranted and
              * advanced the phase to GC_FLIGHT, arming the GSP trap,
@@ -902,8 +883,6 @@ void gc_start_the_world()
     odxprint(safepoints,"%s","start the world");
     WITH_GC_STATE_LOCK {
         gc_state.collector = NULL;
-        write_TLS(IN_WITHOUT_GCING,IN_WITHOUT_GCING,
-                  arch_os_get_current_thread());
         gc_advance(GC_NONE,GC_COLLECT);
     }
 }

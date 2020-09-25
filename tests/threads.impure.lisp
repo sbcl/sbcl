@@ -787,7 +787,7 @@
              (+ sb-vm:+highest-normal-generation+ 2))
   (pushnew :verify-gens *features*))
 
-(with-test (:name :backtrace :broken-on (or :verify-gens (and :x86 :win32)))
+(with-test (:name :backtrace :broken-on :verify-gens)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even

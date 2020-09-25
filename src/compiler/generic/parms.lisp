@@ -193,10 +193,6 @@
     ,@'(*current-catch-block*
         *current-unwind-protect-block*)
 
-    ;; sb-safepoint in addition to accessing this symbol via TLS,
-    ;; uses the symbol itself as a value. Kinda weird.
-    #+(and sb-safepoint sb-thread) *in-without-gcing*
-
     #+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
     ;; stack pointers
