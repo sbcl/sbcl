@@ -385,6 +385,7 @@
                                               (name (and entry
                                                          (sb-kernel:%fun-name entry))))
                                          (and (symbolp name)
+                                              (symbol-package name)
                                               (eq (nth-value 1 (find-symbol (symbol-name name)
                                                                             (symbol-package name)))
                                                   :external))))
