@@ -475,21 +475,21 @@
 #+sb-thread
 (with-test (:name :c-call-save-p)
   (let* ((fun (compile nil '(lambda (a b c d e f g h i j k l m)
-		             (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
-		             (setq *go* t)
-		             #+win32
-		             (alien-funcall (extern-alien "Sleep" (function void int))  300)
-		             #-win32
-		             (alien-funcall (extern-alien "sb_nanosleep" (function void int int)) 0 300000000)
-		             (values a b c d e f g h i j k l m))))
-	 (thr (sb-thread:make-thread (lambda ()
-				       (let ((args #1=(list (LIST 'A) (LIST 'B) (LIST 'C)
-							    (LIST 'D) (LIST 'E) (LIST 'F) (LIST 'G)
-							    (LIST 'H) (LIST 'I) (LIST 'J) (LIST 'K)
-							    (LIST 'L) (LIST 'M))))
-					 (use-up-thread-region)
-					 (apply fun
-						args))))))
+                             (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+                             (setq *go* t)
+                             #+win32
+                             (alien-funcall (extern-alien "Sleep" (function void int))  300)
+                             #-win32
+                             (alien-funcall (extern-alien "sb_nanosleep" (function void int int)) 0 300000000)
+                             (values a b c d e f g h i j k l m))))
+         (thr (sb-thread:make-thread (lambda ()
+                                       (let ((args #1=(list (LIST 'A) (LIST 'B) (LIST 'C)
+                                                            (LIST 'D) (LIST 'E) (LIST 'F) (LIST 'G)
+                                                            (LIST 'H) (LIST 'I) (LIST 'J) (LIST 'K)
+                                                            (LIST 'L) (LIST 'M))))
+                                         (use-up-thread-region)
+                                         (apply fun
+                                                args))))))
     (loop (sb-thread:barrier (:read))
           (if *go* (return))
           (sleep .1))

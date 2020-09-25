@@ -1062,7 +1062,7 @@ int
 handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 {
     struct thread *self = arch_os_get_current_thread();
-    
+
     FSHOW_SIGNAL((stderr, "fault_address = %p, sp = %p, &csp = %p\n",
                   fault_address,
                   GC_SAFEPOINT_TRAP_ADDR, csp_around_foreign_call(self)));
