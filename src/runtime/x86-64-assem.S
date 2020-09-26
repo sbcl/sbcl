@@ -38,17 +38,12 @@
 
 // Produce position-independent code.
 // macOS does not like the general way we do this, so do something different.
-// I don't know about win32, so conservatively exclude that too.
-#if !defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_WIN32
-#define PIC_CALL(x) x@PLT
-#define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
-#else
-#define PIC_CALL(x) x
 #ifdef LISP_FEATURE_DARWIN
+#define PIC_CALL(x) x
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
 #else
-#define LOAD_PIC_VAR(x,dest) mov GNAME(x), dest
-#endif
+#define PIC_CALL(x) x@PLT
+#define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
