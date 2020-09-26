@@ -38,7 +38,7 @@
 
 // Produce position-independent code.
 // macOS does not like the general way we do this, so do something different.
-#ifdef LISP_FEATURE_DARWIN
+#if defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_WIN32)
 #define PIC_CALL(x) x
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
 #else
