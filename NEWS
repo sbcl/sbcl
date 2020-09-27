@@ -10,6 +10,17 @@ changes relative to sbcl-2.0.8:
     so the signal is deliverable to user code as is customary. Ignoring the
     signal - in lieu of the OS default of process termination - is obtainable
     via (SB-SYS:ENABLE-INTERRUPT SB-UNIX:SIGPIPE :IGNORE).
+  * platform support:
+    ** a number of obsolete portability layers (particularly on the Windows
+       platform) have been removed in favour of direct calling of the native
+       interfaces.
+    ** RUN-PROGRAM now accepts a :WINDOW argument to control whether a
+       subprocess window should be displayed.  (Thanks to Luis Borges de
+       Oliveira)
+    ** the use of futexes implied by :SB-FUTEX is now implemented on FreeBSD.
+  * bug fix: SB-SPROF can distinguish between SBCL-internal assembly routines.
+  * bug fix: SB-SPROF has better output in its reports for anonymous
+    functions.
   * optimization: CALL-NEXT-METHOD with supplied arguments in required
     positions is now faster if the supplied arguments are EQL to the original
     arguments.
