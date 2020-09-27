@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.8:
+changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture
     support has been removed.
   * minor incompatible change: the compiler signals a warning at
