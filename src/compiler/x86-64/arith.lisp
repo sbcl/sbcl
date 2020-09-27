@@ -1088,11 +1088,8 @@ constant shift greater than word length")))
     (inst not res)
     POS
     (inst bsr res res)
-    (inst jmp :z ZERO)
+    (inst jmp :z DONE)
     (inst inc res)
-    (inst jmp DONE)
-    ZERO
-    (zeroize res)
     DONE))
 
 (define-vop (unsigned-byte-64-len)
@@ -1105,11 +1102,8 @@ constant shift greater than word length")))
   (:result-types unsigned-num)
   (:generator 26
     (inst bsr res arg)
-    (inst jmp :z ZERO)
+    (inst jmp :z DONE)
     (inst inc res)
-    (inst jmp DONE)
-    ZERO
-    (zeroize res)
     DONE))
 
 ;; The code on which this was based existed in no less than three varieties,
