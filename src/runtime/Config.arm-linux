@@ -10,7 +10,6 @@
 # files for more information.
 
 CFLAGS += -marm -march=armv5
-NM = ./linux-nm
 
 ASSEM_SRC = arm-assem.S
 ARCH_SRC = arm-arch.c

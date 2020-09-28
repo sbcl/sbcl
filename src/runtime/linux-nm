@@ -1,9 +1,0 @@
-#!/bin/sh
-
-# " A " used to be in the set of removed symbols, but it turns out
-# that the alpha implementation of closure_tramp and undefined_tramp
-# is as an A.  Whatever that is.  CSR, 2005-06-12.
-# " A " is a global absolute symbol, that is a symbol with a fixed
-# assembly time value (which is used for offset calculations).
-
-nm -p "$@" | GREP_OPTIONS='' grep -v " [abcdgIiNnrstUuvw?-] "

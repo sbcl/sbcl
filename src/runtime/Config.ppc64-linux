@@ -11,7 +11,6 @@
 
 CFLAGS += -m64
 LINKFLAGS += -m64 -Wl,--export-dynamic
-NM = ./linux-nm
 
 ASSEM_SRC = ppc64-assem.S
 ARCH_SRC = ppc-arch.c

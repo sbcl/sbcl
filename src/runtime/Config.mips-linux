@@ -10,7 +10,6 @@
 # files for more information.
 
 LINKFLAGS += -O2 -Wl,--export-dynamic
-NM = ./linux-nm
 
 ASSEM_SRC = mips-assem.S
 ARCH_SRC = mips-arch.c

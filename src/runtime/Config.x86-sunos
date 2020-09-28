@@ -11,7 +11,6 @@
 
 CC=gcc
 CFLAGS = -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
-NM = nm -xgp
 GREP = ggrep
 
 ASSEM_SRC = x86-assem.S

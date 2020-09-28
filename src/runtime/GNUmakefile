@@ -22,7 +22,6 @@ SBCL_PAXCTL ?= :
 # Config file. Most of them are same on most systems right now.
 # If you need to override one of these, do it in Config.
 LINKFLAGS += -g
-NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
 LD = ld
@@ -69,11 +68,7 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
-ifdef LISP_FEATURE_SUNOS # don't bother running 'nm' (or 'gnm')
 targets: $(TARGET) $(OBJTARGET) sbcl.mk
-else
-targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
-endif
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
@@ -141,10 +136,6 @@ sbcl.mk: Config
 	  fi ; \
 	  : ) > $@
 
-sbcl.nm: $(TARGET)
-	$(NM) $(TARGET) | $(GREP) -v " [FUw] " > ,$@
-	mv -f ,$@ $@
-
 sbcl.h: $(wildcard genesis/*.h)
 	echo '#include "genesis/config.h"' >sbcl.h
 	echo '#include "genesis/constants.h"' >>sbcl.h
@@ -156,7 +147,7 @@ TAGS tags: $(SRCS) $(HEADERS)
 	@etags $(SRCS) $(HEADERS) || true
 
 clean:
-	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
+	-rm -f *.[do] $(TARGET) sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
