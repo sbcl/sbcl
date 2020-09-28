@@ -1084,12 +1084,15 @@ constant shift greater than word length")))
   (:generator 28
     (move res arg)
     (inst test res res)
-    (inst jmp :z DONE)
     (inst jmp :ge POS)
     (inst not res)
     POS
     (inst bsr res res)
+    (inst jmp :z ZERO)
     (inst inc res)
+    (inst jmp DONE)
+    ZERO
+    (zeroize res)
     DONE))
 
 (define-vop (unsigned-byte-64-len)
