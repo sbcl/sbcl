@@ -2265,9 +2265,7 @@
                       name->addr)))
       (let ((code sb-fasl:*assembler-routines*))
         (invert (%code-debug-info code)
-                (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
-    #-linkage-table
-       (invert *static-foreign-symbols* #'identity))
+                (lambda (x) (sap-int (sap+ (code-instructions code) (car x)))))))
     (loop for name across sb-vm::+all-static-fdefns+
           for address =
           #+immobile-code (sb-vm::function-raw-address name)
@@ -2503,7 +2501,6 @@
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
   (multiple-value-bind (name offs) (find-assembler-routine address)
-    #+linkage-table
     (unless name
       (setq name (sap-foreign-symbol (int-sap address))))
     (when name

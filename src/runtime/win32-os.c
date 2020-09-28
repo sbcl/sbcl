@@ -304,7 +304,6 @@ void unmap_gc_page()
 
 #endif
 
-#if defined(LISP_FEATURE_LINKAGE_TABLE)
 /* This feature has already saved me more development time than it
  * took to implement.  In its current state, ``dynamic RT<->core
  * linking'' is a protocol of initialization of C runtime and Lisp
@@ -597,8 +596,6 @@ void* os_dlsym_default(char* name)
     }
     return result;
 }
-
-#endif /* LINKAGE_TABLE */
 
 #if defined(LISP_FEATURE_SB_THREAD)
 /* We want to get a slot in TIB that (1) is available at constant

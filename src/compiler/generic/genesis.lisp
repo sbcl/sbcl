@@ -2010,68 +2010,6 @@ core and return a descriptor to it."
 (defvar *cold-foreign-symbol-table*)
 (declaim (type hash-table *cold-foreign-symbol-table*))
 
-;; Read the sbcl.nm file to find the addresses for foreign-symbols in
-;; the C runtime.
-#-linkage-table
-(defun load-cold-foreign-symbol-table (filename)
-  (with-open-file (file filename)
-    (loop for line = (read-line file nil nil)
-          while line do
-          ;; UNIX symbol tables might have tabs in them, and tabs are
-          ;; not in Common Lisp STANDARD-CHAR, so there seems to be no
-          ;; nice portable way to deal with them within Lisp, alas.
-          ;; Fortunately, it's easy to use UNIX command line tools like
-          ;; sed to remove the problem, so it's not too painful for us
-          ;; to push responsibility for converting tabs to spaces out to
-          ;; the caller.
-          ;;
-          ;; Other non-STANDARD-CHARs are problematic for the same reason.
-          ;; Make sure that there aren't any..
-          (let ((ch (find-if (lambda (char)
-                               (not (typep char 'standard-char)))
-                             line)))
-            (when ch
-              (error "non-STANDARD-CHAR ~S found in foreign symbol table:~%~S"
-                     ch
-                     line)))
-          (setf line (string-trim '(#\space) line))
-          (let ((p1 (position #\space line :from-end nil))
-                (p2 (position #\space line :from-end t)))
-            (if (not (and p1 p2 (< p1 p2)))
-                ;; KLUDGE: It's too messy to try to understand all
-                ;; possible output from nm, so we just punt the lines we
-                ;; don't recognize. We realize that there's some chance
-                ;; that might get us in trouble someday, so we warn
-                ;; about it.
-                (warn "ignoring unrecognized line ~S in ~A" line filename)
-                (multiple-value-bind (value name)
-                    (if (string= "0x" line :end2 2)
-                        (values (parse-integer line :start 2 :end p1 :radix 16)
-                                (subseq line (1+ p2)))
-                        (values (parse-integer line :end p1 :radix 16)
-                                (subseq line (1+ p2))))
-                  (multiple-value-bind (old-value found)
-                      (gethash name *cold-foreign-symbol-table*)
-                    (when (and found
-                               (not (= old-value value)))
-                      (warn "redefining ~S from #X~X to #X~X"
-                            name old-value value)))
-                  (setf (gethash name *cold-foreign-symbol-table*) value))))))
-  (values))     ;; PROGN
-
-#-linkage-table
-(defun cold-foreign-symbol-address (name)
-  (declare (ignorable name))
-  #+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
-  #-crossbuild-test
-  (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
-      (progn
-        (format *error-output* "~&The foreign symbol table is:~%")
-        (maphash (lambda (k v)
-                   (format *error-output* "~&~S = #X~8X~%" k v))
-                 *cold-foreign-symbol-table*)
-        (error "The foreign symbol ~S is undefined." name))))
-
 (defvar *cold-assembler-routines*)
 (defvar *cold-static-call-fixups*)
 
@@ -2236,7 +2174,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (:absolute (absolute (cdr item)))))
     (number-to-core (sb-c:pack-code-fixup-locs (absolute) (relative)))))
 
-#+linkage-table
 (defun linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
   (sb-vm::linkage-table-entry-address
@@ -2244,21 +2181,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    *cold-foreign-symbol-table*
                    (hash-table-count *cold-foreign-symbol-table*))))
 
-;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
-;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
-;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
-;;; target-load.lisp refers to.
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
-    #-linkage-table
-    ;; Sort by name
-    (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'string< :key #'car)
-             (lambda (symbol)
-               (cold-cons (set-readonly (base-string-to-core (car symbol)))
-                          (number-to-core (cdr symbol))))
-             '*!initial-foreign-symbols*)
-    #+linkage-table
     ;; Sort by index into linkage table
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
              (lambda (pair &aux (key (car pair))
@@ -2780,17 +2705,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:asm-routine-nil-offset
               (- (lookup-assembler-reference sym) sb-vm:nil-value))
              (:foreign
-              (let ((sym (base-string-from-core sym)))
-                #+linkage-table (linkage-table-note-symbol sym nil)
-                #-linkage-table (cold-foreign-symbol-address sym)))
+              (linkage-table-note-symbol (base-string-from-core sym) nil))
              (:foreign-dataref
-              (let ((sym (base-string-from-core sym)))
-                #+linkage-table (linkage-table-note-symbol sym t)
-                #-linkage-table
-                (progn (maphash (lambda (k v)
-                                  (format *error-output* "~&~S = #X~8X~%" k v))
-                                *cold-foreign-symbol-table*)
-                       (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
+              (linkage-table-note-symbol (base-string-from-core sym) t))
              (:code-object (descriptor-bits code-obj))
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index sym))
@@ -2840,7 +2757,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
                           (* 32 sb-vm:immobile-card-bytes))))
       #-gencgc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
-      #+linkage-table
       (check sb-vm:linkage-table-space-start sb-vm:linkage-table-space-end :linkage-table))))
 
 ;;;; emitting C header file
@@ -3336,7 +3252,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       "layouts"
                       "type specifiers"
                       "symbols"
-                      #+linkage-table "linkage table")))
+                      "linkage table")))
       (dotimes (i (length sections))
         (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
@@ -3422,7 +3338,6 @@ III. initially undefined function references (alphabetically):
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
-  #+linkage-table
   (progn
     (format t "~%~|~%VIII. linkage table:~2%")
     (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)

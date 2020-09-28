@@ -943,7 +943,7 @@
                ;; but its global value must be an immobile object.
                :immobile-symbol :symbol-value)
                (the symbol name))
-              ((:foreign #+linkage-table :foreign-dataref) (the string name))
+              ((:foreign :foreign-dataref) (the string name))
               ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))

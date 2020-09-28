@@ -13,7 +13,6 @@
 
 ;;;; DEFKNOWNs
 
-#+linkage-table
 (deftransform foreign-symbol-address ((symbol &optional datap)
                                       ((constant-arg simple-string)
                                        &optional (constant-arg boolean)))
@@ -23,11 +22,6 @@
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
                                   (simple-string &optional boolean))
-  #-linkage-table
-  (if (null datap)
-      (give-up-ir1-transform)
-      `(foreign-symbol-sap symbol))
-  #+linkage-table
   (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
       (if (lvar-value datap)
           `(foreign-symbol-dataref-sap symbol)

@@ -425,7 +425,7 @@
 
  ("src/code/load")
 
- #+linkage-table ("src/code/linkage-table" :not-host)
+ ("src/code/linkage-table" :not-host)
  ("src/code/foreign" :not-host)
  #+os-provides-dlopen ("src/code/foreign-load" :not-host)
  #+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)

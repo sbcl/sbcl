@@ -957,15 +957,6 @@
     (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
                         (* os-context-t))))
 
-;;; With :LINKAGE-TABLE symbols which come from the runtime go through
-;;; an indirection table, but the debugger needs to know the actual
-;;; address.
-(defun static-foreign-symbol-address (name)
-  #+linkage-table
-  (find-dynamic-foreign-symbol-address name)
-  #-linkage-table
-  (foreign-symbol-address name))
-
 (defun catch-runaway-unwind (block)
   (declare (ignorable block))
   #-(and win32 x86) ;; uses SEH
@@ -3495,8 +3486,7 @@ register."
 (defun make-bpt-lra (real-lra)
   (declare (type #-(or x86 x86-64) lra #+(or x86 x86-64) system-area-pointer real-lra))
   (macrolet ((symbol-addr (name)
-               ;; "static" is not really correct if #+linkage-table
-               `(static-foreign-symbol-address ,name))
+               `(find-dynamic-foreign-symbol-address ,name))
              (trap-offset ()
                `(- (symbol-addr "fun_end_breakpoint_trap") src-start)))
     ;; These are really code labels, not variables: but this way we get

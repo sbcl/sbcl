@@ -1963,7 +1963,6 @@
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
-#+linkage-table
 (defknown foreign-symbol-dataref-sap (simple-string)
   system-area-pointer
   (movable flushable))

@@ -205,8 +205,9 @@
     ;; threading support
     #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
 
-    ;; dynamic runtime linking support
-    #+linkage-table +required-foreign-symbols+
+    ;; runtime linking of lisp->C calls (regardless of whether
+    ;; the C function is in a dynamic shared object or not)
+    +required-foreign-symbols+
 
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order

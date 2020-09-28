@@ -1276,15 +1276,6 @@
 
 (in-package "SB-ALIEN")
 
-;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
-;;; as opposed to C's "extern"). The table contains symbols known at
-;;; the time that the program was built, but not symbols defined in
-;;; object files which have been loaded dynamically since then.
-#-linkage-table
-(progn
-  (declaim (type hash-table *static-foreign-symbols*))
-  (defvar *static-foreign-symbols* (make-hash-table :test 'equal)))
-
 #+sb-xc
 (defmacro maybe-with-pinned-objects (variables types &body body)
   (declare (ignorable variables types))

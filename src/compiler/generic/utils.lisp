@@ -50,13 +50,11 @@
       0))
 
 ;;; the address of the linkage table entry for table index I.
-#+linkage-table
 (defun linkage-table-entry-address (i)
   (ecase linkage-table-growth-direction
     (:up   (+ (* i linkage-table-entry-size) linkage-table-space-start))
     (:down (- linkage-table-space-end (* (1+ i) linkage-table-entry-size)))))
 
-#+linkage-table
 (defun linkage-table-index-from-address (addr)
   (ecase linkage-table-growth-direction
     (:up
