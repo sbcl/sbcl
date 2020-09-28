@@ -7,7 +7,7 @@
 
 (defconstant +alloc-region-size+
   #-gencgc
-  (get-page-size)
+  sb-c:+backend-page-bytes+
   #+gencgc
   (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-card-bytes))
 

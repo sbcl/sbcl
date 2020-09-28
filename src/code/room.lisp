@@ -11,8 +11,6 @@
 
 (in-package "SB-VM")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (export 'sb-sys::get-page-size "SB-SYS"))
 
 ;;;; type format database
 
@@ -847,11 +845,6 @@ We could try a few things to mitigate this:
 
 ;;;; PRINT-ALLOCATED-OBJECTS
 
-;;; This notion of page-size is completely arbitrary - it affects 2 things:
-;;; (1) how much output to print "per page" in print-allocated-objects
-;;; (2) sb-sprof deciding how many regions [sic] were made if #+cheneygc
-(defun get-page-size () sb-c:+backend-page-bytes+)
-
 ;;; This function is sheer madness.  You're better off using
 ;;; LIST-ALLOCATED-OBJECTS and then iterating over that, to avoid
 ;;; seeing all the junk created while doing this thing.
@@ -865,7 +858,7 @@ We could try a few things to mitigate this:
     (let* ((space-start (ash start n-fixnum-tag-bits))
            (space-end (ash end n-fixnum-tag-bits))
            (space-size (- space-end space-start))
-           (pagesize (get-page-size))
+           (pagesize sb-c:+backend-page-bytes+)
            (start (+ space-start (round (* space-size percent) 100)))
            (printed-conses (make-hash-table :test 'eq))
            (pages-so-far 0)
