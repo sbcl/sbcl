@@ -1272,10 +1272,7 @@
 (declaim (ftype (sfunction (string hash-table) (or integer null))
                 find-foreign-symbol-in-table))
 (defun find-foreign-symbol-in-table (name table)
-  (let ((extern (extern-alien-name name)))
-    (values
-     (or (gethash extern table)
-         (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
+  (values (gethash (extern-alien-name name) table)))
 
 (in-package "SB-ALIEN")
 
