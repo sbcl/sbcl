@@ -6,6 +6,16 @@
 
 ;#+sb-fasteval (setq sb-ext:*evaluator-mode* :compile)
 
+;;; SIGPROF-HANDLER used to have a slow call to ALIEN-FUNCALL which entails
+;;; COMPILE which entails needing to acquire *WORLD-LOCK* for various things.
+;;; It was the mother of all deadlocks.
+(let ((c (sb-kernel:fun-code-header #'sb-sprof::sigprof-handler)))
+  (loop for i from sb-vm:code-constants-offset below (sb-kernel:code-header-words c)
+        do (let ((obj (sb-kernel:code-header-ref c i)))
+             (if (typep obj 'sb-kernel:fdefn)
+                 (assert (not (eq (sb-kernel:fdefn-name obj)
+                                  'sb-alien:alien-funcall)))))))
+
 ;;; silly examples
 
 (defun test-0 (n &optional (depth 0))

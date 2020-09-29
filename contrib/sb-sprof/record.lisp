@@ -352,7 +352,7 @@ EXPERIMENTAL: Interface subject to change."
     (unix-kill 0 sb-unix:sigprof))
 
   (defun sigprof-handler (signal code scp)
-    (declare (ignore signal code) (optimize speed (space 0))
+    (declare (ignore signal code) (optimize speed)
              (disable-package-locks sb-di::x86-call-context)
              (muffle-conditions compiler-note)
              (type system-area-pointer scp))
