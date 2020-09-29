@@ -387,6 +387,24 @@
             (return)))
     (sb-thread:join-thread gc-thread)))
 
+(defun parse-address-range (line)
+  ;; I hope nothing preceding the match of "00-" could be a false positive.
+  ;; If there is, I suspect we should parse the legend that contains
+  ;;  "REGION TYPE                      START - END" to determine the column
+  ;; with a #\- which appears consistently in the same place on each following line.
+  (let ((pos (search "00-" line)))
+    (assert pos)
+    (let* ((separator (+ pos 2)) ; position of the #\-
+           (start separator))
+      (loop (if (digit-char-p (char line (1- start)) 16) (decf start) (return)))
+      (values (parse-integer line :start start :end separator :radix 16)
+              (multiple-value-bind (value end)
+                (parse-integer line :start (1+ separator) :radix 16 :junk-allowed t)
+                (assert (and (> end (+ separator 3))
+                             (or (= end (length line))
+                                 (char= (char line end) #\space))))
+                value)))))
+
 (defun get-shared-library-maps ()
   (let (result)
     #+linux
@@ -409,14 +427,11 @@
         (assert (search "REGION TYPE" (read-line s)))
         (loop (let ((line (read-line s)))
                 (when (zerop (length line)) (return))
+                ;; Look for lines that look like
+                ;; "{mumble} 7fff646c8000-7fff646ca000 {mumble}.dylib"
                 (when (search ".dylib" line)
-                  (let ((c (search "00-00" line)))
-                    (assert c)
-                    (let ((start (parse-integer line :start (+ c 2 (- 16)) :radix 16
-                                                     :junk-allowed t))
-                          (end (parse-integer line :start (+ c 3) :radix 16
-                                                   :junk-allowed t)))
-                      (push `(,start . ,end) result)))))))
+                  (multiple-value-bind (start end) (parse-address-range line)
+                    (push `(,start . ,end) result))))))
       (process-wait p))
     result))
 
