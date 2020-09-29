@@ -2582,8 +2582,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (let ((jumptable-word (read-bits-wordindexed des aligned-n-boxed-words)))
         (aver (zerop (ash jumptable-word -14)))
         ;; assign serialno
-        (write-wordindexed/raw des aligned-n-boxed-words
-                               (logior (ash (incf *code-serialno*) 14) jumptable-word)))
+        (write-wordindexed/raw
+         des aligned-n-boxed-words
+         (logior (ash (incf *code-serialno*) (byte-position sb-vm::code-serialno-byte))
+                 jumptable-word)))
       (when *show-pre-fixup-code-p*
         (format *trace-output*
                 "~&LOAD-CODE: ~d header words, ~d code bytes.~%"

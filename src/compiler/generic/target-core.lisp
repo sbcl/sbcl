@@ -108,13 +108,14 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         ;; clip to 18 significant bits for serialno regardless of machine word size
-         (let* ((serialno (ldb (byte 18 0) (atomic-incf sb-fasl::*code-serialno*)))
+         (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
+                               (atomic-incf sb-fasl::*code-serialno*)))
                 (insts (code-instructions code-obj))
                 (jumptable-word (sap-ref-word insts 0)))
            (aver (zerop (ash jumptable-word -14)))
-           ;; insert serialno
-           (setf (sap-ref-word insts 0) (logior (ash serialno 14) jumptable-word)))
+           (setf (sap-ref-word insts 0) ; insert serialno
+                 (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
+                         jumptable-word)))
          #+(or x86 x86-64)
          (let ((rel-fixups (elt preserved-lists 1))
                (abs-fixups (elt preserved-lists 2))

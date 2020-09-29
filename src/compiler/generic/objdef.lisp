@@ -580,6 +580,9 @@ during backtrace.
   (lisp-thread :pointer t :special sb-thread:*current-thread*))
 
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
+(defconstant-eqx code-serialno-byte
+  #+64-bit (byte 32 32) #-64-bit (byte 18 14)
+  #'equalp)
 (declaim (inline code-object-size code-header-words %code-code-size))
 #-sb-xc-host
 (progn
@@ -619,6 +622,6 @@ during backtrace.
     (if (eql (code-header-ref code code-boxed-size-slot) 0)
         0
         (with-pinned-objects (code)
-          (ldb (byte 18 14) (sap-ref-word (code-instructions code) 0)))))
+          (ldb code-serialno-byte (sap-ref-word (code-instructions code) 0)))))
 
 ) ; end PROGN
