@@ -569,8 +569,6 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
-  #+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; If we need the header slots, but they can't precede this structure
   ;; for technical reasons having to do with no writable memory being there,
   ;; then stuff them at the end, for lack of any place better.

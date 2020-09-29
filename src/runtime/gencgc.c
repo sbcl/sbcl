@@ -3921,9 +3921,6 @@ collect_garbage(generation_index_t last_gen)
     struct thread *th;
     for_each_thread(th) {
         ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-        ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);
-#endif
     }
     gc_close_all_regions();
 

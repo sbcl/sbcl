@@ -194,8 +194,7 @@ The following keyword args are recognized:
       (enable-call-counting)
       (setf *profiled-threads* threads)
       (sb-sys:enable-interrupt sb-unix:sigprof
-                               #'sigprof-handler
-                               :synchronous t)
+                               #'sigprof-handler)
       (ecase mode
         (:alloc
          (let ((alloc-signal (1- alloc-interval)))

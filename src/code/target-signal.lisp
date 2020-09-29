@@ -62,7 +62,9 @@
 ;;; FIXME: terrible name. doesn't actually "enable" in the sense of unmasking.
 (defun enable-interrupt (signal handler &key synchronous)
   (declare (type (or function (member :default :ignore)) handler))
-  (%install-handler signal handler synchronous)
+  (when synchronous
+    (error ":SYNCHRONOUS is broken and should not be used"))
+  (%install-handler signal handler)
   ;; This used to return the previously installed handler, if any.
   ;; It no longer does, but the old handler can be obtained via SAP-REF-LISPOBJ
   ;; on 'lisp_sig_handlers'. The reason for not returning it is that the value was
@@ -72,7 +74,7 @@
   ;; feasible, is definitely not what was intended.
   nil)
 
-(defun %install-handler (signal handler synchronous)
+(defun %install-handler (signal handler)
   (flet ((run-handler (signo info-sap context-sap)
            #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
            (unblock-gc-signals)
@@ -82,14 +84,13 @@
       ;; 0 and 1 probably coincide with SIG_DFL and SIG_IGN, but those
       ;; constants are opaque. We use our own explicit translation
       ;; of them in the C install_handler() argument convention.
-      (with-alien ((%sigaction (function void int unsigned int) :extern "install_handler"))
+      (with-alien ((%sigaction (function void int unsigned) :extern "install_handler"))
         (alien-funcall %sigaction
                        signal
                        (case handler
                          (:default 0)
                          (:ignore 1)
-                         (t (sb-kernel:get-lisp-obj-address #'run-handler)))
-                       (if synchronous 1 0)))))
+                         (t (sb-kernel:get-lisp-obj-address #'run-handler)))))))
   nil)
 
 ;;;; Support for signal handlers which aren't.
@@ -218,19 +219,19 @@
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
-  (%install-handler sigint #'sigint-handler nil)
-  (%install-handler sigterm #'sigterm-handler nil)
-  (%install-handler sigill #'sigill-handler t)
-   #-(or linux android haiku) (%install-handler sigemt #'sigemt-handler nil)
-  (%install-handler sigfpe #'sb-vm:sigfpe-handler t)
+  (%install-handler sigint #'sigint-handler)
+  (%install-handler sigterm #'sigterm-handler)
+  (%install-handler sigill #'sigill-handler)
+  #-(or linux android haiku) (%install-handler sigemt #'sigemt-handler)
+  (%install-handler sigfpe #'sb-vm:sigfpe-handler)
   (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
-      (%install-handler sigbus #'sigbus-handler t)
+      (%install-handler sigbus #'sigbus-handler)
       (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
-  #-(or linux android) (%install-handler sigsys #'sigsys-handler t)
-  #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler nil)
-  #-sb-thruption (%install-handler sigurg #'sigurg-handler nil)
-  (%install-handler sigchld #'sigchld-handler nil)
+  #-(or linux android) (%install-handler sigsys #'sigsys-handler)
+  #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler)
+  #-sb-thruption (%install-handler sigurg #'sigurg-handler)
+  (%install-handler sigchld #'sigchld-handler)
   ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
   ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.
   (dx-let ((mask (make-array sb-unix::sizeof-sigset_t :element-type '(unsigned-byte 8)

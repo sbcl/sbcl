@@ -227,8 +227,6 @@
           ;; the branch delay slot to write back the free-pointer
           ;; (on overflow restore it the trap handler to a good value),
           ;; and fold the lowtag addition into the size subtraction.
-          ;; (Possibly not ok for the sprof_alloc_region,
-          ;; but sb-sprof didn't work on sparc prior to this change)
           (storew result-tn null-tn 0 (- nil-value boxed-region))
           ;; Compute the base pointer and add lowtag.
           (cond ((integerp size)

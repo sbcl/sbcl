@@ -122,7 +122,6 @@ extern void sig_stop_for_gc_handler(int, siginfo_t*, os_context_t*);
 #endif
 typedef void (*interrupt_handler_t)(int, siginfo_t *, os_context_t *);
 extern void ll_install_handler(int signal, interrupt_handler_t handler);
-extern void install_handler(int signal, lispobj handler, int synchronous);
 
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:

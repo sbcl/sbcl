@@ -1876,9 +1876,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 #endif
 
 /* This is called from Lisp. */
-void
-install_handler(int signal, lispobj handler,
-                int __attribute__((unused)) synchronous)
+void install_handler(int signal, lispobj handler)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
@@ -1898,13 +1896,6 @@ install_handler(int signal, lispobj handler,
             lisp_sig_handlers[signal] = NIL;
             return;
         }
-#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
-        if (signal == SIGPROF)
-            sa.sa_sigaction = sigprof_handler_trampoline;
-        else if (!synchronous)
-            sa.sa_sigaction = spawn_signal_thread_handler;
-        else
-#endif
         if (sigismember(&deferrable_sigset, signal))
             sa.sa_sigaction = maybe_now_maybe_later;
         else

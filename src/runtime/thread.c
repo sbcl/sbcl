@@ -379,9 +379,6 @@ unregister_thread(struct thread *th,
 
     block_blockable_signals(0);
     ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);
-#endif
     pop_gcing_safety(&scribble->safety);
     lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -408,9 +405,6 @@ unregister_thread(struct thread *th,
      * There's no reason for that, so closing of regions should be done
      * sooner to eliminate an ordering constraint. */
     ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    ensure_region_closed(&th->sprof_alloc_region, BOXED_PAGE_FLAG);
-#endif
     unlink_thread(th);
     thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -973,9 +967,6 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
 #ifdef LISP_FEATURE_GENCGC
     gc_init_region(&th->alloc_region);
-# if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    gc_init_region(&th->sprof_alloc_region);
-# endif
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
     /* This parallels the same logic in globals.c for the
