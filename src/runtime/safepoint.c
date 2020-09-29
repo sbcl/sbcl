@@ -1005,6 +1005,8 @@ void* os_get_csp(struct thread* th)
 #ifndef LISP_FEATURE_WIN32
 
 # ifdef LISP_FEATURE_SB_THRUPTION
+/* This is basically what 'low_level_maybe_now_maybe_later' was (which doesn't exist),
+ * but with a different name, and different way of deciding to defer the signal */
 void
 thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
 {

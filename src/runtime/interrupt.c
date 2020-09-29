@@ -253,9 +253,8 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
  * interrupt_handle_now_handler
  * maybe_now_maybe_later
  * low_level_handle_now_handler
- * low_level_maybe_now_maybe_later
  *
- * This gives us a single point of control (or four) over errno, fp
+ * This gives us a single point of control (or three) over errno, fp
  * control word, and fixing up signal context on sparc.
  *
  * The SPARC/Linux platform doesn't quite do signals the way we want
@@ -1318,18 +1317,6 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
     check_interrupts_enabled_or_lose(context);
     (*interrupt_low_level_handlers[signal])(signal, info, context);
 }
-
-static void
-low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
-{
-    SAVE_ERRNO(signal,context,void_context);
-    struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = &thread_interrupt_data(thread);
-
-    if (can_handle_now(low_level_interrupt_handle_now, data, signal, info, context))
-        low_level_interrupt_handle_now(signal, info, context);
-    RESTORE_ERRNO;
-}
 #endif
 
 #ifdef THREADS_USING_GCSIGNAL
@@ -1843,19 +1830,19 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 
     if (ARE_SAME_HANDLER(handler, SIG_DFL))
         sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
-    else if (sigismember(&deferrable_sigset,signal))
-        sa.sa_sigaction = low_level_maybe_now_maybe_later;
-    else
-        sa.sa_sigaction = low_level_handle_now_handler;
-
+    else if (
 #ifdef LISP_FEATURE_SB_THRUPTION
     /* It's in `deferrable_sigset' so that we block&unblock it properly,
-     * but we don't actually want to defer it.  And if we put it only
+     * but we don't actually want to defer it, at least not here.
+     * (It might get deferred until a safepoint). And if we put it only
      * into blockable_sigset, we'd have to special-case it around thread
      * creation at least. */
-    if (signal == SIGURG)
-        sa.sa_sigaction = low_level_handle_now_handler;
+             (signal == SIGURG) ||
 #endif
+             !sigismember(&deferrable_sigset,signal))
+        sa.sa_sigaction = low_level_handle_now_handler;
+    else
+        lose("Can't install low-level handler");
 
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
