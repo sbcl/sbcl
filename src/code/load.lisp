@@ -333,7 +333,12 @@
                       (result (make-string length)))
                  (read-string-as-bytes stream result)
                  (push result results)
-                 result)))
+                 result))
+             (unsuffix (s)
+               (if (and (> (length s) 4)
+                        (string= s "-WIP" :start1 (- (length s) 4)))
+                   (subseq s 0 (- (length s) 4))
+                   s)))
         ;; Read and validate implementation and version.
         (let ((implementation (string-from-stream))
               (expected-implementation +backend-fasl-file-implementation+))
@@ -351,7 +356,7 @@
                                  (string-from-stream)))
                (expected-version (lisp-implementation-version)))
           (push fasl-version results)
-          (unless (string= expected-version sbcl-version)
+          (unless (string= (unsuffix expected-version) (unsuffix sbcl-version))
             (restart-case
                 (error 'invalid-fasl-version
                        :stream stream

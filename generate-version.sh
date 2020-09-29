@@ -63,7 +63,7 @@ if git diff HEAD --no-ext-diff --quiet --exit-code
 then
     version_dirty=""
 else
-    version_dirty="-dirty"
+    version_dirty="-WIP"
 fi
 # Now that we have all the pieces, put them together.
 cat >version.lisp-expr <<EOF
