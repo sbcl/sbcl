@@ -9,6 +9,7 @@
 ;;; SIGPROF-HANDLER used to have a slow call to ALIEN-FUNCALL which entails
 ;;; COMPILE which entails needing to acquire *WORLD-LOCK* for various things.
 ;;; It was the mother of all deadlocks.
+#-win32
 (let ((c (sb-kernel:fun-code-header #'sb-sprof::sigprof-handler)))
   (loop for i from sb-vm:code-constants-offset below (sb-kernel:code-header-words c)
         do (let ((obj (sb-kernel:code-header-ref c i)))
