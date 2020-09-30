@@ -290,13 +290,6 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 
 /* Generic signal related utilities. */
 
-void
-get_current_sigmask(sigset_t *sigset)
-{
-    /* Get the current sigmask, by blocking the empty set. */
-    thread_sigmask(SIG_BLOCK, 0, sigset);
-}
-
 // Stringify sigset into the supplied result buffer.
 void
 sigset_tostring(const sigset_t *sigset, char* result, int result_length)
@@ -326,7 +319,7 @@ all_signals_blocked_p(const sigset_t *sigset, sigset_t *sigset2,
     boolean has_blocked = 0, has_unblocked = 0;
     sigset_t current;
     if (sigset == 0) {
-        get_current_sigmask(&current);
+        thread_sigmask(SIG_BLOCK, 0, &current);
         sigset = &current;
     }
     for(i = 1; i <= MAX_SIGNUM; i++) {

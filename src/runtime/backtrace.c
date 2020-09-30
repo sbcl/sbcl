@@ -473,14 +473,10 @@ describe_thread_state(void)
     struct interrupt_data *data = &thread_interrupt_data(thread);
 #ifndef LISP_FEATURE_WIN32
     sigset_t mask;
-    get_current_sigmask(&mask);
-    printf("Signal mask:\n");
-    printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
-    printf(" SIGINT = %d\n", sigismember(&mask, SIGINT));
-    printf(" SIGPROF = %d\n", sigismember(&mask, SIGPROF));
-#ifdef SIG_STOP_FOR_GC
-    printf(" SIG_STOP_FOR_GC = %d\n", sigismember(&mask, SIG_STOP_FOR_GC));
-#endif
+    char string[180];
+    thread_sigmask(SIG_BLOCK, 0, &mask);
+    sigset_tostring(&mask, string, sizeof string);
+    if (string[0]) printf("Signal mask: %s\n", string);
 #endif
     printf("Specials:\n");
     printf(" *GC-INHIBIT* = %s\n", (read_TLS(GC_INHIBIT, thread) == T) ? "T" : "NIL");

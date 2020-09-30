@@ -16,7 +16,7 @@
 #include <string.h>
 #include "genesis/static-symbols.h"
 
-extern void get_current_sigmask(sigset_t *sigset);
+extern void sigset_tostring(const sigset_t *sigset, char* result, int result_length);
 
 /* Set all deferrable signals into *s. */
 extern void sigaddset_deferrable(sigset_t *s);

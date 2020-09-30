@@ -562,7 +562,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 #if 0
 static void dump_cpu_state(char *reason, os_context_t* context)
 {
-    extern void sigset_tostring(const sigset_t *sigset, char* result, int result_length);
     int i,j,r=0;
     sigset_t cur_sigset;
     char buf[100];
