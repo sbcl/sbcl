@@ -181,9 +181,10 @@
    (let ((sb-xc:*compile-print* nil))
      (if (make-host-2-parallelism)
          (funcall 'parallel-make-host-2 (make-host-2-parallelism))
-         (let ((total
+         (let ((total-files
                 (count-if (lambda (x) (not (find :not-target (cdr x))))
                           (get-stems-and-flags 2)))
+               (total-time 0)
                (n 0)
                (sb-xc:*compile-verbose* nil))
            ;; Workaround memory exhaustion in SB-FASTEVAL.
@@ -193,10 +194,15 @@
            (with-math-journal
             (do-stems-and-flags (stem flags 2)
               (unless (position :not-target flags)
-                (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
-                (target-compile-stem stem flags)
-                (terpri)
+                (format t "~&[~3D/~3D] ~40A" (incf n) total-files (stem-remap-target stem))
+                (let ((start (get-internal-real-time)))
+                  (target-compile-stem stem flags)
+                  (let ((elapsed (/ (- (get-internal-real-time) start)
+                                    internal-time-units-per-second)))
+                    (format t " (~f sec)~%" elapsed)
+                    (incf total-time elapsed)))
                 ;; The specialized array registry has file-wide scope. Hacking that aspect
                 ;; into the xc build scaffold seemed slightly easier than hacking the
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)
-                (clear-specialized-array-registry)))))))))
+                (clear-specialized-array-registry)))
+             (format t "~&~50t ~f~%" total-time)))))))
