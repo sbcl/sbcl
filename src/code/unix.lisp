@@ -1003,14 +1003,13 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 #-win32
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
-  "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of
-   three system timers (:real :virtual or :profile). A SIGALRM signal
-   will be delivered VALUE <seconds+microseconds> from now. INTERVAL,
-   when non-zero, is <seconds+microseconds> to be loaded each time
-   the timer expires. Setting INTERVAL and VALUE to zero disables
-   the timer. See the Unix man page for more details. On success,
-   unix-setitimer returns the old contents of the INTERVAL and VALUE
-   slots as in unix-getitimer."
+  "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of three system
+   timers (:real :virtual or :profile). A SIGALRM, SIGVTALRM, or SIGPROF
+   respectively will be delivered in VALUE <seconds+microseconds> from now.
+   INTERVAL, when non-zero, is reloaded into the timer on each expiration.
+   Setting VALUE to zero disables the timer. See the Unix man page for more
+   details. On success, unix-setitimer returns the
+   old contents of the INTERVAL and VALUE slots as in unix-getitimer."
   (declare (type (member :real :virtual :profile) which)
            (type unsigned-byte int-secs val-secs)
            (type (integer 0 (1000000)) int-usec val-usec)
