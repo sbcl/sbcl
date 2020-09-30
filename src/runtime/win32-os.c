@@ -22,7 +22,7 @@
 
 /*
  * This file was copied from the Linux version of the same, and
- * likely still has some linuxisms in it have haven't been elimiated
+ * likely still has some linuxisms in it have haven't been eliminated
  * yet.
  */
 
@@ -207,20 +207,6 @@ intptr_t sys_aver(long value, char* comment, char* file, int line,
     ({ __typeof__(booly) __attribute__((unused)) me = (booly);  \
         sys_aver((booly)?0:-1, #booly, __FILE__, __LINE__, 0);  \
         me;})
-
-const char * t_nil_s(lispobj symbol);
-
-/*
- * The following signal-mask-related alien routines are called from Lisp:
- */
-
-/* As of win32, deferrables _do_ matter. gc_signal doesn't. */
-unsigned long block_deferrables_and_return_mask()
-{
-    sigset_t sset;
-    block_deferrable_signals(&sset);
-    return (unsigned long)sset;
-}
 
 /* The exception handling function looks like this: */
 EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
