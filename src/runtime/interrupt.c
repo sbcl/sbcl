@@ -1307,16 +1307,6 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
         interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
 }
-
-static void
-low_level_interrupt_handle_now(int signal, siginfo_t *info,
-                               os_context_t *context)
-{
-    /* No FP control fixage needed, caller has done that. */
-    assert_blockables_blocked();
-    check_interrupts_enabled_or_lose(context);
-    (*interrupt_low_level_handlers[signal])(signal, info, context);
-}
 #endif
 
 #ifdef THREADS_USING_GCSIGNAL

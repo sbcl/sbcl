@@ -33,6 +33,12 @@
                  +elements-per-sample+)))
 
 ;;; Encapsulate all the information about a sampling run
+;;; For the love of god can we have maybe NOT chose to name a structure
+;;; "SAMPLES" when we _also_ refer to each individual program counter
+;;; location in a trace as an instance of a "sample". WTF?
+;;; Yeah, it's called "trace-samples" for the trace's samples, but the name
+;;; is not referentially transparent and you can only figure out the disconnect
+;;; after understanding ALL the code, which is the opposite of modular design.
 (defstruct (samples
              (:constructor
               make-samples (&key start-time
@@ -104,7 +110,7 @@
     (let ((trace-start (cons 'trace-start nil)))
       (setf (aref vector index)       trace-start
             (aref vector (+ index 1)) sb-thread:*current-thread*
-            (aref vector (+ index 2)) (get-internal-real-time))
+            (aref vector (+ index 2)) :do-not-use) ; was the INTERNAL-REAL-TIME
       (setf (samples-index samples)       (+ index +elements-per-trace-start+)
             (samples-trace-start samples) trace-start))))
 
@@ -146,15 +152,14 @@ EXPERIMENTAL: Interface subject to change."
             while (< start index)
             for end = (cdr (aref vector start))
             for thread = (aref vector (+ start 1))
-            for time = (/ (- (aref vector (+ start 2)) start-time)
-                          internal-time-units-per-second)
+            for time = :do-not-use ; was the delta from start of profiling
             do (let ((trace (list vector start end)))
                  (funcall function thread time trace))))))
 
 (defun map-trace-samples (function trace)
-  "Call FUNCTION on each sample in TRACE.
+  "Call FUNCTION on each program counter location in TRACE.
 
-The lambda list of FUNCTION has to be compatible to
+The lambda list of FUNCTION has to be compatible with
 
   (info pc-or-offset)
 
