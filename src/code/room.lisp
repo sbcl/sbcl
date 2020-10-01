@@ -298,6 +298,13 @@
        (setq start (sap+ start size))))
     (when strict-bound
      ;; If START is not eq to END, then we have blown past our endpoint.
+      #+sb-devel
+     (unless (sap= start end)
+       ;; don't make things go more wrong than they already are.
+       (alien-funcall (extern-alien "printf" (function void system-area-pointer))
+                      (vector-sap #.(format nil "map-objects-in-range failure~%")))
+       (alien-funcall (extern-alien "ldb_monitor" (function void))))
+     #-sb-devel
      (aver (sap= start end)))))
 
 ;;; Test the sizing function ASAP, because if it's broken, then MAP-ALLOCATED-OBJECTS
@@ -330,7 +337,6 @@
               ;; of word size. This is fine for 32-bit address space,
               ;; but if 64-bit then we have to scale the value. Additionally
               ;; there is a fallback for when even the scaled value is too big.
-              ;; (None of this matters to Lisp code for the most part)
               (start #+64-bit (unsigned 32) #-64-bit signed)
               ;; On platforms with small enough GC pages, this field
               ;; will be a short. On platforms with larger ones, it'll
@@ -429,41 +435,57 @@ We could try a few things to mitigate this:
   ;; You can't specify :ALL and also a list of spaces. Check that up front.
   (do-rest-arg ((space) spaces) (the spaces space))
   (flet ((do-1-space (space)
-    (ecase space
-      (:static
-       ;; Static space starts with NIL, which requires special
-       ;; handling, as the header and alignment are slightly off.
-       (multiple-value-bind (start end) (%space-bounds space)
-         (declare (ignore start))
-         (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
-         (let ((start (+ (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
-                         (ash (- sizeof-nil-in-words 2) sb-vm:word-shift))))
-           (map-objects-in-range fun
-                                 (ash start (- sb-vm:n-fixnum-tag-bits))
-                                 end))))
+           (ecase space
+            (:static
+             ;; Static space starts with NIL, which requires special
+             ;; handling, as the header and alignment are slightly off.
+             (multiple-value-bind (start end) (%space-bounds space)
+               (declare (ignore start))
+               (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
+               (let ((start (+ (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
+                               (ash (- sizeof-nil-in-words 2) sb-vm:word-shift))))
+                 (map-objects-in-range fun
+                                       (ash start (- sb-vm:n-fixnum-tag-bits))
+                                       end))))
 
-      ((:read-only #-gencgc :dynamic)
-       ;; Read-only space (and dynamic space on cheneygc) is a block
-       ;; of contiguous allocations.
-       (multiple-value-bind (start end) (%space-bounds space)
-         (map-objects-in-range fun start end)))
-      #+immobile-space
-      (:immobile
-       ;; Filter out filler objects. These either look like cons cells
-       ;; in fixedobj subspace, or code without enough header words
-       ;; in varyobj subspace. (cf 'filler_obj_p' in gc-internal.h)
-       (dx-flet ((filter (obj type size)
-                   (unless (= type list-pointer-lowtag)
-                     (funcall fun obj type size))))
-         (map-immobile-objects #'filter :fixed))
-       (dx-flet ((filter (obj type size)
-                   (unless (and (code-component-p obj)
-                                (code-obj-is-filler-p obj))
-                     (funcall fun obj type size))))
-         (map-immobile-objects #'filter :variable)))
+            ((:read-only #-gencgc :dynamic)
+             ;; Read-only space (and dynamic space on cheneygc) is a block
+             ;; of contiguous allocations.
+             (multiple-value-bind (start end) (%space-bounds space)
+                                  (map-objects-in-range fun start end)))
+            #+immobile-space
+            (:immobile
+             ;; Filter out filler objects. These either look like cons cells
+             ;; in fixedobj subspace, or code without enough header words
+             ;; in varyobj subspace. (cf 'filler_obj_p' in gc-internal.h)
+             (dx-flet ((filter (obj type size)
+                         (unless (= type list-pointer-lowtag)
+                           (funcall fun obj type size))))
+               (map-immobile-objects #'filter :fixed))
+             (dx-flet ((filter (obj type size)
+                         (unless (and (code-component-p obj)
+                                      (code-obj-is-filler-p obj))
+                           (funcall fun obj type size))))
+               (map-immobile-objects #'filter :variable))))))
+    (do-rest-arg ((space) spaces)
+      (if (eq space :dynamic)
+          (without-gcing (walk-dynamic-space fun #b1111111 0 0))
+          (do-1-space space)))))
 
-      #+gencgc
-      (:dynamic
+;;; Using the mask bits you can make many different match conditions resulting
+;;; from a product of {boxed,unboxed,code,any} x {large,non-large,both}
+;;; e.g. mask = #b10011" constraint = "#b10010"
+;;; matches "large & (unboxed | code)"
+;;;
+;;; I think, when iterating over only code, that if we grab the code_allocator_lock
+;;; and free_pages_lock, that this can be made reliable (both crash-free and
+;;; guaranteed to visit all chosen objects) despite other threads running.
+;;; As things are it is only "maybe" reliable, regardless of the parameters.
+(defun walk-dynamic-space (fun generation-mask
+                               page-type-mask page-type-constraint)
+  (declare (function fun)
+           (type (unsigned-byte 7) generation-mask)
+           (type (unsigned-byte 5) page-type-mask page-type-constraint))
        ;; Dynamic space on gencgc requires walking the GC page tables
        ;; in order to determine what regions contain objects.
 
@@ -479,87 +501,57 @@ We could try a few things to mitigate this:
        ;; BYTES-USED is not GENCGC-CARD-BYTES or we reach
        ;; NEXT-FREE-PAGE.  We then MAP-OBJECTS-IN-RANGE if the range
        ;; is not empty, and proceed to the next page (unless we've hit
-       ;; NEXT-FREE-PAGE).  We happily take advantage of the fact that
-       ;; MAP-OBJECTS-IN-RANGE will simply return if passed two
-       ;; coincident pointers for the range.
+       ;; NEXT-FREE-PAGE).
 
        ;; FIXME: WITHOUT-GCING prevents a GC flip, but doesn't prevent
        ;; closing allocation regions and opening new ones.  This may
        ;; prove to be an issue with concurrent systems, or with
        ;; spectacularly poor timing for closing an allocation region
        ;; in a single-threaded system.
-       (close-current-gc-region)
-       (do ((initial-next-free-page next-free-page)
-            ;; This is a "funny" fixnum - essentially the bit cast of a pointer
-            (start (the fixnum (%make-lisp-obj (current-dynamic-space-start))))
-            (page-index 0 (1+ page-index))
-            ;; SPAN is a page count, for which an unsigned fixnum is adequate.
-            (span 0))
-           ;; We can safely iterate up to and including next_free_page
-           ;; even if next_free_page is the total number of pages in the space,
-           ;; because there is one extra page table entry as a sentinel.
-           ;; The extra page always has 0 bytes used, so we'll observe the end
-           ;; of a contiguous block without needing a termination clause to
-           ;; handle a final sequence of totally full pages that exactly abut
-           ;; the heap end. [Also note that for our purposes, contiguous blocks
-           ;; can span different GC generations and page types, whereas within
-           ;; GC, a page ends a block if the next differs in those aspects]
-           ((> page-index initial-next-free-page))
-         ;; The type constraint on PAGE-INDEX is probably too generous,
+  (close-current-gc-region)
+  (do ((initial-next-free-page next-free-page)
+       (base (int-sap (current-dynamic-space-start)))
+       (start-page 0)
+       (end-page 0)
+       (end-page-bytes-used 0))
+      ((> start-page initial-next-free-page))
+         ;; The type constraint on page indices is probably too generous,
          ;; but it does its job of producing efficient code.
-         (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
-                        page-index)
-                  (type (and fixnum unsigned-byte) span))
-         (let ((page-bytes-used ; The low bit of bytes-used is the need-to-zero flag.
-                (logandc1 1 (slot (deref page-table page-index) 'bytes-used))))
-           (if (= page-bytes-used gencgc-card-bytes)
-               (incf span)
-               ;; RANGE-END forces funny increment of START by the extent in bytes,
-               ;; returning a negative fixum when the word's high bit flips.
-               ;; The proper way to add "funny" fixnums is via +-MODFX which for
-               ;; reasons unknown isn't defined on all backends.
-               (macrolet
-                   ((range-end (extra)
-                      `(truly-the fixnum
-                        (%make-lisp-obj
-                         (logand most-positive-word
-                                 ;; The first and third addends are known good
-                                 ;; The second needs help to avoid an expensive ASH
-                                 (+ (get-lisp-obj-address start)
-                                    (logand (* span gencgc-card-bytes) most-positive-word)
-                                    ,extra))))))
-                 (map-objects-in-range fun start (range-end page-bytes-used)
-                                       (< page-index initial-next-free-page))
-                 ;; In a certain rare situation, we must restart the next loop iteration
-                 ;; at exactly PAGE-INDEX instead of 1+ PAGE-INDEX.
-                 ;; Normally the contents of PAGE-INDEX are always included in the
-                 ;; current range. But what if it contributed 0 bytes to the range?
-                 ;;
-                 ;;     N : #x8000 bytes used
-                 ;;   N+1 : #x8000 bytes used
-                 ;;   N+2 : 0 bytes used        <- PAGE-INDEX now points here
-                 ;;   N+3 : initially 0 bytes, then gets some bytes
-                 ;;
-                 ;; We invoked the map function with page_address(N) for #x10000 bytes.
-                 ;; Suppose that function consed a partly unboxed object starting on
-                 ;; page N+2 extending to page N+3, and that NEXT-FREE-PAGE was greater
-                 ;; than both to begin with, so the termination condition isn't in play.
-                 ;; In the best case scenario, resuming the scan at page N+3 (mid-object)
-                 ;; would read valid widetags, but in the worst case scenario, we get
-                 ;; random bits. Page N+2 needs a fighting chance to be the start of
-                 ;; a range, so go back 1 page if the current page had zero bytes used
-                 ;; and the span exceeded 1. That is, always make forward progress.
-                 (setq start (range-end (cond ((and (zerop page-bytes-used) (plusp span))
-                                               (decf page-index)
-                                               0)
-                                              (t
-                                               gencgc-card-bytes)))
-                       span 0)))))))))
-
-  (do-rest-arg ((space) spaces)
-    (if (eq space :dynamic)
-        (without-gcing (do-1-space space))
-        (do-1-space space)))))
+    (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
+                   start-page end-page))
+    (setq end-page start-page)
+    (loop (setq end-page-bytes-used
+                ;; The low bit of bytes-used is the need-to-zero flag.
+                (logandc1 1 (slot (deref page-table end-page) 'bytes-used)))
+          ;; See 'page_ends_contiguous_block_p' in gencgc.c
+          (when (or (< end-page-bytes-used gencgc-card-bytes)
+                    (= (slot (deref page-table (1+ end-page)) 'start) 0))
+            (return))
+          (incf end-page))
+    (let ((start (sap+ base (truly-the sb-vm:signed-word
+                                       (logand (* start-page gencgc-card-bytes)
+                                               most-positive-word))))
+          (end (sap+ base (truly-the sb-vm:signed-word
+                                     (logand (+ (* end-page gencgc-card-bytes)
+                                                end-page-bytes-used)
+                                             most-positive-word)))))
+      (when (sap> end start)
+        ;; The bits in the 5-bit flag field have fixed positions,
+        ;; but the position of the field itself depends on endianness.
+        (let ((flags (ldb #+little-endian (byte 5 0) #+big-endian (byte 5 3)
+                          (slot (deref page-table start-page) 'flags))))
+          ;; The GEN slot is declared as (SIGNED 8) which does not satisfy the
+          ;; type restriction on the first argument to LOGBITP.
+          ;; Masking it to 3 bits fixes that, and allows using the other 5 bits
+          ;; for something potentially.
+          (when (and (logbitp (logand (slot (deref page-table start-page) 'gen) 7)
+                              generation-mask)
+                     (= (logand flags page-type-mask) page-type-constraint))
+            (map-objects-in-range fun
+                                  (%make-lisp-obj (sap-int start))
+                                  (%make-lisp-obj (sap-int end))
+                                  (< start-page initial-next-free-page))))))
+    (setq start-page (1+ end-page))))
 
 ;; Start with a Lisp rendition of ensure_region_closed() on the active
 ;; thread's region, since users are often surprised to learn that a
@@ -1445,6 +1437,26 @@ We could try a few things to mitigate this:
           (format t "(unused)~%"))
         (format t "~5d = ~s~%" n x)
         (setq prev n)))))
+
+(flet ((print-it (obj type size)
+         (declare (ignore type size))
+         (let ((*print-level* 2) (*print-lines* 1))
+           (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))
+(defun print-all-code ()
+  (walk-dynamic-space #'print-it #x7f #b11 #b11))
+(defun print-large-code ()
+  (walk-dynamic-space #'print-it #x7f #b10011 #b10011))
+(defun print-large-unboxed ()
+  (walk-dynamic-space #'print-it #x7f #b10011 #b10010))
+;;; Use this only if you know what you're doing. It can fail because a page
+;;; that needs to continue onto the next page will cause the "overrun" check
+;;; to fail.
+(defun print-page-contents (page)
+  (let* ((start
+          (+ (current-dynamic-space-start) (* sb-vm:gencgc-card-bytes page)))
+         (end
+          (+ start sb-vm:gencgc-card-bytes)))
+    (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add

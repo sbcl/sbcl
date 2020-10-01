@@ -231,6 +231,21 @@ static inline boolean
 page_ends_contiguous_block_p(page_index_t page_index,
                              generation_index_t __attribute__((unused)) gen)
 {
+    /* Re. this next test: git rev c769dd53 said that there was a bug when we don't
+     * test page_bytes_used, but I fail to see how 'page_starts_contiguous_block_p'
+     * on the next page is not a STRONGER condition, i.e. it should imply that
+     * 'page_index' ends a block without regard for the number of bytes used.
+     * Apparently at some point I understood this and now I don't again.
+     * That's what comments are for, damnit.
+     * Anyway, I *think* the issue was, at some point, as follows:
+     * |   page             |     page   |
+     *        pinned-obj
+     *     <------------------- scan-start
+     * where the first of the two pages had a small object pinned. This used to
+     * adjust the bytes used to account _only_ for the pins.  That was wrong -
+     * the page has to be counted as if it is completely full.
+     * So _maybe_ both these conditions do not need to be present now ?
+     */
     // There is *always* a next page in the page table.
     boolean answer = page_bytes_used(page_index) < GENCGC_CARD_BYTES
                   || page_starts_contiguous_block_p(page_index+1);

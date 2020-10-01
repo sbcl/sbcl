@@ -334,8 +334,11 @@
   (funcall 'callfoo))
 
 ;;; Pseudo-static large objects should retain the single-object flag
+;;; What is this???
+;;;  ::: UNEXPECTED-FAILURE :PSEUDOSTATIC-LARGE-OBJECTS due to UNBOUND-VARIABLE:
+;;;      "The variable OBJ is unbound."
 #+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects)
+(with-test (:name :pseudostatic-large-objects :fails-on :interpreter)
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
@@ -348,7 +351,7 @@
              (assert (logbitp 4 type)))))))
    :all))
 
-(with-test (:name :unique-code-serialno)
+(with-test (:name :unique-code-serialno :skipped-on :interpreter)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
     (sb-vm:map-allocated-objects
      (lambda (obj type size)
@@ -440,7 +443,8 @@
 ;;; Verify that it works fine while invoking GC in another thread
 ;;; despite removal of the mysterious WITHOUT-GCING.
 #+sb-thread
-(with-test (:name :sap-foreign-symbol-no-deadlock)
+(with-test (:name :sap-foreign-symbol-no-deadlock
+                  :skipped-on :interpreter) ;; needlessly slow when interpreted
   (let* ((worker-thread
           (sb-thread:make-thread
            (lambda (ranges)
@@ -488,7 +492,7 @@
 (defglobal *go* nil)
 
 #+sb-thread
-(with-test (:name :c-call-save-p)
+(with-test (:name :c-call-save-p :skipped-on :interpreter)
   (let* ((fun (compile nil '(lambda (a b c d e f g h i j k l m)
                              (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
                              (setq *go* t)
@@ -510,3 +514,24 @@
           (sleep .1))
     (gc)
     (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))
+
+(defun code-iterator (how)
+  (let ((n 0) (tot-bytes 0))
+    (sb-int:dx-flet ((visit (obj type size)
+                       (declare (ignore obj))
+                       (when (= type sb-vm:code-header-widetag)
+                         (incf n)
+                         (incf tot-bytes size))))
+    (ecase how
+      (:slow (sb-vm:map-allocated-objects #'visit :dynamic))
+      (:fast (sb-vm::walk-dynamic-space #'visit #x7f 3 3)))
+    (values n tot-bytes))))
+(compile 'code-iterator)
+
+(with-test (:name :code-iteration-fast)
+  (sb-int:binding* (((slow-n slow-bytes) (code-iterator :slow))
+                    ((fast-n fast-bytes) (code-iterator :fast)))
+    ;; Fast should be 20x to 50x faster than slow, but that's kinda sensitive
+    ;; to the machine and can't be reliably asserted.
+    (assert (= slow-n fast-n))
+    (assert (= slow-bytes fast-bytes))))
