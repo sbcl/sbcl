@@ -60,7 +60,7 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
          (out-name (namestring (translate-logical-pathname output-file)))
          (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
     (if prot
-        (sb-unix::void-syscall ("chmod" c-string int)
+        (sb-unix:void-syscall ("chmod" c-string int)
                                out-name
                                (logior prot
                                        (if (logand prot #o400) #o100)

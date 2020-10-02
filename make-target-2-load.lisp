@@ -406,6 +406,7 @@ Please check that all strings which were not recognizable to the compiler
         #.(find-package "SB-ASSEM")
         #.(find-package "SB-DISASSEM")
         #.(find-package "SB-IMPL")
+        #.(find-package "SB-UNIX")
         #.(find-package "SB-PCL")
         #.(find-package "SB-MOP")
         #.(find-package "SB-PRETTY")

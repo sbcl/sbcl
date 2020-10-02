@@ -53,14 +53,6 @@
 
 (/show0 "unix.lisp 74")
 
-;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
-;;; macros in this file, are only used in this file, and could be
-;;; implemented using SB-XC:DEFMACRO wrapped in EVAL-WHEN.
-;;;
-;;; SB-EXECUTABLE, at least, uses one of these macros; other libraries
-;;; and programs have been known to use them as well.  Perhaps they
-;;; should live in SB-SYS or even SB-EXT?
-
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
     (setf name
@@ -1197,3 +1189,5 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
+
+(push '("SB-UNIX" unix-fast-getrusage) *!removable-symbols*)

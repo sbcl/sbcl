@@ -2925,7 +2925,6 @@ no guarantees of interface stability."
                "UID-USERNAME"
                "UID-HOMEDIR"
                "USER-HOMEDIR"
-               "WITH-RESTARTED-SYSCALL"
                "SB-MKSTEMP"
                "UNIX-OFFSET"
                "FD-TYPE"
@@ -2967,6 +2966,8 @@ no guarantees of interface stability."
                "UNIX-UNLINK" "UNIX-WRITE"
                "WCONTINUED" "WNOHANG" "WUNTRACED"
                "W_OK" "X_OK"
+               "SC-NPROCESSORS-ONLN"
+               "VOID-SYSCALL"
 
                ;; signals
                "SIGALRM" "SIGBUS" "SIGCHLD" "SIGCONT" "SIGEMT" "SIGFPE"
@@ -2985,7 +2986,7 @@ no guarantees of interface stability."
                "FD-ISSET" "FD-SET" "UNIX-FAST-SELECT"
                "UNIX-KILL"
                "FD-ZERO" "FD-CLR"
-               "FD-SETSIZE" "UNIX-FAST-GETRUSAGE"
+               "FD-SETSIZE"
                "UNIX-KILLPG"))
 
    #s(sb-cold:package-data
