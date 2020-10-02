@@ -196,6 +196,10 @@
                  'mpz-pow
                  -15546163094340153687 11))
 
+(deftest intexp-1
+    (sb-gmp::gmp-intexp 1 (ash 1 127))
+  1)
+
 (deftest remove-1
     (multiple-value-list (mpz-remove 28 2))
   (7 2))

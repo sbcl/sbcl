@@ -934,14 +934,15 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 (defun gmp-intexp (base power)
   (declare (inline mpz-mul-2exp mpz-pow))
-  (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
   (cond
     ((or (and (integerp base)
               (< (abs power) 1000)
               (< (blength base) 4))
+         (member base '(0 1 -1))
          *gmp-disabled*)
      (orig-intexp base power))
     (t
+     (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
      (cond ((minusp power)
             (/ (the integer (gmp-intexp base (- power)))))
            ((eql base 2)

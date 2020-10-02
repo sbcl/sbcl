@@ -120,6 +120,12 @@
          (if (evenp power)
              1
              base))
+        ((eql base 0)
+         (cond ((= power 0) 1)
+               ((> power 0) 0)
+               (t (error 'division-by-zero
+                         :operands (list 0 power)
+                         :operation 'expt))))
         ((ratiop base)
          (let ((den (denominator base))
                (num (numerator base)))
