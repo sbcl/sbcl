@@ -53,13 +53,33 @@
 
 (/show0 "unix.lisp 74")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun libc-name-for (x)
+    (assert (stringp x))
+    ;; This function takes a possibly-wrapped C name and strips off "sb_"
+    ;; if it doesn't need a wrapper. The list of functions that can be
+    ;; called directly is listed explicitly, because there are also others
+    ;; that might want to be wrapped even if they don't need to be,
+    ;; like sb_opendir and sb_closedir. Why are those wrapped in fact?
+    #+netbsd x
+    #-netbsd (if (member x '("sb_getrusage" ; syscall*
+                             "sb_gettimeofday" ;syscall*
+                             "sb_select" ; int-syscall
+                             "sb_getitimer" ; syscall*
+                             "sb_setitimer" ; ssycall*
+                             "sb_utimes") ; posix
+                         :test #'string=)
+                 (subseq x 3)
+                 x)))
+
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
     (setf name
           (concatenate 'string #+win32 "_" (subseq name 3))))
   `(locally
     (declare (optimize (sb-c::float-accuracy 0)))
-    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+    (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
+                                               (function int ,@arg-types))
                                 ,@args)))
       (if (minusp result)
           (values nil (get-errno))
@@ -71,14 +91,15 @@
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb-c::float-accuracy 0)))
-    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+    (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
+                                               (function int ,@arg-types))
                                  ,@args)))
       (if (minusp result)
           (error "Syscall ~A failed: ~A" ,name (strerror))
           ,success-form))))
 
 (defmacro int-syscall ((name &rest arg-types) &rest args)
-  `(syscall (,name ,@arg-types) (values result 0) ,@args))
+  `(syscall (,(libc-name-for name) ,@arg-types) (values result 0) ,@args))
 
 (defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
@@ -1018,13 +1039,13 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
             (slot (slot itvn 'it-interval) 'tv-usec) int-usec
             (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
             (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
-      (syscall* ("sb_setitimer" int (* (struct timeval))(* (struct timeval)))
+      (syscall* ("sb_setitimer" int (* (struct timeval)) (* (struct timeval)))
                 (values t
                         (slot (slot itvo 'it-interval) 'tv-sec)
                         (slot (slot itvo 'it-interval) 'tv-usec)
                         (slot (slot itvo 'it-value) 'tv-sec)
                         (slot (slot itvo 'it-value) 'tv-usec))
-                which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
+                which (alien-sap (addr itvn)) (alien-sap (addr itvo))))))
 
 
 ;;; FIXME: Many Unix error code definitions were deleted from the old
@@ -1047,10 +1068,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
     (with-alien ((tv (struct timeval)))
-      (syscall* ("sb_gettimeofday" (* (struct timeval)))
+      (syscall* ("sb_gettimeofday" (* (struct timeval)) system-area-pointer)
                 (values (slot tv 'tv-sec)
                         (slot tv 'tv-usec))
-                (addr tv))))
+                (addr tv) (int-sap 0))))
 
   (declaim (inline system-internal-run-time
                    system-real-time-values))

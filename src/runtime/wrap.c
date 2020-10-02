@@ -523,18 +523,13 @@ int s_issock(mode_t mode)
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
-#ifndef LISP_FEATURE_WIN32
-int sb_getrusage(int who, struct rusage *rusage)
-{
-        return getrusage(who, rusage);
-}
-
-int sb_gettimeofday(struct timeval *tp)
-{
-        return gettimeofday(tp, NULL);
-}
-
-#ifndef LISP_FEATURE_DARWIN /* reimplements nanosleep in darwin-os.c  */
+#ifdef LISP_FEATURE_UNIX
+#ifdef LISP_FEATURE_DARWIN
+/* nanosleep() is not re-entrant on some versions of Darwin and is
+ * reimplemented using the underlying syscalls.
+ */
+int sb_nanosleep(time_t sec, int nsec);
+#else
 void sb_nanosleep(time_t sec, int nsec)
 {
     struct timespec rqtp = {sec, nsec};
@@ -571,11 +566,6 @@ void sb_nanosleep(time_t sec, int nsec)
         */
     }
 }
-#else
-/* nanosleep() is not re-entrant on some versions of Darwin and is
- * reimplemented it using the underlying syscalls.
- */
-int sb_nanosleep(time_t sec, int nsec);
 #endif
 
 void sb_nanosleep_double(double seconds) {
@@ -590,6 +580,20 @@ void sb_nanosleep_double(double seconds) {
 }
 void sb_nanosleep_float(float seconds) {
     sb_nanosleep_double(seconds);
+}
+#endif
+
+#ifdef LISP_FEATURE_NETBSD
+/* These thin wrappers are needed due to "linker rewriting"
+ * acording to git revision 9304704f68 */
+int sb_getrusage(int who, struct rusage *rusage)
+{
+        return getrusage(who, rusage);
+}
+
+int sb_gettimeofday(struct timeval *tp, void *tz)
+{
+        return gettimeofday(tp, tz);
 }
 
 int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
@@ -612,7 +616,11 @@ int sb_utimes(char *path, struct timeval times[2])
 {
     return utimes(path, times);
 }
-#else /* !LISP_FEATURE_WIN32 */
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+
+// These are used in src/code/irrat.lisp. Search for DEF-MATH-RTN
 #define SB_TRIG_WRAPPER(name) \
     double sb_##name (double x) {               \
         return name(x);                         \

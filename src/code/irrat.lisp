@@ -76,6 +76,7 @@
 #-x86 (def-math-rtn "atan" 1)
 #-x86 (def-math-rtn "atan2" 2)
 
+;;; See src/runtime/wrap.c for the definitions of the "sb_"-prefixed things.
 (def-math-rtn "acos" 1 #+win32 t)
 (def-math-rtn "asin" 1 #+win32 t)
 (def-math-rtn "cosh" 1 #+win32 t)
