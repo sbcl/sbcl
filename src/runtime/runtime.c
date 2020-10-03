@@ -38,9 +38,7 @@
 #include <locale.h>
 #include <limits.h>
 
-#if defined(SVR4) || defined(__linux__)
 #include <time.h>
-#endif
 
 #if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
 #include "signal.h"
@@ -63,6 +61,8 @@
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
+
+struct timespec lisp_init_time;
 
 static char libpath[] = "../lib/sbcl";
 char *sbcl_runtime_home;
@@ -397,6 +397,9 @@ sbcl_main(int argc, char *argv[], char *envp[])
     /* Exception handling support structure. Evil Win32 hack. */
     struct lisp_exception_frame exception_frame;
 #endif
+#ifdef LISP_FEATURE_UNIX
+    clock_gettime(CLOCK_REALTIME_COARSE, &lisp_init_time);
+#endif
 
     /* the name of the core file we're to execute. Note that this is
      * a malloc'ed string which should be freed eventually. */
@@ -423,7 +426,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
     boolean have_hardwired_spaces = os_preinit(argv, envp);
 
     interrupt_init();
-#ifndef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_UNIX
     /* Not sure why anyone sends signals to this process so early.
      * But win32 models the signal mask as part of 'struct thread'
      * which doesn't exist yet, so don't do this */

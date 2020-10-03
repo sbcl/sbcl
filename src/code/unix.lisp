@@ -1065,12 +1065,10 @@ the UNIX epoch (January 1st 1970.)"
                 (addr tv) (int-sap 0))))
 
   ;; The "optimizations that actually matter" don't actually matter for 64-bit.
-  ;; Milliseconds can express at least 1E8 years of uptime:
-  ;; (float (/ most-positive-fixnum (* 1000 60 60 24 (+ 365 1/4))))
-  ;;   = milliseconds-per-second * seconds-per-minute * minutes-per-hour
+  ;; Microseconds can express at least 1E5 years of uptime:
+  ;; (float (/ most-positive-fixnum (* 1000000 60 60 24 (+ 365 1/4))))
+  ;;   = microseconds-per-second * seconds-per-minute * minutes-per-hour
   ;;     * hours-per-day * days-per-year
-  ;; Accounting for the fixnum tag bit, that's still plenty.
-  ;; Additionally we could increase internal-time-units-per-second by quite a lot.
   #+64-bit
   (progn
     (defun reinit-internal-real-time () nil)

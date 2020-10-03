@@ -89,13 +89,9 @@ static void dragonfly_init();
 static void openbsd_init();
 #endif
 
-#include <sys/time.h>
-struct timespec lisp_init_time;
-
 void
 os_init(char *argv[], char *envp[])
 {
-    clock_gettime(CLOCK_REALTIME, &lisp_init_time);
 #ifdef __NetBSD__
     netbsd_init();
 #elif defined(LISP_FEATURE_FREEBSD)

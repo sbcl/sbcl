@@ -68,9 +68,6 @@
 
 ;;;; High resolution timer
 
-;;; FIXME: High resolution this is not. Build a microsecond-accuracy version
-;;; on top of unix-getrusage, maybe.
-
 (defconstant +ticks-per-second+ internal-time-units-per-second)
 
 (declaim (inline get-internal-ticks))
