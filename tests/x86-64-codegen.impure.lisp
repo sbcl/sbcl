@@ -740,10 +740,14 @@ sb-vm::(define-vop (cl-user::test)
 
 #+immobile-code
 (with-test (:name :debug-fun-from-pc-more-robust)
+  ;; This test verifies that debug-fun-from-pc does not croak when the PC points
+  ;; within a trampoline allocated to wrap a closure in a simple-funifying wrapper
+  ;; for installation into a global symbol.
+  (assert (sb-kernel:closurep #'sb-int:constantly-0))
   (let ((trampoline
           (sb-di::code-header-from-pc
            (sb-sys:int-sap (sb-vm::fdefn-raw-addr
-                            (sb-kernel::find-fdefn 'sb-kernel::get-internal-real-time))))))
+                            (sb-kernel::find-fdefn 'sb-int:constantly-0))))))
     (assert (zerop (sb-kernel:code-n-entries trampoline)))
     (assert (typep (sb-di::debug-fun-from-pc trampoline 8)
                    'sb-di::bogus-debug-fun))))

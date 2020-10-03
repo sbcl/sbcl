@@ -340,6 +340,21 @@ main(int argc, char __attribute__((unused)) *argv[])
 #endif // !WIN32
     printf("\n");
 
+#ifdef LISP_FEATURE_UNIX
+    defconstant("clock-realtime", CLOCK_REALTIME);
+#endif
+#ifdef LISP_FEATURE_LINUX
+    defconstant("clock-realtime-alarm", CLOCK_REALTIME_ALARM);
+    defconstant("clock-realtime-coarse", CLOCK_REALTIME_COARSE);
+    defconstant("clock-tai", CLOCK_TAI); // International Atomic Time.
+    defconstant("clock-monotonic", CLOCK_MONOTONIC);
+    defconstant("clock-monotonic-coarse", CLOCK_MONOTONIC_COARSE);
+    defconstant("clock-monotonic-raw", CLOCK_MONOTONIC_RAW);
+    defconstant("clock-boottime", CLOCK_BOOTTIME);
+    defconstant("clock-boottime-alarn", CLOCK_BOOTTIME_ALARM);
+    defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
+    defconstant("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
+#endif
     printf(";;; structures\n");
     DEFSTRUCT(timeval, struct timeval,
         DEFSLOT(tv-sec, tv_sec);

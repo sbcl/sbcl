@@ -66,7 +66,7 @@
                              "sb_gettimeofday" ;syscall*
                              "sb_select" ; int-syscall
                              "sb_getitimer" ; syscall*
-                             "sb_setitimer" ; ssycall*
+                             "sb_setitimer" ; syscall*
                              "sb_utimes") ; posix
                          :test #'string=)
                  (subseq x 3)
@@ -1055,8 +1055,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; enough of them all in one place here that they should probably be
 ;;; removed by hand.
 
-(defconstant micro-seconds-per-internal-time-unit
+(defconstant microseconds-per-internal-time-unit
   (/ 1000000 internal-time-units-per-second))
+(defconstant nanoseconds-per-internal-time-unit
+  (* microseconds-per-internal-time-unit 1000))
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
@@ -1073,13 +1075,55 @@ the UNIX epoch (January 1st 1970.)"
                         (slot tv 'tv-usec))
                 (addr tv) (int-sap 0))))
 
-  (declaim (inline system-internal-run-time
-                   system-real-time-values))
-  (defun system-real-time-values ()
-    (multiple-value-bind (sec usec) (get-time-of-day)
-      (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
-      (values sec (truncate usec micro-seconds-per-internal-time-unit))))
+  ;; The "optimizations that actually matter" don't actually matter for 64-bit.
+  ;; Milliseconds can express at least 1E8 years of uptime:
+  ;; (float (/ most-positive-fixnum (* 1000 60 60 24 (+ 365 1/4))))
+  ;;   = milliseconds-per-second * seconds-per-minute * minutes-per-hour
+  ;;     * hours-per-day * days-per-year
+  ;; Accounting for the fixnum tag bit, that's still plenty.
+  ;; Additionally we could increase internal-time-units-per-second by quite a lot.
+  #+(and 64-bit (or bsd linux)) ; use clock_gettime()
+  (progn
+    ;; this is a POSIX-specified API but I've only tested it on (linux|bsd) + amd64.
+    (declaim (inline clock-gettime))
+    (defun clock-gettime (clockid)
+      (declare (type (signed-byte 32) clockid))
+      (with-alien ((ts (struct timespec)))
+        (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
+                       clockid (addr ts))
+        (values (truly-the fixnum (slot ts 'tv-sec))
+                (truly-the fixnum (slot ts 'tv-nsec)))))
+    (defun reinit-internal-real-time () nil)
+    (defun get-internal-real-time ()
+      (with-alien ((base (struct timespec) :extern "lisp_init_time"))
+        (multiple-value-bind (c-sec c-nsec)
+            ;; By scaling down we end up with far less resolution than clock-realtime
+            ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
+            ;; BSD has something similar.
+            (clock-gettime #+linux clock-realtime-coarse
+                           #-linux clock-realtime)
+          (declare (optimize (sb-c::type-check 0)))
+          (let ((delta-sec (the fixnum (- c-sec (the fixnum (slot base 'tv-sec)))))
+                (delta-nsec (the fixnum (- c-nsec (the fixnum (slot base 'tv-nsec))))))
+            (the sb-kernel:internal-time
+                 (+ (the fixnum (* delta-sec internal-time-units-per-second))
+                    (floor delta-nsec nanoseconds-per-internal-time-unit))))))))
 
+  #+(and 64-bit (not (or bsd linux))) ; use gettimeofday()
+  (let ((e-sec 0) (e-usec 0)) ; "epoch" in seconds + microseconds
+    (declare (fixnum e-sec e-usec))
+    (defun reinit-internal-real-time ()
+      (setf (values e-sec e-usec) (get-time-of-day)))
+    (defun get-internal-real-time ()
+      (multiple-value-bind (c-sec c-usec) (get-time-of-day)
+        (declare (optimize (sb-c::type-check 0)))
+        (let ((delta-sec (the fixnum (- (the fixnum c-sec) e-sec)))
+              (delta-usec (the fixnum (- (the fixnum c-usec) e-usec))))
+          (the sb-kernel:internal-time
+               (+ (the fixnum (* delta-sec internal-time-units-per-second))
+                  (floor delta-usec microseconds-per-internal-time-unit)))))))
+
+  #-64-bit
   ;; There are two optimizations here that actually matter (on 32-bit
   ;; systems): substract the epoch from seconds and milliseconds
   ;; separately, as those should remain fixnums for the first 17 years
@@ -1097,6 +1141,14 @@ the UNIX epoch (January 1st 1970.)"
   ;; bound.
   ;;
   ;; --NS 2007-04-05
+  (progn
+
+  (declaim (inline system-real-time-values))
+  (defun system-real-time-values ()
+    (multiple-value-bind (sec usec) (get-time-of-day)
+      (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
+      (values sec (truncate usec microseconds-per-internal-time-unit))))
+
   (let ((e-sec 0)
         (e-msec 0)
         (c-sec 0)
@@ -1133,7 +1185,11 @@ the UNIX epoch (January 1st 1970.)"
                 c-msec msec
                 c-sec sec))
         now)))
+  ) ; end #-64-bit PROGN
 
+  ;; TODO: use clock_gettime(CLOCK_PROCESS_CPUTIME_ID) where available.
+  ;; It's lighter weight than getrusage.
+  (declaim (inline system-internal-run-time))
   (defun system-internal-run-time ()
     (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
         (unix-fast-getrusage rusage_self)
@@ -1148,8 +1204,8 @@ the UNIX epoch (January 1st 1970.)"
                           internal-time-units-per-second)
                        (floor (+ utime-usec
                                  stime-usec
-                                 (floor micro-seconds-per-internal-time-unit 2))
-                              micro-seconds-per-internal-time-unit))))
+                                 (floor microseconds-per-internal-time-unit 2))
+                              microseconds-per-internal-time-unit))))
         result))))
 
 ;;; FIXME, KLUDGE: GET-TIME-OF-DAY used to be UNIX-GETTIMEOFDAY, and had a

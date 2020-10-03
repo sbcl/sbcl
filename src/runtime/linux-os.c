@@ -262,9 +262,11 @@ futex_wake(int *lock_word, int n)
 #endif
 
 
+struct timespec lisp_init_time;
 void os_init(char __attribute__((unused)) *argv[],
              char __attribute__((unused)) *envp[])
 {
+    clock_gettime(CLOCK_REALTIME_COARSE, &lisp_init_time);
 #ifdef LISP_FEATURE_SB_FUTEX
     futex_init();
 #endif
