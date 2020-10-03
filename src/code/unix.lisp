@@ -1051,8 +1051,11 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     (with-alien ((ts (struct timespec)))
       (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
                      clockid (addr ts))
-      (values (truly-the fixnum (slot ts 'tv-sec))
-              (truly-the fixnum (slot ts 'tv-nsec)))))
+      ;; 'seconds' is definitely a fixnum for 64-bit, because most-positive-fixnum
+      ;; can express 1E11 years in seconds.
+      (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
+              #-64-bit (slot ts 'tv-sec)
+              (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec)))))
 
   (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
@@ -1069,35 +1072,27 @@ the UNIX epoch (January 1st 1970.)"
   ;; (float (/ most-positive-fixnum (* 1000000 60 60 24 (+ 365 1/4))))
   ;;   = microseconds-per-second * seconds-per-minute * minutes-per-hour
   ;;     * hours-per-day * days-per-year
-  #+64-bit
-  (progn
-    (defun reinit-internal-real-time () nil)
-    (defun get-internal-real-time ()
-      (with-alien ((base (struct timespec) :extern "lisp_init_time"))
-        (multiple-value-bind (c-sec c-nsec)
-            ;; By scaling down we end up with far less resolution than clock-realtime
-            ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
-            ;; BSD has something similar.
-            (clock-gettime #+linux clock-realtime-coarse
-                           #-linux clock-realtime)
-          (declare (optimize (sb-c::type-check 0)))
-          (let ((delta-sec (the fixnum (- c-sec (the fixnum (slot base 'tv-sec)))))
-                (delta-nsec (the fixnum (- c-nsec (the fixnum (slot base 'tv-nsec))))))
-            (the sb-kernel:internal-time
-                 (+ (the fixnum (* delta-sec internal-time-units-per-second))
-                    (floor delta-nsec nanoseconds-per-internal-time-unit))))))))
 
-  #-64-bit
-  ;; There are two optimizations here that actually matter (on 32-bit
-  ;; systems): substract the epoch from seconds and milliseconds
-  ;; separately, as those should remain fixnums for the first 17 years
-  ;; or so of runtime. Also, avoid doing consing a new bignum if the
-  ;; result would be = to the last result given.
-  ;;
-  ;; Note: the next trick would be to spin a separate thread to update
-  ;; a global value once per internal tick, so each individual call to
-  ;; get-internal-real-time would be just a memory read... but that is
-  ;; probably best left for user-level code. ;)
+  (defun get-internal-real-time ()
+    (with-alien ((base (struct timespec) :extern "lisp_init_time"))
+      (multiple-value-bind (c-sec c-nsec)
+          ;; By scaling down we end up with far less resolution than clock-realtime
+          ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
+          ;; BSD has something similar.
+          (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
+
+        #+64-bit ;; I know that my math is valid for 64-bit.
+        (declare (optimize (sb-c::type-check 0)))
+        #+64-bit
+        (let ((delta-sec (the fixnum (- c-sec (the fixnum (slot base 'tv-sec)))))
+              (delta-nsec (the fixnum (- c-nsec (the fixnum (slot base 'tv-nsec))))))
+          (the sb-kernel:internal-time
+               (+ (the fixnum (* delta-sec internal-time-units-per-second))
+                  (floor delta-nsec nanoseconds-per-internal-time-unit))))
+
+  ;; There are two optimizations here that actually matter on 32-bit systems:
+  ;;  (1) subtract the epoch from seconds and milliseconds separately,
+  ;;  (2) avoid consing a new bignum if the result is unchanged.
   ;;
   ;; Thanks to James Anderson for the optimization hint.
   ;;
@@ -1105,51 +1100,32 @@ the UNIX epoch (January 1st 1970.)"
   ;; bound.
   ;;
   ;; --NS 2007-04-05
-  (progn
-
-  (declaim (inline system-real-time-values))
-  (defun system-real-time-values ()
-    (multiple-value-bind (sec usec) (get-time-of-day)
-      (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
-      (values sec (truncate usec microseconds-per-internal-time-unit))))
-
-  (let ((e-sec 0)
-        (e-msec 0)
-        (c-sec 0)
-        (c-msec 0)
-        (now 0))
-    (declare (type sb-kernel:internal-seconds e-sec c-sec)
-             (type sb-kernel:internal-seconds e-msec c-msec)
-             (type sb-kernel:internal-time now))
-    (defun reinit-internal-real-time ()
-      (setf (values e-sec e-msec) (system-real-time-values)
-            c-sec 0
-            c-msec 0))
-    ;; If two threads call this at the same time, we're still safe, I
-    ;; believe, as long as NOW is updated before either of C-MSEC or
-    ;; C-SEC. Same applies to interrupts. --NS
-    ;;
-    ;; I believe this is almost correct with x86/x86-64 cache
-    ;; coherency, but if the new value of C-SEC, C-MSEC can become
-    ;; visible to another CPU without NOW doing the same then it's
-    ;; unsafe. It's `almost' correct on x86 because writes by other
-    ;; processors may become visible in any order provided transitity
-    ;; holds. With at least three cpus, C-MSEC and C-SEC may be from
-    ;; different threads and an incorrect value may be returned.
-    ;; Considering that this failure is not detectable by the caller -
-    ;; it looks like time passes a bit slowly - and that it should be
-    ;; an extremely rare occurance I'm inclinded to leave it as it is.
-    ;; --MG
-    (defun get-internal-real-time ()
-      (multiple-value-bind (sec msec) (system-real-time-values)
-        (unless (and (= msec c-msec) (= sec c-sec))
-          (setf now (+ (* (- sec e-sec)
-                          sb-xc:internal-time-units-per-second)
-                       (- msec e-msec))
-                c-msec msec
-                c-sec sec))
-        now)))
-  ) ; end #-64-bit PROGN
+        #-64-bit
+        (symbol-macrolet ((observed-sec
+                           (sb-thread::thread-observed-internal-real-time-delta-sec thr))
+                          (observed-msec
+                           (sb-thread::thread-observed-internal-real-time-delta-millisec thr))
+                          (time (sb-thread::thread-internal-real-time thr)))
+          (let* ((delta-sec (- c-sec (slot base 'tv-sec)))
+                 ;; I inadvertently had too many THE casts in here, so I'd prefer
+                 ;; to err on the side of caution rather than cause GC lossage
+                 ;; (which I accidentally did). So assert that nanoseconds are <= 10^9
+                 ;; and the compiler will do as best it can with that information.
+                 (delta-nsec (- c-nsec (the (integer 0 #.(expt 10 9))
+                                            (slot base 'tv-nsec))))
+                 ;; ROUND, FLOOR? Who cares, it's a number that's going to change.
+                 ;; More math = more self-induced jitter.
+                 (delta-millisec (floor delta-nsec 1000000))
+                 (thr sb-thread:*current-thread*))
+            (if (and (= delta-sec observed-sec) (= delta-millisec observed-msec))
+                time
+                (let ((current (+ (* delta-sec internal-time-units-per-second)
+                                  ;; ASSUMPTION: delta-millisec = delta-itu
+                                  delta-millisec)))
+                  (setf time current
+                        observed-msec delta-millisec
+                        observed-sec delta-sec)
+                  current)))))))
 
   (declaim (inline system-internal-run-time))
   (defun system-internal-run-time ()

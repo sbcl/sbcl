@@ -21,10 +21,8 @@ any time."
   #+sb-thread (/= (thread-primitive-thread thread) 0)
   #-sb-thread t)
 
-(defvar *current-thread*)
 (setf (documentation '*current-thread* 'variable)
       "Bound in each thread to the thread itself.")
-(declaim (type thread *current-thread*))
 
 (defun mutex-value (mutex)
   "Current owner of the mutex, NIL if the mutex is free. May return a

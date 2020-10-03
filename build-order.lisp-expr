@@ -213,6 +213,8 @@
  ("src/code/mipsstrops" :not-host)
 
  ("src/code/early-time" :c-headers)
+ ;; 32-bit implementatin of GET-INTERNAL-REAL-TIME needs some thread slots
+ ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
  ("src/code/unix" :not-host)
  #+win32 ("src/code/win32" :not-host)
 
@@ -225,7 +227,6 @@
 
  ("src/code/share-vm" :not-host)
 
- ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
  ("src/code/thread" :not-host :block-compile) ; provides *CURRENT-THREAD* for target-signal
  ("src/code/target-signal-common" :not-host)
 

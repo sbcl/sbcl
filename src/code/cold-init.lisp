@@ -195,7 +195,7 @@
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 
-  (show-and-call time-reinit)
+  #+win32 (show-and-call reinit-internal-real-time)
 
   ;; Set sane values again, so that the user sees sane values instead
   ;; of whatever is left over from the last DECLAIM/PROCLAIM.
@@ -350,7 +350,7 @@ process to continue normally."
     (float-cold-init-or-reinit))
   (gc-reinit)
   (foreign-reinit)
-  (time-reinit)
+  #+win32 (reinit-internal-real-time)
   ;; If the debugger was disabled in the saved core, we need to
   ;; re-disable ldb again.
   (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)

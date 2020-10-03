@@ -11,9 +11,6 @@
 
 (in-package "SB-IMPL")
 
-(defun time-reinit ()
-  (reinit-internal-real-time))
-
 ;;; Implemented in unix.lisp and win32.lisp.
 (setf (documentation 'get-internal-real-time 'function)
       "Return the real time (\"wallclock time\") since startup in the internal

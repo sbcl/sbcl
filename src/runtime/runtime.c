@@ -400,9 +400,9 @@ sbcl_main(int argc, char *argv[], char *envp[])
 #ifdef LISP_FEATURE_UNIX
     clock_gettime(
 #ifdef LISP_FEATURE_LINUX
-        CLOCK_REALTIME_COARSE
+        CLOCK_MONOTONIC_COARSE
 #else
-        CLOCK_REALTIME
+        CLOCK_MONOTONIC
 #endif
         , &lisp_init_time);
 #endif

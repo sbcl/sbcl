@@ -122,6 +122,19 @@ in future versions."
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")
    :type mutex :read-only t)
+
+  ;; Per-thread memoization of GET-INTERNAL-REAL-TIME, for race-free update.
+  ;; This might be a bignum, which is why we bother.
+  #-64-bit (observed-internal-real-time-delta-sec 0 :type sb-vm:word)
+  #-64-bit (observed-internal-real-time-delta-millisec
+            ;; This needs a sentinel that can not possibly match an actual delta.
+            ;; I have seen threads start up where 0 and 0 do match sec,msec
+            ;; respectively, and then we'd return the cached NIL as if it were
+            ;; the time. Forcing mismatch avoids putting in an extra test for NIL.
+            (ash sb-ext:most-positive-word -1)
+            :type sb-vm:signed-word)
+  #-64-bit (internal-real-time)
+
   ;; On succesful execution of the thread's lambda, a list of values.
   (result 0)
   ;; The completion condition _could_ be manifested as a condition var, but a difficulty
@@ -151,3 +164,5 @@ temporarily.")
   (signal-number nil :type integer))
 
 (declaim (sb-ext:freeze-type mutex thread))
+(defvar *current-thread*)
+(declaim (type thread *current-thread*))
