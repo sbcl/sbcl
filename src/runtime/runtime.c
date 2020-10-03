@@ -398,7 +398,13 @@ sbcl_main(int argc, char *argv[], char *envp[])
     struct lisp_exception_frame exception_frame;
 #endif
 #ifdef LISP_FEATURE_UNIX
-    clock_gettime(CLOCK_REALTIME, &lisp_init_time);
+    clock_gettime(
+#ifdef LISP_FEATURE_LINUX 
+        CLOCK_REALTIME_COARSE
+#else
+        CLOCK_REALTIME
+#endif
+        , &lisp_init_time);
 #endif
 
     /* the name of the core file we're to execute. Note that this is
