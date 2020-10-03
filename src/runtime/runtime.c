@@ -399,7 +399,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
 #endif
 #ifdef LISP_FEATURE_UNIX
     clock_gettime(
-#ifdef LISP_FEATURE_LINUX 
+#ifdef LISP_FEATURE_LINUX
         CLOCK_REALTIME_COARSE
 #else
         CLOCK_REALTIME

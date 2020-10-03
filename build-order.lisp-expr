@@ -254,7 +254,6 @@
  ("src/code/query"  :not-host)
 
  ("src/code/sort"  :not-host)
- ("src/code/time"  :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
@@ -606,6 +605,7 @@
  ("src/code/alloc"             :not-host) ; needs foo-SPACE-START
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
+ ("src/code/time"              :not-host)
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"

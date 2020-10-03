@@ -467,7 +467,6 @@ EXPERIMENTAL: Interface subject to change."
           (*eval-calls* 0)
           (sb-c::*lambda-conversions* 0)
           (aborted t))
-      (declare (special *eval-calls* sb-c::*lambda-conversions*))
       (multiple-value-bind (h0 l0) (read-cycle-counter)
         (unwind-protect
              (multiple-value-prog1 (apply fun arguments)
@@ -496,8 +495,10 @@ EXPERIMENTAL: Interface subject to change."
                       (note :processor-cycles cycles #'zerop))
                     (note :lambdas-converted sb-c::*lambda-conversions* #'zerop)
                     (note :eval-calls *eval-calls* #'zerop)
-                    (note :gc-run-time-ms gc-internal-run-time)
+                    (note :gc-run-time-ms (floor gc-internal-run-time
+                                                 (/ internal-time-units-per-second 1000)))
                     (note :system-run-time-us system-run-time)
                     (note :user-run-time-us user-run-time)
-                    (note :real-time-ms real-time))
+                    (note :real-time-ms (floor real-time
+                                               (/ internal-time-units-per-second 1000))))
                   (apply timer plist))))))))))
