@@ -869,4 +869,5 @@
     (with-open-file (stream file)
       (let ((cs (make-concatenated-stream stream)))
         (read-char-no-hang cs)
-        (assert (listen cs))))))
+        (assert (listen cs))))
+    (delete-file file)))
