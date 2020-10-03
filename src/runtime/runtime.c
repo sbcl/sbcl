@@ -397,9 +397,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
     /* Exception handling support structure. Evil Win32 hack. */
     struct lisp_exception_frame exception_frame;
 #endif
-#ifdef LISP_FEATURE_UNIX
-    clock_gettime(CLOCK_REALTIME_COARSE, &lisp_init_time);
-#endif
 
     /* the name of the core file we're to execute. Note that this is
      * a malloc'ed string which should be freed eventually. */

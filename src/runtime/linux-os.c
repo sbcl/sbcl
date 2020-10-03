@@ -269,6 +269,8 @@ void os_init(char __attribute__((unused)) *argv[],
     futex_init();
 #endif
 
+    clock_gettime(CLOCK_REALTIME_COARSE, &lisp_init_time);
+
 #ifdef LISP_FEATURE_X86
     /* Use SSE detector.  Recent versions of Linux enable SSE support
      * on SSE capable CPUs.  */
