@@ -1,7 +1,8 @@
 (use-package "SB-THREAD")
 
 (with-test (:name (:join-thread :timeout)
-                  :skipped-on (not :sb-thread))
+            :broken-on :sb-safepoint
+            :skipped-on (not :sb-thread))
   (macrolet ((delta-t () '(/ (- (get-internal-real-time) begin)
                              internal-time-units-per-second)))
     (let ((thr (sb-thread:make-thread (lambda () (sleep 10)) :name "thr1"))
