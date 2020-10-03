@@ -862,4 +862,11 @@
     (assert (null (read-byte (process-output process) nil nil)))
     (process-close process)))
 
-;;; success
+(with-test (:name :concatenated-stream-listen)
+  (let ((file (scratch-file-name)))
+    (with-open-file (stream file :direction :output :if-exists :supersede)
+      (write-line "abc" stream))
+    (with-open-file (stream file)
+      (let ((cs (make-concatenated-stream stream)))
+        (read-char-no-hang cs)
+        (assert (listen cs))))))

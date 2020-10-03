@@ -116,9 +116,7 @@
     (case operation
       (:listen
        (if (ansi-stream-p in)
-           (or (/= (the fixnum (ansi-stream-in-index in))
-                   +ansi-stream-in-buffer-length+)
-               (funcall (ansi-stream-misc in) in :listen))
+           (%ansi-stream-listen in)
            (stream-misc-dispatch in :listen)))
       (:unread (setf (echo-stream-unread-stuff stream) t)
                (unread-char arg1 in))

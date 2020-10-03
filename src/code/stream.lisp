@@ -435,15 +435,18 @@
         (stream-unread-char stream character)))
   nil)
 
-(declaim (inline ansi-stream-listen))
-(defun ansi-stream-listen (stream)
+(declaim (inline %ansi-stream-listen))
+(defun %ansi-stream-listen (stream)
   (or (/= (the fixnum (ansi-stream-in-index stream))
           +ansi-stream-in-buffer-length+)
-      ;; Handle :EOF return from misc methods specially
-      (let ((result (funcall (ansi-stream-misc stream) stream :listen)))
-        (if (eq result :eof)
-            nil
-            result))))
+      (funcall (ansi-stream-misc stream) stream :listen)))
+
+(declaim (inline ansi-stream-listen))
+(defun ansi-stream-listen (stream)
+  (let ((result (%ansi-stream-listen stream)))
+    (if (eq result :eof)
+        nil
+        result)))
 
 (defun listen (&optional (stream *standard-input*))
   (declare (explicit-check))
@@ -455,7 +458,7 @@
 
 (declaim (inline ansi-stream-read-char-no-hang))
 (defun ansi-stream-read-char-no-hang (stream eof-error-p eof-value recursive-p)
-  (if (funcall (ansi-stream-misc stream) stream :listen)
+  (if (%ansi-stream-listen stream)
       ;; On T or :EOF get READ-CHAR to do the work.
       (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
       nil))
@@ -970,9 +973,7 @@
         ;; the in-buffer of the wrapped stream, since just calling
         ;; ANSI-STREAM-MISC on them
         (case operation
-          (:listen (or (/= (the fixnum (ansi-stream-in-index syn))
-                           +ansi-stream-in-buffer-length+)
-                       (funcall (ansi-stream-misc syn) syn :listen)))
+          (:listen (%ansi-stream-listen syn))
           (:clear-input (clear-input syn))
           (:unread (unread-char arg1 syn))
           (t
@@ -1034,9 +1035,7 @@
     (case operation
       (:listen
        (if in-ansi-stream-p
-           (or (/= (the fixnum (ansi-stream-in-index in))
-                   +ansi-stream-in-buffer-length+)
-               (funcall (ansi-stream-misc in) in :listen))
+           (%ansi-stream-listen in)
            (listen in)))
       ((:finish-output :force-output :clear-output)
        (if out-ansi-stream-p
@@ -1135,8 +1134,7 @@
          (return-from concatenated-misc :eof))
        (loop
         (let ((stuff (if (ansi-stream-p current)
-                         (funcall (ansi-stream-misc current) current
-                                  :listen)
+                         (%ansi-stream-listen current)
                          (stream-misc-dispatch current :listen))))
           (cond ((eq stuff :eof)
                  ;; Advance STREAMS, and try again.
