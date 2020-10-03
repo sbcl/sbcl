@@ -164,5 +164,7 @@ temporarily.")
   (signal-number nil :type integer))
 
 (declaim (sb-ext:freeze-type mutex thread))
-(defvar *current-thread*)
-(declaim (type thread *current-thread*))
+#-sb-xc-host
+(progn
+  (defvar *current-thread*)
+  (declaim (type thread *current-thread*)))
