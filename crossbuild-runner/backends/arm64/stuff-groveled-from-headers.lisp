@@ -134,6 +134,17 @@
 (defconstant fpe-fltinv 7) ; #x7
 (defconstant fpe-fltsub 8) ; #x8
 
+(defconstant clock-realtime 0) ; #x0
+(defconstant clock-process-cputime-id 2) ; #x2
+(defconstant clock-realtime-alarm 8) ; #x8
+(defconstant clock-realtime-coarse 5) ; #x5
+(defconstant clock-tai 11) ; #xb
+(defconstant clock-monotonic 1) ; #x1
+(defconstant clock-monotonic-coarse 6) ; #x6
+(defconstant clock-monotonic-raw 4) ; #x4
+(defconstant clock-boottime 7) ; #x7
+(defconstant clock-boottime-alarn 9) ; #x9
+(defconstant clock-thread-cputime-id 3) ; #x3
 ;;; structures
 (define-alien-type nil
   (struct timeval
