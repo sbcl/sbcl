@@ -342,6 +342,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 
 #ifdef LISP_FEATURE_UNIX
     defconstant("clock-realtime", CLOCK_REALTIME);
+    defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
 #endif
 #ifdef LISP_FEATURE_LINUX
     defconstant("clock-realtime-alarm", CLOCK_REALTIME_ALARM);
@@ -352,7 +353,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("clock-monotonic-raw", CLOCK_MONOTONIC_RAW);
     defconstant("clock-boottime", CLOCK_BOOTTIME);
     defconstant("clock-boottime-alarn", CLOCK_BOOTTIME_ALARM);
-    defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
     defconstant("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
 #endif
     printf(";;; structures\n");

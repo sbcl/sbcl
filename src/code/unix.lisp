@@ -550,26 +550,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 ;;;; sys/resource.h
 
-;;; FIXME: All we seem to need is the RUSAGE_SELF version of this.
-;;;
-;;; This is like getrusage(2), except it returns only the system and
-;;; user time, and returns the seconds and microseconds as separate
-;;; values.
-#-win32 (declaim (inline unix-fast-getrusage))
-#-win32
-(defun unix-fast-getrusage (who)
-  (declare (values (member t)
-                   unsigned-byte fixnum
-                   unsigned-byte fixnum))
-  (with-alien ((usage (struct rusage)))
-    (syscall* ("sb_getrusage" int (* (struct rusage)))
-              (values t
-                      (slot (slot usage 'ru-utime) 'tv-sec)
-                      (slot (slot usage 'ru-utime) 'tv-usec)
-                      (slot (slot usage 'ru-stime) 'tv-sec)
-                      (slot (slot usage 'ru-stime) 'tv-usec))
-              who (addr usage))))
-
 ;;; Return information about the resource usage of the process
 ;;; specified by WHO. WHO can be either the current process
 ;;; (rusage_self) or all of the terminated child processes
@@ -1065,6 +1045,15 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #-win32
 (progn
 
+  (declaim (inline clock-gettime))
+  (defun clock-gettime (clockid)
+    (declare (type (signed-byte 32) clockid))
+    (with-alien ((ts (struct timespec)))
+      (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
+                     clockid (addr ts))
+      (values (truly-the fixnum (slot ts 'tv-sec))
+              (truly-the fixnum (slot ts 'tv-nsec)))))
+
   (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
@@ -1082,17 +1071,8 @@ the UNIX epoch (January 1st 1970.)"
   ;;     * hours-per-day * days-per-year
   ;; Accounting for the fixnum tag bit, that's still plenty.
   ;; Additionally we could increase internal-time-units-per-second by quite a lot.
-  #+(and 64-bit (or bsd linux)) ; use clock_gettime()
+  #+64-bit
   (progn
-    ;; this is a POSIX-specified API but I've only tested it on (linux|bsd) + amd64.
-    (declaim (inline clock-gettime))
-    (defun clock-gettime (clockid)
-      (declare (type (signed-byte 32) clockid))
-      (with-alien ((ts (struct timespec)))
-        (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
-                       clockid (addr ts))
-        (values (truly-the fixnum (slot ts 'tv-sec))
-                (truly-the fixnum (slot ts 'tv-nsec)))))
     (defun reinit-internal-real-time () nil)
     (defun get-internal-real-time ()
       (with-alien ((base (struct timespec) :extern "lisp_init_time"))
@@ -1108,20 +1088,6 @@ the UNIX epoch (January 1st 1970.)"
             (the sb-kernel:internal-time
                  (+ (the fixnum (* delta-sec internal-time-units-per-second))
                     (floor delta-nsec nanoseconds-per-internal-time-unit))))))))
-
-  #+(and 64-bit (not (or bsd linux))) ; use gettimeofday()
-  (let ((e-sec 0) (e-usec 0)) ; "epoch" in seconds + microseconds
-    (declare (fixnum e-sec e-usec))
-    (defun reinit-internal-real-time ()
-      (setf (values e-sec e-usec) (get-time-of-day)))
-    (defun get-internal-real-time ()
-      (multiple-value-bind (c-sec c-usec) (get-time-of-day)
-        (declare (optimize (sb-c::type-check 0)))
-        (let ((delta-sec (the fixnum (- (the fixnum c-sec) e-sec)))
-              (delta-usec (the fixnum (- (the fixnum c-usec) e-usec))))
-          (the sb-kernel:internal-time
-               (+ (the fixnum (* delta-sec internal-time-units-per-second))
-                  (floor delta-usec microseconds-per-internal-time-unit)))))))
 
   #-64-bit
   ;; There are two optimizations here that actually matter (on 32-bit
@@ -1187,26 +1153,12 @@ the UNIX epoch (January 1st 1970.)"
         now)))
   ) ; end #-64-bit PROGN
 
-  ;; TODO: use clock_gettime(CLOCK_PROCESS_CPUTIME_ID) where available.
-  ;; It's lighter weight than getrusage.
   (declaim (inline system-internal-run-time))
   (defun system-internal-run-time ()
-    (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
-        (unix-fast-getrusage rusage_self)
-      (declare (ignore ignore)
-               (type unsigned-byte utime-sec stime-sec)
-               ;; (Classic CMU CL had these (MOD 1000000) instead, but
-               ;; at least in Linux 2.2.12, the type doesn't seem to
-               ;; be documented anywhere and the observed behavior is
-               ;; to sometimes return 1000000 exactly.)
-               (type fixnum utime-usec stime-usec))
-      (let ((result (+ (* (+ utime-sec stime-sec)
-                          internal-time-units-per-second)
-                       (floor (+ utime-usec
-                                 stime-usec
-                                 (floor microseconds-per-internal-time-unit 2))
-                              microseconds-per-internal-time-unit))))
-        result))))
+    (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
+      (+ (* sec internal-time-units-per-second)
+         (floor (+ nsec (floor nanoseconds-per-internal-time-unit 2))
+                nanoseconds-per-internal-time-unit)))))
 
 ;;; FIXME, KLUDGE: GET-TIME-OF-DAY used to be UNIX-GETTIMEOFDAY, and had a
 ;;; primary return value indicating sucess, and also returned timezone
@@ -1266,5 +1218,3 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
-
-(push '("SB-UNIX" unix-fast-getrusage) *!removable-symbols*)
