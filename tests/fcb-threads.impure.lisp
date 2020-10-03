@@ -94,11 +94,11 @@
             (lambda ()
               ;; Each trial, when it works, takes between .01 to .4 sec
               ;; (which is a tremendous spread),
-              ;; so after 4 seconds (10x more than needed), say it failed.
+              ;; so after 20 seconds (50x more than needed), say it failed.
               (let ((result
                      (sb-thread:wait-on-semaphore *semaphore*
                                                   :n (* n-threads n-calls)
-                                                  :timeout 4)))
+                                                  :timeout 20)))
                 (if result
                     (format t "OK!~%")
                     (sb-sys:os-exit 1))))))
