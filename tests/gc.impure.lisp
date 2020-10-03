@@ -334,11 +334,8 @@
   (funcall 'callfoo))
 
 ;;; Pseudo-static large objects should retain the single-object flag
-;;; What is this???
-;;;  ::: UNEXPECTED-FAILURE :PSEUDOSTATIC-LARGE-OBJECTS due to UNBOUND-VARIABLE:
-;;;      "The variable OBJ is unbound."
 #+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects :fails-on :interpreter)
+(with-test (:name :pseudostatic-large-objects)
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
