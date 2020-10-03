@@ -837,7 +837,7 @@
           (total-nwords (cdr (pop ranges))))
       (cond ((> jump-table-size 1)
              (format output "# jump table~%")
-             (format output ".quad ~d" jump-table-size)
+             (format output ".quad ~d" (sap-ref-word text-sap 0))
              (dotimes (i (1- jump-table-size))
                (format output ",\"~a\"+0x~x"
                        base-symbol

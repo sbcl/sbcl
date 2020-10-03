@@ -46,7 +46,16 @@ run_sbcl --noinform <<EOF
 EOF
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
+;; I think this tests immobile space exhaustion
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
+;; Test that CODE-SERIAL# is never 0 except for simple-fun-less objects
+(sb-vm:map-allocated-objects
+ (lambda (obj type size)
+   (declare (ignore size))
+   (when (and (= type sb-vm:code-header-widetag)
+              (> (sb-kernel:code-n-entries obj) 0))
+     (assert (/= (sb-kernel:%code-serialno obj) 0))))
+ :all)
 ;; This just needs any function that when ELFinated has its packed fixups rewritten.
 ;; If the packed value is a bignum, it goes into a C data section.
 (let* ((code (sb-kernel:fun-code-header #'sb-impl::schedule-timer))
