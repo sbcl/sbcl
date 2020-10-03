@@ -342,13 +342,13 @@ main(int argc, char __attribute__((unused)) *argv[])
 
 #ifdef LISP_FEATURE_UNIX
     defconstant("clock-realtime", CLOCK_REALTIME);
+    defconstant("clock-monotonic", CLOCK_MONOTONIC);
     defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
 #endif
 #ifdef LISP_FEATURE_LINUX
     defconstant("clock-realtime-alarm", CLOCK_REALTIME_ALARM);
     defconstant("clock-realtime-coarse", CLOCK_REALTIME_COARSE);
     defconstant("clock-tai", CLOCK_TAI); // International Atomic Time.
-    defconstant("clock-monotonic", CLOCK_MONOTONIC);
     defconstant("clock-monotonic-coarse", CLOCK_MONOTONIC_COARSE);
     defconstant("clock-monotonic-raw", CLOCK_MONOTONIC_RAW);
     defconstant("clock-boottime", CLOCK_BOOTTIME);
