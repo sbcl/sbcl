@@ -206,17 +206,8 @@ EXPERIMENTAL: Interface subject to change."
 
 (defvar *show-progress* nil)
 
-(defvar *old-sampling* nil)
-
 ;; Call count encapsulation information
 (defvar *encapsulations* (make-hash-table :test 'equal))
-
-(defun turn-off-sampling ()
-  (setq *old-sampling* *sampling*)
-  (setq *sampling* nil))
-
-(defun turn-on-sampling ()
-  (setq *sampling* *old-sampling*))
 
 (defun show-progress (format-string &rest args)
   (when *show-progress*
