@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.9:
+  * minor incompatible change: the funarg given to SB-SPROF:MAP-TRACES
+    does not receive a wallclock time with each trace.
+
 changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture
     support has been removed.

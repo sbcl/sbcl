@@ -14,23 +14,22 @@
 ;;; 0 code-component-ish
 ;;; 1 an offset relative to the start of the code-component or an
 ;;;   absolute address
-(defconstant +elements-per-sample+ 2)
+(defconstant +elements-per-pc-loc+ 2)
 
 ;;; 0 the trace start marker (trace-start . END-INDEX)
 ;;; 1 the current thread, an SB-THREAD:THREAD instance
-;;; 2 the current internal real time
-(defconstant +elements-per-trace-start+ 3)
+(defconstant +elements-per-trace-start+ 2)
 
 (declaim (inline make-sample-vector))
 (defun make-sample-vector (max-samples)
   (make-array (* max-samples
-                 ;; Arbitrary guess at how many samples we'll be
+                 ;; Arbitrary guess at how many pc-locs we'll be
                  ;; taking for each trace. The exact amount doesn't
                  ;; matter, this is just to decrease the amount of
                  ;; re-allocation that will need to be done.
                  10
-                 ;; Each sample takes two cells in the vector
-                 +elements-per-sample+)))
+                 ;; Each pc-loc takes two cells in the vector
+                 +elements-per-pc-loc+)))
 
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples
@@ -78,7 +77,7 @@
                           approximately ~:D sample~:P), doubling the ~
                           size~%"
           (samples-trace-count samples)
-          (truncate (samples-index samples) +elements-per-sample+)))
+          (truncate (samples-index samples) +elements-per-pc-loc+)))
 
 (declaim (inline ensure-samples-vector))
 (defun ensure-samples-vector (samples)
@@ -89,7 +88,7 @@
     ;; accommodate the largest chunk of elements that we could
     ;; potentially store in one go (currently 3 elements, stored by
     ;; RECORD-TRACE-START).
-    (values (if (< (length vector) (+ index (max +elements-per-sample+
+    (values (if (< (length vector) (+ index (max +elements-per-pc-loc+
                                                  +elements-per-trace-start+)))
                 (let ((new-vector (make-array (* 2 index))))
                   (note-sample-vector-full samples)
@@ -103,8 +102,7 @@
   (multiple-value-bind (vector index) (ensure-samples-vector samples)
     (let ((trace-start (cons 'trace-start nil)))
       (setf (aref vector index)       trace-start
-            (aref vector (+ index 1)) sb-thread:*current-thread*
-            (aref vector (+ index 2)) (get-internal-real-time))
+            (aref vector (+ index 1)) sb-thread:*current-thread*)
       (setf (samples-index samples)       (+ index +elements-per-trace-start+)
             (samples-trace-start samples) trace-start))))
 
@@ -118,22 +116,18 @@
     ;; adjacent cells.
     (setf (aref vector index) info
           (aref vector (1+ index)) pc-or-offset)
-    (setf (samples-index samples) (+ index +elements-per-sample+))))
+    (setf (samples-index samples) (+ index +elements-per-pc-loc+))))
 
 ;;; Trace and sample and access functions
 
 (defun map-traces (function samples)
   "Call FUNCTION on each trace in SAMPLES
 
-The lambda list of FUNCTION has to be compatible to
+The signature of FUNCTION must be compatible with (thread trace).
 
-  (thread time trace)
-
-. FUNCTION is called once for each trace such that THREAD is the
-SB-THREAD:TREAD instance that was sampled to produce TRACE, TIME is
-the internal real time at which TRACE was produced and TRACE is an
-opaque object whose only purpose is being used as the second argument
-to MAP-TRACE-SAMPLES.
+FUNCTION is called once for each trace where THREAD is the SB-THREAD:TREAD
+instance which was sampled to produce TRACE, and TRACE is an opaque object
+to be passed to MAP-TRACE-SAMPLES.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
@@ -146,28 +140,23 @@ EXPERIMENTAL: Interface subject to change."
             while (< start index)
             for end = (cdr (aref vector start))
             for thread = (aref vector (+ start 1))
-            for time = (/ (- (aref vector (+ start 2)) start-time)
-                          internal-time-units-per-second)
             do (let ((trace (list vector start end)))
-                 (funcall function thread time trace))))))
+                 (funcall function thread trace))))))
 
+;;; FIXME: rename to MAP-TRACE-PC-LOCS,
+;;; and also maybe rename SAMPLE-PC to PC-LOC-PC.
 (defun map-trace-samples (function trace)
   "Call FUNCTION on each sample in TRACE.
 
-The lambda list of FUNCTION has to be compatible to
-
-  (info pc-or-offset)
-
-.
-
-TRACE is an object as received by a function passed to MAP-TRACES.
+The signature of FUNCTION must be compatible with (info pc-or-offset).
+TRACE is an object as received by the function passed to MAP-TRACES.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function)))
     (destructuring-bind (samples start end) trace
-      (loop for i from (- end +elements-per-sample+)
+      (loop for i from (- end +elements-per-pc-loc+)
             downto (+ start +elements-per-trace-start+ -1)
-            by +elements-per-sample+
+            by +elements-per-pc-loc+
             for info = (aref samples i)
             for pc-or-offset = (aref samples (1+ i))
             do (funcall function info pc-or-offset)))))
@@ -176,17 +165,13 @@ EXPERIMENTAL: Interface subject to change."
 (defun map-all-samples (function &optional (samples *samples*))
   "Call FUNCTION on each sample in SAMPLES.
 
-The lambda list of FUNCTION has to be compatible to
-
-  (info pc-or-offset)
-
-.
+The signature of FUNCTION must be compatible with (info pc-or-offset).
 
 SAMPLES is usually the value of *SAMPLES* after a profiling run.
 
 EXPERIMENTAL: Interface subject to change."
-  (sb-int:dx-flet ((do-trace (thread time trace)
-                     (declare (ignore thread time))
+  (sb-int:dx-flet ((do-trace (thread trace)
+                     (declare (ignore thread))
                      (map-trace-samples function trace)))
     (map-traces #'do-trace samples)))
 
@@ -423,7 +408,7 @@ EXPERIMENTAL: Interface subject to change."
                         (when (zerop i)
                           (decf (samples-index samples)
                                 (+ +elements-per-trace-start+
-                                   (* +elements-per-sample+ (1+ i)))))
+                                   (* +elements-per-pc-loc+ (1+ i)))))
                         (return)))
                     (record-trace-end samples))))
               ;; Reset thread-local allocation counter before interrupts
