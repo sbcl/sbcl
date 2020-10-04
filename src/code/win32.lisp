@@ -378,6 +378,12 @@
                (addr ,kernel-time)
                (addr ,user-time))))
 
+#+64-bit
+(progn
+  (defun reinit-internal-real-time () nil)
+  (defun get-internal-real-time ()
+    (alien-funcall (extern-alien "get_monotonic_time" (function unsigned)))))
+#-64-bit
 (let ((epoch 0))
   (declare (unsigned-byte epoch))
   ;; FIXME: For optimization ideas see the unix implementation.

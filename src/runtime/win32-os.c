@@ -728,9 +728,25 @@ intptr_t win32_get_module_handle_by_address(os_vm_address_t addr)
                       ? result : 0);
 }
 
+static LARGE_INTEGER lisp_init_time;
+static double qpcMultiplier;
+
 void os_init(char __attribute__((__unused__)) *argv[],
              char __attribute__((__unused__)) *envp[])
 {
+#ifdef LISP_FEATURE_64_BIT
+    LARGE_INTEGER qpcFrequency;
+    if (!QueryPerformanceCounter(&lisp_init_time) ||
+        !QueryPerformanceFrequency(&qpcFrequency))
+        lose("Can't use monotonic realtime clock. Please report this as an SBCL bug");
+    // Convert performance counter ticks per second into INTERNAL-TIME-UNITS-PER-SECOND
+    // (microseconds). In theory the performance counter can increment faster than
+    // or slower than I-T-U. Fwiw, on my machine the frequency is 10x I-T-U-P-S,
+    // so a single integer division by 10 would work, but I don't know in general
+    // what the ratio is.
+    qpcMultiplier = (double)1000000 / qpcFrequency.QuadPart;
+#endif
+
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
     os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
@@ -745,6 +761,16 @@ void os_init(char __attribute__((__unused__)) *argv[],
     resolve_optional_imports();
     runtime_module_handle = (HMODULE)win32_get_module_handle_by_address(&runtime_module_handle);
 }
+
+#ifdef LISP_FEATURE_64_BIT
+uword_t get_monotonic_time()
+{
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    t.QuadPart -= lisp_init_time.QuadPart;
+    return (uword_t)((double)t.QuadPart * qpcMultiplier);
+}
+#endif
 
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
