@@ -684,8 +684,11 @@
                        (make-fixnum-descriptor length))
     des))
 
+;;; The COLD-LAYOUT is a reflection of or proxy for the words stored
+;;; in the core for a cold layout, so that we don't have to extract
+;;; them out of the core to compare cold layouts for validity.
 (defstruct (cold-layout (:constructor %make-cold-layout))
-  depthoid length bitmap flags inherits descriptor)
+  name depthoid length bitmap flags inherits descriptor)
 
 ;;; the hosts's representation of LAYOUT-of-LAYOUT
 (defvar *host-layout-of-layout* (find-layout 'layout))
@@ -1027,9 +1030,9 @@ core and return a descriptor to it."
 ;;; WHN 19990816] is initializing layout's layout, which must point to
 ;;; itself.
 
-;;; a map from DESCRIPTOR-BITS of cold layouts to the name, for inverting
-;;; mapping
-(defvar *cold-layout-names*)
+;;; a map from DESCRIPTOR-BITS of cold layouts (as descriptors)
+;;; to the host's COLD-LAYOUT proxy for that layout.
+(defvar *cold-layout-by-addr*)
 
 ;;; the descriptor for layout's layout (needed when making layouts)
 (defvar *layout-layout*)
@@ -1171,13 +1174,17 @@ core and return a descriptor to it."
                                   (cold-svref inherits i))
                (incf dsd-index)))
 
-    (setf (gethash (descriptor-bits result) *cold-layout-names*) name
-          (gethash name *cold-layouts*) (%make-cold-layout :depthoid depthoid
-                                                           :length length
-                                                           :bitmap bitmap
-                                                           :flags flags
-                                                           :inherits inherits
-                                                           :descriptor result))
+    (let ((proxy (%make-cold-layout :name name
+                                    :depthoid depthoid
+                                    :length length
+                                    :bitmap bitmap
+                                    :flags flags
+                                    :inherits inherits
+                                    :descriptor result)))
+      ;; Make two different ways to look up the proxy object -
+      ;; by name or by descriptor-bits.
+      (setf (gethash (descriptor-bits result) *cold-layout-by-addr*) proxy
+            (gethash name *cold-layouts*) proxy))
     result))
 
 (defun predicate-for-specializer (type-name)
@@ -2255,9 +2262,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
   (let* ((layout (pop-stack))
+         (proxy-layout ; our host-structure wrapper on the slots of the cold layout
+          (gethash (descriptor-bits layout) *cold-layout-by-addr*))
          (result (allocate-struct size layout))
-         (bitmap (descriptor-fixnum
-                  (read-slot layout *host-layout-of-layout* :bitmap))))
+         (bitmap (descriptor-fixnum (cold-layout-bitmap proxy-layout))))
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
@@ -3607,7 +3615,7 @@ III. initially undefined function references (alphabetically):
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
-           (*cold-layout-names* (make-hash-table :test 'eql)) ; addr -> symbol
+           (*cold-layout-by-addr* (make-hash-table :test 'eql)) ; addr -> cold-layout
            (*!cold-defsymbols* nil)
            (*!cold-defuns* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
