@@ -3919,7 +3919,9 @@
                                    finally (return result))
                              (loop for result = (checked-compile lambda)
                                    do (incf iterations)
-                                   until (> (get-internal-run-time) (+ start 10))
+                                   until (> (get-internal-run-time) (+ start (* 10
+                                                                                (/ internal-time-units-per-second
+                                                                                   1000))))
                                    finally (return result))))
                     (end (get-internal-run-time))
                     (got (funcall fun)))
