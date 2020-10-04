@@ -98,7 +98,8 @@
               (let ((result
                      (sb-thread:wait-on-semaphore *semaphore*
                                                   :n (* n-threads n-calls)
-                                                  :timeout 20)))
+                                                  ;; :timeout 20
+                                                  )))
                 (if result
                     (format t "OK!~%")
                     (sb-sys:os-exit 1))))))
