@@ -833,7 +833,8 @@
         finally (return (/ min-internal-time-units-per-call
                            (float internal-time-units-per-second)))))
 
-(defmacro runtime (form &key (repetitions 5) (precision 30))
+(defmacro runtime (form &key (repetitions 5) (precision (* 30
+                                                           (/ internal-time-units-per-second 1000))))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
 
 (declaim (notinline opaque-identity))
