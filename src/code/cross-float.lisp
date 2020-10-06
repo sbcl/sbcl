@@ -992,6 +992,7 @@
   (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
   (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
   (assert (eq (sb-xc:- (coerce 0 format)) (make-flonum :minus-zero format)))
+  (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (realnumify x)
              (:no-error (x) (error "Expected an error, got ~S" x))
@@ -1001,7 +1002,7 @@
       (assert-not-number nan)
       (assert (float-nan-p nan)))
     (dolist (symbol '(:+infinity :-infinity :minus-zero))
-      (assert-not-number (make-flonum symbol format)))))
+      (assert-not-number (make-flonum symbol format))))))
 
 #+host-quirks-sbcl ; Cross-check some more things if we can
 (loop for (our-symbol host-single host-double)
