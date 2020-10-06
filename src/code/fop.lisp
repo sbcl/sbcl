@@ -660,7 +660,7 @@ report it as a ~ bug.~:@>")
                             `(define-fop ,(car spec)
                                           (,(symbolicate "FOP-LAYOUT-OF-"
                                                          (cadr spec)))
-                                          (find-layout ',(cadr spec))))
+                               ,(find-layout (cadr spec))))
                           specs))))
   (frob (#x68 t)
         (#x69 structure-object)
