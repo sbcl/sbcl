@@ -19,14 +19,6 @@
 
 ;;; The CLASSOID structure is a supertype of all classoid types.
 ;;; Its definition occurs in 'early-classoid.lisp'
-
-(defmethod make-load-form ((self classoid) &optional env)
-  (declare (ignore env))
-  (let ((name (classoid-name self)))
-    (if (and name (eq (find-classoid name nil) self))
-        `(find-classoid ',name)
-        (error "can't use anonymous or undefined class as constant:~%  ~S"
-               self))))
 #+sb-xc-host
 (defmethod sb-xc:make-load-form ((self classoid) &optional env)
   (declare (ignore env))
@@ -148,38 +140,44 @@
 ;;; don't need to do that anyway because our code isn't going to be
 ;;; cold loaded, so we use the ordinary load form system.
 #+sb-xc-host
+(progn
 (defmethod make-load-form ((layout layout) &optional env)
   (declare (ignore env))
-  (when (layout-invalid layout)
-    (sb-c:compiler-error "can't dump reference to obsolete class: ~S"
-                          (layout-classoid layout)))
-  (let* ((classoid (layout-classoid layout))
-         (name (classoid-name classoid)))
-    (aver (= (layout-flags layout)
-             (typecase classoid
-               (structure-classoid +structure-layout-flag+)
-               (condition-classoid +condition-layout-flag+)
-               (undefined-classoid
-                (bug "xc MAKE-LOAD-FORM on undefined layout"))
-               (t 0))))
-    (unless name
-      (sb-c:compiler-error "can't dump anonymous LAYOUT: ~S" layout))
-    ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
-    ;; we have to do this in two stages, like the TREE-WITH-PARENT
-    ;; example in the MAKE-LOAD-FORM entry in the ANSI spec.
-    (values
-     ;; "creation" form (which actually doesn't create a new LAYOUT if
-     ;; there's a preexisting one with this name)
-     `(find-layout ',name)
-     ;; "initialization" form (which actually doesn't initialize
-     ;; preexisting LAYOUTs, just checks that they're consistent).
-     `(%init-or-check-layout ,layout
-                             ,(layout-classoid layout)
-                             ,(layout-length layout)
-                             ,(layout-flags layout)
-                             ,(layout-inherits layout)
-                             ,(layout-depthoid layout)
-                             ,(layout-bitmap layout)))))
+  (labels ((externalize (layout &aux (classoid (layout-classoid layout))
+                                     (name (classoid-name classoid)))
+             (when (layout-invalid layout)
+               (sb-c:compiler-error "can't dump reference to obsolete class: ~S"
+                                    (layout-classoid layout)))
+             (unless name
+               (sb-c:compiler-error "can't dump anonymous LAYOUT: ~S" layout))
+             (aver (= (layout-flags layout)
+                      (typecase classoid
+                        (structure-classoid +structure-layout-flag+)
+                        (condition-classoid +condition-layout-flag+)
+                        (undefined-classoid
+                         (bug "xc MAKE-LOAD-FORM on undefined layout"))
+                        (t 0))))
+             `(xc-load-layout ',name
+                              ,(layout-depthoid layout)
+                              (vector ,@(map 'list #'externalize (layout-inherits layout)))
+                              ,(layout-length layout)
+                              ,(layout-bitmap layout)
+                              ,(layout-flags layout))))
+      (externalize layout)))
+(defun xc-load-layout (name depthoid inherits length bitmap flags)
+  (let ((classoid (find-classoid name)))
+    (aver (and classoid (not (undefined-classoid-p classoid))))
+    (let ((layout (classoid-layout classoid)))
+      (aver layout)
+      (unless (and (= (layout-depthoid layout) depthoid)
+                   (= (length (layout-inherits layout)) (length inherits))
+                   (every #'eq (layout-inherits layout) inherits)
+                   (= (layout-length layout) length)
+                   (= (layout-bitmap layout) bitmap)
+                   (= (layout-flags layout) flags))
+        (error "XC can't reload layout for ~S with ~S vs ~A"
+               name (list depthoid inherits length bitmap flags) layout))
+      layout))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
