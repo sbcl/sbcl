@@ -79,6 +79,9 @@
 ;; FIND-LAYOUT is used by FIND-AND-INIT-OR-CHECK-LAYOUT which is used
 ;; by FOP-LAYOUT, so clearly it's used when reading fasl files.
 (defun find-layout (name)
+  (binding* ((classoid (find-classoid name nil) :exit-if-null) ; threadsafe
+             (layout (classoid-layout classoid) :exit-if-null))
+    (return-from find-layout layout))
   ;; This seems to be currently used only from the compiler, but make
   ;; it thread-safe all the same. We need to lock *F-R-L* before doing
   ;; FIND-CLASSOID in case (SETF FIND-CLASSOID) happens in parallel.
