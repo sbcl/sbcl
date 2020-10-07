@@ -68,23 +68,13 @@
   (defun layout-proper-name (layout)
     (classoid-proper-name (layout-classoid layout))))
 
-;;; If we can't find any existing layout, then we create a new one
-;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
-;;; used to immediately check for compatibility, but for
-;;; cross-compilability reasons (i.e. convenience of using this
-;;; function in a MAKE-LOAD-FORM expression) that functionality has
-;;; been split off into INIT-OR-CHECK-LAYOUT.
+;;; Return the layout currently installed in the classoid named NAME.
+;;; If there is none, then make a layout referring for an undefined classoid.
 (declaim (ftype (sfunction (symbol) layout) find-layout))
-;; The comment "This seems ..." is misleading but I don't have a better one.
-;; FIND-LAYOUT is used by FIND-AND-INIT-OR-CHECK-LAYOUT which is used
-;; by FOP-LAYOUT, so clearly it's used when reading fasl files.
 (defun find-layout (name)
   (binding* ((classoid (find-classoid name nil) :exit-if-null) ; threadsafe
              (layout (classoid-layout classoid) :exit-if-null))
     (return-from find-layout layout))
-  ;; This seems to be currently used only from the compiler, but make
-  ;; it thread-safe all the same. We need to lock *F-R-L* before doing
-  ;; FIND-CLASSOID in case (SETF FIND-CLASSOID) happens in parallel.
   (let ((table *forward-referenced-layouts*))
     (with-world-lock ()
       (let ((classoid (find-classoid name nil)))
@@ -94,46 +84,6 @@
                                      (hash-layout-name name)
                                      (or classoid
                                          (make-undefined-classoid name))))))))))
-
-;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and BITMAP.
-;;; Otherwise require that it be consistent with the existing values.
-;;;
-;;; UNDEFINED-CLASS values are interpreted specially as "we don't know
-;;; anything about the class", so if LAYOUT is initialized, any
-;;; preexisting class slot value is OK, and if it's not initialized,
-;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
-;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (sfunction (layout classoid layout-length fixnum simple-vector
-                            layout-depthoid layout-bitmap) layout)
-                %init-or-check-layout))
-(defun %init-or-check-layout (layout classoid length flags inherits depthoid bitmap)
-  ;; BITMAP is redundant information about the primitive object representation
-  ;; which is fully captured by the defstruct description, and not stored in the
-  ;; host layout.
-  (cond ((eq (layout-invalid layout) :uninitialized)
-         ;; There was no layout before, we just created one which
-         ;; we'll now initialize with our information.
-         (setf (layout-classoid layout) classoid)
-         (set-layout-inherits layout inherits)
-         (assign-layout-slots layout :depthoid depthoid :length length :flags flags)
-         #-sb-xc-host ; Assign target-only slots
-         (when (logtest +structure-layout-flag+ flags)
-           ;; STRING-STREAM and FILE-STREAM have depthoid=4 but are not structure types
-           (setf (layout-bitmap layout) bitmap))
-         ;; Finally, make it valid.
-         (setf (layout-invalid layout) nil))
-        ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
-        ;; clause is not needed?
-        ((not *type-system-initialized*)
-         (setf (layout-classoid layout) classoid))
-        (t
-         ;; There was an old layout already initialized with old
-         ;; information, and we'll now check that old information
-         ;; which was known with certainty is consistent with current
-         ;; information which is known with certainty.
-         (check-layout layout classoid length inherits depthoid bitmap)))
-  layout)
 
 ;;; In code for the target Lisp, we don't dump LAYOUTs using the
 ;;; standard load form mechanism, we use special fops instead, in
@@ -191,9 +141,9 @@
                            simple-vector
                            layout-depthoid
                            layout-bitmap))
-                redefine-layout-warning))
-(defun redefine-layout-warning (old-context old-layout
-                                context length inherits depthoid bitmap)
+                warn-if-altered-layout))
+(defun warn-if-altered-layout (old-context old-layout context
+                               length inherits depthoid bitmap)
   (declare (type layout old-layout) (type simple-string old-context context))
   (let ((name (layout-proper-name old-layout))
         (old-inherits (layout-inherits old-layout)))
@@ -238,50 +188,35 @@ between the ~A definition and the ~A definition"
                 name old-context context)
           t))))
 
-;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and BITMAP.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid layout-bitmap))
-                check-layout))
-(defun check-layout (layout classoid length inherits depthoid bitmap)
-  (aver (eq (layout-classoid layout) classoid))
-  (when (redefine-layout-warning "current" layout
-                                 "compile time" length inherits depthoid bitmap)
-    ;; Classic CMU CL had more options here. There are several reasons
-    ;; why they might want more options which are less appropriate for
-    ;; us: (1) It's hard to fit the classic CMU CL flexible approach
-    ;; into the ANSI-style MAKE-LOAD-FORM system, and having a
-    ;; non-MAKE-LOAD-FORM-style system is painful when we're trying to
-    ;; make the cross-compiler run under vanilla ANSI Common Lisp. (2)
-    ;; We have CLOS now, and if you want to be able to flexibly
-    ;; redefine classes without restarting the system, it'd make sense
-    ;; to use that, so supporting complexity in order to allow
-    ;; modifying DEFSTRUCTs without restarting the system is a low
-    ;; priority. (3) We now have the ability to rebuild the SBCL
-    ;; system from scratch, so we no longer need this functionality in
-    ;; order to maintain the SBCL system by modifying running images.
-    (error "The loaded code expects an incompatible layout for class ~S."
-           (layout-proper-name layout)))
-  (values))
-
-;;; a common idiom (the same as CMU CL FIND-LAYOUT) rolled up into a
-;;; single function call
-;;;
-;;; Used by the loader to forward-reference layouts for classes whose
-;;; definitions may not have been loaded yet. This allows type tests
-;;; to be loaded when the type definition hasn't been loaded yet.
-(defun find-and-init-or-check-layout (name depthoid flags length bitmap inherits)
-  (truly-the ; avoid an "assertion too complex to check" optimizer note
-   (values layout &optional)
-   (with-world-lock ()
-    (let ((layout (find-layout name)))
-      (%init-or-check-layout layout
-                             (or (find-classoid name nil)
-                                 (layout-classoid layout))
-                             length
-                             flags
-                             inherits
-                             depthoid
-                             bitmap)))))
+(defun load-layout (name depthoid inherits length bitmap flags)
+  (let* ((layout
+          (or (binding* ((classoid (find-classoid name nil) :exit-if-null))
+                (classoid-layout classoid))
+              (let ((table *forward-referenced-layouts*))
+                (with-world-lock ()
+                 (let ((classoid (find-classoid name nil)))
+                   (or (and classoid (classoid-layout classoid))
+                       (ensure-gethash
+                        name table
+                        (make-layout
+                         (hash-layout-name name)
+                         (or classoid (make-undefined-classoid name))
+                         :depthoid depthoid :inherits inherits
+                         :length length :bitmap bitmap :flags flags))))))))
+         (classoid
+          (or (find-classoid name nil) (layout-classoid layout))))
+    (if (or (eq (layout-invalid layout) :uninitialized)
+            (not *type-system-initialized*))
+        (setf (layout-classoid layout) classoid)
+        ;; There was an old layout already initialized with old
+        ;; information, and we'll now check that old information
+        ;; which was known with certainty is consistent with current
+        ;; information which is known with certainty.
+        (when (warn-if-altered-layout "current" layout "compile time"
+                                    length inherits depthoid bitmap)
+          (error "The loaded code expects an incompatible layout for class ~S."
+                 (layout-proper-name layout))))
+    layout))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -1169,14 +1104,13 @@ between the ~A definition and the ~A definition"
                (depthoid (if hierarchical-p
                            (or depth (length inherits-vector))
                            -1)))
-          (register-layout
-           (find-and-init-or-check-layout name
-                                          depthoid
-                                          0 ; flags
-                                          length
-                                          +layout-all-tagged+
-                                          inherits-vector)
-           :invalidate nil)))))
+          (register-layout (load-layout name
+                                        depthoid
+                                        inherits-vector
+                                        length
+                                        +layout-all-tagged+
+                                        0) ; flags
+                           :invalidate nil)))))
   (/show0 "done with loop over +!BUILT-IN-CLASSES+"))
 
 ;;; Now that we have set up the class heterarchy, seal the sealed

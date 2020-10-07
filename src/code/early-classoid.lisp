@@ -268,7 +268,7 @@
 #+sb-xc-host
 (progn
   (defstruct (layout (:include structure!object)
-                     (:constructor make-layout
+                     (:constructor host-make-layout
                                    (clos-hash classoid &key depthoid length flags inherits info)))
     ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
     ;; Theoretically we don't need this in the cross-compiler, because the
@@ -282,6 +282,10 @@
     (depthoid -1 :type layout-depthoid)
     (length 0 :type layout-length)
     (info nil :type (or null defstruct-description)))
+  (defun make-layout (&rest args)
+    (let ((args (copy-list args)))
+      (remf args :bitmap)
+      (apply #'host-make-layout args)))
   (defun layout-bitmap (layout)
     (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 

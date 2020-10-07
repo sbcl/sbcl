@@ -1601,7 +1601,7 @@ or they must be declared locally notinline at each call site.~@:>"
         ;; exercised in this code path anyway. -- WHN 19990510
         (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
         (error "shouldn't happen: weird state of OLD-LAYOUT?"))
-       ((redefine-layout-warning old-context
+       ((warn-if-altered-layout  old-context
                                  old-layout
                                  new-context
                                  (layout-length new-layout)

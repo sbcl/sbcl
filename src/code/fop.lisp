@@ -183,7 +183,7 @@
 (define-fop 45 :not-host (fop-layout ((:operands depthoid flags length)
                                        name bitmap inherits))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
-  (find-and-init-or-check-layout name depthoid flags length bitmap inherits))
+  (sb-kernel::load-layout name depthoid inherits length bitmap flags))
 
 ;; Allocate a CLOS object. This is used when the compiler detects that
 ;; MAKE-LOAD-FORM returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS,

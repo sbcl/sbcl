@@ -98,7 +98,7 @@
            (setq layout old-layout)
            (unless (eq (classoid-layout class) layout)
              (register-layout layout)))
-          ((redefine-layout-warning "current"
+          ((warn-if-altered-layout  "current"
                                     old-layout
                                     "new"
                                     (layout-length layout)
