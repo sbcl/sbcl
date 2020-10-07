@@ -1554,14 +1554,11 @@ or they must be declared locally notinline at each call site.~@:>"
                  (t
                   (values 'structure-classoid 'make-structure-classoid)))
         (insured-find-classoid (dd-name info)
-                               (case class
+                               (ecase class
                                  (structure-classoid #'structure-classoid-p)
-                                 ;; The final fallthrough case would recurse infinitely
-                                 ;; on BUILT-IN-CLASSOID if TYPEP were allowed to parse
-                                 ;; its argument, so don't let it.
                                  (built-in-classoid #'built-in-classoid-p)
-                                 (t (lambda (x)
-                                      (sb-xc:typep x (classoid-name (find-classoid class))))))
+                                 (static-classoid #'static-classoid-p)
+                                 (condition-classoid #'condition-classoid-p))
                                constructor))
     (setf (classoid-direct-superclasses classoid)
           (case (dd-name info)
@@ -1578,15 +1575,13 @@ or they must be declared locally notinline at each call site.~@:>"
            (flags (if (dd-alternate-metaclass info) 0 +structure-layout-flag+))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
-              (set-layout-inherits
                (make-layout (hash-layout-name (dd-name info))
                             classoid
                             :flags flags
                             :inherits inherits
                             :depthoid (length inherits)
                             :length (dd-length info)
-                            :info info)
-                inherits))))
+                            :info info))))
       (cond
        ((not old-layout)
         (values classoid new-layout nil))
@@ -2272,18 +2267,6 @@ or they must be declared locally notinline at each call site.~@:>"
              (values nil 'sb-fasl::fop-struct))
             (t
              (values creation-form init-form))))))
-
-(defmacro get-dsd-index (type-name slot-name)
-  ;; Without the NOTINLINE we get:
-  ; caught STYLE-WARNING:
-  ;   Derived type of SB-C::VAL is
-  ;     (VALUES NULL &OPTIONAL),
-  ;   conflicting with its asserted type
-  ;     SB-KERNEL:DEFSTRUCT-SLOT-DESCRIPTION.
-  (declare (notinline find dsd-bits))
-  (dsd-index (find slot-name
-                   (dd-slots (find-defstruct-description type-name))
-                   :key #'dsd-name)))
 
 ;;; Compute a SAP to the specified slot in INSTANCE.
 ;;; This looks mildly redundant with DEFINE-STRUCTURE-SLOT-ADDRESSOR,

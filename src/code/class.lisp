@@ -270,9 +270,9 @@ between the ~A definition and the ~A definition"
             #-64-bit (setf (layout-depthoid destruct-layout) (layout-depthoid layout)
                            (layout-length destruct-layout) (layout-length layout))
             (setf (layout-flags destruct-layout) (layout-flags layout)
-                  (layout-info destruct-layout) (layout-info layout)
-                  (layout-bitmap destruct-layout) (layout-bitmap layout))
+                  (layout-info destruct-layout) (layout-info layout))
             (set-layout-inherits destruct-layout inherits)
+            (set-bitmap-from-layout destruct-layout layout)
             (setf (layout-invalid destruct-layout) nil
                   (classoid-layout classoid) destruct-layout))
           (setf (layout-invalid layout) nil

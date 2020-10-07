@@ -190,7 +190,9 @@
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
   (info nil :type (or null defstruct-description))
   ;; Map of raw slot indices.
-  (bitmap +layout-all-tagged+ :type layout-bitmap)
+  ;; These will eventually be moved to the end of the structure
+  ;; as a variable-length raw slot.
+  (bitmap +layout-all-tagged+ :type layout-bitmap :read-only t)
   ;; EQUALP comparator for two instances with this layout
   ;; Could be the generalized function, or a type-specific one
   ;; if the defstruct was compiled in a policy of SPEED 3.
@@ -219,6 +221,20 @@
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
            (ash ,(or length 0) 16)
            ,(or flags 0)))
+
+(defmacro get-dsd-index (type-name slot-name)
+  (declare (notinline dsd-index)) ; forward references
+  (dsd-index (find slot-name
+                   (dd-slots (find-defstruct-description type-name))
+                   :key #'dsd-name)))
+
+(defmacro set-bitmap-from-layout (to-layout from-layout)
+  #+sb-xc-host (declare (ignore to-layout from-layout))
+  ;; While this obviously has a straightforward implementation for now,
+  ;; that will change once the bits are stored as trailing slots.
+  #-sb-xc-host
+  `(setf (%instance-ref (the layout ,to-layout) (get-dsd-index layout bitmap))
+        (layout-bitmap ,from-layout)))
 
 (defmacro set-layout-inherits (layout inherits &optional depthoid)
   `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
