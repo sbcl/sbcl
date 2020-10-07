@@ -348,7 +348,9 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef LISP_FEATURE_LINUX
     defconstant("clock-realtime-alarm", CLOCK_REALTIME_ALARM);
     defconstant("clock-realtime-coarse", CLOCK_REALTIME_COARSE);
+#ifdef CLOCK_TAI
     defconstant("clock-tai", CLOCK_TAI); // International Atomic Time.
+#endif
     defconstant("clock-monotonic-coarse", CLOCK_MONOTONIC_COARSE);
     defconstant("clock-monotonic-raw", CLOCK_MONOTONIC_RAW);
     defconstant("clock-boottime", CLOCK_BOOTTIME);
