@@ -532,3 +532,20 @@
     ;; to the machine and can't be reliably asserted.
     (assert (= slow-n fast-n))
     (assert (= slow-bytes fast-bytes))))
+
+(defglobal *wp-for-signal-handler-gc-test* nil)
+#+(and gencgc unix sb-thread)
+(with-test (:name :signal-handler-gc-test)
+  (sb-thread:join-thread
+   (sb-thread:make-thread
+    (lambda ()
+      (let ((foo (make-symbol "hey")))
+        (setf *wp-for-signal-handler-gc-test* (make-weak-pointer foo))
+        (sb-sys:enable-interrupt
+         23
+         (lambda (&rest x) (declare (ignore x)) (constantly foo)))))))
+  (sb-ext:gc :gen 7)
+  ;; If fullcgc fails to see the closure that is installed as a signal handler
+  ;; (actually a closure around a closure) then the weak pointer won't survive.
+  ;; Was broken in https://sourceforge.net/p/sbcl/sbcl/ci/04296434
+  (assert (weak-pointer-value *wp-for-signal-handler-gc-test*)))

@@ -3687,7 +3687,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
 
     /* Scavenge the Lisp functions of the interrupt handlers */
-    scavenge(lisp_sig_handlers, NSIG);
+    if (compacting_p())
+        scavenge(lisp_sig_handlers, NSIG);
+    else
+        gc_mark_range(lisp_sig_handlers, NSIG);
 
     /* Scavenge the binding stacks. */
     {
