@@ -643,6 +643,22 @@ size_immediate(lispobj __attribute__((unused)) *where)
     return 1;
 }
 
+//// General boxed object scav/trans/size functions
+
+#define DEF_SCAV_BOXED(suffix, sizer) \
+  static sword_t __attribute__((unused)) \
+  scav_##suffix(lispobj *where, lispobj header) { \
+      return 1 + scavenge(where+1, sizer(header)); \
+  } \
+  static lispobj trans_##suffix(lispobj object) { \
+      return copy_object(object, 1 + sizer(*native_pointer(object))); \
+  } \
+  static sword_t size_##suffix(lispobj *where) { return 1 + sizer(*where); }
+
+DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
+DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
+DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
+
 static inline boolean bignum_logbitp_inline(int index, struct bignum* bignum)
 {
     int len = HeaderValue(bignum->header);
@@ -760,10 +776,10 @@ static sword_t size_instance(lispobj *where) {
     return 1 + (instance_length(*where) | 1);
 }
 
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 static sword_t
 scav_funinstance(lispobj *where, lispobj header)
 {
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     // Do a similar thing as scav_instance but do not split into 3 cases
     // based on whether the bitmap is a fixnum or a bignum or the special
     // case of all tagged; it's always a fixnum, with at least 1 raw slot.
@@ -784,24 +800,10 @@ scav_funinstance(lispobj *where, lispobj header)
             scav1(where, obj);
     }
     return 1 + nslots;
-}
+#else
+    return scav_short_boxed(where, header);
 #endif
-
-//// Boxed object scav/trans/size functions
-
-#define DEF_SCAV_BOXED(suffix, sizer) \
-  static sword_t __attribute__((unused)) \
-  scav_##suffix(lispobj *where, lispobj header) { \
-      return 1 + scavenge(where+1, sizer(header)); \
-  } \
-  static lispobj trans_##suffix(lispobj object) { \
-      return copy_object(object, 1 + sizer(*native_pointer(object))); \
-  } \
-  static sword_t size_##suffix(lispobj *where) { return 1 + sizer(*where); }
-
-DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
-DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
-DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
+}
 
 /* Bignums use the high bit as the mark, and all remaining bits
  * excluding the 8 widetag bits to convey the size.
