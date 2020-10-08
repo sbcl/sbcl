@@ -109,17 +109,6 @@
           ((not (classoid-layout class))
            (register-layout layout)))
 
-    ;; This looks totally bogus - it essentially means that the LAYOUT-INFO
-    ;; of a condition is good for nothing, because it describes something
-    ;; that is not the condition class being defined.
-    ;; In addition to which, the INFO for CONDITION itself describes
-    ;; slots which do not exist, viz:
-    ;;  (dd-slots (layout-info (classoid-layout (find-classoid 'condition))))
-    ;; => (#<DEFSTRUCT-SLOT-DESCRIPTION ACTUAL-INITARGS>
-    ;;     #<DEFSTRUCT-SLOT-DESCRIPTION ASSIGNED-SLOTS>)
-    (setf (layout-info layout)
-          (layout-info (classoid-layout (find-classoid 'condition))))
-
     (setf (find-classoid name) class)
 
     ;; Initialize CPL slot.

@@ -73,8 +73,12 @@
     (if (and olayout
              (not (mismatch (layout-inherits olayout) new-inherits)))
         olayout
+        ;; All condition classoid layouts carry the same LAYOUT-INFO - the defstruct
+        ;; description for CONDITION - which is a representation of the primitive object
+        ;; and not the lisp-level object.
         (make-layout (hash-layout-name name)
                      (make-undefined-classoid name)
+                     :info (layout-info cond-layout)
                      :flags +condition-layout-flag+
                      :inherits new-inherits
                      :depthoid -1
