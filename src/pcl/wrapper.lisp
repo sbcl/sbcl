@@ -40,12 +40,12 @@
         (aver layout)
         layout))
      (t
-      (set-layout-valid
        (make-layout (hash-layout-name name)
                     (make-standard-classoid :name name)
                     :length length
                     :flags +pcl-object-layout-flag+
-                    :bitmap bitmap))))))
+                    :bitmap bitmap
+                    :invalid nil)))))
 
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
@@ -71,9 +71,8 @@
                                               :name (and (symbolp name) name)))
                      (t
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
-       (set-layout-valid
-        (make-layout (hash-layout-name name)
-                     classoid :length length :flags +pcl-object-layout-flag+))))
+        (make-layout (hash-layout-name name) classoid
+                     :invalid nil :length length :flags +pcl-object-layout-flag+)))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
             (layout (classoid-layout found)))

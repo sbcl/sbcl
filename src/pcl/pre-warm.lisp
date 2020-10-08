@@ -119,11 +119,6 @@
     (long-method-combination long-method-combination-p)
     (short-method-combination short-method-combination-p)))
 
-(defmacro set-layout-valid (layout)
-  `(let ((layout ,layout))
-     (setf (layout-invalid layout) niL)
-     layout))
-
 #+sb-xc-host
 (progn
 ;;; Create #<SB-KERNEL::CONDITION-CLASSOID CONDITION>
@@ -135,13 +130,13 @@
 (let* ((name 'condition)
        (classoid (sb-kernel::make-condition-classoid :name name))
        (cell (sb-kernel::make-classoid-cell name classoid))
-       (layout (set-layout-valid
-                (make-layout (hash-layout-name name)
+       (layout (make-layout (hash-layout-name name)
                              classoid
-                             :inherits (vector (find-layout 't))
                              :depthoid 1
+                             :inherits (vector (find-layout 't))
                              :length (+ sb-vm:instance-data-start 1)
-                             :flags +condition-layout-flag+))))
+                             :flags +condition-layout-flag+
+                             :invalid nil)))
   (setf (classoid-layout classoid) layout
         (info :type :classoid-cell name) cell
         (info :type :kind name) :instance))
@@ -151,13 +146,13 @@
          (let* ((classoid (make-standard-classoid :name name))
                 (cell (sb-kernel::make-classoid-cell name classoid))
                 (layout
-                 (set-layout-valid
                   (make-layout (hash-layout-name name)
                                classoid
+                               :depthoid -1
                                :inherits (map 'vector #'find-layout
                                               (cons t (if fun-p '(function))))
                                :length 0 ; don't care
-                               :depthoid -1))))
+                               :invalid nil)))
            (setf (classoid-layout classoid) layout
                  (info :type :classoid-cell name) cell
                  (info :type :kind name) :instance))))

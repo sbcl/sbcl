@@ -264,13 +264,15 @@
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #() inheritsp)
                          (info nil)
-                         (bitmap (if info (dd-bitmap info) +layout-all-tagged+)))
+                         (bitmap (if info (dd-bitmap info) +layout-all-tagged+))
+                         (invalid :uninitialized))
   (let ((layout (%make-layout clos-hash classoid
                               #+64-bit (pack-layout-flags depthoid length flags)
                               #-64-bit depthoid #-64-bit length #-64-bit flags
                               info bitmap)))
     (when inheritsp
       (set-layout-inherits layout inherits))
+    (setf (layout-invalid layout) invalid)
     layout))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
@@ -287,7 +289,8 @@
 (progn
   (defstruct (layout (:include structure!object)
                      (:constructor host-make-layout
-                                   (clos-hash classoid &key depthoid length flags inherits info)))
+                                   (clos-hash classoid &key info depthoid inherits
+                                                       length flags invalid)))
     ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
     ;; Theoretically we don't need this in the cross-compiler, because the
     ;; layout has a classoid which has a name which has a known hash.
