@@ -23,11 +23,8 @@
 (setf (system-package-p *package*) t)
 
 ;;; The changes to GC to support this code were as follows:
-;;; * One bit of the payload length in an instance header is reserved to signify
-;;;   that the instance has a special GC scavenge method. This avoids indirecting
-;;;   to the layout to see whether all instances of a type have a special method.
 ;;;
-;;; * If an instance has a header bit so indicating, then the first data slot
+;;; * If an instance is flagged as being a LFlist node, then the first data slot
 ;;;   is treated as an instance pointer even if it missing its tag bits.
 ;;;
 ;;; * Since you can't pin an object that you don't a-priori have a tagged pointer
