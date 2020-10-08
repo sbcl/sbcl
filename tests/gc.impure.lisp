@@ -461,7 +461,7 @@
          (gc-thread
           (sb-thread:make-thread
            (lambda ()
-             (loop while working do (gc) (sleep .001))))))
+             (loop while working do (gc) (sleep .01))))))
     (sb-thread:join-thread worker-thread)
     (setq working nil)
     (sb-thread:join-thread gc-thread)))
