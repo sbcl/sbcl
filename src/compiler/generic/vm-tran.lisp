@@ -84,6 +84,10 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
+(defun dd-contains-raw-slots-p (dd)
+  (dolist (dsd (dd-slots dd))
+    (unless (eq (dsd-raw-type dsd) t) (return t))))
+
 (deftransform copy-structure ((instance) * * :result result :node node)
   (let* ((classoid (lvar-type instance))
          (name (and (structure-classoid-p classoid) (classoid-name classoid)))
@@ -104,8 +108,8 @@
                  ;; Also note that VAR-ALLOC can not cope with dynamic-extent except where
                  ;; support has been added (x86oid so far); so requiring an exact type here
                  ;; causes VAR-ALLOC to become FIXED-ALLOC which works on more architectures.
-                 #-c-stack-is-control-stack
-                 (and dd (eql (layout-bitmap layout) sb-kernel:+layout-all-tagged+))
+                 #-c-stack-is-control-stack (and dd (not (dd-contains-raw-slots-p dd)))
+
                  ;; Definitely do this if copying to stack
                  (or (lvar-dynamic-extent result)
                      ;; Or if it's a small fixed number of words
