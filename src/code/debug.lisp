@@ -1952,3 +1952,28 @@ forms that explicitly control this kind of evaluation.")
        (format t "~S ~A~%" tag link)
        (setq sap link)
        (if (= (sap-int sap) 0) (return))))))
+
+;;; Sometimes in cold-init it is not possible to call LIST-BACKTRACE
+;;; because that depends on a zillion things being set up correctly.
+;;; This simple version seems to always work.
+#+(or x86 x86-64)
+(defun ultralite-backtrace (&optional (decode-pcs t))
+  ;; this misses the current frame but that's perfectly fine for its intended use
+  (let ((fp (current-fp)) (list))
+    (loop
+     (let ((prev-fp (sap-ref-sap fp 0)))
+       (cond ((and (sap> prev-fp fp)
+                   (sap< prev-fp (descriptor-sap sb-vm:*control-stack-end*)))
+              (push (sap-ref-sap fp sb-vm:n-word-bytes) list) ; pc
+              (setq fp prev-fp))
+             (t
+              (return)))))
+    (setq list (nreverse list))
+    (if decode-pcs
+        (mapcar (lambda (pc)
+                  (let ((code (sb-di::code-header-from-pc pc)))
+                    (if code
+                        (cons code (sap- pc (code-instructions code)))
+                        pc)))
+                list)
+        list)))

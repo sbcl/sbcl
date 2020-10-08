@@ -1458,6 +1458,20 @@ We could try a few things to mitigate this:
           (+ start sb-vm:gencgc-card-bytes)))
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
+(defun code-from-serialno (serial)
+  (dx-flet ((visit (obj type size)
+              (declare (ignore size))
+              (aver (= type sb-vm:code-header-widetag))
+              (when (= (%code-serialno obj) serial)
+                (return-from code-from-serialno obj))))
+    #+immobile-code
+    (map-objects-in-range #'visit
+                          (ash varyobj-space-start (- n-fixnum-tag-bits))
+                          (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
+    (walk-dynamic-space #'visit
+                        #b1111111 ; all generations
+                        3 3)))
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-point-fixups into the weak hash-table.
