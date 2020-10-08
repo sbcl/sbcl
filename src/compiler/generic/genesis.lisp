@@ -3328,11 +3328,16 @@ III. initially undefined function references (alphabetically):
                 name)))
 
     (format t "~%~|~%V. layout names:~2%")
+    (format t "              Bitmap  Name [Depth]~%")
     (dolist (pair (sort-cold-layouts))
-      (let* ((descriptor (cold-layout-descriptor (cdr pair)))
+      (let* ((proxy (cdr pair))
+             (descriptor (cold-layout-descriptor proxy))
              (addr (descriptor-bits descriptor)))
-        (format t "~8,'0X: ~S[~D]~%"
-                addr (car pair) (cold-layout-length (cdr pair)))))
+        (format t "~10,'0X: ~8d  ~S[~D]~%"
+                addr
+                (descriptor-fixnum (cold-layout-bitmap proxy))
+                (car pair)
+                (cold-layout-length proxy))))
 
     (format t "~%~|~%VI. parsed type specifiers:~2%")
     (mapc (lambda (cell)
