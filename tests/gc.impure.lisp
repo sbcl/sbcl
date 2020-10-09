@@ -525,7 +525,7 @@
     (values n tot-bytes))))
 (compile 'code-iterator)
 
-(with-test (:name :code-iteration-fast)
+(with-test (:name :code-iteration-fast :skipped-on :cheneygc)
   (sb-int:binding* (((slow-n slow-bytes) (code-iterator :slow))
                     ((fast-n fast-bytes) (code-iterator :fast)))
     ;; Fast should be 20x to 50x faster than slow, but that's kinda sensitive

@@ -469,7 +469,8 @@ We could try a few things to mitigate this:
                (map-immobile-objects #'filter :variable))))))
     (do-rest-arg ((space) spaces)
       (if (eq space :dynamic)
-          (without-gcing (walk-dynamic-space fun #b1111111 0 0))
+          (without-gcing #+cheneygc (do-1-space space)
+                         #+gencgc (walk-dynamic-space fun #b1111111 0 0))
           (do-1-space space)))))
 
 ;;; Using the mask bits you can make many different match conditions resulting
@@ -481,6 +482,7 @@ We could try a few things to mitigate this:
 ;;; and free_pages_lock, that this can be made reliable (both crash-free and
 ;;; guaranteed to visit all chosen objects) despite other threads running.
 ;;; As things are it is only "maybe" reliable, regardless of the parameters.
+#+gencgc
 (defun walk-dynamic-space (fun generation-mask
                                page-type-mask page-type-constraint)
   (declare (function fun)
@@ -1438,6 +1440,7 @@ We could try a few things to mitigate this:
         (format t "~5d = ~s~%" n x)
         (setq prev n)))))
 
+#+gencgc
 (flet ((print-it (obj type size)
          (declare (ignore type size))
          (let ((*print-level* 2) (*print-lines* 1))
@@ -1461,16 +1464,19 @@ We could try a few things to mitigate this:
 (defun code-from-serialno (serial)
   (dx-flet ((visit (obj type size)
               (declare (ignore size))
-              (aver (= type sb-vm:code-header-widetag))
+              #+gencgc (aver (= type sb-vm:code-header-widetag))
               (when (= (%code-serialno obj) serial)
                 (return-from code-from-serialno obj))))
-    #+immobile-code
-    (map-objects-in-range #'visit
-                          (ash varyobj-space-start (- n-fixnum-tag-bits))
-                          (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
-    (walk-dynamic-space #'visit
-                        #b1111111 ; all generations
-                        3 3)))
+    #+cheneygc (map-allocated-objects #'visit :all)
+    #+gencgc
+    (progn
+      #+immobile-code
+      (map-objects-in-range #'visit
+                            (ash varyobj-space-start (- n-fixnum-tag-bits))
+                            (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
+      (walk-dynamic-space #'visit
+                          #b1111111 ; all generations
+                          3 3))))
 
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
