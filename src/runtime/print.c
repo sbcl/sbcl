@@ -434,15 +434,23 @@ static void brief_struct(lispobj obj)
 }
 
 #include "genesis/layout.h"
+#include "genesis/defstruct-description.h"
+#include "genesis/defstruct-slot-description.h"
 static boolean tagged_slot_p(struct layout *layout, int slot_index)
 {
-  lispobj bitmap = layout->bitmap;
-  sword_t fixnum = fixnum_value(bitmap); // optimistically
-  return fixnump(bitmap)
-         ? bitmap == make_fixnum(-1) ||
-            (slot_index < N_WORD_BITS && ((fixnum >> slot_index) & 1) != 0)
-         : positive_bignum_logbitp(slot_index,
-                                   (struct bignum*)native_pointer(bitmap));
+    // Since we're doing this scan, we could return the name
+    // and exact raw type.
+    if (layout->info != NIL) {
+        struct defstruct_description* dd = (void*)(layout->info-INSTANCE_POINTER_LOWTAG);
+        lispobj slots = dd->slots;
+        for ( ; slots != NIL ; slots = CONS(slots)->cdr ) {
+            struct defstruct_slot_description* dsd =
+                (void*)(CONS(slots)->car-INSTANCE_POINTER_LOWTAG);
+            if ((fixnum_value(dsd->bits) >> 6) == slot_index) // +DSD-INDEX-SHIFT+
+                return (fixnum_value(dsd->bits) & 7) == 0;
+        }
+    }
+    return 0;
 }
 
 static void print_struct(lispobj obj)

@@ -3156,7 +3156,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (rplaca cell name)
               (rplacd cell name))))
       (loop for slot across names
-            do (format t "    lispobj ~A;~@[ // ~A~]~%" (car slot) (cdr slot))))
+            do (format t "    lispobj ~A;~@[ // ~A~]~%"
+                       ;; reserved word
+                       (if (string= (car slot) "default") "_default" (car slot))
+                       (cdr slot))))
     (format t "};~%")
     (when (member (dd-name dd) '(layout))
       (write-cast-operator (dd-name dd) (cstring (dd-name dd))
@@ -3833,7 +3836,8 @@ III. initially undefined function references (alphabetically):
             (dolist (obj structs)
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
-        (dolist (class '(classoid defstruct-description hash-table layout package
+        (dolist (class '(defstruct-description defstruct-slot-description
+                         classoid layout hash-table package
                          sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
