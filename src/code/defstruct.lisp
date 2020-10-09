@@ -146,18 +146,19 @@
   ;; Ensure that rsd-index is representable in 3 bits. (Can easily be changed)
   (assert (<= (1+ (length *raw-slot-data*)) 8)))
 
-;; genesis needs to know how many bits are to the right of the 'index' field
-;; in the packed BITS slot of a DSD.
-(defconstant +dsd-index-shift+ 6)
-(defun pack-dsd-bits (index read-only safe-p always-boundp rsd-index)
-  (logior (ash index +dsd-index-shift+)
-          (if read-only (ash 1 5) 0)
-          (if safe-p (ash 1 4) 0)
-          (if always-boundp (ash 1 3) 0)
+(defconstant sb-vm:dsd-index-shift   7)
+(defconstant sb-vm:dsd-raw-type-mask #b111)
+(defun pack-dsd-bits (index read-only safe-p always-boundp gc-ignorable rsd-index)
+  (logior (ash index sb-vm:dsd-index-shift)
+          (if read-only (ash 1 6) 0)
+          (if safe-p (ash 1 5) 0)
+          (if always-boundp (ash 1 4) 0)
+          (if gc-ignorable (ash 1 3) 0)
           (the (unsigned-byte 3) (if rsd-index (1+ rsd-index) 0))))
 
 (declaim (inline dsd-always-boundp
                  dsd-safe-p
+                 dsd-gc-ignorable
                  ; dsd-read-only ; compilation order problem
                  ))
 
@@ -187,22 +188,24 @@
 ;; Index into *RAW-SLOT-DATA* vector of the RAW-SLOT-DATA for this slot.
 ;; The index is NIL if this slot is not raw.
 (defun dsd-rsd-index (dsd)
-  (let ((val (ldb (byte 3 0) (dsd-bits dsd))))
+  (let ((val (logand (dsd-bits dsd) sb-vm:dsd-raw-type-mask)))
     (if (plusp val) (the (mod #.(length *raw-slot-data*)) (1- val)))))
+;;; GC-ignorable slots are a superset of raw slots.
+(defun dsd-gc-ignorable (dsd) (logbitp 3 (dsd-bits dsd)))
 
 ;; Whether the slot is always bound. Slots are almost always bound,
 ;; the exception being those which appear as an &AUX var with no value
 ;; in a BOA constructor.
-(defun dsd-always-boundp (dsd) (logbitp 3 (dsd-bits dsd)))
+(defun dsd-always-boundp (dsd) (logbitp 4 (dsd-bits dsd)))
 ;; Whether the slot is known to be always of the specified type
 ;; A slot may be SAFE-P even if not always-boundp.
-(defun dsd-safe-p (dsd) (logbitp 4 (dsd-bits dsd)))
-(defun dsd-read-only (dsd) (logbitp 5 (dsd-bits dsd)))
+(defun dsd-safe-p (dsd) (logbitp 5 (dsd-bits dsd)))
+(defun dsd-read-only (dsd) (logbitp 6 (dsd-bits dsd)))
 ;; its position in the implementation sequence
 (defun dsd-index (dsd)
-  (the index (ash (dsd-bits dsd) (- +dsd-index-shift+))))
+  (the index (ash (dsd-bits dsd) (- sb-vm:dsd-index-shift))))
 (sb-c:define-source-transform dsd-index (dsd)
-  `(truly-the index (ash (dsd-bits ,dsd) ,(- +dsd-index-shift+))))
+  `(truly-the index (ash (dsd-bits ,dsd) ,(- sb-vm:dsd-index-shift))))
 
 (!set-load-form-method defstruct-slot-description (:host :xc :target))
 (defmethod print-object ((x defstruct-slot-description) stream)
@@ -966,10 +969,15 @@ unless :NAMED is also specified.")))
       (when (or rsd-index (neq (dd-type defstruct) 'structure))
         (setf always-boundp t safe-p nil))) ; "demote" to unsafe.
 
-    (let ((dsd (make-dsd name type accessor-name
-                         (pack-dsd-bits index read-only safe-p
-                                        always-boundp rsd-index)
-                         default)))
+    (let* ((gc-ignorable
+            (csubtypep ctype
+                       (specifier-type '(or fixnum boolean character
+                                            #+64-bit single-float))))
+           (dsd (make-dsd name type accessor-name
+                          (pack-dsd-bits index read-only safe-p
+                                         always-boundp gc-ignorable
+                                         rsd-index)
+                          default)))
       #-sb-xc-host (push (cons dsd spec) *dsd-source-form*)
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       (let ((comparator
@@ -2024,7 +2032,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (mapcar (lambda (slot-name)
                     (make-dsd slot-name t (symbolicate conc-name slot-name)
                               (pack-dsd-bits (prog1 slot-index (incf slot-index))
-                                             nil t t nil)
+                                             nil t t nil nil)
                               nil))
                   slot-names)
           (dd-length dd) slot-index

@@ -446,8 +446,8 @@ static boolean tagged_slot_p(struct layout *layout, int slot_index)
         for ( ; slots != NIL ; slots = CONS(slots)->cdr ) {
             struct defstruct_slot_description* dsd =
                 (void*)(CONS(slots)->car-INSTANCE_POINTER_LOWTAG);
-            if ((fixnum_value(dsd->bits) >> 6) == slot_index) // +DSD-INDEX-SHIFT+
-                return (fixnum_value(dsd->bits) & 7) == 0;
+            if ((fixnum_value(dsd->bits) >> DSD_INDEX_SHIFT) == slot_index)
+                return (fixnum_value(dsd->bits) & DSD_RAW_TYPE_MASK) == 0;
         }
     }
     return 0;

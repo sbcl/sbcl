@@ -34,19 +34,15 @@
 (defstruct (boa-kid (:include boa-saux)))
 (defstruct (boa-grandkid (:include boa-kid)))
 (with-test (:name :defstruct-boa-typecheck)
-  (flet ((dsd-always-boundp (dsd)
-           ;; A copy of sb-kernel::dsd-always-boundp, which may not
-           ;; survive make-target-2's shake-packages.
-           (logbitp 3 (sb-kernel::dsd-bits dsd))))
     (dolist (dsd (sb-kernel:dd-slots
                   (sb-kernel:find-defstruct-description 'boa-saux)))
       (let ((name (sb-kernel:dsd-name dsd))
-            (always-boundp (dsd-always-boundp dsd)))
+            (always-boundp (sb-kernel:dsd-always-boundp dsd)))
         (ecase name
           ((a c) (assert (not always-boundp)))
           (b (assert always-boundp)))))
     (let ((dd (sb-kernel:find-defstruct-description 'boa-grandkid)))
-      (assert (not (dsd-always-boundp (car (sb-kernel:dd-slots dd))))))
+      (assert (not (sb-kernel:dsd-always-boundp (car (sb-kernel:dd-slots dd))))))
     (let ((s (make-boa-saux)))
       (locally (declare (optimize (safety 3))
                         (inline boa-saux-a))
@@ -55,7 +51,7 @@
       (setf (boa-saux-c s) 5)
       (assert (eql (boa-saux-a s) 1))
       (assert (eql (boa-saux-b s) 3))
-      (assert (eql (boa-saux-c s) 5)))))
+      (assert (eql (boa-saux-c s) 5))))
 
 (with-test (:name :defstruct-boa-nice-error :skipped-on :interpreter)
   (let ((err (nth-value 1 (ignore-errors (boa-saux-a (make-boa-saux))))))
@@ -252,9 +248,10 @@
 
 (declaim (optimize (debug 2)))
 
+(declaim (muffle-conditions style-warning)) ; &OPTIONAL and &KEY
+
 (defmacro test-variant (defstructname &key colontype boa-constructor-p)
   `(locally
-     (declare (muffle-conditions style-warning)) ; &OPTIONAL and &KEY
      #+nil(format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
      (defstruct (,defstructname
                   ,@(when colontype `((:type ,colontype)))
