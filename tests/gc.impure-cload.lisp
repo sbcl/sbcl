@@ -168,6 +168,9 @@
 (gc :gen 1)
 (assert (= (sb-kernel:generation-of *junk*) 1))
 
+;;; These aren't defined anywhere, just "implied" by gencgc-internal.h
+(defconstant page-write-protect-bit #+bit-endian 2 #+little-endian 5)
+
 ;;; This test is very contrived, but this bug was observed in real life,
 ;;; having something to do with SB-PCL::CHECK-WRAPPER-VALIDITY.
 (with-test (:name :gc-anonymous-layout)
@@ -177,7 +180,7 @@
          (page (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address foo)))
          (gen (slot (deref sb-vm::page-table page) 'sb-vm::gen))
          (flags (slot (deref sb-vm::page-table page) 'sb-vm::flags))
-         (wp (logbitp 3 flags))
+         (wp (logbitp page-write-protect-bit flags))
          (page-addr (+ sb-vm:dynamic-space-start
                        (* sb-vm:gencgc-card-bytes page)))
          (aok t))
@@ -200,7 +203,8 @@
     (assert (= (sb-kernel:generation-of (sb-kernel:%instance-layout foo)) 0))
 
     ;; And the page with FOO must have gotten touched
-    (assert (not (logbitp 3 (slot (deref sb-vm::page-table page) 'sb-vm::flags))))
+    (assert (not (logbitp page-write-protect-bit
+                          (slot (deref sb-vm::page-table page) 'sb-vm::flags))))
 
     ;; It requires *two* GCs, not one, to cause this bug.
     ;; The first GC sees that the page with the FOO on it was touched,
@@ -213,7 +217,8 @@
     #+nil
     (format t "~&page ~d: wp=~a~%"
             page
-            (logbitp 3 (slot (deref sb-vm::page-table page) 'sb-vm::flags)))
+            (logbitp page-write-protect-bit
+                     (slot (deref sb-vm::page-table page) 'sb-vm::flags)))
 
     ;; This GC would fail in the verify step because it trashes the apparently
     ;; orphaned layout, which actually does have a referer.
