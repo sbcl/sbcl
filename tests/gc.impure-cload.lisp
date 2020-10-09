@@ -169,7 +169,7 @@
 (assert (= (sb-kernel:generation-of *junk*) 1))
 
 ;;; These aren't defined anywhere, just "implied" by gencgc-internal.h
-(defconstant page-write-protect-bit #+bit-endian 2 #+little-endian 5)
+(defconstant page-write-protect-bit #+big-endian 2 #+little-endian 5)
 
 ;;; This test is very contrived, but this bug was observed in real life,
 ;;; having something to do with SB-PCL::CHECK-WRAPPER-VALIDITY.
