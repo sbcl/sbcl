@@ -3281,6 +3281,7 @@
 
 (with-test (:name :float-division-using-exact-reciprocal)
   (flet ((test (lambda-form arg res &key (check-insts t))
+           (declare (ignorable check-insts))
            (let* ((fun (checked-compile lambda-form))
                   (disassembly (with-output-to-string (s)
                                   (disassemble fun :stream s))))
@@ -3329,6 +3330,7 @@
                                   (disassemble fun1 :stream s)))
                   (disassembly2 (with-output-to-string (s)
                                   (disassemble fun2 :stream s))))
+             (declare (ignorable disassembly1 disassembly2))
              ;; Multiplication at runtime should be eliminated only with
              ;; FLOAT-ACCURACY=0. (To catch SNaNs.)
              #+(or x86 x86-64)
@@ -3359,6 +3361,7 @@
                                   (disassemble fun1 :stream s)))
                   (disassembly2 (with-output-to-string (s)
                                   (disassemble fun2 :stream s))))
+             (declare (ignorable disassembly1 disassembly2))
              ;; Let's make sure there is no addition at runtime: for x86 and
              ;; x86-64 that implies an FADD, ADDSS, or ADDSD instruction, so
              ;; look for the ADDs in the disassembly. It's a terrible KLUDGE,
@@ -3382,7 +3385,7 @@
     (test `(lambda (x) (declare (double-float x)) (+ x 0.0)) 543.21d0)
     (test `(lambda (x) (declare (double-float x)) (+ x 0.0d0)) 42.d0)))
 
-(with-test (:name :float-substraction-of-zero)
+(with-test (:name :float-subtraction-of-zero)
   (flet ((test (lambda-form arg &optional (result arg))
            (let* ((fun1 (checked-compile lambda-form))
                   (fun2 (funcall (checked-compile
@@ -3393,6 +3396,7 @@
                                   (disassemble fun1 :stream s)))
                   (disassembly2 (with-output-to-string (s)
                                   (disassemble fun2 :stream s))))
+             (declare (ignorable disassembly1 disassembly2))
              ;; Let's make sure there is no substraction at runtime: for x86
              ;; and x86-64 that implies an FSUB, SUBSS, or SUBSD instruction,
              ;; so look for SUB in the disassembly. It's a terrible KLUDGE,
@@ -3426,6 +3430,7 @@
                                   (disassemble fun1 :stream s)))
                   (disassembly2 (with-output-to-string (s)
                                   (disassemble fun2 :stream s))))
+             (declare (ignorable disassembly1 disassembly2))
              ;; Let's make sure there is no multiplication at runtime: for x86
              ;; and x86-64 that implies an FMUL, MULSS, or MULSD instruction,
              ;; so look for MUL in the disassembly. It's a terrible KLUDGE,
@@ -5673,7 +5678,7 @@
   (let ((f (checked-compile '(lambda (x) (oddp x)))))
     (ctu:assert-no-consing (funcall f most-positive-fixnum))))
 (with-test (:name (oddp bignum :no-consing)
-            :serial t :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter :fails-on :ppc)
   (let ((f (checked-compile '(lambda (x) (oddp x))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
@@ -5682,7 +5687,7 @@
   (let ((f (checked-compile '(lambda (x) (logtest x most-positive-fixnum)))))
     (ctu:assert-no-consing (funcall f 1))))
 (with-test (:name (logtest bignum :no-consing)
-            :serial t :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter :fails-on :ppc)
   (let ((f (checked-compile '(lambda (x) (logtest x 1))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
