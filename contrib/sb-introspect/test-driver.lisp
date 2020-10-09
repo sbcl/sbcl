@@ -761,24 +761,24 @@
 
 ;;; ASDF.  I can't even.
 (compile 'sb-introspect:map-root)
-(defun count-pointees (x simple &aux (n 0))
-  (sb-introspect:map-root (lambda (obj)
-                            (declare (ignore obj))
-                            (incf n))
-                          x
-                          :simple simple)
-  n)
+(defun list-pointees (x simple)
+  (sb-int:collect ((result))
+    (sb-introspect:map-root (lambda (obj) (result obj))
+                            x :simple simple)
+    (result)))
+(defun count-pointees (x simple)
+  (length (list-pointees x simple)))
 
 ;;; A closure points to its underlying function, all closed-over values,
 ;;; and possibly the closure's name.
 ;;; #'SB-INT:CONSTANTLY-T is a nameless closure over 1 value
-(deftest map-root-closure-un (count-pointees #'SB-INT:CONSTANTLY-T nil) 2)
-;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value
+(deftest map-root-closure-unnamed (count-pointees #'sb-int:constantly-t nil) 2)
+;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value.
+;;; The closed-over value is AND, and the name of the closure is (:MACRO AND).
 (deftest map-root-closure-named (count-pointees (symbol-function 'and) nil) 3)
 
-;;; GFs point to their layout, implementation, slots,
-;;; and a hash-code, except that 64-bit headers can store the hash code
-;;; in the slot vector's high header bytes.
+;;; GFs point to their layout, implementation function, and slot vector.
+;;; There's also a hash-code which is stored is one of two different ways.
 ;;; However, in either case we expect only 3 referenced objects,
 ;;; because due to a strange design choice in MAP-ROOT,
 ;;; it does not invoke the funarg on fixnums (or characters).
