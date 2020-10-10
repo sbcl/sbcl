@@ -1299,7 +1299,8 @@
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
          (mode (memory-operand-mode address))
-         (index-encoding (position mode '(:offset :post-index 0 :pre-index)))
+         (index-encoding (or (position mode '(:offset :post-index 0 :pre-index))
+                             (error "Bad addressing mode")))
          (fp (fp-register-p dst))
          (v  (if fp
                  1
