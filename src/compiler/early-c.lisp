@@ -49,10 +49,7 @@
 ;;; otherwise a slot unto itself.
 (def!type layout-depthoid () '(integer -1 #x7FFF))
 (def!type layout-length () '(integer 0 #xFFFF))
-(def!type layout-bitmap ()
-  ;; FIXME: Probably should exclude negative bignum
-  #+compact-instance-header 'integer
-  #-compact-instance-header '(and integer (not (eql 0))))
+(def!type layout-bitmap () 'integer)
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:

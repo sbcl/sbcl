@@ -383,10 +383,9 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
                                          struct heap_adjust __attribute__((unused)) *adj)
 {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER) && defined(LISP_FEATURE_64_BIT)
-    lispobj ptr = function_layout(fun);
+    lispobj ptr = funinstance_layout(fun);
     lispobj adjusted = adjust_word(adj, ptr);
-    if (adjusted != ptr)
-        FIXUP(set_function_layout(fun, adjusted), fun);
+    if (adjusted != ptr) FIXUP(funinstance_layout(fun)=adjusted, fun);
 #endif
 }
 
@@ -398,6 +397,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
     lispobj layout, adjusted_layout, bitmap;
     struct code* code;
     sword_t delta;
+    int i;
 
     adj->n_relocs_abs = adj->n_relocs_rel = 0;
     for ( ; where < end ; where += nwords ) {
@@ -419,15 +419,11 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             adjust_word_at(where+1, adj);
             /* FALLTHROUGH */
         case INSTANCE_WIDETAG:
-            layout = (widetag == FUNCALLABLE_INSTANCE_WIDETAG) ?
-                funinstance_layout(where) : instance_layout(where);
+            layout = layout_of(where);
             adjusted_layout = adjust_word(adj, layout);
-            // Do not alter the layout as stored in the instance if non-compact
-            // header. instance_scan() will do it if necessary.
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-            if (adjusted_layout != layout)
-                instance_layout(where) = adjusted_layout;
-#endif
+            // writeback the layout if it changed. The layout is not a tagged slot
+            // so it would not be fixed up otherwise.
+            if (adjusted_layout != layout) layout_of(where) = adjusted_layout;
             bitmap = LAYOUT(adjusted_layout)->bitmap;
             gc_assert(fixnump(bitmap)
                       || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
@@ -441,9 +437,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                 // the bitmap slot will be rewritten if needed.
                 bitmap = adjust_word(adj, bitmap);
             }
-
-            instance_scan((void(*)(lispobj*,sword_t,uword_t))adjust_pointers,
-                          where+1, nwords-1, bitmap, (uintptr_t)adj);
+            lispobj* slots = where+1;
+            for (i=0; i<(nwords-1); ++i)
+                if (bitmap_logbitp(i, bitmap)) adjust_pointers(slots+i, 1, adj);
             continue;
         case FDEFN_WIDETAG:
             adjust_pointers(where+1, 2, adj);
@@ -465,7 +461,6 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Fixup absolute jump table
             lispobj* jump_table = code_jumptable_start(code);
             int count = jumptable_count(jump_table);
-            int i;
             for (i = 1; i < count; ++i) adjust_word_at(jump_table+i, adj);
 #endif
             // Fixup all embedded simple-funs
@@ -1145,28 +1140,23 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             nwords = fixnum_value(obj[1]); // vector length
             for(i=0; i<nwords; ++i) RECURSE(obj[i+2]);
             break;
-        // In all the following cases except for CODE, 'nwords' is the count
-        // of payload words (following the header), so we iterate up to and
-        // including that word index. For example, if there are 2 payload words,
-        // then we scan word indices 1 and 2 off the object base address.
         case INSTANCE_WIDETAG:
-            layout = instance_layout(obj);
-            graph_visit(ptr, layout, seen);
-            nwords = instance_length(*obj);
-            bitmap = LAYOUT(layout)->bitmap;
-            for(i=1; i<=nwords; ++i)
-                if (layout_bitmap_logbitp(i-1, bitmap)) RECURSE(obj[i]);
-            break;
         case FUNCALLABLE_INSTANCE_WIDETAG:
-            layout = funinstance_layout(obj);
+            layout = layout_of(obj);
             graph_visit(ptr, layout, seen);
+            nwords = sizetab[widetag_of(obj)](obj);
             bitmap = LAYOUT(layout)->bitmap;
-            nwords = SHORT_BOXED_NWORDS(*obj);
-            // We don't need to scan the word at index 1 (the trampoline pointer)
-            // because it either points to the FIN itself or to readonly space.
-            for(i=2; i<=nwords; ++i)
-                if (layout_bitmap_logbitp(i-1, bitmap)) RECURSE(obj[i]);
+            for (i=0; i<(nwords-1); ++i)
+                if (bitmap_logbitp(i, bitmap)) RECURSE(obj[1+i]);
             break;
+        case CODE_HEADER_WIDETAG:
+            nwords = code_header_words((struct code*)obj);
+            for(i=2; i<nwords; ++i) RECURSE(obj[i]);
+            break;
+        // In all the remaining cases, 'nwords' is the count of payload words
+        // (following the header), so we iterate up to and including that
+        // word index. For example, if there are 2 payload words,
+        // then we scan word indices 1 and 2 off the object base address.
         case CLOSURE_WIDETAG:
             // We must scan the closure's trampoline word.
             graph_visit(ptr, fun_taggedptr_from_self(obj[1]), seen);
@@ -1186,10 +1176,6 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             RECURSE(obj[1]);
             RECURSE(obj[2]);
             RECURSE(fdefn_callee_lispobj((struct fdefn*)obj));
-            break;
-        case CODE_HEADER_WIDETAG:
-            nwords = code_header_words((struct code*)obj);
-            for(i=2; i<nwords; ++i) RECURSE(obj[i]);
             break;
         default:
             if (!leaf_obj_widetag_p(widetag_of(obj))) {

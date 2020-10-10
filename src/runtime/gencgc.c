@@ -3009,9 +3009,6 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         } else switch(widetag) {
                 /* boxed or partially boxed objects */
                 lispobj layout_word;
-                // Two reasons for including funcallable instance here:
-                //  (1) the layout may be in the header, and we need to verify it
-                //  (2) there may be unboxed words in the object
             case FUNCALLABLE_INSTANCE_WIDETAG:
             case INSTANCE_WIDETAG:
                 layout_word = layout_of(where);
@@ -3021,10 +3018,17 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     state->vaddr = 0;
                     gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
-                    sword_t nslots = instance_length(thing) | 1;
                     lispobj bitmap = layout->bitmap;
-                    gc_assert(fixnump(bitmap)
-                              || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
+                    if (widetag_of(where) == FUNCALLABLE_INSTANCE_WIDETAG) {
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+                      gc_assert(bitmap == make_fixnum(-1) || bitmap == make_fixnum(6));
+#else
+                      gc_assert(bitmap == make_fixnum(-6));
+#endif
+                    } else {
+                        gc_assert(fixnump(bitmap)
+                                  || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
+                    }
                     if (lockfree_list_node_layout_p(layout)) {
                         struct instance* node = (struct instance*)where;
                         lispobj next = node->slots[INSTANCE_DATA_START];
@@ -3035,9 +3039,12 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                             state->vaddr = 0;
                         }
                     }
-                    instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
-                                  where+1, nslots, bitmap, (uintptr_t)state);
-                    count = 1 + nslots;
+                    int i;
+                    int nwords = sizetab[widetag](where);
+                    lispobj* slots = where+1;
+                    for (i=0; i<(nwords-1); ++i)
+                        if (bitmap_logbitp(i, bitmap)) verify_range(slots+i, 1, state);
+                    count = nwords;
                 }
                 break;
             case CODE_HEADER_WIDETAG:
@@ -3061,7 +3068,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 for_each_simple_fun(i, fheaderp, code, 1, {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
                     lispobj __attribute__((unused)) layout =
-                        function_layout((lispobj*)fheaderp);
+                        funinstance_layout((lispobj*)fheaderp);
                     gc_assert(!layout || layout == LAYOUT_OF_FUNCTION);
 #endif
                 });

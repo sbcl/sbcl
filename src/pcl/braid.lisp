@@ -173,6 +173,9 @@
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
               (!early-collect-inheritance name)
             (let* ((class (find-class name))
+                   (bitmap (if (memq name '(standard-generic-function))
+                               sb-kernel::standard-gf-primitive-obj-layout-bitmap
+                               +layout-all-tagged+))
                    (wrapper (cond ((eq class slot-class)
                                    slot-class-wrapper)
                                   ((eq class standard-class)
@@ -196,7 +199,7 @@
                                   ((eq class standard-generic-function)
                                    standard-generic-function-wrapper)
                                   (t
-                                   (!boot-make-wrapper (length slots) name))))
+                                   (!boot-make-wrapper (length slots) name bitmap))))
                    (proto nil))
               (let ((symbol (make-class-symbol name)))
                 (when (eq (info :variable :kind symbol) :global)
@@ -661,7 +664,8 @@
       (set-layout-inherits layout
                            (order-layout-inherits
                             (map 'simple-vector #'class-wrapper
-                                 (reverse (rest (class-precedence-list class))))))
+                                 (reverse (rest (class-precedence-list class)))))
+                           t)
       (register-layout layout :invalidate t)
 
       ;; FIXME: I don't think this should be necessary, but without it

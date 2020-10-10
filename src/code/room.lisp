@@ -1075,19 +1075,33 @@ We could try a few things to mitigate this:
                   ;; As for INSTANCE, allow the functoid to see the access form
                   (,functoid (%fun-layout ,obj) ,@more)
                   (,functoid (%funcallable-instance-fun ,obj) ,@more)
+                  ;; Unfortunately for FUNCALLABLE-INSTANCEs, the relation
+                  ;; between layout bitmap indices and indices as given to
+                  ;; FUNCALLABLE-INSTANCE-INFO is not so obvious, and it's
+                  ;; both tricky and unnecessary to generalize iteration.
+                  ;; So just hardcode the few cases that exist.
+                  #+compact-instance-header
                   (ecase (layout-bitmap .l.)
-                    (#.sb-kernel:+layout-all-tagged+
-                     (loop for .i. from instance-data-start ; exclude layout
+                    (-1 ; external trampoline, all slots are tagged
+                     ;; In this case, the trampoline word is scanned, with no ill effect.
+                     (loop for .i. from 0
                            to (- (get-closure-length ,obj) funcallable-instance-info-offset)
                            do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))
-                    (#b0110
-                     ;; A pedantically correct kludge which shall remain unless need arises
-                     ;; for more general partially unboxed FINs.
-                     ;;  payload word 0 is raw (but looks like a fixnum, by design)
-                     ;;  word 1 is the fin-fun which we already accounted for above
-                     ;;  word 2 (info slot 0) is the only one that hasn't been processed.
-                     ;;  words 3 and 4 are raw but looks like fixnums by accident.
-                     (,functoid (%funcallable-instance-info ,obj 0) ,@more)))))
+                    (#b0110 ; internal trampoline, 2 raw slots, 1 tagged slot
+                     ;;   ^ payload word 0 is raw (but looks fixnum-like)
+                     ;;  ^  word 1 is the fin-fun which we already accounted for above
+                     ;; ^   word 2 (INFO index 0) is the only one that hasn't been processed.
+                     ;; and the rest of the words are raw.
+                     (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
+                  #-compact-instance-header
+                  (progn
+                    (aver (eql (layout-bitmap .l.) -6))
+                    ;;               v---- trampoline
+                    ;; -6 = #b1...1010
+                    ;;             ^------ layout pointer = (FUNCALLABLE-INSTANCE-INFO 0)
+                    (loop for .i. from 1
+                          to (- (get-closure-length ,obj) funcallable-instance-info-offset)
+                          do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))))
             .,(make-case 'function))) ; in case there was code provided for it
          (t
           ;; TODO: the generated code is pretty horrible. OTHER-POINTER-LOWTAG

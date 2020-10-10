@@ -66,37 +66,34 @@
 (princ 'did-pass-2) (terpri)
 (force-output)
 
-;; Test the C bignum bit extractor.
-;; Surprisingly, there was a bug in it, unrelated to forwarding
-;; pointers that remained dormant until the randomized
-;; HUGE-MANYRAW test in 'defstruct.impure.lisp' found it.
-(defun c-bignum-logbitp (index bignum)
-  (assert (typep bignum 'bignum))
-  (sb-sys:with-pinned-objects (bignum)
-    (alien-funcall (extern-alien "positive_bignum_logbitp"
-                                 (function boolean int system-area-pointer))
-                   index
-                   (sb-sys:int-sap
-                    (- (sb-kernel:get-lisp-obj-address bignum)
-                       sb-vm:other-pointer-lowtag)))))
+;; Test the C bitmap bit extractor.
+(defun c-bitmap-logbitp (index integer)
+  (eql (sb-sys:with-pinned-objects (integer)
+         (alien-funcall (extern-alien "test_bitmap_logbitp"
+                                      (function int int unsigned))
+                        index
+                        (sb-kernel:get-lisp-obj-address integer)))
+       1))
 
-(with-test (:name :c-bignum-logbitp)
+(with-test (:name :bigmap-logbitp)
   ;; walking 1 bit
   (dotimes (i 256)
     (let ((num (ash 1 i)))
-      (when (typep num 'bignum)
-        (dotimes (j 257)
-          (assert (eq (c-bignum-logbitp j num)
-                     (logbitp j num)))))))
+      (dotimes (j 257)
+        (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))
+  ;; walking 0 bit
+  (dotimes (i 256)
+    (let ((num (lognot (ash 1 i))))
+      (dotimes (j 257)
+        (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))
   ;; random bits
   (let ((max (ash 1 768)))
     (dotimes (i 100)
-      (let ((num (random max)))
-        (when (typep num 'bignum)
-          (dotimes (j (* (sb-bignum:%bignum-length num)
-                         sb-vm:n-word-bits))
-            (assert (eq (c-bignum-logbitp j num)
-                       (logbitp j num)))))))))
+      (let ((num (- (random max) (floor max 20)))) ; test both + and -
+        (dotimes (j (if (typep num 'bignum)
+                        (* (sb-bignum:%bignum-length num) sb-vm:n-word-bits)
+                        sb-vm:n-word-bits))
+          (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))))
 
 ;; for testing the comparator
 (defstruct foo1

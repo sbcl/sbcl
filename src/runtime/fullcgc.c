@@ -244,49 +244,45 @@ void gc_mark_range(lispobj* where, long count) {
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME alivep_funs
 #include "weak-hash-pred.inc"
 
+static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
+{
+    // Apart from the allowance for untagged pointers in lockfree list nodes,
+    // this contains almost none of the special cases that gencgc does.
+    if (!layout) return;
+    gc_mark_obj(layout);
+    lispobj bitmap = LAYOUT(layout)->bitmap;
+    if (!bitmap) return;
+    if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
+        struct instance* node = (struct instance*)where;
+        lispobj next = node->slots[INSTANCE_DATA_START];
+        // ignore if 0
+        if (fixnump(next) && next) __mark_obj(next|INSTANCE_POINTER_LOWTAG);
+    }
+    int i;
+    lispobj* slots = where+1;
+    for (i=0; i<nslots; ++i)
+        if (bitmap_logbitp(i, bitmap) && is_lisp_pointer(slots[i]))
+            __mark_obj(slots[i]);
+}
+
 static void trace_object(lispobj* where)
 {
     lispobj header = *where;
     int widetag = header_widetag(header);
+
+    switch (widetag) {
+    case INSTANCE_WIDETAG:
+        return trace_using_layout(instance_layout(where),
+                                  where, instance_length(header));
+    case FUNCALLABLE_INSTANCE_WIDETAG:
+        return trace_using_layout(funinstance_layout(where),
+                                  where, HeaderValue(header) & SHORT_HEADER_MAX_WORDS);
+    }
     sword_t scan_from = 1;
     sword_t scan_to = sizetab[widetag](where);
     sword_t i;
     struct weak_pointer *weakptr;
-    lispobj layout, bitmap;
-
-    /* If the C compiler emits this switch as a jump table, order doesn't matter.
-     * But if as consecutive tests, instance and vector should be tested first
-     * as they are the most freequent */
     switch (widetag) {
-    case INSTANCE_WIDETAG:
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    /* No need to deal with FINs for non-compact header, because the layout
-       pointer isn't in the header word, the trampoline pointer can only point
-       to readonly space, and all slots are tagged. */
-    case FUNCALLABLE_INSTANCE_WIDETAG:
-        layout = instance_layout(where);
-        gc_mark_obj(layout);
-#else
-        layout = instance_layout(where); // will be marked as where[1]
-#endif
-        if (!layout) break; // fall into general case
-        // mixed boxed/unboxed objects
-        bitmap = LAYOUT(layout)->bitmap;
-        // If no raw slots, just scan without use of the bitmap.
-        // A bitmap of -1 implies that not only are all slots tagged,
-        // there is no special GC method for any slot.
-        if (bitmap == make_fixnum(-1)) break;
-        // Otherwise, the first slot might merit special treatment.
-        if (lockfree_list_node_layout_p(LAYOUT(layout))) {
-            struct instance* node = (struct instance*)where;
-            lispobj next = node->slots[INSTANCE_DATA_START];
-            if (fixnump(next) && next) // ignore initially 0 heap words
-                __mark_obj(next|INSTANCE_POINTER_LOWTAG);
-        }
-        for(i=1; i<scan_to; ++i)
-            if (layout_bitmap_logbitp(i-1, bitmap) && is_lisp_pointer(where[i]))
-                __mark_obj(where[i]);
-        return; // do not scan slots
     case SIMPLE_VECTOR_WIDETAG:
         // non-weak hashtable kv vectors are trivial in fullcgc. Keys don't move
         // so the table will not need rehash as a result of gc.

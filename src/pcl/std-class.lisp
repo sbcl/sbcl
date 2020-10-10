@@ -561,7 +561,8 @@
                 (set-layout-inherits layout
                                      (order-layout-inherits
                                       (map 'simple-vector #'class-wrapper
-                                           (reverse (rest cpl))))))
+                                           (reverse (rest cpl))))
+                                     t))
               (register-layout layout :invalidate t))))
         (mapc #'make-preliminary-layout (class-direct-subclasses class))))))
 

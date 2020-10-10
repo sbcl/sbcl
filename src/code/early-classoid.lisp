@@ -230,6 +230,12 @@
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
 
+(defmacro set-layout-bitmap (layout bitmap)
+  #+sb-xc-host (declare (ignore layout bitmap))
+  #-sb-xc-host
+  `(setf (%instance-ref (the layout ,layout) (get-dsd-index layout bitmap))
+         ,bitmap))
+
 (defmacro set-bitmap-from-layout (to-layout from-layout)
   #+sb-xc-host (declare (ignore to-layout from-layout))
   ;; While this obviously has a straightforward implementation for now,
@@ -238,40 +244,70 @@
   `(setf (%instance-ref (the layout ,to-layout) (get-dsd-index layout bitmap))
         (layout-bitmap ,from-layout)))
 
-(defmacro set-layout-inherits (layout inherits &optional depthoid)
-  `(let* ((l ,layout) (i ,inherits) (d ,(or depthoid '(length i))))
-     (declare (ignorable i d))
-     ;; I tried putting a /SHOW here for debugging, but it's just too broken
-     ;; because layouts affect the printer dispatch mechanism.
-     #+nil
-     (let ((*print-pretty* nil))
-       (fresh-line)
-       (write-string "SET-INHERITS ")
-       (write (layout-classoid-name l))
-       (write-string " ")
-       (write (map 'list #'layout-classoid-name i))
-       (terpri))
+;;; It is purely coincidental that these are the negatives of one another.
+;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
+(defconstant standard-gf-primitive-obj-layout-bitmap
+  #+immobile-code  6
+  #-immobile-code -6)
+
+#+sb-xc-host
+(defmacro set-layout-inherits (layout inherits)
+  `(setf (layout-inherits ,layout) ,inherits))
+#-sb-xc-host
+(defmacro set-layout-inherits (layout inherits &optional recompute-bitmap)
+  `(let* ((l ,layout) (i ,inherits) (d (length i)))
      (setf (layout-inherits l) i)
-     #-sb-xc-host
      (setf (layout-ancestor_2 l) (if (> d 2) (svref i 2) 0)
            (layout-ancestor_3 l) (if (> d 3) (svref i 3) 0)
            (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
            (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
+     ;; This part is for PCL where a class can forward-reference its superclasses
+     ;; and we only decide at class finalization time whether it is funcallable.
+     ;; Picking the right bitmap could probably be done sooner given the metaclass,
+     ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
+     ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
+     ;; explains why we differentiate between SGF and everything else.
+     ,(when recompute-bitmap
+        `(when (find ,(find-layout 'function) i)
+           (set-layout-bitmap
+            l
+            #+immobile-code ; there are two possible bitmap
+            ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
+            (if (find sb-pcl::*sgf-wrapper* i)
+                standard-gf-primitive-obj-layout-bitmap
+                +layout-all-tagged+)
+            ;; there is only one possible bitmap otherwise
+            #-immobile-code standard-gf-primitive-obj-layout-bitmap)))
      l))
+(push '("SB-KERNEL" set-layout-inherits) *!removable-symbols*)
 
+;;; For lack of any better to place to write up some detail surrounding
+;;; layout creation for structure types, I'm putting here.
+;;; When you issue a DEFSTRUCT at the REPL, there are *three* instances
+;;; of LAYOUT makde for the new structure.
+;;; 1) The first is one associated with a temporary instance of
+;;; structure-classoid used in parsing the DEFSTRUCT form so that
+;;; we don't signal an UNKNOWN-TYPE condition for something like:
+;;;   (defstruct chain (next nil :type (or null chain)).
+;;; The temporary classoid is garbage immediately after parsing
+;;; and is never installed.
+;;; 2) The next is the actual LAYOUT that ends up being registered.
+;;; 3) The third is a layout created when setting the "compiler layout"
+;;; which contains copies of the length/depthoid/inherits etc
+;;; that we compare against the isntalled one to make sure they match.
+;;; The third one also gets thrown away.
 #-sb-xc-host
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
-                         (inherits #() inheritsp)
+                         (inherits #())
                          (info nil)
-                         (bitmap (if info (dd-bitmap info) +layout-all-tagged+))
+                         (bitmap (if info (dd-bitmap info) 0))
                          (invalid :uninitialized))
   (let ((layout (%make-layout clos-hash classoid
                               #+64-bit (pack-layout-flags depthoid length flags)
                               #-64-bit depthoid #-64-bit length #-64-bit flags
                               info bitmap)))
-    (when inheritsp
-      (set-layout-inherits layout inherits))
+    (set-layout-inherits layout inherits)
     (setf (layout-invalid layout) invalid)
     layout))
 

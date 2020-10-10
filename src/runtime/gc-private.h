@@ -238,14 +238,30 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     weak_pointer_chain = wp;
 }
 
-/// Same as Lisp LOGBITP, except no negative bignums allowed.
-static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
+/* Basically like LOGBITP in lisp. Cribbed from src/code/bignum.lisp
+ * The'index' is 0-based starting at the first "payload" word.
+ *    word0: header
+ *    word1: payload word index 0
+ *    word2: payload word index 1
+ *    etc
+ * so depending how this is called, you may or may not need to
+ * subtract 1 at the call site.
+ * (Whichever way it is, invariably something either has to add or subtract 1)
+ */
+#include "genesis/bignum.h"
+static inline boolean bitmap_logbitp(unsigned int index, lispobj bitmap)
 {
-    if (fixnump(bitmap))
-      return (index < (N_WORD_BITS - N_FIXNUM_TAG_BITS))
-          ? (bitmap >> (index+N_FIXNUM_TAG_BITS)) & 1
-          : (sword_t)bitmap < 0;
-    return positive_bignum_logbitp(index, (struct bignum*)native_pointer(bitmap));
+    sword_t single_word_bignum = fixnum_value(bitmap);
+    sword_t* digits = &single_word_bignum;
+    unsigned int len = 1;
+    if (!fixnump(bitmap)) {
+        digits = ((struct bignum*)(bitmap - OTHER_POINTER_LOWTAG))->digits;
+        len = HeaderValue(digits[-1]);
+    }
+    unsigned int word_index = index / N_WORD_BITS;
+    unsigned int bit_index  = index % N_WORD_BITS;
+    if (word_index >= len) return digits[len-1] < 0;
+    return (digits[word_index] >> bit_index) & 1;
 }
 
 /* Keep in sync with 'target-hash-table.lisp' */
@@ -334,15 +350,56 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]
 
+extern lispobj layout_of_layout;
+
 #include "genesis/layout.h"
-// Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
-static inline lispobj layout_of(lispobj* instance) { // native ptr
-    // Smart C compilers eliminate the ternary operator if exprs are the same
-    return widetag_of(instance) == FUNCALLABLE_INSTANCE_WIDETAG
-      ? funinstance_layout(instance) : instance_layout(instance);
+static inline int lockfree_list_node_layout_p(struct layout* layout) {
+    return layout->flags & flag_LockfreeListNode;
 }
 
-extern lispobj layout_of_layout;
+/* This is NOT the same value that lisp's %INSTANCE-LENGTH returns.
+ * Lisp always uses the logical length (as originally allocated),
+ * except when heap-walking which requires exact physical sizes */
+static inline int instance_length(lispobj header)
+{
+    // * Byte 3 of an instance header word holds the immobile gen# and visited bit,
+    //   so those have to be masked off.
+    // * fullcgc uses bit index 31 as a mark bit, so that has to
+    //   be cleared. Lisp does not have to clear bit 31 because fullcgc does not
+    //   operate concurrently.
+    // * If the object is in hashed-and-moved state and the original instance payload
+    //   length was odd (total object length was even), then add 1.
+    //   This can be detected by ANDing some bits, bit 10 being the least-significant
+    //   bit of the original size, and bit 9 being the 'hashed+moved' bit.
+    // * 64-bit machines do not need 'long' right-shifts, so truncate to int.
+
+    int extra = ((unsigned int)header >> 10) & ((unsigned int)header >> 9) & 1;
+    return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
+}
+
+/// instance_layout() and layout_of() macros takes a lispobj* and are lvalues
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+
+# ifdef LISP_FEATURE_LITTLE_ENDIAN
+#  define instance_layout(native_ptr) ((uint32_t*)(native_ptr))[1]
+# else
+#  error "No instance_layout() defined"
+# endif
+# define funinstance_layout(native_ptr) instance_layout(native_ptr)
+// generalize over either metatype, but not as general as SB-KERNEL:LAYOUT-OF
+# define layout_of(native_ptr) instance_layout(native_ptr)
+
+#else
+
+// first 2 words of ordinary instance are: header, layout
+# define instance_layout(native_ptr) ((lispobj*)native_ptr)[1]
+// first 4 words of funcallable instance are: header, trampoline, fin-fun, layout
+# define funinstance_layout(native_ptr) ((lispobj*)native_ptr)[3]
+# define layout_of(native_ptr) \
+  ((lispobj*)native_ptr)[widetag_of(native_ptr)==FUNCALLABLE_INSTANCE_WIDETAG?3:1]
+
+#endif
+
 /// Return true if 'thing' is a layout.
 static inline boolean layoutp(lispobj thing)
 {
@@ -351,10 +408,6 @@ static inline boolean layoutp(lispobj thing)
     if ((base_ptr & LOWTAG_MASK) || !(layout = layout_of((lispobj*)base_ptr)))
         return 0;
     return layout == layout_of_layout;
-}
-
-static inline int lockfree_list_node_layout_p(struct layout* layout) {
-    return layout->flags & flag_LockfreeListNode;
 }
 
 #endif /* _GC_PRIVATE_H_ */

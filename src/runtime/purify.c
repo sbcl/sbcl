@@ -560,23 +560,14 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case INSTANCE_WIDETAG:
                 {
-                    lispobj lbitmap = LAYOUT(instance_layout(addr))->bitmap;
-                    lispobj* slots = addr + 1;
-                    long nslots = instance_length(*addr) | 1;
-                    int index;
-                    if (fixnump(lbitmap)) {
-                      sword_t bitmap = fixnum_value(lbitmap);
-                      for (index = 0; index < nslots ; index++, bitmap >>= 1)
-                        if (bitmap & 1)
-                          pscav(slots + index, 1, constant);
-                    } else {
-                      struct bignum * bitmap;
-                      bitmap = (struct bignum*)native_pointer(lbitmap);
-                      for (index = 0; index < nslots ; index++)
-                        if (positive_bignum_logbitp(index, bitmap))
-                          pscav(slots + index, 1, constant);
-                    }
-                    count = 1 + nslots;
+                lispobj lbitmap = LAYOUT(instance_layout(addr))->bitmap;
+                long nslots = instance_length(*addr);
+                int index;
+                for (index = 0; index < nslots ; index++)
+                    // logically treat index 0 (layout) as a tagged slot
+                    if (index == 0 || bitmap_logbitp(index, lbitmap))
+                        pscav((addr+1) + index, 1, constant);
+                count = 1 + (nslots | 1);
                 }
                 break;
 

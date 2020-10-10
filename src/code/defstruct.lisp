@@ -766,6 +766,9 @@ unless :NAMED is also specified.")))
                              (layout-inherits super) (vector super)))))
          (proto-classoid
           (if (dd-class-p dd)
+              ;; The classoid needs a layout whereby to convey inheritance.
+              ;; Classoids only store a *direct* superclass list.
+              ;; Both the layout and classoid are throwaway objects.
               (let* ((classoid (make-structure-classoid :name (dd-name dd)))
                      (layout (make-layout (hash-layout-name (dd-name dd))
                                           classoid :inherits inherits)))
@@ -1502,49 +1505,143 @@ or they must be declared locally notinline at each call site.~@:>"
   (values))
 
 ;;; Compute DD's bitmap, storing 1 for each tagged word.
-;;; The bitmap should be stored as a negative fixnum in two cases:
-;;;  (1) if the positive value is a bignum but the negative is a fixnum.
-;;;  (2) if there are no raw slots at all.
-;;; Example: given (DEFSTRUCT S A B C), the computed bitmap is #b11111 -
-;;; one bit for the layout; one each for A, B, C; and one for padding.
-;;; Whether this is stored as 31 or -1 is mostly immaterial,
-;;; but -1 is preferable because GC has a special case for it.
-;;; Suppose instead we have 1 untagged word followed by N tagged words
-;;; for N > n-fixnum-bits. The computed bitmap is #b111...11101
-;;; but the sign-extended value is -3, which is a fixnum.
-;;; If both the + and - values are fixnums, and raw slots are present,
-;;; we'll choose the positive value.
-(defun dd-bitmap (dd)
-  ;; With compact instances, LAYOUT is not reflected in the bitmap.
-  ;; Without compact instances, the 0th bitmap bit (for the LAYOUT) is always 1.
-  ;; In neither case is the place for the layout represented in in DD-SLOTS.
-  (let ((bitmap sb-vm:instance-data-start))
+;;; The GC can parse signed fixnums and bignums, with which we can
+;;; represent an unlimited number of "&rest" slots all with the same
+;;; nature - tagged or raw. If REST is :TAGGED or :UNTAGGED, it
+;;; specifies a particular nature. If :UNSPECIFIC, then we sign-extend
+;;; from the last specified slot which tends to reduce the bitmap to
+;;; -1 in the case of everything being tagged, (or -2 if non-compact
+;;; header), or a small positive fixnum if the last is untagged.
+;;;
+;;; Bit indices correspond to physical word indices excluding
+;;; the header word. So the least-significant bit of a bitmap is
+;;; always the word just after the instance header word.
+;;;
+;;; Examples: (Legend: u=untaggged slot, t=tagged slot)
+;;;
+;;;                                      logical    arithmetic
+;;;                                      bitmap     value
+;;; Funcallable object:
+;;;   Non-compact header:                #b...1010        -6
+;;;       word0:     header
+;;;       word1: (*) entry address
+;;;       word2: (t) implementation-fun
+;;;       word3: (u) layout
+;;;       word4: (t) tagged slots ...
+;;;   Compact header:
+;;;     External trampoline:             #b...1111        -1
+;;;       word0:     header/layout
+;;;       word1: (*) entry address
+;;;       word2: (t) implementation-fun
+;;;       word3: (t) tagged slots ...
+;;;     Internal trampoline:             #b..00110         6
+;;;       word0:     header/layout
+;;;       word1: (*) entry address [= word 4]
+;;;       word2: (t) implementation-fun
+;;;       word3: (t) tagged slot
+;;;       word4: (u) machine code
+;;;       word5: (u) machine code
+;;; (*) entry address can be treated as either tagged or raw.
+;;;     For some architectures it has a lowtag, but points to
+;;;     read-only space. For others it is a fixnum.
+;;;     In either case the GC need not observe the value.
+;;;     Compact-header with external trampoline can indicate
+;;;     all slots as tagged. The other two cases above have at
+;;;     least one slot which must be marked raw.
+;;;
+;;; Ordinary instance with only tagged slots:
+;;;   Non-compact header:                #b...1110        -2
+;;;      word0:     header
+;;;      word1: (u) layout
+;;;      word2: (t) tagged slots ...
+;;;   Compact header:                    #b...1111        -1
+;;;      word0:     header/layout
+;;;      word1: (t) tagged slots ...
+;;; Ordinary instance with only raw slots slots:
+;;;   [this also includes objects whose slots all have types
+;;;    ignorable by GC such as fixum/character]
+;;;   Non-compact header:                #b...0000         0
+;;;      word0:     header
+;;;      word1: (u) layout
+;;;      word2: (u) raw slots ...
+;;;   Compact header:                    #b...0000         0
+;;;      word0:     header/layout
+;;;      word1: (u) raw slots ...
+;;;
+;;; Notes:
+;;; 1. LAYOUT has to be scanned separately regardless of where stored.
+;;;    (compact header or not). Hence it is regarded as an untagged slot.
+;;; 2. For funcallable objects these examples are exhaustive of all
+;;;    possible bitmaps. The instance length can be anything,
+;;;    but untagged slots are not generally supported.
+;;;    For ordinary instance the examples are merely illustrative.
+;;;
+(defun dd-bitmap (dd &optional (rest :unspecific))
+  (declare (type (member :unspecific :tagged :untagged) rest))
+  #-compact-instance-header
+  (when (eq (car (dd-alternate-metaclass dd)) 'function)
+    ;; There is only one bitmap, which excludes LAYOUT from tagged slots
+    (return-from dd-bitmap standard-gf-primitive-obj-layout-bitmap))
+  ;; Compute two masks with a 1 bit for each dsd-index which contains a descriptor.
+  ;; The "mininal" bitmap contains a 1 for each slot which *must* be scanned in GC,
+  ;; and the "maximal" bitmap contains a 1 for each which *may* be scanned.
+  ;; If a non-raw slot type can be ignored - such as (OR FIXNUM NULL), then it
+  ;; sets a 1 in the maximal bitmap but not in the minimal bitmap.
+  ;; Note that the GC can always add one slot for a stable hash, but that slot
+  ;; can only hold a fixnum, so need not be traced even though it is a descriptor.
+  (let ((n-bits (dd-length dd))
+        (any-raw)
+        (maximal-bitmap 0)
+        (minimal-bitmap 0))
     (dolist (slot (dd-slots dd))
-      (when (eql t (dsd-raw-type slot))
-        (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))
-    ;; The garbage collector can add one more word, but it doesn't need
-    ;; to be accounted for in the bitmap.
-    ;; If the bitmap is -1 ("all tagged"), we leave it alone; if a positive
-    ;; number, the added trailing slot can be regarded as untagged.
-    (let* ((length (dd-length dd))
-           (n-bits (logior length 1)))
-      (when (evenp length) ; Add padding word if necessary.
-        (setq bitmap (logior bitmap (ash 1 length))))
-      (when (and (logbitp (1- n-bits) bitmap)
-                 ;; Bitmap of -1 implies that all slots are tagged,
-                 ;; and no extraordinary GC treatment is needed.
-                 ;; If all are tagged but any special treatment is required,
-                 ;; then the bitmap can't be -1.
-                 (named-let admits-bitmap-optimization ((dd dd))
-                   (cond ((eq (dd-name dd) 'list-node) nil)
-                         ((not (dd-include dd)) t)
-                         ((admits-bitmap-optimization
-                           (find-defstruct-description (car (dd-include dd))))))))
-        (let ((sign-ext (logior (ash -1 n-bits) bitmap)))
-          (when (or (and (fixnump sign-ext) (sb-xc:typep bitmap 'bignum))
-                    (eql sign-ext -1))
-            (return-from dd-bitmap sign-ext)))))
-    bitmap))
+      (cond ((eql t (dsd-raw-type slot))
+             (let ((bit (ash 1 (dsd-index slot))))
+               (setf maximal-bitmap (logior maximal-bitmap bit))
+               (unless (dsd-gc-ignorable slot)
+                 (setf minimal-bitmap (logior minimal-bitmap bit)))))
+            (t
+             (setq any-raw t))))
+
+    ;; If the structure has a custom GC scavenging method then always return
+    ;; the minimal bitmap, and disallow arbitrary trailing slots.
+    ;; The optimization for all-tagged (avoiding use of the bitmap)
+    ;; indicates in addition to no raw slots, no custom GC method either.
+    ;; As of now this only pertains to lockfree-singly-linked-list nodes
+    ;; and descendant types. (The lockfree list uses one pointer bit
+    ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
+    (when (named-let has-custom-gc-method ((dd dd))
+            (cond ((eq (dd-name dd) 'list-node) t)
+                  ((dd-include dd)
+                   (has-custom-gc-method
+                    (find-defstruct-description (car (dd-include dd)))))))
+      (aver (eq rest :unspecific))
+      (return-from dd-bitmap minimal-bitmap))
+
+    ;; The minimal bitmap will have the least number of bits set, and the maximal
+    ;; will have the most, but it is not always a performance improvement to prefer
+    ;; fewer bits. If the total number of bits is large, and there are no raw slots,
+    ;; then the "all tagged" treatment may be better because it does not need to
+    ;; parse the bitmap. But if there are any raw slots, the minimal bitmap is best.
+    (let ((bitmap
+           (if (or (= minimal-bitmap 0) ; don't need a bitmap
+                   any-raw              ; must use a bitmap
+                   ;; for other cases, it is not clear-cut
+                   (and (> (logcount maximal-bitmap) 10) ; arb
+                        (< (logcount minimal-bitmap)
+                           (floor (logcount maximal-bitmap) 2))))
+               minimal-bitmap
+               maximal-bitmap)))
+
+      ;; If the trailing slots have tagged nature, extend bitmap with
+      ;; an infinite sequence of 1 bits. If :UNSPECIFIC, replicate
+      ;; the most-significant-bit whether it be 0 or 1.
+      (cond ((or (eq rest :tagged)
+                 (and (eq rest :unspecific)
+                      (plusp n-bits)
+                      (logbitp (1- n-bits) bitmap)))
+             (dpb bitmap (byte n-bits 0) -1))
+            (t
+             bitmap)))))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should

@@ -470,7 +470,7 @@
 #|
 ;;; To find templateized symbols that aren't special operators:
 (do-all-symbols (s)
-  (let ((template 
+  (let ((template
          (sb-int:info :function :walker-template s)))
     (when (and template (not (special-operator-p s)))
       (format t "Why? ~S~%" s))))

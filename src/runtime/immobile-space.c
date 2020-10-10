@@ -1526,8 +1526,7 @@ static boolean forwardable_ptr_p(lispobj ptr)
            forwarding_pointer_p(native_pointer(ptr));
 }
 
-static void adjust_words(lispobj *where, sword_t n_words,
-                         uword_t __attribute__((unused)) arg)
+static void adjust_words(lispobj *where, sword_t n_words)
 {
     int i;
     for (i=0;i<n_words;++i) {
@@ -1546,7 +1545,7 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     if (asm_routines_start <= raw_addr && raw_addr < asm_routines_end)
         return raw_addr;
     lispobj simple_fun = fun_taggedptr_from_self(raw_addr);
-    adjust_words(&simple_fun, 1, 0);
+    adjust_words(&simple_fun, 1);
     return fun_self_from_taggedptr(simple_fun);
 }
 
@@ -1571,16 +1570,8 @@ static void adjust_fdefn_raw_addr(struct fdefn* fdefn)
   }
 }
 
-/* Fix the layout of OBJ, and return the layout's address in tempspace.
- * If compact headers, store the layout back into the object.
- * If non-compact headers, DO NOT store the layout back into the object,
- * because that will be done when instance_scan() touches all slots.
- * If it were wrongly done now, then the following (real example) happens:
- *   instance @ 0x1000000000 has layout pointer 0x203cb483.
- *   layout @ 0x203cb483 forwards to 0x2030c483.
- *   object _currently_ at 0x2030c480 (NOT a layout) forwards to 0x203c39cf.
- * so the instance winds up with a non-layout in its layout after
- * instance_scan() forwards that slot "again". */
+/* Fix the layout of OBJ, storing it back to the object,
+ * and return the layout's address in tempspace. */
 static struct layout* fix_object_layout(lispobj* obj)
 {
     // This works on instances, funcallable instances (and/or closures)
@@ -1592,13 +1583,11 @@ static struct layout* fix_object_layout(lispobj* obj)
 #else
     gc_assert(widetag_of(obj) == INSTANCE_WIDETAG);
 #endif
-    lispobj layout = instance_layout(obj);
+    lispobj layout = layout_of(obj);
     if (layout == 0) return 0;
     if (forwarding_pointer_p(native_pointer(layout))) { // usually
         layout = forwarding_pointer_value(native_pointer(layout));
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        instance_layout(obj) = layout;
-#endif
+        layout_of(obj) = layout;
     }
     struct layout* native_layout = (struct layout*)tempspace_addr(LAYOUT(layout));
     gc_assert(header_widetag(native_layout->header) == INSTANCE_WIDETAG);
@@ -1623,7 +1612,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         gc_assert(!forwarding_pointer_p(where));
         lispobj header_word = *where;
         if (!is_header(header_word)) {
-            adjust_words(where, 2, 0); // A cons. (It can only be filler?)
+            adjust_words(where, 2); // A cons. (It can only be filler?)
             where += 2;
             continue;
         }
@@ -1634,18 +1623,20 @@ static void fixup_space(lispobj* where, size_t n_words)
           if (!leaf_obj_widetag_p(widetag))
             lose("Unhandled widetag in fixup_space: %p", (void*)header_word);
           break;
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
         case INSTANCE_WIDETAG:
-          instance_scan(adjust_words, where+1, size-1,
-                        fix_object_layout(where)->bitmap,
-                        0);
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+          {
+          lispobj* slots = where+1;
+          int i;
+          lispobj bitmap = fix_object_layout(where)->bitmap;
+          for(i=0; i<(size-1); ++i)
+              if (bitmap_logbitp(i, bitmap)) adjust_words(slots+i, 1);
+          }
           break;
         case CODE_HEADER_WIDETAG:
           // Fixup the constant pool.
           code = (struct code*)where;
-          adjust_words(where+2, code_header_words(code)-2, 0);
+          adjust_words(where+2, code_header_words(code)-2);
           apply_absolute_fixups(code->fixups, code);
           break;
         case CLOSURE_WIDETAG:
@@ -1655,10 +1646,10 @@ static void fixup_space(lispobj* where, size_t n_words)
         case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
           // skip the trampoline word at where[1]
-          adjust_words(where+2, size-2, 0);
+          adjust_words(where+2, size-2);
           break;
         case FDEFN_WIDETAG:
-          adjust_words(where+1, 2, 0);
+          adjust_words(where+1, 2);
           adjust_fdefn_raw_addr((struct fdefn*)where);
           break;
 
@@ -1707,7 +1698,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Use the sizing functions for generality.
           // Symbols can contain strange header bytes,
           // and vectors might have a padding word, etc.
-          adjust_words(where+1, size-1, 0);
+          adjust_words(where+1, size-1);
           break;
         }
         where += size;

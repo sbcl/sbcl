@@ -32,7 +32,7 @@
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes.
-(defun !boot-make-wrapper (length name &optional (bitmap -1))
+(defun !boot-make-wrapper (length name &optional (bitmap +layout-all-tagged+))
   (let ((found (find-classoid name nil)))
     (cond
      (found
@@ -72,6 +72,7 @@
                      (t
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
         (make-layout (hash-layout-name name) classoid
+                     :bitmap +layout-all-tagged+
                      :invalid nil :length length :flags +pcl-object-layout-flag+)))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))

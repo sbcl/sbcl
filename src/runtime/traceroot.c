@@ -163,18 +163,14 @@ static int find_ref(lispobj* source, lispobj target)
     scan_limit = sizetab[widetag](source);
     switch (widetag) {
     case INSTANCE_WIDETAG:
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
-        // mixed boxed/unboxed objects
-        // Unlike in scav_instance where the slot loop is unswitched for
-        // speed into three cases (no raw slots, fixnum bitmap, bignum bitmap),
-        // here we just go for clarity by abstracting out logbitp.
-        layout = instance_layout(source);
+        // Unlike in scav_instance where the slot loop is optimized for
+        // certain special cases, here we opt for simplicity.
+        layout = layout_of(source);
         check_ptr(0, layout);
         bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
         for(i=1; i<scan_limit; ++i)
-            if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
+            if (bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
         // FIXME: check lockfree_list_node_p() also
         return -1;
 #if FUN_SELF_FIXNUM_TAGGED
@@ -737,19 +733,15 @@ static uword_t build_refs(lispobj* where, lispobj* end,
         nwords = scan_limit = sizetab[widetag](where);
         switch (widetag) {
         case INSTANCE_WIDETAG:
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
             // mixed boxed/unboxed objects
-            layout = instance_layout(where);
+            layout = layout_of(where);
             check_ptr(layout);
             // Partially initialized instance can't have nonzero words yet
             bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
-            // If no raw slots, just scan without use of the bitmap.
             // FIXME: check lockfree_list_node_p() also
-            if (bitmap == make_fixnum(-1)) break;
             for(i=1; i<scan_limit; ++i)
-                if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);
+                if (bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);
             continue;
 #if FUN_SELF_FIXNUM_TAGGED
         case CLOSURE_WIDETAG:

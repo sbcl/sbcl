@@ -45,7 +45,7 @@
 ;; these abstractions are provided as soon as the raw slots defs are.
 (def!type sb-vm:word () `(unsigned-byte ,sb-vm:n-word-bits))
 (def!type sb-vm:signed-word () `(signed-byte ,sb-vm:n-word-bits))
-(defconstant +layout-all-tagged+ -1)
+(defconstant +layout-all-tagged+ (ash -1 sb-vm:instance-data-start))
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
 (defstruct (raw-slot-data

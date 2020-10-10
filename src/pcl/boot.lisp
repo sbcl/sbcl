@@ -1974,7 +1974,7 @@ bootstrapping.
 (define-load-time-global *sgf-wrapper*
   (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function
-                      #+immobile-code +machine-code-embedding-fsc-instance-bitmap+))
+                      sb-kernel::standard-gf-primitive-obj-layout-bitmap))
 
 (define-load-time-global *sgf-slots-init*
   (mapcar (lambda (canonical-slot)

@@ -218,12 +218,8 @@
     (or (and (eql kind sb-vm:funcallable-instance-widetag)
              ;; if the FIN has no raw words then it has no internal trampoline
              (eql (layout-bitmap (%fun-layout fun))
-                  sb-kernel:+layout-all-tagged+))
+                  +layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
-
-(defconstant sb-pcl::+machine-code-embedding-fsc-instance-bitmap+
-  (logxor (1- (ash 1 funcallable-instance-info-offset))
-          (ash 1 (1- funcallable-instance-trampoline-slot))))
 
 ;;; This allocator is in its own function because the immobile allocator
 ;;; VOPs are impolite (i.e. bad) and trash all registers.

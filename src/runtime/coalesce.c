@@ -164,14 +164,11 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             next = where + nwords;
             switch (widetag) {
             case INSTANCE_WIDETAG: // mixed boxed/unboxed objects
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
-                layout = instance_layout(where);
+                layout = layout_of(where);
                 bitmap = LAYOUT(layout)->bitmap;
-                for(i=1; i<nwords; ++i)
-                    if (layout_bitmap_logbitp(i-1, bitmap))
-                        coalesce_obj(where+i, ht);
+                for (i=0; i<(nwords-1); ++i)
+                    if (bitmap_logbitp(i, bitmap)) coalesce_obj(where+1+i, ht);
                 continue;
             case CODE_HEADER_WIDETAG:
                 nwords = code_header_words((struct code*)where);
