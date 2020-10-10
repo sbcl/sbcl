@@ -512,6 +512,8 @@
     (gc)
     (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))
 
+#+genecgc
+(progn
 (defun code-iterator (how)
   (let ((n 0) (tot-bytes 0))
     (sb-int:dx-flet ((visit (obj type size)
@@ -525,13 +527,13 @@
     (values n tot-bytes))))
 (compile 'code-iterator)
 
-(with-test (:name :code-iteration-fast :skipped-on :cheneygc)
+(with-test (:name :code-iteration-fast)
   (sb-int:binding* (((slow-n slow-bytes) (code-iterator :slow))
                     ((fast-n fast-bytes) (code-iterator :fast)))
     ;; Fast should be 20x to 50x faster than slow, but that's kinda sensitive
     ;; to the machine and can't be reliably asserted.
     (assert (= slow-n fast-n))
-    (assert (= slow-bytes fast-bytes))))
+    (assert (= slow-bytes fast-bytes)))))
 
 (defglobal *wp-for-signal-handler-gc-test* nil)
 #+(and gencgc unix sb-thread)
