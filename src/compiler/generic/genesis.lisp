@@ -470,6 +470,13 @@
         (logior bits (ash -1 (1+ sb-vm:n-positive-fixnum-bits)))
         bits)))
 
+(defun descriptor-integer (des)
+  (cond ((is-fixnum-lowtag (descriptor-lowtag des))
+         (descriptor-fixnum des))
+        ((= (logand (read-bits-wordindexed des 0) sb-vm:widetag-mask)
+            sb-vm:bignum-widetag)
+         (bignum-from-core des))))
+
 (defun descriptor-word-sized-integer (des)
   ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
   ;; representation.
@@ -1177,7 +1184,7 @@ core and return a descriptor to it."
     (let ((proxy (%make-cold-layout :name name
                                     :depthoid depthoid
                                     :length length
-                                    :bitmap bitmap
+                                    :bitmap (descriptor-integer bitmap)
                                     :flags flags
                                     :inherits inherits
                                     :descriptor result)))
@@ -2265,7 +2272,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (proxy-layout ; our host-structure wrapper on the slots of the cold layout
           (gethash (descriptor-bits layout) *cold-layout-by-addr*))
          (result (allocate-struct size layout))
-         (bitmap (descriptor-fixnum (cold-layout-bitmap proxy-layout))))
+         (bitmap (cold-layout-bitmap proxy-layout)))
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
@@ -2283,10 +2290,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-layout (depthoid flags length))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
   (let* ((inherits (pop-stack))
-         (bitmap (pop-stack))
+         (bitmap-descriptor  (pop-stack))
+         (bitmap-value (descriptor-integer bitmap-descriptor))
          (name (pop-stack))
          (existing-layout (gethash name *cold-layouts*)))
-    (declare (type descriptor bitmap inherits))
+    (declare (type descriptor bitmap-descriptor inherits))
     (declare (type symbol name))
     (setq flags
           ;; Nothing tests layout-flags at cross-compile time,
@@ -2309,7 +2317,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (unless (and (= flags old-flags)
                      (= depthoid old-depthoid)
                      (= length old-length)
-                     (= (descriptor-fixnum bitmap) (descriptor-fixnum old-bitmap))
+                     (= bitmap-value old-bitmap)
                      (eql (cold-vector-len inherits) (cold-vector-len old-inherits))
                      (dotimes (i (cold-vector-len inherits) t)
                        (unless (descriptor= (cold-svref inherits i)
@@ -2319,11 +2327,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (format t "old=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
                   old-flags old-depthoid old-length old-bitmap old-inherits)
           (format t "new=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
-                  flags depthoid length (descriptor-fixnum bitmap) inherits)
+                  flags depthoid length bitmap-value inherits)
           (bug "Messed up fop-layout for ~s" name))))
     (if existing-layout
         (cold-layout-descriptor existing-layout)
-        (make-cold-layout name depthoid flags length bitmap inherits))))
+        (make-cold-layout name depthoid flags length bitmap-descriptor inherits))))
 
 ;;;; cold fops for loading symbols
 
@@ -3339,7 +3347,7 @@ III. initially undefined function references (alphabetically):
              (addr (descriptor-bits descriptor)))
         (format t "~10,'0X: ~8d  ~S[~D]~%"
                 addr
-                (descriptor-fixnum (cold-layout-bitmap proxy))
+                (cold-layout-bitmap proxy)
                 (car pair)
                 (cold-layout-length proxy))))
 
