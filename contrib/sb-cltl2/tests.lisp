@@ -136,6 +136,16 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
         (equalp (frob (+ x x))
                 '(+ y y))))
   t)
+;; MULTIPLE-VALUE-BIND and -SETQ and were failing to macroexpand-all
+;; because the walker treated them both as special operators.
+(deftest macroexpand-all.mvb
+  (let ((form '(multiple-value-bind (a b) (something) (use-them a b))))
+    (not (equalp form (macroexpand-all form nil))))
+  t)
+(deftest macroexpand-all.mvs
+  (let ((form '(multiple-value-setq (a b) (something))))
+    (not (equalp form (macroexpand-all form nil))))
+  t)
 ;;;; DECLARATION-INFORMATION
 
 (defmacro dinfo (thing &environment env)

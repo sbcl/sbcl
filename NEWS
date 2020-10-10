@@ -3,6 +3,8 @@
 changes relative to sbcl-2.0.9:
   * minor incompatible change: the funarg given to SB-SPROF:MAP-TRACES
     does not receive a wallclock time with each trace.
+  * bug fix: SB-CLTL2:MACROEXPAND-ALL did not expand MULTIPLE-VALUE-BIND
+    and MULTIPLE-VALUE-SETQ
 
 changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture
