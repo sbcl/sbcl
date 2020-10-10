@@ -38,12 +38,12 @@
 ;; SunOS defines CLOCK_PROCESS_CPUTIME_ID but you get EINVAL if you try to use it.
 (defun system-internal-run-time ()
   (multiple-value-bind (utime-sec utime-usec stime-sec stime-usec)
-      (with-alien ((usage (struct rusage)))
-        (syscall* ("sb_getrusage" int (* (struct rusage)))
-                  (slot (slot usage 'sb-unix::ru-utime) 'sb-untv-sec)
-                  (slot (slot usage 'ru-utime) 'tv-usec)
-                  (slot (slot usage 'ru-stime) 'tv-sec)
-                  (slot (slot usage 'ru-stime) 'tv-usec)
+      (with-alien ((usage (struct sb-unix::rusage)))
+        (syscall* ("sb_getrusage" int (* (struct sb-unix::rusage)))
+                  (values (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-sec)
+                          (slot (slot usage 'sb-unix::ru-utime) 'sb-unix::tv-usec)
+                          (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-sec)
+                          (slot (slot usage 'sb-unix::ru-stime) 'sb-unix::tv-usec))
                   rusage_self (addr usage)))
     (+ (* (+ utime-sec stime-sec) internal-time-units-per-second)
        (floor (+ utime-usec stime-usec

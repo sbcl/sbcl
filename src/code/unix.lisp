@@ -1128,6 +1128,7 @@ the UNIX epoch (January 1st 1970.)"
                   current)))))))
 
   (declaim (inline system-internal-run-time))
+  #-sunos ; defined in sunos-os
   (defun system-internal-run-time ()
     (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
       (+ (* sec internal-time-units-per-second)
