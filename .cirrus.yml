@@ -3,7 +3,6 @@ freebsd_build_task:
   freebsd_instance:
     matrix:
       image_family: freebsd-13-0-snap
-      image_family: freebsd-12-1
     cpu: 1
     memory: 1G
 
