@@ -244,11 +244,10 @@
   `(setf (%instance-ref (the layout ,to-layout) (get-dsd-index layout bitmap))
         (layout-bitmap ,from-layout)))
 
-;;; It is purely coincidental that these are the negatives of one another.
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
-  #+immobile-code  6
-  #-immobile-code -6)
+  #+compact-instance-header  6
+  #-compact-instance-header -4)
 
 #+sb-xc-host
 (defmacro set-layout-inherits (layout inherits)

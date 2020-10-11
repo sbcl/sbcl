@@ -1088,18 +1088,20 @@ We could try a few things to mitigate this:
                            to (- (get-closure-length ,obj) funcallable-instance-info-offset)
                            do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))
                     (#b0110 ; internal trampoline, 2 raw slots, 1 tagged slot
-                     ;;   ^ payload word 0 is raw (but looks fixnum-like)
-                     ;;  ^  word 1 is the fin-fun which we already accounted for above
-                     ;; ^   word 2 (INFO index 0) is the only one that hasn't been processed.
+                     ;;   ^ ---- trampoline
+                     ;;  ^------ implementation function
+                     ;; ^------- (FUNCALLABLE-INSTANCE-INFO 0)
                      ;; and the rest of the words are raw.
                      (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
                   #-compact-instance-header
                   (progn
-                    (aver (eql (layout-bitmap .l.) -6))
-                    ;;               v---- trampoline
-                    ;; -6 = #b1...1010
-                    ;;             ^------ layout pointer = (FUNCALLABLE-INSTANCE-INFO 0)
-                    (loop for .i. from 1
+                    (aver (eql (layout-bitmap .l.) -4))
+                    ;;            v ----trampoline
+                    ;; = #b1...1100
+                    ;;           ^----- layout
+                    ;;          ^------ implementation function
+                    ;;         ^------- (FUNCALLABLE-INSTANCE-INFO 0)
+                    (loop for .i. from 0
                           to (- (get-closure-length ,obj) funcallable-instance-info-offset)
                           do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))))
             .,(make-case 'function))) ; in case there was code provided for it

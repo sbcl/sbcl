@@ -283,6 +283,8 @@ during backtrace.
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
+  #-compact-instance-header (layout :set-trans %set-funcallable-instance-layout
+                                    :ref-trans %fun-layout)
   ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'
   ;; (at least for the builds with compact-instance-header)
   ;; then for both funcallable and non-funcallable instances,

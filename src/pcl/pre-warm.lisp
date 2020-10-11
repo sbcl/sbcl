@@ -78,13 +78,6 @@
   :dd-type funcallable-structure)
 )
 
-;;; Needed to compile the #n# reader because apparently some people think it amusing
-;;; to create readable funcallable instances involving circularity and/or sharing.
-;;; No constraint on the result type so that the slot implementation strategy
-;;; is wholly defined within the warm build.
-(defmacro %fsc-instance-slots (fin)
-  `(%funcallable-instance-info ,fin ,sb-vm:instance-data-start))
-
 ;;; Set up fake standard-classes.
 ;;; This is enough to fool the compiler into optimizing TYPEP into
 ;;; %INSTANCE-TYPEP.

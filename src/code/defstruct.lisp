@@ -1522,11 +1522,11 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;                                      logical    arithmetic
 ;;;                                      bitmap     value
 ;;; Funcallable object:
-;;;   Non-compact header:                #b...1010        -6
+;;;   Non-compact header:                #b...1100        -4
 ;;;       word0:     header
 ;;;       word1: (*) entry address
-;;;       word2: (t) implementation-fun
-;;;       word3: (u) layout
+;;;       word2: (u) layout
+;;;       word3: (t) implementation-fun
 ;;;       word4: (t) tagged slots ...
 ;;;   Compact header:
 ;;;     External trampoline:             #b...1111        -1
@@ -2106,19 +2106,20 @@ or they must be declared locally notinline at each call site.~@:>"
                                               slot-names)
   (let* ((dd (make-defstruct-description t class-name))
          (conc-name (string (gensymify* class-name "-")))
-         ;; Without compact instance headers, the index starts at 1 for
-         ;; named slots, because slot 0 is the LAYOUT.
-         ;; This is the same in ordinary structures too: see (INCF DD-LENGTH)
-         ;; in PARSE-DEFSTRUCT-NAME-AND-OPTIONS.
-         ;; With compact instance headers, slot 0 is a data slot.
-         (slot-index sb-vm:instance-data-start))
+         (slot-index 0))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
     ;; because alternate-metaclass structures can not have either.
     (case dd-type
       ;; We don't fully support inheritance of alternate metaclass stuff,
       ;; so sanity check our own code.
       (structure
-       (aver (eq superclass-name 't)))
+       (aver (eq superclass-name 't))
+       ;; Without compact instance headers, the index starts at 1 for
+       ;; named slots, because slot 0 is the LAYOUT.
+       ;; This is the same in ordinary structures too: see (INCF DD-LENGTH)
+       ;; in PARSE-DEFSTRUCT-NAME-AND-OPTIONS.
+       ;; With compact instance headers, slot 0 is a data slot.
+       (incf slot-index sb-vm:instance-data-start))
       (funcallable-structure
        (aver (eq superclass-name 'function)))
       (t (bug "Unknown DD-TYPE in ALTERNATE-METACLASS: ~S" dd-type)))

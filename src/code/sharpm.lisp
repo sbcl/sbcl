@@ -306,16 +306,12 @@
                       (i sb-vm:instance-data-start (1+ i)))
                      ((>= i len))
                    (process (%instance-ref tree i)))))
-             ;; It is not safe to iterate over %FUNCALLABLE-INSTANCE-INFO without knowing
-             ;; where the raw slots are, if any. We can safely process FSC-INSTANCE-SLOTS
-             ;; though, and that's the *only* slot to look at.
-             ;; No other funcallable structure (%METHOD-FUNCTION, INTERPRETED-FUNCTION, etc)
-             ;; has a reader syntax.
-             ;; ASSUMPTION: all funcallable structures have at least 1 slot beyond
-             ;; %FUNCALLABLE-INSTANCE-FUN (overlapping with FSC-INSTANCE-SLOTS)
-             ;; and that slot is never a raw slot.
+            ;; ASSUMPTION: all funcallable instances have at least 1 slot
+            ;; accessible via FUNCALLABLE-INSTANCE-INFO.
+            ;; The only such objects with reader syntax are CLOS objects,
+            ;; and those have exactly 1 slot in the primitive object.
             (funcallable-instance
-             (process (sb-pcl::%fsc-instance-slots tree))))))
+             (process (%funcallable-instance-info tree 0))))))
       tree)))
 
 ;;; Sharp-equal works as follows.

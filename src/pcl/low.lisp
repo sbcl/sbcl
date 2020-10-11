@@ -204,7 +204,8 @@
   `(%instance-ref ,x ,sb-vm:instance-data-start))
 (defmacro std-instance-slots (x)
   `(truly-the simple-vector (%std-instance-slots ,x)))
-;; %fsc-instance-slots is defined in src/pcl/pre-warm
+(defmacro %fsc-instance-slots (fin)
+  `(%funcallable-instance-info ,fin 0))
 (defmacro fsc-instance-slots (x)
   `(truly-the simple-vector (%fsc-instance-slots ,x)))
 

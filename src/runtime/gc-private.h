@@ -393,10 +393,10 @@ static inline int instance_length(lispobj header)
 
 // first 2 words of ordinary instance are: header, layout
 # define instance_layout(native_ptr) ((lispobj*)native_ptr)[1]
-// first 4 words of funcallable instance are: header, trampoline, fin-fun, layout
-# define funinstance_layout(native_ptr) ((lispobj*)native_ptr)[3]
+// first 4 words of funcallable instance are: header, trampoline, layout, fin-fun
+# define funinstance_layout(native_ptr) ((lispobj*)native_ptr)[2]
 # define layout_of(native_ptr) \
-  ((lispobj*)native_ptr)[widetag_of(native_ptr)==FUNCALLABLE_INSTANCE_WIDETAG?3:1]
+  ((lispobj*)native_ptr)[1+((widetag_of(native_ptr)>>LAYOUT_SELECTOR_BIT)&1)]
 
 #endif
 

@@ -3023,7 +3023,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                       gc_assert(bitmap == make_fixnum(-1) || bitmap == make_fixnum(6));
 #else
-                      gc_assert(bitmap == make_fixnum(-6));
+                      gc_assert(bitmap == make_fixnum(-4));
 #endif
                     } else {
                         gc_assert(fixnump(bitmap)
