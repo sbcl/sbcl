@@ -1,1 +1,1 @@
-:win32 :avx2 :sb-safepoint :sb-thruption :sb-wtimer :sb-safepoint-strictly :gencgc :sb-simd-pack :sb-simd-pack-256 :little-endian :sb-thread
+:avx2 :gencgc :sb-simd-pack :sb-simd-pack-256 :little-endian

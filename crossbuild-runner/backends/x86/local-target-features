@@ -1,1 +1,1 @@
-:sb-thread :largefile :gencgc :little-endian
+:largefile :gencgc :little-endian

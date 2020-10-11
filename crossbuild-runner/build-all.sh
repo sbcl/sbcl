@@ -24,8 +24,10 @@ do
   # Assume that dlopen() is provided so that we don't try to read sbcl.nm though.
   echo '(lambda (features) (union features (list :crossbuild-test :os-provides-dlopen ' > $ltf
   echo ":$arch" >> $ltf
-  # x86-64 is tested as if #+win32
-  if [ $arch != "x86-64" ]; then
+  # x86 and x86-64 are tested as if #+win32. Unix is otherwise plenty tested.
+  if [ $arch = x86 -o $arch = x86-64 ]; then
+    echo ':win32 :sb-thread :sb-safepoint :sb-thruption :sb-wtimer' >> $ltf
+  else
     echo ':unix :linux :elf' >> $ltf
   fi
   cat crossbuild-runner/backends/$arch/features >> $ltf

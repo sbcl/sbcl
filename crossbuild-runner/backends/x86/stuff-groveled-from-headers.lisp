@@ -1,6 +1,22 @@
 ;;;; This is an automatically generated file, please do not hand-edit it.
 ;;;; See the program "grovel-headers.c".
 
+(in-package "SB-WIN32")
+
+(define-alien-type int-ptr (signed 32))
+(define-alien-type dword (signed 32))
+(define-alien-type bool (signed 32))
+(define-alien-type uint (unsigned 32))
+(define-alien-type ulong (unsigned 32))
+
+(defconstant error_file_not_found 2)
+(defconstant error_file_exists #x50)
+
+;; these are total fabrications
+(defconstant max_path 1024)
+(defconstant error-no-data 1)
+(defconstant +exception-maximum-parameters+ 6)
+
 (in-package "SB-ALIEN")
 
 ;;;flags for dlopen()
