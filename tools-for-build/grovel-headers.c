@@ -346,15 +346,21 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
 #endif
 #ifdef LISP_FEATURE_LINUX
+#ifdef CLOCK_REALTIME_ALARM
     defconstant("clock-realtime-alarm", CLOCK_REALTIME_ALARM);
+#endif
     defconstant("clock-realtime-coarse", CLOCK_REALTIME_COARSE);
 #ifdef CLOCK_TAI
     defconstant("clock-tai", CLOCK_TAI); // International Atomic Time.
 #endif
     defconstant("clock-monotonic-coarse", CLOCK_MONOTONIC_COARSE);
     defconstant("clock-monotonic-raw", CLOCK_MONOTONIC_RAW);
+#ifdef CLOCK_BOOTTIME
     defconstant("clock-boottime", CLOCK_BOOTTIME);
+#endif
+#ifdef CLOCK_BOOTTIME_ALARM
     defconstant("clock-boottime-alarn", CLOCK_BOOTTIME_ALARM);
+#endif
     defconstant("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
 #endif
     printf(";;; structures\n");
