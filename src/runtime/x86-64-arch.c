@@ -413,6 +413,10 @@ sigill_handler(int __attribute__((unused)) signal,
 #endif
 
     fake_foreign_function_call(context);
+#ifdef LISP_FEATURE_LINUX
+    extern void sb_dump_mcontext(char*,void*);
+    sb_dump_mcontext("SIGILL received", context);
+#endif
     lose("Unhandled SIGILL at %p.", pc);
 }
 

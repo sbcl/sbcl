@@ -76,14 +76,68 @@ int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 
+// This array is indexed by the encoding of the register in an instruction.
+static unsigned char regmap[16] = {
+    REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI,
+    REG_R8,  REG_R9,  REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15
+};
+// So is this one, to coincide with the one above
+static char *gprnames[] = {
+    "rax","rcx","rdx","rbx","rsp","rbp","rsi","rdi",
+    "r8","r9","r10","r11","r12","r13","r14","r15"
+};
+static char *fprnames[] = {
+    "xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7",
+    "xmm8","xmm9","xmm10","xmm11","xmm12","xmm13","xmm14","xmm15"
+};
+static char *flagbits[] = {"CF",0,"PF",0,"AF",0,"ZF","SF","TF","IF","DF","OF"};
+
+void sb_dump_mcontext(char *reason, ucontext_t* context)
+{
+    /* In case multiple threads receive SIGILL at the same time,
+     * we want to try to avoid interleaving their output.
+     * Using a single write() call usually does the trick */
+    char obuf[2048], smallbuf[100];
+    int bit, ptr = 0, i, j;
+    smallbuf[0] = smallbuf[1] = 0;
+    long unsigned int flags = context->uc_mcontext.gregs[REG_EFL];
+    for (bit=11; bit>=0; --bit)
+        if (flagbits[bit] && (flags & (1<<bit)))
+          ptr += sprintf(smallbuf+ptr, " %s", flagbits[bit]);
+#define REMAINING sizeof obuf - ptr
+    ptr = 0;
+    ptr = snprintf(obuf, REMAINING,
+                   "Thread %d CPU state (%s): PC=%lx Flags={%s}\n",
+                   THREAD_ID_VALUE, reason,
+                   (uword_t)context->uc_mcontext.gregs[REG_RIP],
+                   smallbuf+1);
+    // GPRs
+    for(i=0; i<2; ++i) {
+        for(j=0; j<8; ++j) ptr += snprintf(obuf+ptr, REMAINING, " %16s", gprnames[i*8+j]);
+        if (REMAINING) obuf[ptr++] = '\n';
+        for(j=0; j<8; ++j)
+            ptr += snprintf(obuf+ptr, REMAINING, " %16lX",
+                            (uword_t)context->uc_mcontext.gregs[regmap[i*8+j]]);
+        if (REMAINING) obuf[ptr++] = '\n';
+    }
+    // FPRs
+    for(i=0; i<4; ++i) {
+        for(j=0; j<4; ++j) ptr += snprintf(obuf+ptr, REMAINING, "  %32s", fprnames[i*4+j]);
+        if (REMAINING) obuf[ptr++] = '\n';
+        for(j=0; j<4; ++j) {
+            uint32_t* e = context->uc_mcontext.fpregs->_xmm[i*4+j].element;
+            ptr += snprintf(obuf+ptr, REMAINING, "  %08X%08X%08X%08X", e[3], e[2], e[1], e[0]);
+        }
+        if (REMAINING) obuf[ptr++] = '\n';
+    }
+    sigset_tostring(&context->uc_sigmask, smallbuf, sizeof smallbuf);
+    ptr += snprintf(obuf+ptr, REMAINING, "sigmask=%s\n", smallbuf);
+    write(2, obuf, ptr);
+}
 
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
-    static unsigned char regmap[16] = {
-       REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI,
-       REG_R8,  REG_R9,  REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15
-    };
     if (offset >= 0 && offset < 16)
         return (os_context_register_t*)&context->uc_mcontext.gregs[regmap[offset]];
     return 0;
