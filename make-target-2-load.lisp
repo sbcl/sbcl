@@ -38,7 +38,6 @@
           ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
           ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP
-          :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
           :OS-PROVIDES-BLKSIZE-T)")) ; only for 'src/runtime/wrap.h'
        (public-features
         (cons

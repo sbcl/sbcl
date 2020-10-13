@@ -208,12 +208,6 @@
  ;;
  ; :sb-futex
 
- ;; On some operating systems the FS segment register (used for SBCL's
- ;; thread local storage) is not reliably preserved in signal
- ;; handlers, so we need to restore its value from the pthread thread
- ;; local storage.
- ; :restore-fs-segment-register-from-tls
-
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
  ;; code (when applied to user-level packages), relating to material

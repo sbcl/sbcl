@@ -528,10 +528,6 @@ case "$sbcl_os" in
                 if [ $sbcl_os = "gnu-kfreebsd" ]; then
                     printf ' :gnu-kfreebsd' >> $ltf
                 fi
-
-                if [ $sbcl_arch = "x86" ]; then
-                    printf ' :restore-fs-segment-register-from-tls' >> $ltf
-                fi
                 link_or_copy Config.$sbcl_arch-$sbcl_os Config
                 ;;
             openbsd)
@@ -555,7 +551,7 @@ case "$sbcl_os" in
     darwin)
         printf ' :unix :bsd :darwin :mach-o' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls' >> $ltf
+            printf ' :mach-exception-handler' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
             printf ' :mach-exception-handler' >> $ltf
