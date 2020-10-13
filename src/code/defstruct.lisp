@@ -2383,4 +2383,38 @@ or they must be declared locally notinline at each call site.~@:>"
                  sb-vm:word-shift)
             sb-vm:instance-pointer-lowtag)))
 
+(defun show-all-layouts ()
+  (let ((l (sb-vm::list-allocated-objects :all :test #'sb-kernel::layout-p))
+        zero trailing-raw trailing-tagged vanilla)
+    (dolist (x l)
+      (let ((m (sb-kernel::layout-bitmap x)))
+        (cond ((eql m -1) (push x vanilla))
+              ((eql m 0) (push x zero))
+              ((minusp m) (push x trailing-tagged))
+              (t (push x trailing-raw)))))
+    (flet ((legend (newline str list)
+             (when newline (terpri))
+             (let ((s (format nil str (length list))))
+               (format t "~A~%~A~%" s (make-string (length s) :initial-element #\-))))
+           (name (x) (classoid-name (layout-classoid x))))
+      (when zero
+        (legend nil "Zero bitmap (~d):" zero)
+        (dolist (x zero) (format t "~a~%" (name x))))
+      (when trailing-raw
+        (legend t "Trailing raw (~d):" trailing-raw)
+        (dolist (x trailing-raw)
+          (let ((m (sb-kernel::layout-bitmap x)))
+            (format t "~30a 0...~v,'0b~%"
+                    (name x)
+                    (acond ((layout-info x) (1+ (dd-length it))) (t 32))
+                    m))))
+      (when trailing-tagged
+        (legend t "Trailing tagged (~d):" trailing-tagged)
+        (dolist (x trailing-tagged)
+          (let ((m (sb-kernel::layout-bitmap x)))
+            (format t "~30a 1...~b~%"
+                    (name x)
+                    (ldb (byte (dd-length (layout-info x)) 0) m)))))
+      (legend t "Default: (~d) [not shown]" vanilla))))
+
 (/show0 "code/defstruct.lisp end of file")

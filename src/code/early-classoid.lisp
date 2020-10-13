@@ -272,7 +272,7 @@
             l
             #+immobile-code ; there are two possible bitmap
             ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
-            (if (find sb-pcl::*sgf-wrapper* i)
+            (if (or (find sb-pcl::*sgf-wrapper* i) (eq l sb-pcl::*sgf-wrapper*))
                 standard-gf-primitive-obj-layout-bitmap
                 +layout-all-tagged+)
             ;; there is only one possible bitmap otherwise

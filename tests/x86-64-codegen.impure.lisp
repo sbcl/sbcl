@@ -783,3 +783,8 @@ sb-vm::(define-vop (cl-user::test)
                            (search "Invalid argument count trap" line))
                          lines)
                1))))
+
+#+compact-instance-header
+(with-test (:name :gf-self-contained-trampoline)
+  (let ((l (sb-kernel:find-layout 'standard-generic-function)))
+    (assert (/= (sb-kernel:layout-bitmap l) sb-kernel:+layout-all-tagged+))))
