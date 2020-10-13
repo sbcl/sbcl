@@ -805,7 +805,8 @@ not supported."
              (if (minusp value)
                  (syscall-error 'utimes)
                  value)))
-      (let ((fun (extern-alien "sb_utimes" (function int (c-string :not-null t)
+      (let ((fun (extern-alien #-netbsd "utimes" #+netbsd "sb_utimes"
+                               (function int (c-string :not-null t)
                                                   (* (array alien-timeval 2)))))
             (name (filename filename)))
         (if (not (and access-time modification-time))

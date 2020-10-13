@@ -665,21 +665,24 @@
   t)
 
 #-(or (and darwin x86) win32)
-(deftest utimes.1
-    (let ((file (merge-pathnames #p"utimes.1" *test-directory*))
-          (atime (random (1- (expt 2 31))))
-          (mtime (random (1- (expt 2 31)))))
-      (with-open-file (stream file
-                       :direction :output
-                       :if-exists :supersede
-                       :if-does-not-exist :create)
-        (princ "Hello, utimes" stream))
-      (sb-posix:utime file atime mtime)
-      (let* ((stat (sb-posix:stat file)))
-        (delete-file file)
-        (list (= (sb-posix:stat-atime stat) atime)
-              (= (sb-posix:stat-mtime stat) mtime))))
-  (t t))
+(macrolet ((test (name posix-fun)
+             `(deftest ,name
+                (let ((file (merge-pathnames #p"utimes.1" *test-directory*))
+                      (atime (random (1- (expt 2 31))))
+                      (mtime (random (1- (expt 2 31)))))
+                  (with-open-file (stream file
+                                          :direction :output
+                                          :if-exists :supersede
+                                          :if-does-not-exist :create)
+                                  (princ "Hello, utimes" stream))
+                  (,posix-fun file atime mtime)
+                  (let* ((stat (sb-posix:stat file)))
+                    (delete-file file)
+                    (list (= (sb-posix:stat-atime stat) atime)
+                          (= (sb-posix:stat-mtime stat) mtime))))
+                (t t))))
+  (test utime.1 sb-posix:utime)
+  (test utimes.1 sb-posix:utimes))
 
 ;; readlink tests.
 #-win32
