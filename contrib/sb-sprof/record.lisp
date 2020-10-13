@@ -132,8 +132,7 @@ to be passed to MAP-TRACE-SAMPLES.
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
         (vector (samples-vector samples))
-        (index (samples-index samples))
-        (start-time (samples-start-time samples)))
+        (index (samples-index samples)))
     (when (plusp index)
       (sb-int:aver (typep (aref vector 0) '(cons (eql trace-start) index)))
       (loop for start = 0 then end
