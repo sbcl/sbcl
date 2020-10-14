@@ -447,9 +447,9 @@ boolean immobile_space_preserve_pointer(void* addr)
         char* page_start_addr = PTR_ALIGN_DOWN(addr, IMMOBILE_CARD_BYTES);
         object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
         valid = !fixnump(*object_start)
-            && (lispobj*)addr < object_start + fixedobj_page_obj_size(page_index)
-            && (properly_tagged_descriptor_p(addr, object_start)
-                || widetag_of(object_start) == FUNCALLABLE_INSTANCE_WIDETAG);
+            && (widetag_of(object_start) == FUNCALLABLE_INSTANCE_WIDETAG ||
+                widetag_of(object_start) == FDEFN_WIDETAG ||
+                properly_tagged_descriptor_p(addr, object_start));
     } else {
       return 0;
     }
