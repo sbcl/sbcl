@@ -132,13 +132,7 @@
 
 ;;; Maximum value of N in ANCESTOR_N. Couldn't come up with a better name.
 (defconstant sb-c::layout-inherits-max-optimized-depth 5)
-(sb-xc:defstruct (layout
-             ;; Accept a specific subset of keywords
-             #+64-bit (:constructor %make-layout
-                          (clos-hash classoid flags info bitmap))
-             #-64-bit (:constructor %make-layout
-                          (clos-hash classoid depthoid length flags info bitmap))
-             (:copier nil))
+(sb-xc:defstruct (layout (:copier nil) (:constructor nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
   #+64-bit (flags 0 :type (signed-byte #.sb-vm:n-word-bits))
@@ -296,19 +290,34 @@
 ;;; that we compare against the isntalled one to make sure they match.
 ;;; The third one also gets thrown away.
 #-sb-xc-host
+(macrolet ((nwords () (dd-length (find-defstruct-description 'layout))))
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
                          (info nil)
                          (bitmap (if info (dd-bitmap info) 0))
                          (invalid :uninitialized))
-  (let ((layout (%make-layout clos-hash classoid
-                              #+64-bit (pack-layout-flags depthoid length flags)
-                              #-64-bit depthoid #-64-bit length #-64-bit flags
-                              info bitmap)))
+  (let ((layout (truly-the layout
+                 #+immobile-space
+                 (sb-vm::alloc-immobile-fixedobj
+                  (1+ (nwords))
+                  (logior (ash (nwords) sb-vm:instance-length-shift)
+                          sb-vm:instance-widetag))
+                 #-immobile-space (%make-instance (nwords)))))
+    (setf (%instance-layout layout) #.(find-layout 'layout))
+    (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
+                                #-64-bit flags)
+    (setf (layout-clos-hash layout) clos-hash
+          (layout-classoid layout) classoid
+          (layout-invalid layout) invalid)
+    #-64-bit (setf (layout-depthoid layout) depthoid (layout-length layout) length)
+    (setf (layout-info layout) info)
+    (setf (%instance-ref layout (get-dsd-index layout bitmap)) bitmap)
+    (setf (layout-slot-list layout) nil
+          (layout-slot-table layout) #(1 nil))
     (set-layout-inherits layout inherits)
     (setf (layout-invalid layout) invalid)
-    layout))
+    layout)))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-MAPMAP (LAYOUT-INFO layout)).

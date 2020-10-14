@@ -221,15 +221,6 @@
                   +layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
 
-;;; This allocator is in its own function because the immobile allocator
-;;; VOPs are impolite (i.e. bad) and trash all registers.
-;;; Since there are no callee-saved registers, this makes it legit'
-;;; to put in a separate function.
-#+immobile-code
-(defun alloc-immobile-funinstance ()
-  (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
-                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag))))
-
 ;; TODO: put a trampoline in all fins and allocate them anywhere.
 ;; Revision e7cd2bd40f5b9988 caused some FINs to go in dynamic space
 ;; which is fine, but those fins need to have a default bitmap of -1 instead
@@ -258,7 +249,10 @@
 ;; is insensitive to the index of the trampoline slot, probably.
 #+immobile-code
 (defun make-immobile-funinstance (layout slot-vector)
-  (let ((gf (truly-the funcallable-instance (alloc-immobile-funinstance))))
+  (let ((gf (truly-the funcallable-instance
+             (alloc-immobile-fixedobj 6 ; KLUDGE
+                                      (logior (ash 5 n-widetag-bits)
+                                              funcallable-instance-widetag)))))
     ;; Assert that raw bytes will not cause GC invariant lossage
     (aver (/= (layout-bitmap layout) +layout-all-tagged+))
     ;; Set layout prior to writing raw slots
@@ -279,14 +273,13 @@
 (defun alloc-immobile-fdefn ()
   (or #+nil ; Avoid creating new objects in the text segment for now
       (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
-           (allocate-immobile-obj (* fdefn-size n-word-bytes)
+           (alloc-immobile-code (* fdefn-size n-word-bytes)
                                   (logior (ash undefined-fdefn-header 16)
                                           fdefn-widetag) ; word 0
                                   0 other-pointer-lowtag nil)) ; word 1, lowtag, errorp
-      (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag
-                          fdefn-size
-                          (logior (ash undefined-fdefn-header 16)
-                                  fdefn-widetag))))) ; word 0
+      (alloc-immobile-fixedobj fdefn-size
+                               (logior (ash undefined-fdefn-header 16)
+                                       fdefn-widetag)))) ; word 0
 
 (defun fdefn-has-static-callers (fdefn)
   (declare (type fdefn fdefn))

@@ -255,7 +255,7 @@ struct fixedobj_page { // 12 bytes per page
         /* space per object in Lisp words. Can exceed obj_size
            to align on a larger boundary */
         unsigned char obj_align;
-        unsigned char obj_size; /* in Lisp words, incl. header */
+        unsigned char obj_size_dontuse; /* in Lisp words, incl. header */
         /* Which generations have data on this page */
         unsigned char gens_; // a bitmap
       } parts;
@@ -267,7 +267,7 @@ struct fixedobj_page { // 12 bytes per page
 };
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
-#define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_size
+#define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_align
 #endif
 
 extern page_index_t next_free_page;

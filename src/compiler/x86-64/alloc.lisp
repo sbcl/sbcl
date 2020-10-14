@@ -606,18 +606,12 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-   (let* ((instancep (typep type 'layout)) ; is this any instance?
-          (layoutp #+immobile-space
-                   (eq type #.(find-layout 'layout))) ; " a new LAYOUT instance?
+   (let* ((instancep (typep type 'layout)) ; is this an instance type?
           (bytes (pad-data-block words)))
     (progn name) ; possibly not used
-    (unless (or stack-allocate-p layoutp)
+    (unless stack-allocate-p
       (instrument-alloc bytes node))
     (pseudo-atomic (:elide-if stack-allocate-p)
-     (cond (layoutp
-            (invoke-asm-routine 'call 'alloc-layout node)
-            (inst mov result r11-tn))
-           (t
             ;; If storing a header word, defer ORing in the lowtag until after
             ;; the header is written so that displacement can be 0.
             (allocation nil bytes (if type 0 lowtag) node stack-allocate-p result)
@@ -632,7 +626,7 @@
                     ;; where this instruction must write exactly 4 bytes.
                     (inst mov :dword (ea 0 result) header)
                     (storew* header result 0 0 (not stack-allocate-p)))
-                (inst or :byte result lowtag))))))
+                (inst or :byte result lowtag))))
     (when instancep ; store its layout
       (inst mov :dword (ea (+ 4 (- lowtag)) result)
             (make-fixup type :layout))))))
@@ -682,22 +676,26 @@
                                            temp-reg-tn)))))))
 #+immobile-space
 (define-vop (alloc-immobile-fixedobj)
-  (:info lowtag size header)
-  (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
-  (:temporary (:sc unsigned-reg :to :eval :offset rsi-offset) c-arg2)
+  (:args (size-class :scs (any-reg) :target c-arg1)
+         (nwords :scs (any-reg) :target c-arg2)
+         (header :scs (any-reg) :target c-arg3))
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset) c-arg1)
+  (:temporary (:sc unsigned-reg :from (:argument 1) :to :eval :offset rsi-offset) c-arg2)
+  (:temporary (:sc unsigned-reg :from (:argument 2) :to :eval :offset rdx-offset) c-arg3)
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
               c-result)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-   (inst mov c-arg1 size)
-   (inst mov c-arg2 header)
+   (inst mov c-arg1 size-class)
+   (inst mov c-arg2 nwords)
+   (inst mov c-arg3 header)
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic ()
-     (c-call "alloc_fixedobj")
-     (inst lea result (ea lowtag c-result)))))
+     (c-call "alloc_immobile_fixedobj")
+     (move result c-result))))
 
 (define-vop (alloc-dynamic-space-code)
   (:args (total-words :scs (signed-reg) :target c-arg1))

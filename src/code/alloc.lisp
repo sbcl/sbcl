@@ -273,7 +273,7 @@
       (setf (hole-size hole) (- hole-end hole))))
   (add-to-freelist hole))
 
-(defun allocate-immobile-obj (n-bytes word0 word1 lowtag errorp)
+(defun alloc-immobile-code (n-bytes word0 word1 lowtag errorp)
   (declare (type (and fixnum unsigned-byte) n-bytes))
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
@@ -319,7 +319,7 @@
                           (sb-debug:print-backtrace)
                           (sb-impl::%halt))
                          (t
-                          (return-from allocate-immobile-obj nil))))
+                          (return-from alloc-immobile-code nil))))
                  (set-varyobj-space-free-pointer free-ptr)
                  addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
@@ -366,34 +366,34 @@
      ;; so that we needn't inhibit GC.
      (%make-lisp-obj (logior addr lowtag)))))
 
-;;; I don't know whether immobile space vectors actually work.
-;;; I think the idea was to use them as fd-stream buffers when applicable
-;;; instead of having a finalizer on OS-allocated memory.
-(defun allocate-immobile-vector (widetag length words)
-  (allocate-immobile-obj (pad-data-block (+ words vector-data-offset))
-                         widetag
-                         (fixnumize length)
-                         other-pointer-lowtag
-                         t))
+;;; Size-class segregation (implying which page we try to allocate to)
+;;; is done from lisp now, not C. There are 4 objects types we'll see,
+;;; each in its own size class (even if some are coincidentally the same size).
+;;;  - Symbols
+;;;  - FDEFNs
+;;;  - Layouts
+;;;  - Funcallable instances
+;;; The first two are truly fixed in size. The latter two could occur in several
+;;; sizes, each occupying a different size-class. This isn't implemented yet.
+(defun alloc-immobile-fixedobj (nwords header)
+  (let* ((widetag (logand (truly-the fixnum header) widetag-mask))
+         (size-class
+          (ecase widetag
+            (#.symbol-widetag 1)
+            (#.fdefn-widetag  2)
+            ;; TODO: use size classes for <= {16,24,32,48} words
+            (#.instance-widetag 3)
+            (#.funcallable-instance-widetag 4))))
+    (values (%primitive alloc-immobile-fixedobj
+                        size-class
+                        (truly-the fixnum (align-up nwords 2))
+                        header))))
 
-(defun allocate-immobile-simple-vector (n-elements)
-  (allocate-immobile-vector simple-vector-widetag n-elements n-elements))
-(defun allocate-immobile-bit-vector (n-elements)
-  (allocate-immobile-vector simple-bit-vector-widetag n-elements
-                            (ceiling n-elements n-word-bits)))
-(defun allocate-immobile-byte-vector (n-elements)
-  (allocate-immobile-vector simple-array-unsigned-byte-8-widetag n-elements
-                            (ceiling n-elements n-word-bytes)))
-(defun allocate-immobile-word-vector (n-elements)
-  (allocate-immobile-vector #+64-bit simple-array-unsigned-byte-64-widetag
-                            #-64-bit simple-array-unsigned-byte-32-widetag
-                            n-elements n-elements))
-
-(defun alloc-immobile-symbol ()
-  (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag symbol-size
-                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))
 (defun make-immobile-symbol (name)
-  (let ((symbol (truly-the symbol (alloc-immobile-symbol))))
+  (let ((symbol (truly-the symbol
+                 (alloc-immobile-fixedobj
+                  symbol-size
+                  (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)))))
     ;; no pin, it's immobile (and obviously live)
     (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address symbol))
                            (- (ash symbol-name-slot word-shift) other-pointer-lowtag))
@@ -440,10 +440,10 @@
            #+gencgc
            (or #+immobile-code
                (when (member space '(:immobile :auto))
-                 ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
+                 ;; We don't need to inhibit GC here - ALLOC-IMMOBILE-CODE does it.
                  ;; Indicate that there are initially 2 boxed words, otherwise
                  ;; immobile space GC thinks this object is freeable.
-                 (allocate-immobile-obj (ash total-words word-shift)
+                 (alloc-immobile-code (ash total-words word-shift)
                                         (logior (ash total-words code-header-size-shift)
                                                 code-header-widetag)
                                         (ash 2 n-fixnum-tag-bits)

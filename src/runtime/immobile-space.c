@@ -105,7 +105,7 @@ unsigned int immobile_scav_queue_count;
 
 // Packing and unpacking attributes
 // the low two flag bits are for write-protect status
-#define MAKE_ATTR(spacing,size,flags) (((spacing)<<8)|((size)<<16)|flags)
+#define MAKE_ATTR(spacing) ((spacing)<<8)
 #define OBJ_SPACING(attr) ((attr>>8) & 0xFF)
 
 // Ignore the write-protect bits and the generations when comparing attributes
@@ -233,60 +233,9 @@ static int get_freeish_page(int hint_page, int attributes)
   lose("No more immobile pages available");
 }
 
-/// The size classes are: 2w, 4w, 6w, 8w, ..., up to 20w.
-/// Each size class can store at most 2 different alignments. So for example in
-/// the size class for 14 words there will be a page hint for 14-word-aligned
-/// objects and at most one other alignment.
+/// Size class is specified by lisp now
 #define MAX_SIZE_CLASSES 10
-#define MAX_HINTS_PER_CLASS 2
-long page_hints[MAX_SIZE_CLASSES*MAX_HINTS_PER_CLASS];
-static inline int hint_attributes(long hint) { return hint & 0xFFFFFFFF; }
-static int hint_page(long hint) { return hint>>32; }
-static long make_hint(int page, int attributes) {
-    return ((long)page << 32) | attributes;
-}
-
-static int get_hint(int attributes, int *page)
-{
-    long hint;
-    unsigned int size = attributes >> 16;
-    int hint_index = size - 2, limit = hint_index + 1, free_slot = -1;
-    if (hint_index > (int)(sizeof page_hints / sizeof (long)))
-        lose("Unexpectedly large fixedobj allocation request");
-    for ( ; hint_index <= limit; ++hint_index ) {
-#ifdef __ATOMIC_SEQ_CST
-        __atomic_load(&page_hints[hint_index], &hint, __ATOMIC_SEQ_CST);
-#else
-        hint = __sync_fetch_and_add(&page_hints[hint_index], 0);
-#endif
-        if (hint_attributes(hint) == attributes) {
-            *page = hint_page(hint);
-            return hint_index;
-        } else if (hint == 0 && free_slot < 0)
-            free_slot = hint_index;
-    }
-    if (free_slot<0)
-        lose("Should not happen"); // TODO: evict a hint
-    // Linearly search for a free page from the beginning
-    int free_page = get_freeish_page(0, attributes);
-    *page = free_page;
-    int existing = __sync_val_compare_and_swap(&page_hints[free_slot], 0,
-                                               make_hint(free_page, attributes));
-    if (existing) // collided. don't worry about it
-        return -1;
-    return free_slot;
-}
-
-static void unset_hint(int page)
-{
-    int attributes = fixedobj_pages[page].attr.packed;
-    unsigned int size = (attributes >> 16) & 0xff; // mask off the generation bits
-    int hint_index = size - 2;
-    if (hint_page(page_hints[hint_index]) == page)
-        page_hints[hint_index] = 0;
-    if (hint_page(page_hints[hint_index+1]) == page)
-        page_hints[hint_index+1] = 0;
-}
+long fixedobj_page_hint[MAX_SIZE_CLASSES];
 
 // Unused, but possibly will be for some kind of collision-avoidance scheme
 // on claiming of new free pages.
@@ -312,15 +261,22 @@ long immobile_alloc_collisions;
      masking. if the next address is above or equal to the page start,
      store it in the hint, otherwise mark the page full */
 
-static lispobj* alloc_immobile_obj(int page_attributes, lispobj header)
+lispobj AMD64_SYSV_ABI
+alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
 {
-  int hint_index, page;
+  size_class = fixnum_value(size_class);
+  spacing_words = fixnum_value(spacing_words);
+  header = fixnum_value(header);
+
+  int page;
   lispobj word;
   char * page_data, * obj_ptr, * next_obj_ptr, * limit, * next_free;
-  int spacing_in_bytes = OBJ_SPACING(page_attributes) << WORD_SHIFT;
+  int page_attributes = MAKE_ATTR(spacing_words);
+  int spacing_in_bytes = spacing_words << WORD_SHIFT;
   const int npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
 
-  hint_index = get_hint(page_attributes, &page);
+  page = fixedobj_page_hint[size_class];
+  if (!page) page = get_freeish_page(0, page_attributes);
   gc_dcheck(fixedobj_page_address(page) < (void*)fixedobj_free_pointer);
   do {
       page_data = fixedobj_page_address(page);
@@ -336,7 +292,7 @@ static lispobj* alloc_immobile_obj(int page_attributes, lispobj header)
               // the next hole. Use it to update the freelist pointer.
               // Just slam it in.
               fixedobj_pages[page].free_index = next_obj_ptr + word - page_data;
-              return (lispobj*)obj_ptr;
+              return compute_lispobj((lispobj*)obj_ptr);
           }
           // If some other thread updated the free_index
           // to a larger value, use that. (See example below)
@@ -347,11 +303,9 @@ static lispobj* alloc_immobile_obj(int page_attributes, lispobj header)
       int old_page = page;
       page = get_freeish_page(page+1 >= npages ? 0 : page+1,
                               page_attributes);
-      if (hint_index >= 0) { // try to update the hint
-          __sync_val_compare_and_swap(page_hints + hint_index,
-                                      make_hint(old_page, page_attributes),
-                                      make_hint(page, page_attributes));
-      }
+      // try to update the hint
+      __sync_val_compare_and_swap(&fixedobj_page_hint[size_class],
+                                  old_page, page);
   } while (1);
 }
 
@@ -1018,7 +972,6 @@ sweep_fixedobj_pages(int raise)
             }
         } else {
             dprintf((logfile,"page %d is all garbage\n", page));
-            unset_hint(page);
             fixedobj_pages[page].attr.packed = 0;
         }
 #ifdef DEBUG
@@ -1026,6 +979,7 @@ sweep_fixedobj_pages(int raise)
 #endif
         dprintf((logfile,"page %d: %d holes\n", page, n_holes));
     }
+    memset(fixedobj_page_hint, 0, sizeof fixedobj_page_hint);
 }
 
 static void make_filler(void* where, int nbytes)
@@ -1192,7 +1146,6 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     for (page = 0; page <= FIXEDOBJ_RESERVED_PAGES; ++page) {
         // set page attributes that can't match anything in get_freeish_page()
         fixedobj_pages[page].attr.parts.obj_align = 1;
-        fixedobj_pages[page].attr.parts.obj_size = 1;
         if (gen != 0 && ENABLE_PAGE_PROTECTION)
             fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
         fixedobj_pages[page].gens |= 1 << gen;
@@ -1205,7 +1158,6 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
             if (!fixnump(header)) {
                 gc_assert(other_immediate_lowtag_p(*obj));
                 int size = sizetab[header_widetag(header)](obj);
-                fixedobj_pages[page].attr.parts.obj_size = size;
                 fixedobj_pages[page].attr.parts.obj_align = size;
                 fixedobj_pages[page].gens |= 1 << immobile_obj_gen_bits(obj);
                 if (gen != 0 && ENABLE_PAGE_PROTECTION)
@@ -1443,26 +1395,6 @@ lispobj* find_preceding_object(lispobj* obj)
       }
       --page;
   }
-}
-
-lispobj* AMD64_SYSV_ABI alloc_fixedobj(int nwords, uword_t header)
-{
-    return alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(nwords,2), // spacing
-                                        ALIGN_UP(nwords,2), // size
-                                        0),
-                              header);
-}
-
-static const int LAYOUT_NWORDS = sizeof (struct layout)/N_WORD_BYTES;
-
-lispobj AMD64_SYSV_ABI alloc_layout()
-{
-    lispobj* l =
-        alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(LAYOUT_NWORDS,2),
-                                     ALIGN_UP(LAYOUT_NWORDS,2),
-                                     0),
-                           (LAYOUT_NWORDS-1)<<INSTANCE_LENGTH_SHIFT | INSTANCE_WIDETAG);
-    return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 
 // FIXME: Figure out not to hardcode
@@ -1904,7 +1836,7 @@ static void defrag_immobile_space(boolean verbose)
     // If the text segment is writable, then the last 3 of those are
     // moved into varyobj space.
     int n_layout_pages = calc_n_fixedobj_pages(obj_type_histo[INSTANCE_WIDETAG/4],
-                                               LAYOUT_NWORDS);
+                                               sizeof (struct layout)/N_WORD_BYTES);
     char* layout_alloc_ptr = defrag_base;
     char* symbol_alloc_ptrs[N_SYMBOL_KINDS+1];
     symbol_alloc_ptrs[0]    = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;

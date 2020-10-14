@@ -57,13 +57,6 @@
   (inst xor :byte rdi-tn 1) ; clear the bit
   (inst jmp  (make-fixup "alloc" :foreign)))
 
-;;; There's no layout allocator preserving YMM regs because MAKE-LAYOUT entails a full call.
-#+immobile-space
-(define-assembly-routine (alloc-layout) ()
-  (with-registers-preserved (c xmm :except r11-tn)
-    (inst call (make-fixup "alloc_layout" :foreign))
-    (inst mov r11-tn rax-tn)))
-
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.
 ;;; FIXME: we're missing routines that preserve YMM. I guess nobody cares.
