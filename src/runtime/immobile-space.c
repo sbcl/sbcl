@@ -813,12 +813,12 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
 static inline boolean can_wp_fixedobj_page(page_index_t page, int keep_gen, int new_gen)
 {
     int obj_spacing = fixedobj_page_obj_align(page);
-    int obj_size_words = fixedobj_page_obj_size(page);
     lispobj* obj = fixedobj_page_address(page);
     lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
     do {
         if (!fixnump(*obj) && // an object header
-            fixedobj_points_to_younger_p(obj, obj_size_words,
+            fixedobj_points_to_younger_p(obj,
+                                         sizetab[widetag_of(obj)](obj),
                                          immobile_obj_generation(obj),
                                          keep_gen, new_gen))
             return 0;
@@ -897,7 +897,6 @@ sweep_fixedobj_pages(int raise)
     // at the start of the prior GC, and subtracting from that the number
     // that exist now, we know how much usable space was obtained (per page).
     int n_holes = 0;
-    int word_idx;
 
     SETUP_GENS();
 
@@ -918,7 +917,6 @@ sweep_fixedobj_pages(int raise)
             continue;
         }
         int obj_spacing = fixedobj_page_obj_align(page);
-        int obj_size_words = fixedobj_page_obj_size(page);
         page_base = fixedobj_page_address(page);
         limit = compute_fixedobj_limit(page_base, obj_spacing);
         obj = (lispobj*)page_base;
@@ -944,17 +942,18 @@ sweep_fixedobj_pages(int raise)
                 hole = obj;
                 n_holes ++;
             } else if ((gen = immobile_obj_gen_bits(obj)) == discard_gen) { // trash
-                for (word_idx=obj_size_words-1 ; word_idx > 0 ; --word_idx)
-                    obj[word_idx] = 0;
+                memset(obj, 0, obj_spacing);
                 goto trash_it;
             } else if (gen == keep_gen) {
                 assign_generation(obj, gen = new_gen);
 #ifdef DEBUG
-                gc_assert(!fixedobj_points_to_younger_p(obj, obj_size_words,
+                gc_assert(!fixedobj_points_to_younger_p(obj,
+                                                        sizetab[widetag_of(obj)](obj),
                                                         gen, keep_gen, new_gen));
 #endif
                 any_kept = -1;
-            } else if (wp_it && fixedobj_points_to_younger_p(obj, obj_size_words,
+            } else if (wp_it && fixedobj_points_to_younger_p(obj,
+                                                             sizetab[widetag_of(obj)](obj),
                                                              gen, keep_gen, new_gen))
               wp_it = 0;
         } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
@@ -1330,6 +1329,13 @@ int immobile_space_handle_wp_violation(void* fault_addr)
     return 1;
 }
 
+/// For defragmentation
+
+static struct tempspace {
+  char* start;
+  int n_bytes;
+} fixedobj_tempspace, varyobj_tempspace;
+
 // Find the object that encloses pointer.
 lispobj *
 search_immobile_space(void *pointer)
@@ -1359,9 +1365,19 @@ search_immobile_space(void *pointer)
         if (page_attributes_valid && page_index >= FIXEDOBJ_RESERVED_PAGES) {
             int spacing = fixedobj_page_obj_align(page_index);
             int index = ((char*)pointer - page_base) / spacing;
-            char *begin = page_base + spacing * index;
-            char *end = begin + (fixedobj_page_obj_size(page_index) << WORD_SHIFT);
-            if ((char*)pointer < end) return (lispobj*)begin;
+            lispobj *obj = (void*)(page_base + spacing * index);
+            char* end;
+            /* When defragmenting, there are forwarding pointers in object headers
+             * so the sizing functions don't work. Following the forwarding pointer
+             * isn't right, because it points to where the object _will_ be,
+             * but it isn't actually there. So we have to conservatively assume
+             * that the object size is the object alignment.
+             * It all other situations, it is OK to call the sizing function. */
+            if (fixedobj_tempspace.start) // defragmenting
+                end = (char*)obj + spacing;
+            else
+                end = (char*)(obj + sizetab[widetag_of(obj)](obj));
+            if ((char*)pointer < end) return obj;
         } else {
             return gc_search_space((lispobj*)page_base, pointer);
         }
@@ -1402,11 +1418,6 @@ lispobj* find_preceding_object(lispobj* obj)
 #define GF_SIZE 6
 
 //// Defragmentation
-
-static struct tempspace {
-  char* start;
-  int n_bytes;
-} fixedobj_tempspace, varyobj_tempspace;
 
 // Given an address in the target core, return the equivalent
 // physical address to read or write during defragmentation

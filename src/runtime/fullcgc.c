@@ -481,7 +481,7 @@ static void sweep_fixedobj_pages(long *zeroed)
         int obj_spacing = fixedobj_page_obj_align(page);
         if (!obj_spacing)
             continue;
-        int nwords = fixedobj_page_obj_size(page);
+        int nwords = obj_spacing >> WORD_SHIFT;
         lispobj *limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES - obj_spacing);
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             lispobj header = *obj;
