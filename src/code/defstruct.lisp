@@ -769,11 +769,12 @@ unless :NAMED is also specified.")))
               ;; The classoid needs a layout whereby to convey inheritance.
               ;; Classoids only store a *direct* superclass list.
               ;; Both the layout and classoid are throwaway objects.
+              ;; It's probably too dangerous to stack-allocate, because references
+              ;; could leak from the type cache machinery.
               (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                     (layout (make-layout (hash-layout-name (dd-name dd))
-                                          classoid :inherits inherits)))
-                (setf (layout-invalid layout) nil
-                      (classoid-layout classoid) layout)
+                     (layout (make-temporary-layout (hash-layout-name (dd-name dd))
+                                                    classoid inherits)))
+                (setf (classoid-layout classoid) layout)
                 classoid)))
          (ancestor-slot-comparator-list))
     #+sb-xc-host

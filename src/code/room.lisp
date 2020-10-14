@@ -1324,7 +1324,7 @@ We could try a few things to mitigate this:
 (defun show-immobile-spaces (which)
   (flet ((show (obj type size)
            (declare (ignore type size))
-           (let ((*print-pretty* nil))
+           (let ((*print-pretty* nil) (*print-length* 3))
              (format t "~x: ~s~%" (get-lisp-obj-address obj) obj))))
     (when (or (eq which :fixed) (eq which :both))
       (format t "Fixedobj space~%==============~%")

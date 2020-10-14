@@ -132,7 +132,10 @@
 
 ;;; Maximum value of N in ANCESTOR_N. Couldn't come up with a better name.
 (defconstant sb-c::layout-inherits-max-optimized-depth 5)
-(sb-xc:defstruct (layout (:copier nil) (:constructor nil))
+(sb-xc:defstruct (layout (:copier nil)
+                         ;; Parsing DEFSTRUCT uses a temporary layout
+                         (:constructor make-temporary-layout
+                             (clos-hash classoid inherits &aux (invalid nil))))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
   #+64-bit (flags 0 :type (signed-byte #.sb-vm:n-word-bits))
@@ -351,6 +354,8 @@
     (let ((args (copy-list args)))
       (remf args :bitmap)
       (apply #'host-make-layout args)))
+  (defun make-temporary-layout (clos-hash classoid inherits)
+    (host-make-layout clos-hash classoid :inherits inherits :invalid nil))
   (defun layout-bitmap (layout)
     (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 
