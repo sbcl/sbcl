@@ -270,7 +270,7 @@
         `(when (find ,(find-layout 'function) i)
            (set-layout-bitmap
             l
-            #+immobile-code ; there are two possible bitmap
+            #+immobile-code ; there are two possible bitmaps
             ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
             (if (or (find sb-pcl::*sgf-wrapper* i) (eq l sb-pcl::*sgf-wrapper*))
                 standard-gf-primitive-obj-layout-bitmap
