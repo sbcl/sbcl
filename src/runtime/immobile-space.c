@@ -234,8 +234,8 @@ static int get_freeish_page(int hint_page, int attributes)
 }
 
 /// Size class is specified by lisp now
-#define MAX_SIZE_CLASSES 10
-long fixedobj_page_hint[MAX_SIZE_CLASSES];
+#define MAX_ALLOCATOR_SIZE_CLASSES 10
+long fixedobj_page_hint[MAX_ALLOCATOR_SIZE_CLASSES];
 
 // Unused, but possibly will be for some kind of collision-avoidance scheme
 // on claiming of new free pages.
@@ -1766,6 +1766,59 @@ static void place_fixedobj(lispobj* obj, int size_in_bytes,
       *alloc_ptr = new + size_in_bytes;
 }
 
+/// Like above, but specifically for layouts;
+struct size_class {
+    char* alloc_ptr;
+    /* Initially this is a count of the number of layouts in the size class.
+     * After computing the total number of layout pages needed, this becomes a count
+     * of how many objects can be allocated starting from 'alloc_ptr' without
+     * overflowing the page. When zero, we grab the next available page. */
+    int count;
+};
+
+/* Defragmentation needs more size classes than allocation because a
+ * restarted core can not discern the original (coarser) size class
+ * in which a layout was allocated. It can only use the actual size.
+ * 2n+16 words for N from 0..16 gives a range from 16 to 48 words */
+#define MAX_LAYOUT_DEFRAG_SIZE_CLASSES 17
+static inline int layout_size_class_nwords(int index) {
+    return 16 + 2*index ;
+}
+static inline int nwords_to_layout_size_class(unsigned int nwords) {
+    // the smallest layout size class is 16 words
+    int index = nwords <= 16 ? 0 : (nwords - 16)/2;
+    if (index >= MAX_LAYOUT_DEFRAG_SIZE_CLASSES)
+        lose("Oversized layout: can't defragment");
+    return index;
+}
+
+static void place_layout(lispobj* obj,
+                         struct size_class size_classes[],
+                         char** alloc_ptr, char *alloc_ptr_limit)
+{
+    // Layouts may occur in different sizes.
+    int nwords = 1 + (instance_length(*obj) | 1);
+    int size_class_index = nwords_to_layout_size_class(nwords);
+    if (size_classes[size_class_index].count == 0) {
+        gc_assert(*alloc_ptr <= alloc_ptr_limit);
+        size_classes[size_class_index].alloc_ptr = *alloc_ptr;
+        size_classes[size_class_index].count = (IMMOBILE_CARD_BYTES>>WORD_SHIFT) / nwords;
+        *alloc_ptr += IMMOBILE_CARD_BYTES;
+    } else {
+        gc_assert(size_classes[size_class_index].alloc_ptr != 0);
+        gc_assert(size_classes[size_class_index].count > 0);
+    }
+    size_classes[size_class_index].count--;
+    char* new = size_classes[size_class_index].alloc_ptr;
+    gc_assert(!*tempspace_addr(new));
+    memcpy(tempspace_addr(new), obj, nwords*N_WORD_BYTES);
+    set_forwarding_pointer(obj, make_lispobj(new, INSTANCE_POINTER_LOWTAG));
+    // Use nbytes for the defragmentation size class when bumping the pointer,
+    // and not the object spacing for the page on which obj resides.
+    size_classes[size_class_index].alloc_ptr +=
+        layout_size_class_nwords(size_class_index) << WORD_SHIFT;
+}
+
 static void __attribute__((unused)) add_filler_if_needed(char* from, char* to)
 {
     if (to>from)
@@ -1799,6 +1852,8 @@ static void defrag_immobile_space(boolean verbose)
     struct { int size, count; } sym_kind_histo[N_SYMBOL_KINDS];
     bzero(obj_type_histo, sizeof obj_type_histo);
     bzero(sym_kind_histo, sizeof sym_kind_histo);
+    struct size_class layout_size_class[MAX_LAYOUT_DEFRAG_SIZE_CLASSES];
+    bzero(layout_size_class, sizeof layout_size_class);
 
     // Count the fdefns, trampolines, and GFs already in varyobj sapace.
     // There are 3 kinds of code objects we might see -
@@ -1827,14 +1882,23 @@ static void defrag_immobile_space(boolean verbose)
                 lispobj word = *obj;
                 if (!fixnump(word)) {
                     int widetag = header_widetag(word);
+                    int size = sizetab[widetag](obj);
                     ++obj_type_histo[widetag/4];
-                    if (widetag == SYMBOL_WIDETAG) {
+                    switch (widetag) {
+                    case SYMBOL_WIDETAG:
+                        {
                         int kind = classify_symbol(obj);
-                        int size = sizetab[widetag](obj);
                         ++sym_kind_histo[kind].count;
                         if (!sym_kind_histo[kind].size)
                             sym_kind_histo[kind].size = size;
                         gc_assert(sym_kind_histo[kind].size == size);
+                        }
+                        break;
+                    case INSTANCE_WIDETAG:
+                        gc_assert(layoutp(make_lispobj(obj, INSTANCE_POINTER_LOWTAG)));
+                        int class_index = nwords_to_layout_size_class(size);
+                        ++layout_size_class[class_index].count;
+                        break;
                     }
                 }
             } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
@@ -1846,8 +1910,14 @@ static void defrag_immobile_space(boolean verbose)
     // page order is: layouts, symbols, fdefns, trampolines, GFs
     // If the text segment is writable, then the last 3 of those are
     // moved into varyobj space.
-    int n_layout_pages = calc_n_fixedobj_pages(obj_type_histo[INSTANCE_WIDETAG/4],
-                                               sizeof (struct layout)/N_WORD_BYTES);
+    int n_layout_pages = 0;
+    int class_index;
+    for (class_index = 0; class_index < MAX_LAYOUT_DEFRAG_SIZE_CLASSES; ++class_index) {
+        int count = layout_size_class[class_index].count;
+        n_layout_pages += calc_n_fixedobj_pages(count, layout_size_class_nwords(class_index));
+        layout_size_class[class_index].count = 0;
+    }
+
     char* layout_alloc_ptr = defrag_base;
     char* symbol_alloc_ptrs[N_SYMBOL_KINDS+1];
     symbol_alloc_ptrs[0]    = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;
@@ -2013,7 +2083,12 @@ static void defrag_immobile_space(boolean verbose)
         lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
         do {
             if (fixnump(*obj)) continue;
-            place_fixedobj(obj, obj_spacing, alloc_ptrs, symbol_alloc_ptrs);
+            if (widetag_of(obj) == INSTANCE_WIDETAG) {
+                place_layout(obj, layout_size_class,
+                             &layout_alloc_ptr, symbol_alloc_ptrs[0]);
+            } else {
+                place_fixedobj(obj, obj_spacing, alloc_ptrs, symbol_alloc_ptrs);
+            }
          } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     }
 #if WRITABLE_TEXT_SEGMENT

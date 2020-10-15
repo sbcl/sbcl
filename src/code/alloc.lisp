@@ -377,16 +377,22 @@
 ;;; sizes, each occupying a different size-class. This isn't implemented yet.
 (defun alloc-immobile-fixedobj (nwords header)
   (let* ((widetag (logand (truly-the fixnum header) widetag-mask))
+         (aligned-nwords (truly-the fixnum (align-up nwords 2)))
          (size-class
           (ecase widetag
             (#.symbol-widetag 1)
             (#.fdefn-widetag  2)
-            ;; TODO: use size classes for <= {16,24,32,48} words
-            (#.instance-widetag 3)
-            (#.funcallable-instance-widetag 4))))
+            (#.instance-widetag
+             (cond ((<= aligned-nwords 16) (setq aligned-nwords 16) 3)
+                   ((<= aligned-nwords 24) (setq aligned-nwords 24) 4)
+                   ((<= aligned-nwords 32) (setq aligned-nwords 32) 5)
+                   ((<= aligned-nwords 48) (setq aligned-nwords 48) 6)
+                   (t (error "Oversized layout"))))
+            ;; TODO: allow different sizes of funcallable-instance
+            (#.funcallable-instance-widetag 7))))
     (values (%primitive alloc-immobile-fixedobj
                         size-class
-                        (truly-the fixnum (align-up nwords 2))
+                        aligned-nwords
                         header))))
 
 (defun make-immobile-symbol (name)
