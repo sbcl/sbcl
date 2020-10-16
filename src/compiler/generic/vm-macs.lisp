@@ -93,7 +93,9 @@
                              ',(remove-keywords options '(:rest-p :length))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
-            (constants `(defconstant ,offset-sym ,offset))
+            (constants
+             `(progn (defconstant ,offset-sym ,offset)
+                     (setf (info :variable :kind ',offset-sym) :constant)))
             (when special
               (specials `(progn
                            (defvar ,special)
