@@ -1499,7 +1499,7 @@ We could try a few things to mitigate this:
         zero trailing-raw trailing-tagged vanilla)
     (dolist (x l)
       (let ((m (sb-kernel::layout-bitmap x)))
-        (cond ((eql m -1) (push x vanilla))
+        (cond ((eql m +layout-all-tagged+) (push x vanilla))
               ((eql m 0) (push x zero))
               ((minusp m) (push x trailing-tagged))
               (t (push x trailing-raw)))))
@@ -1525,7 +1525,8 @@ We could try a few things to mitigate this:
           (let ((m (sb-kernel::layout-bitmap x)))
             (format t "~30a 1...~b~%"
                     (name x)
-                    (ldb (byte (dd-length (layout-info x)) 0) m)))))
+                    (acond ((layout-info x) (ldb (byte (dd-length it) 0) m))
+                           (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))
 
 (in-package "SB-C")

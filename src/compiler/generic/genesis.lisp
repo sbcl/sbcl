@@ -309,9 +309,8 @@
 ;;; free word index is boosted as necessary, and if additional memory
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
-(defun allocate-cold-descriptor (gspace length lowtag &optional page-attributes)
-  (let* ((word-index
-          (gspace-claim-n-bytes gspace length page-attributes))
+(defun allocate-cold-descriptor (gspace length lowtag &optional (page-type :mixed))
+  (let* ((word-index (gspace-claim-n-bytes gspace length page-type))
          (ptr (+ (gspace-word-address gspace) word-index))
          (des (make-descriptor (logior (ash ptr sb-vm:word-shift) lowtag)
                                gspace
@@ -418,46 +417,31 @@
         (assign-page-types page-type word-index n-words)
         (note-it word-index)))))
 
-;; layoutp is true if we need to force objects on this page to LAYOUT-ALIGN
-;; boundaries. This doesn't need to be generalized - everything of type
-;; INSTANCE is either on its natural alignment, or the layout alignment.
-;; [See doc/internals-notes/compact-instance for why you might want it at all]
-;; PAGE-KIND is a heuristic for placement of symbols
-;; based on being interned/uninterned/likely-special-variable.
-(defun make-page-attributes (layoutp page-kind)
-  (declare (type (or null (integer 0 3)) page-kind))
-  (logior (ash (or page-kind 0) 1) (if layoutp 1 0)))
-
-(defun gspace-claim-n-bytes (gspace specified-n-bytes page-attributes)
-  (declare (ignorable page-attributes))
+(defun gspace-claim-n-bytes (gspace specified-n-bytes &optional (page-type :mixed))
   (let* ((n-bytes (round-up specified-n-bytes (ash 1 sb-vm:n-lowtag-bits)))
          (n-words (ash n-bytes (- sb-vm:word-shift))))
     (aver (evenp n-words))
     (cond #+immobile-space
           ((eq gspace *immobile-fixedobj*)
-           (aver page-attributes)
-           ;; An immobile fixedobj page can only have one value of object-spacing
-           ;; and size for all objects on it. Different widetags are ok.
-           (let* ((key (cons specified-n-bytes page-attributes))
-                  (found (cdr (assoc key *immobile-space-map* :test 'equal)))
-                  (page-n-words (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
+           ;; There can be at most 1 page in progress for each distinct N-WORDS.
+           ;; Try to find the one which matches.
+           (let* ((found (cdr (assoc n-words *immobile-space-map*)))
+                  (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
              (unless found ; grab one whole GC page from immobile space
-               (let ((free-word-index
-                      (gspace-claim-n-words gspace page-n-words)))
+               (let ((free-word-index (gspace-claim-n-words gspace words-per-page)))
                  (setf found (cons 0 free-word-index))
-                 (push (cons key found) *immobile-space-map*)))
+                 (push (cons n-words found) *immobile-space-map*)))
              (destructuring-bind (page-word-index . page-base-index) found
                (let ((next-word (+ page-word-index n-words)))
-                 (if (> next-word (- page-n-words n-words))
-                     ;; no more objects fit on this page
+                 (if (> next-word (- words-per-page n-words))
+                     ;; no more objects will fit on this page
                      (setf *immobile-space-map*
-                           (delete key *immobile-space-map* :key 'car :test 'equal))
+                           (delete n-words *immobile-space-map* :key 'car))
                      (setf (car found) next-word)))
                (+ page-word-index page-base-index))))
           #+gencgc
           ((eq gspace *dynamic*)
-           (dynamic-space-claim-n-words
-            gspace n-words (if (eq page-attributes :code) :code :mixed)))
+           (dynamic-space-claim-n-words gspace n-words page-type))
           (t
            (gspace-claim-n-words gspace n-words)))))
 
@@ -659,19 +643,17 @@
 ;;;   the length.
 ;;; * Vector objects: There is a header word with the type, then a word for
 ;;;   the length, then the data.
-(defun allocate-object (gspace length lowtag &optional layoutp)
+(defun allocate-object (gspace length lowtag)
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
-  (allocate-cold-descriptor gspace (ash length sb-vm:word-shift) lowtag
-                            (make-page-attributes layoutp 0)))
+  (allocate-cold-descriptor gspace (ash length sb-vm:word-shift) lowtag))
 (defun allocate-header+object (gspace length widetag)
   "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and WIDETAG."
   (let ((des (allocate-cold-descriptor
               gspace (ash (1+ length) sb-vm:word-shift)
-              sb-vm:other-pointer-lowtag
-              (make-page-attributes nil 0))))
+              sb-vm:other-pointer-lowtag)))
     ;; FDEFNs don't store a length, freeing up a header byte for other use
     (when (= widetag sb-vm:fdefn-widetag)
       (setq length 0))
@@ -710,10 +692,9 @@
 
 ;; Make a structure and set the header word and layout.
 ;; NWORDS is the payload length (= DD-LENGTH = LAYOUT-LENGTH)
-(defun allocate-struct (nwords type &optional (gspace *dynamic*) is-layout)
+(defun allocate-struct (nwords type &optional (gspace *dynamic*))
   ;; Add +1 for the header word when allocating.
-  (let* ((object (allocate-object gspace (1+ nwords)
-                                  sb-vm:instance-pointer-lowtag is-layout))
+  (let* ((object (allocate-object gspace (1+ nwords) sb-vm:instance-pointer-lowtag))
          (layout
           (if (symbolp type)
               (let ((layout (gethash type *cold-layouts*)))
@@ -1131,14 +1112,13 @@ core and return a descriptor to it."
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
-(declaim (ftype (function (symbol layout-depthoid integer index descriptor descriptor)
+(declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
-  ;; Can't call STRUCT-SIZE in first genesis - no metadata yet
   (let ((result (allocate-struct (dd-length (find-defstruct-description 'layout))
                                  *layout-layout*
-                                 (symbol-value *cold-layout-gspace*) t)))
+                                 (symbol-value *cold-layout-gspace*))))
     #+64-bit
     (write-slots result *host-layout-of-layout*
      :flags (sb-kernel::pack-layout-flags depthoid length flags))
@@ -1155,10 +1135,12 @@ core and return a descriptor to it."
      :invalid *nil-descriptor*
      :inherits inherits
      :info *nil-descriptor*
-     :bitmap bitmap
+     :bitmap (number-to-core bitmap)
      :slot-list *nil-descriptor*)
 
     (awhen (gethash name *layout-deferred-instances*)
+      (format t "~&Patching layout for ~S into ~D instance~:P~%"
+              name (length it))
       (dolist (instance it (remhash name *layout-deferred-instances*))
         (set-instance-layout instance result)))
 
@@ -1184,7 +1166,7 @@ core and return a descriptor to it."
     (let ((proxy (%make-cold-layout :name name
                                     :depthoid depthoid
                                     :length length
-                                    :bitmap (descriptor-integer bitmap)
+                                    :bitmap bitmap
                                     :flags flags
                                     :inherits inherits
                                     :descriptor result)))
@@ -1312,7 +1294,7 @@ core and return a descriptor to it."
                                (layout-depthoid warm-layout)
                                (layout-flags warm-layout)
                                (layout-length warm-layout)
-                               (number-to-core (layout-bitmap warm-layout))
+                               (layout-bitmap warm-layout)
                                (vector-in-core inherits)))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout)))
@@ -2331,7 +2313,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (bug "Messed up fop-layout for ~s" name))))
     (if existing-layout
         (cold-layout-descriptor existing-layout)
-        (make-cold-layout name depthoid flags length bitmap-descriptor inherits))))
+        (make-cold-layout name depthoid flags length bitmap-value inherits))))
 
 ;;;; cold fops for loading symbols
 
@@ -2577,13 +2559,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-load-code (header code-size n-fixups))
   (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (immobile (oddp header)) ; decode the representation used by dump
          ;; The number of constants is rounded up to even (if required)
          ;; to ensure that the code vector will be properly aligned.
          (n-boxed-words (ash header -1))
          (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
          (debug-info (pop-stack))
          (des (allocate-cold-descriptor
-                  (or #+immobile-code (and (oddp header) *immobile-varyobj*)
+                  (or #+immobile-code (and immobile *immobile-varyobj*)
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
@@ -3345,18 +3328,20 @@ III. initially undefined function references (alphabetically):
                 name)))
 
     (format t "~%~|~%V. layout names:~2%")
-    (format t "              Bitmap  Name [Depth]~%")
+    (format t "              Bitmap  Depth Name [Length]~%")
     (dolist (pair (sort-cold-layouts))
       (let* ((proxy (cdr pair))
              (descriptor (cold-layout-descriptor proxy))
              (addr (descriptor-bits descriptor)))
-        (format t "~10,'0X: ~8d  ~S[~D]~%"
+        (format t "~10,'0X: ~8d   ~2D   ~S [~D]~%"
                 addr
                 (cold-layout-bitmap proxy)
+                (cold-layout-depthoid proxy)
                 (car pair)
                 (cold-layout-length proxy))))
 
     (format t "~%~|~%VI. parsed type specifiers:~2%")
+    (format t "         [Hash]~%")
     (mapc (lambda (cell)
             (format t "~X: [~vx] ~S~%"
                     (descriptor-bits (cdr cell))
