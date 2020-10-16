@@ -2570,6 +2570,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
+    (declare (ignorable immobile))
     (write-code-header-words des aligned-n-boxed-words code-size n-named-calls)
     (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
 

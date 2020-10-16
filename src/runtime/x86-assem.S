@@ -851,7 +851,7 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in ECX, and our hard guard
 	 * page upper bound in EDX. */
 	lea	-4(%esp), %eax
-	mov	GNAME(os_vm_page_size),%edx
+	mov	$BACKEND_PAGE_BYTES,%edx
 	mov	%edx, %ecx
 	add	8(%esp), %ecx
 	add	12(%esp), %edx
