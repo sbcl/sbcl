@@ -2266,11 +2266,14 @@
       (let ((code sb-fasl:*assembler-routines*))
         (invert (%code-debug-info code)
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x)))))))
-    (loop for name across sb-vm::+all-static-fdefns+
-          for address =
-          #+immobile-code (sb-vm::function-raw-address name)
-          #-immobile-code (+ sb-vm:nil-value (sb-vm:static-fun-offset name))
-          do (setf (gethash address addr->name) name))
+    (dovector (name sb-vm::+all-static-fdefns+)
+      ;; ENTER-ALIEN-CALLBACK is not fboundp until src/code/alien-callback
+      ;; is compiled, so don't fail in function-raw-address.
+      (when (fboundp name)
+        (let ((address
+               #+immobile-code (sb-vm::function-raw-address name)
+               #-immobile-code (+ sb-vm:nil-value (sb-vm:static-fun-offset name))))
+          (setf (gethash address addr->name) name))))
     ;; Not really a routine, but it uses the similar logic for annotations
     #+sb-safepoint
     (setf (gethash (+ sb-vm:gc-safepoint-page-addr
