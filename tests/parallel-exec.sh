@@ -75,7 +75,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (return-from wait (wait)))
                    (setq subprocess-list (delete process subprocess-list))
                    (destructuring-bind ((filename . iteration) start-time) (cdr process)
-                     (setq et (- (get-internal-real-time) start-time))
+                     (setq et (elapsed-time-from start-time))
                      (when vop-summary-stats-p
                        (unless (sum-vop-usage (format nil "$logdir/~a.vop-usage" filename) t)
                          (when (or (search ".pure" filename) (search ".impure" filename))
@@ -86,6 +86,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                             (format t "~A~@[[~d]~]: status ~D (~d msec)~%"
                                       filename iteration code et)
                             (push (list filename iteration pid) losing)))))))
+             (elapsed-time-from (when) ; return value in milliseconds
+               (round (- (get-internal-real-time) when)
+                      (/ internal-time-units-per-second 1000)))
              (sum-vop-usage (input deletep)
                (with-open-file (f input :if-does-not-exist nil)
                  ;; No vop coverage file from shell script tests or any test
@@ -154,7 +157,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                 (format output "~7d ~s~%" (car cell) (cdr cell)))))
           (sum-vop-usage "../output/warm-vop-usage.txt" nil)))
 
-      (format t "~&Total realtime: ~d msec~%" (- (get-internal-real-time) start-time))
+      (format t "~&Total realtime: ~d msec~%" (elapsed-time-from start-time))
       (when missing-usage
         (format t "~&Missing vop-usage:~{ ~a~}~%" missing-usage))
 
