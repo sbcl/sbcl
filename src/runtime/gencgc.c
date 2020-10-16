@@ -592,7 +592,7 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
 }
 
 
-#if defined(LISP_FEATURE_X86)
+#if defined LISP_FEATURE_X86 && !defined LISP_FEATURE_LINUX
 void fast_bzero(void*, size_t); /* in <arch>-assem.S */
 #else
 #define fast_bzero(addr, count) memset(addr, 0, count)

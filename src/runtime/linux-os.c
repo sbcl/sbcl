@@ -268,13 +268,6 @@ void os_init(char __attribute__((unused)) *argv[],
 #ifdef LISP_FEATURE_SB_FUTEX
     futex_init();
 #endif
-
-#ifdef LISP_FEATURE_X86
-    /* Use SSE detector.  Recent versions of Linux enable SSE support
-     * on SSE capable CPUs.  */
-    /* FIXME: Are there any old versions that does not support SSE?  */
-    fast_bzero_pointer = fast_bzero_detect;
-#endif
 }
 
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)) \

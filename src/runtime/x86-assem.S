@@ -692,6 +692,7 @@ GNAME(post_signal_tramp):
 	SIZE(GNAME(post_signal_tramp))
 
 
+#ifndef LISP_FEATURE_LINUX
         /* fast_bzero implementations and code to detect which implementation
          * to use.
          */
@@ -827,6 +828,7 @@ Lend_base:
         pop %eax
 	ret
 	SIZE(GNAME(fast_bzero_base))
+#endif /* LISP_FEATURE_LINUX */
 
 
 /* When LISP_FEATURE_C_STACK_IS_CONTROL_STACK, we cannot safely scrub
