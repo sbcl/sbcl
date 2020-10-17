@@ -24,7 +24,7 @@ fi
 
 set -e
 
-tracelog=${TMPDIR:-/tmp}/$TEST_FILESTEM.out
+tracelog=`mktemp ${TMPDIR:-/tmp}/$TEST_FILESTEM.XXXXXX`
 
 strace -f -e futex -e signal=\!sigsegv -o $tracelog \
   $SBCL_RUNTIME --core "$SBCL_CORE" $SBCL_ARGS <<EOF
