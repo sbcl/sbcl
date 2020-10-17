@@ -150,7 +150,7 @@ static inline lispobj canonical_obj(lispobj obj)
 #define check_ptr(index,ptr) if(canonical_obj(ptr)==target) return index;
 static int find_ref(lispobj* source, lispobj target)
 {
-    lispobj layout, bitmap;
+    lispobj layout;
     int scan_limit, i;
 
     lispobj word = *source;
@@ -168,9 +168,12 @@ static int find_ref(lispobj* source, lispobj target)
         // certain special cases, here we opt for simplicity.
         layout = layout_of(source);
         check_ptr(0, layout);
-        bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
-        for(i=1; i<scan_limit; ++i)
-            if (bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
+        if (layout) {
+            struct bitmap bitmap;
+            get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+            for(i=1; i<scan_limit; ++i)
+                if (bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
+        }
         // FIXME: check lockfree_list_node_p() also
         return -1;
 #if FUN_SELF_FIXNUM_TAGGED
@@ -710,7 +713,7 @@ static boolean ignorep(lispobj* base_ptr,
 static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
 {
-    lispobj layout, bitmap;
+    lispobj layout;
     sword_t nwords, scan_limit, i;
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
@@ -738,10 +741,13 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             layout = layout_of(where);
             check_ptr(layout);
             // Partially initialized instance can't have nonzero words yet
-            bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
-            // FIXME: check lockfree_list_node_p() also
-            for(i=1; i<scan_limit; ++i)
-                if (bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);
+            if (layout) {
+                struct bitmap bitmap;
+                get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+                // FIXME: check lockfree_list_node_p() also
+                for(i=1; i<scan_limit; ++i)
+                    if (bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);
+            }
             continue;
 #if FUN_SELF_FIXNUM_TAGGED
         case CLOSURE_WIDETAG:

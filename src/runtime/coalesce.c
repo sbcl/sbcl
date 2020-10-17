@@ -153,7 +153,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
-    lispobj layout, bitmap, *next;
+    lispobj layout, *next;
     sword_t nwords, i;
 
     for ( ; where < limit ; where = next ) {
@@ -166,7 +166,8 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             case INSTANCE_WIDETAG: // mixed boxed/unboxed objects
             case FUNCALLABLE_INSTANCE_WIDETAG:
                 layout = layout_of(where);
-                bitmap = LAYOUT(layout)->bitmap;
+                struct bitmap bitmap;
+                get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
                 for (i=0; i<(nwords-1); ++i)
                     if (bitmap_logbitp(i, bitmap)) coalesce_obj(where+1+i, ht);
                 continue;

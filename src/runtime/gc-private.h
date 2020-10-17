@@ -238,30 +238,41 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     weak_pointer_chain = wp;
 }
 
-/* Basically like LOGBITP in lisp. Cribbed from src/code/bignum.lisp
- * The'index' is 0-based starting at the first "payload" word.
- *    word0: header
- *    word1: payload word index 0
- *    word2: payload word index 1
- *    etc
- * so depending how this is called, you may or may not need to
- * subtract 1 at the call site.
- * (Whichever way it is, invariably something either has to add or subtract 1)
- */
+#include "genesis/layout.h"
 #include "genesis/bignum.h"
-static inline boolean bitmap_logbitp(unsigned int index, lispobj bitmap)
+struct bitmap { sword_t *bits; unsigned int nwords; sword_t small_bignum; };
+// For now this receives the bitmap, but it should only take a layout.
+// Also it should return a structure by value which makes for a much nicer interface.
+// But neither of those can be accomplished until removing the case for small_bignum
+// (because the structure points into  itself, which would return a local variable
+// in an exited stack frame). The signature *should* be:
+//   static inline struct bitmap get_layout_bitmap(struct layout* layout);
+
+static inline void get_layout_bitmap(lispobj bitmap_descriptor,
+                                     struct bitmap *bitmap)
 {
-    sword_t single_word_bignum = fixnum_value(bitmap);
-    sword_t* digits = &single_word_bignum;
-    unsigned int len = 1;
-    if (!fixnump(bitmap)) {
-        digits = ((struct bignum*)(bitmap - OTHER_POINTER_LOWTAG))->digits;
-        len = HeaderValue(digits[-1]);
+    if (fixnump(bitmap_descriptor)) {
+        bitmap->bits = &bitmap->small_bignum;
+        bitmap->small_bignum = fixnum_value(bitmap_descriptor);
+        bitmap->nwords = 1;
+    } else {
+        struct bignum *b = (struct bignum*)(bitmap_descriptor-OTHER_POINTER_LOWTAG);
+        bitmap->bits = b->digits;
+        bitmap->nwords = HeaderValue(b->header);
     }
+}
+
+/* Return true if the INDEXth bit is set in BITMAP.
+ * Index 0 corresponds to the word just after the instance header.
+ * So index 0 may be the layout pointer if #-compact-instance-header,
+ * or a user data slot if #+compact-instance-header
+ */
+static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
+{
     unsigned int word_index = index / N_WORD_BITS;
     unsigned int bit_index  = index % N_WORD_BITS;
-    if (word_index >= len) return digits[len-1] < 0;
-    return (digits[word_index] >> bit_index) & 1;
+    if (word_index >= bitmap.nwords) return bitmap.bits[bitmap.nwords-1] < 0;
+    return (bitmap.bits[word_index] >> bit_index) & 1;
 }
 
 /* Keep in sync with 'target-hash-table.lisp' */
@@ -352,7 +363,6 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 
 extern lispobj layout_of_layout;
 
-#include "genesis/layout.h"
 static inline int lockfree_list_node_layout_p(struct layout* layout) {
     return layout->flags & flag_LockfreeListNode;
 }

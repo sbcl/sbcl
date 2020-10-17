@@ -672,14 +672,30 @@ scav_instance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) instance_layout(where) = layoutptr;
     struct layout *layout = (void*)(layoutptr - INSTANCE_POINTER_LOWTAG);
-    lispobj lbitmap = ((struct layout*)layout)->bitmap;
 
-    if (lbitmap == (make_fixnum(-1) << INSTANCE_DATA_START)) { // all tagged slots
-        scavenge(where+1+INSTANCE_DATA_START, nslots-INSTANCE_DATA_START);
-        return total_nwords;
+    // FIXME: remove scav1() after bitmap is embedded into the layout.
+    // == START OF CODE TO REMOVE ==
+    lispobj bitmap_descriptor = layout->bitmap;
+    /* It is conceivable that 'bitmap_descriptor' points to from_space, AND that it
+     * is stored in one of the slots of the instance about to be scanned.
+     * If so, then forwarding it will deposit new bits into its first
+     * one or two words, rendering it bogus for use as the instance's bitmap.
+     * So scavenge it up front to fix its address */
+    scav1(&bitmap_descriptor, bitmap_descriptor);
+    // == END OF CODE TO REMOVE ==
+
+    struct bitmap bitmap;
+    get_layout_bitmap(bitmap_descriptor, &bitmap);
+    sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
+
+    if (bitmap.nwords == 1) {
+        if (mask == (sword_t)-1 << INSTANCE_DATA_START) {
+            // Easy case: all slots are tagged words
+            scavenge(where+1+INSTANCE_DATA_START, nslots-INSTANCE_DATA_START);
+            return total_nwords;
+        }
+        if (mask == 0) return total_nwords; // trivial case: no tagged words
     }
-
-    if (lbitmap == 0) return total_nwords; // special-case: no tagged slots
 
     // Specially scavenge the 'next' slot of a lockfree list node. If the node is
     // pending deletion, 'next' will satisfy fixnump() but is in fact a pointer.
@@ -698,22 +714,12 @@ scav_instance(lispobj *where, lispobj header)
     }
 
     ++where; // skip over the header
-    sword_t mask = fixnum_value(lbitmap); // optimistically assume fixnum
     lispobj obj;
-    if (!fixnump(lbitmap)) {
-        /* It is conceivable that 'lbitmap' points to from_space, AND that it
-         * is stored in one of the slots of the instance about to be scanned.
-         * If so, then forwarding it will deposit new bits into its first
-         * one or two words, rendering it bogus for use as the instance's bitmap.
-         * So scavenge it up front to fix its address */
-        scav1(&lbitmap, lbitmap);
-        struct bignum* bignum = (void*)(lbitmap - OTHER_POINTER_LOWTAG);
-        int n_bitmap_words = HeaderValue(bignum->header);
-        mask = bignum->digits[0];
-        // Process all but the final word of the bitmap.
-        // This loop will not execute if the bignum has exactly 1 word.
-        int bitmap_word_index = 1;
-        while (bitmap_word_index < n_bitmap_words) {
+    unsigned int end_word_index = bitmap.nwords - 1;
+    if (end_word_index) { // > 1 word
+        unsigned int bitmap_word_index = 0;
+        // 'mask' was preloaded with the bitmap.bits[0]
+        do {
             // I suspect that mutating a structure layout with raw slots
             // could cause this assertion to fail, but at least we'll catch
             // that the user did something dangerous, exiting with an error
@@ -721,17 +727,23 @@ scav_instance(lispobj *where, lispobj header)
             if (nslots < N_WORD_BITS) lose("Mutated structure layout %p", (void*)layout);
             nslots -= N_WORD_BITS;
             lispobj* limit = where + N_WORD_BITS;
-            for ( ; where < limit ; mask >>= 1, ++where )
+            do {
                 if ((mask & 1) && is_lisp_pointer(obj = *where)) scav1(where, obj);
-            mask = bignum->digits[bitmap_word_index++];
-        }
+                mask >>= 1;
+            } while (++where < limit);
+            mask = bitmap.bits[++bitmap_word_index];
+        } while (bitmap_word_index != end_word_index);
     }
-    // Scan the final word of the mask, letting the sign bit repeat.
-    // There might be 0 slots remaining though.
-    lispobj* limit = where + nslots;
+    // Scan at most N_WORD_BITS more using the final word of the mask.
+    // But there may be 0 slots remaining, or more than N_WORD_BITS slots remaining.
+    int count = nslots <= N_WORD_BITS ? nslots : N_WORD_BITS;
+    lispobj* limit = where + count;
     for ( ; where < limit ; mask >>= 1, ++where )
         if ((mask & 1) && is_lisp_pointer(obj = *where)) scav1(where, obj);
+    nslots -= count;
 
+    // Finally, see if the mask has its top bit on and there are more slots
+    if (mask < 0 && nslots != 0) scavenge(where, nslots);
     return total_nwords;
 }
 
@@ -752,8 +764,10 @@ scav_funinstance(lispobj *where, lispobj header)
     // Do a similar thing as scav_instance but without any special cases.
     // Bitmap is always a nonzero fixnum.
     struct layout *layout = (void*)(layoutptr - INSTANCE_POINTER_LOWTAG);
-    gc_assert(fixnump(layout->bitmap));
-    sword_t mask = fixnum_value(layout->bitmap);
+    struct bitmap bitmap;
+    get_layout_bitmap(layout->bitmap, &bitmap);
+    gc_assert(bitmap.nwords == 1);
+    sword_t mask = bitmap.bits[0];
     ++where;
     lispobj* limit = where + nslots;
     lispobj obj;
@@ -2348,6 +2362,9 @@ page_index_t ext_lispobj_size(lispobj *addr) {
 /// Eeternal function for calling from Lisp.
 /// This would be better build into a '.so' from a test
 /// because it really serves no other purpose.
-int test_bitmap_logbitp(int i, lispobj bitmap) {
+int test_bitmap_logbitp(int i, lispobj bitmap_descriptor) {
+    struct bitmap bitmap;
+    get_layout_bitmap(bitmap_descriptor, &bitmap);
     return bitmap_logbitp(i, bitmap);
 }
+

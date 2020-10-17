@@ -3018,16 +3018,14 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     state->vaddr = 0;
                     gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
-                    lispobj bitmap = layout->bitmap;
+                    struct bitmap bitmap;
+                    get_layout_bitmap(layout->bitmap, &bitmap);
                     if (widetag_of(where) == FUNCALLABLE_INSTANCE_WIDETAG) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                      gc_assert(bitmap == make_fixnum(-1) || bitmap == make_fixnum(6));
+                      gc_assert(bitmap.bits[0] == (sword_t)-1 || bitmap.bits[0] == (sword_t)6);
 #else
-                      gc_assert(bitmap == make_fixnum(-4));
+                      gc_assert(bitmap.bits[0] == (sword_t)-4);
 #endif
-                    } else {
-                        gc_assert(fixnump(bitmap)
-                                  || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
                     }
                     if (lockfree_list_node_layout_p(layout)) {
                         struct instance* node = (struct instance*)where;

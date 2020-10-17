@@ -250,14 +250,14 @@ static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
     // this contains almost none of the special cases that gencgc does.
     if (!layout) return;
     gc_mark_obj(layout);
-    lispobj bitmap = LAYOUT(layout)->bitmap;
-    if (!bitmap) return;
     if (lockfree_list_node_layout_p(LAYOUT(layout))) { // allow untagged 'next'
         struct instance* node = (struct instance*)where;
         lispobj next = node->slots[INSTANCE_DATA_START];
         // ignore if 0
         if (fixnump(next) && next) __mark_obj(next|INSTANCE_POINTER_LOWTAG);
     }
+    struct bitmap bitmap;
+    get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
     int i;
     lispobj* slots = where+1;
     for (i=0; i<nslots; ++i)

@@ -733,7 +733,7 @@ static inline boolean
 fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
-  lispobj layout, lbitmap;
+  lispobj layout;
 
   switch (widetag_of(obj)) {
   case FDEFN_WIDETAG:
@@ -750,12 +750,15 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     layout = instance_layout(obj);
     if (younger_p(layout, gen, keep_gen, new_gen))
         return 1;
-    if ((lbitmap = LAYOUT(layout)->bitmap) != make_fixnum(-1)) {
-        gc_assert(fixnump(lbitmap));  // No bignums (yet)
-        sword_t bitmap = fixnum_value(lbitmap);
-        lispobj* where = obj + 1;
-        for ( ; --n_words ; ++where, bitmap >>= 1 )
-            if ((bitmap & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen))
+    struct bitmap bitmap;
+    get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+    gc_assert(bitmap.nwords == 1);
+    if (bitmap.bits[0] != (sword_t)-1) {
+        sword_t mask = bitmap.bits[0];
+        lispobj* where = obj;
+        lispobj* limit = obj + n_words;
+        for ( ; where < limit ; ++where, mask >>= 1 )
+            if ((mask & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen))
                 return 1;
         return 0;
     }
@@ -1571,7 +1574,8 @@ static void fixup_space(lispobj* where, size_t n_words)
           {
           lispobj* slots = where+1;
           int i;
-          lispobj bitmap = fix_object_layout(where)->bitmap;
+          struct bitmap bitmap;
+          get_layout_bitmap(fix_object_layout(where)->bitmap, &bitmap);
           for(i=0; i<(size-1); ++i)
               if (bitmap_logbitp(i, bitmap)) adjust_words(slots+i, 1);
           }
