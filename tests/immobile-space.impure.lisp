@@ -1,4 +1,6 @@
 
+#-immobile-space (sb-ext:exit :code 104)
+
 (defstruct trythis a)
 
 ;;; Assign a bitmap that is not the special case for "all tagged"
