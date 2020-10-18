@@ -32,14 +32,14 @@
 (defglobal things (loop repeat 5 collect (make)))
 ;;; promote THINGS to gen 1 so that we can make them
 ;;; point to something younger.
-(gc)
+(gc :gen 1)
 (assert (eql (sb-kernel:generation-of (car things)) 1))
 (setf (trythis-a (car things)) "wat")
 
 ;;; This next GC doesn't incur a bug (though that's maybe surprising),
 ;;; but the final one would if this one leaves a page protection bit
 ;;; in a wrong state such that an old->young pointer is missed next time.
-(gc :gen 1)
+(gc :gen 2)
 (print things)
 (setf (trythis-a (car things)) "anewstring")
 (gc)
