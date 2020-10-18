@@ -67,33 +67,40 @@
 (force-output)
 
 ;; Test the C bitmap bit extractor.
-(defun c-bitmap-logbitp (index integer)
-  (eql (sb-sys:with-pinned-objects (integer)
+(defun c-bitmap-logbitp (index layout &aux (bitmap (sb-kernel:layout-bitmap layout)))
+  (eql (sb-sys:with-pinned-objects (bitmap)
          (alien-funcall (extern-alien "test_bitmap_logbitp"
                                       (function int int unsigned))
                         index
-                        (sb-kernel:get-lisp-obj-address integer)))
+                        (sb-kernel:get-lisp-obj-address bitmap)))
        1))
 
 (with-test (:name :bitmap-logbitp)
   ;; walking 1 bit
   (dotimes (i 256)
-    (let ((num (ash 1 i)))
+    (let* ((num (ash 1 i))
+           (layout (sb-kernel:make-layout 0 (sb-kernel:find-classoid 'structure-object)
+                                          :bitmap num)))
       (dotimes (j 257)
-        (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))
+        (assert (eq (c-bitmap-logbitp j layout) (logbitp j num))))))
   ;; walking 0 bit
   (dotimes (i 256)
-    (let ((num (lognot (ash 1 i))))
+    (let* ((num (lognot (ash 1 i)))
+           (layout (sb-kernel:make-layout 0 (sb-kernel:find-classoid 'structure-object)
+                                          :bitmap num)))
       (dotimes (j 257)
-        (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))
+        (assert (eq (c-bitmap-logbitp j layout) (logbitp j num))))))
   ;; random bits
   (let ((max (ash 1 768)))
     (dotimes (i 100)
-      (let ((num (- (random max) (floor max 20)))) ; test both + and -
+      (let* ((num (- (random max) (floor max 20))) ; test both + and -
+             (layout
+              (sb-kernel:make-layout 0 (sb-kernel:find-classoid 'structure-object)
+                                     :bitmap num)))
         (dotimes (j (if (typep num 'bignum)
                         (* (sb-bignum:%bignum-length num) sb-vm:n-word-bits)
                         sb-vm:n-word-bits))
-          (assert (eq (c-bitmap-logbitp j num) (logbitp j num))))))))
+          (assert (eq (c-bitmap-logbitp j layout) (logbitp j num))))))))
 
 ;; for testing the comparator
 (defstruct foo1
