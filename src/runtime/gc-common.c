@@ -689,7 +689,7 @@ scav_instance(lispobj *where, lispobj header)
     sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
 
     if (bitmap.nwords == 1) {
-        if (mask == (sword_t)-1 << INSTANCE_DATA_START) {
+        if ((uword_t)mask == (uword_t)-1 << INSTANCE_DATA_START) {
             // Easy case: all slots are tagged words
             scavenge(where+1+INSTANCE_DATA_START, nslots-INSTANCE_DATA_START);
             return total_nwords;
