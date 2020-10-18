@@ -729,7 +729,7 @@ range_points_to_younger_p(lispobj* obj, lispobj* end,
 // Scan a fixed-size object for old-to-young pointers.
 // Since fixed-size objects are boxed and on known boundaries,
 // we never start in the middle of random bytes, so the answer is exact.
-static inline boolean
+static boolean
 fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
@@ -755,7 +755,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     gc_assert(bitmap.nwords == 1);
     if (bitmap.bits[0] != (sword_t)-1) {
         sword_t mask = bitmap.bits[0];
-        lispobj* where = obj;
+        lispobj* where = obj + 1;
         lispobj* limit = obj + n_words;
         for ( ; where < limit ; ++where, mask >>= 1 )
             if ((mask & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen))

@@ -379,6 +379,8 @@
   (let* ((widetag (logand (truly-the fixnum header) widetag-mask))
          (aligned-nwords (truly-the fixnum (align-up nwords 2)))
          (size-class
+          ;; If you change this, then be sure to update tests/immobile-space.impure
+          ;; which hardcodes a size class to not conflict with anything.
           (ecase widetag
             (#.symbol-widetag 1)
             (#.fdefn-widetag  2)
