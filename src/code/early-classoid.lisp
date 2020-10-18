@@ -323,7 +323,7 @@
     layout)))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
-;;;   * BITMAP - obtainable via (DD-MAPMAP (LAYOUT-INFO layout)).
+;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
 ;;;     GC wants it in the layout to avoid double indirection.
 ;;;   * EQUALP-TESTS - needed only for the target's implementation of EQUALP.
 ;;;   * SLOT-TABLE, and SLOT-LIST - used only by the CLOS implementation.

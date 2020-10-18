@@ -75,7 +75,7 @@
                         (sb-kernel:get-lisp-obj-address integer)))
        1))
 
-(with-test (:name :bigmap-logbitp)
+(with-test (:name :bitmap-logbitp)
   ;; walking 1 bit
   (dotimes (i 256)
     (let ((num (ash 1 i)))

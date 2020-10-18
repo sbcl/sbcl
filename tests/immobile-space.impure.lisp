@@ -9,7 +9,7 @@
         1))
 
 (defun ll-alloc ()
-  ;; This must be in its own function because the vop and preserves no registers
+  ;; This must be in its own function because the vop preserves no registers
   ;; when calling to C.
   (values(sb-sys:%primitive
             sb-vm::alloc-immobile-fixedobj
@@ -35,8 +35,8 @@
 (setf (trythis-a (car things)) "wat")
 
 ;;; This next GC doesn't incur a bug (though that's maybe surprising),
-;;; but the finall one would if this one leaves the page protection
-;;; bits in a wrong state such that an old->young pointer is missed.
+;;; but the final one would if this one leaves a page protection bit
+;;; in a wrong state such that an old->young pointer is missed next time.
 (gc :gen 1)
 (print things)
 (setf (trythis-a (car things)) "anewstring")
