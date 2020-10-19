@@ -2343,11 +2343,10 @@ void gc_heapsort_uwords(heap array, int length)
 page_index_t ext_lispobj_size(lispobj *addr) {
     return OBJECT_SIZE(*addr,addr) * N_WORD_BYTES;
 }
-/// Eeternal function for calling from Lisp.
+/// External function for calling from Lisp.
 /// This would be better build into a '.so' from a test
 /// because it really serves no other purpose.
 int test_bitmap_logbitp(int i, struct layout* l) {
     struct bitmap bitmap = get_layout_bitmap(l);
     return bitmap_logbitp(i, bitmap);
 }
-

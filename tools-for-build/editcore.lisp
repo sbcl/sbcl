@@ -1561,11 +1561,11 @@
                              word)))
               (when (eq widetag funcallable-instance-widetag)
                 (let* ((layout (truly-the layout (translate (%fun-layout obj) spaces)))
-                       (bitmap (%raw-instance-ref/word
+                       (bitmap (%raw-instance-ref/signed-word
                                 layout (sb-kernel::type-dd-length sb-kernel:layout))))
-                  (unless (= (sb-kernel::layout-bitmap-words layout) 1)
+                  (unless (= (sb-kernel:layout-bitmap-words layout) 1)
                     (error "Strange funcallable-instance bitmap"))
-                  (unless (eql bitmap -1)
+                  (unless (eql bitmap sb-kernel:+layout-all-tagged+)
                       ;; tagged slots precede untagged slots,
                       ;; so integer-length is the count of tagged slots.
                       (setq nwords (1+ (integer-length bitmap)))))))
