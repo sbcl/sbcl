@@ -135,11 +135,17 @@
           (t
            `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
 
+(defun varying-length-struct-p (classoid)
+  ;; This is a nice feature to have in general, but at present it is only possible
+  ;; to make varying length instances of LAYOUT and nothing else.
+  (eq (classoid-name classoid) 'layout))
+
 (deftransform %instance-length ((instance))
   (let ((classoid (lvar-type instance)))
     (if (and (structure-classoid-p classoid)
              (sb-kernel::compiler-layout-ready-p (classoid-name classoid))
              (eq (classoid-state classoid) :sealed)
+             (not (varying-length-struct-p classoid))
              ;; TODO: if sealed with subclasses which add no slots, use the fixed length
              (not (classoid-subclasses classoid)))
         (dd-length (layout-info (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))

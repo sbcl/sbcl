@@ -5,10 +5,11 @@
 
 ;;; Assign a bitmap that is not the special case for "all tagged"
 ;;; but does correctly indicate 1 tagged slot.
-(let ((l (sb-kernel:find-layout 'trythis)))
-  (setf (sb-kernel:%instance-ref l
-         (sb-kernel:get-dsd-index sb-kernel:layout sb-kernel::bitmap))
-        1))
+(let* ((l (sb-kernel:find-layout 'trythis))
+       (slot (1- (sb-kernel:%instance-length l))))
+  (assert (eql (sb-kernel:%raw-instance-ref/signed-word l slot)
+               sb-kernel:+layout-all-tagged+))
+  (setf (sb-kernel:%raw-instance-ref/word l slot) 1))
 
 (defun ll-alloc ()
   ;; This must be in its own function because the vop preserves no registers

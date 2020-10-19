@@ -256,8 +256,7 @@ static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
         // ignore if 0
         if (fixnump(next) && next) __mark_obj(next|INSTANCE_POINTER_LOWTAG);
     }
-    struct bitmap bitmap;
-    get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+    struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
     int i;
     lispobj* slots = where+1;
     for (i=0; i<nslots; ++i)

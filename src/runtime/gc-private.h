@@ -239,27 +239,17 @@ static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
 }
 
 #include "genesis/layout.h"
-#include "genesis/bignum.h"
-struct bitmap { sword_t *bits; unsigned int nwords; sword_t small_bignum; };
-// For now this receives the bitmap, but it should only take a layout.
-// Also it should return a structure by value which makes for a much nicer interface.
-// But neither of those can be accomplished until removing the case for small_bignum
-// (because the structure points into  itself, which would return a local variable
-// in an exited stack frame). The signature *should* be:
-//   static inline struct bitmap get_layout_bitmap(struct layout* layout);
-
-static inline void get_layout_bitmap(lispobj bitmap_descriptor,
-                                     struct bitmap *bitmap)
+struct bitmap { sword_t *bits; unsigned int nwords; };
+static inline struct bitmap get_layout_bitmap(struct layout* layout)
 {
-    if (fixnump(bitmap_descriptor)) {
-        bitmap->bits = &bitmap->small_bignum;
-        bitmap->small_bignum = fixnum_value(bitmap_descriptor);
-        bitmap->nwords = 1;
-    } else {
-        struct bignum *b = (struct bignum*)(bitmap_descriptor-OTHER_POINTER_LOWTAG);
-        bitmap->bits = b->digits;
-        bitmap->nwords = HeaderValue(b->header);
-    }
+    struct bitmap bitmap;
+    bitmap.bits = (sword_t*)((char*)layout + sizeof (struct layout));
+    // The 2 bits for stable address-based hashing can't ever bet set.
+    bitmap.nwords = (((unsigned int)layout->header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF)
+                    /* subtract one from the struct length in lispwords
+                     * to get the minimum payload length excluding bitmap words. */
+                    - ((sizeof (struct layout) / N_WORD_BYTES) - 1);
+    return bitmap;
 }
 
 /* Return true if the INDEXth bit is set in BITMAP.

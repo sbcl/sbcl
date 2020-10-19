@@ -1527,12 +1527,8 @@
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
-              (let* ((layout (truly-the layout
-                              (translate (%instance-layout obj) spaces)))
-                     (bitmap (layout-bitmap layout))
-                     (translated
-                      (if (fixnump bitmap) bitmap (translate bitmap spaces))))
-                (do-instance-tagged-slot (i obj :bitmap translated)
+              (let ((layout (truly-the layout (translate (%instance-layout obj) spaces))))
+                (do-instance-tagged-slot (i obj :layout layout)
                   (scanptr vaddr obj (1+ i))))
               (return-from scan-obj))
              (#.simple-vector-widetag
@@ -1564,14 +1560,15 @@
                              (+ core-offs n-word-bytes)
                              word)))
               (when (eq widetag funcallable-instance-widetag)
-                (let ((layout (truly-the layout (translate (%fun-layout obj) spaces))))
-                  (unless (fixnump (layout-bitmap layout))
-                    (error "Can't process bignum bitmap"))
-                  (let ((bitmap (layout-bitmap layout)))
-                    (unless (eql bitmap -1)
+                (let* ((layout (truly-the layout (translate (%fun-layout obj) spaces)))
+                       (bitmap (%raw-instance-ref/word
+                                layout (sb-kernel::type-dd-length sb-kernel:layout))))
+                  (unless (= (sb-kernel::layout-bitmap-words layout) 1)
+                    (error "Strange funcallable-instance bitmap"))
+                  (unless (eql bitmap -1)
                       ;; tagged slots precede untagged slots,
                       ;; so integer-length is the count of tagged slots.
-                      (setq nwords (1+ (integer-length bitmap))))))))
+                      (setq nwords (1+ (integer-length bitmap)))))))
              ;; mixed boxed/unboxed objects
              (#.code-header-widetag
               (aver (not pie))

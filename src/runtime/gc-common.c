@@ -672,20 +672,7 @@ scav_instance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) instance_layout(where) = layoutptr;
     struct layout *layout = (void*)(layoutptr - INSTANCE_POINTER_LOWTAG);
-
-    // FIXME: remove scav1() after bitmap is embedded into the layout.
-    // == START OF CODE TO REMOVE ==
-    lispobj bitmap_descriptor = layout->bitmap;
-    /* It is conceivable that 'bitmap_descriptor' points to from_space, AND that it
-     * is stored in one of the slots of the instance about to be scanned.
-     * If so, then forwarding it will deposit new bits into its first
-     * one or two words, rendering it bogus for use as the instance's bitmap.
-     * So scavenge it up front to fix its address */
-    scav1(&bitmap_descriptor, bitmap_descriptor);
-    // == END OF CODE TO REMOVE ==
-
-    struct bitmap bitmap;
-    get_layout_bitmap(bitmap_descriptor, &bitmap);
+    struct bitmap bitmap = get_layout_bitmap(layout);
     sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
 
     if (bitmap.nwords == 1) {
@@ -762,10 +749,7 @@ scav_funinstance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
     // Do a similar thing as scav_instance but without any special cases.
-    // Bitmap is always a nonzero fixnum.
-    struct layout *layout = (void*)(layoutptr - INSTANCE_POINTER_LOWTAG);
-    struct bitmap bitmap;
-    get_layout_bitmap(layout->bitmap, &bitmap);
+    struct bitmap bitmap = get_layout_bitmap(LAYOUT(layoutptr));
     gc_assert(bitmap.nwords == 1);
     sword_t mask = bitmap.bits[0];
     ++where;
@@ -2362,9 +2346,8 @@ page_index_t ext_lispobj_size(lispobj *addr) {
 /// Eeternal function for calling from Lisp.
 /// This would be better build into a '.so' from a test
 /// because it really serves no other purpose.
-int test_bitmap_logbitp(int i, lispobj bitmap_descriptor) {
-    struct bitmap bitmap;
-    get_layout_bitmap(bitmap_descriptor, &bitmap);
+int test_bitmap_logbitp(int i, struct layout* l) {
+    struct bitmap bitmap = get_layout_bitmap(l);
     return bitmap_logbitp(i, bitmap);
 }
 

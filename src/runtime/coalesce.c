@@ -166,8 +166,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             case INSTANCE_WIDETAG: // mixed boxed/unboxed objects
             case FUNCALLABLE_INSTANCE_WIDETAG:
                 layout = layout_of(where);
-                struct bitmap bitmap;
-                get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
                 for (i=0; i<(nwords-1); ++i)
                     if (bitmap_logbitp(i, bitmap)) coalesce_obj(where+1+i, ht);
                 continue;

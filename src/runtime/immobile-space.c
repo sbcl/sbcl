@@ -750,8 +750,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     layout = instance_layout(obj);
     if (younger_p(layout, gen, keep_gen, new_gen))
         return 1;
-    struct bitmap bitmap;
-    get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+    struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
     gc_assert(bitmap.nwords == 1);
     if (bitmap.bits[0] != (sword_t)-1) {
         sword_t mask = bitmap.bits[0];
@@ -1574,8 +1573,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           {
           lispobj* slots = where+1;
           int i;
-          struct bitmap bitmap;
-          get_layout_bitmap(fix_object_layout(where)->bitmap, &bitmap);
+          struct bitmap bitmap = get_layout_bitmap(fix_object_layout(where));
           for(i=0; i<(size-1); ++i)
               if (bitmap_logbitp(i, bitmap)) adjust_words(slots+i, 1);
           }

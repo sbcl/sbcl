@@ -424,24 +424,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // writeback the layout if it changed. The layout is not a tagged slot
             // so it would not be fixed up otherwise.
             if (adjusted_layout != layout) layout_of(where) = adjusted_layout;
-            // FIXME: remove adjustment step after bitmap is embedded into the layout.
-            // == START OF CODE TO REMOVE ==
-            lispobj bitmap_descriptor = LAYOUT(adjusted_layout)->bitmap;
-            // If the post-adjustment address of 'layout' is higher than 'where',
-            // then the layout's pointer slots need adjusting.
-            // This is true regardless of whether the core was mapped at a higher
-            // or lower address than desired.
-            if (is_lisp_pointer(bitmap_descriptor) && adjusted_layout > (lispobj)where) {
-                // Do not write back the adjusted bitmap pointer. Each heap word
-                // must be touched at most once. When the layout itself gets scanned,
-                // the bitmap slot will be rewritten if needed.
-                bitmap_descriptor = adjust_word(adj, bitmap_descriptor);
-            }
-            gc_assert(fixnump(bitmap_descriptor)
-                      || widetag_of(native_pointer(bitmap_descriptor))==BIGNUM_WIDETAG);
-            // == END OF CODE TO REMOVE ==
-            struct bitmap bitmap;
-            get_layout_bitmap(bitmap_descriptor, &bitmap);
+            struct bitmap bitmap = get_layout_bitmap(LAYOUT(adjusted_layout));
             lispobj* slots = where+1;
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) adjust_pointers(slots+i, 1, adj);

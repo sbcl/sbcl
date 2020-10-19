@@ -67,12 +67,13 @@
 (force-output)
 
 ;; Test the C bitmap bit extractor.
-(defun c-bitmap-logbitp (index layout &aux (bitmap (sb-kernel:layout-bitmap layout)))
-  (eql (sb-sys:with-pinned-objects (bitmap)
+(defun c-bitmap-logbitp (index layout)
+  (eql (sb-sys:with-pinned-objects (layout)
          (alien-funcall (extern-alien "test_bitmap_logbitp"
                                       (function int int unsigned))
                         index
-                        (sb-kernel:get-lisp-obj-address bitmap)))
+                        (logandc2 (sb-kernel:get-lisp-obj-address layout)
+                                  sb-vm:lowtag-mask)))
        1))
 
 (with-test (:name :bitmap-logbitp)

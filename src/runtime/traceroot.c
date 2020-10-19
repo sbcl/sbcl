@@ -169,8 +169,7 @@ static int find_ref(lispobj* source, lispobj target)
         layout = layout_of(source);
         check_ptr(0, layout);
         if (layout) {
-            struct bitmap bitmap;
-            get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+            struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             for(i=1; i<scan_limit; ++i)
                 if (bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
         }
@@ -742,8 +741,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             check_ptr(layout);
             // Partially initialized instance can't have nonzero words yet
             if (layout) {
-                struct bitmap bitmap;
-                get_layout_bitmap(LAYOUT(layout)->bitmap, &bitmap);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
                 // FIXME: check lockfree_list_node_p() also
                 for(i=1; i<scan_limit; ++i)
                     if (bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);

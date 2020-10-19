@@ -3018,8 +3018,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     state->vaddr = 0;
                     gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
-                    struct bitmap bitmap;
-                    get_layout_bitmap(layout->bitmap, &bitmap);
+                    struct bitmap bitmap = get_layout_bitmap(layout);
                     if (widetag_of(where) == FUNCALLABLE_INSTANCE_WIDETAG) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                       gc_assert(bitmap.bits[0] == (sword_t)-1 || bitmap.bits[0] == (sword_t)6);

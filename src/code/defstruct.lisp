@@ -797,6 +797,8 @@ unless :NAMED is also specified.")))
         (let ((comparator
                (nth-value 1 (parse-1-dsd proto-classoid dd slot-description))))
           (comparator-list comparator)))
+      (when (dd-class-p dd)
+        (setf (dd-bitmap dd) (calculate-dd-bitmap dd)))
       (values inherits (comparator-list)))))
 
 ;;;; stuff to parse slot descriptions
@@ -1456,16 +1458,22 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; Return true if destructively modifying OLD-LAYOUT into NEW-LAYOUT
 ;;; would be possible in as much as it won't harm the garbage collector.
 ;;; Harm potentially results from turning a raw word into a tagged word.
+;;; There are additional mutations which would be permissible but don't
+;;; strike me as important - e.g. permitting a fixnum slot to become type T
+;;; is permissible, but the fixnum may or may not be marked as tagged
+;;; in the bitmap, depending on whether any raw slot exists.
+;;; I can't imagine that many users will complain that they can no longer
+;;; incompatibly redefine defstructs involving raw slots.
+#-sb-xc-host
 (defun mutable-layout-p (old-layout new-layout)
   (if (layout-info old-layout)
       (let ((old-bitmap (layout-bitmap old-layout))
             (new-bitmap (layout-bitmap new-layout)))
-        (aver (= old-bitmap (dd-bitmap (layout-info old-layout))))
-        (aver (= new-bitmap (dd-bitmap (layout-info new-layout))))
-        (dotimes (i (dd-length (layout-info old-layout)) t)
-          (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
-                     (not (logbitp i old-bitmap))) ; that was opaque bits
-            (return nil))))
+        (and (= (layout-bitmap-words new-layout) (layout-bitmap-words old-layout))
+             (dotimes (i (dd-length (layout-info old-layout)) t)
+               (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
+                          (not (logbitp i old-bitmap))) ; that was opaque bits
+                 (return nil)))))
       t))
 
 ;;; This function is called when we are incompatibly redefining a
@@ -1487,6 +1495,7 @@ or they must be declared locally notinline at each call site.~@:>"
                           already-loaded code and instances.~@:>"
                          name))
        (register-layout new-layout))
+      #-sb-xc-host
       (recklessly-continue ()
        :test (lambda (c)
                (declare (ignore c))
@@ -1577,12 +1586,15 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;    but untagged slots are not generally supported.
 ;;;    For ordinary instance the examples are merely illustrative.
 ;;;
-(defun dd-bitmap (dd &optional (rest :unspecific))
+(defun calculate-dd-bitmap (dd &optional (rest :unspecific))
   (declare (type (member :unspecific :tagged :untagged) rest))
+  #+sb-xc-host
+  (when (eq (dd-name dd) 'layout)
+    (setf rest :untagged))
   #-compact-instance-header
   (when (eq (car (dd-alternate-metaclass dd)) 'function)
     ;; There is only one bitmap, which excludes LAYOUT from tagged slots
-    (return-from dd-bitmap standard-gf-primitive-obj-layout-bitmap))
+    (return-from calculate-dd-bitmap standard-gf-primitive-obj-layout-bitmap))
   ;; Compute two masks with a 1 bit for each dsd-index which contains a descriptor.
   ;; The "mininal" bitmap contains a 1 for each slot which *must* be scanned in GC,
   ;; and the "maximal" bitmap contains a 1 for each which *may* be scanned.
@@ -1614,9 +1626,9 @@ or they must be declared locally notinline at each call site.~@:>"
             (cond ((eq (dd-name dd) 'list-node) t)
                   ((dd-include dd)
                    (has-custom-gc-method
-                    (find-defstruct-description (car (dd-include dd)))))))
+                    (layout-info (compiler-layout-or-lose (car (dd-include dd))))))))
       (aver (eq rest :unspecific))
-      (return-from dd-bitmap minimal-bitmap))
+      (return-from calculate-dd-bitmap minimal-bitmap))
 
     ;; The minimal bitmap will have the least number of bits set, and the maximal
     ;; will have the most, but it is not always a performance improvement to prefer
@@ -2124,7 +2136,8 @@ or they must be declared locally notinline at each call site.~@:>"
       (funcallable-structure
        (aver (eq superclass-name 'function)))
       (t (bug "Unknown DD-TYPE in ALTERNATE-METACLASS: ~S" dd-type)))
-    (setf (dd-alternate-metaclass dd) (list superclass-name
+    (setf (dd-type dd) dd-type
+          (dd-alternate-metaclass dd) (list superclass-name
                                             metaclass-name
                                             metaclass-constructor)
           (dd-slots dd)
@@ -2135,7 +2148,7 @@ or they must be declared locally notinline at each call site.~@:>"
                               nil))
                   slot-names)
           (dd-length dd) slot-index
-          (dd-type dd) dd-type)
+          (dd-bitmap dd) (calculate-dd-bitmap dd))
     dd))
 
 (sb-xc:defmacro !defstruct-with-alternate-metaclass

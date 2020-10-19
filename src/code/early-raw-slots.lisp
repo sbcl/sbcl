@@ -171,15 +171,13 @@
 ;; [If the compiler were smarter about doing fewer memory accesses,
 ;; there would be no need at all for the LAYOUT - if it had already been
 ;; accessed, it shouldn't be another memory read]
-;;
-(defmacro do-instance-tagged-slot ((index-var thing &key layout
-                                                    ((:bitmap bitmap-expr)) (pad t))
+;; Another use-case for LAYOUT is more esoteric, when 'editcore' manipulates
+;; objects in a foreign core.
+(defmacro do-instance-tagged-slot ((index-var thing &key ((:layout layout-expr)) (pad t))
                                    &body body)
-  (with-unique-names (instance bitmap limit)
+  (with-unique-names (instance layout limit)
     `(let* ((,instance ,thing)
-            (,bitmap ,(or bitmap-expr
-                          `(layout-bitmap
-                            ,(or layout `(%instance-layout ,instance)))))
+            (,layout ,(or layout-expr `(%instance-layout ,instance)))
             (,limit ,(if pad
                          ;; target instances have an odd number of payload words.
                          `(logior (%instance-length ,instance) #-sb-xc-host 1)
@@ -187,5 +185,9 @@
        (do ((,index-var sb-vm:instance-data-start (1+ ,index-var)))
            ((>= ,index-var ,limit))
          (declare (type index ,index-var))
-         (when (logbitp ,index-var ,bitmap)
+         (when #+sb-xc-host (logbitp ,index-var (layout-bitmap ,layout))
+               #-sb-xc-host
+               (multiple-value-bind (word bit) (floor ,index-var sb-vm:n-word-bits)
+                 (logbitp bit (%raw-instance-ref/word
+                               ,layout (+ (type-dd-length layout) word))))
            ,@body)))))

@@ -50,6 +50,11 @@
   ;; a list of DEFSTRUCT-SLOT-DESCRIPTION objects for all slots
   ;; (including included ones)
   (slots () :type list)
+  ;; bit mask containing a 1 for each word that the garbage collector must visit
+  ;; (as opposed to a raw slot). Certain slot types (notably fixnum) may have either
+  ;; a 0 or a 1 in the mask because it does not matter if it is seen by GC.
+  ;; Bit index 0 in the mask is the word just after the header, and so on.
+  (bitmap +layout-all-tagged+ :type integer)
   ;; a list of (NAME . INDEX) pairs for accessors of included structures
   (inherited-accessor-alist () :type list)
   ;; number of data words, including the layout itself if the layout
@@ -186,10 +191,6 @@
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
   (info nil :type (or null defstruct-description))
-  ;; Map of raw slot indices.
-  ;; These will eventually be moved to the end of the structure
-  ;; as a variable-length raw slot.
-  (bitmap +layout-all-tagged+ :type layout-bitmap :read-only t)
   ;; EQUALP comparator for two instances with this layout
   ;; Could be the generalized function, or a type-specific one
   ;; if the defstruct was compiled in a policy of SPEED 3.
@@ -219,6 +220,9 @@
            (ash ,(or length 0) 16)
            ,(or flags 0)))
 
+(defmacro type-dd-length (type-name)
+  (dd-length (find-defstruct-description type-name)))
+
 (defmacro get-dsd-index (type-name slot-name)
   ;; It seems to be an error in CCL to declare something NOTINLINE
   ;; if it is an unknown function.
@@ -227,19 +231,14 @@
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
 
-(defmacro set-layout-bitmap (layout bitmap)
-  #+sb-xc-host (declare (ignore layout bitmap))
-  #-sb-xc-host
-  `(setf (%instance-ref (the layout ,layout) (get-dsd-index layout bitmap))
-         ,bitmap))
-
 (defmacro set-bitmap-from-layout (to-layout from-layout)
   #+sb-xc-host (declare (ignore to-layout from-layout))
-  ;; While this obviously has a straightforward implementation for now,
-  ;; that will change once the bits are stored as trailing slots.
   #-sb-xc-host
-  `(setf (%instance-ref (the layout ,to-layout) (get-dsd-index layout bitmap))
-        (layout-bitmap ,from-layout)))
+  `(let ((index (type-dd-length layout)))
+     (dotimes (i (layout-bitmap-words ,from-layout))
+       (setf (%raw-instance-ref/word ,to-layout index)
+             (%raw-instance-ref/word ,from-layout index))
+       (incf index))))
 
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
@@ -265,15 +264,16 @@
      ;; explains why we differentiate between SGF and everything else.
      ,(when recompute-bitmap
         `(when (find ,(find-layout 'function) i)
-           (set-layout-bitmap
-            l
-            #+immobile-code ; there are two possible bitmaps
-            ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
-            (if (or (find sb-pcl::*sgf-wrapper* i) (eq l sb-pcl::*sgf-wrapper*))
-                standard-gf-primitive-obj-layout-bitmap
-                +layout-all-tagged+)
-            ;; there is only one possible bitmap otherwise
-            #-immobile-code standard-gf-primitive-obj-layout-bitmap)))
+           (let ((bitmap
+                  #+immobile-code ; there are two possible bitmaps
+                  ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
+                  (if (or (find sb-pcl::*sgf-wrapper* i) (eq l sb-pcl::*sgf-wrapper*))
+                      standard-gf-primitive-obj-layout-bitmap
+                      +layout-all-tagged+)
+                  ;; there is only one possible bitmap otherwise
+                  #-immobile-code standard-gf-primitive-obj-layout-bitmap))
+             (setf (%raw-instance-ref/word l (type-dd-length layout))
+                   (logand sb-ext:most-positive-word bitmap)))))
      l))
 (push '("SB-KERNEL" set-layout-inherits) *!removable-symbols*)
 
@@ -293,20 +293,23 @@
 ;;; that we compare against the isntalled one to make sure they match.
 ;;; The third one also gets thrown away.
 #-sb-xc-host
-(macrolet ((nwords () (dd-length (find-defstruct-description 'layout))))
+(progn
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
                          (info nil)
                          (bitmap (if info (dd-bitmap info) 0))
                          (invalid :uninitialized))
-  (let ((layout (truly-the layout
+  (let* ((fixed-words (type-dd-length layout))
+         (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
+         (nwords (+ fixed-words bitmap-words))
+         (layout (truly-the layout
                  #+immobile-space
                  (sb-vm::alloc-immobile-fixedobj
-                  (1+ (nwords))
-                  (logior (ash (nwords) sb-vm:instance-length-shift)
+                  (1+ nwords)
+                  (logior (ash nwords sb-vm:instance-length-shift)
                           sb-vm:instance-widetag))
-                 #-immobile-space (%make-instance (nwords)))))
+                 #-immobile-space (%make-instance nwords))))
     (setf (%instance-layout layout) #.(find-layout 'layout))
     (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
                                 #-64-bit flags)
@@ -315,12 +318,25 @@
           (layout-invalid layout) invalid)
     #-64-bit (setf (layout-depthoid layout) depthoid (layout-length layout) length)
     (setf (layout-info layout) info)
-    (setf (%instance-ref layout (get-dsd-index layout bitmap)) bitmap)
     (setf (layout-slot-list layout) nil
           (layout-slot-table layout) #(1 nil))
     (set-layout-inherits layout inherits)
+    #-sb-xc-host
+    (dotimes (i bitmap-words)
+      (setf (%raw-instance-ref/word layout (+ fixed-words i))
+            (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap)))
     (setf (layout-invalid layout) invalid)
-    layout)))
+    layout))
+(defun layout-bitmap-words (layout)
+  (- (%instance-length layout) (type-dd-length layout)))
+(defun layout-bitmap (layout)
+  (acond ((layout-info layout) (dd-bitmap it))
+         ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
+         ;; raw slots, except that funcallable-instances may have 2 raw slots -
+         ;; the trampoline and the layout. The trampoline can have a tag, depending
+         ;; on the platform, and the layout is tagged but a special case.
+         ;; In any event, the bitmap is always 1 word.
+         (t (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).

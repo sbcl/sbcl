@@ -1112,9 +1112,11 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
-  (let ((result (allocate-struct (dd-length (find-defstruct-description 'layout))
-                                 *layout-layout*
-                                 (symbol-value *cold-layout-gspace*))))
+  (let* ((fixed-words (sb-kernel::type-dd-length layout))
+         (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
+         (result (allocate-struct (+ fixed-words bitmap-words)
+                                  *layout-layout*
+                                  (symbol-value *cold-layout-gspace*))))
     #+64-bit
     (write-slots result *host-layout-of-layout*
      :flags (sb-kernel::pack-layout-flags depthoid length flags))
@@ -1131,7 +1133,6 @@ core and return a descriptor to it."
      :invalid *nil-descriptor*
      :inherits inherits
      :info *nil-descriptor*
-     :bitmap (number-to-core bitmap)
      :slot-list *nil-descriptor*)
 
     (awhen (gethash name *layout-deferred-instances*)
@@ -1158,6 +1159,7 @@ core and return a descriptor to it."
                                   (+ sb-vm:instance-slots-offset dsd-index)
                                   (cold-svref inherits i))
                (incf dsd-index)))
+    (integer-bits-to-core result bitmap bitmap-words fixed-words)
 
     (let ((proxy (%make-cold-layout :name name
                                     :depthoid depthoid
