@@ -750,21 +750,25 @@ core and return a descriptor to it."
                                  (* sb-vm:vector-data-offset sb-vm:n-word-bytes)
                                  i)))))))
 
+;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
+;;; least to most significant regardless of machine endianness.
+(defun integer-bits-to-core (descriptor int nwords &optional (offset 0))
+  (declare (fixnum nwords))
+  (do ((index 1 (1+ index))
+       (remainder int (ash remainder (- sb-vm:n-word-bits))))
+      ((> index nwords)
+       (unless (zerop (integer-length remainder))
+         (error "Nonzero remainder after writing ~D using ~D words" int nwords)))
+    (write-wordindexed/raw descriptor
+                           (+ index offset)
+                           (logand remainder sb-ext:most-positive-word))))
+
 (defun bignum-to-core (n)
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb-vm:n-word-bits))
          (handle
           (allocate-header+object *dynamic* words sb-vm:bignum-widetag)))
-    (declare (fixnum words))
-    (do ((index 1 (1+ index))
-         (remainder n (ash remainder (- sb-vm:n-word-bits))))
-        ((> index words)
-         (unless (zerop (integer-length remainder))
-           ;; FIXME: Shouldn't this be a fatal error?
-           (warn "~W words of ~W were written, but ~W bits were left over."
-                 words n remainder)))
-      (write-wordindexed/raw handle index
-                             (ldb (byte sb-vm:n-word-bits 0) remainder)))
+    (integer-bits-to-core handle n words)
     handle))
 
 (defun bignum-from-core (descriptor)
