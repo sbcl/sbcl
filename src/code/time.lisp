@@ -190,14 +190,15 @@ format."
           (truncate years 100))
        (truncate (+ years 300) 400))))
 
-(defconstant +days-before-month+
+(defconstant-eqx +days-before-month+
   #.(let ((reversed-result nil)
           (sum 0))
       (push nil reversed-result)
       (dolist (days-in-month '(31 28 31 30 31 30 31 31 30 31 30 31))
         (push sum reversed-result)
         (incf sum days-in-month))
-      (coerce (nreverse reversed-result) 'simple-vector)))
+      (coerce (nreverse reversed-result) 'simple-vector))
+  #'equalp)
 
 (defun encode-universal-time (second minute hour date month year
                                      &optional time-zone)
