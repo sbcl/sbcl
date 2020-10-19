@@ -461,14 +461,6 @@
             sb-vm:bignum-widetag)
          (bignum-from-core des))))
 
-(defun descriptor-word-sized-integer (des)
-  ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
-  ;; representation.
-  (let ((lowtag (descriptor-lowtag des)))
-    (if (is-fixnum-lowtag lowtag)
-        (make-random-descriptor (descriptor-fixnum des))
-        (read-wordindexed des 1))))
-
 ;;; common idioms
 (defun descriptor-mem (des)
   (gspace-data (descriptor-intuit-gspace des)))
@@ -2259,18 +2251,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (gethash (descriptor-bits layout) *cold-layout-by-addr*))
          (result (allocate-struct size layout))
          (bitmap (cold-layout-bitmap proxy-layout)))
-    ;; Raw slots can not possibly work because dump-struct uses
-    ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
-    ;; Remove this assertion if that problem is somehow circumvented.
-    (unless (eql bitmap sb-kernel:+layout-all-tagged+)
-      (error "Raw slots not working in genesis."))
     (loop for index downfrom (1- size) to sb-vm:instance-data-start
           for val = (pop-stack) then (pop-stack)
-          do (write-wordindexed result
-                                (+ index sb-vm:instance-slots-offset)
-                                (if (logbitp index bitmap)
-                                    val
-                                    (descriptor-word-sized-integer val))))
+          do (let ((dsd-index (+ sb-vm:instance-slots-offset index)))
+               (if (logbitp index bitmap)
+                   (write-wordindexed result dsd-index val)
+                   (write-wordindexed/raw
+                    result dsd-index
+                    (the sb-vm:word (descriptor-integer val))))))
     result))
 
 (define-cold-fop (fop-layout (depthoid flags length))
