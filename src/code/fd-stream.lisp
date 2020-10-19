@@ -1468,6 +1468,7 @@
                        (let* ((byte (aref string start))
                               (bits (char-code byte))
                               (size ,out-size-expr))
+                         (declare (ignorable byte bits))
                          ,out-expr
                          (incf tail size)
                          (setf (buffer-tail obuf) tail)
@@ -1628,7 +1629,7 @@
                             (make-string length :element-type 'character))
                            (t
                             (make-string length :element-type element-type)))))
-            (declare (ignorable stream)
+            (declare (ignorable stream byte)
                      (type index head length) ;; size
                      (type (unsigned-byte 8) byte)
                      (type (or null character) char)

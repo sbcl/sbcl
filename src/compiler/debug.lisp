@@ -756,8 +756,7 @@
 (defun check-block-conflicts (component)
   (do-ir2-blocks (block component)
     (do ((conf (ir2-block-global-tns block)
-               (global-conflicts-next-blockwise conf))
-         (prev nil conf))
+               (global-conflicts-next-blockwise conf)))
         ((null conf))
       (unless (find-in #'global-conflicts-next-tnwise
                        conf

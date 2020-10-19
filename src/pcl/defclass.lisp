@@ -161,7 +161,6 @@
            options)
   (let (metaclass
         default-initargs
-        documentation
         canonized-options)
       (dolist (option options)
         (unless (listp option)
@@ -191,7 +190,6 @@
           (:documentation
            (unless (stringp (second option))
              (error "~S is not a legal :documentation value" (second option)))
-           (setf documentation t)
            (push `(:documentation ,(second option)) canonized-options))
           (otherwise
            (push `(',(car option) ',(cdr option)) canonized-options))))

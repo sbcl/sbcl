@@ -285,6 +285,7 @@
 (defmacro doplist ((key val) plist &body body)
   (with-unique-names (tail)
     `(let ((,tail ,plist) ,key ,val)
+       (declare (ignorable ,key ,val))
        (loop (when (null ,tail) (return nil))
              (setq ,key (pop ,tail))
              (when (null ,tail)

@@ -8,6 +8,8 @@ changes relative to sbcl-2.0.9:
   * bug fix: SB-CLTL2:MACROEXPAND-ALL did not expand MULTIPLE-VALUE-BIND
     and MULTIPLE-VALUE-SETQ
   * bug fix: SIGPIPE is ignored by default again. (lp#1897624)
+  * enhancement: style-warnings are issued for variables which have an
+    assignment but no "for-value reference" (per CLHS glossary entry)
 
 changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture

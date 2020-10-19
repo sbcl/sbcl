@@ -279,7 +279,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; answers. (Modulo any bugs due to near-total lack of testing)
 
 (defun compile-file-position-helper (file-info path-to-find)
-  (let (found-form start-char)
+  (let (start-char)
     (labels
         ((recurse (subpath upper-bound queue)
            (let ((index -1))
@@ -295,8 +295,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                   ;; This does not eagerly declare victory, because we want
                   ;; to find the rightmost match. In "#1=(FOO)" there are two
                   ;; different annotations pointing to (FOO).
-                  (setq found-form (cdr item)
-                        start-char (caar item)))
+                  (setq start-char (caar item)))
                 (unless queue (return))
                 (let* ((next (car queue))
                        (next-end (cdar next)))

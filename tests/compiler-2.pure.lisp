@@ -2959,3 +2959,27 @@
                                     (not (eq z 0)))
                            (/ 10 0)))))
           '(cons sb-ext:code-deletion-note null))))
+
+(with-test (:name :unused-assignment)
+  (flet ((try (expr &aux (warned 0))
+           (handler-bind ((style-warning
+                           (lambda (c)
+                            (if (search "assigned but never read" (princ-to-string c))
+                                (incf warned)
+                                (error "That's unexpected")))))
+             (multiple-value-bind (fun warn error)
+               (let ((*error-output* (make-broadcast-stream))) (compile nil expr))
+               (declare (ignore fun))
+               (assert (and warn (not error) (eql warned 1)))))))
+    (try '(lambda (x) (let* ((a (+ x 5)) (b a)) (setq b 3) (eval ''z))))
+    ;; Even if the initializer is necessary to call, it's still warning-worthy.
+    (try '(lambda (x) (let* ((a (+ x 5))
+                             (b (opaque-identity a)))
+                        (setq b 3)
+                        (eval ''z))))
+    (try '(lambda (x) (let* ((a (+ x 5)) (b a))
+                        (setq b (opaque-identity 3))
+                        (eval ''z)))))
+  ;; This one uses the value of B
+  (checked-compile '(lambda (x) (let* ((a (+ x 5)) (b a))
+                                  (setq b (opaque-identity 3))))))

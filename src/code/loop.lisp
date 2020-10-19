@@ -905,6 +905,12 @@ code to be loaded.
          (check-var-name name)
          (loop-declare-var name dtype :step-var-p step-var-p
                                       :initialization initialization)
+         ;; IGNORABLEize every variable because neither binding nor assignment constitutes
+         ;; a "use". Unfortunately there is no syntax for declaring what to ignore in LOOP.
+         ;; The idiom is to use NIL as a variable, but sometimes users don't, because they
+         ;; want variables names as information within a destructuring operation,
+         ;;  e.g. (for (this . that-not-used) in stuff do (frob this))
+         (push `(ignorable ,name) (declarations loop))
          ;; We use ASSOC on this list to check for duplications (above),
          ;; so don't optimize out this list:
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))

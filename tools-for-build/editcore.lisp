@@ -1704,6 +1704,7 @@
           (fixedobj-range) ; = (START . SIZE-IN-BYTES)
           (relocs (make-array 100000 :adjustable t :fill-pointer 1)))
 
+  (declare (ignorable fixedobj-range))
   ;; Remove old files
   (ignore-errors (delete-file asm-pathname))
   (ignore-errors (delete-file elf-core-pathname))

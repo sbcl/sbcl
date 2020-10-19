@@ -1198,7 +1198,11 @@ care."
                                                   ,value))
     (let ((res (make-set :var var :value dest-lvar)))
       (setf (lvar-dest dest-lvar) res)
-      (setf (leaf-ever-used var) t)
+      (cond (result ; SETQ with a result counts as a REF also
+             (setf (leaf-ever-used var) t))
+            ((not (leaf-ever-used var)) ; doesn't count as a REF
+             ;; (EVER-USED might already be T, leave it alone if so)
+             (setf (leaf-ever-used var) 'set)))
       (push res (basic-var-sets var))
       (link-node-to-previous-ctran res dest-ctran)
       (use-continuation res next result))))

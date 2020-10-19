@@ -745,9 +745,12 @@
   (where-from :assumed :type (member :declared :assumed :defined-here :defined :defined-method))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
-  ;; true if there was ever a REF or SET node for this leaf. This may
-  ;; be true when REFS and SETS are null, since code can be deleted.
-  (ever-used nil :type boolean)
+  ;; For tracking whether to warn about unused variables:
+  ;; NIL if there was never a REF or SET.
+  ;; SET if there was a set but no REF.
+  ;; T if there was a REF.
+  ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
+  (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
   (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent))
   ;; some kind of info used by the back end

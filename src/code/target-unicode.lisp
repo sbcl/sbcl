@@ -1384,7 +1384,6 @@ it defaults to 80 characters"
                           new-i index))))
           (loop for index from new-i below len
                 for char = (char str index)
-                for previous-combining-class = combining-class
                 for combining-class = (combining-class char)
                 until (eql combining-class 0)
                 unless (and (>= (- index new-i) 1)

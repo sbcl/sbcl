@@ -429,12 +429,8 @@ EXPERIMENTAL: Interface subject to change."
         old-page-faults
         new-page-faults
         real-time-overhead
-        run-utime-overhead
-        run-stime-overhead
-        page-faults-overhead
         old-bytes-consed
         new-bytes-consed
-        cons-overhead
         (fun (if (functionp function) function (fdefinition function))))
     (declare (function fun))
     ;; Calculate the overhead...
@@ -448,14 +444,10 @@ EXPERIMENTAL: Interface subject to change."
     (multiple-value-setq
         (new-run-utime new-run-stime new-page-faults new-bytes-consed)
       (time-get-sys-info))
-    (setq run-utime-overhead (- new-run-utime old-run-utime))
-    (setq run-stime-overhead (- new-run-stime old-run-stime))
-    (setq page-faults-overhead (- new-page-faults old-page-faults))
     (setq old-real-time (get-internal-real-time))
     (setq old-real-time (get-internal-real-time))
     (setq new-real-time (get-internal-real-time))
     (setq real-time-overhead (- new-real-time old-real-time))
-    (setq cons-overhead (- new-bytes-consed old-bytes-consed))
     ;; Now get the initial times.
     (multiple-value-setq
         (old-run-utime old-run-stime old-page-faults old-bytes-consed)

@@ -1962,19 +1962,17 @@
 ;;; declared IGNORE, then complain.
 (defun note-unreferenced-vars (vars policy)
   (dolist (var vars)
-    (unless (or (leaf-ever-used var)
-                (lambda-var-ignorep var))
+    (unless (or (eq (leaf-ever-used var) t) (lambda-var-ignorep var))
       (unless (policy policy (= inhibit-warnings 3))
         ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
         ;; requires this to be no more than a STYLE-WARNING.
-        #-sb-xc-host
-        (compiler-style-warn "The variable ~S is defined but never used."
-                             (leaf-debug-name var))
         ;; There's no reason to accept this kind of equivocation
         ;; when compiling our own code, though.
-        #+sb-xc-host
-        (warn "The variable ~S is defined but never used."
-              (leaf-debug-name var)))
+        (#-sb-xc-host compiler-style-warn #+sb-xc-host warn
+         (if (eq (leaf-ever-used var) 'set)
+             "The variable ~S is assigned but never read."
+             "The variable ~S is defined but never used.")
+         (leaf-debug-name var)))
       (setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
 
 (defun note-unreferenced-fun-vars (fun)
