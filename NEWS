@@ -7,6 +7,7 @@ changes relative to sbcl-2.0.9:
     increased to 10^6 on 64-bit architectures.
   * bug fix: SB-CLTL2:MACROEXPAND-ALL did not expand MULTIPLE-VALUE-BIND
     and MULTIPLE-VALUE-SETQ
+  * bug fix: SIGPIPE is ignored by default again. (lp#1897624)
 
 changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture

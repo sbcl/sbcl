@@ -232,6 +232,8 @@
   #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler)
   #-sb-thruption (%install-handler sigurg #'sigurg-handler)
   (%install-handler sigchld #'sigchld-handler)
+  ;; Don't want to silently quit on broken pipes.
+  (%install-handler sigpipe :ignore)
   ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
   ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.
   (dx-let ((mask (make-array sb-unix::sizeof-sigset_t :element-type '(unsigned-byte 8)
