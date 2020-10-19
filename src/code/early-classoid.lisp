@@ -338,6 +338,9 @@
                      (:constructor host-make-layout
                                    (clos-hash classoid &key info depthoid inherits
                                                        length flags invalid)))
+    ;; Cross-compiler-only translation from slot index to symbol naming
+    ;; the accessor to call. (Since access by position is not a thing)
+    (index->accessor-map #() :type simple-vector)
     ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
     ;; Theoretically we don't need this in the cross-compiler, because the
     ;; layout has a classoid which has a name which has a known hash.

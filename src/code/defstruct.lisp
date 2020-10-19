@@ -2238,6 +2238,13 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; only for object dumping.
 #+sb-xc-host
 (progn
+  ;; The set of structure types that we access by slot position at cross-compile
+  ;; time is fairly small, including these and nothing but these:
+  ;;   - DEFINITION-SOURCE-LOCATION
+  ;;   - DEFSTRUCT-DESCRIPTION, DEFSTRUCT-SLOT-DESCRIPTION
+  ;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
+  ;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
+  ;;   - COMMA
   (defun %instance-layout (instance)
     (classoid-layout (find-classoid (type-of instance))))
   (defun %instance-length (instance)
@@ -2245,22 +2252,16 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; exceeed layout length, but in the cross-compiler they're the same.
     (layout-length (%instance-layout instance)))
   (defun %instance-ref (instance index)
-    (let ((layout (%instance-layout instance)))
-      ;; with compact headers, 0 is an ordinary slot index.
-      ;; without, it's the layout.
-      (if (eql index (1- sb-vm:instance-data-start))
-          (error "XC Host should use %INSTANCE-LAYOUT, not %INSTANCE-REF 0")
-          (let* ((dd (layout-info layout))
-                 ;; If data starts at 1, then subtract 1 from index.
-                 ;; otherwise use the index as-is.
-                 (dsd (elt (dd-slots dd)
-                           (- index sb-vm:instance-data-start)))
-                 (accessor-name (dsd-accessor-name dsd)))
-            ;; Why AVER these: because it is slightly abstraction-breaking
-            ;; to assume that the slot-index N is the NTH item in the DSDs.
-            ;; The target Lisp never assumes that.
-            (aver (and (eql (dsd-index dsd) index) (eq (dsd-raw-type dsd) t)))
-            (funcall accessor-name instance)))))
+    (let* ((layout (%instance-layout instance))
+           (map (layout-index->accessor-map layout)))
+      (when (zerop (length map)) ; construct it on demand
+        (let ((slots (dd-slots (layout-info layout))))
+          (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
+                                :initial-element nil)
+                (layout-index->accessor-map layout) map)
+          (dolist (dsd slots)
+            (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
+      (funcall (aref map index) instance)))
 
   (defun %raw-instance-ref/word (instance index)
     (declare (ignore instance index))
