@@ -21,6 +21,11 @@ ifdef LISP_FEATURE_SB_THREAD
 endif
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer -gdwarf-2
+# The installed compiler won't work with no-pie.
+# The support ticket https://dev.haiku-os.org/ticket/12430 is closed,
+# but it certainly looks like my default install succumbed to the same problem
+# in the gcc specs file in the exact way as illustrated in the bug.
+DISABLE_PIE=no
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
