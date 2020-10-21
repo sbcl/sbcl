@@ -512,7 +512,7 @@
     (gc)
     (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))
 
-#+genecgc
+#+gencgc
 (progn
 (defun code-iterator (how)
   (let ((n 0) (tot-bytes 0))
