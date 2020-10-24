@@ -271,6 +271,7 @@
     ;; Ensure the values remain outside of the stack pointer for scrub-control-stack to work
     (declare (notinline f))
     (f))
+  (eval nil)
   (sb-sys:scrub-control-stack)
   (gc)
   ;; There were 20 items REMHASHed plus the freelist contains a pointer
