@@ -11,6 +11,9 @@
 
 (in-package "SB-VM")
 
+(defun ea-for-avx-stack (tn &optional (base rbp-tn))
+  (ea (frame-byte-offset (+ (tn-offset tn) 3)) base))
+
 (defun float-avx2-p (tn)
   (sc-is tn single-avx2-reg single-avx2-stack single-avx2-immediate
             double-avx2-reg double-avx2-stack double-avx2-immediate))
@@ -56,19 +59,19 @@
 
 (define-move-fun (load-int-avx2 2) (vop x y)
   ((int-avx2-stack) (int-avx2-reg))
-  (inst vmovdqu y (ea-for-sse-stack x)))
+  (inst vmovdqu y (ea-for-avx-stack x)))
 
 (define-move-fun (load-float-avx2 2) (vop x y)
   ((single-avx2-stack double-avx2-stack) (single-avx2-reg double-avx2-reg))
-  (inst vmovups y (ea-for-sse-stack x)))
+  (inst vmovups y (ea-for-avx-stack x)))
 
 (define-move-fun (store-int-avx2 2) (vop x y)
   ((int-avx2-reg) (int-avx2-stack))
-  (inst vmovdqu (ea-for-sse-stack y) x))
+  (inst vmovdqu (ea-for-avx-stack y) x))
 
 (define-move-fun (store-float-avx2 2) (vop x y)
   ((double-avx2-reg single-avx2-reg) (double-avx2-stack single-avx2-stack))
-  (inst vmovups (ea-for-sse-stack y) x))
+  (inst vmovups (ea-for-avx-stack y) x))
 
 (define-vop (avx2-move)
   (:args (x :scs (single-avx2-reg double-avx2-reg int-avx2-reg)
@@ -136,8 +139,8 @@
               (inst vmovdqu y x))))
        ((int-avx2-stack double-avx2-stack single-avx2-stack)
         (if (float-avx2-p x)
-            (inst vmovups (ea-for-sse-stack y fp) x)
-            (inst vmovdqu (ea-for-sse-stack y fp) x))))))
+            (inst vmovups (ea-for-avx-stack y fp) x)
+            (inst vmovdqu (ea-for-avx-stack y fp) x))))))
 (define-move-vop move-avx2-arg :move-arg
   (int-avx2-reg double-avx2-reg single-avx2-reg descriptor-reg)
   (int-avx2-reg double-avx2-reg single-avx2-reg))

@@ -173,3 +173,16 @@
                             '(1d0 2d0 3d0 4d0)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
+
+
+(with-test (:name :spilling)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (declare ((sb-ext:simd-pack-256 (unsigned-byte 64)) x))
+         (eval y)
+         (list (sb-kernel:%simd-pack-256-0 x)
+               (sb-kernel:%simd-pack-256-1 x)
+               (sb-kernel:%simd-pack-256-2 x)
+               (sb-kernel:%simd-pack-256-3 x) y))
+    (((sb-ext:%make-simd-pack-256-ub64 1 2 3 4) 0) '(1 2 3 4 0) :test #'equal)))
