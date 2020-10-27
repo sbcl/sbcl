@@ -5,11 +5,28 @@ changes relative to sbcl-2.0.9:
     does not receive a wallclock time with each trace.
   * minor incompatible change: INTERNAL-TIME-UNITS-PER-SECOND has been
     increased to 10^6 on 64-bit architectures.
-  * bug fix: SB-CLTL2:MACROEXPAND-ALL did not expand MULTIPLE-VALUE-BIND
-    and MULTIPLE-VALUE-SETQ
-  * bug fix: SIGPIPE is ignored by default again. (lp#1897624)
+  * minor incompatible change: SIGPIPE is ignored by default again. (lp#1897624)
+  * minor incompatible change: the system code compiled under the
+    :LINKAGE-TABLE feature is now unconditionally compiled in, and the
+    corresponding entry in *FEATURES* has been removed.
   * enhancement: style-warnings are issued for variables which have an
     assignment but no "for-value reference" (per CLHS glossary entry)
+  * bug fix: SB-CLTL2:MACROEXPAND-ALL did not expand MULTIPLE-VALUE-BIND
+    and MULTIPLE-VALUE-SETQ
+  * bug fix: CPUID-based feature detection had an index/mask confusion
+    (lp#1899239)
+  * bug fix: fix a deadlock on Windows (lp#1896802)
+  * bug fix: eliminate type errors when wall clocks go back (lp#1028026,
+    lp#1032111)
+  * bug fix: fix EOF handling in read-char-no-hang on concatenenated streams
+    (lp#690408, reported by Willem Broekema)
+  * bug fix: fix MAP-INTO on extended sequences (lp#1855375, thanks to James
+    Kalenius)
+  * bug fix: SB-GMP can now raise -1, 0 and 1 to the power of a bignum.
+    (thanks to Aaron Chen)
+  * bug fixes in tests:
+    ** add a C function declaration (lp#1897627, thanks to Bob Felts)
+    ** parse vmmap output more liberally (lp#1897722, reported by Bob Felts)
 
 changes in sbcl-2.0.9 relative to sbcl-2.0.8:
   * incompatible change: HPPA and DEC Alpha architecture
