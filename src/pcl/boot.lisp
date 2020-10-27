@@ -1746,6 +1746,21 @@ bootstrapping.
         ;; modified in the method body.
         (parameters-setqd nil))
     (flet ((walk-function (form context env)
+             (when (eq context :set)
+               (let ((var form))
+                 ;; PCL uses "poor man's constraint propagation" - it starts by assuming
+                 ;; that each specialized parameter has a known type. If any SETQ on it
+                 ;; occurs in a method body, the assumption is dropped for the entire body.
+                 ;; Needless to say, it's horrible and could do much better by initially
+                 ;; binding all specialized parameters thusly:
+                 ;; (let ((arg1 (truly-the specialization1 arg1))
+                 ;;       (arg2 (truly-the specialization2 arg2)) ...
+                 ;; and then having ordinary transforms kick in.
+                 (when (var-declaration '%parameter var env)
+                   ;; If a parameter is shadowed by another binding it won't have a
+                   ;; %PARAMETER declaration.
+                   (pushnew var parameters-setqd :test #'eq)))
+               (return-from walk-function form))
              (unless (and (eq context :eval) (consp form))
                (return-from walk-function form))
              (case (car form)
@@ -1753,27 +1768,6 @@ bootstrapping.
                     ;; hierarchy: nil -> :simple -> T.
                     (unless (eq call-next-method-p t)
                       (setq call-next-method-p (if (cdr form) t :simple)))
-                    form)
-               ((setq multiple-value-setq)
-                    ;; The walker will split (SETQ A 1 B 2) to
-                    ;; separate (SETQ A 1) and (SETQ B 2) forms, so we
-                    ;; only need to handle the simple case of SETQ
-                    ;; here.
-                    (let ((vars (if (eq (car form) 'setq)
-                                    (list (second form))
-                                    (second form))))
-                      (dolist (var vars)
-                        ;; Note that we don't need to check for
-                        ;; %VARIABLE-REBINDING declarations like is
-                        ;; done in CAN-OPTIMIZE-ACCESS1, since the
-                        ;; bindings that will have that declation will
-                        ;; never be SETQd.
-                        (when (var-declaration '%parameter var env)
-                          ;; If a parameter binding is shadowed by
-                          ;; another binding it won't have a
-                          ;; %PARAMETER declaration anymore, and this
-                          ;; won't get executed.
-                          (pushnew var parameters-setqd :test #'eq))))
                     form)
                (function
                 (when (equal (cdr form) '(call-next-method))
