@@ -1796,7 +1796,10 @@ PACKAGE."
   (fresh-line)
   (prin1 symbol)
   (when (boundp symbol)
-    (write-string " (bound)"))
+    (let ((value (symbol-value symbol)))
+      (if (typep value '(or fixnum symbol hash-table))
+          (format t " = ~S" value)
+          (format t " (bound, ~S)" (type-of value)))))
   (when (fboundp symbol)
     (write-string " (fbound)")))
 

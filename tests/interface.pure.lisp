@@ -53,6 +53,13 @@
              (length (apropos-list "" "SB-VM" t))
              (length (apropos-list "" "SB-VM")))))
 
+(with-test (:name :apropos-symbol-values)
+  (let ((string
+         (with-output-to-string (*standard-output*)
+           (apropos "*print-"))))
+    (assert (search "=" string))
+    (assert (search "PPRINT-DISPATCH" string))))
+
 ;;; TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
 ;;; UPGRADED-COMPLEX-PART-TYPE should be able to deal with NIL as an
 ;;; environment argument
