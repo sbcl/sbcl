@@ -197,6 +197,12 @@
   (checked-compile `(lambda () (make-array 0 :element-type 'string)))
   (checked-compile `(lambda () (make-array '(0 2) :element-type 'string))))
 
+(with-test (:name (make-array standard-char))
+  ;; Maybe this is a kludge, but STANDARD-CHAR should just work,
+  ;; I don't care if #\nul is nonstandard. Because, seriously?
+  (checked-compile '(lambda ()
+                     (make-array 5 :fill-pointer 0 :element-type 'standard-char))))
+
 (with-test (:name :big-array)
   ;; we used to have leakage from cross-compilation hosts of the INDEX
   ;; type, which prevented us from actually using all the large array

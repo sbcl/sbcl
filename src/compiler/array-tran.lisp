@@ -861,7 +861,16 @@
              #-sb-xc-host
              (and (and (testable-type-p elt-ctype)
                        (neq elt-ctype *empty-type*)
-                       (not (ctypep default-initial-element elt-ctype)))
+                       ;; An explicitly passed :INITIAL-ELEMENT must match the specified
+                       ;; element-type, not the upgraded type. But I don't want to style-warn
+                       ;; about (make-array 1 :element-type 'standard-char) with an implicit
+                       ;; initial element of #\nul. However, generally comparing against the
+                       ;; upgraded type for any implicit initializer would never warn about
+                       ;; things like (make-array 1 :element-type 'string).
+                       (not (ctypep default-initial-element
+                                    (if (and (eq elt-spec 'standard-char) (not initial-element))
+                                        (sb-vm:saetp-ctype saetp)
+                                        elt-ctype))))
                   ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
                   ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
                   ;; INITIAL-ELEMENT is not supplied, the consequences of later
