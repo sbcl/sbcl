@@ -312,8 +312,6 @@
 
 (define-walker-template pv-offset) ; These forms get munged by mutate slots.
 (defmacro pv-offset (arg) arg)
-(define-walker-template instance-accessor-parameter)
-(defmacro instance-accessor-parameter (x) x)
 
 ;;; It is safe for these two functions to be wrong. They just try to
 ;;; guess what the most likely case will be.
