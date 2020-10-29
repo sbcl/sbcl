@@ -518,7 +518,6 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         case COMPLEX_CHARACTER_STRING_WIDETAG:
 #endif
         case COMPLEX_BASE_STRING_WIDETAG:
-        case COMPLEX_VECTOR_NIL_WIDETAG:
         case COMPLEX_BIT_VECTOR_WIDETAG:
         case COMPLEX_VECTOR_WIDETAG:
         case COMPLEX_ARRAY_WIDETAG:

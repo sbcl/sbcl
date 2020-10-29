@@ -60,8 +60,7 @@
          (apply #'!make-saetp args))
        `(;; Erm.  Yeah.  There aren't a lot of things that make sense
          ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
-         (nil #:mu 0 simple-array-nil
-              :complex-typecode #.complex-vector-nil-widetag)
+         (nil #:mu 0 simple-array-nil)
          #-sb-unicode
          (character ,(code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra

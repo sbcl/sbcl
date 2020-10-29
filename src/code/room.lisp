@@ -51,7 +51,7 @@
       (dolist (code (list #+sb-unicode complex-character-string-widetag
                           complex-base-string-widetag simple-array-widetag
                           complex-bit-vector-widetag complex-vector-widetag
-                          complex-array-widetag complex-vector-nil-widetag))
+                          complex-array-widetag))
         (setf (svref infos code) info)))
 
     (setf (svref infos bignum-widetag)

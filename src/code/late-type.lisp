@@ -3337,8 +3337,9 @@ used for a COMPLEX component.~:@>"
     ((type= type (specifier-type 'bignum)) 'bignum)
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
-    ((unparse-string-type type 'simple-string))
-    ((unparse-string-type type 'string))
+    ;; In the absence of Unicode, STRING is not a union.
+    #+sb-unicode ((unparse-string-type type 'simple-string))
+    #+sb-unicode ((unparse-string-type type 'string))
     ((type= type (specifier-type 'complex)) 'complex)
     (t
      ;; If NULL is in the union, and deleting it reduces the union to either an atom

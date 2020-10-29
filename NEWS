@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.10:
+  * minor incompatible change: (ARRAY NIL (*)) is not a subtype of STRING,
+    as is consistent with a majority of maintained CL implementations.
+
 changes in sbcl-2.0.10 relative to sbcl-2.0.9:
   * minor incompatible change: the funarg given to SB-SPROF:MAP-TRACES
     does not receive a wallclock time with each trace.

@@ -1630,7 +1630,6 @@ static void fixup_space(lispobj* where, size_t n_words)
         case COMPLEX_CHARACTER_STRING_WIDETAG:
 #endif
         case COMPLEX_BASE_STRING_WIDETAG:
-        case COMPLEX_VECTOR_NIL_WIDETAG:
         case COMPLEX_BIT_VECTOR_WIDETAG:
         case COMPLEX_VECTOR_WIDETAG:
         case COMPLEX_ARRAY_WIDETAG:

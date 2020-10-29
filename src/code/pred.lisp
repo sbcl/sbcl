@@ -138,8 +138,7 @@
   (def-type-predicate-wrapper simple-rank-1-array-*-p)
   (def-type-predicate-wrapper simple-string-p)
   (def-type-predicate-wrapper stringp)
-  (def-type-predicate-wrapper vectorp)
-  (def-type-predicate-wrapper vector-nil-p))
+  (def-type-predicate-wrapper vectorp))
 
 #+(or x86 x86-64 arm arm64)
 (defun fixnum-mod-p (x limit)

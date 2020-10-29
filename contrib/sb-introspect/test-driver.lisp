@@ -565,7 +565,9 @@
       (type-equal (function-type #'f)
                   (if (expect-wild-return-type-p #'f)
                       '(function (symbol) *)
-                      '(function (symbol) (values simple-string &optional)))))
+                      '(function (symbol) (values #+sb-unicode simple-string
+                                                  #-sb-unicode simple-base-string
+                                                  &optional)))))
   t)
 
 ;; Closures

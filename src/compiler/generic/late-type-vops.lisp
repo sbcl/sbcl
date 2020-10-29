@@ -113,7 +113,7 @@
 
 (define-type-vop simple-string-p
   (#+sb-unicode simple-character-string-widetag
-   simple-base-string-widetag simple-array-nil-widetag))
+   simple-base-string-widetag))
 
 (macrolet
     ((define-simple-array-type-vops ()
@@ -157,7 +157,7 @@
   (simple-array-widetag
    #+sb-unicode complex-character-string-widetag
    complex-base-string-widetag complex-bit-vector-widetag
-   complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
+   complex-vector-widetag complex-array-widetag))
 
 (define-type-vop simple-array-header-p
   (simple-array-widetag))
@@ -165,17 +165,13 @@
 (define-type-vop stringp
   (#+sb-unicode simple-character-string-widetag
    #+sb-unicode complex-character-string-widetag
-   simple-base-string-widetag complex-base-string-widetag
-   simple-array-nil-widetag complex-vector-nil-widetag))
+   simple-base-string-widetag complex-base-string-widetag))
 
 (define-type-vop base-string-p
   (simple-base-string-widetag complex-base-string-widetag))
 
 (define-type-vop bit-vector-p
   (simple-bit-vector-widetag complex-bit-vector-widetag))
-
-(define-type-vop vector-nil-p
-  (simple-array-nil-widetag complex-vector-nil-widetag))
 
 #+sb-unicode
 (define-type-vop character-string-p

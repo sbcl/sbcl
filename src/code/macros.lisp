@@ -1796,7 +1796,8 @@ symbol-case giving up: case=((V U) (F))
                    (let ((ctype (sb-c::careful-specifier-type
                                  (constant-form-value element-type))))
                      (and ctype
-                          (csubtypep ctype (specifier-type 'character)))))
+                          (csubtypep ctype (specifier-type 'character))
+                          (neq ctype *empty-type*))))
               ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
               ;; "The default initial element #\Nul is not a STANDARD-CHAR."
               'make-array ; hooray! it's known be a valid string type

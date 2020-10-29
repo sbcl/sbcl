@@ -381,10 +381,18 @@
 
 ;;; Just convert it into a MAKE-ARRAY.
 (deftransform make-string ((length &key
-                                   (element-type 'character)
+                                   element-type
                                    (initial-element (code-char 0))))
+  ;; There's a minor edge case that is debatable: if you specify a type that is not
+  ;; spelled 'NIL, but equates to the empty type, then we should still return a
+  ;; string. MAKE-ARRAY won't do that. The safe thing to do would be to abort this
+  ;; transform if we don't see a constant type that is known not to be empty.
+  ;; But it's unnecessary hair-splitting: the old behavior was to produce a string
+  ;; that for all intents and purposes was unusable; the new behavior is to similarly
+  ;; produce an unusable object, but signal a TYPE-ERROR.
+  ;; The lisp hackers I surveyed would rather see the error sooner than later.
   `(the simple-string (make-array (the index length)
-                       :element-type element-type
+                       :element-type (or element-type 'character)
                        ,@(when initial-element
                            '(:initial-element initial-element)))))
 

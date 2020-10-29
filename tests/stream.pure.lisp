@@ -280,8 +280,7 @@
                   (let ((s (with-output-to-string
                                (s nil ,@(when element-type-form
                                           `(:element-type ,element-type-form))))))
-                    (assert (typep s '(simple-array ,(if element-type-form
-                                                         (eval element-type-form)
+                    (assert (typep s '(simple-array ,(or (eval element-type-form)
                                                          'character)
                                        (0)))))
                   (get-output-stream-string
@@ -290,19 +289,7 @@
                         `(:element-type ,element-type-form)))))))
     ;; If you pass NIL as element-type, note that there seems to be no requirement
     ;; to produce a stream that can *accept* only characters of that type.
-    ;; We produce a BASE-STRING-OUTPUT-STREAM if you do something so pointless,
-    ;; and accept base characters written to that stream.
-    ;; However, we'll always return a (simple-array nil (0)) from such stream.
-    ;; For comparison -
-    ;; CCL: (type-of (get-output-stream-string (make-string-output-stream :element-type nil)))
-    ;;      => (SIMPLE-BASE-STRING 0)
-    ;; ABCL:
-    ;;      (let ((s (make-string-output-stream :element-type nil)))
-    ;;        (write-string "Hi" s)
-    ;;        (get-output-stream-string s)) => ""
-    ;; CLISP is more pedantic, refusing to accept characters and returning a NIL vector:
-    ;; (type-of (get-output-stream-string (make-string-output-stream :element-type nil)))
-    ;;      => (VECTOR NIL 0)
+    ;; We produce a CHARACTER-STRING-OUTPUT-STREAM if you do something so pointless.
     (frob nil)
     (frob 'character)
     (frob 'base-char)

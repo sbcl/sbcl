@@ -118,7 +118,6 @@
     #+sb-unicode (simple-character-string "character_string")
     #+sb-unicode (complex-character-string "boxed")
     (complex-base-string "boxed")
-    (complex-vector-nil "boxed")
 
     (complex-bit-vector "boxed")
     (complex-vector "boxed")

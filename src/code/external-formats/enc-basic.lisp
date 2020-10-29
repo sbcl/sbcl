@@ -204,12 +204,7 @@
        ;; so we can take a fast path -- and get benefit of the element
        ;; type information. On non-unicode build BASE-CHAR ==
        ;; CHARACTER, handled above.
-       (ascii-bash))
-      ((simple-array nil (*))
-       (if (= send sstart)
-           (make-array null-padding :element-type '(unsigned-byte 8))
-           ;; Just get the error...
-           (aref string sstart))))))
+       (ascii-bash)))))
 
 ;;; from UTF-8
 

@@ -939,16 +939,15 @@ between the ~A definition and the ~A definition"
       :prototype-form "")
      (vector-nil
       :translation (vector nil)
-      :codes (,sb-vm:complex-vector-nil-widetag)
-      :direct-superclasses (string)
-      :inherits (string vector array sequence)
+      :inherits (vector array sequence)
       :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
+     ;; This name is imperfect. It should be SIMPLE-RANK1-ARRAY-NIL
+     ;; to clearly convey that the dimensions are '(*) and not '*.
      (simple-array-nil
       :translation (simple-array nil (*))
       :codes (,sb-vm:simple-array-nil-widetag)
-      :direct-superclasses (vector-nil simple-string)
-      :inherits (vector-nil simple-string string vector simple-array
-                 array sequence)
+      :direct-superclasses (vector-nil)
+      :inherits (vector-nil vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type 'nil))
      (base-string
       :translation base-string

@@ -655,9 +655,9 @@
 
 (with-test (:name :unparse-string)
   (assert (equal (type-specifier (specifier-type '(string 10)))
-                 '(string 10)))
+                 '(#+sb-unicode string #-sb-unicode base-string 10)))
   (assert (equal (type-specifier (specifier-type '(simple-string 10)))
-                 '(simple-string 10))))
+                 '(#+sb-unicode simple-string #-sb-unicode simple-base-string 10))))
 
 (with-test (:name :numeric-types-adjacent)
   (dolist (x '(-0s0 0s0))

@@ -1499,11 +1499,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; No point in optimizing for unsupplied ELEMENT-TYPE.
   ;; Compiler transforms into %MAKE-CHARACTER-STRING-OSTREAM.
   (let ((ctype (specifier-type element-type)))
-    (cond ((eq ctype *empty-type*)
-           (%init-string-output-stream (%allocate-string-ostream)
-                                       (make-array 0 :element-type nil)
-                                       nil))
-          ((csubtypep ctype (specifier-type 'base-char))
+    (cond ((and (csubtypep ctype (specifier-type 'base-char))
+                ;; Let NIL mean "default", i.e. CHARACTER
+                (neq ctype *empty-type*))
            (%make-base-string-ostream))
           ((csubtypep ctype (specifier-type 'character))
            (%make-character-string-ostream))
@@ -1582,11 +1580,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defun string-sout (stream string start end)
   (declare (explicit-check string)
            (type index start end))
-  (when (typep (truly-the simple-string string) '(simple-array nil (*)))
-    ;; Such garbage that we have to deal with in all these routines
-    ;; for b.s. strings.
-    (return-from string-sout ; fail if the span is nonempty
-      (if (> end start) (aref string start))))
   (let* ((full-length (- end start))
          (length full-length)
          (buffer (string-output-stream-buffer stream))
@@ -1714,9 +1707,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 ;;; MAKE-STRING-OUTPUT-STREAM since the last call to this function.
 (defun get-output-stream-string (stream)
   (declare (type string-output-stream stream))
-  (when (eq (string-output-stream-element-type stream) nil)
-    (return-from get-output-stream-string
-      (load-time-value (make-array 0 :element-type nil) t)))
   (let* ((length (max (string-output-stream-index stream)
                       (string-output-stream-index-cache stream)))
          (prev (nreverse (string-output-stream-prev stream)))

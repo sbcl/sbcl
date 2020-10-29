@@ -101,11 +101,9 @@
   `(simple-array base-char (,size)))
 (sb-xc:deftype string (&optional size)
   `(or (array character (,size))
-       (array nil (,size))
        (base-string ,size)))
 (sb-xc:deftype simple-string (&optional size)
   `(or (simple-array character (,size))
-       (simple-array nil (,size))
        (simple-base-string ,size)))
 ;;; On Unicode builds, SIMPLE-CHARACTER-STRING is a builtin type.
 ;;; For non-Unicode it is convenient to be able to use the type name

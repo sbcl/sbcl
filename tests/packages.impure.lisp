@@ -36,7 +36,7 @@
 
 (make-package "FOO")
 (defvar *foo* (find-package (coerce "FOO" 'base-string)))
-(rename-package "FOO" (make-array 0 :element-type nil))
+(rename-package "FOO" (make-array 0 :element-type 'character))
 (assert (eq *foo* (find-package "")))
 (assert (delete-package ""))
 

@@ -934,23 +934,21 @@ line break."
 ;;;; standard pretty-printing routines
 
 (defun pprint-array (stream array)
-  (cond ((and (null *print-array*) (null *print-readably*))
-         (output-ugly-object stream array))
+  (cond ((or (null (array-element-type array))
+             (and (null *print-array*) (null *print-readably*)))
+         (print-object array stream))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
          (sb-impl::output-unreadable-array-readably array stream))
         ((vectorp array)
-         (pprint-vector stream array))
+         (pprint-logical-block (stream nil :prefix "#(" :suffix ")")
+           (dotimes (i (length array))
+             (unless (zerop i)
+               (format stream " ~:_"))
+             (pprint-pop)
+             (output-object (aref array i) stream))))
         (t
          (pprint-multi-dim-array stream array))))
-
-(defun pprint-vector (stream vector)
-  (pprint-logical-block (stream nil :prefix "#(" :suffix ")")
-    (dotimes (i (length vector))
-      (unless (zerop i)
-        (format stream " ~:_"))
-      (pprint-pop)
-      (output-object (aref vector i) stream))))
 
 (defun pprint-multi-dim-array (stream array)
   (funcall (formatter "#~DA") stream (array-rank array))

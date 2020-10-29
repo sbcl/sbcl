@@ -160,7 +160,7 @@
 ;;;
 ;;; * SIMPLE-ARRAY-* = (SIMPLE-ARRAY * (*))
 ;;;
-;;; * SIMPLE-ARRAY-NIL + SIMPLE-BASE-STRING = SIMPLE-STRING
+;;; * SIMPLE-CHARACTER-STRING + SIMPLE-BASE-STRING = SIMPLE-STRING
 ;;;
 ;;; * SIMPLE-ARRAY + COMPLEX-ARRAYOID = (SATISFIES ARRAY-HEADER-P)
 ;;;
@@ -180,7 +180,6 @@
 ;;; At present on 64-bit target with unicode we have:
 ;;;   (logcount (logxor complex-character-string-widetag simple-character-string-widetag)) = 2
 ;;;   (logcount (logxor complex-base-string-widetag simple-base-string-widetag)) = 2
-;;;   (logcount (logxor complex-vector-nil-widetag simple-array-nil-widetag)) = 3
 ;;;   (logcount (logxor complex-bit-vector-widetag simple-bit-vector-widetag)) = 1
 ;;; and we have one winner.  The situation is slightly different for 32-bit.
 
@@ -286,15 +285,18 @@
   simple-bit-vector-widetag                 ;  CA   D5  CA   D5
   simple-vector-widetag                     ;  CE   D9  CE   D9
 
-  ;; Strings
+  ;; Not a string type
   simple-array-nil-widetag                  ;  D2   DD  D2   DD
+
+  ;; Strings
   simple-base-string-widetag                ;  D6   E1  D6   E1
   #+sb-unicode
   simple-character-string-widetag           ;  DA   E5
   #+sb-unicode
   complex-character-string-widetag          ;  DE   E9
   complex-base-string-widetag               ;  E2   ED  DA   E5
-  complex-vector-nil-widetag                ;  E6   F1  DE   E9
+
+  unused-array-widetag                      ;  E6   F1  DE   E9
 
   complex-bit-vector-widetag                ;  EA   F5  E2   ED
   complex-vector-widetag                    ;  EE   F9  E6   F1

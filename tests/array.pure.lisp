@@ -544,6 +544,10 @@
 (with-test (:name (make-array :strange-type-specifiers))
   (assert (stringp (make-array 10 :element-type (opaque-identity '(base-char)))))
   (assert (stringp (make-array 10 :element-type (opaque-identity '(standard-char)))))
+  ;; If there are no extended characters (as on #-sb-unicode), then EXTENDED-CHAR is
+  ;; the empty type. You'll get exactly what you ask for: an array which can hold
+  ;; nothing. It's not a string, which is the right answer.
+  #+sb-unicode
   (assert (stringp (make-array 10 :element-type (opaque-identity '(extended-char)))))
   (assert (bit-vector-p (make-array 10 :element-type (opaque-identity '(bit))))))
 

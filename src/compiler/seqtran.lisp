@@ -2143,8 +2143,7 @@
   (if (eq '* (upgraded-element-type-specifier sequence))
       (let ((form
              `(sb-impl::string-dispatch ((simple-array character (*))
-                                         (simple-array base-char (*))
-                                         (simple-array nil (*)))
+                                         (simple-array base-char (*)))
                   sequence
                 (%find-position item sequence from-end start end key test))))
         (if (csubtypep (lvar-type sequence) (specifier-type 'simple-string))

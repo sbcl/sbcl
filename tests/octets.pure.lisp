@@ -243,13 +243,12 @@
 ;;; START argument.
 (assert (equalp #(50) (string-to-octets "42" :start 1 :external-format :utf-8)))
 
-;;; STRING->UTF8 should cope with NIL strings if a null range is required
 (assert (equalp #() (string-to-octets "" :external-format :utf-8)))
-(assert (equalp #() (string-to-octets (make-array 0 :element-type nil)
+(assert (equalp #() (string-to-octets (make-string 0)
                                       :external-format :utf-8)))
-(assert (equalp #() (string-to-octets (make-array 5 :element-type nil)
+(assert (equalp #() (string-to-octets (make-string 5)
                                       :start 3 :end 3 :external-format :utf-8)))
-(assert (equalp #(0) (string-to-octets (make-array 5 :element-type nil)
+(assert (equalp #(0) (string-to-octets (make-string 5)
                                        :start 3 :end 3 :null-terminate t
                                        :external-format :utf-8)))
 

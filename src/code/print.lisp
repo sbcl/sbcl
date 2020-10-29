@@ -839,7 +839,8 @@ variable: an unreadable object representing the error is printed instead.")
                     (write-char #\" stream))
                    (t
                     (write-string vector stream))))
-            ((not (or *print-array* readably))
+            ((or (null (array-element-type vector))
+                 (not (or *print-array* readably)))
              (output-terse-array vector stream))
             ((bit-vector-p vector)
              (cond ((cut-length))
@@ -890,7 +891,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Output the printed representation of any array in either the #< or #A
 ;;; form.
 (defmethod print-object ((array array) stream)
-  (if (or *print-array* *print-readably*)
+  (if (and (or *print-array* *print-readably*) (array-element-type array))
       (output-array-guts array stream)
       (output-terse-array array stream)))
 
@@ -898,7 +899,10 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-terse-array (array stream)
   (let ((*print-level* nil)
         (*print-length* nil))
-    (print-unreadable-object (array stream :type t :identity t))))
+    (if (and (not (array-element-type array)) *print-readably* *read-eval*)
+        (format stream "#.(~S '~D :ELEMENT-TYPE ~S)"
+                'make-array (array-dimensions array) nil)
+        (print-unreadable-object (array stream :type t :identity t)))))
 
 ;;; Convert an array into a list that can be used with MAKE-ARRAY's
 ;;; :INITIAL-CONTENTS keyword argument.

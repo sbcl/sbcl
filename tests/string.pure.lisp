@@ -48,34 +48,67 @@
     (nstring-capitalize nstring)
     (assert (string= nstring "Cat"))))
 
-;;; (VECTOR NIL)s are strings.  Tests for that and issues uncovered in
-;;; the process.
+#|
+(VECTOR NIL)s are strings only if you believe that the definition involving union
+types prevails over the ample amount of exposition in the spec, as well as utility
+of the resulting strings, and common sense.
+
+I tested 9 other implementations, and 7 of them agree that:
+  (SUBTYPEP '(SIMPLE-ARRAY NIL (*)) 'STRING) => NIL and T
+
+They have differing behaviors as to effect of make-string and make-array as follows:
+
+Allegro (10.1 Free Express Edition):
+ (SIMPLE-ARRAY NIL (*)) exists but does not satisfy STRINGP
+ (make-string 1 :element-type NIL) returns a (SIMPLE-ARRAY CHARACTER (1))
+
+Clasp (built from git rev 6b8047c2 @ 2020-10-22):
+ (make-array 1 :element-type NIL) signals error
+ (make-string 1 :element-type NIL) returns a (SIMPLE-ARRAY CHARACTER (1))
+
+Clozure (v1.12):
+ (make-array 1 :element-type NIL) returns (SIMPLE-VECTOR 1)
+ (make-string 1 :element-type NIL) returns a (SIMPLE-BASE-STRING 1)
+
+CMUCL (version 20d Unicode):
+ (make-array 1 :element-type nil) returns (SIMPLE-BASE-STRING 1)
+ as does MAKE-STRING.
+
+ECL (version 20.4.24):
+ (make-array 1 :element-type NIL) says
+  "ECL does not support arrays with element type NIL"
+ (make-string 1 :element-type NIL) returns a (SIMPLE-ARRAY BASE-CHAR (1))
+
+GCL (version 2.6.12 CLtL1):
+ (type-of (make-array 1 :element-type nil)) => VECTOR
+ (array-element-type (make-string 1 :element-type nil)) => STRING-CHAR
+
+MKCL (version 1.1.11):
+ (make-array 1 :element-type NIL) returns a (VECTOR NIL 1)
+ (make-string 1 :element-type NIL) returns a (SIMPLE-BASE-STRING 1)
+
+Of the dissenters, they return T and T from the subtypep expression above
+though their behavioral differences from MAKE-ARRAY to MAKE-STRING
+present compelling evidence that at least in their API they disfavor considering
+an object a string if it has element type NIL, hence MAKE-STRING upgrades NIL
+to a nonempty type.
+ABCL (version 1.7.1):
+ (type-of (make-array 1 :element-type nil)) => (NIL-VECTOR 1)
+ (type-of (make-string 1 :element-type nil)) => (SIMPLE-BASE-STRING 1)
+ Also: (make-string 1 :element-type 'ratio) => "^@" ; the type is just ignored
+CLISP (version 2.49.92):
+ (type-of (make-array 1 :element-type nil)) => (SIMPLE-ARRAY NIL (1))
+ (type-of (make-string 1 :element-type nil)) => (SIMPLE-BASE-STRING 1)
+
+Hence (SIMPLE-ARRAY NIL (*)) is most plausibly not regarded as a string,
+the ANSI compliance test suite notwithstanding.
+And the range of implementation choices suggest that users can not reasonably
+claim that any particular result from these edge cases constitutes a bug.
+|#
 (with-test (:name (vector nil))
-  (assert (typep (make-array 1 :element-type nil) 'string))
-  (assert (not (typep (make-array 2 :element-type nil) 'base-string)))
-  (assert (typep (make-string 3 :element-type nil) 'simple-string))
-  (assert (not (typep (make-string 4 :element-type nil) 'simple-base-string)))
-
-  (assert (subtypep (class-of (make-array 1 :element-type nil))
-                    (find-class 'string)))
-  (assert (subtypep (class-of (make-array 2 :element-type nil :fill-pointer 1))
-                    (find-class 'string)))
-
-  (assert (string= "" (make-array 0 :element-type nil)))
-  (assert (string/= "a" (make-array 0 :element-type nil)))
-  (assert (string= "" (make-array 5 :element-type nil :fill-pointer 0)))
-
-  (assert (= (sxhash "")
-             (sxhash (make-array 0 :element-type nil))
-             (sxhash (make-array 5 :element-type nil :fill-pointer 0))
-             (sxhash (make-string 0 :element-type nil))))
-  (assert (subtypep (type-of (make-array 2 :element-type nil)) 'simple-string))
-  (assert (subtypep (type-of (make-array 4 :element-type nil :fill-pointer t))
-                    'string))
-
-  (assert (eq (intern "") (intern (make-array 0 :element-type nil))))
-  (assert (eq (intern "")
-              (intern (make-array 5 :element-type nil :fill-pointer 0)))))
+  (assert (not (stringp (make-array 0 :element-type nil))))
+  (assert (not (subtypep (class-of (make-array 1 :element-type nil))
+                         (find-class 'string)))))
 
 (with-test (:name (make-string :element-type t type-error))
   (multiple-value-bind (fun failure-p warnings)
@@ -159,8 +192,11 @@
 
 (with-test (:name :nil-vector-access)
   (let ((nil-vector (make-array 10 :element-type nil)))
-    (assert-error (write-to-string nil-vector)
-                  sb-kernel:nil-array-accessed-error)
+    ;; Nowhere is it specified that PRINT-OBJECT on a VECTOR-NIL must
+    ;; access the contents and signal an error. So WRITE works fine.
+    (assert (write-to-string nil-vector))
+    (let ((*read-eval* nil))
+      (assert-error (write-to-string nil-vector :readably t)))
     (flet ((test (accessor)
              (assert-error
               (funcall (checked-compile
@@ -172,14 +208,15 @@
                        nil-vector)
               sb-kernel:nil-array-accessed-error)))
       (test 'aref)
-      (test 'char)
-      (test 'schar)
+      ;; (test 'char)  ; you'll get a TYPE-ERROR instead.
+      ;; (test 'schar) ; ditto
       (test 'row-major-aref))))
 
 (with-test (:name :nil-array-access)
   (let ((nil-array (make-array '(10 10) :element-type nil)))
-    (assert-error (write-to-string nil-array)
-                  sb-kernel:nil-array-accessed-error)
+    (assert (write-to-string nil-array))
+    (let ((*read-eval* nil))
+      (assert-error (write-to-string nil-array :readably t)))
     (flet ((test (accessor args)
              (assert-error
               (funcall (checked-compile

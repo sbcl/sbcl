@@ -35,7 +35,6 @@
 (define-type-predicate short-float-p short-float)
 (define-type-predicate single-float-p single-float)
 (define-type-predicate simple-array-p simple-array)
-(define-type-predicate simple-array-nil-p (simple-array nil (*)))
 (define-type-predicate simple-array-unsigned-byte-2-p
                        (simple-array (unsigned-byte 2) (*)))
 (define-type-predicate simple-array-unsigned-byte-4-p
@@ -109,7 +108,6 @@
 (define-type-predicate simd-pack-p simd-pack)
 #+sb-simd-pack-256
 (define-type-predicate simd-pack-256-p simd-pack-256)
-(define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
 #-(or x86 x86-64) (define-type-predicate lra-p lra)

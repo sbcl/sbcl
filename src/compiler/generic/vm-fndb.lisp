@@ -28,7 +28,7 @@
            array-header-p
            simple-array-header-p
            sequencep extended-sequence-p
-           simple-array-p simple-array-nil-p vector-nil-p
+           simple-array-p simple-array-nil-p
            simple-array-unsigned-byte-2-p
            simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
            simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p

@@ -806,7 +806,6 @@ of specialized arrays is supported."
                 (setf ,symbol (make-array (1+ widetag-mask)
                                           :initial-element #'hairy-ref-error))
                 ,@(loop for widetag in '(complex-vector-widetag
-                                         complex-vector-nil-widetag
                                          complex-bit-vector-widetag
                                          #+sb-unicode complex-character-string-widetag
                                          complex-base-string-widetag
