@@ -788,3 +788,13 @@ sb-vm::(define-vop (cl-user::test)
 (with-test (:name :gf-self-contained-trampoline)
   (let ((l (sb-kernel:find-layout 'standard-generic-function)))
     (assert (/= (sb-kernel:layout-bitmap l) sb-kernel:+layout-all-tagged+))))
+
+(with-test (:name :known-array-rank)
+  (let ((lines
+         (disassembly-lines
+          '(lambda (x)
+            #+sb-safepoint (declare (optimize (sb-c::insert-safepoints 0)))
+            (array-rank (truly-the string x))))))
+    ;; (format t "~{~&~A~}" lines)
+    ;; Naturally this is brittle as heck. I wish we had a better way.
+    (assert (<= (length lines) 9))))

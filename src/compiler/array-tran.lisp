@@ -1255,6 +1255,13 @@
     (cond ((eq t (and (array-type-p array-type)
                       (array-type-complexp array-type)))
            '(%array-rank array))
+          ;; We need an extra case in here to best handle a known vector, because
+          ;; if we try to add a transform on ARRAY-HEADER-P (returning false for
+          ;; known simple-array of rank 1), that would fail to optimize where we know
+          ;; the thing is a vector but possibly non-simple. So then the IF below
+          ;; would still have both if its consequents considered plausible.
+          ((csubtypep array-type (specifier-type 'vector))
+           1)
           (t
            (delay-ir1-transform node :constraint)
            `(if (array-header-p array)

@@ -100,6 +100,15 @@ CLISP (version 2.49.92):
  (type-of (make-array 1 :element-type nil)) => (SIMPLE-ARRAY NIL (1))
  (type-of (make-string 1 :element-type nil)) => (SIMPLE-BASE-STRING 1)
 
+And one more Lisp implementation which matches none of the above-
+Lispworks personal edition 7.1:
+  (make-array 1 :element-type nil) signals
+    ERROR: (ARRAY NIL) is an illegal type specifier.
+  (make-string 1 :element-type nil) signals
+    ERROR: (ARRAY NIL) is an illegal type specifier.
+  (subtypep '(vector nil) 'string) signals
+    ERROR: (ARRAY NIL (*)) is an illegal type specifier.
+
 Hence (SIMPLE-ARRAY NIL (*)) is most plausibly not regarded as a string,
 the ANSI compliance test suite notwithstanding.
 And the range of implementation choices suggest that users can not reasonably
