@@ -125,7 +125,7 @@
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
- ("src/code/early-extensions" :c-headers :trace-file) ; on host for COLLECT, SYMBOLICATE, etc.
+ ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/compiler/parse-lambda-list" :c-headers)
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
 
