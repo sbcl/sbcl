@@ -653,20 +653,14 @@
   (let* ((c-length (if (lvar-p length)
                        (if (constant-lvar-p length) (lvar-value length))
                        length))
-         (complex (cond ((and (or
-                               (not fill-pointer)
-                               (and (constant-lvar-p fill-pointer)
-                                    (null (lvar-value fill-pointer))))
-                              (or
-                               (not adjustable)
-                               (and
-                                (constant-lvar-p adjustable)
-                                (null (lvar-value adjustable)))))
-                         nil)
-                        ((and (constant-lvar-p adjustable)
-                              (lvar-value adjustable)))
-                        ((and fill-pointer
-                              (constant-lvar-p fill-pointer)
+         (expressly-adjustable (cond ((not adjustable) nil)
+                                     ((not (constant-lvar-p adjustable)) :maybe)
+                                     (t (and (lvar-value adjustable) t))))
+         (complex (cond ((eq expressly-adjustable t))
+                        ((and (eq expressly-adjustable nil)
+                              (or (not fill-pointer) (constant-lvar-p fill-pointer)))
+                         ;; COMPLEXP = T if and only if fill-pointer is non-null.
+                         (and fill-pointer
                               (lvar-value fill-pointer)))
                         (t
                          ;; Deciding between complex and simple at
