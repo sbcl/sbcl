@@ -363,7 +363,7 @@
   (defglobal function-layout 0))        ; set by genesis
 
 #|
-;; Run this in the SB-VM or SB-VM package once for each target feature combo.
+;; Run this in the SB-VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()
   (rename-file "src/compiler/generic/early-objdef.lisp" "early-objdef.old")
   (with-open-file (in "src/compiler/generic/early-objdef.old")
