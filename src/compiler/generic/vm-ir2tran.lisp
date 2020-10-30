@@ -409,22 +409,19 @@
 ;;; Return a list of parameters with which to call MAKE-ARRAY-HEADER*
 ;;; given the mandatory slots for a simple array of rank 0 or > 1.
 (defun make-array-header-inits (storage n-elements dimensions)
-  (macrolet ((expand ()
-               `(list* sb-vm:simple-array-widetag
-                       ,@(mapcar (lambda (slot)
-                                   (ecase (slot-name slot)
-                                     (data           'storage)
-                                     (fill-pointer   'n-elements)
-                                     (elements       'n-elements)
-                                     (fill-pointer-p nil)
-                                     (displacement   0)
-                                     (displaced-p    nil)
-                                     (displaced-from nil)))
-                                 (butlast (primitive-object-slots
-                                           (find 'array *primitive-objects*
-                                                 :key 'primitive-object-name))))
-                       dimensions)))
-    (expand)))
+  (nconc (mapcar (lambda (slot)
+                   (ecase (slot-name slot)
+                     (data           storage)
+                     (fill-pointer   n-elements)
+                     (elements       n-elements)
+                     (fill-pointer-p nil)
+                     (displacement   0)
+                     (displaced-p    nil)
+                     (displaced-from nil)))
+                 (butlast (primitive-object-slots
+                           (find 'array *primitive-objects*
+                                 :key 'primitive-object-name))))
+         dimensions))
 
 ;;; This order is used by SB-C::TRANSFORM-MAKE-ARRAY-VECTOR
 (assert (equal (mapcar #'slot-name

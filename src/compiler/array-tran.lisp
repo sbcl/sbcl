@@ -597,6 +597,7 @@
                                 (t '*))
                          ,(if dims-constp dims (length dims)))
               (make-array-header*
+               sb-vm:simple-array-widetag
                ,@(sb-vm::make-array-header-inits
                   `(make-array ,size ,@keys) size dims)))))
       `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
@@ -726,7 +727,8 @@
       (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
                            (type-specifier (lvar-type fill-pointer))
                            c-length))
-    (flet ((eliminate-keywords ()
+    (labels
+          ((eliminate-keywords ()
              (eliminate-keyword-args
               call 1
               '((:element-type element-type)
@@ -734,47 +736,39 @@
                 (:initial-element initial-element)
                 (:adjustable adjustable)
                 (:fill-pointer fill-pointer))))
+           (allocator (type-spec &rest rest)
+             (let ((array
+                    `(make-array-header*
+                      ,(or (sb-vm:saetp-complex-typecode saetp)
+                           sb-vm:complex-vector-widetag)
+                       ,@rest)))
+               `(truly-the ,type-spec ,array)))
            (with-alloc-form (&optional data-wrapper)
              (cond (complex
                     (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
                            (fill-pointer-value (and constant-fill-pointer-p
-                                                    (lvar-value fill-pointer))))
+                                                    (lvar-value fill-pointer)))
+                           (length-expr
+                            (cond ((eq fill-pointer-value t) '%length)
+                                  (fill-pointer-value)
+                                  ((and fill-pointer (not constant-fill-pointer-p))
+                                   `(cond ((or (eq fill-pointer t) (null fill-pointer))
+                                           %length)
+                                          ((> fill-pointer %length)
+                                           (error "Invalid fill-pointer ~a" fill-pointer))
+                                          (t fill-pointer)))
+                                  (t '%length))))
                       `(let ((%length (the index ,(or c-length 'length))))
-                         (truly-the
-                          ,result-spec
-                          (make-array-header* ,(or (sb-vm:saetp-complex-typecode saetp)
-                                                   sb-vm:complex-vector-widetag)
-                                              ;; fill-pointer
-                                              ,(cond ((eq fill-pointer-value t)
-                                                      '%length)
-                                                     (fill-pointer-value)
-                                                     ((and fill-pointer
-                                                           (not constant-fill-pointer-p))
-                                                      `(cond ((or (eq fill-pointer t)
-                                                                  (null fill-pointer))
-                                                              %length)
-                                                             ((> fill-pointer %length)
-                                                              (error "Invalid fill-pointer ~a" fill-pointer))
-                                                             (t
-                                                              fill-pointer)))
-                                                     (t
-                                                      '%length))
-                                              ;; fill-pointer-p
-                                              ,(and fill-pointer
-                                                    `(and fill-pointer t))
-                                              ;; elements
-                                              %length
-                                              ;; data
-                                              (let ((data ,data-alloc-form))
-                                                ,(or data-wrapper 'data))
-                                              ;; displacement
-                                              0
-                                              ;; displaced-p
-                                              nil
-                                              ;; displaced-from
-                                              nil
-                                              ;; dimensions
-                                              %length)))))
+                         ,(allocator result-spec
+                                     length-expr   ; fill-pointer
+                                     (and fill-pointer `(and fill-pointer t)) ; fill-pointer-p
+                                     '%length      ; elements
+                                     `(let ((data ,data-alloc-form)) ; data
+                                        ,(or data-wrapper 'data))
+                                     0             ; displacement
+                                     nil           ; displaced-p
+                                     nil           ; displaced-from
+                                     '%length))))  ; dimensions
                    (data-wrapper
                     (subst data-alloc-form 'data data-wrapper))
                    (t
