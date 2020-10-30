@@ -626,3 +626,10 @@
                          (unless (svref p 0)
                            (svref p nil)))
                       :allow-warnings t))))
+
+(with-test (:name :array-has-fill-pointer-p-folding)
+  (assert (equal (sb-kernel:%simple-fun-type
+                  (checked-compile `(lambda (x)
+                                      (declare ((array * (* *)) x))
+                                      (array-has-fill-pointer-p x))))
+                 `(function ((array * (* *))) (values null &optional)))))

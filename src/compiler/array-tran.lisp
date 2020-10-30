@@ -1416,16 +1416,17 @@
           (t
            `(%array-available-elements array)))))
 
-;;; Only complex vectors might have fill pointers. They don't all.
 (deftransform array-has-fill-pointer-p ((array))
+  `(and (array-header-p array) (%array-fill-pointer-p array)))
+
+;;; Only vectors might have fill pointers. and this is only called on
+;;; arrays with a header.
+(deftransform %array-fill-pointer-p ((array))
   (let* ((array-type (lvar-type array))
          (dims (array-type-dimensions-or-give-up array-type)))
-    (if (or (and (listp dims) (/= (length dims) 1))
-            (eq (conservative-array-type-complexp array-type) nil))
+    (if (or (and (listp dims) (/= (length dims) 1)))
         nil
-        (give-up-ir1-transform
-            "The array type is ambiguous; must call ~
-               ARRAY-HAS-FILL-POINTER-P at runtime."))))
+        (give-up-ir1-transform))))
 
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
   (let ((array-ref (lvar-uses array))
