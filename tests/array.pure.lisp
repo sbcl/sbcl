@@ -529,6 +529,24 @@
     (assert (not (array-has-fill-pointer-p (funcall fun nil))))
     (assert (= (length (funcall fun nil)) 3))))
 
+(with-test (:name (make-array :transform :non-constant-fill-pointer))
+  ;; Known adjustable with any fill-pointer can be inlined
+  (let ((fun (checked-compile '(lambda (n fillp)
+                                 (make-array (the (mod 20) n)
+                                             :adjustable t :fill-pointer fillp)))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))
+    (let ((a (funcall fun 10 3)))
+      (assert (= (length a) 3))
+      (assert (= (array-dimension a 0) 10))))
+  ;; Non-adjustable w/ non-constant numeric fill-pointer can be inlined
+  (let ((fun (checked-compile '(lambda (n)
+                                 (make-array (the (mod 20) n)
+                                             :fill-pointer (floor n 2))))))
+    (assert (not (ctu:find-named-callees fun :name 'sb-kernel:%make-array)))
+    (let ((a (funcall fun 10)))
+      (assert (= (length a) 5))
+      (assert (= (array-dimension a 0) 10)))))
+
 (with-test (:name :check-bound-fixnum-check)
   (checked-compile-and-assert (:optimize :safe)
       `(lambda (x) (aref #100(a) x))

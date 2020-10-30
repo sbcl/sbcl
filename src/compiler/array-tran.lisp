@@ -656,13 +656,13 @@
          (expressly-adjustable (cond ((not adjustable) nil)
                                      ((not (constant-lvar-p adjustable)) :maybe)
                                      (t (and (lvar-value adjustable) t))))
-         (complex (cond ((eq expressly-adjustable t))
-                        ((and (eq expressly-adjustable nil)
-                              (or (not fill-pointer) (constant-lvar-p fill-pointer)))
-                         ;; COMPLEXP = T if and only if fill-pointer is non-null.
-                         (and fill-pointer
-                              (lvar-value fill-pointer)))
-                        (t
+         (has-fill-pointer (cond ((not fill-pointer) nil)
+                                 ((numeric-type-p (lvar-type fill-pointer)) t)
+                                 ((constant-lvar-p fill-pointer)
+                                  (not (null (lvar-value fill-pointer))))
+                                 (t :maybe)))
+         (complex (cond ((or (eq expressly-adjustable t) (eq has-fill-pointer t)) t)
+                        ((or (eq expressly-adjustable :maybe) (eq has-fill-pointer :maybe))
                          ;; Deciding between complex and simple at
                          ;; run-time would be too much hassle
                          (give-up-ir1-transform))))
