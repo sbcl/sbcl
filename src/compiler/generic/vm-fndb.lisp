@@ -171,6 +171,9 @@
 (defknown (set-header-bits unset-header-bits)
   (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (values)
   ())
+(defknown (test-header-bit)
+  (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (boolean)
+  (flushable))
 
 (defknown %array-dimension (array index) index
   (flushable))

@@ -47,7 +47,7 @@
                  (symbol (make-room-info tiny-boxed-size-mask name :other))
                  (t      (make-room-info default-size-mask name :other)))))))
 
-    (let ((info (make-room-info default-size-mask 'array-header :other)))
+    (let ((info (make-room-info tiny-boxed-size-mask 'array-header :other)))
       (dolist (code (list #+sb-unicode complex-character-string-widetag
                           complex-base-string-widetag simple-array-widetag
                           complex-bit-vector-widetag complex-vector-widetag

@@ -342,6 +342,13 @@
 ;; nonetheless, opportunities for sharing abound.
 (defconstant +vector-shareable-nonstd+ #x200)
 
+;;; This constant must not conflict with any of the possible bit above
+;;; nor overlap the payload length field of an array header.
+;;;  byte   3 |      2  |      1 |       0
+;;;           |  flags  | length | widetag
+;;; It gets left-shifted by SET-HEADER-DATA or equivalent constructor.
+(defconstant +array-fill-pointer-p+ #x400)
+
 ;;; This header bit is set for symbols which were present in the pristine core.
 ;;; The backend may emit different code when referencing such symbols.
 ;;; For x86-64, symbols with this bit set may be assumed to have been

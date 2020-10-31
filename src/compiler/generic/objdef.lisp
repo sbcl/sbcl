@@ -101,11 +101,6 @@
                 :ref-known (flushable foldable)
                 :set-trans (setf %array-fill-pointer)
                 :set-known ())
-  (fill-pointer-p :type (member t nil)
-                  :ref-trans %array-fill-pointer-p
-                  :ref-known (flushable foldable)
-                  :set-trans (setf %array-fill-pointer-p)
-                  :set-known ())
   (elements :type index
             :ref-trans %array-available-elements
             :ref-known (flushable foldable)

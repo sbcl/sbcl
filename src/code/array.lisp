@@ -25,7 +25,6 @@
                 (defun (setf ,name) (value array)
                   (setf (,name array) value)))))
   (def %array-fill-pointer)
-  (def %array-fill-pointer-p)
   (def %array-available-elements)
   (def %array-data)
   (def %array-displacement)
@@ -440,6 +439,18 @@
         (setf (%array-displaced-from old-data)
               (purge (%array-displaced-from old-data)))))))
 
+#-(vop-translates sb-kernel:set-header-bits)
+(progn
+  (declaim (inline set-header-bits unset-header-bits))
+  (defun set-header-bits (vector bits)
+    (set-header-data vector (logior (get-header-data vector) bits))
+    (values))
+  (defun unset-header-bits (vector bits)
+    (set-header-data vector (logand (get-header-data vector)
+                                    (ldb (byte (- sb-vm:n-word-bits sb-vm:n-widetag-bits) 0)
+                                         (lognot bits))))
+    (values)))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -508,12 +519,13 @@
                                 (simple simple-array-widetag)
                                 (t complex-array-widetag))
                           array-rank)))
-             (if fill-pointer
-                 (setf (%array-fill-pointer-p array) t
-                       (%array-fill-pointer array)
-                       (if (eq fill-pointer t) dimension-0 fill-pointer))
-                 (setf (%array-fill-pointer-p array) nil
-                       (%array-fill-pointer array) total-size))
+             (cond (fill-pointer
+                    (set-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (setf (%array-fill-pointer array)
+                          (if (eq fill-pointer t) dimension-0 fill-pointer)))
+                   (t
+                    (unset-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (setf (%array-fill-pointer array) total-size)))
              (setf (%array-available-elements array) total-size)
              (setf (%array-data array) data)
              (setf (%array-displaced-from array) nil)
@@ -1514,10 +1526,10 @@ of specialized arrays is supported."
     (setf (%array-available-elements array) length)
     (cond (fill-pointer
            (setf (%array-fill-pointer array) fill-pointer)
-           (setf (%array-fill-pointer-p array) t))
+           (set-header-bits array sb-vm:+array-fill-pointer-p+))
           (t
            (setf (%array-fill-pointer array) length)
-           (setf (%array-fill-pointer-p array) nil)))
+           (unset-header-bits array sb-vm:+array-fill-pointer-p+)))
     (setf (%array-displacement array) displacement)
     (if (listp dimensions)
         (dotimes (axis (array-rank array))
@@ -1655,9 +1667,9 @@ function to be removed without further warning."
     (loop for i below rank
           do (%set-array-dimension result i
                                    (%array-dimension array i)))
+    ;; fill-pointer-p defaults to 0
     (setf (%array-displaced-from result) nil
           (%array-displaced-p result) nil
-          (%array-fill-pointer-p result) nil
           (%array-fill-pointer result) size
           (%array-available-elements result) size)
     result))

@@ -116,12 +116,12 @@
     (simple-array-nil "vector_nil")
     (simple-base-string "base_string")
     #+sb-unicode (simple-character-string "character_string")
-    #+sb-unicode (complex-character-string "boxed")
-    (complex-base-string "boxed")
+    #+sb-unicode (complex-character-string "tiny_boxed")
+    (complex-base-string "tiny_boxed")
 
-    (complex-bit-vector "boxed")
-    (complex-vector "boxed")
-    (complex-array "boxed"))))
+    (complex-bit-vector "tiny_boxed")
+    (complex-vector "tiny_boxed")
+    (complex-array "tiny_boxed"))))
 
 #+sb-xc-host
 (defun write-gc-tables (stream)

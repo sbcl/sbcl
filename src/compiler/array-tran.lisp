@@ -739,10 +739,18 @@
            (allocator (type-spec &rest rest)
              (let ((array
                     `(make-array-header*
-                      ,(or (sb-vm:saetp-complex-typecode saetp)
-                           sb-vm:complex-vector-widetag)
+                      ,(logior (if (eq has-fill-pointer t) ; can't handle :maybe
+                                   (ash sb-vm:+array-fill-pointer-p+ sb-vm:n-widetag-bits)
+                                   0)
+                               (or (sb-vm:saetp-complex-typecode saetp)
+                                   sb-vm:complex-vector-widetag))
                        ,@rest)))
-               `(truly-the ,type-spec ,array)))
+               (if (eq has-fill-pointer :maybe)
+                   `(let ((%array (truly-the ,type-spec ,array)))
+                      (when fill-pointer
+                        (set-header-bits %array sb-vm:+array-fill-pointer-p+))
+                      %array)
+                   `(truly-the ,type-spec ,array))))
            (with-alloc-form (&optional data-wrapper)
              (cond (complex
                     (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
@@ -761,7 +769,6 @@
                       `(let ((%length (the index ,(or c-length 'length))))
                          ,(allocator result-spec
                                      length-expr   ; fill-pointer
-                                     (and fill-pointer `(and fill-pointer t)) ; fill-pointer-p
                                      '%length      ; elements
                                      `(let ((data ,data-alloc-form)) ; data
                                         ,(or data-wrapper 'data))
@@ -1092,8 +1099,6 @@
                                                     sb-vm:simple-array-widetag)
                                                ;; fill-pointer
                                                ,total-size
-                                               ;; fill-pointer-p
-                                               nil
                                                ;; elements
                                                ,total-size
                                                ;; data
@@ -1165,7 +1170,7 @@
 
 ;;;; miscellaneous properties of arrays
 
-;;; Transforms for various array properties. If the property is know
+;;; Transforms for various array properties. If the property is known
 ;;; at compile time because of a type spec, use that constant value.
 
 ;;; Most of this logic may end up belonging in code/late-type.lisp;
@@ -1416,17 +1421,23 @@
           (t
            `(%array-available-elements array)))))
 
+;;; Any array can be tested for a fill-pointer now, using the header bit.
+;;; Only a non-simple vector could possibly return true.
+;;; If the input is known simple, we have to avoid doing the logtest because there's
+;;; no constraint that says that the logtest will return false, and style-warnings
+;;; will result from MAP-INTO and other things which have
+;;    (if (array-has-fill-pointer-p a) (setf (fill-pointer a) ...))
+;; where the compiler knows that the input is simple.
 (deftransform array-has-fill-pointer-p ((array))
-  `(and (array-header-p array) (%array-fill-pointer-p array)))
-
-;;; Only vectors might have fill pointers. and this is only called on
-;;; arrays with a header.
-(deftransform %array-fill-pointer-p ((array))
   (let* ((array-type (lvar-type array))
          (dims (array-type-dimensions-or-give-up array-type)))
-    (if (or (and (listp dims) (/= (length dims) 1)))
-        nil
-        (give-up-ir1-transform))))
+    ;; If a vector and possibly non-simple, then perform the bit test,
+    ;; otherwise the answer is definitely NIL.
+    (cond ((and (listp dims) (/= (length dims) 1)) nil) ; dims = * is possibly a vector
+          ((eq (conservative-array-type-complexp array-type) nil) nil)
+          (t
+           #+x86-64 `(test-header-bit array sb-vm:+array-fill-pointer-p+)
+           #-x86-64 `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+)))))
 
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
   (let ((array-ref (lvar-uses array))
@@ -1896,7 +1907,9 @@
   (declare (ignore gen))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
 
-(defoptimizer (%array-fill-pointer-p constraint-propagate-if)
+;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
+;;; is of the specified type.
+(defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
     ((array) node gen)
   (declare (ignore gen))
   (values array (specifier-type '(and vector (not simple-array)))))

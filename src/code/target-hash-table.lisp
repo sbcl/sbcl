@@ -643,18 +643,6 @@ multiple threads accessing the same hash-table without locking."
              (make-array (1+ new-size) :element-type 'hash-table-index))))
     (values new-kv-vector new-next-vector new-hash-vector new-index-vector)))
 
-#-(vop-translates sb-kernel:set-header-bits)
-(progn
-  (declaim (inline set-header-bits unset-header-bits))
-  (defun set-header-bits (vector bits)
-    (set-header-data vector (logior (get-header-data vector) bits))
-    (values))
-  (defun unset-header-bits (vector bits)
-    (set-header-data vector (logand (get-header-data vector)
-                                    (ldb (byte (- sb-vm:n-word-bits sb-vm:n-widetag-bits) 0)
-                                         (lognot bits))))
-    (values)))
-
 ;;; We don't define +-MODFX for all backends, and I can't figure out
 ;;; the rationale, nor how to detect this other than by trial and error.
 ;;; Like why does 64-bit ARM have it but 32-bit not have?

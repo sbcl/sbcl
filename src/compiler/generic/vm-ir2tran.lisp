@@ -286,6 +286,7 @@
 ;;; An array header for simple non-unidimensional arrays is a fixed alloc,
 ;;; because the rank has to be known.
 ;;; (There are no compile-time optimizations for unknown rank arrays)
+;;; WIDETAG may have ORed into it 1 bit for +ARRAY-FILL-POINTER-P+
 (defoptimizer (make-array-header* ir2-convert) ((widetag &rest args) node block)
   (let ((n-args (length args)))
     ;; Remove the widetag lvar
@@ -414,7 +415,6 @@
                      (data           storage)
                      (fill-pointer   n-elements)
                      (elements       n-elements)
-                     (fill-pointer-p nil)
                      (displacement   0)
                      (displaced-p    nil)
                      (displaced-from nil)))
@@ -424,11 +424,12 @@
          dimensions))
 
 ;;; This order is used by SB-C::TRANSFORM-MAKE-ARRAY-VECTOR
+;;; The slot formerly known as FILL-POINTER-P is 1 bit in the header now.
 (assert (equal (mapcar #'slot-name
                        (primitive-object-slots
                         (find 'array *primitive-objects*
                               :key 'primitive-object-name)))
-               '(fill-pointer fill-pointer-p elements data
+               '(fill-pointer elements data
                  displacement displaced-p displaced-from dimensions)))
 
 (defun emit-code-page-write-barrier-p (fun-name)

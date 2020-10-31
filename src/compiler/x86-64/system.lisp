@@ -166,7 +166,8 @@
     (storew temp x 0 other-pointer-lowtag)
     (move res x)))
 
-;;; These next 2 vops are for manipulating the flag bits of a vector header.
+;;; These next 3 vops are for manipulating and reading the flag bits of
+;;; arrays headers, or more generally any OTHER-POINTER object.
 (define-vop (set-header-bits)
   (:translate set-header-bits)
   (:policy :fast-safe)
@@ -188,6 +189,18 @@
         (inst and :byte (ea (- 1 other-pointer-lowtag) x) (lognot bits))
         (inst and :dword (ea (- other-pointer-lowtag) x)
               (lognot (ash bits n-widetag-bits))))))
+(define-vop (test-header-bit)
+  (:translate test-header-bit)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:arg-types t (:constant t))
+  (:info mask)
+  (:conditional :ne)
+  (:generator 1
+    ;; check that the mask is byte index 2
+    (aver (and (= (logcount mask) 1) (not (ldb-test (byte 8 0) mask))))
+    (inst test :byte (ea (- 2 other-pointer-lowtag) array)
+                     (ash mask (- 8)))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)
