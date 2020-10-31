@@ -9,7 +9,10 @@
 
 (in-package "SB-IMPL")
 
-(defconstant array-rank-limit 65529
+;;; The boxed payload length in the header can't exceed #xff.
+;;; 100 is a nice human-understandable number, but this could
+;;; be raised to as much as 249.
+(defconstant array-rank-limit 100
   "the exclusive upper bound on the rank of an array")
 
 ;;; - 2 to leave space for the array header

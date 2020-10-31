@@ -81,8 +81,9 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst asr temp temp n-widetag-bits)
+    ;; ASSUMPTION: n-widetag-bits = 8
+    (inst ldrb temp (@ x #+little-endian (- 1 other-pointer-lowtag)
+                         #+big-endian    (- 6 other-pointer-lowtag)))
     (inst sub temp temp (1- array-dimensions-offset))
     (inst lsl res temp n-fixnum-tag-bits)))
 

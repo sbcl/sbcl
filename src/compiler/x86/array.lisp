@@ -74,8 +74,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 other-pointer-lowtag)
-    (inst shr res n-widetag-bits)
+    ;; ASSUMPTION: n-widetag-bits = 8
+    (inst movzx res (make-ea :byte :base x :disp (- 1 other-pointer-lowtag)))
     (inst sub res (1- array-dimensions-offset))))
 
 ;;;; bounds checking routine

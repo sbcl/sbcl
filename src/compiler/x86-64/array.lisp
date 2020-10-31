@@ -80,9 +80,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 3
-    ;; An unaligned dword read not spanning a 16-byte boundary is as fast as
-    ;; and shorter by 5 bytes than a qword read and right-shift by 8.
-    (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
+    ;; ASSUMPTION: n-widetag-bits = 8
+    (inst movzx '(:byte :dword) res (ea (1+ (- other-pointer-lowtag)) x))
     (inst sub :dword res (1- array-dimensions-offset))))
 
 (define-vop (array-rank-vop=>fixnum)
@@ -92,7 +91,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
+    (inst movzx '(:byte :dword) res (ea (1+ (- other-pointer-lowtag)) x))
     (inst lea :dword res
           (let ((scale (ash 1 n-fixnum-tag-bits)))
             ;; Compute [res*N-disp]. for N=2 use [res+res-disp]
@@ -107,7 +106,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp :dword
+    (inst cmp :byte
           (ea (1+ (- other-pointer-lowtag)) array)
           (+ rank
              (1- array-dimensions-offset)))))

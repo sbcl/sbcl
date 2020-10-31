@@ -61,8 +61,8 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst srawi temp temp n-widetag-bits)
+    ;; ASSUMPTION: n-widetag-bits = 8
+    (inst lbz temp x (- 2 other-pointer-lowtag))
     (inst subi temp temp (1- array-dimensions-offset))
     (inst slwi res temp n-fixnum-tag-bits)))
 
