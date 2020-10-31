@@ -809,7 +809,8 @@ sb-vm::(define-vop (cl-user::test)
   (let ((lines
          (disassembly-lines
           `(lambda (x)
-             (declare (optimize (sb-c::verify-arg-count 0)))
+             (declare (optimize (sb-c::verify-arg-count 0)
+                                #+sb-safepoint (sb-c::insert-safepoints 0)))
              (typep (truly-the other-pointer-object x) ',type)))))
     ;;(format t "~{~&~a~}~%" lines)
     (loop for line in lines
@@ -821,10 +822,12 @@ sb-vm::(define-vop (cl-user::test)
 
   (assert (= 1 (count-cmp-opcodes 'string)))
   (assert (= 1 (count-cmp-opcodes 'base-string))) ; widetags differing in one bit
+  #+sb-unicode
   (assert (= 1 (count-cmp-opcodes 'sb-kernel::character-string))) ; ditto
   (assert (= 1 (count-cmp-opcodes 'simple-string))) ; 2 adjacent widetags
   (assert (= 1 (count-cmp-opcodes '(and string (not simple-array)))))
   (assert (= 1 (count-cmp-opcodes 'simple-base-string)))
+  #+sb-unicode
   (assert (= 1 (count-cmp-opcodes 'sb-kernel::simple-character-string)))
   ;; FIXME: (AND STRING (NOT SIMPLE-STRING)) executs 4 tests
   ;; but it denotes the same set of objects as (AND STRING (NOT SIMPLE-ARRAY)).
