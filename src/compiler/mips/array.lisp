@@ -55,7 +55,7 @@
   (:generator 6
     (loadw temp x 0 other-pointer-lowtag)
     (inst sra temp n-widetag-bits)
-    (inst andi temp temp #xff)
+    (inst and temp temp #xff)
     (inst subu temp (1- array-dimensions-offset))
     (inst sll res temp n-fixnum-tag-bits)))
 
