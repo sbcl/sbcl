@@ -131,6 +131,8 @@
                                   (= (cdar headers) complex-array-widetag)))
                          (ea (- lowtag) value)
                          temp))
+         (first (car headers))
+         (second (cadr headers))
          (untagged))
 
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
@@ -176,45 +178,56 @@
         (inst cmp :byte temp widetag)
         (inst jmp :e when-false))
 
-      ;; FIXME: this backend seems to be missing the special logic for
-      ;;        testing exactly two widetags differing only in a single bit,
-      ;;        which through evolution is almost totally unworkable anyway...
+      (cond
+       ((and (fixnump first)
+             (fixnump second)
+             (not (cddr headers))
+             (= (logcount (logxor first second)) 1))
+        ;; Two widetags differing at one bit. Use one cmp and branch.
+        ;; Start by ORing in the bit that they differ on.
+        (let ((diff-bit (logxor first second)))
+          (aver (not (ea-p widetag-tn))) ; can't clobber a header
+          (inst or :byte widetag-tn diff-bit)
+          (inst cmp :byte widetag-tn (logior first diff-bit))
+          (if not-p (inst jmp :ne target) (inst jmp :eq target))))
+       (t
       ;; Compared to x86 we additionally optimize the cases of a
       ;; range starting with BIGNUM-WIDETAG (= min widetag)
       ;; or ending with COMPLEX-ARRAY-WIDETAG (= max widetag)
-      (do ((remaining headers (cdr remaining)))
-          ((null remaining))
-        (let ((header (car remaining))
-              (last (null (cdr remaining))))
-          (cond
-           ((atom header)
-            (inst cmp :byte widetag-tn header)
-            (if last
-                (inst jmp equal target)
-                (inst jmp :e when-true)))
-           (t
-             (let ((start (car header))
-                   (end (cdr header)))
-               (cond
-                 ((= start bignum-widetag)
-                  (inst cmp :byte widetag-tn end)
-                  (if last
-                      (inst jmp less-or-equal target)
-                      (inst jmp :be when-true)))
-                 ((= end complex-array-widetag)
-                  (inst cmp :byte widetag-tn start)
-                  (if last
-                      (inst jmp greater-or-equal target)
-                      (inst jmp :b when-false)))
-                 ((not last)
-                  (inst cmp :byte temp start)
-                  (inst jmp :b when-false)
-                  (inst cmp :byte temp end)
-                  (inst jmp :be when-true))
-                 (t
-                  (inst sub :byte temp start)
-                  (inst cmp :byte temp (- end start))
-                  (inst jmp less-or-equal target))))))))
+        (do ((remaining headers (cdr remaining)))
+            ((null remaining))
+          (let ((header (car remaining))
+                (last (null (cdr remaining))))
+            (cond
+             ((atom header)
+              (inst cmp :byte widetag-tn header)
+              (if last
+                  (inst jmp equal target)
+                  (inst jmp :e when-true)))
+             (t
+               (let ((start (car header))
+                     (end (cdr header)))
+                 (cond
+                   ((= start bignum-widetag)
+                    (inst cmp :byte widetag-tn end)
+                    (if last
+                        (inst jmp less-or-equal target)
+                        (inst jmp :be when-true)))
+                   ((= end complex-array-widetag)
+                    (inst cmp :byte widetag-tn start)
+                    (if last
+                        (inst jmp greater-or-equal target)
+                        (inst jmp :b when-false)))
+                   ((not last)
+                    (inst cmp :byte temp start)
+                    (inst jmp :b when-false)
+                    (inst cmp :byte temp end)
+                    (inst jmp :be when-true))
+                   (t
+                    (inst sub :byte temp start)
+                    (inst cmp :byte temp (- end start))
+                    (inst jmp less-or-equal target))))))))))
+
       (emit-label drop-through))))
 
 ;;;; other integer ranges

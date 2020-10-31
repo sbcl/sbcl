@@ -288,19 +288,18 @@
   ;; Not a string type
   simple-array-nil-widetag                  ;  D2   DD  D2   DD
 
-  ;; Strings
-  simple-base-string-widetag                ;  D6   E1  D6   E1
-  #+sb-unicode
-  simple-character-string-widetag           ;  DA   E5
-  #+sb-unicode
-  complex-character-string-widetag          ;  DE   E9
-  complex-base-string-widetag               ;  E2   ED  DA   E5
+  simple-base-string-widetag                ;  D6   E1  D6   E1       \
+  #+sb-unicode                              ;                          |
+  simple-character-string-widetag           ;  DA   E5                 | Strings
+  ;; From here down commence the non-simple array types                |
+  complex-base-string-widetag               ;  DE   E9  DA   E5        |
+  #+sb-unicode                              ;                          |
+  complex-character-string-widetag          ;  E2   ED                /
 
-  unused-array-widetag                      ;  E6   F1  DE   E9
-
-  complex-bit-vector-widetag                ;  EA   F5  E2   ED
-  complex-vector-widetag                    ;  EE   F9  E6   F1
-  complex-array-widetag                     ;  F2   FD  EA   F5
+  complex-bit-vector-widetag                ;  E6   F1  DE   E9
+  complex-vector-widetag                    ;  EA   F5  E2   ED
+  complex-array-widetag                     ;  EE   F9  E6   F1
+  unused-array-widetag                      ;  F2   FD  EA   F5
 ))
 
 (defconstant-eqx +function-widetags+
