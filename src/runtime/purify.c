@@ -410,7 +410,6 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
     case COMPLEX_CHARACTER_STRING_WIDETAG:
 #endif
       case COMPLEX_BIT_VECTOR_WIDETAG:
-      case COMPLEX_VECTOR_NIL_WIDETAG:
       case COMPLEX_VECTOR_WIDETAG:
       case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
@@ -560,12 +559,12 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case INSTANCE_WIDETAG:
                 {
-                lispobj lbitmap = LAYOUT(instance_layout(addr))->bitmap;
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(instance_layout(addr)));
                 long nslots = instance_length(*addr);
                 int index;
                 for (index = 0; index < nslots ; index++)
                     // logically treat index 0 (layout) as a tagged slot
-                    if (index == 0 || bitmap_logbitp(index, lbitmap))
+                    if (index == 0 || bitmap_logbitp(index, bitmap))
                         pscav((addr+1) + index, 1, constant);
                 count = 1 + (nslots | 1);
                 }
