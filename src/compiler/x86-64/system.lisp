@@ -197,7 +197,8 @@
   (:info mask)
   (:conditional :ne)
   (:generator 1
-    ;; check that the mask is byte index 2
+    ;; Assert that the mask is in "header data" byte index 1
+    ;; which is byte index 2 of the whole header word.
     (aver (and (= (logcount mask) 1) (not (ldb-test (byte 8 0) mask))))
     (inst test :byte (ea (- 2 other-pointer-lowtag) array)
                      (ash mask (- 8)))))

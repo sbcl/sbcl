@@ -103,6 +103,20 @@
     (load-type al-tn x (- other-pointer-lowtag))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
+
+(define-vop (test-header-bit)
+  (:translate test-header-bit)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:arg-types t (:constant t))
+  (:info mask)
+  (:conditional :ne)
+  (:generator 1
+    ;; Assert that the mask is in "header data" byte index 1
+    ;; which is byte index 2 of the whole header word.
+    (aver (and (= (logcount mask) 1) (not (ldb-test (byte 8 0) mask))))
+    (inst test (make-ea :byte :base array :disp (- 2 other-pointer-lowtag))
+          (ash mask (- 8)))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

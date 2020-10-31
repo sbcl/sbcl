@@ -1436,8 +1436,10 @@
     (cond ((and (listp dims) (/= (length dims) 1)) nil) ; dims = * is possibly a vector
           ((eq (conservative-array-type-complexp array-type) nil) nil)
           (t
-           #+x86-64 `(test-header-bit array sb-vm:+array-fill-pointer-p+)
-           #-x86-64 `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+)))))
+           #+(or x86 x86-64)
+           `(test-header-bit array sb-vm:+array-fill-pointer-p+)
+           #-(or x86 x86-64)
+           `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+)))))
 
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
   (let ((array-ref (lvar-uses array))
