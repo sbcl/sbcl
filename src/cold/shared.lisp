@@ -544,7 +544,18 @@
                        (if *compile-for-effect-only* "-scratch" "-tmp")))
 
          (compile-file (ecase mode
-                         (:host-compile #'compile-file)
+                         (:host-compile
+                          #+ccl
+                          (lambda (&rest args)
+                            ;; CCL doesn't like NOTINLINE on uknown functions
+                            (handler-bind ((ccl:compiler-warning
+                                             (lambda (c)
+                                               (when (eq (ccl::compiler-warning-warning-type c)
+                                                         :unknown-declaration-function)
+                                                 (muffle-warning c)))))
+                              (apply #'compile-file args)))
+                          #-ccl
+                          #'compile-file)
                          (:target-compile (if (find :assem flags)
                                               *target-assemble-file*
                                               *target-compile-file*))))
