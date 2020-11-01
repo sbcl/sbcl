@@ -249,6 +249,7 @@
         (pos -1)
         (count 0)
         (state nil))
+    (declare (ignorable count))
     (flet ((input ()
              (aref octets (incf ptr)))
            (unput (n)

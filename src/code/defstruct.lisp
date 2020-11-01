@@ -1483,6 +1483,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun %redefine-defstruct (classoid old-layout new-layout)
   (declare (type classoid classoid)
            (type layout old-layout new-layout))
+  (declare (ignorable old-layout)) ; for host
   (let ((name (classoid-proper-name classoid)))
     (restart-case
         (error "~@<attempt to redefine the ~S class ~S incompatibly with the current definition~:@>"

@@ -109,6 +109,7 @@
           (buffpos (sm buffpos stream))
           (cnt 0)
           (char nil))
+      (declare (ignorable cnt))
       (unwind-protect
            (flet ((input ()
                     (when (>= buffpos (sm buffer-ptr stream))
