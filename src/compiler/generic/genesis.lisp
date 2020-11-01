@@ -418,6 +418,7 @@
         (note-it word-index)))))
 
 (defun gspace-claim-n-bytes (gspace specified-n-bytes &optional (page-type :mixed))
+  (declare (ignorable page-type))
   (let* ((n-bytes (round-up specified-n-bytes (ash 1 sb-vm:n-lowtag-bits)))
          (n-words (ash n-bytes (- sb-vm:word-shift))))
     (aver (evenp n-words))
