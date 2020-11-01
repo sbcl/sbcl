@@ -224,9 +224,7 @@
   (dd-length (find-defstruct-description type-name)))
 
 (defmacro get-dsd-index (type-name slot-name)
-  ;; It seems to be an error in CCL to declare something NOTINLINE
-  ;; if it is an unknown function.
-  #+sb-xc (declare (notinline dsd-index)) ; forward reference
+  (declare (notinline dsd-index)) ; avoid later inlining failure style-warning
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
