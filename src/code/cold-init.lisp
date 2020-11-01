@@ -224,7 +224,6 @@
   (show-and-call float-cold-init-or-reinit)
 
   (show-and-call !class-finalize)
-  (show-and-call sb-pcl::!fixup-print-object-method-guards)
 
   ;; The reader and printer are initialized very late, so that they
   ;; can do hairy things like invoking the compiler as part of their

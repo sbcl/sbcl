@@ -91,39 +91,29 @@
                     (cdr (or (assoc gf-name *!trivial-methods*)
                              (error "No methods on ~S" gf-name)))))
          (applicable-method
-           ;; Find a method where the guard returns T. If that fails, find a method
-           ;; which exactly matches TYPE-OF the specialized-arg.
-           ;; It might be nice to rely only on the TYPE-OF test, but then we'd have to
-           ;; concern ourselves with type hierarchies.
+           ;; Find a method where the guard returns T, or the object type is
+           ;; EQ to the method's specializer. Trivial dispatch knows nothing
+           ;; of superclass method applicability. In situations where we rely
+           ;; on an ancestral type's method, the predicate will pick it out.
            ;; The "method" is a vector:
            ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
-           (or (find-if (lambda (method &aux (guard (svref method 0)))
-                          (and (or (functionp guard) (fboundp guard))
-                               (funcall guard specialized-arg)))
-                        methods)
-               (find (type-of specialized-arg) methods
-                     :key (lambda (x) (svref x 2))))))
-
+          (find-if (lambda (method)
+                     ;; Most instance types lack a predicate.
+                     ;; Non-instances should all have a predicate.
+                     (let ((type (when (%instancep specialized-arg)
+                                   (classoid-name
+                                    (layout-classoid
+                                     (%instance-layout specialized-arg)))))
+                           (guard (svref method 0)))
+                       (or (eq type (svref method 2))
+                           (and (or (functionp guard) (fboundp guard))
+                                (funcall guard specialized-arg)))))
+                   methods)))
     (if applicable-method
         ;; Call using no permutation-vector / no precomputed next method.
         (apply (svref applicable-method 3) nil nil specialized-arg rest)
         (error "No applicable method for ~S on ~S~%" gf-name
                (type-of specialized-arg)))))
-
-;;; For any "trivial" PRINT-OBJECT method lacking a predicate to determine
-;;; its applicability, try to install one now.
-;;; (Question: could not genesis find a predicate for everything?)
-(defun !fixup-print-object-method-guards ()
-  ;; LAYOUT-OF has an ordinary definition appearing later, unless a vop translates
-  ;; it, in which case it has to be inlined because the stub isn't ready for use.
-  #-(vop-translates sb-kernel:layout-of) (declare (notinline layout-of))
-  ;; Wouldn't you know, DOVECTOR is in early-extensions,
-  ;; and it would need to go in primordial-extensions to use it here.
-  (loop for method across (cdr (assoc 'print-object sb-pcl::*!trivial-methods*))
-        unless (svref method 0)
-        do (let ((classoid (find-classoid (elt method 2))))
-             (setf (svref method 0)
-                   (lambda (x) (classoid-typep (layout-of x) classoid x))))))
 
 (defun make-load-form (object &optional environment)
   (!call-a-method 'make-load-form object environment))
