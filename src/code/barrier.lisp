@@ -11,33 +11,19 @@
 
 (in-package "SB-THREAD")
 
-
-;;;; Interpreter stubs for the various barrier functions
-
 ;;; If no memory barrier vops exist, then the %{mumble}-BARRIER function is an inline
 ;;; function that does nothing. If the vops exist, then the same function
 ;;; is always translated with a vop, and the DEFUN is merely an interpreter stub.
-#-(vop-named sb-vm:%memory-barrier)
-(progn
-;;; Assert correctness of build order. (Need not be exhaustive)
-(eval-when (:compile-toplevel) #+x86-64 (error "Expected %memory-barrier vop"))
-(declaim (inline sb-vm:%compiler-barrier sb-vm:%memory-barrier
-                 sb-vm:%read-barrier sb-vm:%write-barrier
-                 sb-vm:%data-dependency-barrier)))
-
-;;; Because of cross-compiler madness, avoid defining inline functions
-;;; inside a macrolet.
-;;; TODO: fix that problem once and for all, and put this back into a less insane form.
-(progn
-  .
-  #.(loop for name in '(sb-vm:%compiler-barrier
-                        sb-vm:%memory-barrier
-                        sb-vm:%read-barrier
-                        sb-vm:%write-barrier
-                        sb-vm:%data-dependency-barrier)
-          collect `(defun ,name ()
-                     #+(vop-named sb-vm:%memory-barrier) (,name)
-                     (values))))
+(eval-when (:compile-toplevel)
+  (sb-xc:defmacro def-barrier (name)
+    (if (sb-c::vop-existsp :named sb-vm:%memory-barrier)
+        `(defun ,name () (,name))
+        `(progn (declaim (inline ,name)) (defun ,name () (values))))))
+(def-barrier sb-vm:%compiler-barrier)
+(def-barrier sb-vm:%memory-barrier)
+(def-barrier sb-vm:%read-barrier)
+(def-barrier sb-vm:%write-barrier)
+(def-barrier sb-vm:%data-dependency-barrier)
 
 ;;;; The actual barrier macro and support
 (defmacro barrier ((kind) &body forms)

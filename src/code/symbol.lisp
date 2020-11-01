@@ -204,12 +204,11 @@ distinct from the global value. Can also be SETF."
 
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
-  #+(vop-translates cl:symbol-plist)
-  (symbol-plist symbol)
-  #-(vop-translates cl:symbol-plist)
-  (let ((list (car (truly-the list (symbol-info symbol))))) ; a harmless lie
-    ;; Just ensure the result is not a fixnum, and we're done.
-    (if (fixnump list) nil list)))
+  (if (sb-c::vop-existsp :translate cl:symbol-plist)
+      (symbol-plist symbol)
+      (let ((list (car (truly-the list (symbol-info symbol))))) ; a harmless lie
+        ;; Just ensure the result is not a fixnum, and we're done.
+        (if (fixnump list) nil list))))
 
 (declaim (ftype (sfunction (symbol t) cons) %ensure-plist-holder)
          (inline %ensure-plist-holder))

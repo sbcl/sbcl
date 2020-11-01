@@ -109,8 +109,8 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-            #+(vop-translates sb-int:fixnump-instance-ref)
-            ((and (type= type (specifier-type 'fixnum))
+            ((and (vop-existsp :translate fixnump-instance-ref)
+                  (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)))
                            (and (combination-p use)
                                 (almost-immediately-used-p object use)
@@ -876,8 +876,9 @@
         ;; - implement half-width structure slots
         ;; Since both of those are not happening any time soon, ...
        (deeper-p
-         #+(vop-translates sb-c::layout-depthoid-gt) `(layout-depthoid-gt ,n-layout ,depthoid)
-         #-(vop-translates sb-c::layout-depthoid-gt) `(> (layout-depthoid ,n-layout) ,depthoid))
+        (if (vop-existsp :translate layout-depthoid-gt)
+            `(layout-depthoid-gt ,n-layout ,depthoid)
+            `(> (layout-depthoid ,n-layout) ,depthoid)))
        (nth-ancestor ; This is possibly unused (if no compile-time layout, or depthoid -1)
         ;; Use DATA-VECTOR-REF directly, since that's what SVREF in SAFETY 0 will become.
         `(locally (declare (optimize (safety 0)))
@@ -926,8 +927,8 @@
                               `(let ((object-layout ,layout-getter))
                                  (or (eq object-layout ',layout)
                                      (eq object-layout ',other-layout))))
-                             #+(vop-named sb-vm::layout-eq)
-                             ((equal layout-getter '(%instance-layout object))
+                             ((and (vop-existsp :named sb-vm::layout-eq)
+                                   (equal layout-getter '(%instance-layout object)))
                               `(sb-vm::layout-eq object ',layout))
                              (t
                               `(eq ,layout-getter ',layout)))))

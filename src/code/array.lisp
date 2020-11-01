@@ -439,8 +439,7 @@
         (setf (%array-displaced-from old-data)
               (purge (%array-displaced-from old-data)))))))
 
-#-(vop-translates sb-kernel:set-header-bits)
-(progn
+(sb-c::unless-vop-existsp (:translate set-header-bits)
   (declaim (inline set-header-bits unset-header-bits))
   (defun set-header-bits (vector bits)
     (set-header-data vector (logior (get-header-data vector) bits))

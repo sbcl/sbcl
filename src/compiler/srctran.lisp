@@ -2546,12 +2546,7 @@
 
 ;;; Rightward ASH
 
-;;; Assert correctness of build order. (Need not be exhaustive)
-#-(vop-translates sb-kernel:%ash/right)
-(eval-when (:compile-toplevel) #+x86-64 (error "Expected %ASH/RIGHT vop"))
-
-#+(vop-translates sb-kernel:%ash/right)
-(progn
+(when-vop-existsp (:translate sb-kernel:%ash/right)
   (defun %ash/right (integer amount)
     (ash integer (- amount)))
 
@@ -2938,10 +2933,7 @@
                `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
                      ,(- (+ shift1 shift2)))))))))
 
-#-(vop-translates sb-kernel:%multiply-high)
-(progn
-;;; Assert correctness of build order. (Need not be exhaustive)
-(eval-when (:compile-toplevel) #+x86-64 (error "Expected %MULTIPLY-HIGH vop"))
+(unless-vop-existsp (:translate %multiply-high)
 (define-source-transform %multiply-high (x y)
   `(values (sb-bignum:%multiply ,x ,y)))
 )
@@ -3293,12 +3285,12 @@
       ((same-leaf-ref-p x y) t)
       ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
        nil)
-      #+(vop-translates sb-kernel:%instance-ref-eq)
       ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
       ;; if possible, but do not defer the memory load unless doing
       ;; so can have no effect, i.e. Y is a constant or provably not
       ;; effectful. For now, just handle constant Y.
-      ((and (constant-lvar-p y)
+      ((and (vop-existsp :translate %instance-ref-eq)
+            (constant-lvar-p y)
             (combination-p use)
             (almost-immediately-used-p x use)
             (eql '%instance-ref (lvar-fun-name (combination-fun use)))
@@ -3610,11 +3602,11 @@
                     (csubtypep y-type (specifier-type 'float)))
                (and (csubtypep x-type (specifier-type '(complex float)))
                     (csubtypep y-type (specifier-type '(complex float))))
-               #+(vop-named sb-vm::=/complex-single-float)
-               (and (csubtypep x-type (specifier-type '(or single-float (complex single-float))))
+               (and (vop-existsp :named sb-vm::=/complex-single-float)
+                    (csubtypep x-type (specifier-type '(or single-float (complex single-float))))
                     (csubtypep y-type (specifier-type '(or single-float (complex single-float)))))
-               #+(vop-named sb-vm::=/complex-double-float)
-               (and (csubtypep x-type (specifier-type '(or double-float (complex double-float))))
+               (and (vop-existsp :named sb-vm::=/complex-double-float)
+                    (csubtypep x-type (specifier-type '(or double-float (complex double-float))))
                     (csubtypep y-type (specifier-type '(or double-float (complex double-float))))))
            ;; They are both floats. Leave as = so that -0.0 is
            ;; handled correctly.

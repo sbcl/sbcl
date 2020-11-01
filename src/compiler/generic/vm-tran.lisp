@@ -693,15 +693,15 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-#-(vop-named sb-vm::eql/single-float)
+(unless (vop-existsp :named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
-  '(= (single-float-bits x) (single-float-bits y)))
+  '(= (single-float-bits x) (single-float-bits y))))
 
-#-(vop-named sb-vm::eql/double-float)
+(unless (vop-existsp :named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
   #-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
                   (= (double-float-high-bits x) (double-float-high-bits y)))
-  #+64-bit '(= (double-float-bits x) (double-float-bits y)))
+  #+64-bit '(= (double-float-bits x) (double-float-bits y))))
 
 
 ;;;; modular functions

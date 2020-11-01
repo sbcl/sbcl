@@ -155,6 +155,7 @@
   ;; Let's check that the type system, and various other things, are
   ;; reasonably sane. (It's easy to spend a long time wandering around
   ;; confused trying to debug cross-compilation if it isn't.)
+  (sb-c::check-vop-existence-correctness)
   (let ((*readtable* *xc-readtable*)
         (*load-verbose* t))
     (with-math-journal

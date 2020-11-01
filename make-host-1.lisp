@@ -151,12 +151,10 @@
 #+ecl (proclaim '(optimize (safety 2) (debug 2)))
 
 (maybe-with-compilation-unit
- (let ((*feature-evaluation-results* nil))
   ;; If make-host-1 is parallelized, it will produce host fasls without loading
   ;; them. The host will have interpreted definitions of most everything,
   ;; which is OK because writing out the C headers is not compute-intensive.
   (load-or-cload-xcompiler #'host-cload-stem)
-  (write-feature-eval-results))
  ;; propagate structure offset and other information to the C runtime
  ;; support code.
  (load "tools-for-build/corefile.lisp" :verbose nil)

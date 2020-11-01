@@ -1735,17 +1735,16 @@ not stack-allocated LVAR ~S." source-lvar)))))
        (loop for loc in (ir2-lvar-locs 2lvar)
              for idx upfrom 0
              unless (eq (tn-kind loc) :unused)
-             do #+(vop-named sb-vm::more-arg-or-nil)
-                (vop sb-vm::more-arg-or-nil node block
-                     (lvar-tn node block context)
-                     (lvar-tn node block count)
-                     idx
-                     loc)
-                #-(vop-named sb-vm::more-arg-or-nil)
-                (vop sb-vm::more-arg node block
-                     (lvar-tn node block context)
-                     (emit-constant idx)
-                     loc)))
+             do (if-vop-existsp (:named sb-vm::more-arg-or-nil)
+                    (vop sb-vm::more-arg-or-nil node block
+                         (lvar-tn node block context)
+                         (lvar-tn node block count)
+                         idx
+                         loc)
+                    (vop sb-vm::more-arg node block
+                         (lvar-tn node block context)
+                         (emit-constant idx)
+                         loc))))
       (:unknown
        (let ((locs (ir2-lvar-locs 2lvar)))
          (vop* %more-arg-values node block
@@ -1789,9 +1788,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (%special-unbind ir2-convert) ((&rest symbols) node block)
   (declare (ignorable symbols))
-  #-(vop-named sb-c:unbind-n) (vop unbind node block)
-  #+(vop-named sb-c:unbind-n) (vop unbind-n node block
-                                    (mapcar #'lvar-value symbols)))
+  (if-vop-existsp (:named sb-c:unbind-n)
+    (vop unbind-n node block (mapcar #'lvar-value symbols))
+    (vop unbind node block)))
 
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of

@@ -2426,7 +2426,7 @@ mechanism for inter-thread communication."
 ;;; This can not be "corrected" by genesis - there is no TLS when genesis executes.
 ;;; The only way to do this uniformly for all the platforms is to compute the address
 ;;; of the thread-local storage slot, and use (SETF SAP-REF-LISPOBJ) on that.
-;;; (Nor is #+(vop-translates ensure-symbol-tls-index) a reliable indicator that the
+;;; (Existence of a vop for ENSURE-SYMBOL-TLS-INDEX is not an indicator that the
 ;;; SET vop will assign into a thread-local symbol that currently has no TLS value.)
 (defun init-thread-local-storage (thread)
   ;; In addition to wanting the expressly unsafe variant of SYMBOL-VALUE, any error

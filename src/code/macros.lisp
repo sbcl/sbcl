@@ -1479,9 +1479,9 @@ symbol-case giving up: case=((V U) (F))
                   (setq clauses (if default (cons default new-clauses) new-clauses)
                         keys (new-keys)
                         implement-as 'case))
-                 #+(vop-named sb-c:multiway-branch-if-eq)
-                 ((expand-struct-typecase keyform keyform-value normal-clauses keys
-                                          default errorp)
+                 ((and (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
+                       (expand-struct-typecase keyform keyform-value normal-clauses keys
+                                          default errorp))
                   (return-from case-body-aux it))))))
 
     ;; Efficiently expanding CASE over symbols depends on CASE over integers being

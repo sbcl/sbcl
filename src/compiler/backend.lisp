@@ -45,10 +45,6 @@
 (defglobal *backend-sbs* #())
 (declaim (type simple-vector *backend-sbs*))
 
-;;; translation from template names to template structures
-(defglobal *backend-template-names* (make-hash-table)) ; keys are symbols
-(declaim (type hash-table *backend-template-names*))
-
 ;;; hashtables mapping from SC and SB names to the corresponding structures
 (defglobal *backend-sc-names* (make-hash-table))
 (declaim (type hash-table *backend-sc-names*))

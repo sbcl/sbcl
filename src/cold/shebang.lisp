@@ -42,50 +42,6 @@
 (defun backend-asm-package-name ()
   (concatenate 'string "SB-" (string (backend-assembler-target-name)) "-ASM"))
 
-(defun any-vop-named-p (vop-name)
-  (let ((ht (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB-C"))))
-    (not (null (gethash vop-name ht)))))
-
-(defun any-vop-translates-p (fun-name)
-  (let ((f (intern "INFO" "SB-INT")))
-    (when (fboundp f)
-      (let ((info (funcall f :function :info fun-name)))
-        (if info
-            (let ((f (intern "FUN-INFO-TEMPLATES" "SB-C")))
-              (and (fboundp f) (not (null (funcall f info))))))))))
-
-(defvar *feature-eval-results-file* "output/feature-tests.lisp-expr")
-(defvar *feature-evaluation-results*)
-
-(defun recording-feature-eval (expression value)
-  ;; This safety check does not work for parallel build, but that produces
-  ;; different code anyway due to missing derived types in any file that would
-  ;; have been compiled in the serial order but was interpreted instead.
-  (when (boundp '*feature-evaluation-results*)
-    ; (format t "~&FEATURE EXPR: ~S -> ~S~%" expression value)
-    (push (cons expression value) *feature-evaluation-results*))
-  value)
-
-(defun write-feature-eval-results ()
-  (with-open-file (f *feature-eval-results-file*
-                     :direction :output
-                     :if-exists :supersede :if-does-not-exist :create)
-    (let ((*print-readably* t))
-      (format f "(~{~S~^~% ~})~%" *feature-evaluation-results*))))
-
-(defun sanity-check-feature-evaluation ()
-  (flet ((check (phase list)
-           (dolist (x list)
-             (let ((answer
-                     (ecase (caar x)
-                      (:vop-named (any-vop-named-p (cadar x)))
-                      (:vop-translates (any-vop-translates-p (cadar x))))))
-               (unless (eq answer (cdr x))
-                 (error "make-host-~D DEFINE-VOP ordering bug:~@
- ~S should be ~S, was ~S at xc time" phase x answer (cdr x)))))))
-    (check 1 (with-open-file (f *feature-eval-results-file*) (read f)))
-    (check 2 *feature-evaluation-results*)))
-
 ;;; We should never call this with a selector of :HOST any more,
 ;;; but I'm keeping it in case of emergency.
 ;;; SB-XC:*FEATURES* might not be bound yet when computing derived features.
@@ -101,16 +57,7 @@
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
               (:not (destructuring-bind (subexpr) (cdr feature)
-                      (not (subfeature-in-list-p subexpr))))
-              ((:vop-named :vop-translates)
-               (destructuring-bind (subexpr) (cdr feature)
-                 (case (first feature)
-                   (:vop-named
-                    (recording-feature-eval feature
-                                      (any-vop-named-p subexpr)))
-                   (:vop-translates
-                    (recording-feature-eval
-                     feature (any-vop-translates-p subexpr)))))))))))
+                      (not (subfeature-in-list-p subexpr)))))))))
 (compile 'featurep)
 
 (defun read-targ-feature-expr (stream sub-character infix-parameter)

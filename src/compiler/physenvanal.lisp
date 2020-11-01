@@ -484,8 +484,7 @@
             (:restore-nsp
              (code `(%primitive set-nsp ,(ref-leaf node))))))))
     (flet ((coalesce-unbinds (code)
-             code
-              #+(vop-named sb-c:unbind-n)
+             (if (vop-existsp :named sb-c:unbind-n)
               (loop with cleanup
                     while code
                     do (setf cleanup (pop code))
@@ -495,7 +494,8 @@
                                   ,@(loop while (eq (caar code) '%special-unbind)
                                           collect (cadar code)
                                           do (pop code)))
-                                cleanup))))
+                                cleanup))
+                 code)))
      (when (code)
        (aver (not (node-tail-p (block-last (car pred-blocks)))))
        (insert-cleanup-code

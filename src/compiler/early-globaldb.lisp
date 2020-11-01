@@ -92,19 +92,13 @@
 ;;;
 ;;; Define SYMBOL-INFO-VECTOR as an inline function unless a vop translates it.
 ;;; (Inlining occurs first, which would cause the vop not to be used.)
-;;; Also note that we have to guard the appearance of VOP-TRANSLATES here
-;;; so that it does not get tested when building the cross-compiler.
-;;; This was the best way I could see to work around a spurious warning
-;;; about a wrongly ordered VM definition in make-host-1.
-;;; The #+/- reader can't see that a VOP-TRANSLATES term is not for the
-;;; host compiler unless the whole thing is one expression.
-#-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
-(progn
-(declaim (inline symbol-info-vector))
-(defun symbol-info-vector (symbol)
-  (let ((info-holder (symbol-info symbol)))
-    (truly-the (or null simple-vector)
-               (if (listp info-holder) (cdr info-holder) info-holder)))))
+#-sb-xc-host
+(sb-c::unless-vop-existsp (:translate sb-kernel:symbol-info-vector)
+  (declaim (inline symbol-info-vector))
+  (defun symbol-info-vector (symbol)
+    (let ((info-holder (symbol-info symbol)))
+      (truly-the (or null simple-vector)
+                 (if (listp info-holder) (cdr info-holder) info-holder)))))
 
 ;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
 ;;; But in the host Lisp, there is no such thing as a symbol-info slot.

@@ -25,9 +25,7 @@
       functions
       types)
   (sb-xc:with-compilation-unit ()
-    (let ((*feature-evaluation-results* nil))
-      (load "src/cold/compile-cold-sbcl.lisp")
-      (sanity-check-feature-evaluation))
+    (load "src/cold/compile-cold-sbcl.lisp")
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
     (when (and sb-c::*undefined-warnings*

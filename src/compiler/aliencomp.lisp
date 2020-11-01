@@ -710,7 +710,7 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        (cond #+(vop-named sb-vm::call-out-named)
+        (cond #+#.(cl:if (sb-c::vop-existsp :named sb-vm::call-out-named) '(and) '(or))
               ((and (constant-lvar-p function) (stringp (lvar-value function)))
                (vop* call-out-named call block (arg-operands) (result-operands)
                      (lvar-value function)
