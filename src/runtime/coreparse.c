@@ -1117,7 +1117,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
     if (hopscotch_get(seen, ptr, 0))
         return;
     hopscotch_insert(seen, ptr, 1);
-    lispobj layout, bitmap, *obj;
+    lispobj layout, *obj;
     int nwords, i;
     if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
         RECURSE(CONS(ptr)->car);
@@ -1132,7 +1132,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             layout = layout_of(obj);
             graph_visit(ptr, layout, seen);
             nwords = sizetab[widetag_of(obj)](obj);
-            bitmap = LAYOUT(layout)->bitmap;
+            struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) RECURSE(obj[1+i]);
             break;
