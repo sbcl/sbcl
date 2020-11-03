@@ -659,6 +659,27 @@ DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
+static inline int array_header_nwords(lispobj header) {
+    // TODO: store only the array-rank, and compute nwords from the rank.
+    return TINY_BOXED_NWORDS(header) + 1;
+}
+static sword_t scav_array(lispobj *where, lispobj header) {
+    struct array* a = (void*)where;
+    scav1(&a->data, a->data);
+    // displaced_p sounds like it would be T or NIL, but it is overloaded
+    // to hold information for situations where array A is displaced to an
+    // expressly adjustable array B which gets adjusted to become too small
+    // to contain all the elements of A.
+    scav1(&a->displaced_p, a->displaced_p);
+    scav1(&a->displaced_from, a->displaced_from);
+    return array_header_nwords(header);
+}
+static lispobj trans_array(lispobj object) {
+    // VECTOR is a lie but I'm using it only to subtract the lowtag
+    return copy_object(object, array_header_nwords(VECTOR(object)->header));
+}
+static sword_t size_array(lispobj *where) { return array_header_nwords(*where); }
+
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {

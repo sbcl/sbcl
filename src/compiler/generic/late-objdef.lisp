@@ -84,7 +84,7 @@
     #+sb-simd-pack-256 (simd-pack-256 "unboxed")
     (filler "unboxed")
 
-    (simple-array "boxed")
+    (simple-array "array")
     (simple-array-unsigned-byte-2 "vector_unsigned_byte_2")
     (simple-array-unsigned-byte-4 "vector_unsigned_byte_4")
     (simple-array-unsigned-byte-7 "vector_unsigned_byte_8")
@@ -116,12 +116,12 @@
     (simple-array-nil "vector_nil")
     (simple-base-string "base_string")
     #+sb-unicode (simple-character-string "character_string")
-    #+sb-unicode (complex-character-string "tiny_boxed")
-    (complex-base-string "tiny_boxed")
+    #+sb-unicode (complex-character-string "array")
+    (complex-base-string "array")
 
-    (complex-bit-vector "tiny_boxed")
-    (complex-vector "tiny_boxed")
-    (complex-array "tiny_boxed"))))
+    (complex-bit-vector "array")
+    (complex-vector "array")
+    (complex-array "array"))))
 
 #+sb-xc-host
 (defun write-gc-tables (stream)

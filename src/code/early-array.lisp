@@ -9,10 +9,10 @@
 
 (in-package "SB-IMPL")
 
-;;; The boxed payload length in the header can't exceed #xff.
-;;; 100 is a nice human-understandable number, but this could
-;;; be raised to as much as 249.
-(defconstant array-rank-limit 100
+;;; The ANSI-specified minimum is 8.
+;;; Adding the overhead words for a fancy array header plus 9 dimensions
+;;; yields a payload length of 15, which is 4 bits.
+(defconstant array-rank-limit 10
   "the exclusive upper bound on the rank of an array")
 
 ;;; - 2 to leave space for the array header

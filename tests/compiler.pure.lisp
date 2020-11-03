@@ -4582,8 +4582,8 @@
 
 (with-test (:name (:bug-1050768 :cause))
   (let ((types `((string string)
-                 ((or (simple-array character 24) (vector t 24))
-                  (or (simple-array character 24) (vector t))))))
+                 ((or (simple-array character 9) (vector t 9))
+                  (or (simple-array character 9) (vector t))))))
     (dolist (pair types)
       (destructuring-bind (orig conservative) pair
         (assert (sb-kernel:type= (sb-kernel:specifier-type conservative)
