@@ -182,7 +182,7 @@
 (defknown %array-rank (array) array-rank
   (flushable))
 
-#+x86-64
+#+(or x86 x86-64)
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 

@@ -677,10 +677,9 @@
       (cond ((cdr dims)
              (values `(,header-test
                        ,@(when (eq (array-type-dimensions stype) '*)
-                           #+x86-64
-                           `((%array-rank= ,obj ,(length dims)))
-                           #-x86-64
-                           `((= (%array-rank ,obj) ,(length dims))))
+                           (if (vop-existsp :translate %array-rank=)
+                               `((%array-rank= ,obj ,(length dims)))
+                               `((= (%array-rank ,obj) ,(length dims)))))
                        ,@(loop for d in dims
                                for i from 0
                                unless (eq '* d)

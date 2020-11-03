@@ -77,6 +77,17 @@
     ;; ASSUMPTION: n-widetag-bits = 8
     (inst movzx res (make-ea :byte :base x :disp (- 1 other-pointer-lowtag)))
     (inst sub res (1- array-dimensions-offset))))
+
+(define-vop ()
+  (:translate %array-rank=)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:info rank)
+  (:arg-types * (:constant t))
+  (:conditional :e)
+  (:generator 2
+    (inst cmp (make-ea :byte :disp (1+ (- other-pointer-lowtag)) :base array)
+              (+ rank (1- array-dimensions-offset)))))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)
