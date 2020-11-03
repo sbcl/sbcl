@@ -59,11 +59,39 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
-// Return only the lisp-visible vector header flag bits,
-// masking out flag_VectorWeakVisited.
-#define vector_flags(header) (HeaderValue(header) & 7)
-// Test for presence of a bit in vector's header.
-#define vector_flagp(header, val) (HeaderValue(header) & flag_##val)
+/*
+ * Predicates rather than bit extractors should be used to test the flags
+ * in a vector header, because:
+ *
+ * - while trying to place the flags into a different header byte, I found it
+ *   unobvious whether to treat flags as part of the "Header data" (which is a
+ *   3-byte or 7-byte wide field starting at bit 8) versus the entire "Header word".
+ *   So e.g. if the Lisp VECTOR-WEAK value were redefined to #x0100, which would
+ *   place a 1 bit into byte index 3 (using SET-HEADER-DATA), it isn't clear that
+ *   "vector_flags(vector) == vectorWeak" is the proper test, because vector_flags()
+ *   could reasonably be defined to right-shift by 0, 8, or 16 bits.
+ *   (i.e. leave the bits where they are, but mask out the widetag; or make them
+ *   act like "Header data"; or right-align as if we had Lisp bitfield extractors)
+ *   Looked at differently, the natural values for the first 3 flag bits should be
+ *   1, 2, and 4 but this would force you to write expressions such as:
+ *    (SET-HEADER-DATA V (ASH SB-VM:VECTOR-HASHING-FLAG SB-VM:VECTOR-FLAG-BITS-SHIFT))
+ *   which looks to be terribly inconvenient for Lisp.
+ *   Alternatively, the constants can be defined as their "natural" values for C
+ *   which would have flag_VectorWeak = 0x010000, but then you need the inverse
+ *   shift in Lisp which expects SET-HEADER-DATA to get #x0100 as the argument.
+ *   Hypothetically, that is.
+ *
+ * - With smarter macros it ought to be possible to avoid 8-byte loads and shifts.
+ *   They would need to be endian-aware, which I didn't want to do just yet.
+ */
+#define vector_flagp(header, val) ((int)header & (flag_##val << N_WIDETAG_BITS))
+#define vector_flags_zerop(header) ((int)(header) & 0x0700) == 0
+// True if flags are zero, also testing the widetag at the same time.
+#define ordinary_simple_vector_p(header) ((int)(header) & 0x07ff) == SIMPLE_VECTOR_WIDETAG
+// Return true if vector is a weak vector that is not a hash-table <k,v> vector.
+#define vector_is_weak_not_hashing_p(header) \
+  ((int)(header) & ((flag_VectorWeak|flag_VectorHashing) << N_WIDETAG_BITS)) == \
+    (flag_VectorWeak << N_WIDETAG_BITS)
 
 // Mask out the fullcgc mark bit when asserting header validity
 #define UNSET_WEAK_VECTOR_VISITED(v) \

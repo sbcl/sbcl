@@ -1318,19 +1318,19 @@ scav_vector (lispobj *where, lispobj header)
 {
     sword_t length = fixnum_value(where[1]);
 
-    /* SB-VM:VECTOR-HASHING-SUBTYPE is set for all hash tables in the
+    /* SB-VM:VECTOR-HASHING-FLAG is set for all hash tables in the
      * Lisp HASH-TABLE code to indicate need for special GC support.
      * But note that if the vector is a hashing vector that is neither
      * weak nor contains any key hashed by its address, then it is basically
      * a regular vector, except that GC needs only to look at cells below
      * the high-water-mark, plus the SUPPLEMENT slot at the end */
-    if (vector_flags(header) == 0) { // no special indicator bits set
+    if (vector_flags_zerop(header)) { // ordinary simple-vector
  normal:
         scavenge(where + 2, length);
         goto done;
     }
 
-    if (vector_flags(header) == flag_VectorWeak) { // specifically not weak + hashing
+    if (vector_is_weak_not_hashing_p(header)) {
         add_to_weak_vector_list(where, header);
         goto done;
     }

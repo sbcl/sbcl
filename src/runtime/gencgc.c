@@ -2402,7 +2402,7 @@ static inline boolean large_simple_vector_p(page_index_t page) {
     // high-water mark which is in general a good thing.  Perhaps if the
     // ratio of HWM to total size warrants it, we should prefer to use the
     // large_simple_vector optimization instead.
-    return header_widetag(header) == SIMPLE_VECTOR_WIDETAG && vector_flags(header) == 0;
+    return ordinary_simple_vector_p(header);
 }
 
 /* Attempt to re-protect code from first_page to last_page inclusive.

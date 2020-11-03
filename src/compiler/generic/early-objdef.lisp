@@ -307,23 +307,6 @@
   #'equal)
 
 ;;; the different vector flags can be ORed together.
-;;; N.B.: These are not "types" in the lisp sense.
-;; Weak vectors that are NOT hash-table backing vectors use this bit to track
-;; whether we've already recorded the vector for deferred scavenging.
-;; Hash-tables use an entirely different mechanism. Flag bit used only in C.
-(defconstant vector-weak-visited-flag 8)
-;; All hash-table backing vectors are marked with this bit.
-;; Essentially it informs GC that the vector has a high-water mark.
-(defconstant vector-hashing-flag      4)
-;; Set if hash-table contains address-sensitive keys and possibly
-;; an associated vector of 32-bit hashes.
-;; When upsizing a table, both the old and new vector may have this bit set.
-(defconstant vector-addr-hashing-flag 2)
-;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
-(defconstant vector-weak-flag         1)
-
-;;; These next two constants must not occupy the same byte of a
-;;; vector header word as the values in the preceding defenum.
 
 ;; A vector tagged as +VECTOR-SHAREABLE+ is logically readonly,
 ;; and permitted to be shared with another vector per the CLHS standard
@@ -331,7 +314,7 @@
 ;; often the print-name of a symbol, or was a literal in source code
 ;; and loaded from a fasl, or used in a few others situations
 ;; which warrant sharing.
-(defconstant +vector-shareable+ #x100)
+(defconstant +vector-shareable+        #x20)
 
 ;; A vector tagged as +VECTOR-SHAREABLE-NONSTD+ is logically readonly,
 ;; and *not* technically permitted by the standard to be shared.
@@ -340,7 +323,21 @@
 ;; into memory, where the requirement is that the machine code
 ;; reference "the same" object as appeared in source, but where,
 ;; nonetheless, opportunities for sharing abound.
-(defconstant +vector-shareable-nonstd+ #x200)
+(defconstant +vector-shareable-nonstd+ #x10)
+
+;; Weak vectors that are not hash-table backing vectors use this bit to track
+;; whether we've already recorded the vector for deferred scavenging.
+;; Hash-tables use an entirely different mechanism. Flag bit used only in C.
+(defconstant vector-weak-visited-flag  #x08)
+;; All hash-table backing vectors are marked with this bit.
+;; Essentially it informs GC that the vector has a high-water mark.
+(defconstant vector-hashing-flag       #x04)
+;; Set if hash-table contains address-sensitive keys and possibly
+;; an associated vector of 32-bit hashes.
+;; When upsizing a table, both the old and new vector may have this bit set.
+(defconstant vector-addr-hashing-flag  #x02)
+;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
+(defconstant vector-weak-flag          #x01)
 
 ;;; This constant must not conflict with any of the possible bit above
 ;;; nor overlap the payload length field of an array header.

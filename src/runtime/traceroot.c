@@ -764,10 +764,9 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // a path from the root only if it does not involve whichever
             // object is definitely weak. This fails on weak key-OR-value
             // tables since we can't decide whether to allow the entry.
-            // Disregard the address-sensitivity bit when checking whether
-            // this is a weak hash-table vector.
-            if ((vector_flags(*where) & ~flag_VectorAddrHashing)
-                == flag_VectorHashing + flag_VectorWeak) {
+            if (vector_flagp(*where, VectorWeak)) { // if any kind of weak vector
+                // If not a hashtable, just skip it.
+                if (!vector_flagp(*where, VectorHashing)) continue;
                 lispobj* data = where + 2;
                 int kv_vector_length = fixnum_value(where[1]);
                 lispobj lhash_table = data[kv_vector_length-1];
@@ -785,8 +784,6 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                     continue;
                 }
             }
-            if (vector_flagp(*where, VectorWeak))
-                continue;
             break;
         default:
             if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag)))
