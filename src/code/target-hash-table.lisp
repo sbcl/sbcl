@@ -310,7 +310,7 @@ Examples:
      ;; is set, so it needs to see a valid value in the 'supplement' slot.
      ;; Neither 0 nor +empty-ht-slot+ is a valid value.
      (setf (kv-vector-supplement v) nil)
-     (set-header-data v sb-vm:vector-hashing-subtype)
+     (set-header-data v sb-vm:vector-hashing-flag)
      v))
 
 (defun install-hash-table-lock (table)
@@ -524,8 +524,8 @@ Examples:
                 table
                 (or hash-vector (= table-kind hash-table-kind-eql))))
       (when weakp
-        (set-header-data kv-vector (logior sb-vm:vector-hashing-subtype
-                                           sb-vm:vector-weak-subtype)))
+        (set-header-data kv-vector (logior sb-vm:vector-hashing-flag
+                                           sb-vm:vector-weak-flag)))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
       table))
@@ -712,7 +712,7 @@ multiple threads accessing the same hash-table without locking."
                 ;; Set address-sensitivity BEFORE depending on the bits.
                 ;; Precise GC platforms can move any key except the ones which
                 ;; are explicitly pinned.
-                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag)
                 (push-in-chain (pointer-hash->bucket (pointer-hash key) mask)))))))
     ((= (ht-flags-kind (hash-table-flags table)) hash-table-kind-eql)
      ;; There's a very tricky issue here with using EQL-HASH - you can't just
@@ -743,7 +743,7 @@ multiple threads accessing the same hash-table without locking."
                 (pin-object key)
                 (multiple-value-bind (hash address-based) (eql-hash-no-memoize key)
                   (when address-based
-                    (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+                    (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
                   (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))))
     (t
       (do ((i hwm (1- i))) ((zerop i))
@@ -753,7 +753,7 @@ multiple threads accessing the same hash-table without locking."
                 (setf (aref next-vector i) next-free next-free i))
                (t
                 (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
-                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
                 (push-in-chain (pointer-hash->bucket (pointer-hash key) mask))))))))
   ;; This is identical to the calculation of next-free-kv in INSERT-AT.
   (cond ((/= next-free 0) next-free)
@@ -789,7 +789,7 @@ multiple threads accessing the same hash-table without locking."
    ;; to the hashing vectors, since at most one thread can win this CAS.
    (when (eq (cas (svref kv-vector rehash-stamp-elt) epoch rehashing-state) epoch)
      ;; Remove address-sensitivity, preserving the other flags.
-     (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+     (unset-header-bits kv-vector sb-vm:vector-addr-hashing-flag)
      ;; Rehash in place. For the duration of the rehash, readers who otherwise
      ;; might have seen intact chains (by which to find address-insensitive keys)
      ;; can't. No big deal. If we were willing to cons new vectors, we could
@@ -811,7 +811,7 @@ multiple threads accessing the same hash-table without locking."
                 (cond ((/= (aref hash-vector i) +magic-hash-vector-value+)
                        (push-in-chain (mask-hash (aref hash-vector i) mask)))
                       (t
-                       (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                       (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag)
                        (push-in-chain (pointer-hash->bucket
                                        (pointer-hash pair-key) mask))))
                 (when (eq pair-key key) (setq result key-index))))))
@@ -824,7 +824,7 @@ multiple threads accessing the same hash-table without locking."
                  (pin-object pair-key)
                  (multiple-value-bind (hash address-based) (eql-hash-no-memoize pair-key)
                    (when address-based
-                     (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+                     (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
                    (push-in-chain (mask-hash (prefuzz-hash hash) mask)))
                 (when (eq pair-key key) (setq result key-index)))))))
          (t
@@ -834,7 +834,7 @@ multiple threads accessing the same hash-table without locking."
              (with-pair (pair-key)
               (unless (empty-ht-slot-p pair-key)
                 (when (sb-vm:is-lisp-pointer (get-lisp-obj-address pair-key))
-                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+                  (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
                 (push-in-chain (pointer-hash->bucket
                                 (pointer-hash pair-key) mask))
                 (when (eq pair-key key) (setq result key-index)))))))
@@ -879,7 +879,7 @@ multiple threads accessing the same hash-table without locking."
     ;; for rehash (it's going to be zeroed out).
     ;; Clearing the weakness causes all entries to stay alive.
     ;; Furthermore, clearing both makes the trailing metadata ignorable.
-    (set-header-data old-kv-vector sb-vm:vector-hashing-subtype)
+    (set-header-data old-kv-vector sb-vm:vector-hashing-flag)
     (setf (kv-vector-supplement old-kv-vector) nil)
 
     ;; The high-water-mark remains unchanged.
@@ -916,7 +916,7 @@ multiple threads accessing the same hash-table without locking."
         ;; Now that the table points to the right hash-vector
         ;; we can set the vector's backpointer and turn it weak.
         (setf (kv-vector-supplement new-kv-vector) table)
-        (set-header-bits new-kv-vector sb-vm:vector-weak-subtype))
+        (set-header-bits new-kv-vector sb-vm:vector-weak-flag))
 
       ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
       ;; strong references to each k/v. For non-weak vectors there is no technical
@@ -1314,7 +1314,7 @@ nnnn 1_    any       linear scan
              (aver (eql (cas (svref kv-vector rehash-stamp-elt) initial-stamp
                              (1+ initial-stamp)) initial-stamp))
              ;; Remove weakness and address-sensitivity.
-             (set-header-data kv-vector sb-vm:vector-hashing-subtype)
+             (set-header-data kv-vector sb-vm:vector-hashing-flag)
              ;; We don't need to zero-fill the NEXT vector, just the INDEX vector.
              ;; Unless a key slot can be reached by a chain starting from the index
              ;; vector or the 'next' of a previous chain element, we don't read either
@@ -1329,7 +1329,7 @@ nnnn 1_    any       linear scan
              ;; so clear the list of GC-smashed cells.
              (setf (hash-table-smashed-cells hash-table) nil)
              ;; Re-enable weakness
-             (set-header-bits kv-vector sb-vm:vector-weak-subtype)
+             (set-header-bits kv-vector sb-vm:vector-weak-flag)
              (done-rehashing kv-vector initial-stamp))
            ;; One more try gives the definitive answer even if the hashes are
            ;; obsolete again.  KEY's hash can't have changed, and there
@@ -1615,7 +1615,7 @@ nnnn 1_    any       linear scan
              ;; so as long as the table informs GC that it has the dependency
              ;; by the time the key is free to move, all is well.
              (when address-based-p
-               (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype))
+               (set-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
 
              ;; Store the hash unless an EQ table. Because the key is pinned, it is
              ;; OK that GC would not have seen +magic-hash-vector-value+ for this
@@ -1866,7 +1866,7 @@ table itself."
                   (when (hash-table-weak-p hash-table)
                     (aver (eq (kv-vector-supplement kv-vector) hash-table)))
                   ;; Remove address-sensitivity.
-                  (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                  (unset-header-bits kv-vector sb-vm:vector-addr-hashing-flag)
                   ;; Do this only after unsetting the address-sensitive bit,
                   ;; otherwise GC might come along and touch this bit again.
                   (setf (kv-vector-rehash-stamp kv-vector) 0)

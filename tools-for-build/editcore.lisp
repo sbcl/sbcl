@@ -1533,7 +1533,7 @@
               (return-from scan-obj))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
-                (when (eql (logand (get-header-data obj) #xFF) vector-addr-hashing-subtype)
+                (when (eql (logand (get-header-data obj) #xFF) vector-addr-hashing-flag)
                   (do ((i 2 (+ i 2)) (needs-rehash))
                       ((= i len)
                        (when needs-rehash

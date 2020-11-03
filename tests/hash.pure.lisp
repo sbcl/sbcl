@@ -211,7 +211,7 @@
     (setf (gethash #\a tbl) 1)
     #+64-bit (setf (gethash 1.0f0 tbl) 1) ; single-float is a nonpointer
     (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
-      (assert (not (logtest data sb-vm:vector-addr-hashing-subtype))))))
+      (assert (not (logtest data sb-vm:vector-addr-hashing-flag))))))
 
 (with-test (:name (hash-table :small-rehash-size))
   (let ((ht (make-hash-table :rehash-size 2)))
@@ -227,10 +227,10 @@
     ;; verify that EQ hashing on symbols is address-sensitive
     (let ((h (make-hash-table :test 'eq)))
       (setf (gethash 'foo h) 1)
-      (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))
+      (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-flag)))
     (let ((h (make-hash-table :test 'eq :hash-function 'sb-kernel:symbol-hash)))
       (setf (gethash 'foo h) 1)
-      (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype))))
+      (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-flag))))
 
     ;; Verify that any standard hash-function on a function is address-sensitive,
     ;; but a custom hash function makes it not so.
@@ -240,13 +240,13 @@
     (dolist (test '(eq eql equal equalp))
       (let ((h (make-hash-table :test test)))
         (setf (gethash #'car h) 1)
-        (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))
+        (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-flag)))
       (let ((h (make-hash-table :test test :hash-function
                                 (lambda (x)
                                   (sb-kernel:%code-serialno
                                    (sb-kernel:fun-code-header x))))))
         (setf (gethash #'car h) 1)
-        (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))))))
+        (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-flag)))))))
 
 (defun hash-table-freelist (tbl)
   (sb-int:named-let chain ((index (sb-impl::hash-table-next-free-kv tbl)))

@@ -285,8 +285,8 @@ static void trace_object(lispobj* where)
     case SIMPLE_VECTOR_WIDETAG:
         // non-weak hashtable kv vectors are trivial in fullcgc. Keys don't move
         // so the table will not need rehash as a result of gc.
-        if ((vector_subtype(header) & ~subtype_VectorAddrHashing)
-            == subtype_VectorHashing + subtype_VectorWeak) { // weak table
+        if ((vector_flags(header) & ~flag_VectorAddrHashing)
+            == flag_VectorHashing + flag_VectorWeak) { // weak table
             struct vector* v = (struct vector*)where;
             lispobj lhash_table = v->data[fixnum_value(v->length)-1];
             gc_dcheck(instancep(lhash_table));
@@ -308,7 +308,7 @@ static void trace_object(lispobj* where)
             }
             return;
         }
-        if (is_vector_subtype(header, VectorWeak)) {
+        if (vector_flagp(header, VectorWeak)) {
             add_to_weak_vector_list(where, header);
             return;
         }

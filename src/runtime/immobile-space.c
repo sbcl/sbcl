@@ -1601,7 +1601,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         // Special case because we might need to mark hashtables
         // as needing rehash.
         case SIMPLE_VECTOR_WIDETAG:
-          if (is_vector_subtype(header_word, VectorAddrHashing)) {
+          if (vector_flagp(header_word, VectorAddrHashing)) {
               struct vector* kv_vector = (struct vector*)where;
               lispobj* data = kv_vector->data;
               gc_assert(kv_vector->length >= 5);

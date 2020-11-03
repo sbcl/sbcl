@@ -1081,10 +1081,10 @@ extern uword_t gc_private_cons(uword_t, uword_t);
 
 void add_to_weak_vector_list(lispobj* vector, lispobj header)
 {
-    if (!is_vector_subtype(header, VectorWeakVisited)) {
+    if (!vector_flagp(header, VectorWeakVisited)) {
         weak_vectors = (struct cons*)gc_private_cons((uword_t)vector,
                                                      (uword_t)weak_vectors);
-        *vector |= subtype_VectorWeakVisited << N_WIDETAG_BITS;
+        *vector |= flag_VectorWeakVisited << N_WIDETAG_BITS;
     }
 }
 
@@ -1248,7 +1248,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
 {
     lispobj* data = kv_vector->data;
 
-    if (!is_vector_subtype(kv_vector->header, VectorAddrHashing)) {
+    if (!vector_flagp(kv_vector->header, VectorAddrHashing)) {
         // All keys were hashed address-insensitively
         return (void)scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
     }
@@ -1324,13 +1324,13 @@ scav_vector (lispobj *where, lispobj header)
      * weak nor contains any key hashed by its address, then it is basically
      * a regular vector, except that GC needs only to look at cells below
      * the high-water-mark, plus the SUPPLEMENT slot at the end */
-    if (vector_subtype(header) == 0) { // no special indicator bits set
+    if (vector_flags(header) == 0) { // no special indicator bits set
  normal:
         scavenge(where + 2, length);
         goto done;
     }
 
-    if (vector_subtype(header) == subtype_VectorWeak) { // specifically not weak + hashing
+    if (vector_flags(header) == flag_VectorWeak) { // specifically not weak + hashing
         add_to_weak_vector_list(where, header);
         goto done;
     }
@@ -1341,7 +1341,7 @@ scav_vector (lispobj *where, lispobj header)
 
     /* Scavenge element (length-1), which may be a hash-table structure. */
     scavenge(&data[length-1], 1);
-    if (!is_vector_subtype(header, VectorWeak)) {
+    if (!vector_flagp(header, VectorWeak)) {
         scan_nonweak_kv_vector((struct vector*)where, gc_scav_pair);
         goto done;
     }

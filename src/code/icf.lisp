@@ -89,7 +89,7 @@
          (do-referenced-object (object rewrite)
            (simple-vector
             :extend
-            (when (and (logtest (get-header-data object) vector-addr-hashing-subtype)
+            (when (and (logtest (get-header-data object) vector-addr-hashing-flag)
                        touchedp)
               (setf (svref object 1) 1)))
            (code-component

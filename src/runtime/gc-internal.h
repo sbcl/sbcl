@@ -59,18 +59,18 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
-// Return only the lisp-visible vector header flag bits bits,
-// masking out subtype_VectorWeakVisited.
-#define vector_subtype(header) (HeaderValue(header) & 7)
+// Return only the lisp-visible vector header flag bits,
+// masking out flag_VectorWeakVisited.
+#define vector_flags(header) (HeaderValue(header) & 7)
 // Test for presence of a bit in vector's header.
-#define is_vector_subtype(header, val) (HeaderValue(header) & subtype_##val)
+#define vector_flagp(header, val) (HeaderValue(header) & flag_##val)
 
 // Mask out the fullcgc mark bit when asserting header validity
 #define UNSET_WEAK_VECTOR_VISITED(v) \
   gc_assert((v->header & 0xffff) == \
-    (((subtype_VectorWeakVisited|subtype_VectorWeak) << N_WIDETAG_BITS) \
+    (((flag_VectorWeakVisited|flag_VectorWeak) << N_WIDETAG_BITS) \
      | SIMPLE_VECTOR_WIDETAG)); \
-  v->header ^= subtype_VectorWeakVisited << N_WIDETAG_BITS
+  v->header ^= flag_VectorWeakVisited << N_WIDETAG_BITS
 
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h. These constants are used in gc-common,

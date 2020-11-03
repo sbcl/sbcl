@@ -766,8 +766,8 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // tables since we can't decide whether to allow the entry.
             // Disregard the address-sensitivity bit when checking whether
             // this is a weak hash-table vector.
-            if ((vector_subtype(*where) & ~subtype_VectorAddrHashing)
-                == subtype_VectorHashing + subtype_VectorWeak) {
+            if ((vector_flags(*where) & ~flag_VectorAddrHashing)
+                == flag_VectorHashing + flag_VectorWeak) {
                 lispobj* data = where + 2;
                 int kv_vector_length = fixnum_value(where[1]);
                 lispobj lhash_table = data[kv_vector_length-1];
@@ -785,7 +785,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                     continue;
                 }
             }
-            if (is_vector_subtype(*where, VectorWeak))
+            if (vector_flagp(*where, VectorWeak))
                 continue;
             break;
         default:

@@ -528,7 +528,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 //     [1] : vector length
                 //     [2] : element[0] = high-water mark
                 //     [3] : element[1] = rehash bit
-                if (is_vector_subtype(thing, VectorAddrHashing))
+                if (vector_flagp(thing, VectorAddrHashing))
                     addr[3] = make_fixnum(1); // just flag it for rehash
                 count = 2;
                 break;

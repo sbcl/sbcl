@@ -483,7 +483,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             break;
         // Vectors require extra care because of address-based hashing.
         case SIMPLE_VECTOR_WIDETAG:
-          if (is_vector_subtype(*where, VectorAddrHashing)) {
+          if (vector_flagp(*where, VectorAddrHashing)) {
               struct vector* v = (struct vector*)where;
               // If you could make a hash-table vector with space for exactly 1 k/v pair,
               // it would have length 5.
