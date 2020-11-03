@@ -58,13 +58,13 @@
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:generator 6
     ;; ASSUMPTION: n-widetag-bits = 8
-    (inst lbz temp x (- 2 other-pointer-lowtag))
-    (inst subi temp temp (1- array-dimensions-offset))
-    (inst slwi res temp n-fixnum-tag-bits)))
+    (inst lbz res x #+little-endian (- 1 other-pointer-lowtag)
+                    #+big-endian    (- 6 other-pointer-lowtag))
+    (inst subi res res (1- array-dimensions-offset))))
 
 ;;;; Bounds checking routine.
 
