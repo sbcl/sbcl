@@ -1535,7 +1535,9 @@
               (let ((len (length (the simple-vector obj))))
                 (when (logtest (get-header-data obj) vector-addr-hashing-flag)
                   (do ((i 2 (+ i 2)) (needs-rehash))
-                      ((= i len)
+                      ;; Refer to the figure at the top of src/code/hash-table.lisp.
+                      ;; LEN is an odd number.
+                      ((>= i (1- len))
                        (when needs-rehash
                          (setf (svref obj 1) 1)))
                     ;; A weak or EQ-based hash table any of whose keys is a function
