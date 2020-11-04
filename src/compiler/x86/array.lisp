@@ -37,26 +37,6 @@
     (pseudo-atomic ()
      (allocation nil bytes other-pointer-lowtag node nil result)
      (storew header result 0 other-pointer-lowtag))))
-
-(define-vop (make-array-header/c)
-  (:translate make-array-header)
-  (:policy :fast-safe)
-  (:arg-types (:constant t) (:constant t))
-  (:info type rank)
-   (:results (result :scs (descriptor-reg)))
-  (:node-var node)
-  (:generator 12
-    (let* ((header-size (+ rank
-                           (1- array-dimensions-offset)))
-           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
-                               lowtag-mask)
-                            lowtag-mask))
-           (header (logior (ash header-size
-                                n-widetag-bits)
-                           type)))
-     (pseudo-atomic ()
-      (allocation nil bytes other-pointer-lowtag node nil result)
-      (storew header result 0 other-pointer-lowtag)))))
 
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *

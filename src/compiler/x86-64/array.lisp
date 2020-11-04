@@ -42,27 +42,6 @@
      (allocation nil bytes 0 node nil result)
      (storew header result 0 0)
      (inst or :byte result other-pointer-lowtag))))
-
-(define-vop (make-array-header/c)
-  (:translate make-array-header)
-  (:policy :fast-safe)
-  (:arg-types (:constant t) (:constant t))
-  (:info type rank)
-  (:results (result :scs (descriptor-reg) :from :eval))
-  (:node-var node)
-  (:generator 12
-    (let* ((header-size (+ rank
-                           (1- array-dimensions-offset)))
-           (bytes (* (align-up (1+ header-size) 2) n-word-bytes))
-           (header (logior (ash header-size
-                                n-widetag-bits)
-                           type)))
-     (instrument-alloc bytes node)
-     (pseudo-atomic ()
-      (allocation nil bytes 0 node nil result)
-      (storew* header result 0 0 t)
-      (inst or :byte result other-pointer-lowtag)))))
-
 
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *

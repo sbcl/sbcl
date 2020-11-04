@@ -39,29 +39,6 @@
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
-
-(define-vop (make-array-header/c)
-  (:translate make-array-header)
-  (:policy :fast-safe)
-  (:arg-types (:constant t) (:constant t))
-  (:info type rank)
-  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:results (result :scs (descriptor-reg)))
-  (:generator 4
-    (let* ((header-size (+ rank
-                           (1- array-dimensions-offset)))
-           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
-                               lowtag-mask)
-                            lowtag-mask))
-           (header-bits (logior (ash header-size
-                                     n-widetag-bits)
-                                type)))
-      (pseudo-atomic (pa-flag)
-        (allocation nil bytes other-pointer-lowtag header :flag-tn pa-flag)
-        (load-immediate-word pa-flag header-bits)
-        (storew pa-flag header 0 other-pointer-lowtag)))
-    (move result header)))
 
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *
