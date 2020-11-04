@@ -1245,9 +1245,9 @@
 ;; reduction.
 (deftransform array-rank ((array) (array) * :node node)
   (let ((array-type (lvar-type array)))
-    (cond ((eq t (and (array-type-p array-type)
-                      (array-type-complexp array-type)))
-           '(%array-rank array))
+    (cond ((and (array-type-p array-type)
+                (listp (array-type-dimensions array-type)))
+           (length (array-type-dimensions array-type)))
           ;; We need an extra case in here to best handle a known vector, because
           ;; if we try to add a transform on ARRAY-HEADER-P (returning false for
           ;; known simple-array of rank 1), that would fail to optimize where we know
@@ -1255,6 +1255,9 @@
           ;; would still have both if its consequents considered plausible.
           ((csubtypep array-type (specifier-type 'vector))
            1)
+          ((and (array-type-p array-type)
+                (eq (array-type-complexp array-type) t))
+           '(%array-rank array))
           (t
            (delay-ir1-transform node :constraint)
            `(if (array-header-p array)

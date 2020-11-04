@@ -790,14 +790,19 @@ sb-vm::(define-vop (cl-user::test)
     (assert (/= (sb-kernel:layout-bitmap l) sb-kernel:+layout-all-tagged+))))
 
 (with-test (:name :known-array-rank)
-  (let ((lines
-         (disassembly-lines
-          '(lambda (x)
-            #+sb-safepoint (declare (optimize (sb-c::insert-safepoints 0)))
-            (array-rank (truly-the string x))))))
-    ;; (format t "~{~&~A~}" lines)
-    ;; Naturally this is brittle as heck. I wish we had a better way.
-    (assert (<= (length lines) 9))))
+  (flet ((try (type)
+           (let ((lines
+                  (disassembly-lines
+                   `(lambda (x)
+                     #+sb-safepoint (declare (optimize (sb-c::insert-safepoints 0)))
+                     (array-rank (truly-the ,type x))))))
+             ;; (format t "~{~&~A~}" lines)
+             ;; Naturally this is brittle as heck. I wish we had a better way.
+             (assert (<= (length lines) 9)))))
+    (try 'string)
+    (try '(and vector (not simple-array)))
+    (try '(or string bit-vector)) ; not an array type, but known rank
+    (try '(array * (4 5 *)))))
 
 ;;; Match the same set of objects that %OTHER-POINTER-P does.
 (deftype other-pointer-object ()
