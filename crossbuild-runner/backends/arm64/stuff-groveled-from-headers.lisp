@@ -7,6 +7,7 @@
 (defconstant rtld-lazy 1) ; #x1
 (defconstant rtld-now 2) ; #x2
 (defconstant rtld-global 256) ; #x100
+
 (in-package "SB-UNIX")
 
 ;;; select()
@@ -135,11 +136,10 @@
 (defconstant fpe-fltsub 8) ; #x8
 
 (defconstant clock-realtime 0) ; #x0
+(defconstant clock-monotonic 1) ; #x1
 (defconstant clock-process-cputime-id 2) ; #x2
 (defconstant clock-realtime-alarm 8) ; #x8
 (defconstant clock-realtime-coarse 5) ; #x5
-(defconstant clock-tai 11) ; #xb
-(defconstant clock-monotonic 1) ; #x1
 (defconstant clock-monotonic-coarse 6) ; #x6
 (defconstant clock-monotonic-raw 4) ; #x4
 (defconstant clock-boottime 7) ; #x7

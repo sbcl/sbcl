@@ -7,6 +7,7 @@
 (defconstant rtld-lazy 1) ; #x1
 (defconstant rtld-now 2) ; #x2
 (defconstant rtld-global 256) ; #x100
+
 (in-package "SB-UNIX")
 
 ;;; select()
@@ -19,8 +20,6 @@
 (defconstant pollnval 32) ; #x20
 (defconstant pollerr 8) ; #x8
 (define-alien-type nfds-t (unsigned 64))
-;;; langinfo
-(defconstant codeset 14) ; #xe
 ;;; types, types, types
 (define-alien-type clock-t (signed 64))
 (define-alien-type dev-t (unsigned 64))
@@ -94,6 +93,10 @@
 (defconstant tiocgpgrp 21519) ; #x540f
 
 ;;; signals
+(defconstant sizeof-sigset_t 128) ; #x80
+(defconstant sig_block 0) ; #x0
+(defconstant sig_unblock 1) ; #x1
+(defconstant sig_setmask 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 7) ; #x7
 (defconstant sigchld 17) ; #x11
@@ -132,6 +135,17 @@
 (defconstant fpe-fltinv 7) ; #x7
 (defconstant fpe-fltsub 8) ; #x8
 
+(defconstant clock-realtime 0) ; #x0
+(defconstant clock-monotonic 1) ; #x1
+(defconstant clock-process-cputime-id 2) ; #x2
+(defconstant clock-realtime-alarm 8) ; #x8
+(defconstant clock-realtime-coarse 5) ; #x5
+(defconstant clock-tai 11) ; #xb
+(defconstant clock-monotonic-coarse 6) ; #x6
+(defconstant clock-monotonic-raw 4) ; #x4
+(defconstant clock-boottime 7) ; #x7
+(defconstant clock-boottime-alarn 9) ; #x9
+(defconstant clock-thread-cputime-id 3) ; #x3
 ;;; structures
 (define-alien-type nil
   (struct timeval
