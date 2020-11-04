@@ -411,7 +411,7 @@
         (pseudo-atomic (:elide-if stack-allocate-p)
          (allocation nil (pad-data-block words) lowtag node stack-allocate-p result)
          (when type
-           (storew (logior (ash (1- words) (length-field-shift type)) type)
+           (storew (compute-object-header words type)
                    result
                    0
                    lowtag))))))

@@ -33,8 +33,8 @@
           (ea (+ (* array-dimensions-offset n-word-bytes) lowtag-mask)
               nil rank (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst and :dword bytes (lognot lowtag-mask))
-    (inst lea :dword header (ea (fixnumize (1- array-dimensions-offset)) rank))
-    (inst shl :dword header n-widetag-bits)
+    (inst mov :dword header rank)
+    (inst shl :dword header array-rank-byte-pos)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
     (instrument-alloc bytes node)
@@ -59,23 +59,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 3
-    ;; ASSUMPTION: n-widetag-bits = 8
-    (inst movzx '(:byte :dword) res (ea (1+ (- other-pointer-lowtag)) x))
-    (inst sub :dword res (1- array-dimensions-offset))))
-
-(define-vop (array-rank-vop=>fixnum)
-  (:translate %array-rank)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:generator 2
-    (inst movzx '(:byte :dword) res (ea (1+ (- other-pointer-lowtag)) x))
-    (inst lea :dword res
-          (let ((scale (ash 1 n-fixnum-tag-bits)))
-            ;; Compute [res*N-disp]. for N=2 use [res+res-disp]
-            (ea (- (* scale (1- array-dimensions-offset)))
-                (if (= scale 2) res nil) res (if (= scale 2) 1 scale))))))
+    (inst movzx '(:byte :dword) res (ea (- 2 other-pointer-lowtag) x))))
 
 (define-vop ()
   (:translate %array-rank=)
@@ -85,10 +69,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp :byte
-          (ea (1+ (- other-pointer-lowtag)) array)
-          (+ rank
-             (1- array-dimensions-offset)))))
+    (inst cmp :byte (ea (- 2 other-pointer-lowtag) array) rank)))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)

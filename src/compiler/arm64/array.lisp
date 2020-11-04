@@ -34,8 +34,7 @@
       (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag :lip lip)
       ;; Now that we have the space allocated, compute the header
       ;; value.
-      (inst lsl ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
-      (inst add ndescr ndescr (ash (1- array-dimensions-offset) n-widetag-bits))
+      (inst lsl ndescr rank (- array-rank-byte-pos n-fixnum-tag-bits))
       (inst orr ndescr ndescr (lsr type n-fixnum-tag-bits))
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))
@@ -54,14 +53,11 @@
   (:translate sb-kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:generator 6
-    ;; ASSUMPTION: n-widetag-bits = 8
-    (inst ldrb temp (@ x #+little-endian (- 1 other-pointer-lowtag)
-                         #+big-endian    (- 6 other-pointer-lowtag)))
-    (inst sub temp temp (1- array-dimensions-offset))
-    (inst lsl res temp n-fixnum-tag-bits)))
+    (inst ldrb res (@ x #+little-endian (- 2 other-pointer-lowtag)
+                        #+big-endian    (- 5 other-pointer-lowtag)))))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)

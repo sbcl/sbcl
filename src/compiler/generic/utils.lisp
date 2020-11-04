@@ -215,8 +215,16 @@
       instance-length-shift
       n-widetag-bits))
 
-(defun compute-object-header (size widetag)
-  (logior (case widetag
-            (#.fdefn-widetag 0)
-            (t (ash (1- size) (length-field-shift widetag))))
-          widetag))
+(defconstant array-rank-byte-pos 16)
+
+(defun compute-object-header (nwords widetag)
+  (let ((array-header-p
+         (or (= widetag simple-array-widetag)
+             (>= widetag complex-base-string-widetag))))
+    (logior (if array-header-p
+                (let ((rank (- nwords array-dimensions-offset)))
+                  (ash rank array-rank-byte-pos))
+                (case widetag
+                  (#.fdefn-widetag 0)
+                  (t (ash (1- nwords) (length-field-shift widetag)))))
+            widetag)))

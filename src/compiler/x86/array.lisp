@@ -29,11 +29,10 @@
                    :disp (+ (* array-dimensions-offset n-word-bytes)
                             lowtag-mask)))
     (inst and bytes (lognot lowtag-mask))
-    (inst lea header (make-ea :dword :base rank
-                              :disp (fixnumize (1- array-dimensions-offset))))
-    (inst shl header n-widetag-bits)
+    (inst mov header rank)
+    (inst shl header array-rank-byte-pos)
     (inst or  header type)
-    (inst shr header 2)
+    (inst shr header n-fixnum-tag-bits)
     (pseudo-atomic ()
      (allocation nil bytes other-pointer-lowtag node nil result)
      (storew header result 0 other-pointer-lowtag))))
@@ -54,9 +53,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    ;; ASSUMPTION: n-widetag-bits = 8
-    (inst movzx res (make-ea :byte :base x :disp (- 1 other-pointer-lowtag)))
-    (inst sub res (1- array-dimensions-offset))))
+    (inst movzx res (make-ea :byte :disp (- 2 other-pointer-lowtag) :base x))))
 
 (define-vop ()
   (:translate %array-rank=)
@@ -66,8 +63,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp (make-ea :byte :disp (1+ (- other-pointer-lowtag)) :base array)
-              (+ rank (1- array-dimensions-offset)))))
+    (inst cmp (make-ea :byte :disp (- 2 other-pointer-lowtag) :base array) rank)))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)

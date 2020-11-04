@@ -660,8 +660,9 @@ DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 static inline int array_header_nwords(lispobj header) {
-    // TODO: store only the array-rank, and compute nwords from the rank.
-    return TINY_BOXED_NWORDS(header) + 1;
+    int rank = (header >> 16) & 0xf;
+    int nwords = sizeof (struct array)/N_WORD_BYTES + (rank-1);
+    return ALIGN_UP(nwords, 2);
 }
 static sword_t scav_array(lispobj *where, lispobj header) {
     struct array* a = (void*)where;

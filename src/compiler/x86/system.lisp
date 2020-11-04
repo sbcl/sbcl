@@ -112,11 +112,10 @@
   (:info mask)
   (:conditional :ne)
   (:generator 1
-    ;; Assert that the mask is in "header data" byte index 1
-    ;; which is byte index 2 of the whole header word.
-    (aver (and (= (logcount mask) 1) (not (ldb-test (byte 8 0) mask))))
-    (inst test (make-ea :byte :base array :disp (- 2 other-pointer-lowtag))
-          (ash mask (- 8)))))
+    ;; Assert that the mask is in header-data byte index 0
+    ;; which is byte index 1 of the whole header word.
+    (aver (typep mask '(unsigned-byte 8)))
+    (inst test (make-ea :byte :disp (- 1 other-pointer-lowtag) :base array) mask)))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

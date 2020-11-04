@@ -33,8 +33,7 @@
       (allocation nil ndescr other-pointer-lowtag header
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
-      (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
-      (inst slwi ndescr ndescr n-widetag-bits)
+      (inst slwi ndescr rank array-rank-byte-pos)
       (inst or ndescr ndescr type)
       (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
@@ -56,13 +55,10 @@
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:generator 6
-    ;; ASSUMPTION: n-widetag-bits = 8
-    (inst lbz temp x (- 2 other-pointer-lowtag))
-    (inst subi temp temp (1- array-dimensions-offset))
-    (inst slwi res temp n-fixnum-tag-bits)))
+    (inst lbz res x (- 1 other-pointer-lowtag)))) ; big-endian only
 
 ;;;; Bounds checking routine.
 

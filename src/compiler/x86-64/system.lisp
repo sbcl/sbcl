@@ -186,7 +186,7 @@
   (:info bits)
   (:generator 1
     (if (typep bits '(unsigned-byte 8))
-        (inst and :byte (ea (- 1 other-pointer-lowtag) x) (lognot bits))
+        (inst and :byte (ea (- 1 other-pointer-lowtag) x) (logandc1 bits #xff))
         (inst and :dword (ea (- other-pointer-lowtag) x)
               (lognot (ash bits n-widetag-bits))))))
 (define-vop (test-header-bit)
@@ -197,11 +197,10 @@
   (:info mask)
   (:conditional :ne)
   (:generator 1
-    ;; Assert that the mask is in "header data" byte index 1
-    ;; which is byte index 2 of the whole header word.
-    (aver (and (= (logcount mask) 1) (not (ldb-test (byte 8 0) mask))))
-    (inst test :byte (ea (- 2 other-pointer-lowtag) array)
-                     (ash mask (- 8)))))
+    ;; Assert that the mask is in header-data byte index 0
+    ;; which is byte index 1 of the whole header word.
+    (aver (typep mask '(unsigned-byte 8)))
+    (inst test :byte (ea (- 1 other-pointer-lowtag) array) mask)))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

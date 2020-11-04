@@ -612,21 +612,21 @@
     (unless stack-allocate-p
       (instrument-alloc bytes node))
     (pseudo-atomic (:elide-if stack-allocate-p)
-            ;; If storing a header word, defer ORing in the lowtag until after
-            ;; the header is written so that displacement can be 0.
-            (allocation nil bytes (if type 0 lowtag) node stack-allocate-p result)
-            (when type
-              (let* ((widetag (if instancep instance-widetag type))
-                     (header (logior (ash (1- words) (length-field-shift widetag)) widetag)))
-                (if (or #+compact-instance-header
-                        (and (eq name '%make-structure-instance) stack-allocate-p))
-                    ;; Write a :DWORD, not a :QWORD, because the high half will be
-                    ;; filled in when the layout is stored. Can't use STOREW* though,
-                    ;; because it tries to store as few bytes as possible,
-                    ;; where this instruction must write exactly 4 bytes.
-                    (inst mov :dword (ea 0 result) header)
-                    (storew* header result 0 0 (not stack-allocate-p)))
-                (inst or :byte result lowtag))))
+      ;; If storing a header word, defer ORing in the lowtag until after
+      ;; the header is written so that displacement can be 0.
+      (allocation nil bytes (if type 0 lowtag) node stack-allocate-p result)
+      (when type
+        (let* ((widetag (if instancep instance-widetag type))
+               (header (compute-object-header words widetag)))
+          (if (or #+compact-instance-header
+                  (and (eq name '%make-structure-instance) stack-allocate-p))
+              ;; Write a :DWORD, not a :QWORD, because the high half will be
+              ;; filled in when the layout is stored. Can't use STOREW* though,
+              ;; because it tries to store as few bytes as possible,
+              ;; where this instruction must write exactly 4 bytes.
+              (inst mov :dword (ea 0 result) header)
+              (storew* header result 0 0 (not stack-allocate-p)))
+          (inst or :byte result lowtag))))
     (when instancep ; store its layout
       (inst mov :dword (ea (+ 4 (- lowtag)) result)
             (make-fixup type :layout))))))

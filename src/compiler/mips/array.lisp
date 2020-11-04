@@ -26,8 +26,7 @@
                              lowtag-mask))
     (inst srl bytes n-lowtag-bits)
     (inst sll bytes n-lowtag-bits)
-    (inst addu header rank (fixnumize (1- array-dimensions-offset)))
-    (inst sll header n-widetag-bits)
+    (inst sll header rank array-rank-byte-pos)
     (inst or header type)
     ;; Remove the extraneous fixnum tag bits because TYPE and RANK
     ;; were fixnums
@@ -54,10 +53,9 @@
   (:result-types positive-fixnum)
   (:generator 6
     ;; ASSUMPTION: n-widetag-bits = 8
-    (inst lbu res x #+little-endian (- 1 other-pointer-lowtag)
-                    #+big-endian    (- 2 other-pointer-lowtag))
-    (inst nop)
-    (inst subu res (1- array-dimensions-offset))))
+    (inst lbu res x #+little-endian (- 2 other-pointer-lowtag)
+                    #+big-endian    (- 1 other-pointer-lowtag))
+    (inst nop)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)

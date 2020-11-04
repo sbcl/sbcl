@@ -308,6 +308,14 @@
 
 ;;; the different vector flags can be ORed together.
 
+;;; Byte index:           3           2           1           0
+;;;                 +-----------------------------------+-----------+
+;;;                 |  unused   |   rank    |   flags   |  widetag  |
+;;;                 +-----------+-----------+-----------+-----------+
+;;;                 |<---------- HEADER DATA ---------->|
+
+(defconstant +array-fill-pointer-p+    #x80)
+
 ;; A vector tagged as +VECTOR-SHAREABLE+ is logically readonly,
 ;; and permitted to be shared with another vector per the CLHS standard
 ;; under the concept of similarity as constant. A vector so tagged is
@@ -338,13 +346,6 @@
 (defconstant vector-addr-hashing-flag  #x02)
 ;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
 (defconstant vector-weak-flag          #x01)
-
-;;; This constant must not conflict with any of the possible bit above
-;;; nor overlap the payload length field of an array header.
-;;;  byte   3 |      2  |      1 |       0
-;;;           |  flags  | length | widetag
-;;; It gets left-shifted by SET-HEADER-DATA or equivalent constructor.
-(defconstant +array-fill-pointer-p+ #x400)
 
 ;;; This header bit is set for symbols which were present in the pristine core.
 ;;; The backend may emit different code when referencing such symbols.
