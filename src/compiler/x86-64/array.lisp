@@ -33,7 +33,9 @@
           (ea (+ (* array-dimensions-offset n-word-bytes) lowtag-mask)
               nil rank (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst and :dword bytes (lognot lowtag-mask))
-    (inst mov :dword header rank)
+    ;; rank 1 is stored as 0, 2 is stored as 1, ...
+    (inst lea :dword header (ea (fixnumize -1) rank))
+    (inst and :dword header (fixnumize array-rank-mask))
     (inst shl :dword header array-rank-byte-pos)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
@@ -52,14 +54,15 @@
   array-dimensions-offset other-pointer-lowtag
   (any-reg) positive-fixnum %set-array-dimension)
 
-(define-vop (array-rank-vop)
+(define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 3
-    (inst movzx '(:byte :dword) res (ea (- 2 other-pointer-lowtag) x))))
+    (inst movzx '(:byte :dword) res (ea (- 2 other-pointer-lowtag) x))
+    (inst inc :byte res)))
 
 (define-vop ()
   (:translate %array-rank=)
@@ -69,7 +72,8 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp :byte (ea (- 2 other-pointer-lowtag) array) rank)))
+    (inst cmp :byte (ea (- 2 other-pointer-lowtag) array)
+          (encode-array-rank rank))))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)

@@ -1042,9 +1042,7 @@ of specialized arrays is supported."
 
 (defun array-rank (array)
   "Return the number of dimensions of ARRAY."
-  (if (array-header-p array)
-      (%array-rank array)
-      1))
+  (%array-rank array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."

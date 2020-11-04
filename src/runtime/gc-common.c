@@ -660,7 +660,8 @@ DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 static inline int array_header_nwords(lispobj header) {
-    int rank = (header >> 16) & 0xf;
+    unsigned char rank = (header >> 16);
+    ++rank; // wraparound from 255 to 0
     int nwords = sizeof (struct array)/N_WORD_BYTES + (rank-1);
     return ALIGN_UP(nwords, 2);
 }

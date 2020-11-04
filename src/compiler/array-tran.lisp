@@ -1259,10 +1259,8 @@
                 (eq (array-type-complexp array-type) t))
            '(%array-rank array))
           (t
-           (delay-ir1-transform node :constraint)
-           `(if (array-header-p array)
-                (%array-rank array)
-                1)))))
+           (delay-ir1-transform node :constraint) ; Why?
+           `(%array-rank array)))))
 
 (defun derive-array-rank (ctype)
   (let ((array (specifier-type 'array)))

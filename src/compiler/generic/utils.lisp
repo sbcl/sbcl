@@ -216,6 +216,17 @@
       n-widetag-bits))
 
 (defconstant array-rank-byte-pos 16)
+(defconstant array-rank-mask 255)
+;;; Rank is encoded as a (SIGNED-BYTE 8) integer from -1 to 14 counting the
+;;; the number of words for "extra" dimensions that are not present in the
+;;; primitive object which nominally accommodates 1 dimension.
+;;; Initialization of simple rank 1 array header words is completely unaffected-
+;;; they store 0 for the rank, which is the correct encoding for 1.
+;;; The encoding 1 means 2, encoding 2 means 3, and so on.
+;;; Decoding is just an addition and bitwise AND.
+(defun encode-array-rank (rank)
+  (declare (type (unsigned-byte 4) rank))
+  (logand (1- rank) array-rank-mask))
 
 (defun compute-object-header (nwords widetag)
   (let ((array-header-p
@@ -223,7 +234,7 @@
              (>= widetag complex-base-string-widetag))))
     (logior (if array-header-p
                 (let ((rank (- nwords array-dimensions-offset)))
-                  (ash rank array-rank-byte-pos))
+                  (ash (encode-array-rank rank) array-rank-byte-pos))
                 (case widetag
                   (#.fdefn-widetag 0)
                   (t (ash (1- nwords) (length-field-shift widetag)))))

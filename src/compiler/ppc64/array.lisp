@@ -35,7 +35,12 @@
       (allocation nil ndescr other-pointer-lowtag header
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
-      (inst slwi ndescr rank array-rank-byte-pos)
+      ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
+      (inst subi ndescr rank (fixnumize 1))
+      ;; Exercise for the reader: these next 4 instructions can be
+      ;; replaced by just 2: one RLWINM and one RLWIMI
+      (inst andi. ndescr ndescr (fixnumize array-rank-mask))
+      (inst slwi ndescr ndescr array-rank-byte-pos)
       (inst or ndescr ndescr type)
       (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
@@ -53,7 +58,7 @@
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
-(define-vop (array-rank-vop)
+(define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
@@ -61,7 +66,9 @@
   (:result-types positive-fixnum)
   (:generator 6
     (inst lbz res x #+little-endian (- 2 other-pointer-lowtag)
-                    #+big-endian    (- 5 other-pointer-lowtag))))
+                    #+big-endian    (- 5 other-pointer-lowtag))
+    (inst addi res res 1)
+    (inst andi. res res 15)))
 
 ;;;; Bounds checking routine.
 

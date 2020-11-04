@@ -29,7 +29,9 @@
                    :disp (+ (* array-dimensions-offset n-word-bytes)
                             lowtag-mask)))
     (inst and bytes (lognot lowtag-mask))
-    (inst mov header rank)
+    ;; rank 1 is stored as 0, 2 is stored as 1, ...
+    (inst lea header (make-ea :dword :disp (fixnumize -1) :base rank))
+    (inst and header (fixnumize array-rank-mask))
     (inst shl header array-rank-byte-pos)
     (inst or  header type)
     (inst shr header n-fixnum-tag-bits)
@@ -46,14 +48,18 @@
   array-dimensions-offset other-pointer-lowtag
   (any-reg) positive-fixnum %set-array-dimension)
 
-(define-vop (array-rank-vop)
+(define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst movzx res (make-ea :byte :disp (- 2 other-pointer-lowtag) :base x))))
+    (inst movzx res (make-ea :byte :disp (- 2 other-pointer-lowtag) :base x))
+    ;; not all registers have an addressable low byte,
+    ;; so the simple trick used on x86-64 won't work.
+    (inst inc res)
+    (inst and res 15)))
 
 (define-vop ()
   (:translate %array-rank=)
@@ -63,7 +69,8 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp (make-ea :byte :disp (- 2 other-pointer-lowtag) :base array) rank)))
+    (inst cmp (make-ea :byte :disp (- 2 other-pointer-lowtag) :base array)
+          (encode-array-rank rank))))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)
