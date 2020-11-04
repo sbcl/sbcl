@@ -59,7 +59,12 @@
   (print-unreadable-object (type-class stream :type t)
     (prin1 (alien-type-class-name type-class) stream)))
 
-(defglobal *alien-type-classes* (make-hash-table :test 'eq)) ; keys are symbols
+;;; An benefit of EQL tables of symbols is that they will never rehash due to key
+;;; movement, because they use the symbol's hash which is constant even across
+;;; core restart, whereas EQ tables might rehash.
+;;; Perhaps we should consider using SXHASH on symbols for EQ tables.
+;;; And frankly, why isn't this particular table not a globaldb info instead?
+(defglobal *alien-type-classes* (make-hash-table)) ; keys are symbols
 
 (defun alien-type-class-or-lose (name)
   (or (gethash name *alien-type-classes*)
