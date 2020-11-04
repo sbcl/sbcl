@@ -51,13 +51,10 @@
   (:translate sb-kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst srai temp temp array-rank-byte-pos)
-    (inst andi temp temp #xff)))
+    (inst lbu res x (- 2 other-pointer-lowtag))))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
