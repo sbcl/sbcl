@@ -1018,6 +1018,10 @@
   (let ((ctype (careful-specifier-type type)))
     (if ctype
         (or
+         ;; It's purely a waste of compiler resources to wait for IR1 to
+         ;; see these 2 edge cases that can be decided right now.
+         (cond ((eq ctype *universal-type*) t)
+               ((eq ctype *empty-type*) nil))
          (and (not (intersection-type-p ctype))
               (multiple-value-bind (constantp value) (type-singleton-p ctype)
                 (and constantp
