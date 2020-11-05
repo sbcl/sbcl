@@ -333,18 +333,29 @@
                                type)))
                  (rational 'rational)
                  (float (or (numeric-type-format type) 'float))
-                 ((nil) 'real))))
+                 ((nil) 'real)))
+         (low (numeric-type-low type))
+         (high (numeric-type-high type)))
     (ecase (numeric-type-complexp type)
       (:real
-       (cond #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
-             ((and
-               (eql (numeric-type-class type) 'integer)
-               (or (eql (numeric-type-low type) 0)
-                   (eql (numeric-type-low type) 1))
-               (fixnump (numeric-type-high type)))
+       (cond ((and (eql (numeric-type-class type) 'integer)
+                   (and (fixnump low)
+                        (fixnump high)
+                        (<= (1+ (- high low)) 2)))
+              ;; The fixnum-mod-p case is worse than just EQ testing with
+              ;; only 2 values in the range. (INTEGER 1 2) would have become
+              ;;   (and (not (eq x 0)) (fixnump x) (not (> x 2))).
+              ;; If exactly 1 value, it should have been picked off by TYPE-SINGLETON-P
+              ;; in %SOURCE-TRANSFORM-TYPEP, but even if it wasn't,
+              ;; the OR will drop out due to constraint propagation.
+              `(or (eq ,object ,low) (eq ,object ,high)))
+             #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
+             ((and (eql (numeric-type-class type) 'integer)
+                   (or (eql low 0) (eql low 1))
+                   (fixnump (numeric-type-high type)))
               (let ((mod-p
                       `(fixnum-mod-p ,object ,(numeric-type-high type))))
-                (if (eql (numeric-type-low type) 1)
+                (if (eql low 1)
                     `(and (not (eq ,object 0))
                           ,mod-p)
                     mod-p)))
