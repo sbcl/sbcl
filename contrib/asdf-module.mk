@@ -30,6 +30,7 @@ all: $(FASL) $(ASD)
 
 $(FASL)::
 	$(SBCL) --eval '(setf (sb-ext:readtable-base-char-preference *readtable*) :both)' \
+		--eval '(declaim (muffle-conditions compiler-note))' \
 		--load ../asdf-stub.lisp \
 		--eval '(asdf::build-asdf-contrib "$(SYSTEM)")'
 

@@ -10,6 +10,7 @@
 ;;;; files for more information.
 
 (in-package :sb-concurrency-test)
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
 
 #+sb-thread
 (progn
