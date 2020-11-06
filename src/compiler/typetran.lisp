@@ -1026,8 +1026,6 @@
            (args-type
             (compiler-warn "illegal type specifier for TYPEP: ~S" type)
             (return-from %source-transform-typep (values nil t)))
-           (t nil))
-         (typecase ctype
            (numeric-type
             (source-transform-numeric-typep object ctype))
            (classoid
@@ -1076,7 +1074,7 @@
         ;; at open-coding the type test.
         (let ((type (cadr spec)))
           (if (and (block-compile *compilation*)
-                   (unknown-type-p (specifier-type type)))
+                   (contains-unknown-type-p (careful-specifier-type type)))
               (values nil t)
               (source-transform-typep object type))))
       (values nil t)))
