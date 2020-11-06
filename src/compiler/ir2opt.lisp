@@ -830,9 +830,19 @@
         (reads (tn-reads tn)))
     (and writes reads (not (tn-ref-next writes)) (not (tn-ref-next reads)))))
 
-(defun next-vop-is (vop name)
+(defun next-vop-is (vop names)
   (let ((next (vop-next vop)))
-    (and next (eq (vop-name next) name))))
+    (and next
+         (let ((name (vop-name next)))
+           (if (atom names) (eq name names) (memq name names)))
+         next)))
+
+(defun previous-vop-is (vop names)
+  (let ((prev (vop-prev vop)))
+    (and prev
+         (let ((name (vop-name prev)))
+           (if (atom names) (eq name names) (memq name names)))
+         prev)))
 
 ;;; Possibly replace HOWMANY vops starting at FIRST with a vop named REPLACEMENT.
 ;;; Each deleted vop must have exactly one argument and one result.

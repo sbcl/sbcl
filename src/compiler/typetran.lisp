@@ -109,29 +109,6 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-            ((and (vop-existsp :translate fixnump-instance-ref)
-                  (type= type (specifier-type 'fixnum))
-                         (let ((use (lvar-uses object)))
-                           (and (combination-p use)
-                                (almost-immediately-used-p object use)
-                                (or (and (eq (lvar-fun-name (combination-fun use))
-                                             '%instance-ref)
-                                         (constant-lvar-p
-                                          (second (combination-args use))))
-                                    (member (lvar-fun-name (combination-fun use))
-                                            '(car cdr))))))
-             ;; FIXME: vopcombine should be able to combine a load
-             ;; and a fixnump test withoot special-casing these three.
-             (case (lvar-fun-name (combination-fun (lvar-uses object)))
-               (%instance-ref
-                (splice-fun-args object '%instance-ref 2)
-                `(lambda (obj i) (fixnump-instance-ref obj i)))
-               (car
-                (splice-fun-args object 'car 1)
-                `(lambda (obj) (fixnump-car obj)))
-               (cdr
-                (splice-fun-args object 'cdr 1)
-                `(lambda (obj) (fixnump-cdr obj)))))
             (t
              (give-up-ir1-transform))))))
 

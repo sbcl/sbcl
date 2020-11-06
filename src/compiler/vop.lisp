@@ -576,6 +576,10 @@
   (target nil :type (or null tn-ref))
   ;; the load TN allocated for this operand, if any
   (load-tn nil :type (or tn null))
+  ;; on CISC microprocessors, a representation of the memory load
+  ;; (or store) based on this TN-REF (for which its TN is the base register)
+  ;; and not directly an operand from/into which the TN-REF flows.
+  (memory-access)
   ;; The type of the LVAR the TN of this TN-REF is used for.
   (type nil :type (or ctype null)))
 

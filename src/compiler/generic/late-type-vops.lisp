@@ -74,9 +74,10 @@
                     target not-p ,type-codes
                     :value-tn-ref args)))))
 
+#-x86-64 ; defined in compiler/x86-64/type-vops for x86-64
 (define-type-vop fixnump
   #.fixnum-lowtags
-  #+(or x86-64 x86) simple-type-predicate) ;; save a register
+  #+(or x86) simple-type-predicate) ;; save a register
 
 (define-type-vop functionp (fun-pointer-lowtag))
 
