@@ -1078,6 +1078,7 @@
         ((null ref))
       (let ((tn (tn-ref-tn ref))
             (ltn (tn-ref-load-tn ref)))
+        (awhen (tn-ref-memory-access ref) (format t "@~A" it))
         (cond ((not ltn)
                (print-tn-guts tn))
               (t
