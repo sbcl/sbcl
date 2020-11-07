@@ -59,7 +59,7 @@
   (:generator 6
     (inst ldub res x (- 1 other-pointer-lowtag)) ; big-endian only
     (inst add res res 1)
-    (inst and res res 15)))
+    (inst and res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)

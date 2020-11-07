@@ -59,7 +59,7 @@
   (:generator 6
     (inst lbu res x (- 2 other-pointer-lowtag))
     (inst addi res res 1)
-    (inst andi res res 15)))
+    (inst andi res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)

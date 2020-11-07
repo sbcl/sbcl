@@ -62,7 +62,7 @@
     (inst ldrb res (@ x #+little-endian (- 2 other-pointer-lowtag)
                         #+big-endian    (- 5 other-pointer-lowtag)))
     (inst add res res 1)
-    (inst and res res 15)))
+    (inst and res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)

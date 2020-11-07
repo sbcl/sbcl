@@ -65,7 +65,7 @@
   (:generator 6
     (inst lbz res x (- 1 other-pointer-lowtag)) ; big-endian only
     (inst addi res res 1)
-    (inst andi. res res 15)))
+    (inst andi. res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 

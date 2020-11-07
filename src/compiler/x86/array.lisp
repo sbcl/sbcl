@@ -59,7 +59,7 @@
     ;; not all registers have an addressable low byte,
     ;; so the simple trick used on x86-64 won't work.
     (inst inc res)
-    (inst and res 15)))
+    (inst and res array-rank-mask)))
 
 (define-vop ()
   (:translate %array-rank=)

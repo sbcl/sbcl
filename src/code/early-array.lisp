@@ -10,9 +10,7 @@
 (in-package "SB-IMPL")
 
 ;;; The ANSI-specified minimum is 8.
-;;; Adding the overhead words for a fancy array header plus 9 dimensions
-;;; yields a payload length of 15, which is 4 bits.
-(defconstant array-rank-limit 10
+(defconstant array-rank-limit 256
   "the exclusive upper bound on the rank of an array")
 
 ;;; - 2 to leave space for the array header

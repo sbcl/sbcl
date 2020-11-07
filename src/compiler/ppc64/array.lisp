@@ -68,7 +68,7 @@
     (inst lbz res x #+little-endian (- 2 other-pointer-lowtag)
                     #+big-endian    (- 5 other-pointer-lowtag))
     (inst addi res res 1)
-    (inst andi. res res 15)))
+    (inst andi. res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 
