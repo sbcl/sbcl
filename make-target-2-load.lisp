@@ -441,6 +441,7 @@ Please check that all strings which were not recognizable to the compiler
 (setq sb-c::*name-context-file-path-selector* 'truename)
 
 ;;; Lock internal packages
+#-sb-devel
 (dolist (p (list-all-packages))
   (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
     (sb-ext:lock-package p)))
