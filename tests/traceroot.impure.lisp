@@ -104,3 +104,13 @@
     (assert
      (loop for line in lines
              thereis (search "[   3] a cons = (A B C ...)" line)))))
+
+(defun something ()
+  (let ((a (make-symbol "x")))
+    (gc) ; cause the symbol to be pinned
+    (make-weak-pointer a)))
+
+(with-test (:name :traceroot-old-pin-no-crash)
+  (let ((wp (something)))
+    (search-roots wp)
+    (something)))

@@ -360,7 +360,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
                         break;
                     }
             }
-            return pin;
+            if (*root_thread) return pin;
         }
 #endif
     *root_kind = HEAP;
