@@ -1644,12 +1644,13 @@
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
-      (let ((new-fun (ir1-convert-inline-lambda
-                      res
-                      :debug-name (debug-name 'lambda-inlined source-name)
-                      :system-lambda t))
-            (type (node-derived-type call))
-            (ref (lvar-use (combination-fun call))))
+      (let* ((*transforming* t)
+             (new-fun (ir1-convert-inline-lambda
+                       res
+                       :debug-name (debug-name 'lambda-inlined source-name)
+                       :system-lambda t))
+             (type (node-derived-type call))
+             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
         ;; Don't lose the original derived type

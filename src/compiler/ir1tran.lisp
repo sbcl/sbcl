@@ -34,10 +34,18 @@
   (when (source-form-has-path-p form)
     (gethash form *source-paths*)))
 
+(defvar *transforming* nil)
+
 (defun ensure-source-path (form)
   (or (get-source-path form)
-      (cons (simplify-source-path-form form)
-            *current-path*)))
+      (if (and *transforming*
+               (not (memq 'transformed *current-path*)))
+          ;; Don't hide all the transformed paths, since we might want
+          ;; to look at the final form for error reporting.
+          (list* (simplify-source-path-form form)
+                 'transformed *current-path*)
+          (cons (simplify-source-path-form form)
+                *current-path*))))
 
 (defun simplify-source-path-form (form)
   (if (consp form)
@@ -1091,7 +1099,8 @@
                          (record-call name (ctran-block start) *current-path*))
                        (when *show-transforms-p*
                          (show-transform "src" name transformed))
-                       (ir1-convert start next result transformed))))
+                       (let ((*transforming* t))
+                         (ir1-convert start next result transformed)))))
               (ir1-convert-maybe-predicate start next result form var))))))
 
 ;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE
