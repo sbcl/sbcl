@@ -168,6 +168,21 @@
           `(let ((,temp (abs float2)))
             (if (minusp ,bits) (- ,temp) ,temp)))
         `(if (minusp ,bits) $-1d0 $1d0))))
+
+;;; This doesn't deal with complex at the moment.
+(deftransform signum ((x) (number))
+  (let* ((ctype (lvar-type x))
+         (result-type
+          (dolist (x '(single-float double-float rational))
+            (when (csubtypep ctype (specifier-type x))
+              (return x)))))
+    ;; SB-XC:COERCE doesn't like RATIONAL for some reason.
+    (when (eq result-type 'rational) (setq result-type 'integer))
+    (if result-type
+        `(cond ((zerop x) ,(sb-xc:coerce 0 result-type))
+               ((plusp x) ,(sb-xc:coerce 1 result-type))
+               (t ,(sb-xc:coerce -1 result-type)))
+        (give-up-ir1-transform))))
 
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 

@@ -544,3 +544,19 @@
       (the single-float
        (labels ((%f () (the real p1))) (%f)))))
    ((-96088.234) -1.0)))
+
+(with-test (:name :inline-signum)
+  (assert (ctu:find-named-callees ; should be a full call
+           (compile nil '(lambda (x)
+                           (signum (truly-the number x))))))
+  ;; should not be a full call
+  (dolist (type '(integer
+                  (or (integer 1 10) (integer 50 90))
+                  rational
+                  single-float
+                  (or (single-float -10f0 0f0) (single-float 1f0 20f0))
+                  double-float
+                  (or (double-float -10d0 0d0) (double-float 1d0 20d0))))
+    (assert (null (ctu:find-named-callees
+                   (compile nil `(lambda (x)
+                                   (signum (truly-the ,type x)))))))))
