@@ -212,6 +212,7 @@
                 (delete 'class sb-c::*undefined-warnings*
                         :key #'sb-c::undefined-warning-name))))))))
 
+(sb-c::dump/restore-interesting-types 'write)
 (when (hash-table-p sb-c::*static-vop-usage-counts*)
   (with-open-file (output "output/warm-vop-usage.txt"
                           :direction :output :if-exists :supersede)

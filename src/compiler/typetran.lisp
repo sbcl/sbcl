@@ -1057,6 +1057,42 @@
           (values `(let ((,name ,object))
                      (%typep-wrapper ,transform ,name ',type)))))))
 
+;;; These things will be removed by the tree shaker, so no #+ needed.
+(defvar *interesting-types* nil)
+(defun involves-alien-p (ctype)
+  (sb-kernel::map-type
+   (lambda (type)
+     (when (alien-type-type-p type) (return-from involves-alien-p t)))
+   ctype))
+(defun dump/restore-interesting-types (op)
+  (ecase op
+   (write
+    (when *interesting-types*
+      (let ((list (sort (loop for k being each hash-key of *interesting-types* collect k)
+                        #'string< :key #'write-to-string)))
+        (with-open-file (f "interesting-types.lisp-expr" :direction :output
+                         :if-exists :supersede  :if-does-not-exist :create)
+          (let ((*package* #+sb-xc-host (find-package "XC-STRICT-CL")
+                           #-sb-xc-host #.(find-package "SB-KERNEL"))
+                (*print-pretty* nil)
+                (*print-length* nil)
+                (*print-level* nil)
+                (*print-readably* t))
+            (dolist (item list)
+              (write (uncross item) :stream f)
+              (terpri f)))))))
+   (read
+    (unless (hash-table-p *interesting-types*)
+      (setq *interesting-types* (make-hash-table :test 'equal :synchronized t)))
+    (with-open-file (f "interesting-types.lisp-expr" :if-does-not-exist nil)
+      (when f
+        (let ((*package* (find-package "SB-KERNEL")))
+          (loop (let ((expr (read f nil f)))
+                  (when (eq expr f) (return))
+                  (format t "Read ~a~%" expr)
+                  (setf (gethash expr *interesting-types*) t))))))
+    *interesting-types*)))
+
 (define-source-transform typep (object spec &optional env)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
@@ -1073,6 +1109,22 @@
         ;; during block compilation, we give ourselves a better chance
         ;; at open-coding the type test.
         (let ((type (cadr spec)))
+          ;;
+          #+nil ; collect "golden data" for typep codegen
+          (let ((parse (specifier-type type)))
+            ;; alien types aren't externalizable as trees of symbols,
+            ;; and some classoid types aren't defined at the start of warm build,
+            ;; making it impossible to re-parse a dump produced late in the build.
+            ;; Luckily there are no cases involving compund types and classoids.
+            (unless (or (involves-alien-p parse)
+                        (or (classoid-p parse)
+                            (and (cons-type-p parse)
+                                 (classoid-p (cons-type-car-type parse)))))
+              (let ((table *interesting-types*))
+                (unless (hash-table-p table)
+                  (setq table (dump/restore-interesting-types 'read)))
+                (setf (gethash type table) t))))
+          ;;
           (if (and (block-compile *compilation*)
                    (contains-unknown-type-p (careful-specifier-type type)))
               (values nil t)

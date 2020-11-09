@@ -66,6 +66,8 @@ sb-ext::(declaim (unmuffle-conditions sb-kernel:redefinition-warning))
       (format o "(provide :~A)~%~{(require ~(~S~))~%~}" name dependencies))
     (compile-file module-setup.lisp :output-file module-setup.fasl)
     (operate 'compile-bundle-op system)
+    (let ((s (find-symbol "DUMP/RESTORE-INTERESTING-TYPES" "SB-C")))
+      (when s (funcall s 'write)))
     (concatenate-files input-fasls module.fasl)))
 
 (defun test-asdf-contrib (system)

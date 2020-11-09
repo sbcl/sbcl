@@ -205,4 +205,5 @@
                 ;; into the xc build scaffold seemed slightly easier than hacking the
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)
                 (clear-specialized-array-registry)))
-             (format t "~&~50t ~f~%" total-time)))))))
+             (format t "~&~50t ~f~%" total-time))
+           (sb-c::dump/restore-interesting-types 'write))))))
