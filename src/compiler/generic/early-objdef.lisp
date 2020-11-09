@@ -252,41 +252,41 @@
   #-64-bit unused09-widetag                 ;  7E       7E
 
   simple-array-widetag                      ;  82   81  82   81
-  simple-array-unsigned-byte-2-widetag      ;  86   85  86   85
-  simple-array-unsigned-byte-4-widetag      ;  8A   89  8A   89
-  simple-array-unsigned-byte-7-widetag      ;  8E   8D  8E   8D
-  simple-array-unsigned-byte-8-widetag      ;  92   91  92   91
-  simple-array-unsigned-byte-15-widetag     ;  96   95  96   95
-  simple-array-unsigned-byte-16-widetag     ;  9A   99  9A   99
+  simple-vector-widetag                     ;
+  simple-bit-vector-widetag                 ;
+  simple-array-unsigned-byte-2-widetag      ;
+  simple-array-unsigned-byte-4-widetag      ;
+  simple-array-unsigned-byte-7-widetag      ;
+  simple-array-unsigned-byte-8-widetag      ;
+  simple-array-unsigned-byte-15-widetag     ;
+  simple-array-unsigned-byte-16-widetag     ;
 
   #-64-bit
-  simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
-  simple-array-unsigned-byte-31-widetag     ;  A2   9D  A2   9D
-  simple-array-unsigned-byte-32-widetag     ;  A6   A1  A6   A1
+  simple-array-unsigned-fixnum-widetag      ;
+  simple-array-unsigned-byte-31-widetag     ;
+  simple-array-unsigned-byte-32-widetag     ;
   #+64-bit
-  simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
+  simple-array-unsigned-fixnum-widetag      ;
   #+64-bit
-  simple-array-unsigned-byte-63-widetag     ;       A9       A9
+  simple-array-unsigned-byte-63-widetag     ;
   #+64-bit
-  simple-array-unsigned-byte-64-widetag     ;       AD       AD
-  simple-array-signed-byte-8-widetag        ;  AA   B1  AA   B1
-  simple-array-signed-byte-16-widetag       ;  AE   B5  AE   B5
+  simple-array-unsigned-byte-64-widetag     ;
+  simple-array-signed-byte-8-widetag        ;
+  simple-array-signed-byte-16-widetag       ;
   #-64-bit
-  simple-array-fixnum-widetag               ;  B2   BD  B2   BD
-  simple-array-signed-byte-32-widetag       ;  B6   B9  B6   B9
+  simple-array-fixnum-widetag               ;
+  simple-array-signed-byte-32-widetag       ;
   #+64-bit
-  simple-array-fixnum-widetag               ;  B2   BD  B2   BD
+  simple-array-fixnum-widetag               ;
   #+64-bit
-  simple-array-signed-byte-64-widetag       ;       C1       C1
-  simple-array-single-float-widetag         ;  BA   C5  BA   C5
-  simple-array-double-float-widetag         ;  BE   C9  BE   C9
-  simple-array-complex-single-float-widetag ;  C2   CD  C2   CD
-  simple-array-complex-double-float-widetag ;  C6   D1  C6   D1
-  simple-bit-vector-widetag                 ;  CA   D5  CA   D5
-  simple-vector-widetag                     ;  CE   D9  CE   D9
+  simple-array-signed-byte-64-widetag       ;
+  simple-array-single-float-widetag         ;
+  simple-array-double-float-widetag         ;
+  simple-array-complex-single-float-widetag ;
+  simple-array-complex-double-float-widetag ;
 
   ;; Not a string type
-  simple-array-nil-widetag                  ;  D2   DD  D2   DD
+  simple-array-nil-widetag                  ;
 
   simple-base-string-widetag                ;  D6   E1  D6   E1       \
   #+sb-unicode                              ;                          |
