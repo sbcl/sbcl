@@ -179,7 +179,7 @@
     ;; SB-XC:COERCE doesn't like RATIONAL for some reason.
     (when (eq result-type 'rational) (setq result-type 'integer))
     (if result-type
-        `(cond ((zerop x) ,(sb-xc:coerce 0 result-type))
+        `(cond ((zerop x) x)
                ((plusp x) ,(sb-xc:coerce 1 result-type))
                (t ,(sb-xc:coerce -1 result-type)))
         (give-up-ir1-transform))))

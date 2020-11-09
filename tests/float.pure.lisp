@@ -559,4 +559,11 @@
                   (or (double-float -10d0 0d0) (double-float 1d0 20d0))))
     (assert (null (ctu:find-named-callees
                    (compile nil `(lambda (x)
-                                   (signum (truly-the ,type x)))))))))
+                                   (signum (truly-the ,type x))))))))
+  ;; check signed zero
+  (let ((f (compile nil '(lambda (x) (signum (the single-float x))))))
+    (assert (eql (funcall f -0f0) -0f0))
+    (assert (eql (funcall f +0f0) +0f0)))
+  (let ((f (compile nil '(lambda (x) (signum (the double-float x))))))
+    (assert (eql (funcall f -0d0) -0d0))
+    (assert (eql (funcall f +0d0) +0d0))))
