@@ -223,12 +223,16 @@
                ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
                ;; stopped the badness is a stronger way. It should be the case
                ;; that absence of a DD can't happen unless the classoid is absent.
-               ;; KLUDGE: during PCL build debugging, we can sometimes
-               ;; attempt to print out a PCL object (with null LAYOUT-INFO).
+               ;; KLUDGE: during warm build, we may see a CONDITION or STANDARD-OBJECT
+               ;; here, and we need a way to get a handle on it (for SB-VM:HEXDUMP at least).
+               ;; I'm not sure why a  condition-report function isn't called in the former
+               ;; case. Using the default structure printer won't solve anything, because
+               ;; the layout of a condition does not describe any slot of interest.
                (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
-               (prin1 name stream)
-               (write-char #\space stream)
-               (write-string "(no LAYOUT-INFO)" stream)))
+                 (prin1 name stream)
+                 (write-char #\space stream)
+                 (write-string "(no LAYOUT-INFO) " stream)
+                 (write (get-lisp-obj-address structure) :base 16 :radix t :stream stream)))
               ((not (dd-slots dd))
                ;; the structure type doesn't count as a component for *PRINT-LEVEL*
                ;; processing. We can likewise elide the logical block processing,
