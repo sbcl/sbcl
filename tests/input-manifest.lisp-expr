@@ -90,4 +90,6 @@
   "tests/data/SentenceBreakProperty.txt")
  ("undefined-classoid-bug.test.sh"
   "tests/undefined-classoid-bug-1.lisp"
-  "tests/undefined-classoid-bug-2.lisp"))
+  "tests/undefined-classoid-bug-2.lisp")
+ ("x86-64-codegen.impure.lisp"
+  "tests/typep-golden-data.txt"))
