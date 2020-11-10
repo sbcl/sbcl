@@ -425,9 +425,12 @@
         (multiple-value-bind (losing-local-object converted-lambda)
             (catch 'locall-already-let-converted
               (with-ir1-environment-from-node call
-                (let ((*inline-expansions*
-                        (register-inline-expansion original-functional call))
-                      (*lexenv* (functional-lexenv original-functional)))
+                (let* ((*inline-expansions*
+                         (register-inline-expansion original-functional call))
+                       (*lexenv* (functional-lexenv original-functional))
+                       (*transforming*
+                         (and (functional-inline-expanded original-functional)
+                              (system-inline-fun-p (leaf-source-name original-functional)))))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
