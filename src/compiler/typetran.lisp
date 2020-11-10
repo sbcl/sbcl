@@ -1083,7 +1083,8 @@
               (terpri f)))))))
    (read
     (unless (hash-table-p *interesting-types*)
-      (setq *interesting-types* (make-hash-table :test 'equal :synchronized t)))
+      (setq *interesting-types*
+            (sb-impl::make-system-hash-table :test 'equal :synchronized t)))
     (with-open-file (f "interesting-types.lisp-expr" :if-does-not-exist nil)
       (when f
         (let ((*package* (find-package "SB-KERNEL")))
