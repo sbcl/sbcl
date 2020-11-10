@@ -971,6 +971,7 @@
 
 #-sb-devel
 (declaim (start-block ir1-optimize-combination maybe-terminate-block
+                      system-inline-fun-p
                       validate-call-type))
 
 (defun check-important-result (node info)
