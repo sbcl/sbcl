@@ -231,10 +231,15 @@
                         (:arguments &whole)))
                 program-error))
 
-(define-method-combination bug-309084-b/mc nil
-  ((all *))
-  (:arguments x &optional (y 'a yp) &key (z 'b zp) &aux (w (list y z)))
-  `(list ,x ,y ,yp ,z ,zp ,w))
+(let (warnings)
+  (handler-bind ((warning (lambda (c) (push c warnings))))
+    (eval '(define-method-combination bug-309084-b/mc nil
+             ((all *))
+             (:arguments x &optional (y 'a yp) &key (z 'b zp) &aux (w (list y z)))
+             `(list ,x ,y ,yp ,z ,zp ,w)))
+    ;; Should not get any "assigned but never read" warnings.
+    (assert (= (length warnings) 1))
+    (assert (search "&OPTIONAL and &KEY" (princ-to-string (car warnings))))))
 
 (defgeneric bug-309084-b/gf (a &optional b &key &allow-other-keys)
   (:method-combination bug-309084-b/mc)

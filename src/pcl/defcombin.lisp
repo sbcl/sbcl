@@ -314,7 +314,8 @@
                             (setq ,name (nreverse ,name)))
                            (:most-specific-last))))
                   order-cleanups))))
-      `(let (,@(nreverse names) ,@(nreverse specializer-caches))
+      `(let (,@(nreverse names) ,@specializer-caches)
+        (declare (ignorable ,@specializer-caches))
         ,@declarations
         (dolist (.method. .applicable-methods.)
           (let ((.qualifiers. (method-qualifiers .method.))
