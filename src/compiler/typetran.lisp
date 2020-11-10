@@ -1065,6 +1065,8 @@
      (when (alien-type-type-p type) (return-from involves-alien-p t)))
    ctype))
 (defun dump/restore-interesting-types (op)
+  (declare (ignorable op))
+  #+collect-typep-regression-dataset
   (ecase op
    (write
     (when *interesting-types*
@@ -1083,8 +1085,7 @@
               (terpri f)))))))
    (read
     (unless (hash-table-p *interesting-types*)
-      (setq *interesting-types*
-            (sb-impl::make-system-hash-table :test 'equal :synchronized t)))
+      (setq *interesting-types* (make-hash-table :test 'equal :synchronized t)))
     (with-open-file (f "interesting-types.lisp-expr" :if-does-not-exist nil)
       (when f
         (let ((*package* (find-package "SB-KERNEL")))
@@ -1111,7 +1112,7 @@
         ;; at open-coding the type test.
         (let ((type (cadr spec)))
           ;;
-          #+nil ; collect "golden data" for typep codegen
+          #+collect-typep-regression-dataset
           (let ((parse (specifier-type type)))
             ;; alien types aren't externalizable as trees of symbols,
             ;; and some classoid types aren't defined at the start of warm build,
