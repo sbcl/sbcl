@@ -636,7 +636,8 @@ static unsigned int claim_index(int qty)
     return 0; // use the overflow bin(s)
 }
 
-static boolean instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
+static boolean NO_SANITIZE_MEMORY
+instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
 {
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
