@@ -100,6 +100,9 @@
 
 (defun describe (object &optional (stream-designator *standard-output*))
   "Print a description of OBJECT to STREAM-DESIGNATOR."
+  ;; This DECLARE works around a compiler bug that FTYPE does not force
+  ;; type-checking of the optional argument.
+  (declare (stream-designator stream-designator))
   (let ((stream (out-stream-from-designator stream-designator))
         (*print-right-margin* (or *print-right-margin* 72))
         (*print-circle* t)

@@ -1675,7 +1675,7 @@
                        &key (:stream stream) (:use-labels t))
   null)
 
-(defknown describe (t &optional (or stream (member t nil))) (values))
+(defknown describe (t &optional stream-designator) (values))
 (defknown function-lambda-expression (function) (values t boolean t))
 (defknown inspect (t) (values))
 (defknown room (&optional (member t nil :default)) (values))
