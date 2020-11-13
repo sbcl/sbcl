@@ -190,14 +190,14 @@
   #-64-bit (length 0 :type layout-length) ; smaller than SB-INT:INDEX
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
-  (info nil :type (or null defstruct-description))
+  ;; If this layout is for an object of metatype STANDARD-CLASS,
+  ;; then these are the EFFECTIVE-SLOT-DEFINITION metaobjects.
+  ;; The two are mutually exclusive.
+  (%info nil :type (or list defstruct-description))
   ;; EQUALP comparator for two instances with this layout
   ;; Could be the generalized function, or a type-specific one
   ;; if the defstruct was compiled in a policy of SPEED 3.
   (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
-  ;; If this layout is for an object of metatype STANDARD-CLASS,
-  ;; these are the EFFECTIVE-SLOT-DEFINITION metaobjects.
-  (slot-list nil :type list)
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
@@ -288,10 +288,30 @@
 ;;; 2) The next is the actual LAYOUT that ends up being registered.
 ;;; 3) The third is a layout created when setting the "compiler layout"
 ;;; which contains copies of the length/depthoid/inherits etc
-;;; that we compare against the isntalled one to make sure they match.
+;;; that we compare against the installed one to make sure they match.
 ;;; The third one also gets thrown away.
 #-sb-xc-host
 (progn
+(declaim (inline layout-dd layout-info layout-slot-list))
+;; Use LAYOUT-DD to read LAYOUT-INFO if you want to assert that it is non-nil.
+(defun layout-dd (layout)
+  (the defstruct-description (layout-%info layout)))
+(defun layout-info (layout)
+  (let ((info (layout-%info layout)))
+    (if (%instancep info) info)))
+(defun layout-slot-list (layout)
+  (let ((info (layout-%info layout)))
+    (if (listp info) info)))
+(defun (setf layout-info) (newval layout)
+  ;; The current value must be nil or a defstruct-description,
+  ;; otherwise we'd clobber a non-nil slot list.
+  (aver (not (consp (layout-%info layout))))
+  (setf (layout-%info layout) newval))
+(defun (setf layout-slot-list) (newval layout)
+  ;; The current value must be a list, otherwise we'd clobber
+  ;; a defstruct-description.
+  (aver (listp (layout-%info layout)))
+  (setf (layout-%info layout) newval))
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
@@ -316,8 +336,7 @@
           (layout-invalid layout) invalid)
     #-64-bit (setf (layout-depthoid layout) depthoid (layout-length layout) length)
     (setf (layout-info layout) info)
-    (setf (layout-slot-list layout) nil
-          (layout-slot-table layout) #(1 nil))
+    (setf (layout-slot-table layout) #(1 nil))
     (set-layout-inherits layout inherits)
     #-sb-xc-host
     (dotimes (i bitmap-words)
@@ -369,6 +388,8 @@
     (depthoid -1 :type layout-depthoid)
     (length 0 :type layout-length)
     (info nil :type (or null defstruct-description)))
+  (defun layout-dd (layout)
+    (the defstruct-description (layout-info layout)))
   (defun make-layout (&rest args)
     (let ((args (copy-list args)))
       (remf args :bitmap)

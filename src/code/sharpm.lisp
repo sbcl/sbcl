@@ -298,7 +298,7 @@
              ;; Don't refer to the DD-SLOTS unless there is reason to,
              ;; that is, unless some slot might be raw.
              (if (/= +layout-all-tagged+ (layout-bitmap (%instance-layout tree)))
-                 (let ((dd (layout-info (%instance-layout tree))))
+                 (let ((dd (layout-dd (%instance-layout tree))))
                    (dolist (dsd (dd-slots dd))
                      (when (eq (dsd-raw-type dsd) t)
                        (process (%instance-ref tree (dsd-index dsd))))))

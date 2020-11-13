@@ -1020,7 +1020,7 @@ unless :NAMED is also specified.")))
           ;; CMU CL INSTANCE weirdosities like CONDITION or
           ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
           (let* ((included-layout (classoid-layout included-classoid))
-                 (included-dd (layout-info included-layout)))
+                 (included-dd (layout-dd included-layout)))
             (when (dd-alternate-metaclass included-dd)
               (error "can't :INCLUDE class ~S (has alternate metaclass)"
                      included-name)))))
@@ -1470,7 +1470,7 @@ or they must be declared locally notinline at each call site.~@:>"
       (let ((old-bitmap (layout-bitmap old-layout))
             (new-bitmap (layout-bitmap new-layout)))
         (and (= (layout-bitmap-words new-layout) (layout-bitmap-words old-layout))
-             (dotimes (i (dd-length (layout-info old-layout)) t)
+             (dotimes (i (dd-length (layout-dd old-layout)) t)
                (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
                           (not (logbitp i old-bitmap))) ; that was opaque bits
                  (return nil)))))
@@ -2333,7 +2333,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                      (val (funcall acc object ind)))
                                 (list `(,acc ,object ,ind)
                                       (if (quote-p val) `',val val)))))
-                          (dd-slots (layout-info (%instance-layout object)))))
+                          (dd-slots (layout-dd (%instance-layout object)))))
                 #-sb-xc-host
                 (loop for slot in (sb-mop:class-slots (class-of object))
                       for name = (sb-mop:slot-definition-name slot)
@@ -2384,7 +2384,7 @@ or they must be declared locally notinline at each call site.~@:>"
                   (eq (second creation-form) (type-of constant))
                   (typep init-form '(cons (eql setf)))
                   (canonical-p (cdr init-form)
-                               (dd-slots (layout-info (%instance-layout constant)))
+                               (dd-slots (layout-dd (%instance-layout constant)))
                                constant))
              (values nil 'sb-fasl::fop-struct))
             (t

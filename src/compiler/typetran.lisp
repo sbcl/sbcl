@@ -939,7 +939,7 @@
                         ,(cond ((<= 2 depthoid layout-inherits-max-optimized-depth)
                                 `(or (eq (,ancestor-slot ,n-layout) ,layout)
                                      (eq ,n-layout ,layout)))
-                               ((dd-constructors (layout-info layout))
+                               ((dd-constructors (layout-dd layout))
                                 `(cond ((eq ,n-layout ,layout) t)
                                        (,deeper-p ,ancestor-layout-eq)))
                                (t ; abstract base type deeper than optimized max.

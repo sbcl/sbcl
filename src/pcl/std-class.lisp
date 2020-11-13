@@ -775,7 +775,7 @@
        ;;  (LAMBDA () (SB-PCL::FAST-MAKE-INSTANCE #<STRUCTURE-CLASS THING>))
        ;; So maybe we can figure out how to bundle two lambdas together?
        (lambda ()
-         (let* ((dd (layout-info (class-wrapper class)))
+         (let* ((dd (layout-dd (class-wrapper class)))
                 (f (%make-structure-instance-allocator dd nil)))
            (if (functionp f)
                (funcall (setf (slot-value class 'defstruct-constructor) f))

@@ -441,8 +441,8 @@ static boolean tagged_slot_p(struct layout *layout, int slot_index)
 {
     // Since we're doing this scan, we could return the name
     // and exact raw type.
-    if (layout->info != NIL) {
-        struct defstruct_description* dd = (void*)(layout->info-INSTANCE_POINTER_LOWTAG);
+    if (instancep(layout->_info)) {
+        struct defstruct_description* dd = (void*)(layout->_info-INSTANCE_POINTER_LOWTAG);
         lispobj slots = dd->slots;
         for ( ; slots != NIL ; slots = CONS(slots)->cdr ) {
             struct defstruct_slot_description* dsd =

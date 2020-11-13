@@ -148,7 +148,7 @@
              (not (varying-length-struct-p classoid))
              ;; TODO: if sealed with subclasses which add no slots, use the fixed length
              (not (classoid-subclasses classoid)))
-        (dd-length (layout-info (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
+        (dd-length (layout-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
         (give-up-ir1-transform))))
 
 ;;; *** These transforms should be the only code, aside from the C runtime

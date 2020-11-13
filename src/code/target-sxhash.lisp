@@ -463,7 +463,7 @@
                    (depthoid (1- depthoid)))
                (declare (index max-iterations))
                (if (/= (layout-bitmap layout) +layout-all-tagged+)
-                   (let ((slots (dd-slots (layout-info layout))))
+                   (let ((slots (dd-slots (layout-dd layout))))
                      (loop (unless slots (return))
                            (let* ((slot (pop slots))
                                   (rsd-index+1 (rsd-index+1 slot))

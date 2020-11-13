@@ -1780,14 +1780,14 @@ struct size_class {
 /* Defragmentation needs more size classes than allocation because a
  * restarted core can not discern the original (coarser) size class
  * in which a layout was allocated. It can only use the actual size.
- * 2n+16 words for N from 0..16 gives a range from 16 to 48 words */
-#define MAX_LAYOUT_DEFRAG_SIZE_CLASSES 17
+ * 2n+14 words for N from 0..17 gives a range from 14 to 48 words */
+#define MAX_LAYOUT_DEFRAG_SIZE_CLASSES 18
 static inline int layout_size_class_nwords(int index) {
-    return 16 + 2*index ;
+    return 14 + 2*index ;
 }
 static inline int nwords_to_layout_size_class(unsigned int nwords) {
-    // the smallest layout size class is 16 words
-    int index = nwords <= 16 ? 0 : (nwords - 16)/2;
+    // the smallest layout size class is 14 words
+    int index = nwords <= 14 ? 0 : (nwords - 14)/2;
     if (index >= MAX_LAYOUT_DEFRAG_SIZE_CLASSES)
         lose("Oversized layout: can't defragment");
     return index;

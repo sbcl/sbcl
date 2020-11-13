@@ -1133,8 +1133,7 @@ core and return a descriptor to it."
      :clos-hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))
      :invalid *nil-descriptor*
      :inherits inherits
-     :info *nil-descriptor*
-     :slot-list *nil-descriptor*)
+     :%info *nil-descriptor*)
 
     (awhen (gethash name *layout-deferred-instances*)
       (format t "~&Patching layout for ~S into ~D instance~:P~%"
@@ -3694,7 +3693,7 @@ III. initially undefined function references (alphabetically):
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
               (write-slots (cold-layout-descriptor layout) *host-layout-of-layout*
-                           :info dd))))
+                           :%info dd))))
         (when verbose
           (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
                   (length *known-structure-classoids*)
