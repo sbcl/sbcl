@@ -948,7 +948,8 @@
                                 `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout))))))
 
           ((> depthoid 0) ; fixed-depth ancestors of non-structure types: STREAM, FILE-STREAM,
-           ;; SEQUENCE, CONDITION; all are abstract base types.
+           ;; SEQUENCE; all are abstract base types.
+           ;; (I don't know why sometimes we just call SEQUENCEP and STREAMP. Policy?)
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
                            (bug "Non-frozen static classoids?"))
@@ -964,11 +965,9 @@
                           ;; But we don't have to check the layout-inherits length because
                           ;; it has as least two physical data elements even if it has T
                           ;; as the sole ancestor.
-                          (or ,(if (eql depthoid 1)
-                                   ancestor-layout-eq
-                                   `(eq (,ancestor-slot ,n-layout) ,layout))
-                              ;; So that (TYPEP (MAKE-CONDITION 'CONDITION) 'CONDITION) => T
-                              ,@(when (eq name 'condition) `((eq ,n-layout ,layout)))))))
+                          ,(if (eql depthoid 1)
+                               ancestor-layout-eq
+                               `(eq (,ancestor-slot ,n-layout) ,layout)))))
               (if primtype-predicate
                   `(and ,primtype-predicate (let ((,n-layout ,slot-reader)) ,@guts))
                   `(block typep
