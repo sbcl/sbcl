@@ -70,7 +70,7 @@
            :PACKAGE-LOCAL-NICKNAMES
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
-           :SB-FLUID :SB-DEVEL)")))
+           :SB-FLUID :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
        (removable-features
         (append non-target-features public-features)))
   (defconstant sb-impl:+internal-features+
@@ -441,7 +441,8 @@ Please check that all strings which were not recognizable to the compiler
 (setq sb-c::*name-context-file-path-selector* 'truename)
 
 ;;; Lock internal packages
-#-sb-devel
+#-(and sb-devel
+       (not sb-devel-lock-packages))
 (dolist (p (list-all-packages))
   (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
     (sb-ext:lock-package p)))
