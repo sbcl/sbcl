@@ -1052,31 +1052,43 @@
 ;;; the RETURN-RESULT, because the return might have been deleted (if
 ;;; all calls were TR.)
 (defun unconvert-tail-calls (fun call next-block)
-  (do-sset-elements (called (lambda-calls-or-closes fun))
-    (when (lambda-p called)
-      (dolist (ref (leaf-refs called))
-        (let ((this-call (node-dest ref)))
-          (when (and this-call
-                     (node-tail-p this-call)
-                     (not (node-to-be-deleted-p this-call))
-                     (eq (node-home-lambda this-call) fun))
-            (setf (node-tail-p this-call) nil)
-            (ecase (functional-kind called)
-              ((nil :cleanup :optional)
-               (let ((block (node-block this-call))
-                     (lvar (node-lvar call)))
-                 (unlink-blocks block (first (block-succ block)))
-                 (link-blocks block next-block)
-                 (if (eq (node-derived-type this-call) *empty-type*)
-                     (maybe-terminate-block this-call nil)
-                     (add-lvar-use this-call lvar))))
-              (:deleted)
-              ;; The called function might be an assignment in the
-              ;; case where we are currently converting that function.
-              ;; In steady-state, assignments never appear as a called
-              ;; function.
-              (:assignment
-               (aver (eq called fun)))))))))
+  (let (maybe-terminate)
+    (do-sset-elements (called (lambda-calls-or-closes fun))
+      (when (lambda-p called)
+        (dolist (ref (leaf-refs called))
+          (let ((this-call (node-dest ref)))
+            (when (and this-call
+                       (node-tail-p this-call)
+                       (not (node-to-be-deleted-p this-call))
+                       (eq (node-home-lambda this-call) fun))
+              (setf (node-tail-p this-call) nil)
+              (ecase (functional-kind called)
+                ((nil :cleanup :optional)
+                 (let ((block (node-block this-call))
+                       (lvar (node-lvar call)))
+                   (unlink-blocks block (first (block-succ block)))
+                   (link-blocks block next-block)
+                   (if (eq (node-derived-type this-call) *empty-type*)
+                       ;; Delay terminating the block, because there may be more calls
+                       ;; to be processed here and this may prematurely delete NEXT-BLOCK
+                       ;; before we attach more preceding blocks to it.
+                       ;; Although probably if one call to a function
+                       ;; is derived to be NIL all other calls would
+                       ;; be NIL too, but that may not be available at the same time.
+                       ;; (Or something is smart in the future to
+                       ;; derive different results from different
+                       ;; calls.)
+                       (push this-call maybe-terminate)
+                       (add-lvar-use this-call lvar))))
+                (:deleted)
+                ;; The called function might be an assignment in the
+                ;; case where we are currently converting that function.
+                ;; In steady-state, assignments never appear as a called
+                ;; function.
+                (:assignment
+                 (aver (eq called fun)))))))))
+    (dolist (call maybe-terminate)
+      (maybe-terminate-block call nil)))
   (values))
 
 ;;; Deal with returning from a LET or assignment that we are

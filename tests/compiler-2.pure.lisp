@@ -2983,3 +2983,21 @@
   ;; This one uses the value of B
   (checked-compile '(lambda (x) (let* ((a (+ x 5)) (b a))
                                   (setq b (opaque-identity 3))))))
+
+(with-test (:name :unconvert-tail-calls-terminate-block)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x y)
+      (flet ((f ()
+               (labels ((a ()
+                          (error "~a" x))
+                        (b ()
+                          (a)))
+                 (if nil
+                     (b)
+                     (if y
+                         (a)
+                         (b))))))
+        (block nil
+          (return (f)))))
+    ((t t) (condition 'error))))
