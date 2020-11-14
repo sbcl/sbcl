@@ -73,7 +73,10 @@
                       *trace-output* *error-output*)
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   (unless (!c-runtime-noinform-p)
-    (write-string "COLD-INIT... "))
+    ;; I'd like FORMAT to remain working in cold-init, where it does work,
+    ;; hence the conditional.
+    #+(or x86 x86-64) (format t "COLD-INIT... ")
+    #-(or x86 x86-64) (write-string "COLD-INIT... "))
   (!cold-init-hash-table-methods)
   ;; Establish **initial-handler-clusters**
   (show-and-call sb-kernel::!target-error-cold-init)
@@ -159,8 +162,10 @@
       (%defun name (fdefinition name) inline-expansion dxable-args)))
 
   (unless (!c-runtime-noinform-p)
-    (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
-    (terpri))
+    #+(or x86 x86-64) (format t "[Length(TLFs)=~D]~%" (length *!cold-toplevels*))
+    #-(or x86 x86-64)
+    (progn (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
+           (terpri)))
 
   (loop with *package* = *package* ; rebind to self, as if by LOAD
         for index-in-cold-toplevels from 0

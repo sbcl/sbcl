@@ -13,8 +13,9 @@
                *format-directive-expanders*
                *format-directive-interpreters*))
 (defglobal *format-directive-expanders* (make-array 128 :initial-element nil))
-(define-load-time-global *format-directive-interpreters*
-  (make-array 128 :initial-element nil))
+#-sb-xc-host
+(!define-load-time-global *format-directive-interpreters*
+  #.(sb-xc:make-array 128 :initial-element nil))
 
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)
