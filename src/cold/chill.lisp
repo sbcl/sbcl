@@ -46,16 +46,7 @@
   (declare (ignore stream char))
   (values)) ; ignore the $ as if it weren't there
 (compile 'read-target-float)
-;;; We need the #! readtable modifications.
-(load (merge-pathnames "shebang.lisp" *load-pathname*))
-;;; ... applied to the default readtable
-(set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr)
-(set-dispatch-macro-character #\# #\- #'read-targ-feature-expr)
 (set-macro-character #\$ #'read-target-float t)
-
-;;; Just in case we want to play with the initial value of
-;;; backend-subfeatures
-(setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 
 ;; Restore !DEFINE-LOAD-TIME-GLOBAL macro
 (setf (macro-function 'sb-int::!define-load-time-global)
