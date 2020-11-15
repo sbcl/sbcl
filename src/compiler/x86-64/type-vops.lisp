@@ -529,7 +529,13 @@
     (when (and prev (eq (vop-block prev) (vop-block vop)))
       (let ((result (sb-c::vop-results prev))
             (arg (sb-c::vop-args vop)))
-        (when (and (eq (tn-ref-tn result) (tn-ref-tn arg))
+        ;; Ensure that the fixnump vop does not try to absorb more than one memref.
+        ;; That is, if the initial IR2 matches (fixnump (memref (memref))) which is simplified
+        ;; to (memref+fixnump (memref x)), it would seem to allow matching of the pattern
+        ;; again if this optimizer is reapplied, because the "new" fixnump vop is superficially
+        ;; the same, except for the attachment of extra data to its input.
+        (when (and (not (tn-ref-memory-access arg))
+                   (eq (tn-ref-tn result) (tn-ref-tn arg))
                    (sb-c::very-temporary-p (tn-ref-tn arg)))
           (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
           (let* ((arg-ref (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))

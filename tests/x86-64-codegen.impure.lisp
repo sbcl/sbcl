@@ -346,6 +346,14 @@
                   (and (search "CMP QWORD PTR [" line)
                        (search ":YUP" line))))))
 
+(defun thing-ref-thing-ref (arg1 arg2)
+  (declare (optimize (safety 0)))
+  (let ((answer (typep (thing-x (thing-x arg1)) 'fixnum)))
+    (frobify arg1 arg2)
+    answer))
+(defun frobify (a b) (values a b))
+(compile 'thing-ref-thing-ref)
+
 (with-test (:name :fixnump-thing-ref)
   (flet ((try (access-form true false)
            (let* ((f (compile nil `(lambda (obj) (typep ,access-form 'fixnum))))
@@ -364,7 +372,9 @@
     (try '(thing-x (truly-the thing obj))
          (make-thing :x 1) (make-thing :x "hi"))
     (try '(car obj) '(1) '("hi"))
-    (try '(cdr obj) '("hi" . 1) '("hi"))))
+    (try '(cdr obj) '("hi" . 1) '("hi")))
+  ;; fixnump of memref of memref was eliding one memref by accident
+  (assert (thing-ref-thing-ref (make-thing :x (make-thing :x 3)) 'foo)))
 
 (with-test (:name :huge-code :skipped-on (not :immobile-code))
   (sb-vm::allocate-code-object :immobile 0 4 (* 2 1024 1024)))
@@ -923,5 +933,5 @@ sb-vm::(define-vop (cl-user::test)
                     (when (/= linecount expect-n)
                       (warn "~S was ~d is ~d" type expect-n linecount))))))))))
 
-(with-test (:name :many-interesting-array-types)
+(with-test (:name :many-interesting-array-types :skipped-on (:not :sb-unicode))
   (compare-to-golden-typep-data "typep-golden-data.txt"))
