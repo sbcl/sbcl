@@ -160,8 +160,8 @@ static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
     constant = 0;
-    lispobj info = LAYOUT(instance_layout(native_pointer(thing)))->info;
-    if (info != NIL) {
+    lispobj info = LAYOUT(instance_layout(native_pointer(thing)))->_info;
+    if (instancep(info)) {
         lispobj pure = ((struct defstruct_description*)native_pointer(info))->pure;
         if (pure != NIL && pure != T) {
             gc_abort();
