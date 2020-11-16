@@ -1,0 +1,123 @@
+
+Design for new implementation of TYPEP on structure-objects:
+
+* Assign every layout a permanent stable ID using 29 bits
+  (N-POSITIVE-FIXNUM-BITS for 32-bit words) and try to recycle the
+  unused IDs if layouts get GCd.
+
+* Embed all IDs of every type that a layout "is" directly in the layout.
+  A layout includes its own ID as the last element of the IS-A vector.
+  In contrast, the INHERITS vector did not include the structure itself
+  which always required picking off an exactly equal type as a special
+  case, and then also checking for type inheritance.
+  In the ID-based approach, (typep x 'THING) need not distinguish
+  between whether X is THING or a type descended from THING.
+
+* Reserve space for at least 6 IDs in the IS-A vector, which is 2 more
+  than the former ANCESTOR-n slots held. Additionally, the IS-A vector
+  can always holds _all_ the IDs, whereas the ANCESTOR-n slots did not,
+  and would fall back upon lookup in the INHERITS vector.
+  The IS-A vector is sized as required by the layout constructor.
+  Variable-length layouts are needed for the trailing bitmap anyway,
+  so it is no more trouble to further extend layouts with extra words.
+  Note that depth 0 is implicitly the ID of the type T,
+  and depth 1 is implicitly the ID of STRUCTURE-OBJECT,
+  so those are not stored in the ID vector.
+
+* The most common variant of the structure TYPEP test is changed from:
+  (OR (EQ THIS-LAYOUT EXPECT-LAYOUT)
+      (AND (> THIS-LAYOUT-DEPTH (LAYOUT-DEPTH EXPECT-LAYOUT))
+           (EQ (SVREF INHERITS DEPTH) EXPECT-LAYOUT)))
+  to:
+  (EQ (NTH-ANCESTOR-ID) EXPECT-LAYOUT-ID)
+  which can usually execute safely without the depth check.
+  In case the depth of the type under test exceeds the mandatory minimum
+  length of the IS-A vector (6), then perform the depth test first
+  to avoid out-of-bounds indexing.
+  Lack of the depth check improves branch prediction rate.
+
+Test I: "perf stat" on make-host-1
+==================================
+Old:
+          30497.22 msec task-clock                #    1.000 CPUs utilized
+               162      context-switches          #    0.005 K/sec
+                 0      cpu-migrations            #    0.000 K/sec
+            358179      page-faults               #    0.012 M/sec
+       85176684440      cycles                    #    2.793 GHz
+       49191173035      stalled-cycles-frontend   #   57.75% frontend cycles idle
+       84764154618      instructions              #    1.00  insn per cycle
+                                                  #    0.58  stalled cycles per insn
+       19746929213      branches                  #  647.499 M/sec
+         607098366      branch-misses             #    3.07% of all branches
+
+      30.503523458 seconds time elapsed
+
+      29.206010000 seconds user
+       1.291911000 seconds sys
+
+New:
+          28308.70 msec task-clock                #    0.999 CPUs utilized
+               521      context-switches          #    0.018 K/sec
+                 3      cpu-migrations            #    0.000 K/sec
+            428089      page-faults               #    0.015 M/sec
+       79067487625      cycles                    #    2.793 GHz
+       45445183758      stalled-cycles-frontend   #   57.48% frontend cycles idle
+       80724429510      instructions              #    1.02  insn per cycle
+                                                  #    0.56  stalled cycles per insn
+       18319117558      branches                  #  647.120 M/sec
+         552061322      branch-misses             #    3.01% of all branches
+
+      28.324995675 seconds time elapsed
+
+      26.775357000 seconds user
+       1.555962000 seconds sys
+
+delta: task-clock:  -7.1%
+       cycles:      -7.1%
+       intructions: -4.7%
+       branches:    -7.2%
+       branch-miss: -9.0%
+       user sec:    -8.3%
+
+Test II: "perf stat" on make-host-2
+===================================
+Old:
+          87641.99 msec task-clock                #    1.000 CPUs utilized
+               403      context-switches          #    0.005 K/sec
+                 0      cpu-migrations            #    0.000 K/sec
+            858614      page-faults               #    0.010 M/sec
+      244791150476      cycles                    #    2.793 GHz
+      138448804561      stalled-cycles-frontend   #   56.56% frontend cycles idle
+      258526783085      instructions              #    1.06  insn per cycle
+                                                  #    0.54  stalled cycles per insn
+       58641402544      branches                  #  669.102 M/sec
+        1387692425      branch-misses             #    2.37% of all branches
+
+      87.659365156 seconds time elapsed
+
+      84.883404000 seconds user
+       2.759720000 seconds sys
+
+New:
+          83026.56 msec task-clock                #    1.000 CPUs utilized
+              1244      context-switches          #    0.015 K/sec
+                 7      cpu-migrations            #    0.000 K/sec
+           1119264      page-faults               #    0.013 M/sec
+      231835280270      cycles                    #    2.792 GHz
+      129266360060      stalled-cycles-frontend   #   55.76% frontend cycles idle
+      254253852289      instructions              #    1.10  insn per cycle
+                                                  #    0.51  stalled cycles per insn
+       56393384370      branches                  #  679.221 M/sec
+        1281237117      branch-misses             #    2.27% of all branches
+
+      83.048348272 seconds time elapsed
+
+      79.858200000 seconds user
+       3.187928000 seconds sys
+
+delta: task-clock:  -5.2%
+       cycles:      -5.2%
+       intructions: -1.6%
+       branches:    -3.8%
+       branch-miss: -7.6%
+       user sec:    -5.9%

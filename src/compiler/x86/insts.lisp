@@ -1029,23 +1029,26 @@
   (let ((size (matching-operand-size dst src)))
     (maybe-emit-operand-size-prefix segment size)
     (cond
-     ((integerp src)
-      (cond ((and (not (eq size :byte)) (<= -128 src 127))
+     ((or (integerp src)
+          (and (fixup-p src) (memq (fixup-flavor src) '(:layout-id))))
+      (cond ((and (neq size :byte) (typep src '(signed-byte 8)))
              (emit-byte segment #b10000011)
              (emit-ea segment dst opcode)
              (emit-byte segment src))
-            ((accumulator-p dst)
-             (emit-byte segment
-                        (dpb opcode
-                             (byte 3 3)
-                             (if (eq size :byte)
-                                 #b00000100
-                                 #b00000101)))
-             (emit-imm-operand segment src size))
             (t
-             (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
-             (emit-ea segment dst opcode)
-             (emit-imm-operand segment src size))))
+             (cond ((accumulator-p dst)
+                    (emit-byte segment
+                               (dpb opcode
+                                    (byte 3 3)
+                                    (if (eq size :byte)
+                                        #b00000100
+                                        #b00000101))))
+                   (t
+                    (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
+                    (emit-ea segment dst opcode)))
+             (if (fixup-p src)
+                 (emit-absolute-fixup segment src)
+                 (emit-imm-operand segment src size)))))
      ((register-p src)
       (emit-byte segment
                  (dpb opcode

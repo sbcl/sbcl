@@ -893,7 +893,8 @@
     :symbol-tls-index
     :foreign :foreign-dataref :code-object
     :layout :immobile-symbol :named-call :static-call
-    :symbol-value)
+    :symbol-value
+    :layout-id)
   #'equalp)
 
 ;;; Pack the aspects of a fixup into an integer.
@@ -933,7 +934,9 @@
            (operand
             (ecase flavor
               (:code-object (the null name))
-              (:layout (if (symbolp name) name (layout-classoid-name name)))
+              (:layout
+               (if (symbolp name) name (layout-classoid-name name)))
+              (:layout-id (the layout name))
               ((:assembly-routine :assembly-routine* :asm-routine-nil-offset
                :symbol-tls-index
                ;; Only #+immobile-space can use the following two flavors.

@@ -50,6 +50,8 @@
 (def!type layout-depthoid () '(integer -1 #x7FFF))
 (def!type layout-length () '(integer 0 #xFFFF))
 (def!type layout-bitmap () 'integer)
+;;; ID must be an unsigned fixnum for either value of n-word-bits.
+(def!type layout-id () '(unsigned-byte 29))
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:

@@ -670,7 +670,7 @@
 ;;; in the core for a cold layout, so that we don't have to extract
 ;;; them out of the core to compare cold layouts for validity.
 (defstruct (cold-layout (:constructor %make-cold-layout))
-  name depthoid length bitmap flags inherits descriptor)
+  id name depthoid length bitmap flags inherits descriptor)
 
 ;;; the hosts's representation of LAYOUT-of-LAYOUT
 (defvar *host-layout-of-layout* (find-layout 'layout))
@@ -1112,12 +1112,29 @@ core and return a descriptor to it."
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
+(defvar *condition-layout-uniqueid-counter* 0)
+(defvar *general-layout-uniqueid-counter* 0)
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
+  ;; Layouts created in genesis can't vary in length due to the number of ancestor
+  ;; types in the IS-A vector. They may vary in length due to the bitmap word count.
+  ;; But we can at least assert that there is one less thing to worry about.
+  (aver (<= depthoid sb-kernel::layout-id-vector-fixed-capacity))
   (let* ((fixed-words (sb-kernel::type-dd-length layout))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (result (allocate-struct (+ fixed-words bitmap-words)
                                   *layout-layout*
-                                  (symbol-value *cold-layout-gspace*))))
+                                  (symbol-value *cold-layout-gspace*)))
+         (this-id
+          (if (logtest flags +condition-layout-flag+)
+              ;; It doesn't really matter what ID is assigned to a CONDITION
+              ;; because we don't use the IDs for type testing.
+              ;; Nor for standard-object, but those aren't created during genesis.
+              ;; By keep the structure layout IDs smaller than they would be
+              ;; if the space of assigned IDs were shared, it might be possible
+              ;; to emit some type tests using 1-byte immediate operands on x86.
+              ;; Or not. Because we don't do JIT codegen.
+              (decf *condition-layout-uniqueid-counter*)
+              (incf *general-layout-uniqueid-counter*))))
     #+64-bit
     (write-slots result *host-layout-of-layout*
      :flags (sb-kernel::pack-layout-flags depthoid length flags))
@@ -1152,16 +1169,23 @@ core and return a descriptor to it."
                                  (setq *vacuous-slot-table*
                                        (host-constant-to-core '#(1 nil))))))
 
-    (when (and (logtest flags +structure-layout-flag+) (> depthoid 2))
-      (loop with dsd-index = (get-dsd-index sb-kernel:layout sb-kernel::ancestor_2)
-            for i from 2 to (min (1- depthoid) sb-c::layout-inherits-max-optimized-depth)
-            do (write-wordindexed result
-                                  (+ sb-vm:instance-slots-offset dsd-index)
-                                  (cold-svref inherits i))
-               (incf dsd-index)))
+    (if (not (logtest flags +structure-layout-flag+))
+        (write-slots result *host-layout-of-layout* :id-word0 this-id)
+        (let ((byte-offset (ash (+ (descriptor-word-offset result)
+                                   (get-dsd-index sb-kernel:layout sb-kernel::id-word0)
+                                   sb-vm:instance-slots-offset)
+                                sb-vm:word-shift)))
+          (loop for i from 2 below (cold-vector-len inherits)
+                do (setf (bvref-32 (descriptor-mem result) byte-offset)
+                         (cold-layout-id (gethash (descriptor-bits (cold-svref inherits i))
+                                                  *cold-layout-by-addr*)))
+                   (incf byte-offset 4))
+          (setf (bvref-32 (descriptor-mem result) byte-offset) this-id)))
+
     (integer-bits-to-core result bitmap bitmap-words fixed-words)
 
-    (let ((proxy (%make-cold-layout :name name
+    (let ((proxy (%make-cold-layout :id this-id
+                                    :name name
                                     :depthoid depthoid
                                     :length length
                                     :bitmap bitmap
@@ -1703,7 +1727,8 @@ core and return a descriptor to it."
                        (cold-cons (cold-intern (car pair))
                                   (cold-layout-descriptor (cdr pair))))
                      (sort-cold-layouts))))
-
+  (cold-set 'sb-kernel::*layout-id-generator*
+            (cold-list (make-fixnum-descriptor (1+ *general-layout-uniqueid-counter*))))
   (cold-set 'sb-c::*!initial-parsed-types*
             (vector-in-core
              (mapcar (lambda (x)
@@ -2708,6 +2733,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index sym))
              (:layout (cold-layout-descriptor-bits sym))
+             (:layout-id (cold-layout-id (gethash (descriptor-bits sym)
+                                                  *cold-layout-by-addr*)))
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3323,15 +3350,16 @@ III. initially undefined function references (alphabetically):
                 name)))
 
     (format t "~%~|~%V. layout names:~2%")
-    (format t "              Bitmap  Depth Name [Length]~%")
+    (format t "              Bitmap  Depth  ID  Name [Length]~%")
     (dolist (pair (sort-cold-layouts))
       (let* ((proxy (cdr pair))
              (descriptor (cold-layout-descriptor proxy))
              (addr (descriptor-bits descriptor)))
-        (format t "~10,'0X: ~8d   ~2D   ~S [~D]~%"
+        (format t "~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
                 addr
                 (cold-layout-bitmap proxy)
                 (cold-layout-depthoid proxy)
+                (cold-layout-id proxy)
                 (car pair)
                 (cold-layout-length proxy))))
 

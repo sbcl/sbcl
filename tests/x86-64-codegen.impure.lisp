@@ -148,7 +148,8 @@
   (let* ((lines
           (split-string
            (with-output-to-string (s)
-            (let ((sb-disassem:*disassem-location-column-width* 0))
+            (let ((sb-disassem:*disassem-location-column-width* 0)
+                  (sb-kernel::*print-layout-id* nil))
               (disassemble '(lambda (x) (the sb-assem:label x))
                            :stream s)))
            #\newline))

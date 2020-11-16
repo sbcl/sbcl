@@ -243,12 +243,25 @@ struct bitmap { sword_t *bits; unsigned int nwords; };
 static inline struct bitmap get_layout_bitmap(struct layout* layout)
 {
     struct bitmap bitmap;
-    bitmap.bits = (sword_t*)((char*)layout + sizeof (struct layout));
+    const int layout_id_vector_fixed_capacity = 7;
+#ifdef LISP_FEATURE_64_BIT
+    sword_t depthoid = layout->flags;
+    // Depthoid is stored in the upper 4 bytes of the header, as a fixnum.
+    depthoid >>= (32 + N_FIXNUM_TAG_BITS);
+    int extra_id_words =
+      (depthoid > layout_id_vector_fixed_capacity) ?
+      ALIGN_UP(depthoid - layout_id_vector_fixed_capacity, 2) / 2 : 0;
+#else
+    sword_t depthoid = layout->depthoid;
+    depthoid >>= N_FIXNUM_TAG_BITS;
+    int extra_id_words = (depthoid > layout_id_vector_fixed_capacity) ?
+      depthoid - layout_id_vector_fixed_capacity : 0;
+#endif
     // The 2 bits for stable address-based hashing can't ever bet set.
-    bitmap.nwords = (((unsigned int)layout->header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF)
-                    /* subtract one from the struct length in lispwords
-                     * to get the minimum payload length excluding bitmap words. */
-                    - ((sizeof (struct layout) / N_WORD_BYTES) - 1);
+    const int baseline_payload_words = (sizeof (struct layout) / N_WORD_BYTES) - 1;
+    int payload_words = ((unsigned int)layout->header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF;
+    bitmap.bits = (sword_t*)((char*)layout + sizeof (struct layout)) + extra_id_words;
+    bitmap.nwords = payload_words - baseline_payload_words - extra_id_words;
     return bitmap;
 }
 

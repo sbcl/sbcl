@@ -52,21 +52,52 @@
                                word-shift))
                      instance-pointer-lowtag)
                   layout)))
-  (define-vop (layout-depthoid)
+  (define-vop ()
     (:translate layout-depthoid)
     (:policy :fast-safe)
     (:args (layout :scs (descriptor-reg)))
     (:results (res :scs (any-reg)))
     (:result-types fixnum)
     (:generator 1 (inst movsx '(:dword :qword) res (read-depthoid))))
-  (define-vop (sb-c::layout-depthoid-gt)
+  (define-vop ()
     (:translate sb-c::layout-depthoid-gt)
     (:policy :fast-safe)
     (:args (layout :scs (descriptor-reg)))
     (:info k)
     (:arg-types * (:constant (unsigned-byte 16)))
     (:conditional :g)
+    (:generator 1 (inst cmp :dword (read-depthoid) (fixnumize k))))
+  (define-vop ()
+    (:translate sb-c::layout-depthoid-ge)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:info k)
+    (:arg-types * (:constant (unsigned-byte 16)))
+    (:conditional :ge)
     (:generator 1 (inst cmp :dword (read-depthoid) (fixnumize k)))))
+
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:info test)
+  (:policy :fast-safe)
+  (:conditional :e)
+  (:generator 1
+    (inst cmp :dword
+          (ea (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
+                         instance-slots-offset)
+                      word-shift)
+                 (ash (- (layout-depthoid test) 2) 2)
+                 (- instance-pointer-lowtag))
+              x)
+          ;; Todo: in self-build we should be able to wire in layout-ids.
+          ;; Many of them would fall into the <= 127 case.
+          (if (sb-c::producing-fasl-file)
+              (make-fixup test :layout-id)
+              ;; If the layout-id is <= 127 then this saves 3 encoding bytes
+              ;; by emitting r/m32,imm8 form.
+              (sb-kernel::layout-id test)))))
 
 #+compact-instance-header
 ;; ~20 instructions vs. 35

@@ -1464,12 +1464,23 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; in the bitmap, depending on whether any raw slot exists.
 ;;; I can't imagine that many users will complain that they can no longer
 ;;; incompatibly redefine defstructs involving raw slots.
+;;; Additionally, it is no longer possible to RECKLESSLY-CONTINUE on a defstruct
+;;; if the number of words in the layout would differ due to extra ID words,
+;;; but given that it was already not possible if the bitmaps differ,
+;;; it does not seem a big sacrifice to disallow redefining structures
+;;; at depthoids in excess of 7 (LAYOUT-ID-VECTOR-FIXED-CAPACITY) unless
+;;; both the old and new structure are at the same depthoid.
 #-sb-xc-host
 (defun mutable-layout-p (old-layout new-layout)
   (if (layout-info old-layout)
       (let ((old-bitmap (layout-bitmap old-layout))
             (new-bitmap (layout-bitmap new-layout)))
-        (and (= (layout-bitmap-words new-layout) (layout-bitmap-words old-layout))
+        ;; The number of extra ID words has to match, as does the number of bitmap
+        ;; words, or else GC will croak when parsing the bitmap.
+        (and (= (calculate-extra-id-words (layout-depthoid old-layout))
+                (calculate-extra-id-words (layout-depthoid new-layout)))
+             (= (layout-bitmap-words new-layout)
+                (layout-bitmap-words old-layout))
              (dotimes (i (dd-length (layout-dd old-layout)) t)
                (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
                           (not (logbitp i old-bitmap))) ; that was opaque bits

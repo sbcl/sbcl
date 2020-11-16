@@ -57,10 +57,13 @@
 
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
+(defvar *print-layout-id* t)
 (defmethod print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)
     (format stream
-            "for ~S~@[, INVALID=~S~]"
+            #+sb-xc-host "for ~S~@[, INVALID=~S~]"
+            #-sb-xc-host "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
+            #-sb-xc-host (when *print-layout-id* (layout-id layout))
             (layout-proper-name layout)
             (layout-invalid layout))))
 
@@ -264,14 +267,34 @@ between the ~A definition and the ~A definition"
           ;; Destructively modifying a layout is not threadsafe at all.
           ;; Use at your own risk (interactive use only).
           (let ((inherits (layout-inherits layout))
-                (depthoid (layout-depthoid layout)))
+                (depthoid (layout-depthoid layout)) ; "new" depthoid
+                (extra-id-words ; "old" extra words
+                 (calculate-extra-id-words (layout-depthoid destruct-layout)))
+                (id ; read my ID before screwing with the depthoid
+                 (layout-id destruct-layout)))
             (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
+            ;; DEPTHOID implies the number of words of "extra" IDs preceding the bitmap.
+            ;; Layout alteration is forbidden if it would affect the number of such words.
+            ;; So MUTABLE-LAYOUT-P should have checked that this is OK, but assert it
+            ;; again to be certain. Heap corruption is the greater evil versus a minor
+            ;; inconvenience of not offering the RECKLESSLY-CONTINUE restart.
+            (aver (= (calculate-extra-id-words depthoid) extra-id-words))
             #-64-bit (setf (layout-depthoid destruct-layout) (layout-depthoid layout)
                            (layout-length destruct-layout) (layout-length layout))
             (setf (layout-flags destruct-layout) (layout-flags layout)
                   (layout-info destruct-layout) (layout-info layout))
-            (set-layout-inherits destruct-layout inherits)
+            ;; Zero out the inherited ID values one word at a time.
+            ;; This makes self-ID transiently disappear, but what else can we do?
+            ;; It's may be in the wrong slot anyway, depending on whether depthoid changed.
+            ;; The calculation of the min word count of 3 or 6 is done as
+            ;;   (/ (- (1+ layout-id-vector-fixed-capacity) 2) number-of-ids-per-word)
+            ;; which is surely more confusing than spelling it as 3 or 6.
+            (dotimes (i (+ extra-id-words #+64-bit 3 #-64-bit 6))
+              (setf (%raw-instance-ref/word destruct-layout
+                                            (+ (get-dsd-index layout id-word0) i))
+                    0))
+            (set-layout-inherits destruct-layout inherits t id)
             (set-bitmap-from-layout destruct-layout layout)
             (setf (layout-invalid destruct-layout) nil
                   (classoid-layout classoid) destruct-layout))

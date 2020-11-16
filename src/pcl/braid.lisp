@@ -655,6 +655,24 @@
         (add-method gf class-method)))
     gf))
 
+(defun assign-layout-bitmap (layout)
+  ;; We decide only at class finalization time whether it is funcallable.
+  ;; Picking the right bitmap could probably be done sooner given the metaclass,
+  ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
+  ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
+  ;; explains why we differentiate between SGF and everything else.
+  (let ((inherits (layout-inherits layout)))
+    (when (find #.(find-layout 'function) inherits)
+      (let ((bitmap
+             #+immobile-code ; there are two possible bitmaps
+             (if (or (find *sgf-wrapper* inherits) (eq layout *sgf-wrapper*))
+                 sb-kernel::standard-gf-primitive-obj-layout-bitmap
+                 +layout-all-tagged+)
+             ;; there is only one possible bitmap otherwise
+             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))
+        (setf (%raw-instance-ref/word layout (sb-kernel::type-dd-length layout))
+              (logand sb-ext:most-positive-word bitmap))))))
+
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun %update-lisp-class-layout (class layout)
@@ -665,7 +683,8 @@
                            (order-layout-inherits
                             (map 'simple-vector #'class-wrapper
                                  (reverse (rest (class-precedence-list class)))))
-                           t)
+                           nil 0)
+      (assign-layout-bitmap layout)
       (register-layout layout :invalidate t)
 
       ;; FIXME: I don't think this should be necessary, but without it

@@ -135,8 +135,6 @@
 
 ;;; 32-bit is not done yet. Three slots are still used, instead of two.
 
-;;; Maximum value of N in ANCESTOR_N. Couldn't come up with a better name.
-(defconstant sb-c::layout-inherits-max-optimized-depth 5)
 (sb-xc:defstruct (layout (:copier nil)
                          ;; Parsing DEFSTRUCT uses a temporary layout
                          (:constructor make-temporary-layout
@@ -202,17 +200,84 @@
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
   (slot-table #(1 nil) :type simple-vector)
-  ;; inherited layouts or 0, only pertinent to structure classoids.
-  ;; There is no need to store the layout at depths 0 or 1
-  ;; since they're predetermined to be T and STRUCTURE-OBJECT.
-  (ancestor_2 0)
-  (ancestor_3 0)
-  (ancestor_4 0)
-  (ancestor_5 0))
+  (id-word0 0 :type word)
+  (id-word1 0 :type word)
+  (id-word2 0 :type word)
+  #-64-bit (id-word3 0 :type word)
+  #-64-bit (id-word4 0 :type word)
+  #-64-bit (id-word5 0 :type word))
 (declaim (freeze-type layout))
+
+;;; The cross-compiler representation of a LAYOUT omits several things:
+;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
+;;;     GC wants it in the layout to avoid double indirection.
+;;;   * EQUALP-TESTS - needed only for the target's implementation of EQUALP.
+;;;   * SLOT-TABLE, and SLOT-LIST - used only by the CLOS implementation.
+;;;   * ID-WORDn are optimizations for TYPEP.
+;;; So none of those really make sense on the host.
+;;; Also, we eschew the packed representation of length+depthoid+flags.
+;;; FLAGS are not even strictly necessary, since they are for optimizing
+;;; various type checks.
+#+sb-xc-host
+(progn
+  (defstruct (layout (:include structure!object)
+                     (:constructor host-make-layout
+                                   (clos-hash classoid &key info depthoid inherits
+                                                       length flags invalid)))
+    ;; Cross-compiler-only translation from slot index to symbol naming
+    ;; the accessor to call. (Since access by position is not a thing)
+    (index->accessor-map #() :type simple-vector)
+    ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
+    ;; Theoretically we don't need this in the cross-compiler, because the
+    ;; layout has a classoid which has a name which has a known hash.
+    ;; But there's no harm in storing it.
+    (clos-hash nil :type (and sb-xc:fixnum unsigned-byte))
+    (classoid nil :type classoid)
+    (flags 0 :type word)
+    (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
+    (inherits #() :type simple-vector)
+    (depthoid -1 :type layout-depthoid)
+    (length 0 :type layout-length)
+    (info nil :type (or null defstruct-description)))
+  (defun layout-dd (layout)
+    (the defstruct-description (layout-info layout)))
+  (defun make-layout (&rest args)
+    (let ((args (copy-list args)))
+      (remf args :bitmap)
+      (apply #'host-make-layout args)))
+  (defun make-temporary-layout (clos-hash classoid inherits)
+    (host-make-layout clos-hash classoid :inherits inherits :invalid nil))
+  (defun layout-bitmap (layout)
+    (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))
+
+(defmacro get-dsd-index (type-name slot-name)
+  (declare (notinline dsd-index)) ; avoid later inlining failure style-warning
+  (dsd-index (find slot-name
+                   (dd-slots (find-defstruct-description type-name))
+                   :key #'dsd-name)))
+(defmacro layout-id-vector-sap (layout)
+  `(sap+ (int-sap (get-lisp-obj-address ,layout))
+         (- (ash (+ sb-vm:instance-slots-offset (get-dsd-index layout id-word0))
+                 sb-vm:word-shift)
+            sb-vm:instance-pointer-lowtag)))
+(defconstant structure-object-layout-id 2) ; KLUDGE
+(defun layout-id (layout)
+  #+sb-xc-host (error "Can't call layout-id ~a" layout)
+  #-sb-xc-host
+  (let ((depthoid (layout-depthoid layout)))
+    (truly-the sb-c::layout-id
+     (cond ((not (logtest (layout-flags layout) +structure-layout-flag+))
+            ;; the 0th word of the ID vector stores the layout id
+            (layout-id-word0 layout))
+           ((>= depthoid 2)
+            (with-pinned-objects (layout)
+              ;; Depthoid 2 is in the 0th index and so on.
+              (sap-ref-32 (layout-id-vector-sap layout) (ash (- depthoid 2) 2))))
+           (t ; KLUDGE: must be STRUCTURE-OBJECT
+            structure-object-layout-id)))))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-flags (depthoid length flags)
@@ -223,57 +288,55 @@
 (defmacro type-dd-length (type-name)
   (dd-length (find-defstruct-description type-name)))
 
-(defmacro get-dsd-index (type-name slot-name)
-  (declare (notinline dsd-index)) ; avoid later inlining failure style-warning
-  (dsd-index (find slot-name
-                   (dd-slots (find-defstruct-description type-name))
-                   :key #'dsd-name)))
+(defconstant layout-id-vector-fixed-capacity 7)
+(defmacro calculate-extra-id-words (depthoid)
+  ;; There are 1 or 2 ids per word depending on n-word-bytes.
+  ;; We can always store IDs at depthoids 2,3,4,5,6,7,
+  ;; so depthoid less than or equal to 7 needs no extra words.
+  ;; 0 and 1 for T and STRUCTURE-OBJECT respectively are not stored.
+  `(ceiling (max 0 (- ,depthoid ,layout-id-vector-fixed-capacity))
+            ,(/ sb-vm:n-word-bytes 4)))
+
+;;; FIXME 1: assigning the inherits of a temporary-layout (when parsing DEFSTRUCT)
+;;; should not use up an ID.
+;;; FIXME 2: probably should never assign IDs to any metaclass except structure-class
+(defun set-layout-inherits (layout inherits structurep this-id)
+  (declare (ignorable structurep this-id))
+  (setf (layout-inherits layout) inherits)
+  ;;; If structurep, and *only* if, store all the inherited layout IDs.
+  ;;; It looks enticing to try to always store "something", but that goes wrong,
+  ;;; because only structure-object layouts are growable, and only structure-object
+  ;;; can store the self-ID in the proper index.
+  ;;; If the depthoid is -1, the self-ID has to go in index 0.
+  ;;; Standard-object layouts are not growable. The inherited layouts are known
+  ;;; only at class finalization time, at which point we've already made the layout.
+  ;;; Hence, the required indirection to the simple-vector of inherits.
+  #-sb-xc-host
+  (cond (structurep
+         (with-pinned-objects (layout)
+           (let ((sap (layout-id-vector-sap layout)))
+             (loop for j from 2 below (length inherits)
+                   do (setf (sap-ref-32 sap 0) (layout-id (svref inherits j))
+                            sap (sap+ sap 4)))
+             (setf (sap-ref-32 sap 0) this-id))))
+        ((not (eql this-id 0))
+         (setf (layout-id-word0 layout) this-id))))
 
 (defmacro set-bitmap-from-layout (to-layout from-layout)
   #+sb-xc-host (declare (ignore to-layout from-layout))
   #-sb-xc-host
-  `(let ((index (type-dd-length layout)))
+  `(let ((to-index (+ (type-dd-length layout)
+                      (calculate-extra-id-words (layout-depthoid ,to-layout))))
+         (from-index (+ (type-dd-length layout)
+                      (calculate-extra-id-words (layout-depthoid ,from-layout)))))
      (dotimes (i (layout-bitmap-words ,from-layout))
-       (setf (%raw-instance-ref/word ,to-layout index)
-             (%raw-instance-ref/word ,from-layout index))
-       (incf index))))
+       (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
+             (%raw-instance-ref/word ,from-layout (+ from-index i))))))
 
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
   #+compact-instance-header  6
   #-compact-instance-header -4)
-
-#+sb-xc-host
-(defmacro set-layout-inherits (layout inherits)
-  `(setf (layout-inherits ,layout) ,inherits))
-#-sb-xc-host
-(defmacro set-layout-inherits (layout inherits &optional recompute-bitmap)
-  `(let* ((l ,layout) (i ,inherits) (d (length i)))
-     (setf (layout-inherits l) i)
-     (setf (layout-ancestor_2 l) (if (> d 2) (svref i 2) 0)
-           (layout-ancestor_3 l) (if (> d 3) (svref i 3) 0)
-           (layout-ancestor_4 l) (if (> d 4) (svref i 4) 0)
-           (layout-ancestor_5 l) (if (> d 5) (svref i 5) 0))
-     ;; This part is for PCL where a class can forward-reference its superclasses
-     ;; and we only decide at class finalization time whether it is funcallable.
-     ;; Picking the right bitmap could probably be done sooner given the metaclass,
-     ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
-     ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
-     ;; explains why we differentiate between SGF and everything else.
-     ,(when recompute-bitmap
-        `(when (find ,(find-layout 'function) i)
-           (let ((bitmap
-                  #+immobile-code ; there are two possible bitmaps
-                  ;; *SGF-WRAPPER* isn't defined as yet, but this is just an s-expression.
-                  (if (or (find sb-pcl::*sgf-wrapper* i) (eq l sb-pcl::*sgf-wrapper*))
-                      standard-gf-primitive-obj-layout-bitmap
-                      +layout-all-tagged+)
-                  ;; there is only one possible bitmap otherwise
-                  #-immobile-code standard-gf-primitive-obj-layout-bitmap))
-             (setf (%raw-instance-ref/word l (type-dd-length layout))
-                   (logand sb-ext:most-positive-word bitmap)))))
-     l))
-(push '("SB-KERNEL" set-layout-inherits) *!removable-symbols*)
 
 ;;; For lack of any better to place to write up some detail surrounding
 ;;; layout creation for structure types, I'm putting here.
@@ -312,15 +375,26 @@
   ;; a defstruct-description.
   (aver (listp (layout-%info layout)))
   (setf (layout-%info layout) newval))
+
+(define-load-time-global *layout-id-generator* (cons 0 nil))
+(declaim (type (cons fixnum) *layout-id-generator*))
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
                          (info nil)
                          (bitmap (if info (dd-bitmap info) 0))
-                         (invalid :uninitialized))
+                         (invalid :uninitialized)
+                    &aux (id (or (atomic-pop (cdr *layout-id-generator*))
+                                 (atomic-incf (car *layout-id-generator*)))))
+  (unless (typep id '(and sb-c::layout-id (not (eql 0))))
+    (error "Layout ID limit reached"))
   (let* ((fixed-words (type-dd-length layout))
+         (extra-id-words ; count of additional words needed to store ancestors
+          (if (logtest flags +structure-layout-flag+)
+              (calculate-extra-id-words depthoid)
+              0))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
-         (nwords (+ fixed-words bitmap-words))
+         (nwords (+ fixed-words extra-id-words bitmap-words))
          (layout (truly-the layout
                  #+immobile-space
                  (sb-vm::alloc-immobile-fixedobj
@@ -337,12 +411,18 @@
     #-64-bit (setf (layout-depthoid layout) depthoid (layout-length layout) length)
     (setf (layout-info layout) info)
     (setf (layout-slot-table layout) #(1 nil))
-    (set-layout-inherits layout inherits)
-    #-sb-xc-host
-    (dotimes (i bitmap-words)
-      (setf (%raw-instance-ref/word layout (+ fixed-words i))
-            (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap)))
+    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) id)
+    (let ((bitmap-base (+ fixed-words extra-id-words)))
+      (dotimes (i bitmap-words)
+        (setf (%raw-instance-ref/word layout (+ bitmap-base i))
+              (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
     (setf (layout-invalid layout) invalid)
+    #+nil (format t "~&Made layout ID ~D for ~A~%" id (classoid-name classoid))
+    ;; It's not terribly important that we recycle layout IDs, but I have some other
+    ;; changes planned that warrant a finalizer per layout.
+    (when (>= id 400) ; KLUDGE to get through cold-init, before finalizers work
+      (finalize layout (lambda () (atomic-push id (cdr *layout-id-generator*)))
+                :dont-save t))
     layout))
 (declaim (inline layout-bitmap-words))
 (defun layout-bitmap-words (layout)
@@ -354,57 +434,9 @@
          ;; raw slots, except that funcallable-instances may have 2 raw slots -
          ;; the trampoline and the layout. The trampoline can have a tag, depending
          ;; on the platform, and the layout is tagged but a special case.
-         ;; In any event, the bitmap is always 1 word.
+         ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
+         ;; words preceding it.
          (t (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
-
-;;; The cross-compiler representation of a LAYOUT omits several things:
-;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
-;;;     GC wants it in the layout to avoid double indirection.
-;;;   * EQUALP-TESTS - needed only for the target's implementation of EQUALP.
-;;;   * SLOT-TABLE, and SLOT-LIST - used only by the CLOS implementation.
-;;;   * ANCESTOR_N are optimizations for TYPEP.
-;;; So none of those really make sense on the host.
-;;; Also, we eschew the packed representation of length+depthoid+flags.
-;;; FLAGS are not even strictly necessary, since they are for optimizing
-;;; various type checks.
-#+sb-xc-host
-(progn
-  (defstruct (layout (:include structure!object)
-                     (:constructor host-make-layout
-                                   (clos-hash classoid &key info depthoid inherits
-                                                       length flags invalid)))
-    ;; Cross-compiler-only translation from slot index to symbol naming
-    ;; the accessor to call. (Since access by position is not a thing)
-    (index->accessor-map #() :type simple-vector)
-    ;; CLOS-HASH is needed to convert some TYPECASE forms to jump tables.
-    ;; Theoretically we don't need this in the cross-compiler, because the
-    ;; layout has a classoid which has a name which has a known hash.
-    ;; But there's no harm in storing it.
-    (clos-hash nil :type (and sb-xc:fixnum unsigned-byte))
-    (classoid nil :type classoid)
-    (flags 0 :type word)
-    (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
-    (inherits #() :type simple-vector)
-    (depthoid -1 :type layout-depthoid)
-    (length 0 :type layout-length)
-    (info nil :type (or null defstruct-description)))
-  (defun layout-dd (layout)
-    (the defstruct-description (layout-info layout)))
-  (defun make-layout (&rest args)
-    (let ((args (copy-list args)))
-      (remf args :bitmap)
-      (apply #'host-make-layout args)))
-  (defun make-temporary-layout (clos-hash classoid inherits)
-    (host-make-layout clos-hash classoid :inherits inherits :invalid nil))
-  (defun layout-bitmap (layout)
-    (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
-
-(defmacro sb-c::layout-nth-ancestor-slot (n)
-  `(case ,n
-     (2 'layout-ancestor_2)
-     (3 'layout-ancestor_3)
-     (4 'layout-ancestor_4)
-     (5 'layout-ancestor_5)))
 
 #+(and (not sb-xc-host) 64-bit)
 ;;; LAYOUT-DEPTHOID gets a vop and a stub
@@ -612,6 +644,14 @@
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
+
+#-sb-xc-host
+(defun id-to-layout (id)
+  (maphash (lambda (k v)
+             (declare (ignore k))
+             (when (eql (layout-id v) id) (return-from id-to-layout v)))
+           (classoid-subclasses (find-classoid 't))))
+(export 'id-to-layout)
 
 (in-package "SB-C")
 

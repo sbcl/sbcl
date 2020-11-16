@@ -11,6 +11,43 @@
 
 (load "compiler-test-util.lisp")
 
+;;;; Better ensure nothing in messed up in the ID space
+;;;; or else everything is suspect.
+(defun layout-id-vector-sap (layout)
+  (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address layout))
+               (- (ash (+ sb-vm:instance-slots-offset
+                          (sb-kernel:get-dsd-index
+                           sb-kernel:layout sb-kernel::id-word0))
+                       sb-vm:word-shift)
+                  sb-vm:instance-pointer-lowtag)))
+
+(let ((hash (make-hash-table)))
+  ;; assert that all layout IDs are unique
+  (let ((all-layouts (sb-vm::list-allocated-objects
+                      :all :type sb-vm:instance-widetag
+                      :test #'sb-kernel::layout-p)))
+    (dolist (layout all-layouts)
+      (let ((id (sb-kernel::layout-id layout)))
+        (assert (not (gethash id hash)))
+        (setf (gethash id hash) t)))
+    ;; assert that all inherited ID vectors match the layout-inherits vector
+    (let ((structure-object
+           (sb-kernel:find-layout 'structure-object)))
+      (dolist (layout all-layouts)
+        (when (find structure-object (sb-kernel:layout-inherits layout))
+          (let ((ids
+                 (sb-sys:with-pinned-objects (layout)
+                   (let ((sap (layout-id-vector-sap layout)))
+                     (loop for depthoid from 2 to (sb-kernel:layout-depthoid layout)
+                           collect (sb-sys:sap-ref-32 sap (ash (- depthoid 2) 2))))))
+                (expect
+                 (map 'list 'sb-kernel::layout-id
+                      (sb-kernel:layout-inherits layout))))
+            (unless (equal (append '(1 2) ids)
+                           (append expect (list (sb-kernel::layout-id layout))))
+              (error "Wrong IDs for ~A: expect ~D actual ~D~%"
+                     layout expect ids))))))))
+
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
 
 ;;; Type mismatch of slot default init value isn't an error until the

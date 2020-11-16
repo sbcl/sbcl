@@ -825,6 +825,7 @@
 ;;; object's layout can ever be EQ to that of the ancestor.
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
+(defvar *use-layout-ids* (or #+(or x86 x86-64) t))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))
@@ -856,7 +857,8 @@
                    ((function-with-layout-p object) (%fun-layout object))
                    (t (return-from typep nil)))))
        (depthoid (if layout (layout-depthoid layout) -1))
-       (n-layout (gensym))
+       (n-layout (make-symbol "LAYOUT"))
+       (n-inherits (make-symbol "INHERITS"))
         ;; In order to efficiently perform the DEEPER-P test without this hack of using
         ;; a vop (when available for non-risc machines), we'd have to do two things:
         ;; - have instcombine combine the read and compare as one instruction
@@ -871,14 +873,7 @@
         `(locally (declare (optimize (safety 0)))
            (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
        (ancestor-layout-eq
-        ;; Layouts are immediate constants in immobile space. Again, this is something that
-        ;; an instcombine pass might be able to recognize as having a single instruction.
-        #+(and immobile-space x86-64) `(sb-vm::layout-inherits-ref-eq
-                                        (layout-inherits ,n-layout) ,depthoid ,layout)
-        #-(and immobile-space x86-64) `(eq ,nth-ancestor ,layout))
-       ;; For shallow depthoid we can avoid checking the depthoid or reading the 'inherits'
-       ;; slot, because the layout has some number of ancestor layouts directly in it.
-       (ancestor-slot (layout-nth-ancestor-slot depthoid)))
+        `(eq ,nth-ancestor ,layout)))
 
     ;; Easiest case first: single bit test.
     (cond ((member name '(condition pathname structure-object))
@@ -935,17 +930,21 @@
                     ;; If we allowed structure classes to be mixed in to standard-object,
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
-                    (let ((,n-layout (%instance-layout object)))
-                        ,(cond ((<= 2 depthoid layout-inherits-max-optimized-depth)
-                                `(or (eq (,ancestor-slot ,n-layout) ,layout)
-                                     (eq ,n-layout ,layout)))
-                               ((dd-constructors (layout-dd layout))
+                  (let ((,n-layout (%instance-layout object)))
+                    ,(if *use-layout-ids*
+                         (if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
+                             `(%structure-is-a ,n-layout ,layout)
+                             `(and (layout-depthoid-ge ,n-layout ,depthoid)
+                                   (%structure-is-a ,n-layout ,layout)))
+                         ;; Distinguish between abstract base types - no DD-CONSTRUCTOR,
+                         ;; hence no direct instances - and everything else.
+                         (cond ((dd-constructors (layout-dd layout))
                                 `(cond ((eq ,n-layout ,layout) t)
                                        (,deeper-p ,ancestor-layout-eq)))
                                (t ; abstract base type deeper than optimized max.
                                 ;; Assume that no layout is EQ to the base layout,
                                 ;; and unconditionally fetch and dereference layout-inherits.
-                                `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout))))))
+                                `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout)))))))
 
           ((> depthoid 0) ; fixed-depth ancestors of non-structure types: STREAM, FILE-STREAM,
            ;; SEQUENCE; all are abstract base types.
@@ -953,21 +952,27 @@
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
                            (bug "Non-frozen static classoids?"))
-            ;; quasi-hierarchical layout for other things: STREAM, FILE-STREAM,
-            ;; SEQUENCE, CONDITION; all are abstract base types.
+            ;; There is no need to test the inheritance depth for depthoid 1 because INHERITS
+            ;; will contains at least #<LAYOUT for T> and a padding word if naught else.
+            ;; Though in actual fact it can't have just T, because users have no means to create
+            ;; types that are direct descendants of type T.
+            ;; However, we do have to avoid unsafely dereferencing inherits for FILE-STREAM
+            ;; which is at depth 4. An easy way to avoid this depth test would be requiring at
+            ;; least 5 elements in any INHERITS vector.  Alternatively, adding 1 bit each for
+            ;; SEQUENCE, STREAM, and FILE-STREAM to LAYOUT-FLAGS would suffice.
             (let ((guts `(,@(unless (eq name 'condition)
                               `((when (zerop (layout-clos-hash ,n-layout))
                                  (setq ,n-layout
                                   (truly-the layout
                                              (update-object-layout-or-invalid
                                               object ',layout))))))
-                          ;; the Nth ancestor for N=1 is not directly stored in the layout.
-                          ;; But we don't have to check the layout-inherits length because
-                          ;; it has as least two physical data elements even if it has T
-                          ;; as the sole ancestor.
                           ,(if (eql depthoid 1)
                                ancestor-layout-eq
-                               `(eq (,ancestor-slot ,n-layout) ,layout)))))
+                               `(let ((,n-inherits (layout-inherits ,n-layout)))
+                                  (and (> (length ,n-inherits) ,depthoid)
+                                       (eq (data-vector-ref ,n-inherits ,depthoid)
+                                           ,layout)))))))
+
               (if primtype-predicate
                   `(and ,primtype-predicate (let ((,n-layout ,slot-reader)) ,@guts))
                   `(block typep
