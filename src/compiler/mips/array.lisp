@@ -58,7 +58,9 @@
     ;; ASSUMPTION: n-widetag-bits = 8
     (inst lbu res x #+little-endian (- 2 other-pointer-lowtag)
                     #+big-endian    (- 1 other-pointer-lowtag))
-    (inst nop)))
+    (inst nop)
+    (inst addu res 1)
+    (inst and res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
