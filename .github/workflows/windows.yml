@@ -12,7 +12,7 @@ jobs:
     - name: install host sbcl
       run: |
         cinst sbcl -source tools-for-build
-        echo "::add-path::/c/Program Files/Steel Bank Common Lisp/1.4.14"
+        echo "/c/Program Files/Steel Bank Common Lisp/1.4.14" | Out-File -Append $env:GITHUB_PATH
     - name: build
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
