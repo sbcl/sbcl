@@ -15,7 +15,8 @@
 ;;;; and I don't care too much why, since the functionality still works.
 ;;;; It's just that sometimes we get :PINNED as a root instead of
 ;;;; the expected reference to the one and only thread.
-#-(and gencgc sb-thread (or ppc64 x86-64)) (sb-ext:exit :code 104)
+;;;; And also sb-safepoint gets a crash in C.
+#-(and gencgc sb-thread (not sb-safepoint) (or ppc64 x86-64)) (sb-ext:exit :code 104)
 
 (setq sb-ext:*evaluator-mode* :compile)
 (defvar *fred*)
