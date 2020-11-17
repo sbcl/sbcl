@@ -4,5 +4,5 @@
 (with-test (:name :pseudostatic-garbage :skipped-on (:not :sb-thread))
   (let ((list1 (sb-vm::list-allocated-objects :all :test #'sb-thread::thread-p))
         (list2 (sb-vm::list-allocated-objects :all :test #'sb-thread::semaphore-p)))
-    (assert (not (cdr list1)))
+    (assert (not (cdr list1)) "~a" list1)
     (assert (not (cdr list2)))))

@@ -21,7 +21,8 @@
 (setf sb-unix::*on-dangerous-wait* :error)
 
 (with-test (:name (:threads :trivia))
-  (assert (eql 1 (length (list-all-threads))))
+  (assert (eql 1 (length (sb-thread:list-all-threads)))
+          nil "~a" (sb-thread:list-all-threads))
 
   (assert (eq *current-thread*
               (find (thread-name *current-thread*) (list-all-threads)
