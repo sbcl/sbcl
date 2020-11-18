@@ -1806,10 +1806,12 @@ static boolean can_invoke_post_gc(struct thread* th,
     if (!obj) return 0;
     struct thread_instance* lispthread = (void*)(obj - INSTANCE_POINTER_LOWTAG);
 
+#ifdef LISP_FEATURE_SB_THREAD
     /* If the SB-THREAD:THREAD has a 0 for its 'struct thread', give up.
      * This is the same as the THREAD-ALIVE-P test.  Maybe a thread that is
      * in the process of un-setting that slot performed this GC. */
     if (!lispthread->primitive_thread) return 0;
+#endif
 
     /* I don't know why we aren't in general willing to run post-GC with some or all
      * deferrable signals blocked. "Obviously" the idea is to run post-GC code only in
