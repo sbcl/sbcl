@@ -334,7 +334,7 @@ Examples:
                 (loop
                   (scan-finalizers)
                   ;; Wait for a notification
-                  (with-system-mutex (*finalizer-queue-lock*)
+                  (sb-thread:with-mutex (*finalizer-queue-lock*)
                     ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
                     (unless *finalizer-thread*
                       (return))

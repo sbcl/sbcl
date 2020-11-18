@@ -13,6 +13,7 @@
 
 (use-package :test-util)
 
+(sb-ext:finalize (list 1) (lambda ()))
 (with-test (:name (:async-unwind :specials))
   (let ((*x0* nil) (*x1* nil) (*x2* nil) (*x3* nil) (*x4* nil))
     (declare (special *x0* *x1* *x2* *x3* *x4*))
