@@ -35,7 +35,6 @@ extern void check_deferrables_blocked_or_lose(sigset_t *sigset);
 extern void check_gc_signals_blocked_or_lose(sigset_t *sigset);
 
 extern void check_deferrables_unblocked_or_lose(sigset_t *sigset);
-extern void check_blockables_unblocked_or_lose(sigset_t *sigset);
 extern void check_gc_signals_unblocked_or_lose(sigset_t *sigset);
 
 extern void block_deferrable_signals(sigset_t *old);

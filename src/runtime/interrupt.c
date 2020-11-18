@@ -427,15 +427,6 @@ blockables_blocked_p(sigset_t *sigset)
 }
 #endif
 
-void
-check_blockables_unblocked_or_lose(sigset_t *sigset)
-{
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    if (blockables_blocked_p(sigset))
-        lose("blockables blocked");
-#endif
-}
-
 static void assert_blockables_blocked()
 {
 #if !defined(LISP_FEATURE_WIN32)
