@@ -1926,6 +1926,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                                 saved-sigmask)
       (replace child-sigmask saved-sigmask)
       ;; Ensure that timers and interrupt-thread are directed only to "user" threads.
+      #+unix
       (when (thread-ephemeral-p thread)
         (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
           (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm)
