@@ -1913,22 +1913,30 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
             (run)))
          (saved-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
+         (child-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
+                                    :element-type 'bit :initial-element 0))
          (created))
-    (declare (truly-dynamic-extent saved-sigmask))
-    ;; Block deferrables to ensure that the new thread is unaffected by signals
-    ;; before the various interrupt-related special vars are set up.
-    (with-pinned-objects (saved-sigmask)
+    (declare (truly-dynamic-extent saved-sigmask child-sigmask))
+    (with-pinned-objects (saved-sigmask child-sigmask) ; if not stack-allocated
+      ;; Block deferrables to ensure that the new thread is unaffected by signals
+      ;; before the various interrupt-related special vars are set up.
+      ;; Preserve the current mask into SAVED-SIGMASK and CHILD-SIGMASK.
       (sb-unix::pthread-sigmask sb-unix::SIG_BLOCK
                                 (foreign-symbol-sap "deferrable_sigset" t)
-                                saved-sigmask))
+                                saved-sigmask)
+      (replace child-sigmask saved-sigmask)
+      ;; Ensure that timers and interrupt-thread are directed only to "user" threads.
+      (when (thread-ephemeral-p thread)
+        (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
+          (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm)
+          (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigurg))))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
-               (sigmask
-                (if (position 1 saved-sigmask) ; if there are any signals masked
-                    (copy-seq saved-sigmask) ; heap-allocate to pass to the new thread
-                    nil)) ; otherwise, don't pass the saved mask
                (cell (list thread))
                (startup-info
-                (vector trampoline cell function arguments sigmask
+                (vector trampoline cell function arguments
+                        (if (position 1 child-sigmask) ; if there are any signals masked
+                            (copy-seq child-sigmask) ; heap-allocate to pass to the new thread
+                            nil) ; otherwise, don't pass the saved mask
                         ;; pass fp modes if neccessary, clearing the accrued exception bits
                         (+ #+(or win32 darwin freebsd)
                            (dpb 0 sb-vm:float-sticky-bits (sb-vm:floating-point-modes))))))

@@ -1796,6 +1796,49 @@ valid_lisp_pointer_p(lispobj pointer)
     return 0;
 }
 
+static boolean can_invoke_post_gc(struct thread* th,
+                                  sigset_t *context_sigmask)
+{
+    lispobj obj = th->lisp_thread;
+    /* Ok, I seriously doubt that this can happen now. Don't we create
+     * the 'struct thread' with a pointer to its SB-THREAD:THREAD right away?
+     * I thought so. But if I'm mistaken, give up. */
+    if (!obj) return 0;
+    struct thread_instance* lispthread = (void*)(obj - INSTANCE_POINTER_LOWTAG);
+
+    /* If the SB-THREAD:THREAD has a 0 for its 'struct thread', give up.
+     * This is the same as the THREAD-ALIVE-P test.  Maybe a thread that is
+     * in the process of un-setting that slot performed this GC. */
+    if (!lispthread->primitive_thread) return 0;
+
+    /* I don't know why we aren't in general willing to run post-GC with some or all
+     * deferrable signals blocked. "Obviously" the idea is to run post-GC code only in
+     * a thread that is in a nominally pristine state, as opposed to one that is doing
+     * any manner of monkey business. But was there some specific issue related to
+     * running post-GC with signals blocked? Nontrivial post-GC code is bad anyway,
+     * so how could trivial code be adversely affected? i.e. if your post-GC code
+     * can't run with some signals blocked, then it shouldn't be your post-GC code. */
+    sigset_t mock_context_sigset;
+    if (lispthread->_ephemeral_p == T) {
+        /* If it's the finalizer thread that's doing the GC, we must allow
+         * some signals to be blocked. It won't recursively invoke the finalizer scan,
+         * since it's already looping over the finalizers. The easiest way to test that
+         * no signals are blocked is create a copy of the original sigcontext removing
+         * the known-blocked signals, pretending they weren't there.
+         * The original context is unaffected */
+
+        /* I don't think this needs sigcopyset(), does it? If we overrun the
+         * sigcontext created by the kernel, it' still a read from our stack
+         * (to our stack) and should be accessible.
+         * But see https://bugs.launchpad.net/sbcl/+bug/1904779 */
+        mock_context_sigset = *context_sigmask;
+        sigdelset(&mock_context_sigset, SIGURG);
+        sigdelset(&mock_context_sigset, SIGALRM);
+        context_sigmask = &mock_context_sigset;
+    }
+    return !deferrables_blocked_p(context_sigmask);
+}
+
 boolean
 maybe_gc(os_context_t *context)
 {
@@ -1868,7 +1911,11 @@ maybe_gc(os_context_t *context)
          (read_TLS(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
 #ifndef LISP_FEATURE_WIN32
         sigset_t *context_sigmask = os_context_sigmask_addr(context);
-        if (!deferrables_blocked_p(context_sigmask)) {
+        if (can_invoke_post_gc(thread, context_sigmask)) {
+            /* The gist of this is that we make it appear that return-from-signal
+             * happened, and the calling code decided to take a detour through the
+             * post-GC code. Except that we do it while the interrupt context
+             * is still on the stack */
             thread_sigmask(SIG_SETMASK, context_sigmask, 0);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
             check_gc_signals_unblocked_or_lose(0);

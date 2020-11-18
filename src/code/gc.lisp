@@ -264,18 +264,16 @@ statistics are appended to it."
   ;; B) interrupts are disabled somewhere up the call chain since we
   ;;    don't want to run user code in such a case.
   ;;
+  ;; Condition (A) is tested in the C runtime at can_invoke_post_gc().
+  ;; Condition (B) is tested here.
   ;; The long-term solution will be to keep a separate thread for
   ;; after-gc hooks.
   ;; Finalizers are in a separate thread (usually),
   ;; but it's not permissible to invoke CONDITION-NOTIFY from a
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
-  (when (and
-         #+sb-thread (/= 0 (sap-int (sb-vm::current-thread-offset-sap
-                                     sb-vm::thread-lisp-thread-slot)))
-         (sb-thread:thread-alive-p sb-thread:*current-thread*))
-    #+sb-thread (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
-    (let ((threadp #+sb-thread (%instancep sb-impl::*finalizer-thread*)))
+  #+sb-thread (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
+  (let ((threadp #+sb-thread (%instancep sb-impl::*finalizer-thread*)))
       (when threadp
         ;; It's OK to frob a condition variable regardless of
         ;; *allow-with-interrupts*, and probably OK to start a thread.
@@ -326,7 +324,7 @@ statistics are appended to it."
          (with-interrupts
            (unless threadp
              (run-pending-finalizers))
-           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))))
+           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)
