@@ -69,6 +69,12 @@
 #include "genesis/cons.h"
 #include "genesis/vector.h"
 
+#ifdef ATOMIC_LOGGING
+#include "atomiclog.inc"
+uword_t *eventdata;
+int n_logevents;
+#endif
+
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
  * behaviour: glibc defines sigset_t to support 1024 signals, which is
@@ -247,6 +253,18 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 #  define UNBLOCK_SIGSEGV() {}
 #endif
 
+/* Not safe in general, but if your thread names are all
+ * simple-base-string and won't move, this is slightly ok */
+__attribute__((unused)) static char* cur_thread_name()
+{
+    struct thread* th = arch_os_get_current_thread();
+    struct thread_instance *lispthread =
+        (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+    struct vector* name = VECTOR(lispthread->name);
+    if (widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG) return (char*)name->data;
+    return "?";
+}
+
 /* These are to be used in signal handlers. Currently all handlers are
  * called from one of:
  *
@@ -262,6 +280,36 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
  * kernel properly, so we fix it up ourselves in the
  * arch_os_get_context(..) function. -- CSR, 2002-07-23
  */
+#ifdef ATOMIC_LOGGING
+void dump_eventlog()
+{
+    int i = 0;
+    uword_t *e = eventdata;
+    while (i<n_logevents) {
+        char *fmt = (char*)e[i+1];
+        switch (e[i]) {
+        default: printf("busted event log"); return;
+        case 2: printf(fmt); break;
+        case 3: printf(fmt,e[i+2]); break;
+        case 4: printf(fmt,e[i+2],e[i+3]); break;
+        case 5: printf(fmt,e[i+2],e[i+3],e[i+4]); break;
+        case 6: printf(fmt,e[i+2],e[i+3],e[i+4],e[i+5]); break;
+        case 7: printf(fmt,e[i+2],e[i+3],e[i+4],e[i+5],e[i+6]); break;
+        }
+        putchar('\n');
+        i += e[i];
+    }
+}
+static void record_signal(int sig, void* context)
+{
+    event3("sig%d @%p in %d", sig, (void*)*os_context_pc_addr(context),
+           (int)arch_os_get_current_thread()->os_kernel_tid);
+}
+#define RECORD_SIGNAL(sig,ctxt) if(sig!=SIGSEGV)record_signal(sig,ctxt);
+#else
+#define RECORD_SIGNAL(sig,ctxt)
+#endif
+
 #ifdef LISP_FEATURE_WIN32
 # define should_handle_in_this_thread(c) (1)
 #else
@@ -270,6 +318,7 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
 #define SAVE_ERRNO(signal,context,void_context)                 \
     {                                                           \
         int _saved_errno = errno;                               \
+        RECORD_SIGNAL(signal,void_context);                     \
         UNBLOCK_SIGSEGV();                                      \
         RESTORE_FP_CONTROL_WORD(context,void_context);          \
         if (should_handle_in_this_thread(context)) {
@@ -1892,6 +1941,9 @@ sigabrt_handler(int __attribute__((unused)) signal,
 void
 interrupt_init(void)
 {
+#ifdef ATOMIC_LOGGING
+    eventdata = calloc(EVENTBUFMAX, N_WORD_BYTES);
+#endif
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     int __attribute__((unused)) i;
     SHOW("entering interrupt_init()");
