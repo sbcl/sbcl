@@ -10,7 +10,23 @@
                          (funcall realfun thread stack-base)
                          nil))))
         (success))
-    (assert (null sb-thread::*starting-threads*))
+    ;; This test checks that if pthread_create fails, nothing is added to *STARTING-THREADS*.
+    ;; If there were an entry spuriously added, it would remain forever, as the thread we're
+    ;; attempting to create would not consume and clear out its startup data.
+    ;; So as a precondition to the test, *STARTING-THREADS* must be NIL. If it isn't, then
+    ;; there must have been a finalizer thread started, and it would have left a 0 in the list,
+    ;; which is the telltale mark of a thread that smashed its startup data.
+    ;; So if the list is not NIL right now, assert that there is a finalizer thread,
+    ;; and then set the list to NIL.
+    ;; [The rationale for the 0 is that responsibility for deletion from the list falls to the
+    ;; next MAKE-THREAD so that new threads need not synchronize with creators for exclusive
+    ;; access to the list. But threads can safely RPLACA their own cell in *STARTING-THREADS*
+    ;; allowing it to be GC'd even if nothing subsequently prunes out un-needed cons cells]
+    (when sb-thread::*starting-threads*
+      (assert (sb-thread::thread-p sb-impl::*finalizer-thread*))
+      (assert (equal sb-thread::*starting-threads* '(0)))
+      (setq sb-thread::*starting-threads* nil))
+
     (unwind-protect
          (progn (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
                 (handler-case (sb-thread:make-thread #'list :name "thisfails")
@@ -18,7 +34,7 @@
                     (setq success (string= (write-to-string e)
                                            "Could not create new OS thread.")))))
       (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
-    (assert (equal sb-thread::*starting-threads* nil))
+    (assert (null sb-thread::*starting-threads*))
     (assert (equal (sb-thread::avltree-list sb-thread::*all-threads*)
                    (list sb-thread::*initial-thread*)))))
 
