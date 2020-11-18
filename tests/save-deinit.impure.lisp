@@ -26,6 +26,8 @@
 ;;; because I don't want to cons a &REST arg nor know the exact signature in this test.
 ;;; Encapsulating INIT-THREAD-LOCAL-STORAGE works, but we have to make sure that
 ;;; *DEADLINE* has been initialized before calling SLEEP.
+(sb-impl::finalizer-thread-stop)
+(setf sb-impl::*finalizer-thread* t)
 (defglobal *started-threads* nil)
 (sb-int:encapsulate
  'sb-thread::init-thread-local-storage

@@ -14,8 +14,10 @@
 (defglobal *n-finalized-things* (or #+(and 64-bit (not sb-safepoint)) 20000 10000))
 (defglobal *weak-pointers* nil)
 
-#+sb-thread ; Check that we do want to start a thread, and it hasn't been started.
-(assert (eq sb-impl::*finalizer-thread* t))
+#+sb-thread
+(progn
+  (sb-impl::finalizer-thread-stop)
+  (setf sb-impl::*finalizer-thread* t))
 
 (defun makejunk (_)
   (declare (ignore _))

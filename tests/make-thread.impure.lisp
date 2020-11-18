@@ -35,7 +35,8 @@
                                            "Could not create new OS thread.")))))
       (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
     (assert (null sb-thread::*starting-threads*))
-    (assert (equal (sb-thread::avltree-list sb-thread::*all-threads*)
+    (assert (equal (remove sb-impl::*finalizer-thread*
+                           (sb-thread::avltree-list sb-thread::*all-threads*))
                    (list sb-thread::*initial-thread*)))))
 
 (defun actually-get-stack-roots (current-sp
