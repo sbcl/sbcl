@@ -331,10 +331,6 @@ static void record_signal(int sig, void* context)
 static void run_deferred_handler(struct interrupt_data *data,
                                  os_context_t *context);
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-static void store_signal_data_for_later (struct interrupt_data *data,
-                                         void *handler, int signal,
-                                         siginfo_t *info,
-                                         os_context_t *context);
 
 
 /* Generic signal related utilities. */
@@ -1237,6 +1233,29 @@ run_deferred_handler(struct interrupt_data *data, os_context_t *context)
 }
 
 #ifndef LISP_FEATURE_WIN32
+static void
+store_signal_data_for_later (struct interrupt_data *data, void *handler,
+                             int signal,
+                             siginfo_t *info, os_context_t *context)
+{
+    if (!context || !handler || data->pending_handler)
+        lose("can't defer signal: context=%p handler=%p pending=%p",
+             context, handler, data->pending_handler);
+    data->pending_handler = handler;
+    data->pending_signal = signal;
+    if (info)
+        memcpy(&data->pending_info, info, sizeof *info);
+    else
+        memset(&data->pending_info, 0, sizeof *info);
+    /* the signal mask in the context (from before we were
+     * interrupted) is copied to be restored when run_deferred_handler
+     * happens. Then the usually-blocked signals are added to the mask
+     * in the context so that we are running with blocked signals when
+     * the handler returns */
+    sigcopyset(&data->pending_mask, os_context_sigmask_addr(context));
+    sigaddset_deferrable(os_context_sigmask_addr(context));
+}
+
 static boolean
 can_handle_now(void *handler, struct interrupt_data *data,
                int signal, siginfo_t *info, os_context_t *context)
@@ -1290,36 +1309,6 @@ can_handle_now(void *handler, struct interrupt_data *data,
                   "/can_handle_now(%p,%d): not deferred\n",
                   handler,signal));
     return 1;
-}
-
-static void
-store_signal_data_for_later (struct interrupt_data *data, void *handler,
-                             int signal,
-                             siginfo_t *info, os_context_t *context)
-{
-    if (data->pending_handler)
-        lose("tried to overwrite pending interrupt handler %p with %p",
-             data->pending_handler, handler);
-    if (!handler)
-        lose("tried to defer null interrupt handler");
-    data->pending_handler = handler;
-    data->pending_signal = signal;
-    if(info)
-        memcpy(&(data->pending_info), info, sizeof(siginfo_t));
-
-    FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n",
-                  signal));
-
-    if(!context)
-        lose("Null context");
-
-    /* the signal mask in the context (from before we were
-     * interrupted) is copied to be restored when run_deferred_handler
-     * happens. Then the usually-blocked signals are added to the mask
-     * in the context so that we are running with blocked signals when
-     * the handler returns */
-    sigcopyset(&(data->pending_mask),os_context_sigmask_addr(context));
-    sigaddset_deferrable(os_context_sigmask_addr(context));
 }
 
 static void
