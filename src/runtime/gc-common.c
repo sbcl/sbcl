@@ -1799,6 +1799,7 @@ valid_lisp_pointer_p(lispobj pointer)
 static boolean can_invoke_post_gc(struct thread* th,
                                   sigset_t *context_sigmask)
 {
+#ifdef LISP_FEATURE_SB_THREAD
     lispobj obj = th->lisp_thread;
     /* Ok, I seriously doubt that this can happen now. Don't we create
      * the 'struct thread' with a pointer to its SB-THREAD:THREAD right away?
@@ -1806,12 +1807,10 @@ static boolean can_invoke_post_gc(struct thread* th,
     if (!obj) return 0;
     struct thread_instance* lispthread = (void*)(obj - INSTANCE_POINTER_LOWTAG);
 
-#ifdef LISP_FEATURE_SB_THREAD
     /* If the SB-THREAD:THREAD has a 0 for its 'struct thread', give up.
      * This is the same as the THREAD-ALIVE-P test.  Maybe a thread that is
      * in the process of un-setting that slot performed this GC. */
     if (!lispthread->primitive_thread) return 0;
-#endif
 
     /* I don't know why we aren't in general willing to run post-GC with some or all
      * deferrable signals blocked. "Obviously" the idea is to run post-GC code only in
@@ -1838,6 +1837,7 @@ static boolean can_invoke_post_gc(struct thread* th,
         sigdelset(&mock_context_sigset, SIGALRM);
         context_sigmask = &mock_context_sigset;
     }
+#endif
     return !deferrables_blocked_p(context_sigmask);
 }
 
