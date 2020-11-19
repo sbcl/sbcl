@@ -620,6 +620,16 @@ assert_on_stack(struct thread *th, void *esp)
          th->control_stack_start, th->control_stack_end);
 }
 
+/// Similar to the one in gc-common, but without the sigmask test.
+static boolean can_invoke_post_gc(struct thread* th)
+{
+    lispobj obj = th->lisp_thread;
+    if (!obj) return 0;
+    struct thread_instance* lispthread = (void*)(obj - INSTANCE_POINTER_LOWTAG);
+    if (!lispthread->primitive_thread) return 0;
+    return 1;
+}
+
 // returns 0 if skipped, 1 otherwise
 int
 check_pending_gc(os_context_t *ctx)
@@ -646,11 +656,10 @@ check_pending_gc(os_context_t *ctx)
             thread_sigmask(SIG_SETMASK,&sigset,NULL);
             if (gc_happened == T) {
                 /* POST_GC wants to enable interrupts */
-                if (read_TLS(INTERRUPTS_ENABLED,self) == T ||
-                    read_TLS(ALLOW_WITH_INTERRUPTS,self) == T) {
-                    odxprint(misc, "going to call POST_GC");
+	        if ((read_TLS(INTERRUPTS_ENABLED,self) == T ||
+		     read_TLS(ALLOW_WITH_INTERRUPTS,self) == T)
+		    && can_invoke_post_gc(self))
                     funcall0(StaticSymbolFunction(POST_GC));
-                }
                 done = 1;
             }
         }
