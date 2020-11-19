@@ -23,9 +23,18 @@
 
 (let ((hash (make-hash-table)))
   ;; assert that all layout IDs are unique
-  (let ((all-layouts (sb-vm::list-allocated-objects
-                      :all :type sb-vm:instance-widetag
-                      :test #'sb-kernel::layout-p)))
+  (let ((all-layouts
+         (delete-if
+          ;; temporary layouts (created for parsing DEFSTRUCT)
+          ;; must be be culled out.
+          (lambda (x)
+            (and (typep (sb-kernel:layout-classoid x)
+                        'sb-kernel:structure-classoid)
+                 (eq (sb-kernel::layout-equalp-impl x)
+                     #'sb-kernel::equalp-err)))
+          (sb-vm::list-allocated-objects :all
+                                         :type sb-vm:instance-widetag
+                                         :test #'sb-kernel::layout-p))))
     (dolist (layout all-layouts)
       (let ((id (sb-kernel::layout-id layout)))
         (assert (not (gethash id hash)))
