@@ -656,9 +656,9 @@ check_pending_gc(os_context_t *ctx)
             thread_sigmask(SIG_SETMASK,&sigset,NULL);
             if (gc_happened == T) {
                 /* POST_GC wants to enable interrupts */
-	        if ((read_TLS(INTERRUPTS_ENABLED,self) == T ||
-		     read_TLS(ALLOW_WITH_INTERRUPTS,self) == T)
-		    && can_invoke_post_gc(self))
+                if ((read_TLS(INTERRUPTS_ENABLED,self) == T ||
+                     read_TLS(ALLOW_WITH_INTERRUPTS,self) == T)
+                    && can_invoke_post_gc(self))
                     funcall0(StaticSymbolFunction(POST_GC));
                 done = 1;
             }
