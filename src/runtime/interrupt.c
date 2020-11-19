@@ -441,6 +441,12 @@ sigaddset_blockable(sigset_t *sigset)
 /* initialized in interrupt_init */
 sigset_t deferrable_sigset;
 sigset_t blockable_sigset;
+/* gc_sigset will have exactly 1 bit on, for SIG_STOP_FOR_GC, or no bits on.
+ * We always use SIGUSR2 as SIG_STOP_FOR_GC, though in days past it may have
+ * varied by OS. Also, long ago, there was a different signal to resume after
+ * suspension, but now we use a semaphore for that, which is technically
+ * on shaky ground, but seems to work. e.g. consider an implementation of
+ * of sem_wait that requires a call to malloc; it could fail badly for us */
 sigset_t gc_sigset;
 
 boolean
@@ -503,21 +509,16 @@ static void assert_blockables_blocked()
 }
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-#if !defined(LISP_FEATURE_WIN32)
-boolean
-gc_signals_blocked_p(sigset_t *sigset)
-{
-    return all_signals_blocked_p(sigset, &gc_sigset, "gc");
-}
-#endif
-
 void
 check_gc_signals_unblocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32)
-    if (gc_signals_blocked_p(sigset))
+    sigset_t current;
+    if (!sigset) {
+        thread_sigmask(SIG_BLOCK, 0, &current);
+        sigset = &current;
+    }
+    if (sigismember(sigset, SIG_STOP_FOR_GC))
         lose("gc signals blocked");
-#endif
 }
 #endif
 
@@ -574,12 +575,12 @@ unblock_signals_in_context_and_maybe_warn(os_context_t *context)
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     sigset_t *sigset = os_context_sigmask_addr(context);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    if (all_signals_blocked_p(sigset, &gc_sigset, "gc")) {
+    if (sigismember(sigset, SIG_STOP_FOR_GC)) {
         corruption_warning_and_maybe_lose(
 "Enabling blocked gc signals to allow returning to Lisp without risking\n\
 gc deadlocks. Since GC signals are only blocked in signal handlers when \n\
 they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
-        sigmask_logandc(sigset, &gc_sigset);
+        sigdelset(sigset, SIG_STOP_FOR_GC);
     }
 #endif
     if (!interrupt_handler_pending_p()) {
@@ -636,7 +637,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
              * unblock gc signals. In the end, this is equivalent to
              * blocking the deferrables. */
             sigcopyset(&data->pending_mask, &oldset);
-            thread_sigmask(SIG_UNBLOCK, &gc_sigset, 0);
+            unblock_gc_signals();
             return;
         }
     }
