@@ -32,7 +32,6 @@ extern boolean blockables_blocked_p(sigset_t *sigset);
 extern boolean gc_signals_blocked_p(sigset_t *sigset);
 
 extern void check_deferrables_blocked_or_lose(sigset_t *sigset);
-extern void check_gc_signals_blocked_or_lose(sigset_t *sigset);
 
 extern void check_deferrables_unblocked_or_lose(sigset_t *sigset);
 extern void check_gc_signals_unblocked_or_lose(sigset_t *sigset);

@@ -519,15 +519,6 @@ check_gc_signals_unblocked_or_lose(sigset_t *sigset)
         lose("gc signals blocked");
 #endif
 }
-
-void
-check_gc_signals_blocked_or_lose(sigset_t *sigset)
-{
-#if !defined(LISP_FEATURE_WIN32)
-    if (!gc_signals_blocked_p(sigset))
-        lose("gc signals unblocked");
-#endif
-}
 #endif
 
 void
