@@ -28,7 +28,6 @@ extern sigset_t blockable_sigset;
 extern sigset_t gc_sigset;
 
 extern boolean deferrables_blocked_p(sigset_t *sigset);
-extern boolean blockables_blocked_p(sigset_t *sigset);
 
 extern void check_deferrables_blocked_or_lose(sigset_t *sigset);
 

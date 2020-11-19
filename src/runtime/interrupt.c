@@ -470,14 +470,6 @@ check_deferrables_blocked_or_lose(sigset_t *sigset)
 #endif
 }
 
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-boolean
-blockables_blocked_p(sigset_t *sigset)
-{
-    return all_signals_blocked_p(sigset, &blockable_sigset, "blockable");
-}
-#endif
-
 static void assert_blockables_blocked()
 {
 #if !defined(LISP_FEATURE_WIN32)
@@ -499,7 +491,24 @@ static void assert_blockables_blocked()
      * So we merely skip this assertion.
      *   -- DFL, trying to expand on a comment by AK.
      */
-    if (!blockables_blocked_p(0))
+    sigset_t mask;
+    thread_sigmask(SIG_BLOCK, 0, &mask);
+    /* Test a representative bit from each set of signals of interest:
+     *  (1) stop-for-GC
+     *  (2) other blockable asynchronous signals
+     *  (3) other blockable synchronous signals (SIGPIPE)
+     * If the representative bit is in the mask, say the whole set is.
+     * Since this is just a check of an invariant which correct execution
+     * will always adhere to, there is not much additional advantage to
+     * looking at all the signal bits, unlike the situation where the
+     * mask test is used as a predicate to decide on control flow.
+     */
+    if (!(
+#ifdef THREADS_USING_GCSIGNAL
+        sigismember(&mask, SIG_STOP_FOR_GC) && // (1)
+#endif
+        sigismember(&mask, SIGHUP) &&          // (2)
+        sigismember(&mask, SIGPIPE)))          // (3)
         lose("blockables unblocked");
 #endif
 }
