@@ -659,7 +659,7 @@ in_leaving_without_gcing_race_p(struct thread __attribute__((unused)) *thread)
 }
 
 /* Check our baroque invariants. */
-void
+static void
 check_interrupt_context_or_lose(os_context_t *context)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
@@ -1260,9 +1260,13 @@ static boolean
 can_handle_now(void *handler, struct interrupt_data *data,
                int signal, siginfo_t *info, os_context_t *context)
 {
-    struct thread *thread=arch_os_get_current_thread();
-
+#ifdef DEBUG
+    // All this might prove is that you set sa_mask correctly when calling
+    // sigaction. That's not worth an extra system call.
     assert_blockables_blocked();
+#endif
+
+    struct thread *thread = arch_os_get_current_thread();
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending");
@@ -1271,6 +1275,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
     if (data->gc_blocked_deferrables)
         lose("can_handle_now: gc_blocked_deferrables true");
 
+    int answer = 1;
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
      * atomic section inside a WITHOUT-INTERRUPTS.
@@ -1287,28 +1292,23 @@ can_handle_now(void *handler, struct interrupt_data *data,
                       in_leaving_without_gcing_race_p(thread)));
         store_signal_data_for_later(data,handler,signal,info,context);
         write_TLS(INTERRUPT_PENDING, T,thread);
-        check_interrupt_context_or_lose(context);
-        return 0;
+        answer = 0;
     }
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
-    if (arch_pseudo_atomic_atomic(context)) {
+    else if (arch_pseudo_atomic_atomic(context)) {
         FSHOW_SIGNAL((stderr,
                       "/can_handle_now(%p,%d): deferred(PA)\n",
                       handler,signal));
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
-        check_interrupt_context_or_lose(context);
-        return 0;
+        answer = 0;
     }
 
     check_interrupt_context_or_lose(context);
 
-    FSHOW_SIGNAL((stderr,
-                  "/can_handle_now(%p,%d): not deferred\n",
-                  handler,signal));
-    return 1;
+    return answer;
 }
 
 static void
