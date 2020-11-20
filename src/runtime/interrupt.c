@@ -1394,8 +1394,8 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * for now, and nobody else touches it, the sole exception being that GC
      * sets it to RUNNING. The loads inside thread_wait_until_not()
      * are slightly more interesting from that perspective */
-    if (thread->state != STATE_RUNNING)
-        lose("stop_for_gc: bad thread state: %x", (int)thread->state);
+    if (thread->state_word.state != STATE_RUNNING)
+        lose("stop_for_gc: bad thread state: %x", (int)thread->state_word.state);
 
     /* We say that the thread is "stopped" as of now, but the blocking operation
      * occurs below at thread_wait_until_not(STATE_STOPPED). Note that sem_post()
@@ -1682,7 +1682,7 @@ void lower_thread_control_stack_guard_page(struct thread *th)
 {
     protect_control_stack_guard_page(0, th);
     protect_control_stack_return_guard_page(1, th);
-    th->control_stack_guard_page_protected = NIL;
+    th->state_word.control_stack_guard_page_protected = 0;
     fprintf(stderr, "INFO: Control stack guard page unprotected\n");
 }
 
@@ -1691,7 +1691,7 @@ void reset_thread_control_stack_guard_page(struct thread *th)
     memset(CONTROL_STACK_GUARD_PAGE(th), 0, os_vm_page_size);
     protect_control_stack_guard_page(1, th);
     protect_control_stack_return_guard_page(0, th);
-    th->control_stack_guard_page_protected = T;
+    th->state_word.control_stack_guard_page_protected = 1;
     fprintf(stderr, "INFO: Control stack guard page reprotected\n");
 }
 
@@ -1727,7 +1727,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             lose("Control stack exhausted, fault: %p, PC: %p",
                  addr, (void*)*os_context_pc_addr(context));
         }
-        if (th->control_stack_guard_page_protected == NIL)
+        if (!th->state_word.control_stack_guard_page_protected)
             lose("control_stack_guard_page_protected NIL");
         lower_thread_control_stack_guard_page(th);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -1745,7 +1745,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        if (th->control_stack_guard_page_protected != NIL)
+        if (th->state_word.control_stack_guard_page_protected)
             lose("control_stack_guard_page_protected not NIL");
         reset_thread_control_stack_guard_page(th);
         return 1;

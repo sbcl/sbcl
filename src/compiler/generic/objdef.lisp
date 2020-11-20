@@ -541,12 +541,12 @@ during backtrace.
                        :special *control-stack-start*)
   (control-stack-end :c-type "lispobj *" :pointer t
                      :special *control-stack-end*)
-  (control-stack-guard-page-protected)
   (this :c-type "struct thread *" :pointer t)
   (prev :c-type "struct thread *" :pointer t)
   (next :c-type "struct thread *" :pointer t)
-  ;; starting, running, suspended, dead
-  (state :c-type "lispobj")
+  ;; a struct containing {starting, running, suspended, dead}
+  ;; and some other state fields.
+  (state-word :c-type "struct thread_state_word")
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)

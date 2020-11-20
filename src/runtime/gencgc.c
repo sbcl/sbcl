@@ -3387,7 +3387,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #ifdef LISP_FEATURE_SB_THREAD
     pin_all_dynamic_space_code = 0;
     for_each_thread(th) {
-        if (th->state != STATE_DEAD && (read_TLS(GC_PIN_CODE_PAGES, th) & make_fixnum(1))) {
+        if (th->state_word.state != STATE_DEAD && \
+            (read_TLS(GC_PIN_CODE_PAGES, th) & make_fixnum(1))) {
             pin_all_dynamic_space_code = 1;
             break;
         }
@@ -3480,7 +3481,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (conservative_stack) {
         for_each_thread(th) {
             void* esp = (void*)-1;
-            if (th->state == STATE_DEAD)
+            if (th->state_word.state == STATE_DEAD)
                 continue;
 # if defined(LISP_FEATURE_SB_SAFEPOINT)
             /* Conservative collect_garbage is always invoked with a

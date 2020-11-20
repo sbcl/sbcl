@@ -2004,7 +2004,7 @@ scrub_thread_control_stack(struct thread *th)
          ((os_vm_address_t)sp >= hard_guard_page_address)) ||
         (((os_vm_address_t)sp < (guard_page_address + os_vm_page_size)) &&
          ((os_vm_address_t)sp >= guard_page_address) &&
-         (th->control_stack_guard_page_protected != NIL)))
+         th->state_word.control_stack_guard_page_protected))
         return;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     do {

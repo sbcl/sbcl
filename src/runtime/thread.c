@@ -116,12 +116,14 @@ unlink_thread(struct thread *th)
         th->next->prev = th->prev;
 }
 
-#define get_thread_state(thread) (int)__sync_val_compare_and_swap(&thread->state, -1, -1)
+#define get_thread_state(thread) \
+ (int)__sync_val_compare_and_swap(&thread->state_word.state, -1, -1)
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 
 void
-set_thread_state(struct thread *thread, lispobj state,
+set_thread_state(struct thread *thread,
+                 char state,
                  boolean signals_already_blocked) // for foreign thread
 {
     struct extra_thread_data *semaphores = thread_extra_data(thread);
@@ -131,7 +133,7 @@ set_thread_state(struct thread *thread, lispobj state,
     if (!signals_already_blocked)
         block_blockable_signals(&old);
     os_sem_wait(&semaphores->state_sem, "set_thread_state");
-    if (thread->state != state) {
+    if (thread->state_word.state != state) {
         if ((STATE_STOPPED==state) ||
             (STATE_DEAD==state)) {
             waitcount = semaphores->state_not_running_waitcount;
@@ -146,7 +148,7 @@ set_thread_state(struct thread *thread, lispobj state,
             for (i=0; i<waitcount; i++)
                 os_sem_post(&semaphores->state_not_stopped_sem, "set_thread_state (not stopped)");
         }
-        thread->state = state;
+        thread->state_word.state = state;
     }
     os_sem_post(&semaphores->state_sem, "set_thread_state");
     if (!signals_already_blocked)
@@ -473,6 +475,7 @@ void* new_thread_trampoline(void* arg)
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
+    if (lispthread->_ephemeral_p == T) th->state_word.user_thread_p = 0;
 
     /* Potentially set the externally-visible name of this thread,
      * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
@@ -926,7 +929,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #endif
     }
 
-    th->control_stack_guard_page_protected = T;
+    th->state_word.control_stack_guard_page_protected = 1;
     th->alien_stack_start=
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     set_binding_stack_pointer(th,th->binding_stack_start);
@@ -950,7 +953,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     os_sem_init(&extra_data->state_not_stopped_sem, 0);
 #endif
 
-    th->state=STATE_RUNNING;
+    th->state_word.state = STATE_RUNNING;
+    th->state_word.user_thread_p = 1;
+
 #ifdef ALIEN_STACK_GROWS_DOWNWARD
     th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start
                                        + ALIEN_STACK_SIZE-N_WORD_BYTES);

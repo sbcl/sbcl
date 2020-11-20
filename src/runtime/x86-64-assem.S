@@ -450,7 +450,8 @@ ascs_check_guard_page:
 	jae	ascs_clear_loop
 	cmp	%rax, %rsi
 	ja	ascs_clear_loop
-	cmpq	$(NIL), THREAD_CONTROL_STACK_GUARD_PAGE_PROTECTED_OFFSET(%rdi)
+	/* test state_word.control_stack_guard_page_protected */
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi)
 	jne	ascs_finished
 
 	/* Clear memory backwards to the start of the (4KiB) page */

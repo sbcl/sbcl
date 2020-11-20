@@ -108,7 +108,7 @@ boolean will_exhaust_stack(struct thread * th, x86_thread_state64_t *context, in
     }
 
     if(sp < (__uint64_t)(CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) &&
-       th->control_stack_guard_page_protected != NIL) {
+       th->state_word.control_stack_guard_page_protected) {
         /* We hit the end of the control stack: disable guard page
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page

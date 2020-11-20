@@ -14,6 +14,17 @@
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 
+struct thread_state_word {
+  char control_stack_guard_page_protected;
+  char user_thread_p; // opposite of lisp's ephemeral-p
+  char state;
+#ifdef LISP_FEATURE_64_BIT
+  char padding[5];
+#else
+  char padding[1];
+#endif
+};
+
 #include "genesis/thread.h"
 #include "genesis/thread-instance.h"
 #include "genesis/fdefn.h"
@@ -24,7 +35,7 @@
 enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 
 #ifdef LISP_FEATURE_SB_THREAD
-void set_thread_state(struct thread *thread, lispobj state, boolean);
+void set_thread_state(struct thread *thread, char state, boolean);
 int thread_wait_until_not(int state, struct thread *thread);
 #endif
 
