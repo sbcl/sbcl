@@ -1819,24 +1819,6 @@ static boolean can_invoke_post_gc(struct thread* th,
      * running post-GC with signals blocked? Nontrivial post-GC code is bad anyway,
      * so how could trivial code be adversely affected? i.e. if your post-GC code
      * can't run with some signals blocked, then it shouldn't be your post-GC code. */
-    sigset_t mock_context_sigset;
-    if (lispthread->_ephemeral_p == T) {
-        /* If it's the finalizer thread that's doing the GC, we must allow
-         * some signals to be blocked. It won't recursively invoke the finalizer scan,
-         * since it's already looping over the finalizers. The easiest way to test that
-         * no signals are blocked is create a copy of the original sigcontext removing
-         * the known-blocked signals, pretending they weren't there.
-         * The original context is unaffected */
-
-        /* I don't think this needs sigcopyset(), does it? If we overrun the
-         * sigcontext created by the kernel, it' still a read from our stack
-         * (to our stack) and should be accessible.
-         * But see https://bugs.launchpad.net/sbcl/+bug/1904779 */
-        mock_context_sigset = *context_sigmask;
-        sigdelset(&mock_context_sigset, SIGURG);
-        sigdelset(&mock_context_sigset, SIGALRM);
-        context_sigmask = &mock_context_sigset;
-    }
 #endif
     return !deferrables_blocked_p(context_sigmask);
 }

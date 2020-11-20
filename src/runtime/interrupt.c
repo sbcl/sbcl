@@ -352,39 +352,6 @@ sigset_tostring(const sigset_t *sigset, char* result, int result_length)
         }
     result[len] = 0;
 }
-
-/* Return 1 if all signals in sigset2 are masked in sigset, return 0
- * if all are unmasked, else die. Passing NULL for sigset is a shorthand
- * for the current sigmask. */
-boolean
-all_signals_blocked_p(const sigset_t *sigset, sigset_t *sigset2,
-                      const char *name)
-{
-    int i;
-    boolean has_blocked = 0, has_unblocked = 0;
-    sigset_t current;
-    if (sigset == 0) {
-        thread_sigmask(SIG_BLOCK, 0, &current);
-        sigset = &current;
-    }
-    for(i = 1; i <= MAX_SIGNUM; i++) {
-        if (sigismember(sigset2, i)) {
-            if (sigismember(sigset, i))
-                has_blocked = 1;
-            else
-                has_unblocked = 1;
-        }
-    }
-    if (has_blocked && has_unblocked) {
-        char buf[3*64]; // assuming worst case 64 signals present in sigset
-        sigset_tostring(sigset, buf, sizeof buf);
-        lose("%s signals partially blocked: {%s}", name, buf);
-    }
-    if (has_blocked)
-        return 1;
-    else
-        return 0;
-}
 
 
 /* Deferrables, blockables, gc signals. */
@@ -445,10 +412,39 @@ sigset_t blockable_sigset;
  * of sem_wait that requires a call to malloc; it could fail badly for us */
 sigset_t gc_sigset;
 
+/* Return 1 if almost all deferrable signals are blocked, 0 if not,
+ * and fail if there is a mixture. Explicitly ignore SIGALRM which we now
+ * allow to be always blocked in a thread and/or manipulated.
+ * Also don't bother with ones guarded by #ifdef in sigaddset_deferrable
+ * (SIGIO, SIGPOLL, SIGXCPU).
+ * The intent is to perform a best-effort check that the runtime's assumptions
+ * are not egregiously violated, not to enforce proper use of each and every signal.
+ * (Who would add a SIGTSTP handler that is not completely async safe anyway?)
+ */
 boolean
 deferrables_blocked_p(sigset_t *sigset)
 {
-    return all_signals_blocked_p(sigset, &deferrable_sigset, "deferrable");
+    sigset_t current;
+    if (sigset == 0) {
+        thread_sigmask(SIG_BLOCK, 0, &current);
+        sigset = &current;
+    }
+    int mask = (sigismember(sigset, SIGHUP)    << 10) |
+               (sigismember(sigset, SIGINT)    << 9) |
+               (sigismember(sigset, SIGTERM)   << 8) |
+               (sigismember(sigset, SIGQUIT)   << 7) |
+               (sigismember(sigset, SIGURG)    << 6) |
+               (sigismember(sigset, SIGTSTP)   << 5) |
+               (sigismember(sigset, SIGCHLD)   << 4) |
+               (sigismember(sigset, SIGXFSZ)   << 3) |
+               (sigismember(sigset, SIGVTALRM) << 2) |
+               (sigismember(sigset, SIGPROF)   << 1) |
+               (sigismember(sigset, SIGWINCH)  << 0);
+    if (mask == 0x7ff) return 1;
+    if (!mask) return 0;
+    char buf[3*64]; // assuming worst case 64 signals present in sigset
+    sigset_tostring(sigset, buf, sizeof buf);
+    lose("deferrable signals partially blocked: {%s}", buf);
 }
 #endif
 
@@ -559,10 +555,22 @@ unblock_deferrable_signals(sigset_t *where)
     // fetch the current signal mask (from the OS) and check that.
     check_gc_signals_unblocked_or_lose(where);
 #endif
+    sigset_t localmask, *sigset;
+    if (arch_os_get_current_thread()->state_word.user_thread_p) {
+        sigset = &deferrable_sigset;
+    } else {
+        /* ASSUMPTION: the baseline signal mask for non-user threads
+         * is the deferrable mask minus SIGALRM.
+         * Actually, if we get here in the finalizer thread, things are
+         * in bad shape - stack exhaustion or something */
+        localmask = deferrable_sigset;
+        sigdelset(&localmask, SIGALRM);
+        sigset = &localmask;
+    }
     if (where)
-        sigmask_logandc(where, &deferrable_sigset);
+        sigmask_logandc(where, sigset);
     else
-        thread_sigmask(SIG_UNBLOCK, &deferrable_sigset, 0);
+        thread_sigmask(SIG_UNBLOCK, sigset, 0);
 #endif
 }
 

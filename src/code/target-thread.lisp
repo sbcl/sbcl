@@ -1929,8 +1929,14 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       #+unix
       (when (thread-ephemeral-p thread)
         (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
-          (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm)
-          (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigurg))))
+          ;; It is essentially impossible to call INTERRUPT-THREAD on the finalizer
+          ;; thread, as it spends most of its time with interrupts disabled.
+          ;; So it doesn't much matter if SIGURG is added to the signal mask here.
+          ;; Unfortunately, this means that SB-INTROSPECT's MAP-ROOTS will hang
+          ;; if you give it the finalizer thread.
+          ;; The right answer may be that introspect needs to utilize some kind
+          ;; of stop-the-thread API that it shares in common with stop-the-world.
+          (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm))))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
                (cell (list thread))
                (startup-info

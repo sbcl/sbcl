@@ -334,6 +334,8 @@ Examples:
                 (loop
                   (scan-finalizers)
                   ;; Wait for a notification
+                  ;; I think using SB-THREAD:WITH-MUTEX here was responsible for
+                  ;; deadlocks. So it is critical that this be the -SYSTEM- macro.
                   (with-system-mutex (*finalizer-queue-lock*)
                     ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
                     (unless *finalizer-thread*
