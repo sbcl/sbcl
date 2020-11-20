@@ -91,13 +91,16 @@
                  (ash (- (layout-depthoid test) 2) 2)
                  (- instance-pointer-lowtag))
               x)
-          ;; Todo: in self-build we should be able to wire in layout-ids.
-          ;; Many of them would fall into the <= 127 case.
-          (if (sb-c::producing-fasl-file)
-              (make-fixup test :layout-id)
-              ;; If the layout-id is <= 127 then this saves 3 encoding bytes
-              ;; by emitting r/m32,imm8 form.
-              (sb-kernel::layout-id test)))))
+          ;; Small layout-ids can only occur for layouts made in genesis.
+          ;; Therefore if the compile-time value of the ID is small,
+          ;; it is permanently assigned to that type.
+          ;; Otherwise, we allow for the possibility that the compile-time ID
+          ;; is not the same as the load-time ID.
+          ;; I don't think layout-id 0 can get here, but be sure to exclude it.
+          (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
+                  (not (sb-c::producing-fasl-file)))
+              (layout-id test)
+              (make-fixup test :layout-id)))))
 
 #+compact-instance-header
 ;; ~20 instructions vs. 35

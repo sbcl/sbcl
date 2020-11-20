@@ -31,7 +31,9 @@
        ;; Word at sap + offset contains a value to be replaced by
        ;; adding that value to fixup.
        (let ((final-val (+ fixup (sap-ref-32 sap offset))))
-         (setf (sap-ref-32 sap offset) final-val)
+         (if (eq flavor :layout-id)
+             (setf (signed-sap-ref-32 sap offset) final-val)
+             (setf (sap-ref-32 sap offset) final-val))
          ;; Record absolute fixups that point into CODE itself, with one
          ;; exception: fixups within the range of unboxed words containing
          ;; jump tables are automatically adjusted if the code moves.

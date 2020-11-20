@@ -88,7 +88,7 @@
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address
                              (if (symbolp sym) (find-layout sym) sym)))
-                   (:layout-id (sb-kernel::layout-id sym))
+                   (:layout-id (layout-id sym))
                    (:immobile-symbol (get-lisp-obj-address sym))
                    (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
                    #+immobile-code

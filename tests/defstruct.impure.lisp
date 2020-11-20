@@ -36,9 +36,10 @@
                                          :type sb-vm:instance-widetag
                                          :test #'sb-kernel::layout-p))))
     (dolist (layout all-layouts)
-      (let ((id (sb-kernel::layout-id layout)))
-        (assert (not (gethash id hash)))
-        (setf (gethash id hash) t)))
+      (let ((id (sb-kernel:layout-id layout)))
+        (sb-int:awhen (gethash id hash)
+          (error "ID ~D is ~A and ~A" id sb-int:it layout))
+        (setf (gethash id hash) layout)))
     ;; assert that all inherited ID vectors match the layout-inherits vector
     (let ((structure-object
            (sb-kernel:find-layout 'structure-object)))
@@ -48,12 +49,12 @@
                  (sb-sys:with-pinned-objects (layout)
                    (let ((sap (layout-id-vector-sap layout)))
                      (loop for depthoid from 2 to (sb-kernel:layout-depthoid layout)
-                           collect (sb-sys:sap-ref-32 sap (ash (- depthoid 2) 2))))))
+                           collect (sb-sys:signed-sap-ref-32 sap (ash (- depthoid 2) 2))))))
                 (expect
-                 (map 'list 'sb-kernel::layout-id
+                 (map 'list 'sb-kernel:layout-id
                       (sb-kernel:layout-inherits layout))))
             (unless (equal (append '(1 2) ids)
-                           (append expect (list (sb-kernel::layout-id layout))))
+                           (append expect (list (sb-kernel:layout-id layout))))
               (error "Wrong IDs for ~A: expect ~D actual ~D~%"
                      layout expect ids))))))))
 

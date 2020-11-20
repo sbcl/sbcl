@@ -222,8 +222,9 @@
 (progn
   (defstruct (layout (:include structure!object)
                      (:constructor host-make-layout
-                                   (clos-hash classoid &key info depthoid inherits
+                                   (clos-hash classoid &key id info depthoid inherits
                                                        length flags invalid)))
+    (id nil :type (or null fixnum))
     ;; Cross-compiler-only translation from slot index to symbol naming
     ;; the accessor to call. (Since access by position is not a thing)
     (index->accessor-map #() :type simple-vector)
@@ -241,10 +242,18 @@
     (info nil :type (or null defstruct-description)))
   (defun layout-dd (layout)
     (the defstruct-description (layout-info layout)))
-  (defun make-layout (&rest args)
-    (let ((args (copy-list args)))
+  (defun make-layout (hash classoid &rest keys)
+    (declare (notinline classoid-name)) ; defined later
+    (let ((args (copy-list keys))
+          (name (classoid-name classoid)))
       (remf args :bitmap)
-      (apply #'host-make-layout args)))
+      (apply #'host-make-layout
+             hash classoid
+             :id (case name
+                   ((t) 1)
+                   (structure-object 2)
+                   (t (cdr (assq name *popular-structure-types*))))
+             args)))
   (defun make-temporary-layout (clos-hash classoid inherits)
     (host-make-layout clos-hash classoid :inherits inherits :invalid nil))
   (defun layout-bitmap (layout)
@@ -258,24 +267,28 @@
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
-(defmacro layout-id-vector-sap (layout)
-  `(sap+ (int-sap (get-lisp-obj-address ,layout))
-         (- (ash (+ sb-vm:instance-slots-offset (get-dsd-index layout id-word0))
-                 sb-vm:word-shift)
-            sb-vm:instance-pointer-lowtag)))
 (defconstant structure-object-layout-id 2) ; KLUDGE
+#-sb-xc-host
 (defun layout-id (layout)
-  #+sb-xc-host (error "Can't call layout-id ~a" layout)
-  #-sb-xc-host
   (let ((depthoid (layout-depthoid layout)))
     (truly-the sb-c::layout-id
      (cond ((not (logtest (layout-flags layout) +structure-layout-flag+))
             ;; the 0th word of the ID vector stores the layout id
             (layout-id-word0 layout))
            ((>= depthoid 2)
-            (with-pinned-objects (layout)
-              ;; Depthoid 2 is in the 0th index and so on.
-              (sap-ref-32 (layout-id-vector-sap layout) (ash (- depthoid 2) 2))))
+            ;; Depthoid 2 is in the 0th index and so on.
+            (let ((index (- depthoid 2)))
+              #-64-bit
+              (%raw-instance-ref/signed-word
+               layout (+ (get-dsd-index layout id-word0) index))
+              #+64-bit ; use SAP-ref for lack of half-sized slots
+              (with-pinned-objects (layout)
+                (let ((sap (sap+ (int-sap (get-lisp-obj-address layout))
+                                 (- (ash (+ sb-vm:instance-slots-offset
+                                            (get-dsd-index layout id-word0))
+                                         sb-vm:word-shift)
+                                    sb-vm:instance-pointer-lowtag))))
+                  (signed-sap-ref-32 sap (ash index 2))))))
            (t ; KLUDGE: must be STRUCTURE-OBJECT
             structure-object-layout-id)))))
 
@@ -297,9 +310,6 @@
   `(ceiling (max 0 (- ,depthoid ,layout-id-vector-fixed-capacity))
             ,(/ sb-vm:n-word-bytes 4)))
 
-;;; FIXME 1: assigning the inherits of a temporary-layout (when parsing DEFSTRUCT)
-;;; should not use up an ID.
-;;; FIXME 2: probably should never assign IDs to any metaclass except structure-class
 (defun set-layout-inherits (layout inherits structurep this-id)
   (declare (ignorable structurep this-id))
   (setf (layout-inherits layout) inherits)
@@ -314,11 +324,15 @@
   #-sb-xc-host
   (cond (structurep
          (with-pinned-objects (layout)
-           (let ((sap (layout-id-vector-sap layout)))
-             (loop for j from 2 below (length inherits)
-                   do (setf (sap-ref-32 sap 0) (layout-id (svref inherits j))
-                            sap (sap+ sap 4)))
-             (setf (sap-ref-32 sap 0) this-id))))
+           (loop with sap = (sap+ (int-sap (get-lisp-obj-address layout))
+                                  (- (ash (+ sb-vm:instance-slots-offset
+                                             (get-dsd-index layout id-word0))
+                                          sb-vm:word-shift)
+                                     sb-vm:instance-pointer-lowtag))
+                 for i from 0 by 4
+                 for j from 2 below (length inherits)
+                 do (setf (sap-ref-32 sap i) (layout-id (svref inherits j)))
+                 finally (setf (sap-ref-32 sap i) this-id))))
         ((not (eql this-id 0))
          (setf (layout-id-word0 layout) this-id))))
 
@@ -417,10 +431,9 @@
         (setf (%raw-instance-ref/word layout (+ bitmap-base i))
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
     (setf (layout-invalid layout) invalid)
-    #+nil (format t "~&Made layout ID ~D for ~A~%" id (classoid-name classoid))
     ;; It's not terribly important that we recycle layout IDs, but I have some other
     ;; changes planned that warrant a finalizer per layout.
-    (when (>= id 400) ; KLUDGE to get through cold-init, before finalizers work
+    (unless (built-in-classoid-p classoid)
       (finalize layout (lambda () (atomic-push id (cdr *layout-id-generator*)))
                 :dont-save t))
     layout))

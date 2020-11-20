@@ -1112,8 +1112,22 @@ core and return a descriptor to it."
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
-(defvar *condition-layout-uniqueid-counter* 0)
-(defvar *general-layout-uniqueid-counter* 0)
+;;; General layout IDs are (unsigned-byte 29). They are assigned from 128 on up.
+(defvar *general-layout-uniqueid-counter* 127) ; pre-incremented upon use
+;;; Conditions are numbered from -128 downward.
+(defvar *condition-layout-uniqueid-counter* -128) ; pre-decremened upon use
+(defun choose-layout-id (name conditionp)
+  (case name
+    ((t) 1)
+    (structure-object 2)
+    (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
+           (if conditionp
+               ;; It doesn't really matter what ID is assigned to a CONDITION subtype
+               ;; because we don't use the IDs for type testing. Nor for standard-object.
+               ;; But I'd like to a have a quick visual scan of the IDs assigned during
+               ;; genesis by giving them negative values which can't otherwise occur.
+               (decf *condition-layout-uniqueid-counter*)
+               (incf *general-layout-uniqueid-counter*))))))
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   ;; Layouts created in genesis can't vary in length due to the number of ancestor
   ;; types in the IS-A vector. They may vary in length due to the bitmap word count.
@@ -1124,17 +1138,7 @@ core and return a descriptor to it."
          (result (allocate-struct (+ fixed-words bitmap-words)
                                   *layout-layout*
                                   (symbol-value *cold-layout-gspace*)))
-         (this-id
-          (if (logtest flags +condition-layout-flag+)
-              ;; It doesn't really matter what ID is assigned to a CONDITION
-              ;; because we don't use the IDs for type testing.
-              ;; Nor for standard-object, but those aren't created during genesis.
-              ;; By keep the structure layout IDs smaller than they would be
-              ;; if the space of assigned IDs were shared, it might be possible
-              ;; to emit some type tests using 1-byte immediate operands on x86.
-              ;; Or not. Because we don't do JIT codegen.
-              (decf *condition-layout-uniqueid-counter*)
-              (incf *general-layout-uniqueid-counter*))))
+         (this-id (choose-layout-id name (logtest flags +condition-layout-flag+))))
     #+64-bit
     (write-slots result *host-layout-of-layout*
      :flags (sb-kernel::pack-layout-flags depthoid length flags))
@@ -1727,6 +1731,9 @@ core and return a descriptor to it."
                        (cold-cons (cold-intern (car pair))
                                   (cold-layout-descriptor (cdr pair))))
                      (sort-cold-layouts))))
+  ;; MAKE-LAYOUT uses ATOMIC-INCF which returns the value in the cell prior to
+  ;; increment, so we need to add 1 to get to the next value for it because
+  ;; we always pre-increment *general-layout-uniqueid-counter* when reading it.
   (cold-set 'sb-kernel::*layout-id-generator*
             (cold-list (make-fixnum-descriptor (1+ *general-layout-uniqueid-counter*))))
   (cold-set 'sb-c::*!initial-parsed-types*
@@ -2100,7 +2107,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defun code-jump-table-words (code)
   (ldb (byte 14 0) (read-bits-wordindexed code (code-header-words code))))
 
-(declaim (ftype (sfunction (descriptor sb-vm:word sb-vm:word keyword keyword)
+(declaim (ftype (sfunction (descriptor sb-vm:word (or sb-vm:word
+                                                      sb-vm:signed-word)
+                                       keyword keyword)
                            descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
@@ -2135,7 +2144,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (when (ecase kind
              (:absolute
               (setf (bvref-32 gspace-data gspace-byte-offset)
-                    (the (unsigned-byte 32) addr))
+                    (if (eq flavor :layout-id)
+                        (the (signed-byte 32) addr)
+                        (the (unsigned-byte 32) addr)))
               #+x86
               (let ((n-jump-table-words (code-jump-table-words code-object)))
                 ;; Absolute fixups are recorded if within the object for x86.
@@ -2171,8 +2182,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
               #+x86 (and in-dynamic-space
                           (not (< obj-start-addr addr code-end-addr)))
               #+x86-64 (eq flavor :foreign)))
-          (push (cons kind after-header)
-                (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
+        (push (cons kind after-header)
+              (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
   code-object)
 
 (defun resolve-static-call-fixups ()

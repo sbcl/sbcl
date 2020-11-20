@@ -81,13 +81,10 @@
                             (ash (- (layout-depthoid test) 2) 2)
                             (- instance-pointer-lowtag))
                    :base x)
-          ;; Todo: in self-build we should be able to wire in layout-ids.
-          ;; Many of them would fall into the <= 127 case.
-          (if (sb-c::producing-fasl-file)
-              (make-fixup test :layout-id)
-              ;; If the layout-id is <= 127 then this saves 3 encoding bytes
-              ;; by emitting r/m32,imm8 form.
-              (sb-kernel::layout-id test)))))
+          (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
+                  (not (sb-c::producing-fasl-file)))
+              (layout-id test)
+              (make-fixup test :layout-id)))))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
