@@ -216,8 +216,11 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
     sigemptyset(&sigset);
     int i;
     for(i = 1; i < NSIG; i++) {
+        // This use of SIG_DFL is a bit disingenous. It actually means "is it 0",
+        // because the low_level_handlers array is never explicitly initialized
+        // with SIG_DFL in each element, but SIG_DFL happens to be 0.
         if (!ARE_SAME_HANDLER(interrupt_low_level_handlers[i], SIG_DFL)
-            || lisp_sig_handlers[i] != NIL) {
+            || lisp_sig_handlers[i]) {
             sigaddset(&sigset, i);
         }
     }
@@ -1902,11 +1905,16 @@ void install_handler(int signal, lispobj handler)
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
 
-    if (interrupt_low_level_handlers[signal]==0) {
+    if (interrupt_low_level_handlers[signal]) {
+        // When there's a low-level handler, we must leave it alone.
+        // Give it the lisp function to call if it decides to forward a signal.
+        // SIG_IGN and SIG_DFL don't always do what you think in such case.
+        lisp_sig_handlers[signal] = functionp(handler) ? handler : 0;
+    } else {
         // Our "abstract" values for SIG_DFL and SIG_IGN are 0 and 1
         // respectively which are probably the real values from signal.h
         // but this way way don't need to put them in grovel-headers.c
-        if (handler== 0 || handler==1) {
+        if (handler==0 || handler==1) {
             memset(&sa, 0, sizeof sa);
             sa.sa_handler = handler ? SIG_IGN : SIG_DFL;
             // assign the OS level action before clearing the lisp function.
@@ -1914,7 +1922,7 @@ void install_handler(int signal, lispobj handler)
             // function is NIL, we'd get the effect of :IGNORE regardless
             // of what the default action should be)
             sigaction(signal, &sa, NULL);
-            lisp_sig_handlers[signal] = NIL;
+            lisp_sig_handlers[signal] = 0;
             return;
         }
         if (sigismember(&deferrable_sigset, signal))
@@ -1927,11 +1935,6 @@ void install_handler(int signal, lispobj handler)
         // ensure the C handler sees a lisp function before doing sigaction()
         lisp_sig_handlers[signal] = handler;
         sigaction(signal, &sa, NULL);
-    } else {
-        // When there's a low-level handler, we must leave it alone.
-        // Give it the lisp function to call if it decides to forward a signal.
-        // SIG_IGN and SIG_DFL don't always do what you think in such case.
-        lisp_sig_handlers[signal] = functionp(handler) ? handler : NIL;
     }
 #endif
 }
@@ -1973,13 +1976,8 @@ interrupt_init(void)
 #endif
 
 #ifndef LISP_FEATURE_WIN32
-    /* Set up high level handler information. */
-    for (i = 0; i < NSIG; i++) {
-        lisp_sig_handlers[i] = NIL;
-    }
     ll_install_handler(SIGABRT, sigabrt_handler);
 #endif
-    SHOW("returning from interrupt_init()");
 }
 
 #ifndef LISP_FEATURE_WIN32
