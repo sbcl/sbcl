@@ -468,7 +468,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
               (barrier (:write))
               ,@forms)
          ;; Interrupt handlers and GC save and restore any
-         ;; previous wait marks using WITHOUT-DEADLOCKS below.
+         ;; previous wait marks using WITHOUT-THREAD-WAITING-FOR
          (setf (thread-waiting-for ,n-thread) nil)
          (barrier (:write))))))
 

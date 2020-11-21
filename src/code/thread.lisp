@@ -90,8 +90,10 @@ HOLDING-MUTEX-P."
           (function with-recursive-spinlock :replacement with-recursive-lock)
           (function with-spinlock :replacement with-mutex)))
 
-;;; I wish there were a shred of documentation about WHY this needs to exist.
-;;; SOMEBODY PLEASE HELP!
+;;; Needed to pacify deadlock detection if inerrupting wait-for-mutex,
+;;; otherwise it would appear that if there is a lock grabbed inside
+;;; of BODY it would appear backwards--waiting on a lock while holding
+;;; the new one, which looks like a deadlock.
 (defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
   (with-unique-names (thread prev)
     (let ((without (if already-without-interrupts
