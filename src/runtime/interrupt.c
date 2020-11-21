@@ -429,6 +429,20 @@ deferrables_blocked_p(sigset_t *sigset)
         thread_sigmask(SIG_BLOCK, 0, &current);
         sigset = &current;
     }
+    /* SIGPROF must not be here. Some people use an async-signal-safe profiler
+     * which not only doesn't rely on signal deferral, but wants to manipulate the
+     * blocked/unblocked bit completely independently of SBCL's requirements.
+     * Such usage would have needed to either modify the global deferrable_sigset
+     * at runtime, or locally patch it out of sigaddset_deferrable.
+     * I'd prefer to remove external access to deferrable_sigset which suggests that
+     * this predicate should be insensitive to whether SIGPROF is deferrable.
+     * The actual deferral mechanmism still works, because remember, this test does
+     * not affect behavior of correct code - it is just to decide whether we understand
+     * the signal mask to be in a valid state, but it was overly restrictive.
+     *
+     * Also SIGPWR is conspicuously absent. SB-THREAD:INTERRUPT-THREAD used it long ago,
+     * but I don't know why it was never in sigaddset_deferrable.
+     */
     int mask = (sigismember(sigset, SIGHUP)    << 10) |
                (sigismember(sigset, SIGINT)    << 9) |
                (sigismember(sigset, SIGTERM)   << 8) |
@@ -438,9 +452,8 @@ deferrables_blocked_p(sigset_t *sigset)
                (sigismember(sigset, SIGCHLD)   << 4) |
                (sigismember(sigset, SIGXFSZ)   << 3) |
                (sigismember(sigset, SIGVTALRM) << 2) |
-               (sigismember(sigset, SIGPROF)   << 1) |
-               (sigismember(sigset, SIGWINCH)  << 0);
-    if (mask == 0x7ff) return 1;
+               (sigismember(sigset, SIGWINCH)  << 1);
+    if (mask == 0x7fe) return 1;
     if (!mask) return 0;
     char buf[3*64]; // assuming worst case 64 signals present in sigset
     sigset_tostring(sigset, buf, sizeof buf);
