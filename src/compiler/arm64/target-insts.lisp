@@ -178,6 +178,13 @@
       (princ "NSP" stream)
       (princ (aref *register-names* value) stream)))
 
+(defun print-sized-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size reg) value
+    (when (zerop size)
+      (princ "W" stream))
+    (princ (svref *register-names* reg) stream)))
+
 (defun print-reg-float-reg (value stream dstate)
   (let* ((inst (current-instruction dstate))
          (v (ldb (byte 1 26) inst)))
@@ -231,6 +238,47 @@
             (if (zerop size)
                 "8B"
                 "16B"))))
+
+(defun print-vbhs (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size offset) value
+    (format stream "~a~d"
+            (case size
+              (#b00 "B")
+              (#b01 "H")
+              (#b10 "S"))
+            offset)))
+
+(defun print-vhsd (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size offset) value
+    (format stream "~a~d"
+            (case size
+              (#b00 "H")
+              (#b01 "S")
+              (#b10 "D"))
+            offset)))
+
+(defun print-vx.t (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q size offset) value
+    (format stream "V~d.~a"
+            offset
+            (cond ((and (= size 0)
+                        (= q 0))
+                   "8B")
+                  ((and (= size 0)
+                        (= q 1))
+                   "16B")
+                  ((and (= size 1)
+                        (= q 0))
+                   "4H")
+                  ((and (= size 1)
+                        (= q 1))
+                   "8H")
+                  ((and (= size 2)
+                        (= q 1))
+                   "4S")))))
 
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))

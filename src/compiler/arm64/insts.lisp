@@ -99,9 +99,14 @@
 
   (define-arg-type reg-sp :printer #'print-reg-sp)
 
+  (define-arg-type sized-reg :printer #'print-sized-reg)
+
   (define-arg-type reg-float-reg :printer #'print-reg-float-reg)
 
   (define-arg-type float-reg :printer #'print-float-reg)
+  (define-arg-type vbhs :printer #'print-vbhs)
+  (define-arg-type vhsd :printer #'print-vhsd)
+  (define-arg-type vx.t :printer #'print-vx.t)
 
   (define-arg-type simd-reg :printer #'print-simd-reg)
 
@@ -2421,7 +2426,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(define-instruction s-ext (segment rd rn rm index &optional (size :16b))
+(define-instruction ext (segment rd rn rm index &optional (size :16b))
   (:emitter
    (emit-simd-extract segment
                       (decode-vector-size size)
@@ -2450,24 +2455,151 @@
   (q :field (byte 1 30))
   (op :field (byte 1 29))
   (op4 :field (byte 8 21) :value #b01110000)
+  (imm5 :field (byte 5 16))
   (op5 :field (byte 1 15) :value #b0)
+  (imm4 :field (byte 4 11))
   (op6 :field (byte 1 10) :value #b1)
   (rn :fields (list (byte 5 5) (byte 5 16) (byte 4 11)) :type 'simd-copy-reg)
   (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
 
-(define-instruction s-ins (segment rd index1 rn index2 size)
-  (:printer simd-copy ((q 1) (op 1))
-            '('ins :tab rd ", " rn))
+(define-instruction ins (segment rd index1 rn index2 size)
+  (:printer simd-copy ((q 1) (op 1)))
   (:emitter
    (let ((size (position size '(:B :H :S :D))))
      (emit-simd-copy segment
-                         1
-                         1
-                         (logior (ash index1 (1+ size))
-                                 (ash 1 size))
-                         (ash index2 size)
-                         (tn-offset rn)
-                         (tn-offset rd)))))
+                     1
+                     1
+                     (logior (ash index1 (1+ size))
+                             (ash 1 size))
+                     (ash index2 size)
+                     (tn-offset rn)
+                     (tn-offset rd)))))
+
+(define-instruction-format (simd-copy-to-general 32
+                            :include simd-copy
+                            :default-printer '(:name :tab rd ", " rn))
+  (rn :fields (list (byte 5 5) (byte 5 16)) :type 'simd-copy-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'sized-reg))
+
+(define-instruction umov (segment rd rn index size)
+  (:printer simd-copy-to-general ((op 0) (imm4 #b0111)))
+  (:emitter
+   (let ((size (position size '(:B :H :S :D))))
+     (emit-simd-copy segment
+                     (case size
+                       (:d 1)
+                       (t 0))
+                     0
+                     (logior (ash index (1+ size))
+                             (ash 1 size))
+                     #b0111
+                     (tn-offset rn)
+                     (tn-offset rd)))))
+
+(def-emitter simd-across-lanes
+    (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b01110 5 24)
+  (size 2 22)
+  (#b11000 5 17)
+  (op 5 12)
+  (#b10 2 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-across-lanes 32
+                            :default-printer '(:name :tab rd ", " rn))
+  (o1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (u :field (byte 1 29))
+  (op2 :field (byte 5 24) :value #b01110)
+  (size :field (byte 2 22))
+  (op3 :field (byte 5 17) :value #b11000)
+  (op :field (byte 4 12))
+  (op4 :field (byte 2 10) :value #b10)
+  (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'vx.t)
+  (rd :fields (list (byte 2 22) (byte 5 0)) :type 'vbhs))
+
+
+(def-emitter simd-two-misc
+    (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b01110 5 24)
+  (size 2 22)
+  (#b10000 5 17)
+  (op 5 12)
+  (#b10 2 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction addv (segment rd sized rn sizen)
+  (:printer simd-across-lanes  ((u 0) (op #b11011)))
+  (:emitter
+   (emit-simd-across-lanes
+    segment
+    (ecase sizen
+      (:8b 0)
+      (:16b 1)
+      (:4h 0)
+      (:8h 1)
+      (:4s 1))
+    0
+    (ecase sized
+      (:b 0)
+      (:h 1)
+      (:s 2))
+    #b11011
+    (tn-offset rn)
+    (tn-offset rd))))
+
+(define-instruction uaddlv (segment rd sized rn sizen)
+  (:printer simd-across-lanes  ((u 1) (op #b00011)
+                                      (rd nil :type 'vhsd)))
+  (:emitter
+   (emit-simd-across-lanes
+    segment
+    (ecase sizen
+      (:8b 0)
+      (:16b 1)
+      (:4h 0)
+      (:8h 1)
+      (:4s 1))
+    1
+    (ecase sized
+      (:h 0)
+      (:s 1)
+      (:d 2))
+    #b00011
+    (tn-offset rn)
+    (tn-offset rd))))
+
+(define-instruction-format (simd-two-misc 32
+                            :default-printer '(:name :tab rd ", " rn))
+  (o1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (u :field (byte 1 29))
+  (op2 :field (byte 5 24) :value #b01110)
+  (size :field (byte 2 22))
+  (op3 :field (byte 5 17) :value #b10000)
+  (op :field (byte 4 12))
+  (op4 :field (byte 2 10) :value #b10)
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+
+(define-instruction cnt (segment rd rn size)
+  (:printer simd-two-misc ((u 0) (op #b00101)))
+  (:emitter
+   (emit-simd-two-misc segment
+                       (ecase size
+                         (:8b 0)
+                         (:16b 1))
+                       0
+                       00
+                       #b00101
+                       (tn-offset rn)
+                       (tn-offset rd))))
 
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)

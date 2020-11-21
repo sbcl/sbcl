@@ -694,7 +694,7 @@
       (complex-single-reg
        (unless (eql (tn-offset r) (tn-offset real))
          (inst s-mov r real))
-       (inst s-ins r 1 imag 0 :s))
+       (inst ins r 1 imag 0 :s))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))
@@ -725,7 +725,7 @@
       (complex-double-reg
        (unless (eql (tn-offset r) (tn-offset real))
          (inst s-mov r real))
-       (inst s-ins r 1 imag 0 :d))
+       (inst ins r 1 imag 0 :d))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))
@@ -750,7 +750,7 @@
   (:generator 3
     (sc-case x
       (complex-single-reg
-       (inst s-ins r 0 x (ecase slot
+       (inst ins r 0 x (ecase slot
                            (:real 0)
                            (:imag 1))
              :s))
@@ -785,7 +785,7 @@
   (:generator 3
     (sc-case x
       (complex-double-reg
-       (inst s-ins r 0 x (ecase slot
+       (inst ins r 0 x (ecase slot
                            (:real 0)
                            (:imag 1))
              :d))
