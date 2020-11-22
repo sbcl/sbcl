@@ -342,8 +342,11 @@
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 
+(defknown %signed-multiply-high (sb-vm:signed-word sb-vm:signed-word) sb-vm:signed-word
+    (movable foldable flushable))
+
 (defknown (mod rem) (real real) real
-  (movable foldable flushable))
+    (movable foldable flushable))
 
 (defknown (ffloor fceiling fround ftruncate)
   (real &optional real) (values float real)

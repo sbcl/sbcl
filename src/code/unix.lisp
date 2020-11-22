@@ -1088,7 +1088,7 @@ the UNIX epoch (January 1st 1970.)"
               (delta-nsec (the fixnum (- c-nsec (the fixnum (slot base 'tv-nsec))))))
           (the sb-kernel:internal-time
                (+ (the fixnum (* delta-sec internal-time-units-per-second))
-                  (floor delta-nsec nanoseconds-per-internal-time-unit))))
+                  (truncate delta-nsec nanoseconds-per-internal-time-unit))))
 
   ;; There are two optimizations here that actually matter on 32-bit systems:
   ;;  (1) subtract the epoch from seconds and milliseconds separately,

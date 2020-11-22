@@ -515,7 +515,8 @@
   (let ((*random-state* (make-random-state t)))
     (dolist (dividend-type `((unsigned-byte ,sb-vm:n-word-bits)
                              (and fixnum unsigned-byte)
-                             (integer 10000 10100)))
+                             (integer 10000 10100)
+                             fixnum))
       (dolist (divisor `(;; Some special cases from the paper
                          7 10 14 641 274177
                          ;; Range extremes
@@ -527,7 +528,9 @@
                                  for r = (random (expt 2 i))
                                  ;; We don't want 0, 1 and powers of 2.
                                  when (not (zerop (logand r (1- r))))
-                                 collect r)))
+                                 collect r
+                                 and
+                                 collect (- r))))
         (dolist (fun '(truncate ceiling floor mod rem))
           (let ((foo (checked-compile
                       `(lambda (x)

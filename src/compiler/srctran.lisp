@@ -2933,10 +2933,91 @@
                `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
                      ,(- (+ shift1 shift2)))))))))
 
+(when-vop-existsp (:translate %signed-multiply-high)
+ (defun %signed-multiply-high (x y)
+   (declare (type word x y))
+   (%signed-multiply-high x y))
+
+ (defun gen-signed-truncate-by-constant-expr (y max-x)
+   (declare (type sb-vm:signed-word y)
+            (type word max-x))
+   (aver (not (zerop (logand y (1- y)))))
+   (labels ((ld (x)
+              ;; the floor of the binary logarithm of (positive) X
+              (integer-length (1- x)))
+            (choose-multiplier (y precision)
+              (do* ((l (ld y))
+                    (shift l (1- shift))
+                    (expt-2-n+l (expt 2 (+ sb-vm:n-word-bits l)))
+                    (m-low (truncate expt-2-n+l y) (ash m-low -1))
+                    (m-high (truncate (+ expt-2-n+l
+                                         (ash expt-2-n+l (- precision)))
+                                      y)
+                            (ash m-high -1)))
+                   ((not (and (< (ash m-low -1) (ash m-high -1))
+                              (> shift 0)))
+                    (values m-high shift)))))
+     (let ((n (expt 2 sb-vm:n-word-bits))
+           (n-1 (expt 2 (1- sb-vm:n-word-bits)))
+           (precision (integer-length max-x)))
+       (multiple-value-bind (m shift) (choose-multiplier (abs y) precision)
+         (let ((code
+                 (cond ((< m n-1)
+                        `(ash (%signed-multiply-high x ,m)
+                                 ,(- shift)))
+                       (t
+                        `(ash (truly-the sb-vm:signed-word
+                                         (+ x (%signed-multiply-high x ,(- m n))))
+                              ,(- shift))))))
+           (if (minusp y)
+               `(- (ash x (- 1 sb-vm:n-word-bits)) ,code)
+               `(- ,code (ash x (- 1 sb-vm:n-word-bits)))))))))
+
+ (deftransform truncate ((x y) (sb-vm:signed-word
+                                (constant-arg sb-vm:signed-word))
+                         *
+                         :policy (and (> speed compilation-speed)
+                                      (> speed space)))
+   "convert integer division to multiplication"
+   (let* ((y      (lvar-value y))
+          (x-type (lvar-type x))
+          (max-x  (or (and (numeric-type-p x-type)
+                           (numeric-type-high x-type)
+                           (numeric-type-low x-type)
+                           (max (numeric-type-high x-type)
+                                (abs (numeric-type-low x-type))))
+                      (expt 2 (1- sb-vm:n-word-bits)))))
+     ;; Division by zero, one or powers of two is handled elsewhere.
+     (when (or (zerop (logand y (1- y)))
+               ;; Leave it for the unsigned transform
+               (and (plusp y)
+                    (not (types-equal-or-intersect x-type
+                                                   (specifier-type
+                                                    '(and sb-vm:signed-word
+                                                      (not unsigned-byte)))))))
+       (give-up-ir1-transform))
+     `(let* ((quot ,(gen-signed-truncate-by-constant-expr y max-x))
+             (rem (truly-the sb-vm:signed-word
+                             (- x (truly-the sb-vm:signed-word (* quot ,y))))))
+        (values quot rem)))))
+
+;;; The paper also has this,
+;;; but it seems to overflow when adding to X
+;; (defun gen-signed-floor-by-constant-expr (y max-x)
+;;   (declare (type sb-vm:signed-word y)
+;;            (type word max-x))
+;;   (let ((trunc (gen-signed-truncate-by-constant-expr y
+;;                                                      max-x)))
+;;     (let ((y-sign (xsign y)))
+;;       `(let* ((x-sign (xsign (logior x (+ x ,y-sign))))
+;;               (x (+ ,y-sign (- x-sign) x)))
+;;          (truly-the sb-vm:signed-word
+;;                     (+ ,trunc
+;;                        (logxor x-sign ,y-sign)))))))
+
 (unless-vop-existsp (:translate %multiply-high)
-(define-source-transform %multiply-high (x y)
-  `(values (sb-bignum:%multiply ,x ,y)))
-)
+                    (define-source-transform %multiply-high (x y)
+                      `(values (sb-bignum:%multiply ,x ,y))))
 
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
@@ -2964,6 +3045,7 @@
             (rem (ldb (byte #.sb-vm:n-word-bits 0)
                       (- x (* quot ,y)))))
        (values quot rem))))
+
 
 ;;;; arithmetic and logical identity operation elimination
 
