@@ -1087,9 +1087,7 @@
                 ;; function.
                 (:assignment
                  (aver (eq called fun)))))))))
-    (dolist (call maybe-terminate)
-      (maybe-terminate-block call nil)))
-  (values))
+    maybe-terminate))
 
 ;;; Deal with returning from a LET or assignment that we are
 ;;; converting. FUN is the function we are calling, CALL is a call to
@@ -1117,9 +1115,9 @@
 (defun move-return-stuff (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
            (type (or cblock null) next-block))
-  (when next-block
-    (unconvert-tail-calls fun call next-block))
-  (let* ((return (lambda-return fun))
+  (let* ((maybe-terminate-calls (when next-block
+                                  (unconvert-tail-calls fun call next-block)))
+         (return (lambda-return fun))
          (call-fun (node-home-lambda call))
          (call-return (lambda-return call-fun)))
     (when (and call-return
@@ -1144,8 +1142,11 @@
            (aver (node-tail-p call))
            (setf (lambda-return call-fun) return)
            (setf (return-lambda return) call-fun)
-           (setf (lambda-return fun) nil))))
-  (delete-lvar-use call) ; LET call does not have value semantics
+           (setf (lambda-return fun) nil)))
+    ;; Delayed because otherwise next-block could become deleted
+    (dolist (call maybe-terminate-calls)
+      (maybe-terminate-block call nil)))
+  (delete-lvar-use call)      ; LET call does not have value semantics
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the

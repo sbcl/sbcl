@@ -2982,4 +2982,25 @@
                          (b))))))
         (block nil
           (return (f)))))
-    ((t t) (condition 'error))))
+   ((t t) (condition 'error))))
+
+(with-test (:name :unconvert-tail-calls-terminate-block.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (flet ((f ()
+               (labels ((a ()
+                          (error "foo ~a" x))
+                        (b ()
+                          (let (*)
+                            (a))))
+                 (if nil
+                     (b)
+                     (if nil
+                         (a)
+                         (if x
+                             (a)
+                             (b)))))))
+        (f)
+        10))
+   ((t t) (condition 'error))))
