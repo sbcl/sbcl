@@ -885,10 +885,14 @@
                              (t         +structure-layout-flag+)))))
 
           ;; Next easiest: Sealed and at most one subclass.
-          ((and (eq (classoid-state classoid) :sealed) layout
-                 (or (not (classoid-subclasses classoid))
-                     (eql (hash-table-count (classoid-subclasses classoid))
-                          1)))
+          ;; However, it is better not to perform two IFs when a single one
+          ;; will suffice, so forbid any subclass when using layout-ids.
+          ((and layout
+                (eq (classoid-state classoid) :sealed)
+                (or (not (classoid-subclasses classoid))
+                    (and (not *use-layout-ids*)
+                         (eql (hash-table-count (classoid-subclasses classoid))
+                              1))))
             ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
             ;; though probably extremely weird. Also the PRED should be set in
             ;; that event, but it isn't.
