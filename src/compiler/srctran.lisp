@@ -2980,6 +2980,7 @@
                                       (> speed space)))
    "convert integer division to multiplication"
    (let* ((y      (lvar-value y))
+          (abs-y  (abs y))
           (x-type (lvar-type x))
           (max-x  (or (and (numeric-type-p x-type)
                            (numeric-type-high x-type)
@@ -2996,8 +2997,10 @@
                                                     '(and sb-vm:signed-word
                                                       (not unsigned-byte)))))))
        (give-up-ir1-transform))
-     `(let* ((quot ,(gen-signed-truncate-by-constant-expr y max-x))
-             (rem (truly-the sb-vm:signed-word
+     `(let* ((quot (truly-the
+                    (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
+                    ,(gen-signed-truncate-by-constant-expr y max-x)))
+             (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
                              (- x (truly-the sb-vm:signed-word (* quot ,y))))))
         (values quot rem)))))
 
@@ -3041,9 +3044,10 @@
     ;; Division by zero, one or powers of two is handled elsewhere.
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
-    `(let* ((quot ,(gen-unsigned-div-by-constant-expr y max-x))
-            (rem (ldb (byte #.sb-vm:n-word-bits 0)
-                      (- x (* quot ,y)))))
+    `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
+                             ,(gen-unsigned-div-by-constant-expr y max-x)))
+            (rem (truly-the (mod ,y)
+                            (- x (* quot ,y)))))
        (values quot rem))))
 
 
