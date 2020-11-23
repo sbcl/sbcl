@@ -35,7 +35,7 @@
 ;;; NEWLINE is defined after SECTION-START, because it is a subtype.
 ;;; One of SECTION-START's slot setters refers to type NEWLINE.
 (with-test (:name :pretty-stream-structs
-                 :fails-on (:or :x86 :x86-64)) ; Same issue as the preceding test
+                  :fails-on (:or :x86 :x86-64)) ; Same issue as the preceding test
   (let ((layouts
          (ctu:find-code-constants #'(setf sb-pretty::section-start-section-end)
                                   :type 'sb-kernel:layout)))
@@ -46,7 +46,8 @@
     (assert (find (sb-kernel:find-layout 'sb-pretty::newline)
                   layouts))))
 
-(with-test (:name :mutex-owner-typecheck)
+(with-test (:name :mutex-owner-typecheck
+                  :fails-on (:or :x86 :x86-64)) ; Same issue as the preceding test
   (let ((layouts
          (ctu:find-code-constants #'(setf sb-thread::mutex-%owner)
                                   :type 'sb-kernel:layout)))
