@@ -689,3 +689,9 @@
 (with-test (:name :pathnamep-flag-bit)
   (let ((f (compile nil '(lambda (x) (pathnamep x)))))
     (assert (not (ctu:find-code-constants f)))))
+
+(with-test (:name :structure-is-a)
+  (dolist (what '(sb-int:sset-element sb-c::leaf sb-c::functional
+                  sb-c::optional-dispatch))
+    (assert (eval `(sb-c::%structure-is-a ,(sb-kernel:find-layout 'sb-c::optional-dispatch)
+                                          ,(sb-kernel:find-layout what))))))
