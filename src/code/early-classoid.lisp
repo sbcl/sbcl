@@ -271,7 +271,7 @@
 #-sb-xc-host
 (defun layout-id (layout)
   (let ((depthoid (layout-depthoid layout)))
-    (truly-the sb-c::layout-id
+    (truly-the layout-id
      (cond ((not (logtest (layout-flags layout) +structure-layout-flag+))
             ;; the 0th word of the ID vector stores the layout id
             (layout-id-word0 layout))
@@ -331,8 +331,8 @@
                                      sb-vm:instance-pointer-lowtag))
                  for i from 0 by 4
                  for j from 2 below (length inherits)
-                 do (setf (sap-ref-32 sap i) (layout-id (svref inherits j)))
-                 finally (setf (sap-ref-32 sap i) this-id))))
+                 do (setf (signed-sap-ref-32 sap i) (layout-id (svref inherits j)))
+                 finally (setf (signed-sap-ref-32 sap i) this-id))))
         ((not (eql this-id 0))
          (setf (layout-id-word0 layout) this-id))))
 
@@ -400,7 +400,7 @@
                          (invalid :uninitialized)
                     &aux (id (or (atomic-pop (cdr *layout-id-generator*))
                                  (atomic-incf (car *layout-id-generator*)))))
-  (unless (typep id '(and sb-c::layout-id (not (eql 0))))
+  (unless (typep id '(and layout-id (not (eql 0))))
     (error "Layout ID limit reached"))
   (let* ((fixed-words (type-dd-length layout))
          (extra-id-words ; count of additional words needed to store ancestors
