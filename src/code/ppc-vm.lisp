@@ -14,14 +14,16 @@
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (let ((sap (code-instructions code)))
     (ecase kind
        (:absolute
-        ;; There is an implicit addend currently stored in the fixup location.
-        (incf (sap-ref-32 sap offset) fixup))
+        (if (eq flavor :layout-id)
+            ;; BIGVEC sap-ref doesn't have a signed variant, so clip to positive.
+            (setf (sap-ref-32 sap offset) (ldb (byte 32 0) (the layout-id fixup)))
+            ;; There is an implicit addend currently stored in the fixup location.
+            (incf (sap-ref-32 sap offset) fixup)))
        (:absolute64
         (incf (sap-ref-64 sap offset) fixup))
        (:b

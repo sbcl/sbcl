@@ -2369,16 +2369,25 @@
 (defun sort-inline-constants (constants)
   (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
 
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-assem::%emit-skip segment 4)))
+
 (defun emit-inline-constant (section constant label)
   (let ((size (align-of constant)))
     (emit section
           `(.align ,(integer-length (1- size)))
           label
-          (if (eq (car constant) :jump-table)
-              `(.lispword ,@(coerce (cdr constant) 'list))
-              (let* ((val (cdr constant))
-                     (bytes (loop repeat size
-                                  collect (prog1 (ldb (byte 8 0) val)
-                                            (setf val (ash val -8))))))
-                #+big-endian (setq bytes (nreverse bytes))
-                `(.byte ,@bytes))))))
+          (cond ((eq (car constant) :jump-table)
+                 `(.lispword ,@(coerce (cdr constant) 'list)))
+                ((typep (cdr constant) '(cons (eql :layout-id)))
+                 `(.layout-id ,(cddr constant)))
+                (t
+                 (let* ((val (cdr constant))
+                        (bytes (loop repeat size
+                                     collect (prog1 (ldb (byte 8 0) val)
+                                               (setf val (ash val -8))))))
+                   #+big-endian (setq bytes (nreverse bytes))
+                   `(.byte ,@bytes)))))))

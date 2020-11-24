@@ -63,6 +63,35 @@
                      instance-pointer-lowtag))
     (inst lwax res object temp)))
 
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  ;; "extra" info in conditional vops follows the 2 super-magical info args
+  (:info target not-p test-layout)
+  (:temporary (:scs (non-descriptor-reg)) this-id)
+  (:generator 4
+    (let ((test-id (layout-id test-layout))
+          (offset (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
+                             instance-slots-offset)
+                          word-shift)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
+                     (- instance-pointer-lowtag))))
+      (inst lwa this-id x offset)
+      ;; Always prefer 'cmpwi' if compiling to memory.
+      ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
+      (cond ((or (typep test-id '(and (signed-byte 8) (not (eql 0))))
+                 (and (not (sb-c::producing-fasl-file))
+                      (typep test-id '(signed-byte 16))))
+             (inst cmpwi this-id test-id))
+            (t
+             (inst lwa temp-reg-tn code-tn
+                   (register-inline-constant `(:layout-id . ,test-layout) :word))
+             (inst cmpw this-id temp-reg-tn))))
+    (inst b? (if not-p :ne :eq) target)))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
