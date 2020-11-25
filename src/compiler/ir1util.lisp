@@ -3251,23 +3251,26 @@ is :ANY, the function name is not checked."
                    (report values)))
         t)))))
 
+(defun improper-sequence-p (annotation value)
+  (case annotation
+    (proper-list
+     (and (listp value)
+          (not (proper-list-p value))))
+    (proper-sequence
+     (and (typep value 'sequence)
+          (not (proper-sequence-p value))))
+    (proper-or-circular-list
+     (and (listp value)
+          (not (proper-or-circular-list-p value))))
+    (proper-or-dotted-list
+     (and (listp value)
+          (not (proper-or-dotted-list-p value))))))
+
 (defun process-lvar-proper-sequence-annotation (lvar annotation)
   (multiple-value-bind (type values) (lvar-constants lvar)
     (let ((kind (lvar-proper-sequence-annotation-kind annotation)))
       (labels ((bad-p (value)
-                 (case kind
-                   (proper-list
-                    (and (listp value)
-                         (not (proper-list-p value))))
-                   (proper-sequence
-                    (and (typep value 'sequence)
-                         (not (proper-sequence-p value))))
-                   (proper-or-circular-list
-                    (and (listp value)
-                         (not (proper-or-circular-list-p value))))
-                   (proper-or-dotted-list
-                    (and (listp value)
-                         (not (proper-or-dotted-list-p value))))))
+                 (improper-sequence-p kind value))
                (report (values)
                  (when (every #'bad-p values)
                    (if (singleton-p values)

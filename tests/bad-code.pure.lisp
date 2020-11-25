@@ -343,10 +343,9 @@
 
 
 (with-test (:name :sequence-lvar-dimensions-dotted-list)
-  (assert (nth-value 3
+  (assert (nth-value 1
                      (checked-compile
                       '(lambda () (position 0 '(1 2 0 5 . 5)))
-                      :allow-style-warnings t
                       :allow-warnings t))))
 
 (with-test (:name :source-form-context-dotted-list)

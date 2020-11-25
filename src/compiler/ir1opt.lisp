@@ -1089,6 +1089,20 @@
                                   (give-up-ir1-transform)))
                   :note "auto-DX"))
 
+(defun check-proper-sequences (combination info)
+  (when (fun-info-annotation info)
+    (map-combination-args-and-types
+     (lambda (lvar type lvars annotations)
+       (declare (ignore type lvars))
+       (when (constant-lvar-p lvar)
+         (loop with value = (lvar-value lvar)
+               for annotation in annotations
+               when (improper-sequence-p annotation value)
+               do
+               (setf (combination-kind combination) :error)
+               (return-from check-proper-sequences))))
+     combination info)))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
@@ -1106,6 +1120,7 @@
                  (setf (lvar-reoptimize arg) nil))))
            (process-info ()
              (check-important-result node info)
+             (check-proper-sequences node info)
              (let ((fun (fun-info-derive-type info)))
                (when fun
                  (let ((res (funcall fun node)))
