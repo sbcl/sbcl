@@ -28,21 +28,20 @@
          (code-end-addr (+ (sap-int sap) (%code-code-size code))))
     (ecase kind
       (:absolute
-       ;; Word at sap + offset contains a value to be replaced by
-       ;; adding that value to fixup.
-       (let ((final-val (+ fixup (sap-ref-32 sap offset))))
-         (if (eq flavor :layout-id)
-             (setf (signed-sap-ref-32 sap offset) final-val)
-             (setf (sap-ref-32 sap offset) final-val))
-         ;; Record absolute fixups that point into CODE itself, with one
-         ;; exception: fixups within the range of unboxed words containing
-         ;; jump tables are automatically adjusted if the code moves.
-         (let ((n-jump-table-words
-                (the (unsigned-byte 16)
-                     (get-lisp-obj-address
-                      (code-header-ref code (code-header-words code))))))
-           (and (< obj-start-addr final-val code-end-addr)
-                (>= offset (ash n-jump-table-words word-shift))))))
+       (case flavor
+         (:layout-id
+          (setf (signed-sap-ref-32 sap offset) fixup)
+          nil)
+         (t
+          ;; Word at sap + offset contains a value to be replaced by
+          ;; adding that value to fixup.
+          (let ((final-val (+ fixup (sap-ref-32 sap offset))))
+            (setf (sap-ref-32 sap offset) final-val)
+            ;; Record absolute fixups that point into CODE itself, with one
+            ;; exception: fixups within the range of unboxed words containing
+            ;; jump tables are automatically adjusted if the code moves.
+            (and (< obj-start-addr final-val code-end-addr)
+                 (>= offset (ash (code-jump-table-words code) word-shift)))))))
       (:relative
        ;; Fixup is the actual address wanted.
        ;; Replace word with value to add to that loc to get there.
