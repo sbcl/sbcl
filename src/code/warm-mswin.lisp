@@ -83,12 +83,16 @@
   (process handle)
   (exit-code uint))
 
-(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory window)
+(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory window preserve-handles)
   (let ((std-handles (multiple-value-list (get-std-handles)))
         (inheritp nil))
     (flet ((maybe-std-handle (arg)
              (let ((default (pop std-handles)))
                (case arg (-1 default) (otherwise (setf inheritp t) arg)))))
+      (when preserve-handles
+        (setf inheritp t)
+        (loop for handle in preserve-handles
+              do (setf (inheritable-handle-p handle) t)))
       (with-alien ((process-information process-information)
                    (startup-info startup-info))
         (sb-kernel:system-area-ub8-fill
@@ -112,6 +116,7 @@
                                                  ((nil) 0))
               (slot startup-info 'flags) (logior (if inheritp +startf-use-std-handles+ 0)
                                                  (if window +startf-use-show-window+ 0)))
+
         (without-interrupts
           ;; KLUDGE: pass null image file name when searchp is true.
           ;; This way, file extension gets resolved by OS if omitted.

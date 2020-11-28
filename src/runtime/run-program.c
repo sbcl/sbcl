@@ -133,8 +133,22 @@ int closefrom_fddir(char *dir, int lowfd)
     return 0;
 }
 
-void closefds_from(int lowfd)
+void closefds_from(int lowfd, int* dont_close)
 {
+    if (dont_close) {
+        uword_t length = fixnum_value(((uword_t*)dont_close)[-1]);
+
+        for (uword_t i = 0; i < length; i++)
+        {
+            int fd = dont_close[i];
+            for (int close_fd = lowfd; close_fd < fd; close_fd++)
+            {
+                close(close_fd);
+            }
+            lowfd = fd+1;
+        }
+    }
+
 #if defined(LISP_FEATURE_OPENBSD) || defined(LISP_FEATURE_NETBSD)       \
     || defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_FREEBSD) \
     || defined(LISP_FEATURE_SUNOS)
@@ -199,7 +213,7 @@ extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name,
           int channel[2],
-          char *pwd)
+          char *pwd, int* dont_close)
 {
     pid_t pid;
     sigset_t sset;
@@ -252,7 +266,7 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     /* Close all other fds. First arrange for the pipe fd to be the
      * lowest free fd, then close every open fd above that. */
     channel[1] = dup2(channel[1], 3);
-    closefds_from(4);
+    closefds_from(4, dont_close);
 
     if (-1 != channel[1]) {
         if (-1==fcntl(channel[1], F_SETFD,  FD_CLOEXEC)) {

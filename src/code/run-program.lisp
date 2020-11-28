@@ -589,7 +589,8 @@ status slot."
   (envp (* c-string))
   (pty-name c-string)
   (channel (array int 2))
-  (dir c-string))
+  (dir c-string)
+  (preserve-fds (* int)))
 
 #-win32
 (define-alien-routine wait-for-exec
@@ -694,25 +695,26 @@ status slot."
 ;;; the fork worked, and NIL if it did not.
 (defun run-program (program args
                     &key
-                    (env nil env-p)
-                    (environment
-                     (when env-p
-                       (unix-environment-sbcl-from-cmucl env))
-                     environment-p)
-                    (wait t)
-                    search
-                    #-win32 pty
-                    input
-                    if-input-does-not-exist
-                    output
-                    (if-output-exists :error)
-                    (error :output)
-                    (if-error-exists :error)
-                    status-hook
-                    (external-format :default)
-                    directory
-                    #+win32 (escape-arguments t)
-                    #+win32 (window nil))
+                      (env nil env-p)
+                      (environment
+                       (when env-p
+                         (unix-environment-sbcl-from-cmucl env))
+                       environment-p)
+                      (wait t)
+                      search
+                      #-win32 pty
+                      input
+                      if-input-does-not-exist
+                      output
+                      (if-output-exists :error)
+                      (error :output)
+                      (if-error-exists :error)
+                      status-hook
+                      (external-format :default)
+                      directory
+                      preserve-fds
+                      #+win32 (escape-arguments t)
+                      #+win32 (window nil))
   "RUN-PROGRAM creates a new process specified by PROGRAM.
 ARGS are passed as the arguments to the program.
 
@@ -800,6 +802,10 @@ Users Manual for details about the PROCESS structure.
       Specifies the directory in which the program should be run.
       NIL (the default) means the directory is unchanged.
 
+   :PRESERVE-FDS
+      A sequence of file descriptors which should remain open in the child
+      process.
+
    Windows specific options:
    :ESCAPE-ARGUMENTS (default T)
       Controls escaping of the arguments passed to CreateProcess.
@@ -875,51 +881,60 @@ Users Manual for details about the PROCESS structure.
                  ;; death before we have installed the PROCESS
                  ;; structure in *ACTIVE-PROCESSES*.
                  (let (child #+win32 handle)
-                   (with-environment (environment-vec environment
-                                      :null (not (or environment environment-p)))
-                     (with-alien (#-win32 (channel (array int 2)))
-                       (with-open-pty ((pty-name pty-stream) (pty cookie))
-                         (setf (values child #+win32 handle)
-                               #+win32
-                               (with-system-mutex (*spawn-lock*)
-                                 (sb-win32::mswin-spawn
-                                  progname
-                                  args
-                                  stdin stdout stderr
-                                  search environment-vec directory
-                                  window))
-                               #-win32
-                               (with-args (args-vec args)
-                                 (with-system-mutex (*spawn-lock*)
-                                   (spawn progname args-vec
-                                          stdin stdout stderr
-                                          (if search 1 0)
-                                          environment-vec pty-name
-                                          channel
-                                          directory))))
-                         (unless (minusp child)
-                           #-win32
-                           (setf child (wait-for-exec child channel))
-                           (unless (minusp child)
-                             (setf proc
-                                   (make-process
-                                    :input input-stream
-                                    :output output-stream
-                                    :error error-stream
-                                    :status-hook status-hook
-                                    :cookie cookie
-                                    #-win32 :pty #-win32 pty-stream
-                                    :%status :running
-                                    :pid child
-                                    #+win32 :copiers #+win32 *handlers-installed*
-                                    #+win32 :handle #+win32 handle))
-                             (with-active-processes-lock ()
-                               (push proc *active-processes*))
-                             ;; In case a sigchld signal was missed
-                             ;; when the process wasn't on
-                             ;; *active-processes*
-                             (unless wait
-                               (get-processes-status-changes)))))))
+                    (with-environment (environment-vec environment
+                                       :null (not (or environment environment-p)))
+                      (with-alien (#-win32 (channel (array int 2)))
+                        (with-open-pty ((pty-name pty-stream) (pty cookie))
+                          (setf (values child #+win32 handle)
+                                #+win32
+                                (with-system-mutex (*spawn-lock*)
+                                  (sb-win32::mswin-spawn
+                                   progname
+                                   args
+                                   stdin stdout stderr
+                                   search environment-vec directory
+                                   window
+                                   preserve-fds))
+                                #-win32
+                                (let ((preserve-fds
+                                        (and preserve-fds
+                                             (sort (coerce preserve-fds '(simple-array (signed-byte #.(alien-size int)) (*)))
+                                                   #'<))))
+                                  (with-pinned-objects (preserve-fds)
+                                    (with-args (args-vec args)
+                                      (with-system-mutex (*spawn-lock*)
+                                        (spawn progname args-vec
+                                               stdin stdout stderr
+                                               (if search 1 0)
+                                               environment-vec pty-name
+                                               channel
+                                               directory
+                                               (if preserve-fds
+                                                   (vector-sap preserve-fds)
+                                                   (int-sap 0))))))))
+                          (unless (minusp child)
+                            #-win32
+                            (setf child (wait-for-exec child channel))
+                            (unless (minusp child)
+                              (setf proc
+                                    (make-process
+                                     :input input-stream
+                                     :output output-stream
+                                     :error error-stream
+                                     :status-hook status-hook
+                                     :cookie cookie
+                                     #-win32 :pty #-win32 pty-stream
+                                     :%status :running
+                                     :pid child
+                                     #+win32 :copiers #+win32 *handlers-installed*
+                                     #+win32 :handle #+win32 handle))
+                              (with-active-processes-lock ()
+                                (push proc *active-processes*))
+                              ;; In case a sigchld signal was missed
+                              ;; when the process wasn't on
+                              ;; *active-processes*
+                              (unless wait
+                                (get-processes-status-changes)))))))
                    ;; Report the error outside the lock.
                    (case child
                      (-1
