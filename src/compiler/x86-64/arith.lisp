@@ -1858,14 +1858,16 @@ constant shift greater than word length")))
   (:temporary (:sc any-reg :from (:argument 2) :to :eval) temp)
   (:results (result :scs (unsigned-reg) :from (:argument 0))
             (carry :scs (unsigned-reg)))
+  (:optional-results carry)
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
     (move result a)
     (move temp c)
     (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
     (inst adc result b)
-    (inst set carry :c)
-    (inst and :dword carry 1)))
+    (unless (eq (tn-kind carry) :unused)
+     (inst set carry :c)
+     (inst and :dword carry 1))))
 
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
@@ -1878,14 +1880,15 @@ constant shift greater than word length")))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg) :from :eval)
             (borrow :scs (unsigned-reg)))
+  (:optional-results borrow)
   (:result-types unsigned-num positive-fixnum)
   (:generator 5
     (inst cmp c 1) ; Set the carry flag to 1 if c=0 else to 0
     (move result a)
     (inst sbb result b)
-    (inst mov borrow 1)
-    (inst sbb :dword borrow 0)))
-
+    (unless (eq (tn-kind borrow) :unused)
+     (inst mov borrow 1)
+     (inst sbb :dword borrow 0))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)

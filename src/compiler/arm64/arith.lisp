@@ -1056,11 +1056,13 @@
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
             (carry :scs (unsigned-reg) :from :eval))
+  (:optional-results carry)
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
     (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
     (inst adcs result a b)
-    (inst cset carry :cs)))
+    (unless (eq (tn-kind carry) :unused)
+      (inst cset carry :cs))))
 
 (define-vop (sub-w/borrow)
   (:translate sb-bignum:%subtract-with-borrow)
@@ -1071,11 +1073,13 @@
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
             (borrow :scs (unsigned-reg) :from :eval))
+  (:optional-results borrow)
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
     (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
     (inst sbcs result a b)
-    (inst cset borrow :cs)))
+    (unless (eq (tn-kind borrow) :unused)
+     (inst cset borrow :cs))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
@@ -1218,4 +1222,3 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst lsl result digit count)))
-
