@@ -449,7 +449,8 @@
 ;;; IR2-LVAR-LOCS. Otherwise we make a new list padded as necessary by
 ;;; discarded TNs. We always return a TN of the specified type, using
 ;;; the lvar locs only when they are of the correct type.
-(defun lvar-result-tns (lvar types &optional primitive-types)
+(defun lvar-result-tns (lvar types &optional primitive-types
+                                             call)
   (declare (type (or lvar null) lvar)
            (type list primitive-types types))
   (let ((primitive-types (or primitive-types
@@ -466,13 +467,21 @@
                               for prim-type in primitive-types
                               always (eq (tn-primitive-type loc) prim-type)))
                    locs
-                   (loop for prim-type in primitive-types
+                   (loop with optional = (and call
+                                              (vop-info-p (combination-info call))
+                                              (vop-info-optional-results (combination-info call)))
+                         for prim-type in primitive-types
                          for type in types
+                         for i from 0
                          for loc = (pop locs)
-                         collect (if (and loc
-                                          (eq (tn-primitive-type loc) prim-type))
-                                     loc
-                                     (make-normal-tn prim-type type))))))
+                         collect (cond ((and loc
+                                             (eq (tn-primitive-type loc) prim-type))
+                                        loc)
+                                       ((and (not loc)
+                                             (member i optional))
+                                        (make-unused-tn))
+                                       (t
+                                        (make-normal-tn prim-type type)))))))
             (:unknown
              (mapcar #'make-normal-tn primitive-types types))))
         (mapcar #'make-normal-tn primitive-types types))))
@@ -513,6 +522,7 @@
         (ndest (length dest)))
     (mapc (lambda (from to)
             (unless (or (eq from to)
+                        (eq (tn-kind from) :unused)
                         (eq (tn-kind to) :unused))
               (emit-move node block from to)))
           (if (> ndest nsrc)
@@ -713,7 +723,9 @@
                  (return nil))))
         locs
         (lvar-result-tns lvar
-                         (find-template-result-types call rtypes)))))
+                         (find-template-result-types call rtypes)
+                         nil
+                         call))))
 
 ;;; Get the operands into TNs, make TN-REFs for them, and then call
 ;;; the template emit function.

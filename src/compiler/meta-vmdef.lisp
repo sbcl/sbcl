@@ -302,6 +302,8 @@
   (more-results nil :type (or operand-parse null))
   ;; a list of all the above together
   (operands nil :type list)
+  ;; Which results can accept :unused TNs
+  (optional-results nil :type list)
   ;; names of variables that should be declared IGNORE
   (ignores () :type list)
   ;; true if this is a :CONDITIONAL VOP. T if a branchful VOP,
@@ -371,7 +373,7 @@
 ;;; Order here is insignificant; it happens to be alphabetical.
 (defglobal vop-parse-slot-names
     '(arg-types args args-var before-load body conditional-p cost guard ignores info-args inherits
-      ltn-policy more-args more-results move-args name node-var note result-types
+      ltn-policy more-args more-results move-args name node-var note optional-results result-types
       results results-var save-p source-location temps translate variant variant-vars vop-var))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
 ;; get this far in cross-compilaion. So it's probably not worth much.
@@ -1039,6 +1041,10 @@
          (setf (vop-parse-save-p parse)
                (vop-spec-arg spec
                              '(member t nil :compute-only :force-to-stack))))
+        (:optional-results
+         (setf (vop-parse-optional-results parse)
+               (append (vop-parse-optional-results parse)
+                       (rest spec))))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (values)))
@@ -1141,7 +1147,9 @@
         :more-result-costs
         ',(if (vop-parse-more-results parse)
               (compute-loading-costs-if-any (vop-parse-more-results parse) nil)
-              nil)))))
+              nil)
+        :optional-results ',(loop for name in (vop-parse-optional-results parse)
+                                collect (position name (vop-parse-results parse) :key #'operand-parse-name))))))
 
 ;;;; operand checking and stuff
 

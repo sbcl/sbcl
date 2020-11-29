@@ -267,6 +267,7 @@
   (:arg-types signed-num signed-num)
   (:results (quo :scs (signed-reg) :from :eval)
             (rem :scs (signed-reg) :from :eval))
+  (:optional-results rem)
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 64) arithmetic")
   (:vop-var vop)
@@ -275,7 +276,8 @@
     (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst cbz y zero))
     (inst sdiv quo x y)
-    (inst msub rem quo y x)))
+    (unless (eq (tn-kind rem) :unused)
+     (inst msub rem quo y x))))
 
 (define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)
   (:translate truncate)
@@ -284,6 +286,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:results (quo :scs (unsigned-reg) :from :eval)
             (rem :scs (unsigned-reg) :from :eval))
+  (:optional-results rem)
   (:result-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) arithmetic")
   (:vop-var vop)
@@ -292,7 +295,8 @@
     (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst cbz y zero))
     (inst udiv quo x y)
-    (inst msub rem quo y x)))
+    (unless (eq (tn-kind rem) :unused)
+      (inst msub rem quo y x))))
 
 ;;;
 (define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)

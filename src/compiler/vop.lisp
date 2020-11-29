@@ -735,6 +735,7 @@
   ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1)))
   (optimizer nil :type (or null function))
+  (optional-results nil :type list)
   move-vop-p)
 (declaim (inline vop-name))
 (defun vop-name (vop)
