@@ -1160,7 +1160,8 @@
                           :type (if (eq :declared where-from)
                                     (leaf-type found)
                                     (or (and lp
-                                             (ftype-from-lambda-list lambda-list))
+                                             (ignore-errors
+                                              (ftype-from-lambda-list lambda-list)))
                                         (specifier-type 'function))))))
                (substitute-leaf res found)
                (setf (gethash name free-funs) res)))

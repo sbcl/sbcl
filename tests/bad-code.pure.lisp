@@ -577,3 +577,5 @@
                  :initial-value 0))
     (("abc") 294)))
 
+(with-test (:name :get-defined-fun-lambda-list-error)
+  (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))
