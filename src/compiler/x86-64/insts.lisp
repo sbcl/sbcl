@@ -2100,7 +2100,6 @@
                            (t
                             (setq amt src src dst dst maybe-size)
                             (matching-operand-size dst src)))))
-           (declare (type (or (member :cl) (mod 64)) amt))
            (when (eq size :byte)
              (error "Double shift requires word or larger operand"))
            (emit-prefixes segment dst src size)
@@ -2109,7 +2108,7 @@
                        (dpb opcode (byte 1 3) (if (eq amt :cl) #xA5 #xA4)))
            (emit-ea segment dst src)
            (unless (eq amt :cl)
-             (emit-byte segment amt)))))
+             (emit-byte segment (the (mod 64) amt))))))
   (macrolet ((define (name direction-bit op)
                `(define-instruction ,name (segment maybe-size dst src &optional amt)
                   (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b100))
