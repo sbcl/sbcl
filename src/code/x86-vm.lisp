@@ -14,48 +14,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "X86")
-
-;;;; :CODE-OBJECT fixups
 
-;;; This gets called by LOAD to resolve newly positioned objects
-;;; with things (like code instructions) that have to refer to them.
-;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
-(defun fixup-code-object (code offset fixup kind flavor)
-  (declare (type index offset))
-  (declare (ignorable flavor))
-  (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb-vm:lowtag-mask))
-         (sap (code-instructions code))
-         (code-end-addr (+ (sap-int sap) (%code-code-size code))))
-    (ecase kind
-      (:absolute
-       (case flavor
-         (:layout-id
-          (setf (signed-sap-ref-32 sap offset) fixup)
-          nil)
-         (t
-          ;; Word at sap + offset contains a value to be replaced by
-          ;; adding that value to fixup.
-          (let ((final-val (+ fixup (sap-ref-32 sap offset))))
-            (setf (sap-ref-32 sap offset) final-val)
-            ;; Record absolute fixups that point into CODE itself, with one
-            ;; exception: fixups within the range of unboxed words containing
-            ;; jump tables are automatically adjusted if the code moves.
-            (and (< obj-start-addr final-val code-end-addr)
-                 (>= offset (ash (code-jump-table-words code) word-shift)))))))
-      (:relative
-       ;; Fixup is the actual address wanted.
-       ;; Replace word with value to add to that loc to get there.
-       (let* ((loc-sap (+ (sap-int sap) offset))
-              ;; Use modular arithmetic so that if the offset
-              ;; doesn't fit into signed-byte-32 it'll wrap around
-              ;; when added to EIP
-              (rel-val (ldb (byte 32 0) (- fixup loc-sap n-word-bytes))))
-         (declare (type (unsigned-byte 32) loc-sap rel-val))
-         (setf (sap-ref-32 sap offset) rel-val))
-       ;; Relative fixups point outside of this object. Keep them all.
-       (aver (or (< fixup obj-start-addr) (> fixup code-end-addr)))
-       t))))
-
 ;;;; low-level signal context access functions
 ;;;;
 ;;;; Note: In CMU CL, similar functions were hardwired to access

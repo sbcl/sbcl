@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi) #'equalp)
+
 
 ;;;; Registers
 

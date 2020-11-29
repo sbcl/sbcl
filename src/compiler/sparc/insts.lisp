@@ -1940,3 +1940,22 @@ about function addresses and register values.")
   (define-cond-fp-move-integer fmovrs #b0101)
   (define-cond-fp-move-integer fmovrd #b0110 :extended t)
   (define-cond-fp-move-integer fmovrq #b0111 :extended t))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:call
+       (error "Can't deal with CALL fixups, yet."))
+      (:sethi
+       (setf (ldb (byte 22 0) (sap-ref-32 sap offset))
+             (ldb (byte 22 10) value)))
+      (:add
+       (setf (ldb (byte 10 0) (sap-ref-32 sap offset))
+             (ldb (byte 10 0) value)))
+      (:absolute
+       (setf (sap-ref-32 sap offset) value))))
+  nil)

@@ -11,6 +11,9 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch)
+  #'equalp)
+
 
 ;;;; register specs
 

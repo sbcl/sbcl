@@ -155,8 +155,7 @@
                                    for i from 0
                                    collect `(ash (bvref bigvec ,index) ,(* i 8)))))
                  (defun (setf ,name) (new-value bigvec byte-index)
-                   ;; We don't carefully distinguish between signed and unsigned,
-                   ;; since there's only one setter function per byte size.
+                   ;; FIXME: We should carefully distinguish between signed and unsigned
                    (declare (type (or (signed-byte ,n) (unsigned-byte ,n))
                                   new-value))
                    (setf ,@(loop for index in le-octet-indices
@@ -252,6 +251,28 @@
                                         (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
                                        (t
                                         0))))
+
+(defstruct (model-sap (:constructor make-model-sap (address gspace)))
+  (address 0 :type sb-vm:word)
+  (gspace nil :type gspace))
+(defun model-sap-int (x) (model-sap-address x))
+(macrolet ((access (name)
+             `(,name (gspace-data (model-sap-gspace sap))
+                     (- (+ (model-sap-address sap) offset)
+                        (gspace-byte-address (model-sap-gspace sap))))))
+  (defun model-sap-ref-8 (sap offset) (access bvref-8))
+  (defun model-sap-ref-u32 (sap offset) (access bvref-32))
+  (defun model-sap-ref-u64 (sap offset) (access bvref-64))
+  (defun model-sap-ref-s32 (sap offset)
+    (sb-disassem:sign-extend (access bvref-32) 32))
+  (defun model-sap-ref-s64 (sap offset)
+    (sb-disassem:sign-extend (access bvref-64) 64))
+  (defun (setf model-sap-ref-u32) (newval sap offset)
+      (setf (access bvref-32) newval))
+  (defun (setf model-sap-ref-s32) (newval sap offset)
+    (setf (access bvref-32) (ldb (byte 32 0) (the (signed-byte 32) newval))))
+  (defun (setf model-sap-ref-u64) (newval sap offset)
+    (setf (access bvref-64) newval)))
 
 ;;;; representation of descriptors
 
@@ -286,6 +307,8 @@
   "the lowtag bits for DES"
   (logand (descriptor-bits des) sb-vm:lowtag-mask))
 
+(defun descriptor-base-address (des)
+  (logandc2 (descriptor-bits des) sb-vm:lowtag-mask))
 (defmethod print-object ((des descriptor) stream)
   (let ((gspace (descriptor-gspace des))
         (bits (descriptor-bits des))
@@ -301,7 +324,7 @@
             (t
              (format stream
                      "for pointer: #X~X, lowtag #b~v,'0B, ~A"
-                     (logandc2 bits sb-vm:lowtag-mask)
+                     (descriptor-base-address bits)
                      sb-vm:n-lowtag-bits lowtag
                      (if gspace (gspace-name gspace) "unknown")))))))
 
@@ -503,6 +526,9 @@
             (setf (descriptor-word-offset des)
                   (- abs-word-addr (gspace-word-address gspace)))
             (return (setf (descriptor-gspace des) gspace)))))))
+
+(defun descriptor-gspace-name (des)
+  (gspace-name (descriptor-intuit-gspace des)))
 
 (defun %fixnum-descriptor-if-possible (num)
   (and (typep num `(signed-byte ,sb-vm:n-fixnum-bits))
@@ -2050,6 +2076,14 @@ core and return a descriptor to it."
 (defun code-header-words (code-object) ; same, but expressed in words
   (ash (code-header-bytes code-object) (- sb-vm:word-shift)))
 
+(declaim (inline calculate-code-insts-address))
+(defun calc-code-insts-address (code)
+  (+ (descriptor-bits code)
+     (- sb-vm:other-pointer-lowtag)
+     (code-header-bytes code)))
+(defun model-code-instructions (code)
+  (make-model-sap (calc-code-insts-address code) (descriptor-gspace code)))
+
 ;;; These are fairly straightforward translations of the similarly named accessor
 ;;; from src/code/simple-fun.lisp
 (defun code-trailer-ref (code offset)
@@ -2113,77 +2147,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                            descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
-  (declare (ignorable flavor))
-  (let* ((offset-within-code-object
-          (+ (code-header-bytes code-object) after-header))
-         (gspace-byte-offset (+ (descriptor-byte-offset code-object)
-                                offset-within-code-object)))
-    #-(or x86 x86-64)
-    (sb-vm:fixup-code-object code-object gspace-byte-offset value kind flavor)
-
-    #+(or x86 x86-64)
-    (let* ((gspace-data (descriptor-mem code-object))
-           (obj-start-addr (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask))
-           (code-end-addr (+ obj-start-addr (code-object-size code-object)))
-           (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
-           (in-dynamic-space
-            (= (gspace-identifier (descriptor-intuit-gspace code-object))
-               dynamic-core-space-id))
-           (addr (+ value
-                    (sb-vm::sign-extend (bvref-32 gspace-data gspace-byte-offset)
-                                        32))))
-
-      (declare (ignorable code-end-addr in-dynamic-space))
-      (assert (= obj-start-addr
-                 (+ gspace-base (descriptor-byte-offset code-object))))
-
-      ;; FIXME: every other backend has the code factored out nicely into
-      ;; {target}-vm.lisp, but x86 doesn't. Is it really so impossible?
-      ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
-      ;; Except for the use of saps, this is nearly identical.
-      (when (ecase kind
-             (:absolute
-              (setf (bvref-32 gspace-data gspace-byte-offset)
-                    (if (eq flavor :layout-id)
-                        (the (signed-byte 32) addr)
-                        (the (unsigned-byte 32) addr)))
-              #+x86
-              (let ((n-jump-table-words (code-jump-table-words code-object)))
-                ;; Absolute fixups are recorded if within the object for x86.
-                (and in-dynamic-space
-                     (< obj-start-addr addr code-end-addr)
-                     ;; Except for an initial sequence of unboxed words
-                     (>= after-header (ash n-jump-table-words sb-vm:word-shift))))
-              ;; Absolute fixups on x86-64 do not refer to this code component,
-              ;; because we have RIP-relative addressing, but references to
-              ;; other immobile-space objects must be recorded.
-              ;; FIXME: unfortunately OAOO-violating with x86-64-vm.lisp
-              #+x86-64
-              (member flavor '(:named-call :static-call :layout :immobile-symbol
-                               :symbol-value :assembly-routine :assembly-routine*)))
-             #+x86-64
-             (:absolute64
-              (setf (bvref-64 gspace-data gspace-byte-offset)
-                    (the (unsigned-byte 64) addr))
-              ;; Never record it. These fixups are used only for jump table entries,
-              ;; which are automatically adjusted if core relocation happens.
-              nil)
-             (:relative ; (used for arguments to X86 relative CALL instruction)
-              (let ((diff (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
-                (setf (bvref-32 gspace-data gspace-byte-offset)
-                      ;; 32-bit: use modular arithmetic since the address space is 32 bits
-                      #+x86 (ldb (byte 32 0) diff)
-                      ;; 64-bit: ensure that the fixup actually fits in the size
-                      ;; encodable in the instruction, or we're screwed
-                      #+x86-64 (the (signed-byte 32) diff)))
-              ;; Relative fixups are recorded if outside of the object.
-              ;; Except that read-only space contains calls to asm routines,
-              ;; and we don't record those fixups.
-              #+x86 (and in-dynamic-space
-                          (not (< obj-start-addr addr code-end-addr)))
-              #+x86-64 (eq flavor :foreign)))
-        (push (cons kind after-header)
-              (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
+  (when (sb-vm:fixup-code-object code-object after-header value kind flavor)
+    (push (cons kind after-header)
+          (gethash (descriptor-bits code-object) *code-fixup-notes*)))
   code-object)
 
 (defun resolve-static-call-fixups ()
@@ -2649,10 +2615,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (write-wordindexed (car place) (cdr place) fun))))
 
 (defun compute-fun (code-object fun-index)
-  (let* ((code-instructions
-          (+ (descriptor-bits code-object)
-             (- sb-vm:other-pointer-lowtag)
-             (code-header-bytes code-object)))
+  (let* ((code-instructions (calc-code-insts-address code-object))
          (fun (+ code-instructions (%code-fun-offset code-object fun-index))))
     (unless (zerop (logand fun sb-vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))

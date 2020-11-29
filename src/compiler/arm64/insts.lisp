@@ -2695,3 +2695,20 @@
                `(.byte ,@(loop repeat size
                                collect (prog1 (ldb (byte 8 0) val)
                                          (setf val (ash val -8)))))))))))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:absolute
+       (setf (sap-ref-word sap offset) value))
+      (:cond-branch
+       (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
+             (ash (- value (+ (sap-int sap) offset)) -2)))
+      (:uncond-branch
+       (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
+             (ash (- value (+ (sap-int sap) offset)) -2)))))
+  nil)

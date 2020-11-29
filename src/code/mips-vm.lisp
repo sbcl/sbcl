@@ -2,39 +2,9 @@
 ;;;
 (in-package "SB-VM")
 
-
-#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "MIPS")
-
-;;;; FIXUP-CODE-OBJECT
-
-(defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi) #'equalp)
-(!with-bigvec-or-sap
-(defun fixup-code-object (code offset value kind flavor)
-  (declare (type index offset))
-  (declare (ignore flavor))
-  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
-    (error "Unaligned instruction?  offset=#x~X." offset))
-  (let ((sap (code-instructions code)))
-    (ecase kind
-       (:absolute
-        (setf (sap-ref-32 sap offset) value))
-       (:jump
-        (aver (zerop (ash value -28)))
-        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
-              (ash value -2)))
-       (:lui
-        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ash (1+ (ash value -15)) -1)))
-       (:addi
-        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) value)))))
-  nil))
-
-
-#-sb-xc-host (progn
 
 (define-alien-routine ("os_context_bd_cause" context-bd-cause-int)
     unsigned-int
@@ -86,4 +56,3 @@
          (trap-number (ldb (byte 8 6) (sap-ref-32 pc offset))))
     (declare (type system-area-pointer pc))
     (sb-kernel::decode-internal-error-args (sap+ pc (+ offset 4)) trap-number)))
-) ; end PROGN

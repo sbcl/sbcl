@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :absolute64 :b :ba :ha :l) #'equalp)
+
 ;;; NUMBER-STACK-DISPLACEMENT
 ;;;
 ;;; The number of bytes reserved above the number stack pointer.  These

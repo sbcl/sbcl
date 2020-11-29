@@ -10,7 +10,22 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
+(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :s-type :u-type) #'equalp)
+
+(defun u-and-i-inst-immediate (value)
+  (let ((hi (ash (+ value (expt 2 11)) -12)))
+    (values hi (- value (ash hi 12)))))
+
+(def!type short-immediate () `(signed-byte 12))
+(def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+
+(deftype u+i-immediate ()
+  #-64-bit `(or (signed-byte 32) (unsigned-byte 32))
+  #+64-bit `(or (integer #x-80000800 #x7ffff7ff)
+                (integer ,(+ (ash 1 64) #x-80000800)
+                         ,(1- (ash 1 64)))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *register-names* (make-array 32 :initial-element nil)))
 

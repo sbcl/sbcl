@@ -2,57 +2,15 @@
 ;;;
 (in-package "SB-VM")
 
-#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   #-64-bit "PowerPC"
   #+64-bit "PowerPC64")
 
-;;;; FIXUP-CODE-OBJECT
-
-(defconstant-eqx +fixup-kinds+ #(:absolute :absolute64 :b :ba :ha :l) #'equalp)
-(!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind flavor)
-  (declare (type index offset))
-  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
-    (error "Unaligned instruction?  offset=#x~X." offset))
-  (let ((sap (code-instructions code)))
-    (ecase kind
-       (:absolute
-        (if (eq flavor :layout-id)
-            ;; BIGVEC sap-ref doesn't have a signed variant, so clip to positive.
-            (setf (sap-ref-32 sap offset) (ldb (byte 32 0) (the layout-id fixup)))
-            ;; There is an implicit addend currently stored in the fixup location.
-            (incf (sap-ref-32 sap offset) fixup)))
-       (:absolute64
-        (incf (sap-ref-64 sap offset) fixup))
-       (:b
-        (error "Can't deal with CALL fixups, yet."))
-       (:ba
-        (setf (ldb (byte 24 2) (sap-ref-32 sap offset))
-              (ash fixup -2)))
-       (:ha
-        (let* ((h (ldb (byte 16 16) fixup))
-               (l (ldb (byte 16 0) fixup)))
-          ; Compensate for possible sign-extension when the low half
-          ; is added to the high.  We could avoid this by ORI-ing
-          ; the low half in 32-bit absolute loads, but it'd be
-          ; nice to be able to do:
-          ;  lis rX,foo@ha
-          ;  lwz rY,foo@l(rX)
-          ; and lwz/stw and friends all use a signed 16-bit offset.
-          (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-                 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
-       (:l
-        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) fixup)))))
-  nil))
-
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
 
-#-sb-xc-host (progn
 (define-alien-routine ("os_context_lr_addr" context-lr-addr) (* unsigned-long)
   (context (* os-context-t)))
 
@@ -132,4 +90,3 @@
                          '(#.arg-count-sc)))))
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
-) ; end PROGN

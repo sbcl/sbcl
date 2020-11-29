@@ -1377,3 +1377,23 @@
   (:emitter
    (emit-fp-load/store-inst segment #b111001 reg 1 base index)))
 
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:absolute
+       (setf (sap-ref-32 sap offset) value))
+      (:jump
+       (aver (zerop (ash value -28)))
+       (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
+             (ash value -2)))
+      (:lui
+       (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+             (ash (1+ (ash value -15)) -1)))
+      (:addi
+       (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+             (ldb (byte 16 0) value)))))
+  nil)

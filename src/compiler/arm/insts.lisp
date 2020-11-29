@@ -1734,3 +1734,14 @@
 (define-two-reg-transfer-fp-instruction fmrrs :single :to-arm)
 (define-two-reg-transfer-fp-instruction fmdrr :double :from-arm)
 (define-two-reg-transfer-fp-instruction fmrrd :double :to-arm)
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:absolute
+       (setf (sap-ref-32 sap offset) value))))
+  nil)

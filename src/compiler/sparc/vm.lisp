@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute) #'equalp)
+
 ;;;; Additional constants
 
 ;;; NUMBER-STACK-DISPLACEMENT

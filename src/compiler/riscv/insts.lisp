@@ -911,3 +911,27 @@
 (define-instruction lra-header-word (segment)
   (:emitter
    (emit-header-data segment return-pc-widetag)))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  #+64-bit
+  (unless (typep value 'u+i-immediate)
+    (error "Tried to fixup with ~a." value))
+  (sb-vm::with-code-instructions (sap code)
+    (multiple-value-bind (u i) (u-and-i-inst-immediate value)
+      (ecase kind
+        (:absolute
+         (setf (sap-ref-32 sap offset) value))
+        (:i-type
+         (setf (ldb (byte 12 20) (sap-ref-32 sap offset)) i))
+        (:s-type
+         (setf (ldb (byte 5 7) (sap-ref-32 sap offset))
+               (ldb (byte 5 0) i))
+         (setf (ldb (byte 7 25) (sap-ref-32 sap offset))
+               (ldb (byte 7 5) i)))
+        (:u-type
+         (setf (ldb (byte 20 12) (sap-ref-32 sap offset)) u)))))
+   nil)

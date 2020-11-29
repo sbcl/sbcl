@@ -2532,6 +2532,45 @@
                                 collect (prog1 (ldb (byte 8 0) val)
                                           (setf val (ash val -8))))))))))
 
+;;; This gets called by LOAD to resolve newly positioned objects
+;;; with things (like code instructions) that have to refer to them.
+;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
+(defun fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:absolute
+       (case flavor
+         (:layout-id
+          (setf (signed-sap-ref-32 sap offset) value)
+          nil) ; do not record this
+         (t
+          ;; Word at sap + offset contains a value to be replaced by
+          ;; adding that value to fixup.
+          (let ((final-val (+ value (sap-ref-32 sap offset))))
+            (setf (sap-ref-32 sap offset) final-val)
+            ;; Record absolute fixups that point into CODE itself, with one
+            ;; exception: fixups within the range of unboxed words containing
+            ;; jump tables are automatically adjusted if the code moves.
+            (and (sb-vm::self-referential-code-fixup-p final-val code)
+                 (>= offset (ash (code-jump-table-words code) word-shift)))))))
+      (:relative
+       ;; VALUE is the actual address wanted.
+       ;; Replace word with displacement to get there.
+       (let* ((loc-sap (+ (sap-int sap) offset))
+              ;; Use modular arithmetic so that if the offset
+              ;; doesn't fit into signed-byte-32 it'll wrap around
+              ;; when added to EIP.
+              ;; "-4" is for the number of remaining bytes in the current instruction.
+              ;; The CPU calculates based off the next instruction.
+              (rel-val (ldb (byte 32 0) (- value loc-sap 4))))
+         (declare (type (unsigned-byte 32) loc-sap rel-val))
+         (setf (sap-ref-32 sap offset) rel-val))
+       ;; Record relative fixups pointing outside of this object.
+       (when (eq (sb-vm::containing-memory-space code) :dynamic)
+         (aver (not (sb-vm::self-referential-code-fixup-p value code)))
+         t)))))
+
 ;;; Perform exhaustive analysis here because of the extreme degree
 ;;; of confusion I have about what is allowed to reach the instruction
 ;;; emitter as a raw fixup, a fixup wrapped in an EA, a label wrapped

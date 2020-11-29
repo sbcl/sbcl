@@ -2391,3 +2391,40 @@
                                                (setf val (ash val -8))))))
                    #+big-endian (setq bytes (nreverse bytes))
                    `(.byte ,@bytes)))))))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb-vm::with-code-instructions (sap code)
+    (ecase kind
+      (:absolute
+       (case flavor
+         (:layout-id
+          (aver (zerop (sap-ref-32 sap offset)))
+          (setf (signed-sap-ref-32 sap offset) (the layout-id value)))
+         (t
+          ;; There is an implicit addend currently stored in the fixup location.
+          (incf (sap-ref-32 sap offset) value))))
+      (:absolute64
+       (incf (sap-ref-64 sap offset) value))
+      (:b
+       (error "Can't deal with CALL fixups, yet."))
+      (:ba
+       (setf (ldb (byte 24 2) (sap-ref-32 sap offset)) (ash value -2)))
+      (:ha
+       (let* ((h (ldb (byte 16 16) value))
+              (l (ldb (byte 16 0) value)))
+          ; Compensate for possible sign-extension when the low half
+          ; is added to the high.  We could avoid this by ORI-ing
+          ; the low half in 32-bit absolute loads, but it'd be
+          ; nice to be able to do:
+          ;  lis rX,foo@ha
+          ;  lwz rY,foo@l(rX)
+          ; and lwz/stw and friends all use a signed 16-bit offset.
+          (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+                 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
+      (:l
+       (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+             (ldb (byte 16 0) value)))))
+  nil)

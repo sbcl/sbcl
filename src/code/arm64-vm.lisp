@@ -2,39 +2,15 @@
 ;;;
 (in-package "SB-VM")
 
-#-sb-xc-host
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "ARM64")
-
-;;;; FIXUP-CODE-OBJECT
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch)
-  #'equalp)
-(!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind flavor)
-  (declare (type index offset))
-  (declare (ignore flavor))
-  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
-    (error "Unaligned instruction?  offset=#x~X." offset))
-  (let ((sap (code-instructions code)))
-    (ecase kind
-        (:absolute
-         (setf (sap-ref-word sap offset) fixup))
-        (:cond-branch
-         (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
-               (ash (- fixup (+ (sap-int sap) offset)) -2)))
-        (:uncond-branch
-         (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
-               (ash (- fixup (+ (sap-int sap) offset)) -2)))))
-  nil))
-
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
-#-sb-xc-host (progn
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
@@ -84,11 +60,9 @@
     (if (= trap-number invalid-arg-count-trap)
         (values error-number '(#.arg-count-sc) trap-number)
         (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number error-number))))
-) ; end PROGN
 
 ;;; Undo the effects of XEP-ALLOCATE-FRAME
 ;;; and point PC to FUNCTION
-#-sb-xc-host
 (defun context-call-function (context function &optional arg-count)
   (with-pinned-objects (function)
     (with-pinned-context-code-object (context)

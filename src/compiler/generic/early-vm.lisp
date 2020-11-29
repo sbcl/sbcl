@@ -142,29 +142,50 @@
   (and (integerp x)
        (<= most-negative-fixnum x most-positive-fixnum)))
 
-;;; Helper macro for defining FIXUP-CODE-OBJECT so that its body
-;;; can be the same between the host and target.
-;;; In the target, the byte offset supplied is relative to CODE-INSTRUCTIONS.
-;;; Genesis works differently - it adjusts the offset so that it is relative
-;;; to the containing gspace since that's what bvref requires.
-(defmacro !with-bigvec-or-sap (&body body)
-  `(macrolet #-sb-xc-host ()
-             #+sb-xc-host
-             ((code-instructions (code) `(sb-fasl::descriptor-mem ,code))
+;;; Helper macro for defining FIXUP-CODE-OBJECT with emulation of SAP
+;;; accessors so that the host and target can use the same fixup logic.
+(defmacro with-code-instructions ((sap-var code-var) &body body)
+  #+sb-xc-host
+  `(macrolet ((self-referential-code-fixup-p (value self)
+                `(let* ((base (sb-fasl::descriptor-base-address ,self))
+                        (limit (+ base (1- (code-object-size ,self)))))
+                   (<= base ,value limit)))
+              #+x86
+              (containing-memory-space (code)
+                `(sb-fasl::descriptor-gspace-name ,code))
+              (sap-ref-8 (sap offset)
+                `(sb-fasl::model-sap-ref-u8 ,sap ,offset))
+              (sap-ref-32 (sap offset)
+                `(sb-fasl::model-sap-ref-u32 ,sap ,offset))
+              (signed-sap-ref-32 (sap offset)
+                `(sb-fasl::model-sap-ref-s32 ,sap ,offset))
+              (sap-ref-64 (sap offset)
+                `(sb-fasl::model-sap-ref-u64 ,sap ,offset))
+              (signed-sap-ref-64 (sap offset)
+                `(sb-fasl::model-sap-ref-s64 ,sap ,offset))
+              (sap-ref-word (sap offset)
+                `(#+64-bit sb-fasl::model-sap-ref-u64
+                  #-64-bit sb-fasl::model-sap-ref-u32 ,sap ,offset))
               (sap-int (sap)
-                ;; KLUDGE: SAP is a bigvec; it doesn't know its address.
-                ;; Note that this shadows the uncallable stub function for SAP-INT
-                ;; that placates the host when compiling 'compiler/*/move.lisp'.
-                (declare (ignore sap))
-                `(locally
-                     (declare (notinline sb-fasl::descriptor-gspace)) ; fwd ref
-                   (sb-fasl::gspace-byte-address
-                    (sb-fasl::descriptor-gspace code)))) ; use CODE, not SAP
-              (sap-ref-8 (sap offset) `(sb-fasl::bvref-8 ,sap ,offset))
-              (sap-ref-32 (sap offset) `(sb-fasl::bvref-32 ,sap ,offset))
-              (sap-ref-64 (sap offset) `(sb-fasl::bvref-64 ,sap ,offset))
-              (sap-ref-word (sap offset) `(sb-fasl::bvref-word ,sap ,offset)))
-     ,@body))
+                `(sb-fasl::model-sap-int ,sap)))
+     (let ((,sap-var (sb-fasl::model-code-instructions ,code-var)))
+       ,@body))
+  #-sb-xc-host
+  `(macrolet ((self-referential-code-fixup-p (value self)
+                ;; Using SAPs keeps all the arithmetic machine-word-sized.
+                ;; Otherwise it would potentially involve bignums on 32-bit
+                ;; if code starts at #x20000000 and up.
+                `(let* ((base (sap+ (int-sap (get-lisp-obj-address ,self))
+                                    (- sb-vm:lowtag-mask)))
+                        (limit (sap+ base (1- (code-object-size ,self))))
+                        (value-sap (int-sap ,value)))
+                   (and (sap>= value-sap base) (sap<= value-sap limit))))
+              #+x86
+              (containing-memory-space (code)
+                (declare (ignore code))
+                :dynamic))
+    (let ((,sap-var (code-instructions ,code-var)))
+      ,@body)))
 
 #+sb-safepoint
 ;;; The offset from the fault address reported to the runtime to the
