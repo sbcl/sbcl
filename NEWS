@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.10:
+changes in sbcl-2.0.11 relative to sbcl-2.0.10:
   * minor incompatible change: (ARRAY NIL (*)) is not a subtype of STRING,
     as is consistent with a majority of maintained CL implementations.
   * minor incompatible change: ARRAY-RANK-LIMIT is decreased from 65529 to 256
