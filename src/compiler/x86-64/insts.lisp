@@ -17,7 +17,7 @@
   (import '(conditional-opcode
             plausible-signed-imm32-operand-p
             ea-p ea-base ea-index size-nbyte alias-p
-            ea ea-disp rip-relative-ea) "SB-VM")
+            ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
   #+sb-simd-pack-256
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
@@ -1023,6 +1023,7 @@
 
 ;;;; the effective-address (ea) structure
 (defstruct (ea (:constructor %ea (disp base index scale))
+               (:constructor %make-ea-dont-use (size disp base index scale))
                (:copier nil))
   ;; FIXME: SIZE is unnecessary, but is here for backward-compatibility
   ;; temporarily anyway. Our code only creates EAs with :unspecific,
@@ -3508,6 +3509,24 @@
 (defun sb-c::replace-coverage-instruction (statement label offset)
   (setf (stmt-mnemonic statement) 'mov
         (stmt-operands statement) `(:byte ,(rip-relative-ea label offset) 1)))
+
+
+;;; This constructor is for broken 3rd-party library code. It's fine that we have
+;;; some degree of backward-compatibility, but it's another entirely to say that
+;;; we allowed code that SHOULD NOT have been allowed to work.
+;;;
+;;; The problem: MAKE-EA gets called with registers that were resized
+;;; using REG-IN-SIZE. The BASE and INDEX parts of an EA are *always*
+;;; qwords, and we should have enforced that. Well, it's too late now
+;;; to start enforcing.
+(defun make-ea (size &key base index (scale 1) (disp 0))
+  (flet ((fix (reg)
+           (if (register-p reg)
+               (make-random-tn :kind :normal
+                               :sc (sc-or-lose 'sb-vm::unsigned-reg)
+                               :offset (reg-id-num (reg-id reg)))
+               reg)))
+    (%make-ea-dont-use size disp (fix base) (fix index) scale)))
 
 (defun parse-2-operands (stmt)
   (let* ((operands (stmt-operands stmt))
