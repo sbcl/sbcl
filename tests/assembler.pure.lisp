@@ -167,22 +167,33 @@
                      (concatenate 'string (subseq expect 0 p)
                                   #+x86 "EBP" #+x86-64 "RBP"
                                   (subseq expect (+ p 3))))))
-           (test-assemble inst expect))
-         (memref (size) (make-ea size :base #+x86 ebp-tn #+x86-64 rbp-tn)))
-    (try `(bt ,(memref :word)  ,ax-tn)  "660FA34500       BT WORD PTR [$fp], AX")
-    (try `(bt ,(memref :dword) ,eax-tn) "0FA34500         BT DWORD PTR [$fp], EAX")
+           (destructuring-bind (opcode operand1 operand2 . more) inst
+             (when (or (typep operand1 '(cons (eql memref)))
+                       (typep operand2 '(cons (eql memref))))
+               #+x86-64
+               (let ((prefix (second (if (consp operand1) operand1 operand2))))
+                 (flet ((new-ea (operand) (if (consp operand) (ea rbp-tn) operand)))
+                   (setf inst
+                         (list* opcode prefix (new-ea operand1) (new-ea operand2) more))))
+               #+x86
+               (flet ((new-ea (operand)
+                        (if (consp operand) (make-ea (second operand) :base ebp-tn) operand)))
+                 (setf inst (list* opcode (new-ea operand1) (new-ea operand2) more)))))
+           (test-assemble inst expect)))
+    (try `(bt (memref :word)  ,ax-tn)  "660FA34500       BT WORD PTR [$fp], AX")
+    (try `(bt (memref :dword) ,eax-tn) "0FA34500         BT DWORD PTR [$fp], EAX")
     #+x86-64
-    (try `(bt ,(memref :qword) ,rax-tn) "480FA34500       BT QWORD PTR [$fp], RAX")
-    (try `(bt ,(memref :word)  3) "660FBA650003     BT WORD PTR [$fp], 3")
-    (try `(bt ,(memref :dword) 3) "0FBA650003       BT DWORD PTR [$fp], 3")
+    (try `(bt (memref :qword) ,rax-tn) "480FA34500       BT QWORD PTR [$fp], RAX")
+    (try `(bt (memref :word)  3) "660FBA650003     BT WORD PTR [$fp], 3")
+    (try `(bt (memref :dword) 3) "0FBA650003       BT DWORD PTR [$fp], 3")
     #+x86-64
-    (try `(bt ,(memref :qword) 3) "480FBA650003     BT QWORD PTR [$fp], 3")
+    (try `(bt (memref :qword) 3) "480FBA650003     BT QWORD PTR [$fp], 3")
     ;;
     (try `(shld ,eax-tn ,ebx-tn :cl) "0FA5D8           SHLD EAX, EBX, CL")
-    (try `(shld ,(memref :word)  ,bx-tn 6)  "660FA45D0006     SHLD [$fp], BX, 6")
-    (try `(shld ,(memref :dword) ,ebx-tn 6) "0FA45D0006       SHLD [$fp], EBX, 6")
+    (try `(shld (memref :word)  ,bx-tn 6)  "660FA45D0006     SHLD [$fp], BX, 6")
+    (try `(shld (memref :dword) ,ebx-tn 6) "0FA45D0006       SHLD [$fp], EBX, 6")
     #+x86-64
-    (try `(shld ,(memref :qword) ,rbx-tn 6) "480FA45D0006     SHLD [$fp], RBX, 6")
+    (try `(shld (memref :qword) ,rbx-tn 6) "480FA45D0006     SHLD [$fp], RBX, 6")
     ;;
     (try `(add ,al-tn  #x7f)       "047F             ADD AL, 127")
     (try `(add ,ax-tn  #x7fff)     "6605FF7F         ADD AX, 32767")
@@ -201,16 +212,16 @@
     #+x86-64
     (try `(add ,rax-tn #x7f)       "4883C07F         ADD RAX, 127")
     ;;
-    (try `(add ,(memref :byte) ,cl-tn)   "004D00           ADD [$fp], CL")
-    (try `(add ,(memref :word) ,cx-tn)   "66014D00         ADD [$fp], CX")
-    (try `(add ,(memref :dword) ,ecx-tn) "014D00           ADD [$fp], ECX")
+    (try `(add (memref :byte) ,cl-tn)   "004D00           ADD [$fp], CL")
+    (try `(add (memref :word) ,cx-tn)   "66014D00         ADD [$fp], CX")
+    (try `(add (memref :dword) ,ecx-tn) "014D00           ADD [$fp], ECX")
     #+x86-64
-    (try `(add ,(memref :qword) ,rcx-tn) "48014D00         ADD [$fp], RCX")
-    (try `(add ,cl-tn ,(memref :byte))   "024D00           ADD CL, [$fp]")
-    (try `(add ,cx-tn ,(memref :word))   "66034D00         ADD CX, [$fp]")
-    (try `(add ,ecx-tn ,(memref :dword)) "034D00           ADD ECX, [$fp]")
+    (try `(add (memref :qword) ,rcx-tn) "48014D00         ADD [$fp], RCX")
+    (try `(add ,cl-tn (memref :byte))   "024D00           ADD CL, [$fp]")
+    (try `(add ,cx-tn (memref :word))   "66034D00         ADD CX, [$fp]")
+    (try `(add ,ecx-tn (memref :dword)) "034D00           ADD ECX, [$fp]")
     #+x86-64
-    (try `(add ,rcx-tn ,(memref :qword)) "48034D00         ADD RCX, [$fp]")
+    (try `(add ,rcx-tn (memref :qword)) "48034D00         ADD RCX, [$fp]")
     ))
 
 (test-util:with-test (:name :disassemble-imul :skipped-on (not (or :x86 :x86-64)))

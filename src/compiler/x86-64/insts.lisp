@@ -2101,9 +2101,14 @@
     (define shr #b101)
     (define sar #b111)))
 
-(flet ((emit* (segment opcode dst src amt)
-         (declare (type (or (member :cl) (mod 64)) amt))
-         (let ((size (matching-operand-size dst src)))
+(flet ((emit* (segment opcode maybe-size dst src amt)
+         (let ((size (cond (amt
+                            (aver (is-size-p maybe-size))
+                            maybe-size)
+                           (t
+                            (setq amt src src dst dst maybe-size)
+                            (matching-operand-size dst src)))))
+           (declare (type (or (member :cl) (mod 64)) amt))
            (when (eq size :byte)
              (error "Double shift requires word or larger operand"))
            (emit-prefixes segment dst src size)
@@ -2114,13 +2119,13 @@
            (unless (eq amt :cl)
              (emit-byte segment amt)))))
   (macrolet ((define (name direction-bit op)
-               `(define-instruction ,name (segment dst src amt)
+               `(define-instruction ,name (segment maybe-size dst src &optional amt)
                   (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b100))
                                                       (imm nil :type 'imm-byte))
                             '(:name :tab reg/mem ", " reg ", " imm))
                   (:printer ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
                             '(:name :tab reg/mem ", " reg ", " 'cl))
-                  (:emitter (emit* segment ,direction-bit dst src amt)))))
+                  (:emitter (emit* segment ,direction-bit maybe-size dst src amt)))))
     (define shld 0 #b10100000)
     (define shrd 1 #b10101000)))
 
