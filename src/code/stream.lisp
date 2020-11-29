@@ -838,26 +838,23 @@
 ;;;; broadcast streams
 
 (defun make-broadcast-stream (&rest streams)
-  (unless streams
-    (return-from make-broadcast-stream
-      (load-time-value (let ((out (lambda (stream arg)
-                                    (declare (ignore stream arg)
-                                             (optimize speed (safety 0)))))
-                             (sout (lambda (stream string start end)
-                                     (declare (ignore stream string start end)
-                                              (optimize speed (safety 0)))))
-                             (stream (%make-broadcast-stream nil)))
-                         (setf (broadcast-stream-out stream) out
-                               (broadcast-stream-bout stream) out
-                               (broadcast-stream-sout stream) sout)
-                         stream)
-                       t)))
   (dolist (stream streams)
     (unless (output-stream-p stream)
       (error 'type-error
              :datum stream
              :expected-type '(satisfies output-stream-p))))
-  (%make-broadcast-stream streams))
+  (let ((stream (%make-broadcast-stream streams)))
+    (unless streams
+      (flet ((out (stream arg)
+               (declare (ignore stream arg)
+                        (optimize speed (safety 0))))
+             (sout (stream string start end)
+               (declare (ignore stream string start end)
+                        (optimize speed (safety 0)))))
+        (setf (broadcast-stream-out stream) #'out
+              (broadcast-stream-bout stream) #'out
+              (broadcast-stream-sout stream) #'sout)))
+    stream))
 
 (macrolet ((out-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
@@ -925,8 +922,7 @@
              (file-string-length (car last) arg1)
              1)))
       (:close
-       (when (broadcast-stream-streams stream)
-         (set-closed-flame stream)))
+         (set-closed-flame stream))
       (t
        (let ((res nil))
          (dolist (stream streams res)

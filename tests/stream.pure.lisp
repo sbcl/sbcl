@@ -489,3 +489,9 @@
 (compile 'input-from-dynamic-extent-stream)
 (with-test (:name :with-input-from-string-signal-stream-error)
   (assert (search "unavailable" (input-from-dynamic-extent-stream))))
+
+(with-test (:name :closeable-broadcast-stream)
+  (let ((b (make-broadcast-stream)))
+   (close b)
+   (assert (not (open-stream-p b)))
+   (assert-error (write-string "test" b))))
