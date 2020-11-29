@@ -4,6 +4,17 @@ changes relative to sbcl-2.0.10:
   * minor incompatible change: (ARRAY NIL (*)) is not a subtype of STRING,
     as is consistent with a majority of maintained CL implementations.
   * minor incompatible change: ARRAY-RANK-LIMIT is decreased from 65529 to 256
+  * optimization: TYPEP on structure types is faster and more compact on
+    x86[-64] and ppc64.
+  * optimization: LOGCOUNT is faster on arm64.
+  * optimization: SIGNUM can be inlined if its argument type is known.
+    (lp#1903533)
+  * bug fix: compiler crash in tail call handling.  (lp#1903938)
+  * bug fix: crash in traceroot.  (lp#1903419, reported by Michal Herda)
+  * bug fix: DESCRIBE called with a string as second argument no longer mutates
+    that string.  (lp#1903901, reported by Michal Herda)
+  * bug fix: stack clobbering by 256-bit SIMD packs on x86-64.  (lp#1901685,
+    reported by Marco Heisig)
 
 changes in sbcl-2.0.10 relative to sbcl-2.0.9:
   * minor incompatible change: the funarg given to SB-SPROF:MAP-TRACES
