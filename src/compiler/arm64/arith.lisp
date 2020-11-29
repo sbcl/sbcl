@@ -1139,6 +1139,17 @@
     (inst umulh temp x y)
     (inst and hi temp (bic-mask fixnum-tag-mask))))
 
+(define-vop ()
+  (:translate %signed-multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:results (hi :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 20
+    (inst smulh hi x y)))
+
 (define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
 

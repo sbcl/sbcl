@@ -2935,7 +2935,6 @@
 
 (when-vop-existsp (:translate %signed-multiply-high)
  (defun %signed-multiply-high (x y)
-   (declare (type word x y))
    (%signed-multiply-high x y))
 
  (defun gen-signed-truncate-by-constant-expr (y max-x)
