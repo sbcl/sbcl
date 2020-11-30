@@ -2937,9 +2937,9 @@
  (defun %signed-multiply-high (x y)
    (%signed-multiply-high x y))
 
- (defun gen-signed-truncate-by-constant-expr (y max-x)
+ (defun gen-signed-truncate-by-constant-expr (y precision)
    (declare (type sb-vm:signed-word y)
-            (type word max-x))
+            (type fixnum precision))
    (aver (not (zerop (logand y (1- y)))))
    (labels ((ld (x)
               ;; the floor of the binary logarithm of (positive) X
@@ -2957,8 +2957,7 @@
                               (> shift 0)))
                     (values m-high shift)))))
      (let ((n (expt 2 sb-vm:n-word-bits))
-           (n-1 (expt 2 (1- sb-vm:n-word-bits)))
-           (precision (integer-length max-x)))
+           (n-1 (expt 2 (1- sb-vm:n-word-bits))))
        (multiple-value-bind (m shift) (choose-multiplier (abs y) precision)
          (let ((code
                  (cond ((< m n-1)
@@ -2980,28 +2979,32 @@
    "convert integer division to multiplication"
    (let* ((y      (lvar-value y))
           (abs-y  (abs y))
-          (x-type (lvar-type x))
-          (max-x  (or (and (numeric-type-p x-type)
-                           (numeric-type-high x-type)
-                           (numeric-type-low x-type)
-                           (max (numeric-type-high x-type)
-                                (abs (numeric-type-low x-type))))
-                      (expt 2 (1- sb-vm:n-word-bits)))))
-     ;; Division by zero, one or powers of two is handled elsewhere.
-     (when (or (zerop (logand y (1- y)))
-               ;; Leave it for the unsigned transform
-               (and (plusp y)
-                    (not (types-equal-or-intersect x-type
-                                                   (specifier-type
-                                                    '(and sb-vm:signed-word
-                                                      (not unsigned-byte)))))))
-       (give-up-ir1-transform))
-     `(let* ((quot (truly-the
-                    (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
-                    ,(gen-signed-truncate-by-constant-expr y max-x)))
-             (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
-                             (- x (truly-the sb-vm:signed-word (* quot ,y))))))
-        (values quot rem)))))
+          (x-type (lvar-type x)))
+     (multiple-value-bind (precision max-x)
+         (if (and (numeric-type-p x-type)
+                  (numeric-type-high x-type)
+                  (numeric-type-low x-type))
+             (values (max (integer-length (numeric-type-high x-type))
+                          (integer-length (numeric-type-low x-type)))
+                     (max (numeric-type-high x-type)
+                          (abs (numeric-type-low x-type))))
+             (values (1- sb-vm:n-word-bits)
+                     (expt 2 (1- sb-vm:n-word-bits))))
+         ;; Division by zero, one or powers of two is handled elsewhere.
+         (when (or (zerop (logand y (1- y)))
+                   ;; Leave it for the unsigned transform
+                   (and (plusp y)
+                        (not (types-equal-or-intersect x-type
+                                                       (specifier-type
+                                                        '(and sb-vm:signed-word
+                                                          (not unsigned-byte)))))))
+           (give-up-ir1-transform))
+      `(let* ((quot (truly-the
+                     (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
+                     ,(gen-signed-truncate-by-constant-expr y precision)))
+              (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
+                              (- x (truly-the sb-vm:signed-word (* quot ,y))))))
+         (values quot rem))))))
 
 ;;; The paper also has this,
 ;;; but it seems to overflow when adding to X

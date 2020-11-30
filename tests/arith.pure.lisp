@@ -514,6 +514,7 @@
 (with-test (:name (:integer-division-using-multiplication :correctness))
   (let ((*random-state* (make-random-state t)))
     (dolist (dividend-type `((unsigned-byte ,sb-vm:n-word-bits)
+                             (signed-byte ,sb-vm:n-word-bits)
                              (and fixnum unsigned-byte)
                              (integer 10000 10100)
                              fixnum))
@@ -547,7 +548,8 @@
                                 ,@(loop for i from 4 to sb-vm:n-word-bits
                                         for pow = (expt 2 (1- i))
                                         for r = (+ pow (random pow))
-                                        collect r)))
+                                        collect r
+                                        collect (- r))))
               (when (typep dividend dividend-type)
                 (multiple-value-bind (q1 r1)
                     (funcall foo dividend)
