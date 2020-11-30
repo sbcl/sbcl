@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -m64
+CFLAGS += -m64 -std=gnu99
 LINKFLAGS += -m64 -Wl,--export-dynamic
 
 ASSEM_SRC = ppc64-assem.S
