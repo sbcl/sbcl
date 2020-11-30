@@ -137,11 +137,13 @@ void closefds_from(int lowfd, int* dont_close)
 {
     if (dont_close) {
         uword_t length = fixnum_value(((uword_t*)dont_close)[-1]);
-
-        for (uword_t i = 0; i < length; i++)
+        uword_t i;
+        for (i = 0; i < length; i++)
         {
             int fd = dont_close[i];
-            for (int close_fd = lowfd; close_fd < fd; close_fd++)
+            int close_fd;
+
+            for (close_fd = lowfd; close_fd < fd; close_fd++)
             {
                 close(close_fd);
             }
