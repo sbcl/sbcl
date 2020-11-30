@@ -825,7 +825,7 @@
 ;;; object's layout can ever be EQ to that of the ancestor.
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
-(defvar *use-layout-ids* (or #+(or ppc64 x86 x86-64) t))
+(defvar *use-layout-ids* (or #+(or ppc ppc64 x86 x86-64) t))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))

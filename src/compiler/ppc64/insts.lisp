@@ -625,7 +625,8 @@
             (emit-d-form-inst segment opcode rt ra
                               (+ (component-header-length)
                                  (segment-header-skew segment)
-                                 (label-position si))))))
+                                 (label-position si)
+                                 (- sb-vm::code-tn-lowtag))))))
         (t
          (when (typep si 'fixup)
            (note-fixup segment :l si)
