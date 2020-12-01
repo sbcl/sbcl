@@ -65,7 +65,12 @@
   (define edi rdi-tn :dword)
   (define r8d r8-tn :dword)
   (define r9d r9-tn :dword))
-
+#+x86
+(progn (defglobal al al-tn) (defglobal ax ax-tn) (defglobal eax eax-tn)
+       (defglobal bl bl-tn) (defglobal bx bx-tn) (defglobal ebx ebx-tn)
+       (defglobal cl cl-tn) (defglobal cx cx-tn) (defglobal ecx ecx-tn)
+       (defglobal dl dl-tn)
+       (defglobal edi edi-tn))
 (test-util:with-test (:name :assemble-movnti-instruction :skipped-on (not :x86-64))
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
