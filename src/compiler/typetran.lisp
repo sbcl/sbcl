@@ -826,6 +826,9 @@
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
 (defvar *use-layout-ids* (or #+(or ppc ppc64 x86 x86-64) t))
+#+(or ppc ppc64) ; no vop
+(defmacro layout-depthoid-ge (layout depthoid)
+  `(>= (layout-depthoid ,layout) ,depthoid))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))

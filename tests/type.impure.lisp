@@ -1002,3 +1002,15 @@
     (assert (handler-case (not (sb-kernel:specifier-type class))
               (sb-kernel:parse-unknown-type ()
                 t)))))
+
+;;; Try depthoid in excess of sb-kernel::layout-id-vector-fixed-capacity
+(defstruct d2)                ; depthoid = 2
+(defstruct (d3(:include d2))) ; = 3
+(defstruct (d4(:include d3))) ; and so on
+(defstruct (d5(:include d4)))
+(defstruct (d6(:include d5)))
+(defstruct (d7(:include d6)))
+(defstruct (d8(:include d7)))
+(compile 'd8-p)
+(with-test (:name :deep-structure-is-a)
+  (assert (d8-p (opaque-identity (make-d8)))))
