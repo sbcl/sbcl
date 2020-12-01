@@ -1498,6 +1498,9 @@
 
 ;;; This function SHOULD NOT BE USED. It is only for compatibility.
 (defun sb-vm::reg-in-size (tn size)
+  ;; We don't put internal functions through a deprecation cycle.
+  ;; This should annoy maintainers enough to remove their misuses of this.
+  (warn "Don't use REG-IN-SIZE")
   (sized-thing (tn-reg tn) size))
 
 (define-instruction mov (segment maybe-size dst &optional src)
