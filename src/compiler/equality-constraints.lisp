@@ -204,3 +204,28 @@
      (equality-constraint eql inverse)
      (equality-constraint = inverse))
     result))
+
+(defoptimizer (- equality-constraint) ((x y) node)
+  (let ((integer (specifier-type 'integer)))
+    (when (and (types-equal-or-intersect (lvar-type x) integer)
+               (types-equal-or-intersect (lvar-type y) integer))
+      (macrolet ((f (op x y pos)
+                   `(let ((constr (find-ref-equality-constraint ',op ,x ,y nil)))
+                      (when constr
+                        (if (constraint-not-p constr)
+                            ,@(if pos
+                                  `((go POS) (go NEG))
+                                  `((go NEG) (go POS))))))))
+        (tagbody
+           (f < x y t)
+           (f > x y nil)
+           (f > y x t)
+           (f < y x nil)
+           (go DONE)
+         POS
+           (derive-node-type node (specifier-type '(integer 0)))
+           (go DONE)
+         NEG
+           (derive-node-type node (specifier-type '(integer * (0))))
+         DONE))))
+  :give-up)
