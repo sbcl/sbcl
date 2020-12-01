@@ -663,15 +663,13 @@
   ;; explains why we differentiate between SGF and everything else.
   (let ((inherits (layout-inherits layout)))
     (when (find #.(find-layout 'function) inherits)
-      (let ((bitmap
+      (setf (%raw-instance-ref/signed-word layout (sb-kernel::type-dd-length layout))
              #+immobile-code ; there are two possible bitmaps
              (if (or (find *sgf-wrapper* inherits) (eq layout *sgf-wrapper*))
                  sb-kernel::standard-gf-primitive-obj-layout-bitmap
                  +layout-all-tagged+)
              ;; there is only one possible bitmap otherwise
-             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))
-        (setf (%raw-instance-ref/word layout (sb-kernel::type-dd-length layout))
-              (logand sb-ext:most-positive-word bitmap))))))
+             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))))
 
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
