@@ -155,15 +155,6 @@
   (:emitter
    (emit-byte segment byte)))
 
-(define-instruction word (segment word)
-  (:emitter
-   (etypecase word
-     (fixup
-      (note-fixup segment :absolute word)
-      (emit-word segment 0))
-     (integer
-      (emit-word segment word)))))
-
 (define-instruction dword (segment word)
   (:emitter
    (etypecase word
@@ -2669,6 +2660,9 @@
 (defun size-nbyte (size)
   (ecase size
     (:byte  1)
+    ;; These keywords are completely wrong for AARCH64 but I don't want to touch them.
+    ;; The correct definitions would have :HWORD (halfword) for 2 bytes, :WORD for 4,
+    ;; :DWORD for 8, and :QWORD for 16.
     (:word  2)
     (:dword 4)
     ((:qword :fixup) 8)
@@ -2687,11 +2681,12 @@
           (let ((val (cdr constant)))
             (case type
               (:fixup
-               ;; Use the WORD emitter which knows how to emit fixups
-               `(word ,(apply #'make-fixup val)))
+               ;; Use the DWORD emitter which knows how to emit fixups
+               `(dword ,(apply #'make-fixup val)))
               (t
                ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
                ;; But it works fine to emit as a sequence of bytes
+               ;; FIXME: missing support for big-endian. Do we care?
                `(.byte ,@(loop repeat size
                                collect (prog1 (ldb (byte 8 0) val)
                                          (setf val (ash val -8)))))))))))
