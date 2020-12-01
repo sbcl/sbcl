@@ -2319,7 +2319,8 @@
                                                3))))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
-                                #b01 0
+                                (if (sc-is dest 32-bit-reg) #b00 #b01)
+                                0
                                 (ldb (byte 19 0)
                                      (ash (compute-delta position) -2))
                                 (tn-offset dest)))
@@ -2619,8 +2620,9 @@
     (destructuring-bind (type value) constant
       (ecase type
         ((:byte :word :dword :qword)
-         (aver (integerp value))
-         (cons type value))
+         (etypecase value
+           ((or integer (cons (eql :layout-id)))
+            (cons type value))))
         (:base-char
          #+sb-unicode (aver (typep value 'base-char))
          (cons :byte (char-code value)))
@@ -2672,34 +2674,42 @@
   (stable-sort constants #'> :key (lambda (constant)
                                     (size-nbyte (caar constant)))))
 
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-assem::%emit-skip segment 4)))
+
 (defun emit-inline-constant (section constant label)
   (let* ((type (car constant))
+         (val (cdr constant))
          (size (size-nbyte type)))
     (emit section
           `(.align ,(integer-length (1- size)))
           label
-          (let ((val (cdr constant)))
-            (case type
-              (:fixup
-               ;; Use the DWORD emitter which knows how to emit fixups
-               `(dword ,(apply #'make-fixup val)))
-              (t
+          (cond ((typep val '(cons (eql :layout-id)))
+                 `(.layout-id ,(cadr val)))
+                ((eql type :fixup)
+                 ;; Use the DWORD emitter which knows how to emit fixups
+                 `(dword ,(apply #'make-fixup val)))
+                (t
                ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
                ;; But it works fine to emit as a sequence of bytes
                ;; FIXME: missing support for big-endian. Do we care?
                `(.byte ,@(loop repeat size
                                collect (prog1 (ldb (byte 8 0) val)
-                                         (setf val (ash val -8)))))))))))
+                                         (setf val (ash val -8))))))))))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb-vm::with-code-instructions (sap code)
     (ecase kind
       (:absolute
-       (setf (sap-ref-word sap offset) value))
+       (if (eq flavor :layout-id)
+           (setf (signed-sap-ref-32 sap offset) value)
+           (setf (sap-ref-word sap offset) value)))
       (:cond-branch
        (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))
