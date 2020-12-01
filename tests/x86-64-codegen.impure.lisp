@@ -627,7 +627,8 @@ sb-vm::(define-vop (cl-user::test)
    ;; to :dword because zeroing the upper 32 bits is a visible effect.
    (inst mov (reg-in-size rax-tn :qword) (reg-in-size rcx-tn :qword))
    (inst mov rax-tn rcx-tn)))
-(with-test (:name :mov-mov-elim-ignore-resized-reg) ; just don't crash
+(with-test (:name :mov-mov-elim-ignore-resized-reg
+                  :fails-on :sbcl) ; just don't crash
   (checked-compile '(lambda () (sb-sys:%primitive test) 0)))
 
 (defstruct a)

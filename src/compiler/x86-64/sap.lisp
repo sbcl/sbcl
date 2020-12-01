@@ -362,6 +362,6 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
   (:result-types signed-num)
   (:generator 5
     (inst mov :dword eax oldval)
-    (inst cmpxchg :dword (ea sap offset) newval :lock)
+    (inst cmpxchg :lock :dword (ea sap offset) newval)
     (inst movsx '(:dword :qword) result eax)))
 

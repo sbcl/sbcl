@@ -267,14 +267,14 @@
        (:result-types ,el-type)
        (:generator 5
          (move rax old-value)
-         (inst cmpxchg
+         (inst cmpxchg :lock
                (ea (- (* (+ (if (sc-is index immediate) (tn-value index) 0) ,offset)
                          n-word-bytes)
                       ,lowtag)
                    object
                    (unless (sc-is index immediate) index)
                    (ash 1 (- word-shift n-fixnum-tag-bits)))
-               new-value :lock)
+               new-value)
          (move value rax)))))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)

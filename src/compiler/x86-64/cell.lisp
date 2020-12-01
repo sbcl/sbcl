@@ -89,8 +89,7 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 5
      (move rax old)
-     (inst cmpxchg (ea (- (* offset n-word-bytes) lowtag) object)
-           new :lock)
+     (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
      (move result rax)))
 
 ;;;; symbol hacking VOPs
@@ -193,10 +192,10 @@
       (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
         #+sb-thread (progn (compute-virtual-symbol)
                             (move rax old)
-                            (inst cmpxchg (symbol-value-slot-ea cell) new :lock))
+                            (inst cmpxchg :lock (symbol-value-slot-ea cell) new))
         #-sb-thread (progn (move rax old)
                             ;; is the :LOCK is necessary?
-                            (inst cmpxchg (symbol-value-slot-ea symbol) new :lock))
+                            (inst cmpxchg :lock (symbol-value-slot-ea symbol) new))
         (inst cmp :byte rax unbound-marker-widetag)
         (inst jmp :e unbound)
         (move result rax))))
@@ -212,11 +211,11 @@
     (:policy :fast-safe)
     (:generator 10
       (move rax old)
-      (inst cmpxchg
+      (inst cmpxchg :lock
             (if (sc-is symbol immediate)
                 (symbol-slot-ea (tn-value symbol) symbol-value-slot)
                 (symbol-value-slot-ea symbol))
-            new :lock)
+            new)
       (move result rax)))
 
   #+sb-thread
@@ -880,7 +879,7 @@
     (:results (result :scs (unsigned-reg)))
     (:result-types unsigned-num)
     (:generator 5
-      (inst xadd (instance-slot-ea object index) diff :lock)
+      (inst xadd :lock (instance-slot-ea object index) diff)
       (move result diff)))
 
   (define-vop (raw-instance-atomic-incf-c/word)
@@ -896,7 +895,7 @@
     (:results (result :scs (unsigned-reg)))
     (:result-types unsigned-num)
     (:generator 4
-      (inst xadd (instance-slot-ea object index) diff :lock)
+      (inst xadd :lock (instance-slot-ea object index) diff)
       (move result diff))))
 
 ;;;;
@@ -912,7 +911,7 @@
   (move rdx old-hi)
   (move rbx new-lo)
   (move rcx new-hi)
-  (inst cmpxchg16b memory-operand :lock)
+  (inst cmpxchg16b :lock memory-operand)
   ;; RDX:RAX hold the actual old contents of memory.
   ;; Manually analyze result lifetimes to avoid clobbering.
   (cond ((and (location= result-lo rdx) (location= result-hi rax))

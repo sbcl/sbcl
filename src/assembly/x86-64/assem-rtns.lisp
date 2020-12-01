@@ -422,7 +422,7 @@
         (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
         (inst jmp :ae try-dynamic-space)
         (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-        (inst bts :dword (ea rdi-tn) temp-reg-tn :lock)
+        (inst bts :dword :lock (ea rdi-tn) temp-reg-tn)
         (inst jmp store))
 
       TRY-DYNAMIC-SPACE
@@ -440,20 +440,20 @@
              (inst shl temp-reg-tn 3) ; multiply by 8
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP - bit index 5 of flags byte
-             (inst and :byte (ea 6 temp-reg-tn) (lognot (ash 1 5)) :lock))
+             (inst and :byte :lock (ea 6 temp-reg-tn) (lognot (ash 1 5))))
             (t
              (inst lea temp-reg-tn (ea temp-reg-tn temp-reg-tn 2)) ; multiply by 3
              (inst shl temp-reg-tn 2) ; then by 4, = 12
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP
-             (inst and :byte (ea 8 temp-reg-tn) (lognot (ash 1 5)) :lock)))
+             (inst and :byte :lock (ea 8 temp-reg-tn) (lognot (ash 1 5)))))
 
       STORE
       (inst mov rdi-tn (ea 24 rsp-tn))      ; object
       (inst mov temp-reg-tn (ea 32 rsp-tn)) ; word index
       (inst mov rax-tn (ea 40 rsp-tn))      ; newval
       ;; set 'written' flag in the code header
-      (inst or :byte (ea (- 3 other-pointer-lowtag) rdi-tn) #x40 :lock)
+      (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi-tn) #x40)
       ;; store newval into object
       (inst mov (ea (- other-pointer-lowtag) rdi-tn temp-reg-tn n-word-bytes)
             rax-tn)))
@@ -480,7 +480,7 @@
 
    (inst push rax-tn)
    (inst mov rax-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-   (inst bts :dword (ea rax-tn) temp-reg-tn :lock)
+   (inst bts :dword :lock (ea rax-tn) temp-reg-tn)
    (inst pop rax-tn))
   DONE
   (inst ret 8)) ; remove 1 stack arg

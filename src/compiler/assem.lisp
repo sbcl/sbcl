@@ -1346,6 +1346,12 @@
 
 ;;;; interface to the rest of the compiler
 
+;;; Map of opcode symbol to function that emits it into the byte stream
+;;; (or with the schedulding assembler, into the queue)
+;;; Key is a symbol. Value is either #<function> or (#<function>),
+;;; the latter if function wants to receive prefix arguments.
+(defglobal *inst-encoder* (make-hash-table)) ; keys are symbols
+
 ;;; Return T only if STATEMENT has a label which is potentially a branch
 ;;; target, and not merely labeled to store a location of interest.
 (defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
@@ -1375,8 +1381,14 @@
                   (if usedp "" " (notused)"))))
       (if (functionp op)
           (format stream "# postit ~S~A~%" op eol-comment)
-          (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
-                  op (stmt-operands statement) eol-comment))))
+          ;; Squelch a leading 0 on a prefix-accepting instruction.
+          (flet ((remove-prefix (list)
+                   (if (and (typep list '(cons (eql 0))) (consp (gethash op *inst-encoder*)))
+                       (cdr list)
+                       list)))
+            (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
+                    op (remove-prefix (stmt-operands statement))
+                    eol-comment)))))
   (let ((*print-length* nil)
         (*print-pretty* t)
         (*print-right-margin* 80))
@@ -1399,10 +1411,6 @@
             (section-tail second) head))
     (setf (section-tail first) last-stmt))
   first)
-
-;;; Map of opcode symbol to function that emits it into the byte stream
-;;; (or with the schedulding assembler, into the queue)
-(defglobal *inst-encoder* (make-hash-table)) ; keys are symbols
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble (segment section)
@@ -1454,9 +1462,10 @@
                ((nil)) ; ignore
                (t
                 (let ((encoder (gethash mnemonic *inst-encoder*)))
-                  (cond ((functionp encoder)
+                  (cond (encoder
                          (instruction-hooks segment)
-                         (apply encoder segment
+                         (apply (the function (if (listp encoder) (car encoder) encoder))
+                                segment
                                 (perform-operand-lowering operands)))
                         (t
                          (bug "No encoder for ~S" mnemonic))))))))))
@@ -1596,13 +1605,16 @@
                                   *backend-instruction-set-package*)
             action (gethash mnemonic *inst-encoder*))
       (aver action))
+    #+x86-64
+    (when (listp action) (setq operands (extract-prefix-keywords operands)))
     (typecase dest
       (cons ; streaming in to the assembler
        (trace-inst dest mnemonic operands)
        (emit dest (cons mnemonic operands)))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
-       (apply action dest (perform-operand-lowering operands))))))
+       (apply (the function (if (listp action) (car action) action))
+              dest (perform-operand-lowering operands))))))
 
 (defun emit-label (label)
   "Emit LABEL at this location in the current section."
@@ -1765,9 +1777,16 @@
                (:little-endian (nreverse forms))
                (:big-endian forms)))))))
 
-(defun %def-inst-encoder (symbol &optional thing)
-  (setf (gethash symbol *inst-encoder*)
-        (or thing (gethash symbol *inst-encoder*))))
+(defun %def-inst-encoder (symbol thing &optional accept-prefixes)
+  (let ((function
+         (or thing ; load-time effect passes the definition
+             ;; (where compile-time doesn't).
+             ;; Otherwise, take what we already had so that a compile-time
+             ;; effect doesn't clobber an already-working hash-table entry
+             ;; if re-evaluating a define-instruction form.
+             (car (ensure-list (gethash symbol *inst-encoder*))))))
+    (setf (gethash symbol *inst-encoder*)
+          (if accept-prefixes (cons function t) function))))
 
 (defmacro define-instruction (name lambda-list &rest options)
   (binding* ((fun-name (intern (symbol-name name) *backend-instruction-set-package*))
@@ -1865,13 +1884,18 @@
        (setf (get ',fun-name 'sb-disassem::instruction-flavors)
              (list ,@pdefs))
        ,@(when emitter
-           `((eval-when (:compile-toplevel) (%def-inst-encoder ',fun-name))
-             (%def-inst-encoder
-              ',fun-name
-              (named-lambda ,(string fun-name) (,segment-name ,@(cdr lambda-list))
-                (declare ,@decls)
-                (let ,(and vop-name `((,vop-name **current-vop**)))
-                  (block ,fun-name ,@emitter))))))
+           (let* ((operands (cdr lambda-list))
+                  (accept-prefixes (eq (car operands) '&prefix)))
+             (when accept-prefixes (setf operands (cdr operands)))
+             `((eval-when (:compile-toplevel)
+                 (%def-inst-encoder ',fun-name nil ',accept-prefixes))
+               (%def-inst-encoder
+                ',fun-name
+                (named-lambda ,(string fun-name) (,segment-name ,@operands)
+                  (declare ,@decls)
+                  (let ,(and vop-name `((,vop-name **current-vop**)))
+                    (block ,fun-name ,@emitter)))
+                ',accept-prefixes))))
        ',fun-name)))
 
 (defun instruction-hooks (segment)

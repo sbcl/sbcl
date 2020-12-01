@@ -91,7 +91,7 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst xadd (object-slot-ea object offset lowtag) result :lock)))
+    (inst xadd :lock (object-slot-ea object offset lowtag) result)))
 
 (define-vop (cell-xsub cell-xadd)
   (:args (object)
@@ -107,7 +107,7 @@
      (t
       (move result value)
       (inst neg result)))
-    (inst xadd (object-slot-ea object offset lowtag) result :lock)))
+    (inst xadd :lock (object-slot-ea object offset lowtag) result)))
 
 (define-vop (atomic-inc-symbol-global-value cell-xadd)
   (:translate %atomic-inc-symbol-global-value)
@@ -167,9 +167,9 @@
                         `(progn (move newval rax)
                                 (inst sub newval delta))
                         `(inst lea newval (ea rax delta))))
-               (inst cmpxchg
+               (inst cmpxchg :lock
                      (object-slot-ea cell ,slot list-pointer-lowtag)
-                     newval :lock)
+                     newval)
                (inst jmp :ne retry)
                (inst mov result rax)))))))
   (def-atomic %atomic-inc-car cell-xadd cons-car-slot)
@@ -181,8 +181,7 @@
 (define-vop (set-instance-hashed)
   (:args (x :scs (descriptor-reg)))
   (:generator 1
-    (inst or :byte (ea (- 1 instance-pointer-lowtag) x)
+    (inst or :lock :byte (ea (- 1 instance-pointer-lowtag) x)
           ;; Bit index is 0-based. Subtract 8 since we're using the EA
           ;; to select byte 1 of the header word.
-          (ash 1 (- stable-hash-required-flag 8))
-          :lock)))
+          (ash 1 (- stable-hash-required-flag 8)))))
