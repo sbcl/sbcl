@@ -3004,3 +3004,13 @@
         (f)
         10))
    ((t t) (condition 'error))))
+
+
+(with-test (:name :fixnum-checking-boxing
+                  :skipped-on (:not x86-64))
+  (checked-compile
+   `(lambda (x y)
+      (declare (optimize speed)
+               (fixnum x y))
+      (the fixnum (+ x y)))
+   :allow-notes nil))

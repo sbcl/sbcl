@@ -464,7 +464,7 @@
 (define-vop (fixnump simple-type-predicate)
   (:translate fixnump)
   (:args-var arg-ref)
-  (:generator 1
+  (:generator 3
    (let ((mem-op (tn-ref-memory-access arg-ref)))
      (when mem-op
        (when (sc-is value control-stack)
