@@ -593,6 +593,8 @@
     (let ((type (tn-ref-type x-tn-ref)))
       (cond ((not type)
              nil)
+            ((csubtypep type (specifier-type 'fixnum))
+             (template-or-lose 'sb-vm::move-from-word/fixnum))
             ((csubtypep type
                         (specifier-type `(integer ,most-negative-fixnum
                                                   ,(1+ most-positive-fixnum))))

@@ -3007,7 +3007,7 @@
 
 
 (with-test (:name :fixnum-checking-boxing
-                  :skipped-on (:not x86-64))
+                  :skipped-on (not :x86-64))
   (checked-compile
    `(lambda (x y)
       (declare (optimize speed)

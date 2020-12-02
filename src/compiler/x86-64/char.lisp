@@ -56,7 +56,7 @@
   (assert (not (logbitp 7 character-widetag))))
 (define-vop (tagged-char-code) ; valid only if N-FIXNUM-TAG-BITS = 1
   (:args (x :scs (any-reg descriptor-reg control-stack) :target y :load-if nil))
-  (:results (y :scs (any-reg control-stack) :load-if nil))
+  (:results (y :scs (any-reg descriptor-reg control-stack) :load-if nil))
   (:note "character untagging")
   (:generator 1
     (untagify-char y x (- n-widetag-bits n-fixnum-tag-bits))

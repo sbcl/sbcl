@@ -86,7 +86,11 @@
                           ;; performed based on the SC.
                           (and reads
                                (null (tn-ref-next reads))
-                               (eq (vop-name (tn-ref-vop reads)) 'move)))
+                               (eq (vop-name (tn-ref-vop reads)) 'move)
+                               ;; Except for fixnums which may benifit from improved representation selection
+                               ;; if there is a way to go through an any-reg "adapter"
+                               (not (memq sb-vm:any-reg-sc-number (primitive-type-scs (tn-primitive-type tn))))
+                               (not (memq sb-vm:any-reg-sc-number (primitive-type-scs (tn-primitive-type arg-tn))))))
                         (subsetp (primitive-type-scs
                                   (tn-primitive-type tn))
                                  (primitive-type-scs
