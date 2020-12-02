@@ -1283,6 +1283,9 @@
 (define-instruction load-from-label (segment &rest args)
   (:vop-var vop)
   (:emitter
+   ;; ISTM this use of an interior-pointer is unnecessary. Since we know the
+   ;; displacement of the label from the base of the CODE, we could load
+   ;; either from [code+X] or [PC+X] where X is in an unsigned-reg.
    (with-condition-defaulted (args (condition dest lip label))
      ;; We can load the word addressed by a label in a single
      ;; instruction if the overall offset puts it to within a 12-bit
@@ -1735,13 +1738,27 @@
 (define-two-reg-transfer-fp-instruction fmdrr :double :from-arm)
 (define-two-reg-transfer-fp-instruction fmrrd :double :to-arm)
 
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))))
+
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb-vm::with-code-instructions (sap code)
     (ecase kind
       (:absolute
-       (setf (sap-ref-32 sap offset) value))))
+       (case flavor
+         (:layout-id
+          (aver (typep value '(unsigned-byte 24)))
+          (setf (sap-ref-word sap offset)
+                (dpb (ldb (byte 8 16) value) (byte 8 0) (sap-ref-word sap offset))
+                (sap-ref-word sap (+ offset 4))
+                (dpb (ldb (byte 8  8) value) (byte 8 0) (sap-ref-word sap (+ offset 4)))
+                (sap-ref-word sap (+ offset 8))
+                (dpb (ldb (byte 8  0) value) (byte 8 0) (sap-ref-word sap (+ offset 8)))))
+         (t
+          (setf (sap-ref-32 sap offset) value))))))
   nil)

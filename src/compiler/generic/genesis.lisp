@@ -1138,15 +1138,28 @@ core and return a descriptor to it."
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
-;;; General layout IDs are (unsigned-byte 29). They are assigned from 128 on up.
-(defvar *general-layout-uniqueid-counter* 127) ; pre-incremented upon use
-;;; Conditions are numbered from -128 downward.
-(defvar *condition-layout-uniqueid-counter* -128) ; pre-decremened upon use
+
+;;; IDs are all unsigned integers
+#+arm
+(defvar *general-layout-uniqueid-counter* 255) ; pre-incremented upon use
+
+;;; Else, some preallocated IDs are negative.
+#-arm
+(progn
+  ;; General layout IDs are (unsigned-byte 29). They are assigned from 128 on up.
+  (defvar *general-layout-uniqueid-counter* 127) ; pre-incremented upon use
+  ;; Conditions are numbered from -128 downward.
+  (defvar *condition-layout-uniqueid-counter* -128)) ; pre-decremened upon use
+
 (defun choose-layout-id (name conditionp)
+  (declare (ignorable conditionp))
   (case name
     ((t) 1)
     (structure-object 2)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
+           #+arm
+           (incf *general-layout-uniqueid-counter*)
+           #-arm
            (if conditionp
                ;; It doesn't really matter what ID is assigned to a CONDITION subtype
                ;; because we don't use the IDs for type testing. Nor for standard-object.

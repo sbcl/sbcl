@@ -205,6 +205,21 @@ SB-DI::FUN-END-COOKIE
 SB-ALIEN::SHARED-OBJECT
 )))
 
+;;; The rationale for using (signed-byte 8) for small IDs on the x86
+;;; is that imm8 operands are sign-extended.
+;;; The rationale for using (unsigned-byte 8) for small IDs on ARM
+;;; is that imm8 operands are NOT sign-extended.
+;;; This condition should probably be x86[-64] and everybody else.
+;;; I suspect that nobody else benefits from sign-extended immediates.
+
+#+arm
+;;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
+(let ((id 2)) ; 1 and 2 are wired to T and STRUCTURE-OBJECT
+  (dolist (item *popular-structure-types*)
+    ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
+    (rplacd item (incf id))))
+
+#-arm
 ;;; Assign all the above a (SIGNED-BYTE 8) layout-id.
 ;;; There is room for 74 more types that are encodable as such.
 ;;; It would be really interesting to figure out a way to allow user code
