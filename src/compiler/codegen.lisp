@@ -138,9 +138,9 @@
       constant
       (asmstream-constant-table asmstream)
       (multiple-value-bind (label value) (sb-vm:inline-constant-value constant)
-	(vector-push-extend (cons constant label)
-			    (asmstream-constant-vector asmstream))
-	value)))))
+        (vector-push-extend (cons constant label)
+                            (asmstream-constant-vector asmstream))
+        value)))))
 #-(or arm arm64 mips ppc ppc64 x86 x86-64)
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)

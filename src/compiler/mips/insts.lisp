@@ -1372,9 +1372,9 @@
 (defun emit-inline-constant (section constant label)
   (aver (typep constant '(cons (eql :layout-id) (cons t null))))
   (emit section
-	`(.align 2) ; 2 bits of alignment (just to be pedantic I suppose)
-	label
-	`(.layout-id ,(cadr constant))))
+        `(.align 2) ; 2 bits of alignment (just to be pedantic I suppose)
+        label
+        `(.layout-id ,(cadr constant))))
 
 (sb-assem::%def-inst-encoder
  '.layout-id
