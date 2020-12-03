@@ -1202,12 +1202,21 @@
 
 (define-instruction lw (segment reg base &optional (index 0))
   (:declare (type tn reg base)
-            (type (or (signed-byte 16) fixup) index))
+            (type (or (signed-byte 16) fixup label) index))
   (:printer load-store ((op #b100011)))
   (:dependencies (reads base) (reads :memory) (writes reg))
   (:delay 1)
   (:emitter
-   (emit-load/store-inst segment #b100011 base reg index)))
+   (if (and (label-p index) (eq base sb-vm::code-tn))
+       (emit-back-patch segment 4
+        (lambda (segment posn)
+          (declare (ignore posn))
+          (emit-load/store-inst segment #b100011
+                                base reg
+                                (+ (component-header-length)
+                                   (label-position index)
+                                   (- sb-vm:other-pointer-lowtag)))))
+       (emit-load/store-inst segment #b100011 base reg index))))
 
 ;; next is just for ease of coding double-in-int c-call convention
 (define-instruction lw-odd (segment reg base &optional (index 0))
@@ -1331,6 +1340,47 @@
   (:delay 0)
   (:emitter
    (emit-fp-load/store-inst segment #b111001 reg 1 base index)))
+
+;;; This mechanism is more complicated than minimally necessary for it to do its job.
+;;; Consequently each backend has its own completely screwy way of canonicalizing
+;;; because each one is better than the other.
+;;; CONSTANT is just the &REST list passed to REGISTER-INLINE-CONSTANT which acts as
+;;; a key in an EQUAL table for collapsing multiple references to the same data
+;;; so that we only emit it once (or possibly not even once, if we fuse bytes from
+;;; adjacent constants as suggested by comments in codegen. e.g. an 8-byte constant
+;;; may contain a naturally-aligned 4-byte constant whose bytes match).
+;;; The question is - why doesn't the vop just pass the proper key in the first place?
+(defun canonicalize-inline-constant (constant)
+  constant)
+
+;;; Again this is too complex in the simplest case- you return an assembler label,
+;;; and a cookie to hand to the consumer of the constant, which is {often,always}
+;;; redundant, because the consumer knows what shape the value is - float, octaword, etc.
+;;; The label alone conveys enough data to access the bits stored, however
+;;; in some cases the sorting logic might need a way to determine the storage size.
+(defun inline-constant-value (constant)
+  (declare (ignore constant))
+  (let ((label (gen-label)))
+    (values label label)))
+
+;;; Trivial "sort"
+(defun sort-inline-constants (constants) constants)
+
+;;; This is called once per unboxed constant, to emit its bytes.
+;;; In general the bytes may be literal octets, or a fixup (as here)
+;;; which is in turn emitted with a pseudo-instruction.
+(defun emit-inline-constant (section constant label)
+  (aver (typep constant '(cons (eql :layout-id) (cons t null))))
+  (emit section
+	`(.align 2) ; 2 bits of alignment (just to be pedantic I suppose)
+	label
+	`(.layout-id ,(cadr constant))))
+
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-assem::%emit-skip segment 4)))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))

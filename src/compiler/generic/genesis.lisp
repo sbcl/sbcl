@@ -1139,34 +1139,30 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 
-;;; IDs are all unsigned integers
-#+arm
-(defvar *general-layout-uniqueid-counter* 255) ; pre-incremented upon use
-
-;;; Else, some preallocated IDs are negative.
-#-arm
-(progn
-  ;; General layout IDs are (unsigned-byte 29). They are assigned from 128 on up.
-  (defvar *general-layout-uniqueid-counter* 127) ; pre-incremented upon use
-  ;; Conditions are numbered from -128 downward.
-  (defvar *condition-layout-uniqueid-counter* -128)) ; pre-decremened upon use
+(defvar *general-layout-uniqueid-counter*  ; incremented before use
+  (ecase sb-kernel::layout-id-type
+    (signed-byte 127) ; predefined IDs range from -128 to 127
+    (unsigned-byte 255))) ; all IDs are unsigned integers
+;;; Conditions are numbered from -128 downward,
+;;; but only if layout IDs can be negative.
+(defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
 
 (defun choose-layout-id (name conditionp)
-  (declare (ignorable conditionp))
   (case name
     ((t) 1)
     (structure-object 2)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
-           #+arm
-           (incf *general-layout-uniqueid-counter*)
-           #-arm
-           (if conditionp
-               ;; It doesn't really matter what ID is assigned to a CONDITION subtype
-               ;; because we don't use the IDs for type testing. Nor for standard-object.
-               ;; But I'd like to a have a quick visual scan of the IDs assigned during
-               ;; genesis by giving them negative values which can't otherwise occur.
-               (decf *condition-layout-uniqueid-counter*)
-               (incf *general-layout-uniqueid-counter*))))))
+           (ecase sb-kernel::layout-id-type
+             (unsigned-byte
+              (incf *general-layout-uniqueid-counter*))
+             (signed-byte
+              (if conditionp
+                  ;; It doesn't really matter what ID is assigned to a CONDITION subtype
+                  ;; because we don't use the IDs for type testing. Nor for standard-object.
+                  ;; But I'd like to a have a quick visual scan of the IDs assigned during
+                  ;; genesis by giving them negative values which can't otherwise occur.
+                  (decf *condition-layout-uniqueid-counter*)
+                  (incf *general-layout-uniqueid-counter*))))))))
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   ;; Layouts created in genesis can't vary in length due to the number of ancestor
   ;; types in the IS-A vector. They may vary in length due to the bitmap word count.

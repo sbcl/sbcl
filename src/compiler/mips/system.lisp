@@ -57,6 +57,28 @@
 
     DONE))
 
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  ;; "extra" info in conditional vops follows the 2 super-magical info args
+  (:info target not-p test-layout)
+  (:temporary (:sc unsigned-reg) this-id test-id)
+  (:generator 4
+    (let ((label (register-inline-constant :layout-id test-layout))
+          (offset (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
+                             instance-slots-offset)
+                          word-shift)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
+                     (- instance-pointer-lowtag))))
+      (inst lw test-id sb-vm::code-tn label)
+      (inst lw this-id x offset)
+      (inst nop)
+      (inst* (if not-p 'bne 'beq) this-id test-id target)
+      (inst nop))))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)

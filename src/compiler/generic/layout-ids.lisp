@@ -212,22 +212,26 @@ SB-ALIEN::SHARED-OBJECT
 ;;; This condition should probably be x86[-64] and everybody else.
 ;;; I suspect that nobody else benefits from sign-extended immediates.
 
-#+arm
-;;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
-(let ((id 2)) ; 1 and 2 are wired to T and STRUCTURE-OBJECT
-  (dolist (item *popular-structure-types*)
-    ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
-    (rplacd item (incf id))))
+(defconstant layout-id-type
+  #+(or arm mips) 'unsigned-byte
+  #-(or arm mips) 'signed-byte)
 
-#-arm
-;;; Assign all the above a (SIGNED-BYTE 8) layout-id.
-;;; There is room for 74 more types that are encodable as such.
-;;; It would be really interesting to figure out a way to allow user code
-;;; to avail itself of some of that encoding space.
-(let ((id -128))
-  (dolist (item *popular-structure-types*)
-    ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
-    (rplacd item id)
-    (if (= id -1) ; hop over 0, 1, and 2
-        (setq id 3)
-        (incf id))))
+(ecase layout-id-type
+  (unsigned-byte
+   ;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
+   (let ((id 2)) ; 1 and 2 are wired to T and STRUCTURE-OBJECT
+     (dolist (item *popular-structure-types*)
+       ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
+       (rplacd item (incf id)))))
+  (signed-byte
+   ;; Assign all the above a (SIGNED-BYTE 8) layout-id.
+   ;; There is room for 74 more types that are encodable as such.
+   ;; It would be really interesting to figure out a way to allow user code
+   ;; to avail itself of some of that encoding space.
+   (let ((id -128))
+     (dolist (item *popular-structure-types*)
+       ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
+       (rplacd item id)
+       (if (= id -1) ; hop over 0, 1, and 2
+           (setq id 3)
+           (incf id))))))

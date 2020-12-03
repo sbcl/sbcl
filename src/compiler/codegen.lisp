@@ -125,19 +125,23 @@
 ;;; to get handles (as returned by sb-vm:inline-constant-value) from constant
 ;;; descriptors.
 ;;;
-#+(or x86 x86-64 arm64 ppc ppc64)
+#+(or arm arm64 mips ppc ppc64 x86 x86-64)
 (defun register-inline-constant (&rest constant-descriptor)
-  (declare (dynamic-extent constant-descriptor))
+  ;; N.B.: Please do not think yourself so clever as to declare DYNAMIC-EXTENT on
+  ;; CONSTANT-DESCRIPTOR. Giving the list indefinite extent allows backends to simply
+  ;; return it as the key to the hash-table in the most trivial possible implementation.
+  ;; The cost of listifying a &REST arg is unnoticeable here.
   (let ((asmstream *asmstream*)
         (constant (sb-vm:canonicalize-inline-constant constant-descriptor)))
-    (ensure-gethash
-     constant
-     (asmstream-constant-table asmstream)
-     (multiple-value-bind (label value) (sb-vm:inline-constant-value constant)
-       (vector-push-extend (cons constant label)
-                           (asmstream-constant-vector asmstream))
-       value))))
-#-(or x86 x86-64 arm64 ppc ppc64)
+    (values ; kill the second value
+     (ensure-gethash
+      constant
+      (asmstream-constant-table asmstream)
+      (multiple-value-bind (label value) (sb-vm:inline-constant-value constant)
+	(vector-push-extend (cons constant label)
+			    (asmstream-constant-vector asmstream))
+	value)))))
+#-(or arm arm64 mips ppc ppc64 x86 x86-64)
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))
