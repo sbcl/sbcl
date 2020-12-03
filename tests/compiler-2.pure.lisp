@@ -3014,3 +3014,11 @@
                (fixnum x y))
       (the fixnum (+ x y)))
    :allow-notes nil))
+
+(with-test (:name :ltn-analyze-mv-bind)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (multiple-value-call #'list
+        10 (apply #'values '(44 33d0))))
+   (() '(10 44  33d0) :test #'equal)))

@@ -376,13 +376,13 @@
                       (primitive-types))
               (let ((n-values (nth-value 1 (values-types
                                             (lvar-derived-type arg)))))
-                (loop for (prim-type . lvar-type) = (pop types)
-                      repeat n-values
+                (loop repeat n-values
                       do
-                      (primitive-types (or prim-type
-                                           *backend-t-primitive-type*))
-                      (lvar-types (or lvar-type
-                                      *universal-type*)))
+                      (destructuring-bind (&optional prim-type . lvar-type) (pop types)
+                        (primitive-types (or prim-type
+                                             *backend-t-primitive-type*))
+                        (lvar-types (or lvar-type
+                                        *universal-type*))))
                 (annotate-fixed-values-lvar
                  arg
                  (primitive-types) (lvar-types))))))))
