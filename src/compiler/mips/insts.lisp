@@ -223,19 +223,9 @@
     (load-store-annotation :fields (list (byte 5 21) (byte 16 0))
                            :type 'load-store-annotation))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter jump-printer
-    #'(lambda (value stream dstate)
-        (let ((addr (ash value 2)))
-          (cond (stream
-                 (maybe-note-assembler-routine addr t dstate)
-                 (write addr :base 16 :radix t :stream stream))
-                (t
-                 (operand addr dstate)))))))
-
 (define-instruction-format (jump 32 :default-printer '(:name :tab target))
   (op :field (byte 6 26))
-  (target :field (byte 26 0) :printer jump-printer))
+  (target :field (byte 26 0) :printer #'jump-printer))
 
 (defconstant-eqx reg-printer
   '(:name :tab rd (:unless (:same-as rd) ", " rs) ", " rt)
@@ -1034,41 +1024,6 @@
 
 
 ;;;; Random system hackery and other noise
-
-(define-instruction-macro entry-point ()
-  nil)
-
-(defmacro break-cases (breaknum &body cases)
-  (let ((bn-temp (gensym)))
-    (collect ((clauses))
-      (dolist (case cases)
-        (clauses `((= ,bn-temp ,(car case)) ,@(cdr case))))
-      `(let ((,bn-temp ,breaknum))
-         (cond ,@(clauses))))))
-
-(defun break-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap (break-subcode chunk dstate)))
-      (case trap
-        (#.halt-trap
-         (nt "Halt trap"))
-        (#.pending-interrupt-trap
-         (nt "Pending interrupt trap"))
-        (#.breakpoint-trap
-         (nt "Breakpoint trap"))
-        (#.fun-end-breakpoint-trap
-         (nt "Function end breakpoint trap"))
-        (#.after-breakpoint-trap
-         (nt "After breakpoint trap"))
-        (#.single-step-around-trap
-         (nt "Single step around trap"))
-        (#.single-step-before-trap
-         (nt "Single step before trap"))
-        (t
-         (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
-                   (>= trap error-trap))
-           (handle-break-args #'snarf-error-junk trap stream dstate)))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))
