@@ -53,6 +53,28 @@
     (load-type result lip)
     DONE))
 
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  ;; "extra" info in conditional vops follows the 2 super-magical info args
+  (:info target not-p test-layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (let ((offset (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
+                             instance-slots-offset)
+                          word-shift)
+                     (ash (- (layout-depthoid test-layout) 2) 2)
+                     (- instance-pointer-lowtag))))
+      (inst lw this-id x offset)
+      (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+              (not (sb-c::producing-fasl-file)))
+          (inst li temp (layout-id test-layout))
+          (inst load-layout-id temp test-layout))
+      (inst* (if not-p 'bne 'beq) this-id temp target))))
+
 #+64-bit
 (define-vop (layout-depthoid)
   (:translate layout-depthoid)

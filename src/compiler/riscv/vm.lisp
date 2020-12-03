@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :s-type :u-type) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :s-type :u-type :u+i-type) #'equalp)
 
 (defun u-and-i-inst-immediate (value)
   (let ((hi (ash (+ value (expt 2 11)) -12)))

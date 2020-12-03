@@ -912,9 +912,16 @@
   (:emitter
    (emit-header-data segment return-pc-widetag)))
 
+(define-instruction-macro load-layout-id (reg layout)
+  `(progn (inst .layout-id-fixup ,layout)
+          (inst lui ,reg #xfffff)
+          (inst addi ,reg ,reg -1)))
+
+(define-instruction .layout-id-fixup (segment layout)
+ (:emitter (sb-c:note-fixup segment :u+i-type (sb-c:make-fixup layout :layout-id))))
+
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   #+64-bit
@@ -925,13 +932,16 @@
       (ecase kind
         (:absolute
          (setf (sap-ref-32 sap offset) value))
+        (:u-type
+         (setf (ldb (byte 20 12) (sap-ref-32 sap offset)) u))
         (:i-type
          (setf (ldb (byte 12 20) (sap-ref-32 sap offset)) i))
+        (:u+i-type
+         (sb-vm:fixup-code-object code offset u :u-type flavor)
+         (sb-vm:fixup-code-object code (+ offset 4) i :i-type flavor))
         (:s-type
          (setf (ldb (byte 5 7) (sap-ref-32 sap offset))
                (ldb (byte 5 0) i))
          (setf (ldb (byte 7 25) (sap-ref-32 sap offset))
-               (ldb (byte 7 5) i)))
-        (:u-type
-         (setf (ldb (byte 20 12) (sap-ref-32 sap offset)) u)))))
+               (ldb (byte 7 5) i))))))
    nil)

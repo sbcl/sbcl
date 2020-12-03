@@ -825,7 +825,7 @@
 ;;; object's layout can ever be EQ to that of the ancestor.
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
-(defvar *use-layout-ids* (or #+(or arm arm64 mips ppc ppc64 x86 x86-64) t))
+(defvar *use-layout-ids* (or #+(or arm arm64 mips ppc ppc64 riscv x86 x86-64) t))
 #+(or arm arm64 mips ppc ppc64) ; no vop
 (defmacro layout-depthoid-ge (layout depthoid)
   `(>= (layout-depthoid ,layout) ,depthoid))
