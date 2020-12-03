@@ -310,7 +310,7 @@
 (defun descriptor-base-address (des)
   (logandc2 (descriptor-bits des) sb-vm:lowtag-mask))
 (defmethod print-object ((des descriptor) stream)
-  (let ((gspace (descriptor-gspace des))
+  (let ((gspace (descriptor-intuit-gspace des))
         (bits (descriptor-bits des))
         (lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
@@ -324,7 +324,7 @@
             (t
              (format stream
                      "for pointer: #X~X, lowtag #b~v,'0B, ~A"
-                     (descriptor-base-address bits)
+                     (descriptor-base-address des)
                      sb-vm:n-lowtag-bits lowtag
                      (if gspace (gspace-name gspace) "unknown")))))))
 
