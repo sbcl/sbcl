@@ -825,7 +825,6 @@
 ;;; object's layout can ever be EQ to that of the ancestor.
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
-(defvar *use-layout-ids* (or #+(or arm arm64 mips ppc ppc64 sparc riscv x86 x86-64) t))
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
   `(>= (layout-depthoid ,layout) ,depthoid))
@@ -862,15 +861,6 @@
        (depthoid (if layout (layout-depthoid layout) -1))
        (n-layout (make-symbol "LAYOUT"))
        (n-inherits (make-symbol "INHERITS"))
-        ;; In order to efficiently perform the DEEPER-P test without this hack of using
-        ;; a vop (when available for non-risc machines), we'd have to do two things:
-        ;; - have instcombine combine the read and compare as one instruction
-        ;; - implement half-width structure slots
-        ;; Since both of those are not happening any time soon, ...
-       (deeper-p
-        (if (vop-existsp :translate layout-depthoid-gt)
-            `(layout-depthoid-gt ,n-layout ,depthoid)
-            `(> (layout-depthoid ,n-layout) ,depthoid)))
        (nth-ancestor ; This is possibly unused (if no compile-time layout, or depthoid -1)
         ;; Use DATA-VECTOR-REF directly, since that's what SVREF in SAFETY 0 will become.
         `(locally (declare (optimize (safety 0)))
@@ -887,15 +877,10 @@
                              (pathname  +pathname-layout-flag+)
                              (t         +structure-layout-flag+)))))
 
-          ;; Next easiest: Sealed and at most one subclass.
-          ;; However, it is better not to perform two IFs when a single one
-          ;; will suffice, so forbid any subclass when using layout-ids.
+          ;; Next easiest: Sealed and no subtypes.
           ((and layout
                 (eq (classoid-state classoid) :sealed)
-                (or (not (classoid-subclasses classoid))
-                    (and (not *use-layout-ids*)
-                         (eql (hash-table-count (classoid-subclasses classoid))
-                              1))))
+                (not (classoid-subclasses classoid)))
             ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
             ;; though probably extremely weird. Also the PRED should be set in
             ;; that event, but it isn't.
@@ -903,27 +888,15 @@
             ;; (BLOCK (RETURN ...)) seems to emit a forward branch in the
             ;; passing case, but AND emits a forward branch in the failing
             ;; case which I believe is the better choice.
-            (let ((other-layout (and (classoid-subclasses classoid)
-                                     (dohash ((classoid layout)
-                                              (classoid-subclasses classoid)
-                                              :locked t)
-                                             (declare (ignore classoid))
-                                             (return layout)))))
-              (flet ((check-layout (layout-getter)
-                       (cond (other-layout
-                              ;; It's faster to compare two layouts than
-                              ;; doing whatever is done below
-                              `(let ((object-layout ,layout-getter))
-                                 (or (eq object-layout ',layout)
-                                     (eq object-layout ',other-layout))))
-                             ((and (vop-existsp :named sb-vm::layout-eq)
+            (flet ((check-layout (layout-getter)
+                       (cond ((and (vop-existsp :named sb-vm::layout-eq)
                                    (equal layout-getter '(%instance-layout object)))
                               `(sb-vm::layout-eq object ',layout))
                              (t
                               `(eq ,layout-getter ',layout)))))
                 (if primtype-predicate
                     `(and ,primtype-predicate ,(check-layout slot-reader))
-                    `(block typep ,(check-layout get-layout-or-return-false))))))
+                    `(block typep ,(check-layout get-layout-or-return-false)))))
 
           ;; All other structure types
           ((and (typep classoid 'structure-classoid) layout)
@@ -938,20 +911,10 @@
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
                   (let ((,n-layout (%instance-layout object)))
-                    ,(if *use-layout-ids*
-                         (if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-                             `(%structure-is-a ,n-layout ,layout)
-                             `(and (layout-depthoid-ge ,n-layout ,depthoid)
-                                   (%structure-is-a ,n-layout ,layout)))
-                         ;; Distinguish between abstract base types - no DD-CONSTRUCTOR,
-                         ;; hence no direct instances - and everything else.
-                         (cond ((dd-constructors (layout-dd layout))
-                                `(cond ((eq ,n-layout ,layout) t)
-                                       (,deeper-p ,ancestor-layout-eq)))
-                               (t ; abstract base type deeper than optimized max.
-                                ;; Assume that no layout is EQ to the base layout,
-                                ;; and unconditionally fetch and dereference layout-inherits.
-                                `(eq (if ,deeper-p ,nth-ancestor ,n-layout) ,layout)))))))
+                    ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
+                         `(%structure-is-a ,n-layout ,layout)
+                         `(and (layout-depthoid-ge ,n-layout ,depthoid)
+                               (%structure-is-a ,n-layout ,layout))))))
 
           ((> depthoid 0) ; fixed-depth ancestors of non-structure types: STREAM, FILE-STREAM,
            ;; SEQUENCE; all are abstract base types.

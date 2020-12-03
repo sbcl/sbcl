@@ -100,7 +100,7 @@
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
 #+64-bit (defknown layout-depthoid (layout) layout-depthoid (flushable always-translatable))
-#+(or x86 x86-64) (defknown (layout-depthoid-ge layout-depthoid-gt)
+#+(or x86 x86-64) (defknown (layout-depthoid-ge)
                       (layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
 (defknown copy-structure (structure-object) structure-object
