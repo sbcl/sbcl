@@ -1941,9 +1941,22 @@ about function addresses and register values.")
   (define-cond-fp-move-integer fmovrd #b0110 :extended t)
   (define-cond-fp-move-integer fmovrq #b0111 :extended t))
 
+(define-instruction-macro load-layout-id (reg layout)
+  `(without-scheduling ()
+     (inst .layout-id-fixup ,layout)
+     (inst sethi ,reg 0)
+     (inst add ,reg #x3ff)))
+
+;;; The architectures which use the scheduler get angry if DEFINE-INSTRUCTION
+;;; lacks the read/write dependency specifications.
+;;; But this isn't a real instruction, it's just marks where to fixup.
+(sb-assem::%def-inst-encoder
+ '.layout-id-fixup
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :sethi+add (sb-c:make-fixup layout :layout-id))))
+
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb-vm::with-code-instructions (sap code)
@@ -1956,6 +1969,9 @@ about function addresses and register values.")
       (:add
        (setf (ldb (byte 10 0) (sap-ref-32 sap offset))
              (ldb (byte 10 0) value)))
+      (:sethi+add
+       (sb-vm:fixup-code-object code offset value :sethi flavor)
+       (sb-vm:fixup-code-object code (+ offset 4) value :add flavor))
       (:absolute
        (setf (sap-ref-32 sap offset) value))))
   nil)

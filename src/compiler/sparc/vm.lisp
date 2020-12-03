@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute :sethi+add) #'equalp)
 
 ;;;; Additional constants
 

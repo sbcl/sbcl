@@ -99,11 +99,9 @@
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
-;;; FIXME: either add LAYOUT-DEPTHOID vops universally,
-;;; or else get this to stop warning about macro -> function redefinition
-;;; by conditionalizing it, which I'm loath to do.
 #+64-bit (defknown layout-depthoid (layout) layout-depthoid (flushable always-translatable))
-(defknown (layout-depthoid-ge layout-depthoid-gt) (layout integer) boolean (flushable))
+#+(or x86 x86-64) (defknown (layout-depthoid-ge layout-depthoid-gt)
+                      (layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
