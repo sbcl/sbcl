@@ -86,11 +86,12 @@
 ;;; allowing exactly one primary method. Methods are sorted most-specific-first,
 ;;; so we can stop looking as soon as a match is found.
 ;;; Sorting is performed during genesis.
-(defun !call-a-method (gf-name specialized-arg &rest rest)
-  (let* ((methods (the simple-vector
-                    (cdr (or (assoc gf-name *!trivial-methods*)
-                             (error "No methods on ~S" gf-name)))))
-         (applicable-method
+(defmacro trivial-methods (gf-name)
+  `(the simple-vector
+        (cdr (or (assoc ,gf-name *!trivial-methods*)
+                 (error "No methods on ~S" ,gf-name)))) )
+(defun trivial-call-a-method (gf-name methods specialized-arg &rest rest)
+  (let* ((applicable-method
            ;; Find a method where the guard returns T, or the object type is
            ;; EQ to the method's specializer. Trivial dispatch knows nothing
            ;; of superclass method applicability. In situations where we rely
@@ -116,9 +117,20 @@
                (type-of specialized-arg)))))
 
 (defun make-load-form (object &optional environment)
-  (!call-a-method 'make-load-form object environment))
+  (trivial-call-a-method  'make-load-form (trivial-methods 'make-load-form)
+                         object environment))
 (defun print-object (object stream)
-  (!call-a-method 'print-object object stream))
+  (let ((methods (trivial-methods 'print-object)))
+    ;; The method selected for CONDITION is basically useless because it picks out
+    ;; STRUCTURE-OBJECT which prints as #<WARNING (no LAYOUT-INFO) #xBD2B8C9> or somesuch.
+    ;; It's because trivial method selection is based on the first predicate in METHODS
+    ;; which returns T (so we kinda get type hierarchies correct), but there is no
+    ;; CONDITION-P predicate, so the candidate method is just skipped.
+    ;; Hacking in an extra test here solves that (maybe?) until the real GF is installed.
+    (if (typep object 'condition)
+        (funcall (elt (find 'condition methods :key (lambda (x) (elt x 2))) 3)
+                 nil nil object stream)
+        (trivial-call-a-method 'print-object methods object stream))))
 
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT
