@@ -540,6 +540,9 @@
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
           ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
+          ;; Serial# shares a word with the jump-table word count,
+          ;; so we can't assign serial# until after all raw bytes are copied in.
+          (sb-c::assign-code-serialno code)
           (sb-thread:barrier (:write))
           ;; Assign debug-info last. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().

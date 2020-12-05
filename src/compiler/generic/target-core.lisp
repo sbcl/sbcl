@@ -109,14 +109,6 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
-                               (atomic-incf sb-fasl::*code-serialno*)))
-                (insts (code-instructions code-obj))
-                (jumptable-word (sap-ref-word insts 0)))
-           (aver (zerop (ash jumptable-word -14)))
-           (setf (sap-ref-word insts 0) ; insert serialno
-                 (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
-                         jumptable-word)))
          #+(or x86 x86-64)
          (let ((rel-fixups (elt preserved-lists 1))
                (abs-fixups (elt preserved-lists 2))
@@ -247,6 +239,16 @@
 ;;; are 0, so the jump table count is 0.
 ;;; Similar considerations pertain to x86[-64] fixups within the machine code.
 
+(defun assign-code-serialno (code-obj)
+  (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
+                        (atomic-incf sb-fasl::*code-serialno*)))
+         (insts (code-instructions code-obj))
+         (jumptable-word (sap-ref-word insts 0)))
+    (aver (zerop (ash jumptable-word -14)))
+    (setf (sap-ref-word insts 0) ; insert serialno
+          (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
+                  jumptable-word))))
+
 (defun make-core-component (component segment length fixup-notes object)
   (declare (type component component)
            (type segment segment)
@@ -278,7 +280,10 @@
              ;; is GC-safe because we no longer need to know where simple-funs are embedded
              ;; within the object to trace pointers. We *do* need to know where the funs
              ;; are when transporting the object, but it's currently pinned.
-             (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
+             (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
+             ;; Serial# shares a word with the jump-table word count,
+             ;; so we can't assign serial# until after all raw bytes are copied in.
+             (assign-code-serialno code-obj))
            ;; Enforce that the final unboxed data word is published to memory
            ;; before the debug-info is set.
            (sb-thread:barrier (:write))
