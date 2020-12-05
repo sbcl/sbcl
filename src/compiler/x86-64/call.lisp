@@ -473,7 +473,7 @@
     (emit-label trampoline-label)
     (popw rbp-tn (frame-word-offset return-pc-save-offset)))
   (when alignp
-    (emit-alignment n-lowtag-bits :long-nop))
+    (emit-alignment n-lowtag-bits alignp))
   (emit-label start-label))
 
 ;;; Non-TR local call for a fixed number of values passed according to

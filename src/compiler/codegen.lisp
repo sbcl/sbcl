@@ -274,6 +274,9 @@
             "~|~%assembly code for ~S~2%"
             component))
   (let* ((prev-env nil)
+         ;; The first function's alignment word is zero-filled, but subsequent
+         ;; ones can use a NOP which helps the disassembler not lose sync.
+         (filler-pattern 0)
          (asmstream (make-asmstream))
          (*asmstream* asmstream))
 
@@ -298,7 +301,8 @@
                                        (not (loop-info cloop)))
                               ;; Mark the loop as aligned by saving the IR1 block aligned.
                               (setf (loop-info cloop) 1block)
-                              t))))
+                              filler-pattern))))
+              (setf filler-pattern :long-nop)
               (emit-block-header (block-label 1block)
                                  (ir2-block-%trampoline-label block)
                                  (ir2-block-dropped-thru-to block)
