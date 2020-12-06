@@ -200,8 +200,6 @@ about function addresses and register values.")
 (define-arg-type branch-fp-condition
   :printer (coerce branch-fp-conditions 'vector))
 
-(define-arg-type call-fixup :use-label t)
-
 (deftype fp-branch-condition ()
   `(member ,@branch-fp-conditions))
 

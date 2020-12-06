@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <sys/file.h>
+#include <limits.h>
 
 #include <unistd.h>
 #include <errno.h>
