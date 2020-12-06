@@ -1692,6 +1692,12 @@ or they must be declared locally notinline at each call site.~@:>"
                                constructor))
     (setf (classoid-direct-superclasses classoid)
           (case (dd-name info)
+            ;; Argh, could this case be any more opaque???
+            ;; It's ostensibly the set of types whose superclasse would come out wrong
+            ;; if we didn't fudge them manually. But the computation of the superclass
+            ;; list is obfuscated. I think we have assertions about this somewhere.
+            ;; But ideally we remove this junky case from the target image somehow
+            ;; while leaving it in for self-build.
             ((ansi-stream
               fd-stream
               sb-impl::string-input-stream sb-impl::string-output-stream
@@ -1702,7 +1708,14 @@ or they must be declared locally notinline at each call site.~@:>"
              (list (layout-classoid
                     (svref inherits (1- (length inherits))))))))
     (let* ((old-layout (or compiler-layout old-layout))
-           (flags (if (dd-alternate-metaclass info) 0 +structure-layout-flag+))
+           (flags
+            (logior (if (dd-alternate-metaclass info) 0 +structure-layout-flag+)
+                    (if (find #.(find-layout 'stream) inherits)
+                        +stream-layout-flag+ 0)
+                    (if (find #.(find-layout 'file-stream) inherits)
+                        +file-stream-layout-flag+ 0)
+                    (if (find #.(find-layout 'string-stream) inherits)
+                        +string-stream-layout-flag+ 0)))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
                (make-layout (hash-layout-name (dd-name info))

@@ -669,7 +669,18 @@
                  sb-kernel::standard-gf-primitive-obj-layout-bitmap
                  +layout-all-tagged+)
              ;; there is only one possible bitmap otherwise
-             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))))
+             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))
+    (let ((flags
+           (logior (if (find #.(find-layout 'stream) inherits)
+                       +stream-layout-flag+ 0)
+                   ;; Simple-Streams can put FILE-STREAM in the inherits vector.
+                   (if (find #.(find-layout 'file-stream) inherits)
+                       +file-stream-layout-flag+ 0)
+                   ;; Is it legal for users to have STRING-STREAM in the inherits vector?
+                   ;; If not, this case should be removed.
+                   (if (find #.(find-layout 'string-stream) inherits)
+                       +string-stream-layout-flag+ 0))))
+      (setf (layout-flags layout) (logior flags (layout-flags layout))))))
 
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.

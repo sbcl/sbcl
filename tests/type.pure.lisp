@@ -15,6 +15,18 @@
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
 
+(with-test (:name :stream-layout-bits)
+  (loop for layout being each hash-value
+        of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't))
+        do (flet ((check-bit (bit ancestor-type)
+                    (let ((ancestor (sb-kernel:find-layout ancestor-type)))
+                      (when (or (eq layout ancestor)
+                                (find ancestor (sb-kernel:layout-inherits layout)))
+                        (assert (logtest bit (sb-kernel:layout-flags layout)))))))
+              (check-bit sb-kernel:+stream-layout-flag+ 'stream)
+              (check-bit sb-kernel:+string-stream-layout-flag+ 'string-stream)
+              (check-bit sb-kernel:+file-stream-layout-flag+ 'file-stream))))
+
 (with-test (:name (typep sb-kernel:ctypep))
   (locally
       (declare (notinline mapcar))

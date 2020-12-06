@@ -332,6 +332,18 @@ between the ~A definition and the ~A definition"
 ;;; elements are filled with their successors, ensuring that each
 ;;; element contains a valid layout.
 ;;;
+;;; *** FIXME *** the preceding comment seems dubious, and I'm not sure whether
+;;; to fix the code or the comment or both. The code works as-is, but is too hairy.
+;;; I fail to see how "still-empty" elements can exist after filling in mandatory
+;;; elements. It seems to anticipate being able to create a type whose INHERITS vector
+;;; length exceeds depthoid, or, say, a type at depthoid 5 which inherits STREAM but
+;;; might lack an entry at depth index 1 for example. As to why I think the comment
+;;; is false: FILE-STREAM and STRING-STREAM each have depthoid 4, but their INHERITS
+;;; vector has length 2. So they don't store elements that would be at index 2 and 3.
+;;; Length less than depthoid is opposite of what the fill-in logic supports.
+;;; How, in practice, could a user achieve such weird states as need this logic?
+;;; If impossible, then simplify it.
+
 ;;; This reordering may destroy CPL ordering, so the inherits should
 ;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)

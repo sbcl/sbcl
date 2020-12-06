@@ -828,6 +828,10 @@
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
   `(>= (layout-depthoid ,layout) ,depthoid))
+;;; Assert that it is OK to look at element 1 of any INHERITS vector
+;;; without pre-checking its length.
+(eval-when (:compile-toplevel)
+  (aver (eql (layout-depthoid (find-layout 'sequence)) 1)))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))
@@ -859,14 +863,7 @@
                    ((function-with-layout-p object) (%fun-layout object))
                    (t (return-from typep nil)))))
        (depthoid (if layout (layout-depthoid layout) -1))
-       (n-layout (make-symbol "LAYOUT"))
-       (n-inherits (make-symbol "INHERITS"))
-       (nth-ancestor ; This is possibly unused (if no compile-time layout, or depthoid -1)
-        ;; Use DATA-VECTOR-REF directly, since that's what SVREF in SAFETY 0 will become.
-        `(locally (declare (optimize (safety 0)))
-           (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
-       (ancestor-layout-eq
-        `(eq ,nth-ancestor ,layout)))
+       (n-layout (make-symbol "LAYOUT")))
 
     ;; Easiest case first: single bit test.
     (cond ((member name '(condition pathname structure-object))
@@ -916,33 +913,31 @@
                          `(and (layout-depthoid-ge ,n-layout ,depthoid)
                                (%structure-is-a ,n-layout ,layout))))))
 
-          ((> depthoid 0) ; fixed-depth ancestors of non-structure types: STREAM, FILE-STREAM,
-           ;; SEQUENCE; all are abstract base types.
-           ;; (I don't know why sometimes we just call SEQUENCEP and STREAMP. Policy?)
+          ((> depthoid 0)
+           ;; fixed-depth ancestors of non-structure types:
+           ;; STREAM, FILE-STREAM, STRING-STREAM, and SEQUENCE.
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
                            (bug "Non-frozen static classoids?"))
-            ;; There is no need to test the inheritance depth for depthoid 1 because INHERITS
-            ;; will contains at least #<LAYOUT for T> and a padding word if naught else.
-            ;; Though in actual fact it can't have just T, because users have no means to create
-            ;; types that are direct descendants of type T.
-            ;; However, we do have to avoid unsafely dereferencing inherits for FILE-STREAM
-            ;; which is at depth 4. An easy way to avoid this depth test would be requiring at
-            ;; least 5 elements in any INHERITS vector.  Alternatively, adding 1 bit each for
-            ;; SEQUENCE, STREAM, and FILE-STREAM to LAYOUT-FLAGS would suffice.
-            (let ((guts `(,@(unless (eq name 'condition)
-                              `((when (zerop (layout-clos-hash ,n-layout))
-                                 (setq ,n-layout
+            (let ((guts `((when (zerop (layout-clos-hash ,n-layout))
+                            (setq ,n-layout
                                   (truly-the layout
                                              (update-object-layout-or-invalid
-                                              object ',layout))))))
-                          ,(if (eql depthoid 1)
-                               ancestor-layout-eq
-                               `(let ((,n-inherits (layout-inherits ,n-layout)))
-                                  (and (> (length ,n-inherits) ,depthoid)
-                                       (eq (data-vector-ref ,n-inherits ,depthoid)
-                                           ,layout)))))))
-
+                                              object ',layout))))
+                          ,(ecase name
+                            (stream
+                             `(logtest (layout-flags ,n-layout) ,+stream-layout-flag+))
+                            (file-stream
+                             `(logtest (layout-flags ,n-layout) ,+file-stream-layout-flag+))
+                            (string-stream
+                             `(logtest (layout-flags ,n-layout) ,+string-stream-layout-flag+))
+                            ;; Testing the type EXTENDED-SEQUENCE tests for #<LAYOUT of SEQUENCE>.
+                            ;; It can only arise from a direct invocation of TRANSFORM-INSTANCE-TYPEP,
+                            ;; because the lisp type is not a classoid. It's done this way to define
+                            ;; the logic once only, instead of both here and src/code/pred.lisp.
+                            (sequence
+                             `(eq (data-vector-ref (layout-inherits ,n-layout) 1)
+                                  ,layout))))))
               (if primtype-predicate
                   `(and ,primtype-predicate (let ((,n-layout ,slot-reader)) ,@guts))
                   `(block typep

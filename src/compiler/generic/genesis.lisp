@@ -1345,6 +1345,8 @@ core and return a descriptor to it."
 
 (defun initialize-layouts ()
   (setq *layout-layout* (make-fixnum-descriptor 0))
+  (let ((l (find-layout 'stream)))
+    (setf (layout-flags l) (logior (logior (layout-flags l)) +stream-layout-flag+)))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
@@ -1368,7 +1370,8 @@ core and return a descriptor to it."
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
              (symbol   (chill-layout 'symbol t-layout)))
-        (chill-layout 'null t-layout sequence list symbol)))))
+        (chill-layout 'null t-layout sequence list symbol))
+      (chill-layout 'stream t-layout))))
 
 ;;;; interning symbols in the cold image
 
@@ -2274,6 +2277,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
                     (the sb-vm:word (descriptor-integer val))))))
     result))
 
+(defun find-in-inherits (typename inherits)
+  (dotimes (i (cold-vector-len inherits))
+    (let ((proxy (gethash (descriptor-bits (cold-svref inherits i))
+                          *cold-layout-by-addr*)))
+      (when (eq (cold-layout-name proxy) typename)
+        (return proxy)))))
+
 (define-cold-fop (fop-layout (depthoid flags length))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
   (let* ((inherits (pop-stack))
@@ -2294,6 +2304,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
                         ;; in order to set it for the root CONDITION type.
                         ((eq name 'condition) +condition-layout-flag+)
                         (t 0))))
+    (flet ((maybe-set-flag (flag type)
+             (when (or (find-in-inherits type inherits) (eq name type))
+               (setq flags (logior flags flag)))))
+      (maybe-set-flag +stream-layout-flag+ 'stream)
+      (maybe-set-flag +file-stream-layout-flag+ 'file-stream)
+      (maybe-set-flag +string-stream-layout-flag+ 'string-stream))
     ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
     (when existing-layout
       (let ((old-flags (cold-layout-flags existing-layout))
