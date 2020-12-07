@@ -773,8 +773,9 @@
 
 ;;; A closure points to its underlying function, all closed-over values,
 ;;; and possibly the closure's name.
-;;; #'SB-INT:CONSTANTLY-T is a nameless closure over 1 value
-(deftest map-root-closure-unnamed (count-pointees #'sb-int:constantly-t nil) 2)
+(deftest map-root-closure-unnamed
+    (count-pointees (funcall (compile nil `(lambda (x) (lambda () x))) t) nil)
+  2)
 ;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value.
 ;;; The closed-over value is AND, and the name of the closure is (:MACRO AND).
 (deftest map-root-closure-named (count-pointees (symbol-function 'and) nil) 3)
