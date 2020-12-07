@@ -461,68 +461,61 @@
               (make-fixup (tn-value layout) :layout)
               layout)))))
 
+;;; Return the DISP part of an EA based on MEM-OP, which is comprised
+;;; of a vop name and its codegen info.
+;;; Return NIL if the value can't be encoded in a machine instruction.
+(defun valid-memref-byte-disp (mem-op)
+  (ecase (car mem-op)
+    (instance-index-ref-c
+     (destructuring-bind (index) (cdr mem-op)
+       (- (ash (+ index instance-slots-offset) word-shift)
+          instance-pointer-lowtag)))
+    (slot
+     (destructuring-bind (name index lowtag) (cdr mem-op)
+       (declare (ignore name))
+       (- (ash index word-shift) lowtag)))
+    (data-vector-ref-with-offset/simple-vector-c
+     (destructuring-bind (index offset) (cdr mem-op)
+       (let ((disp (- (ash (+ vector-data-offset index offset) word-shift)
+                      other-pointer-lowtag)))
+         (if (typep disp '(signed-byte 32)) disp))))))
+
 (define-vop (fixnump simple-type-predicate)
   (:translate fixnump)
   (:args-var arg-ref)
+  (:args (value :scs (any-reg descriptor-reg) :load-if (tn-ref-memory-access arg-ref)))
   (:generator 3
-   (let ((mem-op (tn-ref-memory-access arg-ref)))
-     (when mem-op
-       (when (sc-is value control-stack)
-         ;; If this operation involves memory (such as INSTANCE-REF + FIXNUMP)
-         ;; and the arg is not in a register, then we need to load the operand of the
-         ;; load into TEMP-REG-TN and use that as the base for the TEST instruction.
-         (inst mov temp-reg-tn value)
-         (setq value temp-reg-tn))
-       (ecase (car mem-op)
-        (instance-index-ref-c
-         (destructuring-bind (index) (cdr mem-op)
-           (setq value (ea (- (ash (+ index instance-slots-offset) word-shift)
-                              instance-pointer-lowtag)
-                           value))))
-        (slot
-         (destructuring-bind (name index lowtag) (cdr mem-op)
-           (declare (ignore name))
-           (setq value (ea (- (ash index word-shift) lowtag) value))))
-        (data-vector-ref-with-offset/simple-vector-c
-         (destructuring-bind (index offset) (cdr mem-op)
-           (setq value (ea (- (ash (+ vector-data-offset index offset) word-shift)
-                              other-pointer-lowtag)
-                           value)))))))
+   (awhen (tn-ref-memory-access arg-ref)
+     (setq value (ea (cdr it) value)))
    (test-type value nil target not-p
               (even-fixnum-lowtag odd-fixnum-lowtag pad0-lowtag pad1-lowtag
                pad2-lowtag pad3-lowtag pad4-lowtag pad5-lowtag))))
 
-;;; Try to replace a memory load + fixnump with one vop by absorbing the memory load
-;;; into the test. In theory, SVREF + fixnump can be replaced only if the 'disp' field
-;;; of the EA is small enough. We've got problems otherwise, because TEMP-REG-TN can't
-;;; do double-duty as the stand-in for an overly large index if the TN for the vector
-;;; is not in a register, which would also requires use of temp-reg-tn.
-;;; It wouldn't be hard to guard against this: the body of the fixnump vop generator would
-;;; need to be factored out, and we could try to see if it can encode the instructions.
-;;; If it can't, it can return a failure code to give up on the optimizer.
+;;; Try to absorb a memory load into FIXNUMP.
 (defoptimizer (sb-c::vop-optimize fixnump) (vop)
-  (let ((prev (sb-c::previous-vop-is
-               vop
-               '(instance-index-ref-c slot
-                 data-vector-ref-with-offset/simple-vector-c))))
-    (when (and prev (eq (vop-block prev) (vop-block vop)))
-      (let ((result (sb-c::vop-results prev))
-            (arg (sb-c::vop-args vop)))
-        ;; Ensure that the fixnump vop does not try to absorb more than one memref.
-        ;; That is, if the initial IR2 matches (fixnump (memref (memref))) which is simplified
-        ;; to (memref+fixnump (memref x)), it would seem to allow matching of the pattern
-        ;; again if this optimizer is reapplied, because the "new" fixnump vop is superficially
-        ;; the same, except for the attachment of extra data to its input.
-        (when (and (not (tn-ref-memory-access arg))
-                   (eq (tn-ref-tn result) (tn-ref-tn arg))
-                   (sb-c::very-temporary-p (tn-ref-tn arg)))
-          (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
-          (let* ((arg-ref (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
-                 (new (sb-c::emit-and-insert-vop
-                       (sb-c::vop-node vop) (vop-block vop) (sb-c::vop-info vop)
-                       arg-ref nil prev (vop-codegen-info vop))))
-            (setf (tn-ref-memory-access arg-ref)
-                  (cons (vop-name prev) (vop-codegen-info prev)))
-            (sb-c::delete-vop prev)
-            (sb-c::delete-vop vop)
-            new))))))
+  ;; Ensure that the fixnump vop does not try to absorb more than one memref.
+  ;; That is, if the initial IR2 matches (fixnump (memref (memref))) which is simplified
+  ;; to (memref+fixnump (memref x)), it would seem to allow matching of the pattern
+  ;; again if this optimizer is reapplied, because the "new" fixnump vop is superficially
+  ;; the same, except for the attachment of extra data to its input.
+  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+    (let ((prev (sb-c::previous-vop-is
+                 vop
+                 '(instance-index-ref-c slot
+                   data-vector-ref-with-offset/simple-vector-c))))
+      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (when (and prev (eq (vop-block prev) (vop-block vop)))
+        (let ((arg (sb-c::vop-args vop)))
+          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+                     (sb-c::very-temporary-p (tn-ref-tn arg)))
+            (binding* ((mem-op (cons (vop-name prev) (vop-codegen-info prev)))
+                       (disp (valid-memref-byte-disp mem-op) :exit-if-null)
+                       (arg-ref
+                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                       (new (sb-c::emit-and-insert-vop
+                             (sb-c::vop-node vop) (vop-block vop) (sb-c::vop-info vop)
+                             arg-ref nil prev (vop-codegen-info vop))))
+              (setf (tn-ref-memory-access arg-ref) `(:read . ,disp))
+              (sb-c::delete-vop prev)
+              (sb-c::delete-vop vop)
+              new)))))))
