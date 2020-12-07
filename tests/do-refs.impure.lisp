@@ -64,18 +64,21 @@
                                         :key 'widetag-of :test #'/=)))))))
 
 (test-util:with-test (:name :walk-slots-fdefn)
-  (walk-slots-test*
-   (sb-kernel::find-fdefn 'constantly-t)
-   (lambda (slots)
-     #+immobile-code
-     (and (= (length slots) 3)
-          (symbolp (first slots))
-          (closurep (second slots))
-          (code-component-p (third slots)))
-     #-immobile-code
-     (and (= (length slots) 2)
-          (symbolp (first slots))
-          (closurep (second slots))))))
+  (let* ((closure (funcall (compile nil '(lambda (x)  (lambda () x))) t))
+         (symbol (gensym)))
+    (setf (fdefinition symbol) closure)
+    (walk-slots-test*
+     (sb-kernel::find-fdefn symbol)
+     (lambda (slots)
+       #+immobile-code
+       (and (= (length slots) 3)
+            (symbolp (first slots))
+            (closurep (second slots))
+            (code-component-p (third slots)))
+       #-immobile-code
+       (and (= (length slots) 2)
+            (symbolp (first slots))
+            (closurep (second slots)))))))
 
 (defclass mystdinst ()
   ((a :initform 1) (b :initform 2)

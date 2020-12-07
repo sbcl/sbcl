@@ -20,17 +20,21 @@
 (define-source-transform values (x) `(prog1 ,x))
 
 (deftransform constantly ((value) * * :node node)
-  (let ((lvar (node-lvar node)))
-    (map-all-lvar-dests
-     lvar
-     (lambda (lvar node)
-       (unless (lvar-called-by-node-p lvar node)
-         (give-up-ir1-transform))))
-    `#'(lambda (&rest rest)
-         (declare (ignore rest))
-         value)))
+  (if (constant-lvar-p value)
+      `#'(lambda (&rest rest)
+           (declare (ignore rest))
+           ',(lvar-value value))
+      (let ((lvar (node-lvar node)))
+        ;; Is it destined to a funcall? Then don't create a closure
+        (map-all-lvar-dests
+         lvar
+         (lambda (lvar node)
+           (unless (lvar-called-by-node-p lvar node)
+             (give-up-ir1-transform))))
+        `#'(lambda (&rest rest)
+             (declare (ignore rest))
+             value))))
 
-;;; CONSTANTLY is pretty much never worth transforming, but it's good to get the type.
 (defoptimizer (constantly derive-type) ((value))
   (specifier-type
    `(function (&rest t) (values ,(type-specifier (lvar-type value)) &optional))))
