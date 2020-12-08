@@ -1180,41 +1180,35 @@ constant shift greater than word length")))
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
-  (:args (x :scs (any-reg)
-            :load-if (not (and (sc-is x control-stack)
-                               (sc-is y any-reg))))
+  (:args (x :scs (any-reg control-stack))
          (y :scs (any-reg control-stack)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison"))
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg) :load-if t))
+  (:args (x :scs (any-reg control-stack)))
   (:arg-types tagged-num (:constant fixnum))
   (:info y))
 
 (define-vop (fast-conditional/signed fast-conditional)
-  (:args (x :scs (signed-reg)
-            :load-if (not (and (sc-is x signed-stack)
-                               (sc-is y signed-reg))))
+  (:args (x :scs (signed-reg signed-stack))
          (y :scs (signed-reg signed-stack)))
   (:arg-types signed-num signed-num)
   (:note "inline (signed-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg) :load-if t))
+  (:args (x :scs (signed-reg signed-stack)))
   (:arg-types signed-num (:constant (signed-byte 64)))
   (:info y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
-  (:args (x :scs (unsigned-reg)
-            :load-if (not (and (sc-is x unsigned-stack)
-                               (sc-is y unsigned-reg))))
+  (:args (x :scs (unsigned-reg unsigned-stack))
          (y :scs (unsigned-reg unsigned-stack)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg) :load-if t))
+  (:args (x :scs (unsigned-reg unsigned-stack)))
   (:arg-types unsigned-num (:constant (unsigned-byte 64)))
   (:info y))
 
@@ -1298,37 +1292,16 @@ constant shift greater than word length")))
                (inst test :byte `(,x . :high-byte) (ash y -8))
                (inst test size x y))))))
 
-;; Stolen liberally from the x86 32-bit implementation.
 (macrolet ((define-logtest-vops ()
              `(progn
                ,@(loop for suffix in '(/fixnum -c/fixnum
                                        /signed -c/signed
                                        /unsigned -c/unsigned)
-                       ;; FIXME: remove, after changing the ancestor vops
-                       ;; to not pessimize their allowable SCs
-                       for scs = (case (let ((s (string suffix)))
-                                         (intern (subseq s (1+ (position #\/ s)))))
-                                   (fixnum '(any-reg control-stack))
-                                   (signed '(signed-reg signed-stack))
-                                   (unsigned '(unsigned-reg unsigned-stack)))
-                       ;;
                        for cost in '(4 3 6 5 6 5)
                        collect
                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
                          (:translate logtest)
-                         ;; Simplify the lambda made by MAKE-GENERATOR-FUNCTION:
-                         ;; LOAD-IF can be NIL because the only alternate SCs to
-                         ;; register SCs are stack SCs. And since we're pretending
-                         ;; that the CPU can directly receive two stack operands,
-                         ;; loading would just check that each argument individually
-                         ;; is either in a register or on the stack - which it is -
-                         ;; and do nothing.
-                         (:args (x :scs ,scs :load-if nil)
-                                ,@(unless (search "-C/" (string suffix)) `((y :scs ,scs :load-if nil))))
-                         ;; This temp spec is just being cautious. TEMP-REG-TN is reserved
-                         (:temporary (:sc unsigned-reg :offset #.(tn-offset temp-reg-tn)) scratch)
-                         (:ignore scratch)
                          (:conditional :ne)
                          (:generator ,cost
                           (emit-optimized-test-inst x
@@ -1407,23 +1380,14 @@ constant shift greater than word length")))
              `(progn
                 ,@(mapcar
                    (lambda (suffix cost signed)
-                     (let ((scs (case (let ((s (string suffix)))
-                                        (intern (subseq s (1+ (position #\/ s)))))
-                                  (fixnum '(any-reg control-stack))
-                                  (signed '(signed-reg signed-stack))
-                                  (unsigned '(unsigned-reg unsigned-stack)))))
                      `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
                                    ,(symbolicate "FAST-CONDITIONAL"  suffix))
-                        (:args (x :scs ,scs :load-if nil)
-                               ,@(unless (search "-C/" (string suffix))
-                                   `((y :scs ,scs :load-if nil))))
                         (:translate ,tran)
                         (:conditional ,(if signed cond unsigned))
                         (:generator ,cost
                           (emit-optimized-cmp
-                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y))))))
+                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
-;                  '(/fixnum  /signed  /unsigned)
                    '(4 3 6 5 6 5)
                    '(t t t t nil nil)))))
 
@@ -1494,29 +1458,19 @@ constant shift greater than word length")))
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
   (:translate eql %eql/integer)
-  (:generator 6
-    (inst cmp x y)))
+  (:generator 6 (emit-optimized-cmp x y)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
   (:translate eql %eql/integer)
-  (:generator 5
-    (cond ((and (sc-is x signed-reg) (zerop y))
-           (inst test x x))  ; smaller instruction
-          (t
-           (inst cmp x (constantize y))))))
+  (:generator 5 (emit-optimized-cmp x y)))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
   (:translate eql %eql/integer)
-  (:generator 6
-    (inst cmp x y)))
+  (:generator 6 (emit-optimized-cmp x y)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
   (:translate eql %eql/integer)
-  (:generator 5
-    (cond ((and (sc-is x unsigned-reg) (zerop y))
-           (inst test x x))  ; smaller instruction
-          (t
-           (inst cmp x (constantize y))))))
+  (:generator 5 (emit-optimized-cmp x y)))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
 ;;; known fixnum.
@@ -1528,20 +1482,15 @@ constant shift greater than word length")))
 ;;; consing the argument.
 
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg)
-            :load-if (not (and (sc-is x control-stack)
-                               (sc-is y any-reg))))
+  (:args (x :scs (any-reg control-stack))
          (y :scs (any-reg control-stack)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql %eql/integer)
-  (:generator 4
-    (inst cmp x y)))
+  (:generator 4 (emit-optimized-cmp x y)))
 
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
-  (:args (x :scs (any-reg descriptor-reg)
-            :load-if (not (and (sc-is x control-stack)
-                               (sc-is y any-reg))))
+  (:args (x :scs (any-reg descriptor-reg control-stack))
          (y :scs (any-reg control-stack)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
@@ -1553,19 +1502,7 @@ constant shift greater than word length")))
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eql %eql/integer)
-  (:generator 2
-    (cond ((and (sc-is x any-reg descriptor-reg) (zerop y))
-           (inst test x x))  ; smaller instruction
-          (t
-           (let ((y (constantize (fixnumize y))))
-             (when (and (sc-is x control-stack) (ea-p y))
-               ;; The constant didn't fit in 'imm32' operand, so load X.
-               ;; Expressing it as as :LOAD-IF would perhaps be pedantically right,
-               ;; but worse. TEMP-REG-TN always works in a pinch, and until every
-               ;; use of that free temp is removed, then it's better to just use it.
-               (inst mov temp-reg-tn x)
-               (setq x temp-reg-tn))
-             (inst cmp x y))))))
+  (:generator 2 (emit-optimized-cmp x (fixnumize y))))
 
 ;;; FIXME: this seems never to be invoked any more. What did we either break or improve?
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
