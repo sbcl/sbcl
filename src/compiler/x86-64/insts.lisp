@@ -35,9 +35,11 @@
 (defconstant +dword-size-prefix+   #b110)
 (defconstant +qword-size-prefix+   #b111)
 (defun lockp (prefix) (if (logtest +lock-prefix-present+ prefix) :lock))
+(defmacro opsize-prefix-present (byte) `(logtest ,byte #b100))
+(defmacro opsize-prefix-keyword (byte)
+  `(svref #(:byte :word :dword :qword) (logand ,byte #b11)))
 (defun pick-operand-size (prefix operand1 &optional operand2)
-  (acond ((logtest prefix #b100)
-          (svref #(:byte :word :dword :qword) (logand prefix #b11)))
+  (acond ((logtest prefix #b100) (opsize-prefix-keyword prefix))
          (operand2 (matching-operand-size operand1 operand2))
          (t (operand-size operand1))))
 (defun encode-size-prefix (prefix)
@@ -53,6 +55,13 @@
                ((encode-size-prefix (car args)) (setq size it))
                (t (return (cons (logior lockp size) args))))
         (pop args)))
+(defun sb-assem::decode-prefix (args) ; for trace file only
+  (let ((b (car args)))
+    (if (zerop b)
+        (cdr args)
+        (cons (append (if (logtest +lock-prefix-present+ b) '(:lock))
+                      (if (opsize-prefix-present b) (list (opsize-prefix-keyword b))))
+              (cdr args)))))
 
 ;;; a REG object discards all information about a TN except its storage base
 ;;; (a/k/a register class), size class (for GPRs), and encoding.

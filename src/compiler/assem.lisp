@@ -1357,6 +1357,11 @@
 (defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
   (if (listp labels) (some #'label-usedp labels) (label-usedp labels)))
 
+#-x86-64
+(progn
+  (defun extract-prefix-keywords (x) x)
+  (defun decode-prefix (args) args))
+
 (defun dump-symbolic-asm (section stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
   (do ((statement (stmt-next (section-start section)) (stmt-next statement))
@@ -1381,14 +1386,12 @@
                   (if usedp "" " (notused)"))))
       (if (functionp op)
           (format stream "# postit ~S~A~%" op eol-comment)
-          ;; Squelch a leading 0 on a prefix-accepting instruction.
-          (flet ((remove-prefix (list)
-                   (if (and (typep list '(cons (eql 0))) (consp (gethash op *inst-encoder*)))
-                       (cdr list)
-                       list)))
-            (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
-                    op (remove-prefix (stmt-operands statement))
-                    eol-comment)))))
+          (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
+                  op
+                  (if (consp (gethash op *inst-encoder*))
+                      (decode-prefix (stmt-operands statement))
+                      (stmt-operands statement))
+                  eol-comment))))
   (let ((*print-length* nil)
         (*print-pretty* t)
         (*print-right-margin* 80))
@@ -1605,7 +1608,6 @@
                                   *backend-instruction-set-package*)
             action (gethash mnemonic *inst-encoder*))
       (aver action))
-    #+x86-64
     (when (listp action) (setq operands (extract-prefix-keywords operands)))
     (typecase dest
       (cons ; streaming in to the assembler
