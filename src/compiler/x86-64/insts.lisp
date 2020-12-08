@@ -3233,7 +3233,6 @@
 
 (flet ((emit* (segment opcode subcode src)
          (aver (not (register-p src)))
-         (aver (eq (operand-size src) :byte))
          (aver subcode)
          (emit-prefixes segment src nil :byte)
          (emit-byte segment #x0f)
