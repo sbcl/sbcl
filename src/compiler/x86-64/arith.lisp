@@ -1547,7 +1547,7 @@ constant shift greater than word length")))
   (:variant-cost 7))
 
 (define-vop (fast-eql-c/fixnum fast-conditional-c/fixnum)
-  (:args (x :scs (any-reg) :load-if t))
+  (:args (x :scs (any-reg control-stack)))
   (:arg-types tagged-num (:constant fixnum))
   (:info y)
   (:conditional :e)
@@ -1557,10 +1557,19 @@ constant shift greater than word length")))
     (cond ((and (sc-is x any-reg descriptor-reg) (zerop y))
            (inst test x x))  ; smaller instruction
           (t
-           (inst cmp x (constantize (fixnumize y)))))))
+           (let ((y (constantize (fixnumize y))))
+             (when (and (sc-is x control-stack) (ea-p y))
+               ;; The constant didn't fit in 'imm32' operand, so load X.
+               ;; Expressing it as as :LOAD-IF would perhaps be pedantically right,
+               ;; but worse. TEMP-REG-TN always works in a pinch, and until every
+               ;; use of that free temp is removed, then it's better to just use it.
+               (inst mov temp-reg-tn x)
+               (setq x temp-reg-tn))
+             (inst cmp x y))))))
 
+;;; FIXME: this seems never to be invoked any more. What did we either break or improve?
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
-  (:args (x :scs (any-reg descriptor-reg) :load-if t))
+  (:args (x :scs (any-reg descriptor-reg control-stack)))
   (:arg-types * (:constant fixnum))
   (:variant-cost 6))
 
