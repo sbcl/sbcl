@@ -1,5 +1,7 @@
 (in-package "SB-THREAD")
 
+#+cheneygc (sb-ext:exit :code 104)
+
 ;;; Test out-of-memory (or something) that goes wrong in pthread_create
 #+pauseless-threadstart ; no SB-THREAD::PTHREAD-CREATE symbol if not
 (test-util:with-test (:name :failed-thread-creation)

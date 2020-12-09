@@ -12,16 +12,12 @@
 (eval-when (:compile-toplevel)
   (load "compiler-test-util.lisp"))
 
-;;; This test asserted that each constructor for a defstruct
-;;; involved in a mutually referential cycle with other types
-;;; is able to inline the type test of the as-yet-unseen type
-;;; when the DEFSTRUCT form is processed.
-;;; That's kind of tough to do with the typep optimizations now
-;;; because the code header constants will not contain for #<LAYOUT for TYPE>
-;;; The architectures that don't get that optimization still pass,
-;;; but I need to fix this somehow.
-(with-test (:name (:block-compile :defstruct-slot-type-circularity)
-                  :fails-on (:or :x86 :x86-64))
+;;; This test asserts that each constructor for a defstruct involved in a
+;;; mutually referential cycle with other defstructs inlines the test of the
+;;; as-yet-unseen type when the DEFSTRUCT form is first read.
+;;; We can tell that they're inlined because they use layout-IDs, so the only
+;;; boxed constant is for the constructor to deposit a layout.
+(with-test (:name (:block-compile :defstruct-slot-type-circularity))
   (with-scratch-file (fasl "fasl")
     (compile-file "block-compile-defstruct-test.lisp" :output-file fasl :block-compile t)
     (load fasl))
@@ -29,31 +25,18 @@
     (let ((constants
            (ctu:find-code-constants (symbol-function symbol)
                                     :type 'sb-kernel:layout)))
-      (assert (= (length constants) 3)))))
+      (assert (= (length constants) 1)))))
 
-;;; Check an organic (not contrived) use of mutually referential types.
-;;; NEWLINE is defined after SECTION-START, because it is a subtype.
-;;; One of SECTION-START's slot setters refers to type NEWLINE.
-(with-test (:name :pretty-stream-structs
-                  :fails-on (:or :x86 :x86-64)) ; Same issue as the preceding test
-  (let ((layouts
-         (ctu:find-code-constants #'(setf sb-pretty::section-start-section-end)
-                                  :type 'sb-kernel:layout)))
-    ;; expect 3 layouts: one for SECTION-START to check the instance itself,
-    ;; one for NEWLINE and one for BLOCK-END.
-    ;; It's entirely coincidental that the above test also has 3.
-    (assert (= (length layouts) 3))
-    (assert (find (sb-kernel:find-layout 'sb-pretty::newline)
-                  layouts))))
-
-(with-test (:name :mutex-owner-typecheck
-                  :fails-on (:or :x86 :x86-64)) ; Same issue as the preceding test
+(with-test (:name :mutex-owner-typecheck)
   (let ((layouts
          (ctu:find-code-constants #'(setf sb-thread::mutex-%owner)
                                   :type 'sb-kernel:layout)))
-    ;; expect 3 layouts: one for THREAD, one for MUTEX, and one for FOREIGN-THREAD
-    (assert (= (length layouts) 3))
-    (assert (find (sb-kernel:find-layout 'sb-thread:thread)
+    ;; expect exactly 1 layout, that of MUTEX, for signaling OBJECT-NOT-TYPE.
+    ;; To be really pedantic we'd want to assert that in the source file
+    ;; the defstruct of MUTEX appears prior to the defstruct of THREAD,
+    ;; proving without a doubt that block compilation worked.
+    (assert (= (length layouts) 1))
+    (assert (find (sb-kernel:find-layout 'sb-thread:mutex)
                   layouts))))
 
 (defstruct (parent)
