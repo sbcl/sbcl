@@ -532,26 +532,19 @@
 
 ;;;; Logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "SHIFT-TOWARDS-START")
-  (:generator 1
-    (inst srl r num amount)))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "SHIFT-TOWARDS-END")
-  (:generator 1
-    (inst sll r num amount)))
-
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1 (inst ,operation r num amount)))))
+  (define shift-towards-start srl)
+  (define shift-towards-end   sll))
 
 ;;;; Modular arithmetic
 (defmacro define-mod-binop ((name prototype) function)

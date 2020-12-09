@@ -834,32 +834,22 @@
 
 ;;;; 64-bit logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:temporary (:sc unsigned-reg) temp)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "shift-towards-start")
-  (:generator 1
-    (inst andi. temp amount #b111111)
-    (ecase *backend-byte-order*
-      (:big-endian    (inst sld r num temp))
-      (:little-endian (inst srd r num temp)))))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "shift-towards-end")
-  (:generator 1
-    (inst andi. temp amount #b111111)
-    (ecase *backend-byte-order*
-      (:big-endian    (inst srd r num temp))
-      (:little-endian (inst sld r num temp)))))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:temporary (:sc unsigned-reg) temp)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1
+                 (inst andi. temp amount #b111111)
+                 (inst ,operation r num temp)))))
+  (define shift-towards-start #+big-endian sld #+little-endian srd)
+  (define shift-towards-end   #+big-endian srd #+little-endian sld))
 
 ;;;; Bignum stuff.
 

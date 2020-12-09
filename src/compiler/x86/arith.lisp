@@ -1351,30 +1351,23 @@ constant shift greater than word length")))
 ;;;; 32-bit logical operations
 
 ;;; Only the lower 5 bits of the shift amount are significant.
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg) :target r)
-         (amount :scs (signed-reg) :target ecx))
-  (:arg-types unsigned-num tagged-num)
-  (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 1)) ecx)
-  (:results (r :scs (unsigned-reg) :from (:argument 0)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "SHIFT-TOWARDS-START")
-  (:generator 1
-    (move r num)
-    (move ecx amount)
-    (inst shr r :cl)))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "SHIFT-TOWARDS-END")
-  (:generator 1
-    (move r num)
-    (move ecx amount)
-    (inst shl r :cl)))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg) :target r)
+                       (amount :scs (signed-reg) :target ecx))
+                (:arg-types unsigned-num tagged-num)
+                (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 1)) ecx)
+                (:results (r :scs (unsigned-reg) :from (:argument 0)))
+                (:result-types unsigned-num)
+                (:generator 1
+                 (move r num)
+                 (move ecx amount)
+                 (inst ,operation r :cl)))))
+  (define shift-towards-start shr)
+  (define shift-towards-end   shl))
 
 ;;;; Modular functions
 (defmacro define-mod-binop ((name prototype) function)
