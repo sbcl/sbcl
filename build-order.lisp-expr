@@ -195,7 +195,6 @@
 
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)
- ("src/code/target-allocate"  :not-host)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)

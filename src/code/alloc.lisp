@@ -12,6 +12,15 @@
 
 (in-package "SB-VM")
 
+(define-alien-routine ("os_allocate" allocate-system-memory)
+  system-area-pointer
+  (bytes unsigned))
+
+(define-alien-routine ("os_deallocate" deallocate-system-memory)
+  void
+  (addr system-area-pointer)
+  (bytes unsigned))
+
 (!define-load-time-global *allocator-mutex* (sb-thread:make-mutex :name "Allocator"))
 
 (defun allocate-static-vector (widetag length words)
