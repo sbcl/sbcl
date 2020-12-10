@@ -305,9 +305,6 @@
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
 (defparameter *unparse-fun-type-simplify* nil) ; initialized by genesis
-;;; A flag to prevent TYPE-OF calls by user applications from returning
-;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
-(defparameter *unparse-allow-negation* t) ; initialized by genesis
 
 (define-type-method (function :negate) (type) (make-negation-type type))
 
@@ -2623,8 +2620,6 @@ used for a COMPLEX component.~:@>"
                                      dtype
                                      stype)))
          (complexp (array-type-complexp type)))
-    (if (and (eq complexp t) (not *unparse-allow-negation*))
-        (setq complexp :maybe))
     (cond ((eq dims '*)
            (if (eq eltype '*)
                (ecase complexp

@@ -233,10 +233,17 @@
            ((eq object nil) 'null)
            ((eq (sb-xc:symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
-    ((or array complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256)
-     (let ((sb-kernel::*unparse-allow-negation* nil))
-       (declare (special sb-kernel::*unparse-allow-negation*)) ; forward ref
-       (type-specifier (ctype-of object))))
+    (array
+     (let ((etype (specifier-type (array-element-type object))))
+       ;; Obviously :COMPLEXP is known to be T or NIL, but it's not allowed to
+       ;; return (NOT SIMPLE-ARRAY), so use :MAYBE in lieu of T.
+       (type-specifier
+        (make-array-type (array-dimensions object)
+                         :complexp (if (typep object 'simple-array) nil :maybe)
+                         :element-type etype
+                         :specialized-element-type etype))))
+    ((or complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256)
+     (type-specifier (ctype-of object)))
     (t
      (let* ((classoid (classoid-of object))
             (name (classoid-name classoid)))
