@@ -244,6 +244,7 @@
                          :specialized-element-type etype))))
     ((or complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256)
      (type-specifier (ctype-of object)))
+    (simple-fun 'compiled-function)
     (t
      (let* ((classoid (classoid-of object))
             (name (classoid-name classoid)))
