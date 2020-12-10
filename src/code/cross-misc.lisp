@@ -229,8 +229,8 @@
 
 ;;; Needed for constant-folding
 (defun system-area-pointer-p (x) x nil) ; nothing is a SAP
-;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER
-(defun sap-int (x) (error "can't take SAP-INT ~S" x))
+(defmacro sap-ref-word (sap offset)
+  `(#+64-bit sap-ref-64 #-64-bit sap-ref-32 ,sap ,offset))
 
 (defun logically-readonlyize (x) x)
 

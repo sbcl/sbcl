@@ -152,22 +152,7 @@
                    (<= base ,value limit)))
               #+x86
               (containing-memory-space (code)
-                `(sb-fasl::descriptor-gspace-name ,code))
-              (sap-ref-8 (sap offset)
-                `(sb-fasl::model-sap-ref-u8 ,sap ,offset))
-              (sap-ref-32 (sap offset)
-                `(sb-fasl::model-sap-ref-u32 ,sap ,offset))
-              (signed-sap-ref-32 (sap offset)
-                `(sb-fasl::model-sap-ref-s32 ,sap ,offset))
-              (sap-ref-64 (sap offset)
-                `(sb-fasl::model-sap-ref-u64 ,sap ,offset))
-              (signed-sap-ref-64 (sap offset)
-                `(sb-fasl::model-sap-ref-s64 ,sap ,offset))
-              (sap-ref-word (sap offset)
-                `(#+64-bit sb-fasl::model-sap-ref-u64
-                  #-64-bit sb-fasl::model-sap-ref-u32 ,sap ,offset))
-              (sap-int (sap)
-                `(sb-fasl::model-sap-int ,sap)))
+                `(sb-fasl::descriptor-gspace-name ,code)))
      (let ((,sap-var (sb-fasl::model-code-instructions ,code-var)))
        ,@body))
   #-sb-xc-host
