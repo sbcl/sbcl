@@ -265,6 +265,37 @@
                (push disjunct output)))))
         (t input))))) ; no change
 
+;;; If TYPE is such that its entirety is represented by 1 widetag
+;;; - and that widetag can represent nothing else - then return the widetag.
+;;; This is almost but not exactly in correspondence with (SB-C:PRIMITIVE-TYPE X).
+;;; But a primitive type can be more specific than the type expressed by a widetag.
+;;;   e.g. (SB-C:PRIMITIVE-TYPE (SPECIFIER-TYPE '(SIMD-PACK-256 DOUBLE-FLOAT))))
+;;;         => #<SB-C:PRIMITIVE-TYPE :NAME SIMD-PACK-256-DOUBLE> and T
+;;; So I guess we don't have a predicate that returns T if and only if a CTYPE
+;;; is exactly one and only one of the "most primitive" representations,
+;;; hence this.  The computation is just a best effort - it's generally OK to
+;;; say NIL for anything nontrivial, even if there should be an exact answer.
+(defun widetag-for-exactly-type (type)
+  (cond ((built-in-classoid-p type)
+         (case (classoid-name type)
+           (system-area-pointer sb-vm:sap-widetag)
+           (fdefn sb-vm:fdefn-widetag)))
+        ((numeric-type-p type)
+         (cond ((type= type (specifier-type '(complex single-float)))
+                sb-vm:complex-single-float-widetag)
+               ((type= type (specifier-type '(complex double-float)))
+                sb-vm:complex-double-float-widetag)
+               ((type= type (specifier-type '(complex rational)))
+                sb-vm:complex-widetag)))
+        #+sb-simd-pack
+        ((simd-pack-type-p type)
+         (cond ((type= type (specifier-type 'simd-pack))
+                sb-vm:simd-pack-widetag)))
+        #+sb-simd-pack-256
+        ((simd-pack-256-type-p type)
+         (cond ((type= type (specifier-type 'simd-pack-256))
+                sb-vm:simd-pack-256-widetag)))))
+
 ;; Given TYPES which is a list of types from a union type, decompose into
 ;; two unions, one being an OR over types representable as widetags
 ;; with other-pointer-lowtag, and the other being the difference
@@ -284,6 +315,7 @@
     (dolist (x types)
       (let ((adjunct
              (cond
+               ((widetag-for-exactly-type x)) ; easiest case
                ((and (array-type-p x)
                      (equal (array-type-dimensions x) '(*))
                      (type= (array-type-specialized-element-type x)
@@ -305,10 +337,9 @@
                              (list* (sb-vm:saetp-complex-typecode saetp)
                                     (when (eq (array-type-complexp x) :maybe)
                                       (list (sb-vm:saetp-typecode saetp)))))))))
-               ((classoid-p x)
+               ((built-in-classoid-p x)
                 (case (classoid-name x)
-                  (symbol sb-vm:symbol-widetag) ; plus a hack for nil
-                  (system-area-pointer sb-vm:sap-widetag))))))
+                  (symbol sb-vm:symbol-widetag)))))) ; plus a hack for nil
         (cond ((not adjunct) (push x remainder))
               ((listp adjunct) (setq widetags (nconc adjunct widetags)))
               (t (push adjunct widetags)))))
