@@ -269,17 +269,8 @@
 ;; two unions, one being an OR over types representable as widetags
 ;; with other-pointer-lowtag, and the other being the difference
 ;; between the input TYPES and the widetags.
-;; This is architecture-independent, but unfortunately the needed VOP can't
-;; be defined using DEFINE-TYPE-VOPS, so return (VALUES NIL TYPES) for
-;; unsupported backends which can't generate an arbitrary call to %TEST-HEADERS.
 (defun widetags-from-union-type (types)
   (setq types (simplify-array-unions types t))
-  ;; This seems preferable to a reader-conditional in generic code.
-  ;; There is a unit test that the supported architectures don't generate
-  ;; excessively large code, so hopefully it'll not get broken.
-  (let ((info (info :function :info '%other-pointer-subtype-p)))
-    (unless (and info (sb-c::fun-info-templates info))
-      (return-from widetags-from-union-type (values nil types))))
   (let (widetags remainder)
     ;; A little optimization for (OR BIGNUM other). Without this, there would
     ;; be a two-sided GENERIC-{<,>} test plus whatever test(s) "other" entails.
