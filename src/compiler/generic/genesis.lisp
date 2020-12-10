@@ -155,17 +155,20 @@
                                    for i from 0
                                    collect `(ash (bvref bigvec ,index) ,(* i 8)))))
                  (defun (setf ,name) (new-value bigvec byte-index)
-                   ;; FIXME: We should carefully distinguish between signed and unsigned
-                   (declare (type (or (signed-byte ,n) (unsigned-byte ,n))
-                                  new-value))
+                   (declare (type (unsigned-byte ,n) new-value))
                    (setf ,@(loop for index in le-octet-indices
                                  for i from 0
                           append `((bvref bigvec ,index)
-                                   (ldb (byte 8 ,(* i 8)) new-value)))))))))
+                                   (ldb (byte 8 ,(* i 8)) new-value))))
+                   new-value)))))
   (make-bvref-n 8)
   (make-bvref-n 16)
   (make-bvref-n 32)
   (make-bvref-n 64))
+
+(defun (setf bvref-s32) (newval bv index)
+  (setf (bvref-32 bv index) (ldb (byte 32 0) (the (signed-byte 32) newval)))
+  newval)
 
 ;; lispobj-sized word, whatever that may be
 ;; hopefully nobody ever wants a 128-bit SBCL...
@@ -865,8 +868,8 @@ core and return a descriptor to it."
                               #-64-bit sb-vm:complex-single-float-real-slot
                               (descriptor-word-offset des))
                            sb-vm:word-shift)))
-          (setf (bvref-32 (descriptor-mem des) where) (single-float-bits r)
-                (bvref-32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
+          (setf (bvref-s32 (descriptor-mem des) where) (single-float-bits r)
+                (bvref-s32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
           des))
        (double-float
         (let ((des (allocate-header+object *dynamic*
@@ -1215,11 +1218,11 @@ core and return a descriptor to it."
                                    sb-vm:instance-slots-offset)
                                 sb-vm:word-shift)))
           (loop for i from 2 below (cold-vector-len inherits)
-                do (setf (bvref-32 (descriptor-mem result) byte-offset)
+                do (setf (bvref-s32 (descriptor-mem result) byte-offset)
                          (cold-layout-id (gethash (descriptor-bits (cold-svref inherits i))
                                                   *cold-layout-by-addr*)))
                    (incf byte-offset 4))
-          (setf (bvref-32 (descriptor-mem result) byte-offset) this-id)))
+          (setf (bvref-s32 (descriptor-mem result) byte-offset) this-id)))
 
     (integer-bits-to-core result bitmap bitmap-words fixed-words)
 
