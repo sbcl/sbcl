@@ -940,3 +940,11 @@ sb-vm::(define-vop (cl-user::test)
 
 (with-test (:name :many-interesting-array-types :skipped-on (:not :sb-unicode))
   (compare-to-golden-typep-data "typep-golden-data.txt"))
+
+(with-test (:name :integerp->bignump-strength-reduction)
+  (let ((f1 (compile nil '(lambda (x)
+                           (typecase x (fixnum 'a) (integer 'b) (t 'c)))))
+        (f2 (compile nil '(lambda (x)
+                           (typecase x (fixnum 'a) (bignum 'b) (t 'c))))))
+    (assert (= (length (disassembly-lines f1))
+               (length (disassembly-lines f2))))))

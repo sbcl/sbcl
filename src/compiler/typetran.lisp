@@ -1333,3 +1333,6 @@
           ((csubtypep (lvar-type object) this-type)
            nil)
           ((give-up-ir1-transform)))))
+
+;;; BIGNUMP is simpler than INTEGERP, so if we can rule out FIXNUM then ...
+(deftransform integerp ((x) ((not fixnum)) * :important nil) '(bignump x))
