@@ -92,7 +92,7 @@ Examples:
   sockaddr))
 
 (defmethod free-sockaddr-for ((socket inet-socket) sockaddr)
-  (sockint::free-sockaddr-in sockaddr))
+  (sb-alien:free-alien sockaddr))
 
 (defmethod size-of-sockaddr ((socket inet-socket))
   sockint::size-of-sockaddr-in)

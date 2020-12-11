@@ -100,7 +100,7 @@ malformed."
     sockaddr))
 
 (defmethod free-sockaddr-for ((socket inet6-socket) sockaddr)
-  (sockint::free-sockaddr-in6 sockaddr))
+  (sb-alien:free-alien sockaddr))
 
 (defmethod size-of-sockaddr ((socket inet6-socket))
   sockint::size-of-sockaddr-in6)
