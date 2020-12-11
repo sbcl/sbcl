@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch)
+(defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch :layout-id)
   #'equalp)
 
 

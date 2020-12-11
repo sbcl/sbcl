@@ -2373,7 +2373,7 @@
 (sb-assem::%def-inst-encoder
  '.layout-id
  (lambda (segment layout)
-   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-c:note-fixup segment :layout-id (sb-c:make-fixup layout :layout-id))
    (sb-assem::%emit-skip segment 4)))
 
 (defun emit-inline-constant (section constant label)
@@ -2394,21 +2394,19 @@
                    `(.byte ,@bytes)))))))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
-  (declare (type index offset))
+  (declare (type index offset) (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
-       (case flavor
-         (:layout-id
-          (aver (zerop (sap-ref-32 sap offset)))
-          (setf (signed-sap-ref-32 sap offset) (the layout-id value)))
-         (t
-          ;; There is an implicit addend currently stored in the fixup location.
-          (incf (sap-ref-32 sap offset) value))))
+       ;; There is an implicit addend currently stored in the fixup location.
+       (incf (sap-ref-32 sap offset) value))
       (:absolute64
        (incf (sap-ref-64 sap offset) value))
+      (:layout-id
+       (aver (zerop (sap-ref-32 sap offset)))
+       (setf (signed-sap-ref-32 sap offset) (the layout-id value)))
       (:b
        (error "Can't deal with CALL fixups, yet."))
       (:ba

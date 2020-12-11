@@ -2677,7 +2677,7 @@
 (sb-assem::%def-inst-encoder
  '.layout-id
  (lambda (segment layout)
-   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-c:note-fixup segment :layout-id (sb-c:make-fixup layout :layout-id))
    (sb-assem::%emit-skip segment 4)))
 
 (defun emit-inline-constant (section constant label)
@@ -2701,15 +2701,15 @@
                                          (setf val (ash val -8))))))))))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
-  (declare (type index offset))
+  (declare (type index offset) (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
-       (if (eq flavor :layout-id)
-           (setf (signed-sap-ref-32 sap offset) value)
-           (setf (sap-ref-word sap offset) value)))
+       (setf (sap-ref-word sap offset) value))
+      (:layout-id
+       (setf (signed-sap-ref-32 sap offset) value))
       (:cond-branch
        (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))

@@ -20,6 +20,10 @@
   ;; assumptions about the contents of these fields; their semantics
   ;; are imposed by the dumper.
   (name nil :read-only t)
+  ;; FIXME: "-flavor" and "-kind" are completedly devoid of meaning.
+  ;; They former should probably be "fixup-referent-type" or "fixup-source"
+  ;; to indicate that it denotes a namespace for NAME, and latter should be
+  ;; "fixup-how" as it conveys a manner in which to modify encoded bytes.
   (flavor nil :read-only t)
   ;; OFFSET is an optional offset from whatever external label this
   ;; fixup refers to. Or in the case of the :CODE-OBJECT flavor of
