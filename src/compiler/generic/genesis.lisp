@@ -29,7 +29,7 @@
 (in-package "SB-FASL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (use-package "SB-COREFILE")) ; not SB-COREFILE
+  (use-package "SB-COREFILE"))
 
 (defun round-up (number size)
   "Round NUMBER up to be an integral multiple of SIZE."
