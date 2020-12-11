@@ -1309,6 +1309,77 @@ constant shift greater than word length")))
                            nil)))))))
   (define-logtest-vops))
 
+;;; This works for tagged or untagged values, but the vop optimizer
+;;; has to pre-adjust Y if tagged.
+(define-vop (logtest-instance-ref fast-conditional)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant integer))
+  (:info y)
+  (:args-var arg-ref)
+  (:conditional :ne)
+  (:generator 1
+   (let ((disp (cdr (tn-ref-memory-access arg-ref))))
+     ;; Try as :BYTE, :WORD, :DWORD
+     (macrolet ((try (size bits)
+                  `(let ((disp disp) (y y) (mask ,(ldb (byte bits 0) -1)))
+                     (dotimes (i ,(/ 64 bits))
+                       (when (zerop (logandc2 y mask))
+                         (inst test ,size (ea disp x) (ash y (* i ,(- bits))))
+                         (return-from logtest-instance-ref))
+                       (setq mask (ash mask ,bits))
+                       (incf disp ,(/ bits 8))))))
+       (try :byte   8)
+       (try :word  16)
+       (try :dword 32))
+     (let ((val (ea disp x))
+           (y (constantize y)))
+       (cond ((integerp y)
+              (inst test :qword val y))
+             (t
+              (inst mov temp-reg-tn val)
+              (inst test :qword temp-reg-tn y)))))))
+
+;;; Try to absorb a memory load into LOGTEST.
+;;; This removes one instruction and possibly shortens the TEST by eliding
+;;; a REX prefix.
+(defoptimizer (sb-c::vop-optimize fast-logtest-c/fixnum) (vop)
+  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+    (let ((prev (sb-c::previous-vop-is
+                 vop '(raw-instance-ref-c/signed-word
+                       raw-instance-ref-c/word
+                       instance-index-ref-c
+                       ;; This would only happen in unsafe code most likely,
+                       ;; because CAR,CDR, etc would need to cast/assert the loaded
+                       ;; value to fixnum. However, in practive it doesn't work anyway
+                       ;; because there seems to be a spurious MOVE vop in between
+                       ;; the SLOT and the FAST-LOGTEST-C/FIXNUM.
+                       slot))))
+      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (when (and prev (eq (vop-block prev) (vop-block vop)))
+        (let ((arg (sb-c::vop-args vop)))
+          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+                     (sb-c::very-temporary-p (tn-ref-tn arg)))
+            (binding* ((mem-op (cons (vop-name prev) (vop-codegen-info prev)))
+                       (disp (valid-memref-byte-disp mem-op) :exit-if-null)
+                       (arg-ref
+                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                       (codegen-info
+                        (if (eq (vop-name vop) 'fast-logtest-c/fixnum)
+                            (list (fixnumize (car (vop-codegen-info vop))))
+                            (vop-codegen-info vop)))
+                       (new (sb-c::emit-and-insert-vop
+                             (sb-c::vop-node vop) (vop-block vop)
+                             (template-or-lose 'logtest-instance-ref)
+                             arg-ref nil prev codegen-info)))
+              (setf (tn-ref-memory-access arg-ref) `(:read . ,disp))
+              (sb-c::delete-vop prev)
+              (sb-c::delete-vop vop)
+              new)))))))
+(setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/signed))
+      #'vop-optimize-fast-logtest-c/fixnum-optimizer)
+(setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/unsigned))
+      #'vop-optimize-fast-logtest-c/fixnum-optimizer)
+
 ;;; %LOGBITP has the same argument order as ordinary LOGBITP which is * backwards *
 ;;; relative to every other architecture.
 ;;; I suspect the others have a predilection for placing codegen info args last.

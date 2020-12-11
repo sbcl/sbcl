@@ -466,7 +466,9 @@
 ;;; Return NIL if the value can't be encoded in a machine instruction.
 (defun valid-memref-byte-disp (mem-op)
   (ecase (car mem-op)
-    (instance-index-ref-c
+    ((instance-index-ref-c
+      raw-instance-ref-c/word
+      raw-instance-ref-c/signed-word)
      (destructuring-bind (index) (cdr mem-op)
        (- (ash (+ index instance-slots-offset) word-shift)
           instance-pointer-lowtag)))
