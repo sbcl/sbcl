@@ -495,3 +495,14 @@
    (close b)
    (assert (not (open-stream-p b)))
    (assert-error (write-string "test" b))))
+
+(defvar *some-stream*)
+(with-test (:name :closeable-synonym-stream)
+  (let ((*some-stream* (make-string-input-stream "hola")))
+    (let ((syn (make-synonym-stream '*some-stream*)))
+      (assert (eql (read-char syn) #\h))
+      (close syn)
+      (assert (not (open-stream-p syn)))
+      (assert-error (read-char syn))
+      (close syn) ; no error
+      (assert (eql (read-char *some-stream*) #\o)))))

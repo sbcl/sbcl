@@ -152,7 +152,7 @@
 (declaim (inline ansi-stream-open-stream-p))
 (defun ansi-stream-open-stream-p (stream)
   (declare (type ansi-stream stream))
-  ;; CLHS 22.1.4 lets us not worry about synonym streams here.
+  ;; CLHS 21.1.4 lets us not worry about synonym streams here.
   (not (eq (ansi-stream-in stream) #'closed-flame)))
 
 (defun open-stream-p (stream)
@@ -963,6 +963,18 @@
 
 (defun synonym-misc (stream operation &optional arg1 arg2)
   (declare (optimize (safety 1)))
+  ;; CLHS 21.1.4 implies that CLOSE on a synonym stream closes the synonym stream in that
+  ;; "The consequences are undefined if the synonym stream symbol is not bound to an open
+  ;;  stream from the time of the synonym stream's creation until the time it is closed."
+  ;;         The antecent of this "it" is the synonym stream --------------^
+  ;; which means that there exist a way to close synonym streams.
+  ;; We can presume that CLOSE is that way, despite some text seemingly to the contrary
+  ;;  "Any operations on a synonym stream will be performed on the stream that is then
+  ;;   the value of the dynamic variable named by the synonym stream symbol."
+  ;; so "any" in that sentence mean "almost any, with a notable exception".
+  (when (eq operation :close)
+    (set-closed-flame stream)
+    (return-from synonym-misc))
   (let ((syn (symbol-value (synonym-stream-symbol stream))))
     (if (ansi-stream-p syn)
         ;; We have to special-case some operations which interact with
