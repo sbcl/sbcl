@@ -2096,7 +2096,7 @@ core and return a descriptor to it."
   (+ (descriptor-bits code)
      (- sb-vm:other-pointer-lowtag)
      (code-header-bytes code)))
-(defun model-code-instructions (code)
+(defun code-instructions (code)
   (make-model-sap (calc-code-insts-address code) (descriptor-gspace code)))
 
 ;;; These are fairly straightforward translations of the similarly named accessor

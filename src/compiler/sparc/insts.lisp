@@ -1957,7 +1957,7 @@ about function addresses and register values.")
   (declare (type index offset))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb-vm::with-code-instructions (sap code)
+  (let ((sap (code-instructions code)))
     (ecase kind
       (:call
        (error "Can't deal with CALL fixups, yet."))

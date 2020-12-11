@@ -144,16 +144,16 @@
 
 ;;; Helper macro for defining FIXUP-CODE-OBJECT with emulation of SAP
 ;;; accessors so that the host and target can use the same fixup logic.
+#+(or x86 x86-64)
 (defmacro with-code-instructions ((sap-var code-var) &body body)
   #+sb-xc-host
   `(macrolet ((self-referential-code-fixup-p (value self)
                 `(let* ((base (sb-fasl::descriptor-base-address ,self))
                         (limit (+ base (1- (code-object-size ,self)))))
                    (<= base ,value limit)))
-              #+x86
               (containing-memory-space (code)
                 `(sb-fasl::descriptor-gspace-name ,code)))
-     (let ((,sap-var (sb-fasl::model-code-instructions ,code-var)))
+     (let ((,sap-var (code-instructions ,code-var)))
        ,@body))
   #-sb-xc-host
   `(macrolet ((self-referential-code-fixup-p (value self)
@@ -165,7 +165,6 @@
                         (limit (sap+ base (1- (code-object-size ,self))))
                         (value-sap (int-sap ,value)))
                    (and (sap>= value-sap base) (sap<= value-sap limit))))
-              #+x86
               (containing-memory-space (code)
                 (declare (ignore code))
                 :dynamic))

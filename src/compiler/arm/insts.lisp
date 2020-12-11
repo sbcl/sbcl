@@ -1747,7 +1747,7 @@
   (declare (type index offset))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb-vm::with-code-instructions (sap code)
+  (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
        (case flavor

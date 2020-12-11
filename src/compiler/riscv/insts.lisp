@@ -927,7 +927,7 @@
   #+64-bit
   (unless (typep value 'u+i-immediate)
     (error "Tried to fixup with ~a." value))
-  (sb-vm::with-code-instructions (sap code)
+  (let ((sap (code-instructions code)))
     (multiple-value-bind (u i) (u-and-i-inst-immediate value)
       (ecase kind
         (:absolute

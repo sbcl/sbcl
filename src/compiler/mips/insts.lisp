@@ -1387,7 +1387,7 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb-vm::with-code-instructions (sap code)
+  (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
        (setf (sap-ref-32 sap offset) value))
