@@ -449,7 +449,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
          (with-interrupts
            (alien-funcall %wait word-addr oldval to-sec to-usec))
          ;; We're unwinding, unknown whether in the process of waking
-         ;; up or not, just do a spurios wake up
+         ;; up or not, just do a spurious wake up
          (futex-wake word-addr 1))))))
 
 (defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
