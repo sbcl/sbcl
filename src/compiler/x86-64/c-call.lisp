@@ -200,6 +200,11 @@
 (defknown sign-extend ((signed-byte 64) t) fixnum
     (foldable flushable movable))
 
+(defoptimizer (sign-extend derive-type) ((x size))
+  (declare (ignore x))
+  (when (sb-c::constant-lvar-p size)
+    (specifier-type `(signed-byte ,(sb-c::lvar-value size)))))
+
 (define-vop (sign-extend)
   (:translate sign-extend)
   (:policy :fast-safe)
