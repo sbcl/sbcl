@@ -75,6 +75,10 @@ uword_t *eventdata;
 int n_logevents;
 #endif
 
+#ifdef ADDRESS_SANITIZER
+#include <sanitizer/asan_interface.h>
+#endif
+
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
  * behaviour: glibc defines sigset_t to support 1024 signals, which is
@@ -102,6 +106,9 @@ int n_logevents;
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
 {
+#ifdef ADDRESS_SANITIZER
+    sigemptyset(new);
+#endif
     memcpy(new, old, REAL_SIGSET_SIZE_BYTES);
 }
 
@@ -1007,6 +1014,7 @@ interrupt_handler_pending_p(void)
 void
 interrupt_handle_pending(os_context_t *context)
 {
+    __asan_unpoison_memory_region(context, sizeof *context);
     /* There are three ways we can get here. First, if an interrupt
      * occurs within pseudo-atomic, it will be deferred, and we'll
      * trap to here at the end of the pseudo-atomic block. Second, if

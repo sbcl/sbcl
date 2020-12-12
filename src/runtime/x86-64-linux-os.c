@@ -180,7 +180,7 @@ os_context_sigmask_addr(os_context_t *context)
     return &context->uc_sigmask;
 }
 
-void
+void NO_SANITIZE_ADDRESS
 os_restore_fp_control(os_context_t *context)
 {
     if (context->uc_mcontext.fpregs) {
