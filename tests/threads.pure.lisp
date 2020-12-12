@@ -449,8 +449,8 @@
                                           :timeout timeout
                                           :default :timeout))
                      (error "Hang in (join-thread ~A) ?" thread))))
-            (safe-join-thread t1 :timeout 10)
-            (safe-join-thread t3 :timeout 10)))))
+            (safe-join-thread t1 :timeout 60)
+            (safe-join-thread t3 :timeout 60)))))
     (when (zerop (mod run 60))
       (fresh-line)
       (write-string "; "))
