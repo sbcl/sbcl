@@ -370,6 +370,10 @@
 ;;; For PCL code walker
 (define-info-type (:function :walker-template) :type-spec (or list symbol))
 
+;;; The exact type for which this function is the predicate.
+;;; Applicable only for symbols in the CL package.
+(define-info-type (:function :predicate-for) :type-spec t)
+
 ;;; This is a type specifier <t> such that if an argument X to the function
 ;;; does not satisfy (TYPEP x <t>) then the function definitely returns NIL.
 ;;; When the named function is a predicate that appears in (SATISFIES p)

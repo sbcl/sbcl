@@ -1645,6 +1645,43 @@
       (values t t)
       (values nil nil)))
 
+;;; This list exists so that we can turn builtin (SATISFIES fn) types into types
+;;; amenable to algebra, because apparently there are some masochistic users
+;;; who expect (SUBTYPEP 'COMPLEX '(AND NUMBER (SATISFIES REALP))) => NIL and T.
+;;; There are possibly other entries that could go here,
+;;; e.g. (SATISFIES ARRAY-HEADER-P) is something involving the AND, NOT, OR
+;;; combinators. But it might render the expression too hairy to operate on.
+(dolist (pair '((arrayp array)
+                (atom atom)
+                (bit-vector-p bit-vector)
+                (characterp character)
+                (compiled-function-p compiled-function)
+                (complexp complex)
+                (consp cons)
+                (floatp float)
+                (functionp function)
+                (hash-table-p hash-table)
+                (integerp integer)
+                ;; KEYWORD is (SATISFIES KEYWORDP), so we can't turn
+                ;; the predicate into KEYWORD
+                (listp list)
+                (numberp number)
+                (packagep package)
+                (pathnamep pathname)
+                (random-state-p random-state)
+                (rationalp rational)
+                (readtablep readtable)
+                (realp real)
+                (simple-bit-vector-p simple-bit-vector)
+                (simple-string-p simple-string)
+                (simple-vector-p simple-vector)
+                (streamp stream)
+                (stringp string)
+                (symbolp symbol)
+                (vectorp vector)))
+  (destructuring-bind (function type) pair
+    (setf (info :function :predicate-for function) type)))
+
 (def-type-translator satisfies :list (&whole whole predicate-name)
   ;; "* may appear as the argument to a SATISFIES type specifier, but it
   ;;  indicates the literal symbol *" (which in practice is not useful)
@@ -1658,7 +1695,10 @@
    (keywordp (literal-ctype *satisfies-keywordp-type*))
    (legal-fun-name-p (literal-ctype *fun-name-type*))
    (adjustable-array-p (specifier-type '(and array (not simple-array))))
-   (t (%make-hairy-type whole))))
+   (t (let ((type (info :function :predicate-for predicate-name)))
+        (if type
+            (specifier-type type)
+            (%make-hairy-type whole))))))
 
 ;;;; negation types
 

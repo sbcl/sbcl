@@ -332,6 +332,15 @@
       (assert (eq yes cyes))
       (assert (eq win cwin)))))
 
+(with-test (:name :intelligent-satisfies)
+  (assert (sb-kernel:type= (sb-kernel:specifier-type '(satisfies realp))
+                           (sb-kernel:specifier-type 'real)))
+  ;; Part of an example in https://bugs.launchpad.net/sbcl/+bug/309455
+  (multiple-value-bind (answer certain)
+      (subtypep 'complex '(and number (satisfies realp)))
+    (assert (not answer))
+    (assert certain)))
+
 ;;; CONS type SUBTYPEP could be too enthusiastic about thinking it was
 ;;; certain
 (with-test (:name (subtypep cons satisfies))
