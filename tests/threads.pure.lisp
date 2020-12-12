@@ -408,9 +408,6 @@
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on (not :sb-thread)
-            ;; Maybe because they don't use futexes?
-            :fails-on (and :sb-thread
-                           (not (or :darwin :openbsd :sunos)))
             :broken-on :win32)
   ;; Test robustness of semaphore acquisition and notification with
   ;; asynchronous thread termination...  Which we know is currently

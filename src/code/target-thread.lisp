@@ -438,15 +438,19 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     (export 'futex-wake) ; for naughty users only
     (declaim (inline futex-wait futex-wake))
 
+    (define-alien-routine "futex_wake" int (word-addr unsigned) (n unsigned-long))
+
     (defun futex-wait (word-addr oldval to-sec to-usec)
       (with-alien ((%wait (function int unsigned
                                     #+freebsd unsigned #-freebsd (unsigned 32)
                                     long unsigned-long)
                           :extern "futex_wait"))
-        (with-interrupts
-         (alien-funcall %wait word-addr oldval to-sec to-usec))))
-
-    (define-alien-routine "futex_wake" int (word-addr unsigned) (n unsigned-long))))
+        (sb-sys:nlx-protect
+         (with-interrupts
+           (alien-funcall %wait word-addr oldval to-sec to-usec))
+         ;; We're unwinding, unknown whether in the process of waking
+         ;; up or not, just do a spurios wake up
+         (futex-wake word-addr 1))))))
 
 (defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
   (with-unique-names (n-thread n-lock new n-timeout)
