@@ -445,7 +445,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
                                     #+freebsd unsigned #-freebsd (unsigned 32)
                                     long unsigned-long)
                           :extern "futex_wait"))
-        (sb-sys:nlx-protect
+        (nlx-protect
          (with-interrupts
            (alien-funcall %wait word-addr oldval to-sec to-usec))
          ;; We're unwinding, unknown whether in the process of waking

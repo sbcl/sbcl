@@ -408,7 +408,7 @@
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :broken-on :sb-safepoint)
   ;; Test robustness of semaphore acquisition and notification with
   ;; asynchronous thread termination...  Which we know is currently
   ;; fragile.
