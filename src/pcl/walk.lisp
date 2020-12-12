@@ -765,23 +765,15 @@
               new-env)))
       (relist* form let walked-bindings walked-body))))
 
-(defun let*-binding-name (binding)
-  (if (symbolp binding)
-      binding
-      (car binding)))
-
-(defun let*-binding-init (binding)
-  (if (or (symbolp binding)
-          (null (cdr binding)))
-      'no-init
-      (cadr binding)))
-
-(defun let*-bindings (bindings &aux names inits (seen (make-hash-table :test #'eq)))
+(defun let*-bindings (bindings &aux names inits (seen (alloc-xset)))
   (dolist (binding (reverse bindings) (values names inits))
-    (let ((name (let*-binding-name binding)))
-      (push (cons name (gethash name seen)) names)
-      (setf (gethash name seen) t)
-      (push (let*-binding-init binding) inits))))
+    (multiple-value-bind (name init)
+        (cond ((atom binding) (values binding 'no-init))
+              ((not (cdr binding)) (values (car binding) 'no-init))
+              (t (values (car binding) (cadr binding))))
+      (push (cons name (xset-member-p name seen)) names)
+      (add-to-xset name seen)
+      (push init inits))))
 
 (defun walk-let* (form context env)
   (walker-environment-bind (new-env env)
