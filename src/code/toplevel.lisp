@@ -315,7 +315,7 @@ any non-negative real number."
 ;;; Flush anything waiting on one of the ANSI Common Lisp standard
 ;;; output streams before proceeding.
 (defun flush-standard-output-streams ()
-  (let ((null (make-broadcast-stream)))
+  (let ((null *null-broadcast-stream*))
     (dolist (name '(*debug-io*
                     *error-output*
                     *query-io*

@@ -922,7 +922,10 @@
              (file-string-length (car last) arg1)
              1)))
       (:close
-         (set-closed-flame stream))
+         ;; I don't know how something is trying to close the
+         ;; universal sink stream, but it is. Stop it from happening.
+         (unless (eq stream *null-broadcast-stream*)
+           (set-closed-flame stream)))
       (t
        (let ((res nil))
          (dolist (stream streams res)

@@ -342,7 +342,7 @@ variable: an unreadable object representing the error is printed instead.")
                (if (eq initiate :initiate)
                    (let ((*circularity-hash-table*
                           (make-hash-table :test 'eq)))
-                     (check-it (make-broadcast-stream))
+                     (check-it *null-broadcast-stream*)
                      (let ((*circularity-counter* 0))
                        (check-it stream)))
                    ;; otherwise

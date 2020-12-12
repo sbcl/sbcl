@@ -189,6 +189,7 @@
             (write-char #\= stream)
             t)))))
 
+(define-load-time-global *null-broadcast-stream* (make-broadcast-stream))
 (defmacro with-circularity-detection ((object stream) &body body)
   (with-unique-names (marker body-name)
     `(labels ((,body-name ()
@@ -204,7 +205,7 @@
                     (,body-name))))
              (t
               (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
-                (output-object ,object (make-broadcast-stream))
+                (output-object ,object *null-broadcast-stream*)
                 (let ((*circularity-counter* 0))
                   (let ((,marker (check-for-circularity ,object t
                                                         :logical-block)))

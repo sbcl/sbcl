@@ -553,7 +553,7 @@
          (sum-pct 0)
          (sum-bytes 0))
     (when (eq stream nil)
-      (setq stream (make-broadcast-stream))) ; lazy's person's approach
+      (setq stream sb-impl::*null-broadcast-stream*)) ; lazy's person's approach
     (cond ((not detail)
            (format stream "~&       %    Sum %        Bytes    Allocations   Function~%")
            (format stream "~& -------  -------  -----------    -----------   --------~%"))

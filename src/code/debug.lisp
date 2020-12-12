@@ -681,7 +681,7 @@ the current thread are replaced with dummy objects which can safely escape."
 
 (defun ensure-printable-object (object)
   (handler-case
-      (with-open-stream (out (make-broadcast-stream))
+      (with-open-stream (out sb-impl::*null-broadcast-stream*)
         (prin1 object out)
         object)
     (error (cond)
