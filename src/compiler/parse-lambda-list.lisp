@@ -308,10 +308,13 @@
                      ;; (This is not a regression)
                      (destructuring-bind (var &optional default sup-p) arg
                        (if (and (consp var) (eq what-kind '&key))
-                           (destructuring-bind (keyword-name var) var
-                             (unless (symbolp keyword-name)
-                               (croak "keyword-name in ~S is not a symbol" arg))
-                             (need-bindable var description))
+                           (cond ((singleton-p (cdr var))
+                                  (destructuring-bind (keyword-name var) var
+                                    (unless (symbolp keyword-name)
+                                      (croak "keyword-name in ~S is not a symbol" arg))
+                                    (need-bindable var description)))
+                                 (t
+                                  (croak "invalid &KEY syntax: ~S" var)))
                            (need-bindable var description))
                        ;; Inform the user about a possibly malformed
                        ;; destructuring list (&OPTIONAL (A &OPTIONAL B)).
