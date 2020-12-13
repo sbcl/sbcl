@@ -986,7 +986,7 @@ is supported only on simple-streams."
       (simple-stream
        (%write-sequence stream seq start end))
       (ansi-stream
-       (sb-impl::ansi-stream-write-sequence seq stream start end))
+       (sb-impl::write-seq-impl seq stream start end))
       (fundamental-stream
        (sb-gray:stream-write-sequence stream seq start end)))))
 

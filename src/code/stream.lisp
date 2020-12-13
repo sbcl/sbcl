@@ -1245,6 +1245,9 @@
                                    start numbytes nil))
     (cond
       ((not eof-error-p)
+       ;; Really these should go through WRITE-SEQ-IMPL,
+       ;; but then the simple-streams contrib redefinitions would have to
+       ;; redefine that. (The ideal is to avoid repeated keyword parsing.)
        (write-sequence buffer (echo-stream-output-stream stream)
                        :start start :end (+ start bytes-read))
        bytes-read)
@@ -2419,18 +2422,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 (defun write-sequence (seq stream &key (start 0) (end nil))
   "Write the elements of SEQ bounded by START and END to STREAM."
-  (cond ((typep stream 'broadcast-stream)
-         (let* ((length (length seq))
-                (end (or end length)))
-           (unless (<= start end length)
-             (sequence-bounding-indices-bad-error seq start end))
-           (dolist (s (broadcast-stream-streams stream) seq)
-             (write-sequence seq s :start start :end end))))
-        ((ansi-stream-p stream)
-         (ansi-stream-write-sequence seq stream start end))
-        (t
-         ;; must be Gray-streams FUNDAMENTAL-STREAM
-         (stream-write-sequence stream seq start end))))
+  (let* ((length (length seq))
+         (end (or end length)))
+    (unless (<= start end length)
+      (sequence-bounding-indices-bad-error seq start end)))
+  (write-seq-impl seq stream start end))
 
 ;;; This macro allows sharing code between
 ;;; WRITE-SEQUENCE/WRITE-FUNCTION and SB-GRAY:STREAM-WRITE-STRING.
@@ -2509,17 +2505,34 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (write-generic-sequence (compute-write-function nil)))))))
 (declaim (notinline write-sequence/write-function))
 
-(defun ansi-stream-write-sequence (seq stream start %end)
+;;; This takes any kind of stream, not just ansi streams, because of recursion.
+;;; It's basically just the non-keyword-accepting entry for WRITE-SEQUENCE.
+(defun write-seq-impl (seq stream start %end)
   (declare (type sequence seq)
-           (type ansi-stream stream)
+           (type stream stream)
            (type index start)
            (type sequence-end %end)
            (values sequence)
            (inline write-sequence/write-function))
-  (write-sequence/write-function
-   seq stream start %end (stream-element-mode stream)
-   (ansi-stream-out stream) (ansi-stream-bout stream))
-  seq)
+  (typecase stream
+    ((not ansi-stream)
+     ;; must be Gray-streams FUNDAMENTAL-STREAM
+     (stream-write-sequence stream seq start %end))
+    ;; Don't merely extract one layer of composite stream, because a synonym stream
+    ;; may redirect to a broadcast stream which wraps a two-way-stream etc etc.
+    (synonym-stream
+     (write-seq-impl seq (symbol-value (synonym-stream-symbol stream)) start %end))
+    (broadcast-stream
+     (dolist (s (broadcast-stream-streams stream) seq)
+       (write-seq-impl seq s start %end)))
+    (two-way-stream ; handles ECHO-STREAM also
+     (write-seq-impl seq (two-way-stream-output-stream stream) start %end))
+    ;; file, string, pretty, and case-frob streams all fall through to the default
+    (t
+     (write-sequence/write-function
+      seq stream start %end (stream-element-mode stream)
+      (ansi-stream-out stream) (ansi-stream-bout stream))
+     seq)))
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
