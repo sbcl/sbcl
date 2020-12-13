@@ -61,7 +61,10 @@
   (init-var-ignoring-errors
    *posix-argv*
    (loop for i from 0
-         for arg = (sb-alien:deref (sb-alien:extern-alien posix_argv (* sb-alien:c-string)) i)
+         for arg = (sb-alien:deref (sb-alien:extern-alien posix_argv
+                                                          (* (sb-alien:c-string
+                                                              #+win32 :external-format #+win32 :ucs-2)))
+                                   i)
          while arg
          collect arg))
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")

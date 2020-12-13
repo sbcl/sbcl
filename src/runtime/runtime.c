@@ -33,6 +33,8 @@
 #include "runtime.h"
 #ifndef LISP_FEATURE_WIN32
 #include <sched.h>
+#else
+#include <shellapi.h>
 #endif
 #include <errno.h>
 #include <locale.h>
@@ -338,7 +340,13 @@ parse_size_arg(char *arg, char *arg_name)
   return res;
 }
 
-char **posix_argv;
+#ifdef LISP_FEATURE_WIN32
+    wchar_t
+#else
+    char
+#endif
+    **posix_argv;
+
 char *core_string;
 
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
@@ -410,7 +418,13 @@ sbcl_main(int argc, char *argv[], char *envp[])
     /* the name of the core file we're to execute. Note that this is
      * a malloc'ed string which should be freed eventually. */
     char *core = 0;
-    char **sbcl_argv = 0;
+
+#ifdef LISP_FEATURE_WIN32
+    wchar_t
+#else
+        char
+#endif
+        **sbcl_argv = 0;
     os_vm_offset_t embedded_core_offset = 0;
 
     /* other command line options */
@@ -463,7 +477,12 @@ sbcl_main(int argc, char *argv[], char *envp[])
         dynamic_space_size = memsize_options.dynamic_space_size;
         thread_control_stack_size = memsize_options.thread_control_stack_size;
         dynamic_values_bytes = memsize_options.thread_tls_bytes;
+#ifndef LISP_FEATURE_WIN32
         sbcl_argv = argv;
+#else
+        int wargc;
+        sbcl_argv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+#endif
     } else {
         int argi = 1;
 
@@ -570,6 +589,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
         {
             char *argi0 = argv[argi];
             int argj = 1;
+#ifndef LISP_FEATURE_WIN32
             /* (argc - argi) for the arguments, one for the binary,
                and one for the terminating NULL. */
             sbcl_argv = successful_malloc((2 + argc - argi) * sizeof(char *));
@@ -587,6 +607,24 @@ sbcl_main(int argc, char *argv[], char *envp[])
                 }
                 sbcl_argv[argj++] = arg;
             }
+#else
+            /* The runtime options are processed as chars above, which may
+             * not always work but may be good enough for now, as it
+             * has been for a long time. */
+            int wargc;
+            wchar_t** wargv;
+            wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+            sbcl_argv = successful_malloc((2 + wargc - argi) * sizeof(wchar_t *));
+            sbcl_argv[0] = wargv[0];
+            while (argi < wargc) {
+                wchar_t *warg = wargv[argi++];
+                if (!end_runtime_options &&
+                    0 == wcscmp(warg, L"--end-runtime-options")) {
+                    lose("bad runtime option \"%s\"", argi0);
+                }
+                sbcl_argv[argj++] = warg;
+            }
+#endif
             sbcl_argv[argj] = 0;
         }
     }
