@@ -1014,7 +1014,9 @@ interrupt_handler_pending_p(void)
 void
 interrupt_handle_pending(os_context_t *context)
 {
+#ifdef ADDRESS_SANITIZER
     __asan_unpoison_memory_region(context, sizeof *context);
+#endif
     /* There are three ways we can get here. First, if an interrupt
      * occurs within pseudo-atomic, it will be deferred, and we'll
      * trap to here at the end of the pseudo-atomic block. Second, if
