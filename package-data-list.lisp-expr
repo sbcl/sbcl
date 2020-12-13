@@ -2270,11 +2270,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SET-LAYOUT-INHERITS"
                "%CODE-ENTRY-POINT"
                "%CODE-FUN-OFFSET"
-               "CODE-ENTRY-POINTS" ; new accessor - returns a vector
                "CODE-N-ENTRIES"
                "CODE-N-NAMED-CALLS"
                "CODE-OBJ-IS-FILLER-P"
-               "%CODE-ENTRY-POINTS" ; prefer %CODE-ENTRY-POINT instead of this
                "%DENOMINATOR"
                "%OTHER-POINTER-P"
                "%OTHER-POINTER-SUBTYPE-P"

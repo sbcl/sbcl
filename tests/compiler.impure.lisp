@@ -3007,7 +3007,7 @@
     (assert (eql (foo1 10 1) 3628800))
     (let ((code (sb-kernel::fun-code-header #'foo1)))
       (assert (= (sb-kernel::code-n-entries code) 1))
-      (assert (eq (aref (sb-kernel::code-entry-points code) 0)
+      (assert (eq (sb-kernel:%code-entry-point code 0)
                   #'foo1)))))
 
 (with-test (:name (:block-compile :inline))

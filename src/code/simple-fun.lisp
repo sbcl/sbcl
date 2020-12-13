@@ -383,9 +383,6 @@
         ;; return it unchanged in all other cases
         info)))
 
-(defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
-  (%code-entry-point code-obj 0))
-
 (declaim (inline code-obj-is-filler-p))
 (defun code-obj-is-filler-p (code-obj)
   ;; See also HOLE-P in the allocator (same thing but using SAPs)
@@ -472,11 +469,6 @@
     (truly-the function
       (values (%primitive sb-c:compute-fun code-obj
                           (%code-fun-offset code-obj fun-index))))))
-
-(defun code-entry-points (code-obj) ; FIXME: obsolete
-  (let ((a (make-array (code-n-entries code-obj))))
-    (dotimes (i (length a) a)
-      (setf (aref a i) (%code-entry-point code-obj i)))))
 
 ;;; Return the 0-based index of SIMPLE-FUN within its code component.
 ;;; Computed via binary search.
