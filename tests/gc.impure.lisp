@@ -339,7 +339,7 @@
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
-     (when (>= (sb-vm::primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))
+     (when (>= (sb-ext:primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))
        (let* ((addr (sb-kernel:get-lisp-obj-address obj))
               (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
          (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
@@ -469,7 +469,7 @@
 (with-test (:name :no-conses-on-large-object-pages)
   (let* ((fun (checked-compile '(lambda (&rest params) params)))
          (list (make-list #+gencgc (/ sb-vm:large-object-size
-                                      (sb-vm::primitive-object-size '(1))
+                                      (sb-ext:primitive-object-size '(1))
                                       1/2)
                           #-gencgc 16384))
          (rest (apply fun list)))

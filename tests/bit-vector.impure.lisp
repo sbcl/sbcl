@@ -132,7 +132,7 @@
                                      sb-vm:n-fixnum-bits
                                      (ash (sb-sys:sap-int addr)
                                           (- sb-vm:n-fixnum-tag-bits)))))
-           (size (sb-vm::primitive-object-size object)))
+           (size (sb-ext:primitive-object-size object)))
       (assert (simple-bit-vector-p object))
       (assert (= size n-bytes))
       (assert (not (sb-kernel:%bit-position/1 object nil 0 n-bits)))

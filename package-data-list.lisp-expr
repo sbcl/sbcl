@@ -873,6 +873,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; Misc. array and vector tools.
                "ARRAY-STORAGE-VECTOR"
+               "PRIMITIVE-OBJECT-SIZE"
 
                ;; This is something which must exist inside any Common
                ;; Lisp implementation, and which someone writing a
@@ -3423,7 +3424,7 @@ SBCL itself"
   slot-makunbound
   make-load-form-saving-slots
   sb-vm:map-allocated-objects
-  sb-vm::primitive-object-size
+  sb-ext:primitive-object-size
   sb-vm::remove-static-links)
  ;; CLOS implementation
  (sb-mop:class-finalized-p

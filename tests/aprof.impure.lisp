@@ -25,7 +25,7 @@
                 (loop repeat 50 collect (make-fruitbasket))))
             :stream nil)))
     (assert (= nbytes
-               (* 50 (+ (sb-vm::primitive-object-size (make-fruitbasket))
+               (* 50 (+ (sb-ext:primitive-object-size (make-fruitbasket))
                         (* 2 sb-vm:n-word-bytes))))))) ; cons cells
 
 (with-test (:name :aprof-smoketest-non-constant-size-vector
@@ -51,7 +51,7 @@
                 (declare (optimize sb-c::instrument-consing))
                 (make-array (* 128 16) :element-type 'bit)))
             :stream nil)))
-    (assert (= nbytes (sb-vm::primitive-object-size
+    (assert (= nbytes (sb-ext:primitive-object-size
                        (make-array (* 128 16) :element-type 'bit))))))
 
 (with-test (:name :aprof-smoketest-large-vector

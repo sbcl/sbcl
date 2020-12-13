@@ -2022,10 +2022,10 @@ table itself."
               ht))))
 
 (defun hash-table-mem-used (ht)
-  (+ (sb-vm::primitive-object-size (hash-table-pairs ht))
-     (sb-vm::primitive-object-size (hash-table-index-vector ht))
-     (sb-vm::primitive-object-size (hash-table-next-vector ht))
-     (acond ((hash-table-hash-vector ht) (sb-vm::primitive-object-size it))
+  (+ (primitive-object-size (hash-table-pairs ht))
+     (primitive-object-size (hash-table-index-vector ht))
+     (primitive-object-size (hash-table-next-vector ht))
+     (acond ((hash-table-hash-vector ht) (primitive-object-size it))
             (t 0))))
 
 (defun show-growth (&optional (factor 1.5))

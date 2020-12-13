@@ -661,7 +661,7 @@
     (sb-sys:with-pinned-objects (code)
       (let* ((base (logandc2 (sb-kernel:get-lisp-obj-address code)
                              sb-vm:lowtag-mask))
-             (limit (+ base (sb-vm::primitive-object-size code))))
+             (limit (+ base (sb-ext:primitive-object-size code))))
         (flet ((properly-tagged-p (ptr)
                  (eql (alien-funcall (extern-alien "properly_tagged_p_internal"
                                                    (function int unsigned unsigned))

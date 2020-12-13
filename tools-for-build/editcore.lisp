@@ -404,7 +404,7 @@
      (loop
       (when (>= physaddr end) (return))
       (let* ((obj (reconstitute-object (ash physaddr (- n-fixnum-tag-bits))))
-             (size (sb-vm::primitive-object-size obj)))
+             (size (primitive-object-size obj)))
         (when (and (symbolp obj)
                    (string= symbol-name (translate (symbol-name obj) spaces))
                    (%instancep (symbol-package obj))

@@ -207,7 +207,6 @@
 ;;; But see WITH-PINNED-OBJECT-ITERATOR in 'target-hash-table' which offers
 ;;; a way to mitigate the need to bind/unbind a special var when doing a massive
 ;;; numbers of WITH-PINNED-OBJECT operations.
-;;; FIXME: export this from SB-EXT
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (unless (is-lisp-pointer (get-lisp-obj-address object))

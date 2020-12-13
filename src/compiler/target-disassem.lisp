@@ -2450,7 +2450,7 @@
                     (let ((base-obj
                             (if (simple-fun-p thing) (fun-code-header thing) thing)))
                       (+ (logandc2 (get-lisp-obj-address base-obj) sb-vm:lowtag-mask)
-                         (sb-vm::primitive-object-size base-obj)
+                         (primitive-object-size base-obj)
                          -1)))
             (return thing)))))))
 
