@@ -1338,7 +1338,8 @@
                                   (t
                                    (give-up-ir1-transform))))
              (pattern-end (cond ((constant-lvar-p end1)
-                                 (lvar-value end1))
+                                 (or (lvar-value end1)
+                                     (length pattern)))
                                 ((not end1)
                                  (length pattern))
                                 (t

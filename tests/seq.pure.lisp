@@ -534,3 +534,12 @@
         `(lambda (x)
            (make-array 3 :element-type 'fixnum :initial-element x))
       ((1) #(1 1 1) :test #'equalp))))
+
+
+(with-test (:name (search :type-derivation))
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (search '(a) s :end1 nil))
+    (('(b a)) 1)
+    ((#(1)) nil)))
