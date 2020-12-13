@@ -71,6 +71,7 @@
         (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
           (setf (svref infos (saetp-typecode saetp)) saetp))))
 
+    ;; This one is here for completeness only- LENGTH does not imply size.
     (setf (svref infos simple-array-nil-widetag)
           (make-room-info 0 'simple-array-nil :other))
 
@@ -111,6 +112,7 @@
     infos))
 
 (define-load-time-global *room-info* (!compute-room-infos))
+(declaim (type (simple-vector 256) *room-info*))
 
 (defconstant-eqx +heap-spaces+
   '((:dynamic   "Dynamic space"   dynamic-usage)
@@ -208,48 +210,51 @@
 ;;; FIXME: export this from SB-EXT
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
-  (if (is-lisp-pointer (get-lisp-obj-address object))
-      (let ((words
-              (typecase object
-                (cons 2)
-                (instance (1+ (instance-length object)))
-                (function
-                 (when (= (fun-subtype object) simple-fun-widetag)
-                   (return-from primitive-object-size
-                     (primitive-object-size (fun-code-header object))))
-                 (1+ (get-closure-length object)))
-                (null sizeof-nil-in-words)
-                (code-component
-                 (return-from primitive-object-size (code-object-size object)))
-                (fdefn 4) ; no length stored in the header
-                ;; Anything else is an OTHER pointer.
-                (t
-                 (let ((room-info
-                         (aref *room-info* (%other-pointer-widetag object))))
-                   (if (arrayp object)
-                       (cond ((array-header-p object)
-                              (+ array-dimensions-offset (array-rank object)))
-                             ((simple-array-nil-p object) 2)
-                             (t
-                              (let* ((length (+ (length object)
-                                                (saetp-n-pad-elements room-info)))
-                                     (n-bits (saetp-n-bits room-info))
-                                     (alignment-pad (floor 7 n-bits))
+  (unless (is-lisp-pointer (get-lisp-obj-address object))
+    (return-from primitive-object-size 0))
+  (let ((words
+         ;; This should pick off the most frequently-occurring things first.
+         ;; CONS and INSTANCE of course top the list.
+         (typecase object
+           (cons 2)
+           (instance (1+ (instance-length object)))
+           (function
+            (when (= (fun-subtype object) simple-fun-widetag)
+              (return-from primitive-object-size
+                (code-object-size (fun-code-header (truly-the simple-fun object)))))
+            (1+ (get-closure-length object)))
+           (code-component
+            (return-from primitive-object-size (code-object-size object)))
+           ;; Most everything else is an OTHER pointer, except for NIL.
+           ;; Arrays (especially strings and simple-vector) and symbols tend to be the
+           ;; next-most-common heap object, for which we need the ROOM-INFO.
+           (t
+            (let ((room-info (aref *room-info* (%other-pointer-widetag object))))
+              (cond ((typep room-info 'specialized-array-element-type-properties)
+                     (aver (typep object '(simple-array * (*))))
+                     (let* ((length (+ (length object) (saetp-n-pad-elements room-info)))
+                            (n-bits (saetp-n-bits room-info))
+                            (alignment-pad (floor 7 n-bits))
                                      ;; This math confuses me. So there's a self-test
                                      ;; against the C code which is known good.
-                                     (n-data-octets (if (>= n-bits 8)
-                                                        (* length (ash n-bits -3))
-                                                        (ash (* (+ length alignment-pad)
-                                                                n-bits)
-                                                             -3))))
-                                (+ (ceiling n-data-octets n-word-bytes) ; N data words
-                                   vector-data-offset))))
-                       ;; Other things (symbol, value-cell, etc)
-                       ;; don't have a sizer, so use GET-HEADER-DATA
-                       (1+ (logand (get-header-data object)
-                                   (room-info-mask room-info)))))))))
-        (* (align-up words 2) n-word-bytes))
-      0))
+                            (n-data-octets (if (>= n-bits 8)
+                                               (* length (ash n-bits -3))
+                                               (ash (* (+ length alignment-pad) n-bits)
+                                                    -3))))
+                       (+ (ceiling n-data-octets n-word-bytes) ; N data words
+                          vector-data-offset)))
+                    (t
+                     (typecase object
+                       (fdefn 4) ; constant length not stored in the header
+                       ((satisfies array-header-p)
+                        (+ array-dimensions-offset (array-rank object)))
+                       ((simple-array nil (*)) 2) ; no payload
+                       (null sizeof-nil-in-words)
+                       (t
+                        ;; GET-HEADER-DATA works for everything that's left
+                        (1+ (logand (get-header-data object)
+                                    (room-info-mask room-info))))))))))))
+        (* (align-up words 2) n-word-bytes)))
 
 (defmacro widetag@baseptr (sap)
   #+big-endian `(sap-ref-8 ,sap ,(1- n-word-bytes))
