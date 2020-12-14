@@ -1598,7 +1598,7 @@ symbol-case giving up: case=((V U) (F))
                 (with-current-source-form (varlist)
                   (mapcar (lambda (var)
                             (with-current-source-form (var)
-                              (or (cond ((symbolp var) var)
+                              (or (cond ((symbolp var) (list var))
                                         ((listp var)
                                          (unless (symbolp (first var))
                                            (error "~S step variable is not a symbol: ~S"
@@ -1615,6 +1615,7 @@ symbol-case giving up: case=((V U) (F))
                `(block ,block
                   (,bind ,inits
                     ,@decls
+                    (declare (ignorable ,@(mapcar #'car inits)))
                     (tagbody
                      (go ,label-2)
                      ,label-1
@@ -1670,7 +1671,7 @@ symbol-case giving up: case=((V U) (F))
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (binding* (((forms decls) (parse-body body nil))
-             (n-list (sb-xc:gensym "N-LIST"))
+             (n-list (sb-xc:gensym "LIST"))
              (start (sb-xc:gensym "START"))
              ((clist members clist-ok)
               (with-current-source-form (list)
@@ -1699,6 +1700,7 @@ symbol-case giving up: case=((V U) (F))
               (let ((,var ,(if clist-ok
                                `(truly-the (member ,@members) (car ,n-list))
                                `(car ,n-list))))
+                (declare (ignorable ,var))
                 ,@decls
                 (setq ,n-list (cdr ,n-list))
                 (tagbody ,@forms))

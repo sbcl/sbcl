@@ -3022,3 +3022,12 @@
       (multiple-value-call #'list
         10 (apply #'values '(44 33d0))))
    (() '(10 44  33d0) :test #'equal)))
+
+(with-test (:name :lp719585)
+  ;; Iteration variables are always "used"
+  (checked-compile '(lambda () (do (var) (t))))
+  (checked-compile '(lambda () (do* (var) (t))))
+  (checked-compile '(lambda () (do-all-symbols (var))))
+  (checked-compile '(lambda () (do-external-symbols (var))))
+  (checked-compile '(lambda () (do-symbols (var))))
+  (checked-compile '(lambda () (dolist (var '(1 2 3))))))
