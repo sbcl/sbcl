@@ -623,7 +623,7 @@
                            sb-impl::|Vector| vector)))
       (let* ((type (constant-form-value type env))
              (length (1- (length x)))
-             (ctype (careful-values-specifier-type type)))
+             (ctype (careful-specifier-type type)))
         (if (and ctype
                  (neq ctype *empty-type*)
                  (csubtypep ctype (specifier-type '(array * (*)))))

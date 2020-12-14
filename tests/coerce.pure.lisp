@@ -137,3 +137,10 @@
     ((10) 10.0)
     ((1/2) 0.5)
     ((30d0) 30d0)))
+
+(with-test (:name :no-coerce-to-values-type)
+  (multiple-value-bind (fun warnp errorp)
+      (checked-compile '(lambda (x) (coerce (list x) '(values list)))
+                       :allow-warnings t)
+    (assert (and warnp errorp))
+    (assert-error (funcall fun 1))))
