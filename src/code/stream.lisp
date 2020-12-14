@@ -2512,7 +2512,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type stream stream)
            (type index start)
            (type sequence-end %end)
-           (values sequence)
            (inline write-sequence/write-function))
   (typecase stream
     ((not ansi-stream)
@@ -2527,7 +2526,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
        (write-seq-impl seq s start %end)))
     (two-way-stream ; handles ECHO-STREAM also
      (write-seq-impl seq (two-way-stream-output-stream stream) start %end))
-    ;; file, string, pretty, and case-frob streams all fall through to the default
+    ;; file, string, pretty, and case-frob streams all fall through to the default,
+    ;; which has special logic for fd-stream.
     (t
      (write-sequence/write-function
       seq stream start %end (stream-element-mode stream)
