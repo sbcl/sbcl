@@ -1324,6 +1324,10 @@
       ;; to be bound... yet nowhere does it say that the special declaration
       ;; removes the constantness. Call it a spec bug and prohibit it. Same
       ;; for GLOBAL variables.
+      (unless (symbolp name)
+        (compiler-error
+         "~S is not a symbol and thus can't be declared special."
+         name))
       (let ((kind (info :variable :kind name)))
         (unless (member kind '(:special :unknown))
           (compiler-error

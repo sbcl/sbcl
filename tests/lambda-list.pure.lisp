@@ -52,6 +52,10 @@
   ;; is ":allow-failure". It sounds like it's a permission, not a requirement.
   (checked-compile '(lambda (&key ((x) 1)) x) :allow-failure t))
 
+(with-test (:name :lp1740756)
+  (checked-compile '(lambda () (declare (special 1))) :allow-failure t)
+  (checked-compile '(lambda () (declare (special (foo)))) :allow-failure t))
+
 (with-test (:name (:lambda-list :supplied-p-order 1))
   (let ((* 10))
     (assert (eql ((lambda (&key (x * *)) () x)) 10))
