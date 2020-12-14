@@ -721,7 +721,13 @@ status slot."
                       #+win32 (escape-arguments t)
                       #+win32 (window nil))
   "RUN-PROGRAM creates a new process specified by PROGRAM.
-ARGS are passed as the arguments to the program.
+ARGS is a list of strings to be passed literally to the new program.
+In POSIX environments, this list becomes the array supplied as the second
+parameter to the execv() or execvp() system call, each list element becoming
+one array element. The strings should not contain shell escaping, as there is
+no shell involvement. Further note that while conventionally the process
+receives its own pathname in argv[0], that is automatic, and the 0th string
+should not be present in ARGS.
 
 The program arguments and the environment are encoded using the
 default external format for streams.
