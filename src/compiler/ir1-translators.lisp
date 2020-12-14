@@ -613,11 +613,18 @@ be a lambda expression."
   (with-fun-name-leaf (leaf thing start :global-function t)
     (reference-leaf start next result leaf)))
 
-(defun constant-global-fun-name (thing)
-  (let ((constantp (constantp thing)))
+;;; Return T if THING is a constant value and either a symbol (if EXTENDEDP is NIL)
+;;; or an extended-function-name (if EXTENDEDP is T).
+;;; Note however that whether THING actually names something is irrelevant.
+;;; This test is only if it _could_ name something. Return NIL if THING is a function
+;;; or a constant form evaluating to a function, or not a legal designator at all.
+(defun constant-global-fun-name (thing lexenv extendedp)
+  (let ((constantp (constantp thing lexenv)))
     (when constantp
-      (let ((name (constant-form-value thing)))
-        (when (legal-fun-name-p name)
+      (let ((name (constant-form-value thing lexenv)))
+        (when (if extendedp
+                  (legal-fun-name-p name)
+                  (symbolp name))
           name)))))
 
 (defun lvar-constant-global-fun-name (lvar)
@@ -626,14 +633,15 @@ be a lambda expression."
       (when (legal-fun-name-p name)
         name))))
 
-(defun ensure-source-fun-form (source &key (coercer '%coerce-callable-for-call) give-up)
+(defun ensure-source-fun-form (source lexenv &key (coercer '%coerce-callable-for-call)
+                                             (extendedp t) give-up)
   (let ((op (when (consp source) (car source))))
     (cond ((memq op '(%coerce-callable-to-fun %coerce-callable-for-call))
-           (ensure-source-fun-form (second source) :coercer coercer))
+           (ensure-source-fun-form (second source) lexenv :coercer coercer))
           ((member op '(function global-function lambda named-lambda))
            (values source nil))
           (t
-           (let ((cname (constant-global-fun-name source)))
+           (let ((cname (constant-global-fun-name source lexenv extendedp)))
              (if cname
                  (values `(global-function ,cname) nil)
                  (values `(,coercer ,source) give-up)))))))
@@ -691,8 +699,14 @@ be a lambda expression."
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
-(define-source-transform funcall (function &rest args)
-  `(%funcall ,(ensure-source-fun-form function :coercer '%coerce-callable-for-call) ,@args))
+(define-source-transform funcall (function &rest args &environment env)
+  ;; This transform should not allow violating the type constraint on FUNCALL
+  ;; by sneaking in a use of #'name via %FUNCALL in cases where the name is
+  ;; an extended-function-designator instead of just function-designator.
+  `(%funcall ,(ensure-source-fun-form function env
+                                      :coercer '%coerce-callable-for-call
+                                      :extendedp nil)
+             ,@args))
 
 (deftransform %coerce-callable-to-fun ((thing) * * :node node)
   "optimize away possible call to FDEFINITION at runtime"
@@ -703,8 +717,8 @@ be a lambda expression."
   "optimize away possible call to FDEFINITION at runtime"
   (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
 
-(define-source-transform %coerce-callable-to-fun (thing)
-  (ensure-source-fun-form thing :give-up t))
+(define-source-transform %coerce-callable-to-fun (thing &environment env)
+  (ensure-source-fun-form thing env :give-up t))
 
 
 ;;;; LET and LET*
@@ -1444,7 +1458,10 @@ values from the first VALUES-FORM making up the first argument, etc."
                    ;; important for simplifying compilation of
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
-    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun :coercer '%coerce-callable-for-call))
+    (ir1-convert start ctran fun-lvar
+                 (ensure-source-fun-form fun *lexenv*
+                                         :coercer '%coerce-callable-for-call
+                                         :extendedp nil))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))
