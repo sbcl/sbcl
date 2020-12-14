@@ -647,20 +647,10 @@ and no value was provided for it." name))))))))))
 ;;; defaults. Returning the actual vars allows us to use the right
 ;;; variable name in warnings.
 ;;;
-;;; A slightly subtle point: with keywords and optionals, the type in
-;;; the function type is only an assertion on calls --- it doesn't
-;;; constrain the type of default values. So we have to union in the
-;;; type of the default. With optionals, we can't do any assertion
-;;; unless the default is constant.
-;;;
-;;; With keywords, we exploit our knowledge about how hairy keyword
-;;; defaulting is done when computing the type assertion to put on the
-;;; main-entry argument. In the case of hairy keywords, the default
-;;; has been clobbered with NIL, which is the value of the main-entry
-;;; arg in the unsupplied case, whatever the actual default value is.
-;;; So we can just assume the default is constant, effectively
-;;; unioning in NULL, and not totally blow off doing any type
-;;; assertion.
+;; Despite FTYPE proclamations affecting only the calls and not the
+;; function itself, it would be very weird to see a default of &key or
+;; &optional be different from the proclaimed type. Accept NULL only
+;; when there's no default form.
 (defun find-optional-dispatch-types (od type where)
   (declare (type optional-dispatch od)
            (type fun-type type)
@@ -711,47 +701,50 @@ and no value was provided for it." name))))))))))
             (arglist (optional-dispatch-arglist od)))
         (dolist (arg arglist)
           (cond
-           ((lambda-var-arg-info arg)
-            (let* ((info (lambda-var-arg-info arg))
-                   (default (arg-info-default info))
-                   (def-type (when (constantp default)
-                               (ctype-of (constant-form-value default)))))
-              (ecase (arg-info-kind info)
-                (:keyword
-                 (let* ((key (arg-info-key info))
-                        (kinfo (find key keys :key #'key-info-name)))
-                   (cond
-                    (kinfo
-                     (res (type-union (key-info-type kinfo)
-                                      (or def-type (specifier-type 'null)))))
-                    (t
-                     (note-lossage
-                      "Defining a ~S keyword not present in ~A."
-                      key where)
-                     (res *universal-type*)))))
-                (:required (res (pop type-required)))
-                (:optional
-                 ;; We can exhaust TYPE-OPTIONAL when the type was
-                 ;; simplified as described above.
-                 (res (type-union (or (pop type-optional)
-                                      *universal-type*)
-                                  (or def-type *universal-type*))))
-                (:rest
-                 (when (fun-type-rest type)
-                   (res (specifier-type 'list))))
-                (:more-context
-                 (when (fun-type-rest type)
-                   (res *universal-type*)))
-                (:more-count
-                 (when (fun-type-rest type)
-                   (res (specifier-type 'fixnum)))))
-              (vars arg)
-              (when (arg-info-supplied-p info)
-                (res *universal-type*)
-                (vars (arg-info-supplied-p info)))))
-           (t
-            (res (pop type-required))
-            (vars arg))))
+            ((lambda-var-arg-info arg)
+             (let* ((info (lambda-var-arg-info arg))
+                    (default-p (arg-info-default-p info)))
+               (ecase (arg-info-kind info)
+                 (:keyword
+                  (let* ((key (arg-info-key info))
+                         (kinfo (find key keys :key #'key-info-name)))
+                    (cond
+                      (kinfo
+                       (res (if default-p
+                                (key-info-type kinfo)
+                                (type-union (key-info-type kinfo)
+                                            (specifier-type 'null)))))
+                      (t
+                       (note-lossage
+                        "Defining a ~S keyword not present in ~A."
+                        key where)
+                       (res *universal-type*)))))
+                 (:required (res (pop type-required)))
+                 (:optional
+                  ;; We can exhaust TYPE-OPTIONAL when the type was
+                  ;; simplified as described above.
+                  (res (let ((type (or (pop type-optional)
+                                       *universal-type*)))
+                         (if default-p
+                             type
+                             (type-union type
+                                         (specifier-type 'null))))))
+                 (:rest
+                  (when (fun-type-rest type)
+                    (res (specifier-type 'list))))
+                 (:more-context
+                  (when (fun-type-rest type)
+                    (res *universal-type*)))
+                 (:more-count
+                  (when (fun-type-rest type)
+                    (res (specifier-type 'fixnum)))))
+               (vars arg)
+               (when (arg-info-supplied-p info)
+                 (res *universal-type*)
+                 (vars (arg-info-supplied-p info)))))
+            (t
+             (res (pop type-required))
+             (vars arg))))
 
         (dolist (key keys)
           (unless (find (key-info-name key) arglist

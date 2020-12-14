@@ -3023,6 +3023,7 @@
         10 (apply #'values '(44 33d0))))
    (() '(10 44  33d0) :test #'equal)))
 
+
 (with-test (:name :lp719585)
   ;; Iteration variables are always "used"
   (checked-compile '(lambda () (do (var) (t))))
@@ -3031,3 +3032,13 @@
   (checked-compile '(lambda () (do-external-symbols (var))))
   (checked-compile '(lambda () (do-symbols (var))))
   (checked-compile '(lambda () (dolist (var '(1 2 3))))))
+
+(with-test (:name :key-default-type)
+  (let ((name (gensym)))
+    (proclaim `(ftype (function (double-float &key (:y double-float))) ,name))
+    (checked-compile-and-assert
+        (:optimize :default)
+        `(sb-int:named-lambda ,name (x &key (y x))
+           (values x y))
+      ((1d0 :y nil) (condition 'error)))))
+

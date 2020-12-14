@@ -1257,6 +1257,7 @@
   ;; For &REST arguments this may contain information about more context
   ;; the rest list comes from.
   (default nil :type t)
+  (default-p nil :type boolean)
   ;; the actual key for a &KEY argument. Note that in ANSI CL this is
   ;; not necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ...).
   (key nil :type symbol))

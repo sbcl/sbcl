@@ -67,7 +67,8 @@
              (add-info (var kind &key (default nil defaultp) suppliedp-var key)
                (let ((info (make-arg-info :kind kind)))
                  (when defaultp
-                   (setf (arg-info-default info) default))
+                   (setf (arg-info-default info) default
+                         (arg-info-default-p info) t))
                  (when suppliedp-var
                    (setf (arg-info-supplied-p info)
                          (varify-lambda-arg suppliedp-var)))
