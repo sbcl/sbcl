@@ -32,3 +32,7 @@
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-SIMPLE-STREAMS;"
   :components ((:file "simple-stream-tests")))
+
+(defmethod perform ((o test-op) (c (eql (find-system "sb-simple-streams/tests"))))
+  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+      (error "test-op failed")))
