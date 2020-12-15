@@ -1391,9 +1391,13 @@ bootstrapping.
     ;; a factor of 2 with very little effect on the other
     ;; cases. Though it'd be nice to have the generic case be equally
     ;; fast.
+    ;; This is enough hardwired cases to handle the 0, 1, or 2 optional
+    ;; arguments to STREAM-WRITE-STRING. If you change anything about this,
+    ;; make sure to benchmark it.
     `(case ,more-count
        (0 ,(generate-call 0))
        (1 ,(generate-call 1))
+       (2 ,(generate-call 2))
        (t (multiple-value-call (fast-method-call-function ,method-call)
             (values (fast-method-call-pv ,method-call))
             (values (fast-method-call-next-method-call ,method-call))

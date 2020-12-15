@@ -555,3 +555,36 @@
 (defmethod stream-clear-input ((stream character-input-stream))
   (clear-input (character-input-stream-lisp-stream stream)))
 |#
+
+#|
+A small change to INVOKE-FAST-METHOD-CALL/MORE was able to get an easy 10% speedup
+ in STREAM-WRITE-STRING as shown below.
+----
+(defclass sink-stream (fundamental-character-output-stream) ())
+
+(defvar *callcount* 0)
+(defmethod sb-gray:stream-write-string ((stream sink-stream) string &optional start end)
+  (declare (ignore start end))
+  (incf *callcount*))
+
+(defun time-this (&optional (n-iter 30000000))
+  (declare (fixnum n-iter))
+  (let ((stream (make-instance 'sink-stream)))
+    (dotimes (i n-iter)
+      (write-string "zook" stream :start 0 :end 4)))
+  (format t "Calls: ~s~%" *callcount*))
+----
+
+Taking the best out of 3 runs each for old and new:
+perf stat ... --noinform --eval '(setq *evaluator-mode* :compile)' --load foo.lisp --eval '(time-this)' --quit
+Old:
+       1.272560994 seconds time elapsed
+New:
+       1.136901160 seconds time elapsed
+
+Of course a dumb thing about this particular GF is that you probably never
+invoke it directly, but only through WRITE-STRING or WRITE-LINE
+in which case it always receives 4 args. So the small patch in src/pcl/boot
+handles that afficiently, even if it was a little bit ad-hoc.
+I don't think it was too ad-hoc though, because it's valid for any GF.
+|#
