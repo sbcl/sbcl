@@ -246,20 +246,24 @@
      (type-specifier (ctype-of object)))
     (simple-fun 'compiled-function)
     (t
-     (let* ((classoid (classoid-of object))
-            (name (classoid-name classoid)))
-       (if (%instancep object)
-           (case name
-             (sb-alien-internals:alien-value
-              `(alien
-                ,(sb-alien-internals:unparse-alien-type
-                  (sb-alien-internals:alien-value-type object))))
-             (t
-              (let ((pname (classoid-proper-name classoid)))
-                (if (classoid-p pname)
-                    (classoid-pcl-class pname)
-                    pname))))
-           name)))))
+     (let ((layout (layout-of object)))
+       (if (eq (get-lisp-obj-address layout) 0)
+            ;; An empty instance, e.g. created by with-output-to-string
+            'instance
+            (let* ((classoid (layout-classoid layout))
+                   (name (classoid-name classoid)))
+              (if (%instancep object)
+                  (case name
+                    (sb-alien-internals:alien-value
+                     `(alien
+                       ,(sb-alien-internals:unparse-alien-type
+                         (sb-alien-internals:alien-value-type object))))
+                    (t
+                     (let ((pname (classoid-proper-name classoid)))
+                       (if (classoid-p pname)
+                           (classoid-pcl-class pname)
+                           pname))))
+                  name)))))))
 
 ;;;; equality predicates
 

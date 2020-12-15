@@ -716,3 +716,7 @@
                   sb-c::optional-dispatch))
     (assert (eval `(sb-c::%structure-is-a ,(sb-kernel:find-layout 'sb-c::optional-dispatch)
                                           ,(sb-kernel:find-layout what))))))
+
+(with-test (:name :type-of-empty-instance)
+  (assert (eq (type-of (eval '(sb-kernel:%make-instance 12)))
+              'sb-kernel:instance)))
