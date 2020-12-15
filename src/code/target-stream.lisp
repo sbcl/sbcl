@@ -72,10 +72,7 @@
 (defun ansi-stream-peek-char (peek-type stream eof-error-p eof-value
                               recursive-p)
   (cond ((typep stream 'echo-stream)
-         (echo-misc stream
-                    :peek-char
-                    peek-type
-                    (list eof-error-p eof-value)))
+         (echo-stream-peek-char stream peek-type eof-error-p eof-value))
         (t
          (generalized-peeking-mechanism
           peek-type eof-value char
@@ -133,9 +130,17 @@
            in-mode)))
       (:close
        (set-closed-flame stream))
-      (:peek-char
-       ;; For the special case of peeking into an echo-stream
-       ;; arg1 is PEEK-TYPE, arg2 is (EOF-ERROR-P EOF-VALUE)
+      (t
+       (or (if (ansi-stream-p in)
+               (funcall (ansi-stream-misc in) in operation arg1 arg2)
+               (stream-misc-dispatch in operation arg1 arg2))
+           (if (ansi-stream-p out)
+               (funcall (ansi-stream-misc out) out operation arg1 arg2)
+               (stream-misc-dispatch out operation arg1 arg2)))))))
+
+(defun echo-stream-peek-char (stream peek-type eof-error-p eof-value)
+  (let* ((in (two-way-stream-input-stream stream))
+         (out (two-way-stream-output-stream stream)))
        ;; returns peeked-char, eof-value, or errors end-of-file
        ;;
        ;; Note: This code could be moved into PEEK-CHAR if desired.
@@ -161,17 +166,10 @@
                       (setf unread-p (echo-stream-unread-stuff stream))
                       (setf (echo-stream-unread-stuff stream) nil))
                   (setf initial-peek-p nil)
-                  (read-char in (first arg2) :eof)))
+                  (read-char in eof-error-p :eof)))
            (generalized-peeking-mechanism
-            arg1 (second arg2) char
+            peek-type eof-value char
             (infn)
             :eof
             (unread-char char in)
-            (outfn char)))))
-      (t
-       (or (if (ansi-stream-p in)
-               (funcall (ansi-stream-misc in) in operation arg1 arg2)
-               (stream-misc-dispatch in operation arg1 arg2))
-           (if (ansi-stream-p out)
-               (funcall (ansi-stream-misc out) out operation arg1 arg2)
-               (stream-misc-dispatch out operation arg1 arg2)))))))
+            (outfn char))))))
