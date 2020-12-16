@@ -95,14 +95,20 @@
           ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
           ;; Pick the first applicable one.
           (find-if (lambda (method)
-                     (and (null (svref method 1)) ; only primary methods are candidates
-                          (let ((guard (the symbol (svref method 0))))
-                            (if (fboundp guard)
-                                (funcall guard specialized-arg)
-                                (let ((test (find-layout (svref method 2)))
-                                      (arg (layout-of specialized-arg)))
-                                  (or (eq test arg)
-                                      (find test (layout-inherits arg))))))))
+                     ;; LAYOUT-OF can't be called until its constants have been patched in,
+                     ;; which is potentially too early in cold init especially if trying
+                     ;; to debug to figure out what has been patched in.
+                     (let ((arg-layout (if (%instancep specialized-arg)
+                                           (%instance-layout specialized-arg)
+                                           ;; Non-instance types always call a predicate.
+                                           #.(find-layout 't))))
+                       (and (null (svref method 1)) ; only primary methods are candidates
+                            (let ((guard (the symbol (svref method 0))))
+                              (if (fboundp guard)
+                                  (funcall guard specialized-arg)
+                                  (let ((test (find-layout (svref method 2))))
+                                    (or (eq test arg-layout)
+                                        (find test (layout-inherits arg-layout)))))))))
                    methods)))
     (if applicable-method
         ;; Call using no permutation-vector / no precomputed next method.
