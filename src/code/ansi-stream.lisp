@@ -341,3 +341,18 @@
             ;; it is a variable whose values is the opcode for passthru.
             ,(if (keywordp operation) (%stream-opcode operation) operation)
             ,(if argp arg 0)))
+
+;;; This predicate assumes some things:
+;;;  - that a simple-stream class will never be FUNCALLABLE-STANDARD-OBJECT
+;;;    (so that we need only check for %INSTANCEP)
+;;;  - a class will never be redefined such that it moves from one part of the stream
+;;;    hierarchy to the other. (i.e. you don't redefine MY-STREAM-CLASS such that
+;;;    it was a Gray stream and becomes a simple-stream or vice-versa)
+;;;  - instance invalidation, if it needs to happen, will happen somewhere later in
+;;;    the stream protocol. (the layout-invalid trap can be deferred)
+;;;    This is OK because the next level of dispatch is not to a generic function
+;;;    in the simple-stream layering. It is generic at the "device" but not the API.
+(defmacro simple-stream-p (x)
+  `(and (%instancep ,x)
+        (logtest (layout-flags (%instance-layout ,x))
+                 sb-kernel::+simple-stream-layout-flag+)))

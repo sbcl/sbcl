@@ -98,10 +98,11 @@
 (defconstant +pathname-layout-flag+          #b00000010)
 (defconstant +pcl-object-layout-flag+        #b00000100)
 (defconstant +condition-layout-flag+         #b00001000)
-(defconstant +file-stream-layout-flag+       #b00010000)
-(defconstant +string-stream-layout-flag+     #b00100000)
-(defconstant +stream-layout-flag+            #b01000000)
-(defconstant sb-vm:lockfree-list-node-flag   #b10000000) ; exported for use in gc-private.h
+(defconstant +simple-stream-layout-flag+     #b00010000)
+(defconstant +file-stream-layout-flag+       #b00100000)
+(defconstant +string-stream-layout-flag+     #b01000000)
+(defconstant +stream-layout-flag+            #b10000000)
+(defconstant sb-vm:lockfree-list-node-flag  #b100000000) ; exported for use in gc-private.h
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for

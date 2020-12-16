@@ -655,6 +655,8 @@
         (add-method gf class-method)))
     gf))
 
+(define-load-time-global *simple-stream-root-classoid* :unknown)
+
 (defun assign-layout-bitmap (layout)
   ;; We decide only at class finalization time whether it is funcallable.
   ;; Picking the right bitmap could probably be done sooner given the metaclass,
@@ -662,6 +664,18 @@
   ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
   ;; explains why we differentiate between SGF and everything else.
   (let ((inherits (layout-inherits layout)))
+    (when (find #.(find-layout 'stream) inherits)
+      (let ((flags 0))
+        (dovector (layout inherits)
+          (when (eq (layout-classoid layout) *simple-stream-root-classoid*)
+            (setq flags (logior flags +simple-stream-layout-flag+)))
+          (case layout
+            (#.(find-layout 'file-stream)
+             (setq flags (logior flags +file-stream-layout-flag+)))
+            (#.(find-layout 'string-stream)
+             (setq flags +string-stream-layout-flag+))))
+        (setf (layout-flags layout)
+              (logior flags +stream-layout-flag+ (layout-flags layout)))))
     (when (find #.(find-layout 'function) inherits)
       (setf (%raw-instance-ref/signed-word layout (sb-kernel::type-dd-length layout))
              #+immobile-code ; there are two possible bitmaps
@@ -669,18 +683,7 @@
                  sb-kernel::standard-gf-primitive-obj-layout-bitmap
                  +layout-all-tagged+)
              ;; there is only one possible bitmap otherwise
-             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))
-    (let ((flags
-           (logior (if (find #.(find-layout 'stream) inherits)
-                       +stream-layout-flag+ 0)
-                   ;; Simple-Streams can put FILE-STREAM in the inherits vector.
-                   (if (find #.(find-layout 'file-stream) inherits)
-                       +file-stream-layout-flag+ 0)
-                   ;; Is it legal for users to have STRING-STREAM in the inherits vector?
-                   ;; If not, this case should be removed.
-                   (if (find #.(find-layout 'string-stream) inherits)
-                       +string-stream-layout-flag+ 0))))
-      (setf (layout-flags layout) (logior flags (layout-flags layout))))))
+             #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))))
 
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
