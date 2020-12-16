@@ -35,7 +35,7 @@
                     '(cons (cons symbol (cons symbol null))
                            (cons (eql &optional) (cons symbol null))))))
     (print-object
-     ;; Expect one unqualified mandatory arg and one unqualified.
+     ;; Expect one specialized arg and one unspecialized
      (assert (typep lambda-list '(cons (cons symbol (cons symbol null))
                                        (cons symbol null))))))
   (binding* ((specializer (cadar lambda-list)) ; only one allowd
@@ -86,29 +86,23 @@
 ;;; allowing exactly one primary method. Methods are sorted most-specific-first,
 ;;; so we can stop looking as soon as a match is found.
 ;;; Sorting is performed during genesis.
-(defmacro trivial-methods (gf-name)
-  `(the simple-vector
-        (cdr (or (assoc ,gf-name *!trivial-methods*)
-                 (error "No methods on ~S" ,gf-name)))) )
-(defun trivial-call-a-method (gf-name methods specialized-arg &rest rest)
-  (let* ((applicable-method
-           ;; Find a method where the guard returns T, or the object type is
-           ;; EQ to the method's specializer. Trivial dispatch knows nothing
-           ;; of superclass method applicability. In situations where we rely
-           ;; on an ancestral type's method, the predicate will pick it out.
-           ;; The "method" is a vector:
-           ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
+(defun trivial-call-a-method (gf-name specialized-arg &rest rest)
+  (let* ((methods (the simple-vector
+                       (cdr (or (assoc gf-name *!trivial-methods*)
+                                (error "No methods on ~S" gf-name)))))
+         (applicable-method
+          ;; Each "method" is represented as a vector:
+          ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
+          ;; Pick the first applicable one.
           (find-if (lambda (method)
-                     ;; Most instance types lack a predicate.
-                     ;; Non-instances should all have a predicate.
-                     (let ((type (when (%instancep specialized-arg)
-                                   (classoid-name
-                                    (layout-classoid
-                                     (%instance-layout specialized-arg)))))
-                           (guard (svref method 0)))
-                       (or (eq type (svref method 2))
-                           (and (or (functionp guard) (fboundp guard))
-                                (funcall guard specialized-arg)))))
+                     (and (null (svref method 1)) ; only primary methods are candidates
+                          (let ((guard (the symbol (svref method 0))))
+                            (if (fboundp guard)
+                                (funcall guard specialized-arg)
+                                (let ((test (find-layout (svref method 2)))
+                                      (arg (layout-of specialized-arg)))
+                                  (or (eq test arg)
+                                      (find test (layout-inherits arg))))))))
                    methods)))
     (if applicable-method
         ;; Call using no permutation-vector / no precomputed next method.
@@ -117,20 +111,9 @@
                (type-of specialized-arg)))))
 
 (defun make-load-form (object &optional environment)
-  (trivial-call-a-method  'make-load-form (trivial-methods 'make-load-form)
-                         object environment))
+  (trivial-call-a-method 'make-load-form object environment))
 (defun print-object (object stream)
-  (let ((methods (trivial-methods 'print-object)))
-    ;; The method selected for CONDITION is basically useless because it picks out
-    ;; STRUCTURE-OBJECT which prints as #<WARNING (no LAYOUT-INFO) #xBD2B8C9> or somesuch.
-    ;; It's because trivial method selection is based on the first predicate in METHODS
-    ;; which returns T (so we kinda get type hierarchies correct), but there is no
-    ;; CONDITION-P predicate, so the candidate method is just skipped.
-    ;; Hacking in an extra test here solves that (maybe?) until the real GF is installed.
-    (if (typep object 'condition)
-        (funcall (elt (find 'condition methods :key (lambda (x) (elt x 2))) 3)
-                 nil nil object stream)
-        (trivial-call-a-method 'print-object methods object stream))))
+  (trivial-call-a-method 'print-object object stream))
 
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT

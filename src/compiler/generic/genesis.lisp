@@ -1244,10 +1244,7 @@ core and return a descriptor to it."
   (let ((classoid (find-classoid type-name nil)))
     (typecase classoid
       (structure-classoid
-       (cond ((dd-predicate-name (layout-info (classoid-layout classoid))))
-             ;; All early INSTANCEs should be STRUCTURE-OBJECTs.
-             ;; Except: see hack for CONDITIONs in CLASS-DEPTHOID.
-             ((eq type-name 'structure-object) '%instancep)))
+       (dd-predicate-name (layout-info (classoid-layout classoid))))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
@@ -1257,12 +1254,7 @@ core and return a descriptor to it."
                  ((eq type-name 'stream) 'streamp)
                  ((eq type-name 'pathname) 'pathnamep)
                  ((eq type-name 't) 'constantly-t)
-                 (t (error "No predicate for builtin: ~S" type-name))))))
-      (null
-       #+nil (format t "~&; PREDICATE-FOR-SPECIALIZER: no classoid for ~S~%"
-                     type-name)
-       (case type-name
-         (condition 'sb-kernel::!condition-p))))))
+                 (t (error "No predicate for builtin: ~S" type-name)))))))))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
