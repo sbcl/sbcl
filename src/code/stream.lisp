@@ -781,46 +781,66 @@
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
 ;;; appropriate SIMPLE- or FUNDAMENTAL-STREAM functions.
-(defun stream-misc-dispatch (stream operation arg1)
-  (declare (type stream stream))
-  (stream-misc-case (operation)
-    (:listen
-     ;; Return T if input available, :EOF for end-of-file, otherwise NIL.
-     (let ((char (read-char-no-hang stream nil :eof)))
-       (when (characterp char)
-         (unread-char char stream))
-       char))
-    (:unread
-     (unread-char arg1 stream))
-    (:close
-     (close stream))
-    (:clear-input
-     (clear-input stream))
-    (:force-output
-     (force-output stream))
-    (:finish-output
-     (finish-output stream))
-    (:clear-output
-     (clear-output stream))
-    (:element-type
-     (stream-element-type stream))
-    (:element-mode
-     (stream-element-type-stream-element-mode
-      (stream-element-type stream)))
-    (:external-format
-     (stream-external-format stream))
-    (:interactive-p
-     (interactive-stream-p stream))
-    (:line-length
-     (line-length stream))
-    (:charpos
-     (charpos stream))
-    (:file-length
-     (file-length stream))
-    (:file-string-length
-     (file-string-length stream arg1))
-    (:file-position
-     (file-position stream arg1))))
+(defun stream-misc-dispatch (stream operation arg)
+  (if (simple-stream-p stream)
+
+      ;; A simple streams needs to re-call the CL: function because we don't (yet)
+      ;; have a way to invoke the function in sb-simple-streams:: directly.
+      ;; This is slightly inefficient in that the CL: function tests again whether
+      ;; the stream is T or NIL (a designator), and then whether it is a builtin
+      ;; type or Gray or simple stream. Not a big deal, but I do plan to fix that.
+      (stream-misc-case (operation)
+        (:listen (listen stream))
+        (:unread (unread-char arg stream))
+        (:close (close stream))
+        (:clear-input (clear-input stream))
+        (:force-output (force-output stream))
+        (:finish-output (finish-output stream))
+        (:clear-output (clear-output stream))
+        ;; All simple-streams use (UNSIGNED-BYTE 8) - it's one of the
+        ;; salient distinctions between simple-streams and Gray streams.
+        ;; See (DEFMETHOD STREAM-ELEMENT-TYPE ((STREAM SIMPLE-STREAM)) ...)
+        ;; Should we be pedantic here and call the method? Probably not,
+        ;; but one of the tests compares lists by EQL and so expects an answer
+        ;; from here that is EQ to that method's return value.
+        ;; I don't want anyone to accuse me of adjusting a test to fit
+        ;; the code's behavior ... but the test is definitely poorly written.
+        (:element-type (stream-element-type stream))
+        ;; FIXME: All simple-streams are actually bivalent. We historically have
+        ;; returned UNSIGNED-BYTE based on element-type. But this is wrong!
+        (:element-mode 'UNSIGNED-BYTE)
+        ;; This call returns an instance of the format structure defined
+        ;; by the SB-SIMPLE-STREAMS package, not the SB-IMPL:: structure.
+        ;; This also needs to be fixed.
+        (:external-format (stream-external-format stream))
+        (:interactive-p (interactive-stream-p stream))
+        (:line-length (line-length stream))
+        (:charpos (charpos stream))
+        (:file-length (file-length stream))
+        (:file-string-length (file-string-length stream arg))
+        (:file-position (file-position stream arg)))
+
+      ;; Gray streams dispatch directly to a CLOS method.
+      (stream-misc-case (operation)
+       (:listen (stream-listen stream))
+       (:unread (stream-unread-char stream arg)) ; specialized arg first
+       (:close (close stream))
+       (:clear-input (stream-clear-input stream))
+       (:force-output (stream-force-output stream))
+       (:finish-output (stream-finish-output stream))
+       (:clear-output (stream-clear-output stream))
+       (:element-type (stream-element-type stream))
+       (:element-mode
+        (stream-element-type-stream-element-mode (stream-element-type stream)))
+       (:interactive-p (interactive-stream-p stream)) ; is generic
+       (:line-length (stream-line-length stream))
+       (:charpos (stream-line-column stream))
+       (:file-position (stream-file-position stream arg))
+       ;; This last bunch of pseudo-methods will probably just signal an error
+       ;; since they aren't generic and don't work on Gray streams.
+       (:external-format (stream-external-format stream))
+       (:file-length (file-length stream))
+       (:file-string-length (file-string-length stream arg)))))
 
 (declaim (inline stream-element-mode))
 (defun stream-element-mode (stream)
