@@ -3040,5 +3040,16 @@
         (:optimize :default)
         `(sb-int:named-lambda ,name (x &key (y x))
            (values x y))
-      ((1d0 :y nil) (condition 'error)))))
+        ((1d0 :y nil) (condition 'error)))))
+
+(with-test (:name :deleting-unreachable-floats)
+  (let ((name (gensym)))
+    (proclaim `(inline ,name))
+    (eval `(defun ,name (&key (k (eval 0f0)))
+             k))
+    (checked-compile-and-assert
+     (:allow-notes nil)
+     `(lambda ()
+        (,name :k 0f0))
+     (() 0f0))))
 

@@ -2066,7 +2066,8 @@
                                   (let ((pkg (cl:symbol-package first)))
                                     (and pkg (neq pkg *keyword-package*))))
                               (not (member first '(t nil)))
-                              (not (cl:typep first '(or fixnum character)))
+                              (not (cl:typep first '(or fixnum character
+                                                     #+64-bit single-float)))
                               (every (lambda (x)
                                        (present-in-form first x 0))
                                      (source-path-forms path))
