@@ -783,7 +783,7 @@
 ;;; appropriate SIMPLE- or FUNDAMENTAL-STREAM functions.
 (defun stream-misc-dispatch (stream operation arg1)
   (declare (type stream stream))
-  (ecase operation
+  (stream-misc-case (operation)
     (:listen
      ;; Return T if input available, :EOF for end-of-file, otherwise NIL.
      (let ((char (read-char-no-hang stream nil :eof)))
@@ -807,7 +807,7 @@
     (:element-mode
      (stream-element-type-stream-element-mode
       (stream-element-type stream)))
-    (:stream-external-format
+    (:external-format
      (stream-external-format stream))
     (:interactive-p
      (interactive-stream-p stream))
@@ -865,7 +865,7 @@
 
 (defun broadcast-misc (stream operation arg1)
   (let ((streams (broadcast-stream-streams stream)))
-    (case operation
+    (stream-misc-case (operation)
       ;; FIXME: This may not be the best place to note this, but I
       ;; think the :CHARPOS protocol needs revision.  Firstly, I think
       ;; this is the last place where a NULL return value was possible
@@ -973,21 +973,22 @@
   ;;  "Any operations on a synonym stream will be performed on the stream that is then
   ;;   the value of the dynamic variable named by the synonym stream symbol."
   ;; so "any" in that sentence mean "almost any, with a notable exception".
-  (when (eq operation :close)
-    (set-closed-flame stream)
-    (return-from synonym-misc))
-  (let ((syn (symbol-value (synonym-stream-symbol stream))))
-    (if (ansi-stream-p syn)
+  (stream-misc-case (operation)
+   (:close
+    (set-closed-flame stream))
+   (t
+    (let ((syn (symbol-value (synonym-stream-symbol stream))))
+     (if (ansi-stream-p syn)
         ;; We have to special-case some operations which interact with
         ;; the in-buffer of the wrapped stream, since just calling
         ;; ANSI-STREAM-MISC on them
-        (case operation
+        (stream-misc-case (operation)
           (:listen (%ansi-stream-listen syn))
           (:clear-input (clear-input syn))
           (:unread (unread-char arg1 syn))
           (t
            (call-ansi-stream-misc syn operation arg1)))
-        (stream-misc-dispatch syn operation arg1))))
+        (stream-misc-dispatch syn operation arg1))))))
 
 ;;;; two-way streams
 
@@ -1041,7 +1042,7 @@
          (out (two-way-stream-output-stream stream))
          (in-ansi-stream-p (ansi-stream-p in))
          (out-ansi-stream-p (ansi-stream-p out)))
-    (case operation
+    (stream-misc-case (operation)
       (:listen
        (if in-ansi-stream-p
            (%ansi-stream-listen in)
@@ -1137,14 +1138,14 @@
 (defun concatenated-misc (stream operation arg1)
   (let* ((left (concatenated-stream-streams stream))
          (current (car left)))
-    (case operation
+    (stream-misc-case (operation)
       (:listen
        (unless left
          (return-from concatenated-misc :eof))
        (loop
         (let ((stuff (if (ansi-stream-p current)
                          (%ansi-stream-listen current)
-                         (stream-misc-dispatch current :listen arg1))))
+                         (stream-misc-dispatch current operation arg1))))
           (cond ((eq stuff :eof)
                  ;; Advance STREAMS, and try again.
                  (pop (concatenated-stream-streams stream))
@@ -1278,7 +1279,7 @@
 
 (defun string-in-misc (stream operation arg1)
   (declare (type string-input-stream stream))
-  (case operation
+  (stream-misc-case (operation :default nil)
     (:file-position
      (if arg1
          (setf (string-input-stream-index stream)
@@ -1473,11 +1474,13 @@
                ;; (since the char handlers are local functions).
                ;; Technically this should be among the actions performed on :CLEAR-OUTPUT,
                ;; which would also include *actually* clearing the output. But we don't.
-               (if (eq operation :reset)
+               (stream-misc-case (operation)
+                (:reset-unicode-p
                    (setf (string-output-stream-unicode-p stream) nil
                          ;; resume checking for Unicode characters
-                         (ansi-stream-out stream) #'default-out)
-                   (string-out-misc stream operation arg1))))
+                         (ansi-stream-out stream) #'default-out))
+                (t
+                   (string-out-misc stream operation arg1)))))
       (multiple-value-bind (element-type unicode-p out sout-aux)
           (case (%other-pointer-widetag buffer)
             #+sb-unicode
@@ -1674,7 +1677,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 (defun string-out-misc (stream operation arg1)
   (declare (optimize speed))
-  (case operation
+  (stream-misc-case (operation :default nil)
     (:charpos
      ;; Keeping this first is a silly micro-optimization: FRESH-LINE
      ;; makes this the most common one.
@@ -1744,7 +1747,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;; Reset UNICODE-P unless it was :IGNORE or element-type is CHARACTER.
     (when (and (eq (string-output-stream-element-type stream) :default)
                (eq (string-output-stream-unicode-p stream) t))
-      (call-ansi-stream-misc stream :reset))
+      (call-ansi-stream-misc stream :reset-unicode-p))
 
     ;; There are exactly 3 cases that we have to deal with when copying:
     ;;  CHARACTER-STRING into BASE-STRING (without type-checking per character)
@@ -1954,7 +1957,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       dst-end)))
 
 (defun fill-pointer-misc (stream operation arg1)
-  (case operation
+  (stream-misc-case (operation :default nil)
     (:file-position
      (let ((buffer (fill-pointer-output-stream-string stream)))
        (if arg1

@@ -110,11 +110,11 @@
 (defun echo-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
          (out (two-way-stream-output-stream stream)))
-    (case operation
+    (stream-misc-case (operation)
       (:listen
        (if (ansi-stream-p in)
            (%ansi-stream-listen in)
-           (stream-misc-dispatch in :listen arg1)))
+           (stream-misc-dispatch in operation arg1)))
       (:unread (setf (echo-stream-unread-stuff stream) t)
                (unread-char arg1 in))
       (:element-type

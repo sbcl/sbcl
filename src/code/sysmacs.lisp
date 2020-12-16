@@ -129,10 +129,12 @@ maintained."
 ;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
 ;;; ARGS for FUNDAMENTAL-STREAMs.
 (defmacro %with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  (when (and (eq slot 'ansi-stream-misc) (not (cdr args)))
-    ;; Never stuff in a placeholder in the three operations that take an argument.
-    (aver (not (memq (car args) '(:file-position :file-string-lenth :unread))))
-    (setq args (append args '(0))))
+  (when (eq slot 'ansi-stream-misc)
+    (setq args (cons (%stream-opcode (car args)) (cdr args)))
+    (unless (cdr args)
+      ;; Never stuff in a placeholder in the three operations that take an argument.
+      (aver (not (memq (car args) '(:file-position :file-string-lenth :unread))))
+      (setq args (append args '(0)))))
   `(let ((stream ,stream))
     ,(if stream-dispatch
          `(if (ansi-stream-p stream)

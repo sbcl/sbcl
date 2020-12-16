@@ -115,7 +115,7 @@
     (:documentation "Is STREAM an interactive stream?"))
 
   (defmethod interactive-stream-p ((stream ansi-stream))
-    (funcall (ansi-stream-misc stream) stream :interactive-p 0))
+    (sb-impl::call-ansi-stream-misc stream :interactive-p))
 
   (defmethod interactive-stream-p ((stream fundamental-stream))
     nil)

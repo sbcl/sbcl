@@ -628,7 +628,7 @@
      (%check stream :open)
      (any-stream-instance-flags stream :interactive))
     (ansi-stream
-     (funcall (sb-kernel:ansi-stream-misc stream) stream :interactive-p 0))
+     (sb-impl::call-ansi-stream-misc stream :interactive-p))
     (fundamental-stream
      nil)))
 
@@ -1027,7 +1027,7 @@ is supported only on simple-streams."
       (simple-stream
        (%finish-output stream))
       (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :finish-output 0))
+       (sb-impl::call-ansi-stream-misc stream :finish-output))
       (fundamental-stream
        (sb-gray:stream-finish-output stream))))
   nil)
@@ -1040,7 +1040,7 @@ is supported only on simple-streams."
       (simple-stream
        (%force-output stream))
       (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :force-output 0))
+       (sb-impl::call-ansi-stream-misc stream :force-output))
       (fundamental-stream
        (sb-gray:stream-force-output stream))))
   nil)
@@ -1053,7 +1053,7 @@ is supported only on simple-streams."
       (simple-stream
        (%clear-output stream))
       (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :clear-output 0))
+       (sb-impl::call-ansi-stream-misc stream :clear-output))
       (fundamental-stream
        (sb-gray:stream-clear-output stream))))
   nil)
@@ -1078,7 +1078,7 @@ is supported only on simple-streams."
      (%file-length stream))
     (ansi-stream
      (sb-impl::stream-file-stream-or-lose stream)
-     (funcall (sb-kernel:ansi-stream-misc stream) stream :file-length 0))))
+     (sb-impl::call-ansi-stream-misc stream :file-length))))
 
 (defun charpos (&optional (stream *standard-output*))
   "Returns the number of characters on the current line of output of the given
@@ -1090,7 +1090,7 @@ is supported only on simple-streams."
          (%check stream :open)
          (sm charpos stream)))
       (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :charpos 0))
+       (sb-impl::call-ansi-stream-misc stream :charpos))
       (fundamental-stream
        (sb-gray:stream-line-column stream)))))
 
@@ -1106,7 +1106,7 @@ is supported only on simple-streams."
        ;; sb-pretty::default-line-length is used.
        nil)
       (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :line-length 0))
+       (sb-impl::call-ansi-stream-misc stream :line-length))
       (fundamental-stream
        (sb-gray:stream-line-length stream)))))
 

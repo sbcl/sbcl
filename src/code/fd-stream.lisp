@@ -1943,9 +1943,8 @@
     t))
 
 ;;; Handle miscellaneous operations on FD-STREAM.
-(defun fd-stream-misc-routine (fd-stream operation &optional arg1 arg2)
-  (declare (ignore arg2))
-  (case operation
+(defun fd-stream-misc-routine (fd-stream operation arg1)
+  (stream-misc-case (operation :default nil)
     (:listen
      (labels ((do-listen ()
                 (let ((ibuf (fd-stream-ibuf fd-stream)))
@@ -2722,17 +2721,17 @@
         (setf (form-tracking-stream-last-newline stream) pos))
       (incf pos))))
 
-(defun tracking-stream-misc (stream operation &optional arg1 arg2)
+(defun tracking-stream-misc (stream operation arg1)
   ;; The :UNREAD operation will never be invoked because STREAM has a buffer,
   ;; so unreading is implemented entirely within ANSI-STREAM-UNREAD-CHAR.
   ;; But we do need to prevent attempts to change the absolute position.
-  (case operation
+  (stream-misc-case (operation)
     (:file-position
      (if arg1
          (simple-stream-perror "~S is not positionable" stream)
          (fd-stream-get-file-position stream)))
     (t ; call next method
-     (fd-stream-misc-routine stream operation arg1 arg2))))
+     (fd-stream-misc-routine stream operation arg1))))
 
 (!define-load-time-global *!cold-stderr-buf* " ")
 (declaim (type (simple-base-string 1) *!cold-stderr-buf*))
@@ -2759,8 +2758,8 @@
                      ;; will croak if there is any non-BASE-CHAR in the string
                      (out (replace (make-array n :element-type 'base-char)
                                    string :start2 start) 0 n)))))
-     :misc (lambda (stream operation &optional arg1 arg2)
-             (declare (ignore stream arg1 arg2))
-             (case operation
+     :misc (lambda (stream operation arg1)
+             (declare (ignore stream arg1))
+             (stream-misc-case (operation :default nil)
                (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
                 (if (eql (char *!cold-stderr-buf* 0) #\newline) 0 1)))))))

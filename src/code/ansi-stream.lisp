@@ -90,6 +90,30 @@
 (deftype ansi-stream-cin-buffer ()
   `(simple-array character (,+ansi-stream-in-buffer-length+)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun %stream-opcode (name)
+  (ecase name
+    (:listen              0)
+    (:unread              1)
+    (:force-output        2)
+    (:finish-output       3)
+    (:charpos             4)
+    (:file-position       5)
+    (:interactive-p       6)
+    (:element-type        7)
+    (:element-mode        8)
+    (:external-format     9)
+    (:line-length        10)
+    (:file-length        11)
+    (:file-string-length 12)
+    (:clear-input        13)
+    (:clear-output       14)
+    (:close              15)
+    ;; This is used by string streams and is not an opcode seen
+    ;; by STREAM-MISC-DISPATCH. The new stream pseudomethod convention
+    ;; can't pass random keywords to the misc method.
+    (:reset-unicode-p    16))))
+
 ;;; base class for ANSI standard streams (as opposed to the Gray
 ;;; streams extension)
 (defstruct (ansi-stream (:constructor nil)
@@ -119,7 +143,7 @@
   (sout #'ill-out :type function)               ; string output function
 
   ;; other, less-used methods
-  (misc #'no-op-placeholder :type function)
+  (misc #'no-op-placeholder :type (function (stream (integer 0 16) t) *))
 
   ;; Absolute character position, acting also as a generalized boolean
   ;; in lieu of testing FORM-TRACKING-STREAM-P to see if we must
@@ -290,8 +314,30 @@
 (defmacro %with-output-to-string ((var) &body body)
   (expand-with-output-to-string var ''character body t))
 
+;;; A macro to better exploit jump tables. Even though jumping based on symbol-hash
+;;; is possible, it is of course slightly faster to dispatch on small integers,
+;;; and for architectures which don't implement jump tables,
+;;; using integers eliminates the load of many code header constants.
+;;; Streams which don't want to handle every operation (don't end in a T clause)
+;;; should specify :DEFAULT NIL to avoid an error.
+(defmacro stream-misc-case ((operation &key (default 'error)) &rest clauses)
+  (let* ((otherwise)
+         (clauses
+          (mapcar (lambda (clause)
+                    (let ((key (car clause)))
+                      (cons (if (eq key 't)
+                                (setq otherwise t)
+                                (mapcar #'%stream-opcode (ensure-list (car clause))))
+                            (cdr clause))))
+                  clauses)))
+    `(,(if (and (not otherwise) (eq default 'error)) 'ecase 'case) ,operation
+      ,@clauses)))
+
 (defmacro call-ansi-stream-misc (stream operation &optional (arg nil argp))
   ;; Never stuff in a placeholder in the three operations that take an argument.
   (aver (or argp (not (memq operation '(:file-position :file-string-lenth :unread)))))
   `(funcall (ansi-stream-misc ,stream) ,stream
-            ,operation ,(if argp arg 0)))
+            ;; If operation is a literal keyword, translate it, otherwise
+            ;; it is a variable whose values is the opcode for passthru.
+            ,(if (keywordp operation) (%stream-opcode operation) operation)
+            ,(if argp arg 0)))
