@@ -658,7 +658,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "ANSI-STREAM-READ-CHAR-NO-HANG" "ANSI-STREAM-READ-LINE"
                "ANSI-STREAM-READ-SEQUENCE" "ANSI-STREAM-PEEK-CHAR"
                "ANSI-STREAM-UNREAD-CHAR" "ANSI-STREAM-WRITE-SEQUENCE"
-               "ANSI-STREAM-WRITE-STRING"
                "DISPATCH-TABLES" "CHARACTER-MACRO-HASH-TABLE" "CHARACTER-MACRO-ARRAY"
                "TOKEN-DELIMITERP" "WHITESPACE[2]P" "WITH-READ-BUFFER"
                ;; other
@@ -3526,6 +3525,30 @@ SBCL itself"
   sb-interpreter::lexically-unlocked-symbol-p
   sb-interpreter:list-locals
   sb-interpreter::reconstruct-syntactic-closure-env)
+ ;; Simple-streams symbols in SB-IMPL
+ (sb-impl::s-%charpos
+  sb-impl::s-%clear-output
+  sb-impl::s-%file-length
+  sb-impl::s-%file-name
+  sb-impl::s-%file-position
+  sb-impl::s-%file-string-length
+  sb-impl::s-%finish-output
+  sb-impl::s-%force-output
+  sb-impl::s-%fresh-line
+  sb-impl::s-%line-length
+  sb-impl::s-%peek-char
+  sb-impl::s-%read-byte
+  sb-impl::s-%read-char
+  sb-impl::s-%read-char-no-hang
+  sb-impl::s-%read-line
+  sb-impl::s-%stream-external-format
+  sb-impl::s-%terpri
+  sb-impl::s-%unread-char
+  sb-impl::s-%write-byte
+  sb-impl::s-%write-char
+  sb-impl::s-%write-line
+  sb-impl::s-%write-sequence
+  sb-impl::s-%write-string)
  ;; Other
  (sb-debug::find-interrupted-name-and-frame
   sb-impl::encapsulate-generic-function

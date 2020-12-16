@@ -124,31 +124,6 @@ maintained."
                          :format-control "~S isn't an output stream."
                          :format-arguments (list ,svar)))
                 ,svar)))))
-
-;;; WITH-%OUT-STREAM calls the function in the given SLOT of the
-;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
-;;; ARGS for FUNDAMENTAL-STREAMs.
-(defmacro %with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  (when (eq slot 'ansi-stream-misc)
-    (setq args (cons (%stream-opcode (car args)) (cdr args)))
-    (unless (cdr args)
-      ;; Never stuff in a placeholder in the three operations that take an argument.
-      (aver (not (memq (car args) '(:file-position :file-string-lenth :unread))))
-      (setq args (append args '(0)))))
-  `(let ((stream ,stream))
-    ,(if stream-dispatch
-         `(if (ansi-stream-p stream)
-              (funcall (,slot stream) stream ,@args)
-              ,@(when stream-dispatch
-                  `(,(destructuring-bind (function &rest args) stream-dispatch
-                                         `(,function stream ,@args)))))
-         `(funcall (,slot stream) stream ,@args))))
-
-(defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(%with-out-stream (out-stream-from-designator ,stream)
-                     (,slot ,@args)
-                     ,stream-dispatch))
-
 
 ;;;; These are hacks to make the reader win.
 

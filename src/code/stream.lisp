@@ -674,95 +674,98 @@
 
 (defun write-char (character &optional (stream *standard-output*))
   (declare (explicit-check))
-  (with-out-stream stream (ansi-stream-out character)
-                   (stream-write-char character))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (funcall (ansi-stream-out stream) stream character)
+    :simple (s-%write-char stream character)
+    :gray (stream-write-char stream character))
   character)
 
 (defun terpri (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (with-out-stream stream (ansi-stream-out #\newline) (stream-terpri))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (funcall (ansi-stream-out stream) stream #\Newline)
+    :simple (s-%terpri stream)
+    :gray (stream-terpri stream))
   nil)
-
-(declaim (inline ansi-stream-fresh-line))
-(defun ansi-stream-fresh-line (stream)
-  (unless (eql (charpos stream) 0)
-    (funcall (ansi-stream-out stream) stream #\newline)
-    t))
 
 (defun fresh-line (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (let ((stream (out-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-fresh-line stream)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (stream-fresh-line stream))))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (unless (eql (charpos stream) 0)
+              (funcall (ansi-stream-out stream) stream #\newline)
+              t)
+    :simple (s-%fresh-line stream)
+    :gray (stream-fresh-line stream)))
 
-(declaim (inline ansi-stream-write-string))
-(defun ansi-stream-write-string (string stream start end)
-  (with-array-data ((data string) (offset-start start)
-                    (offset-end end)
-                    :check-fill-pointer t)
-    (funcall (ansi-stream-sout stream)
-             stream data offset-start offset-end)))
-
-(defun %write-string (string stream start end)
-  (let ((stream (out-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-write-string string stream start end)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (stream-write-string stream string start end)))
-  string)
+(macrolet
+    ((define (name)
+       `(defun ,name (string stream start end)
+          (with-array-data ((data string) (start start) (end end) :check-fill-pointer t)
+            (stream-api-dispatch (stream)
+              :native (progn (funcall (ansi-stream-sout stream) stream data start end)
+                             ,@(when (eq name '%write-line)
+                                 '((funcall (ansi-stream-out stream) stream #\newline))))
+              :simple (,(symbolicate "S-" name) stream data start end)
+              :gray (progn (stream-write-string stream data start end)
+                           ,@(when (eq name '%write-line)
+                               '((stream-write-char stream #\newline))))))
+          string)))
+  (define %write-line)
+  (define %write-string))
 
 (defun write-string (string &optional (stream *standard-output*)
                             &key (start 0) end)
-  (declare (type string string))
-  (declare (type stream-designator stream))
   (declare (explicit-check))
-  (%write-string string stream start end))
+  (%write-string string (out-stream-from-designator stream) start end))
 
 (defun write-line (string &optional (stream *standard-output*)
                    &key (start 0) end)
-  (declare (type string string))
-  (declare (type stream-designator stream))
   (declare (explicit-check))
-  (let ((stream (out-stream-from-designator stream)))
-    (cond ((ansi-stream-p stream)
-           (ansi-stream-write-string string stream start end)
-           (funcall (ansi-stream-out stream) stream #\newline))
-          (t
-           (stream-write-string stream string start end)
-           (stream-write-char stream #\newline))))
-  string)
+  (%write-line string (out-stream-from-designator stream) start end))
 
 (defun charpos (&optional (stream *standard-output*))
-  (with-out-stream stream (ansi-stream-misc :charpos) (stream-line-column)))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (call-ansi-stream-misc stream :charpos)
+    :simple (s-%charpos stream)
+    :gray (stream-line-column stream)))
 
 (defun line-length (&optional (stream *standard-output*))
-  (with-out-stream stream (ansi-stream-misc :line-length)
-                   (stream-line-length)))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (call-ansi-stream-misc stream :line-length)
+    :simple (s-%line-length stream)
+    :gray (stream-line-length stream)))
 
 (defun finish-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (with-out-stream stream (ansi-stream-misc :finish-output)
-                   (stream-finish-output))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (call-ansi-stream-misc stream :finish-output)
+    :simple (s-%finish-output stream)
+    :gray (stream-finish-output stream))
   nil)
 
 (defun force-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (with-out-stream stream (ansi-stream-misc :force-output)
-                   (stream-force-output))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (call-ansi-stream-misc stream :force-output)
+    :simple (s-%force-output stream)
+    :gray (stream-force-output stream))
   nil)
 
 (defun clear-output (&optional (stream *standard-output*))
   (declare (explicit-check))
-  (with-out-stream stream (ansi-stream-misc :clear-output)
-                   (stream-clear-output))
+  (stream-api-dispatch (stream (out-stream-from-designator stream))
+    :native (call-ansi-stream-misc stream :clear-output)
+    :simple (s-%clear-output stream)
+    :gray (stream-clear-output stream))
   nil)
 
 (defun write-byte (integer stream)
   (declare (explicit-check))
   ;; The STREAM argument is not allowed to be a designator.
-  (%with-out-stream stream (ansi-stream-bout integer) (stream-write-byte integer))
+  (stream-api-dispatch (stream)
+    :native (funcall (ansi-stream-bout stream) stream integer)
+    :simple (s-%write-byte stream integer)
+    :gray (stream-write-byte stream integer))
   integer)
 
 
@@ -1264,19 +1267,16 @@
                                    start numbytes nil))
     (cond
       ((not eof-error-p)
-       ;; Really these should go through WRITE-SEQ-IMPL,
-       ;; but then the simple-streams contrib redefinitions would have to
-       ;; redefine that. (The ideal is to avoid repeated keyword parsing.)
-       (write-sequence buffer (echo-stream-output-stream stream)
-                       :start start :end (+ start bytes-read))
+       (write-seq-impl buffer (echo-stream-output-stream stream)
+                       start (+ start bytes-read))
        bytes-read)
       ((> numbytes bytes-read)
-       (write-sequence buffer (echo-stream-output-stream stream)
-                       :start start :end (+ start bytes-read))
+       (write-seq-impl buffer (echo-stream-output-stream stream)
+                       start (+ start bytes-read))
        (error 'end-of-file :stream stream))
       (t
-       (write-sequence buffer (echo-stream-output-stream stream)
-                       :start start :end (+ start bytes-read))
+       (write-seq-impl buffer (echo-stream-output-stream stream)
+                       start (+ start bytes-read))
        (aver (= numbytes (+ start bytes-read)))
        numbytes))))
 
@@ -1463,7 +1463,7 @@
                ;; in the source material is potentially advantageous versus checking the
                ;; buffer in GET-OUTPUT-STREAM-STRING, because if all source strings are
                ;; BASE-STRING, we needn't check anything.
-               ;; Bounds check was already performed by ANSI-STREAM-WRITE-STRING
+               ;; Bounds check was already performed
                `(let ((s (truly-the simple-character-string src)))
                   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                   (loop for i from start2 below end2
@@ -2070,6 +2070,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (call-ansi-stream-misc target op arg1)
            (stream-misc-dispatch target op arg1))))))
 
+;;; FIXME: formatted output into a simple-stream is currently hampered
+;;; by the fact that case-frob streams assume that the stream is either ANSI
+;;; or Gray. Probably the easiest fix would be to define STREAM-WRITE-CHAR
+;;; and STREAM-WRITE-STRING on simple-stream.
 (defun case-frob-upcase-out (stream char)
   (declare (type case-frob-stream stream)
            (type character char))
@@ -2505,7 +2509,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (write-list (compute-write-function nil)))
         (string
          (if (ansi-stream-p stream)
-             (ansi-stream-write-string seq stream start end)
+             (with-array-data ((data seq) (start start) (end end)
+                               :check-fill-pointer t)
+               (funcall (ansi-stream-sout stream) stream data start end))
              (stream-write-string stream seq start end)))
         (vector
          (with-array-data ((data seq) (offset-start start) (offset-end end)
@@ -2531,10 +2537,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type index start)
            (type sequence-end %end)
            (inline write-sequence/write-function))
-  (typecase stream
-    ((not ansi-stream)
-     ;; must be Gray-streams FUNDAMENTAL-STREAM
-     (stream-write-sequence stream seq start %end))
+  (stream-api-dispatch (stream)
+    :simple (s-%write-sequence stream seq start (or %end (length seq)))
+    :gray (stream-write-sequence stream seq start %end)
+    :native
+    (typecase stream
     ;; Don't merely extract one layer of composite stream, because a synonym stream
     ;; may redirect to a broadcast stream which wraps a two-way-stream etc etc.
     (synonym-stream
@@ -2549,8 +2556,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (t
      (write-sequence/write-function
       seq stream start %end (stream-element-mode stream)
-      (ansi-stream-out stream) (ansi-stream-bout stream))
-     seq)))
+      (ansi-stream-out stream) (ansi-stream-bout stream)))))
+  seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
