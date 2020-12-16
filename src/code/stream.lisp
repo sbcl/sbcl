@@ -161,23 +161,23 @@
 (declaim (inline ansi-stream-element-type))
 (defun ansi-stream-element-type (stream)
   (declare (type ansi-stream stream))
-  (funcall (ansi-stream-misc stream) stream :element-type))
+  (call-ansi-stream-misc stream :element-type))
 
 (defun stream-element-type (stream)
   (ansi-stream-element-type stream))
 
 (defun stream-external-format (stream)
-  (funcall (ansi-stream-misc stream) stream :external-format))
+  (call-ansi-stream-misc stream :external-format))
 
 (defun interactive-stream-p (stream)
   (declare (type stream stream))
-  (funcall (ansi-stream-misc stream) stream :interactive-p))
+  (call-ansi-stream-misc stream :interactive-p))
 
 (declaim (inline ansi-stream-close))
 (defun ansi-stream-close (stream abort)
   (declare (type ansi-stream stream))
   (when (ansi-stream-open-stream-p stream)
-    (funcall (ansi-stream-misc stream) stream :close abort))
+    (call-ansi-stream-misc stream :close abort))
   t)
 
 (defun close (stream &key abort)
@@ -216,9 +216,9 @@
   (cond
     (position
      (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-     (funcall (ansi-stream-misc stream) stream :file-position position))
+     (call-ansi-stream-misc stream :file-position position))
     (t
-     (let ((res (funcall (ansi-stream-misc stream) stream :file-position nil)))
+     (let ((res (call-ansi-stream-misc stream :file-position nil)))
        (when res
          #-sb-unicode
          (- res
@@ -289,7 +289,7 @@
              stream)))
 
 (defun file-string-length (stream object)
-  (funcall (ansi-stream-misc stream) stream :file-string-length object))
+  (call-ansi-stream-misc stream :file-string-length object))
 
 ;;;; input functions
 
@@ -423,8 +423,7 @@
            (when (ansi-stream-input-char-pos stream)
              (decf (ansi-stream-input-char-pos stream))))
           (t
-           (funcall (ansi-stream-misc stream) stream
-                    :unread character)))))
+           (call-ansi-stream-misc stream :unread character)))))
 
 (defun unread-char (character &optional (stream *standard-input*))
   (declare (explicit-check))
@@ -439,7 +438,7 @@
 (defun %ansi-stream-listen (stream)
   (or (/= (the fixnum (ansi-stream-in-index stream))
           +ansi-stream-in-buffer-length+)
-      (funcall (ansi-stream-misc stream) stream :listen)))
+      (call-ansi-stream-misc stream :listen)))
 
 (declaim (inline ansi-stream-listen))
 (defun ansi-stream-listen (stream)
@@ -481,7 +480,7 @@
 (declaim (inline ansi-stream-clear-input))
 (defun ansi-stream-clear-input (stream)
   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-  (funcall (ansi-stream-misc stream) stream :clear-input))
+  (call-ansi-stream-misc stream :clear-input))
 
 (defun clear-input (&optional (stream *standard-input*))
   (declare (explicit-check))
@@ -782,8 +781,8 @@
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
 ;;; appropriate SIMPLE- or FUNDAMENTAL-STREAM functions.
-(defun stream-misc-dispatch (stream operation &optional arg1 arg2)
-  (declare (type stream stream) (ignore arg2))
+(defun stream-misc-dispatch (stream operation arg1)
+  (declare (type stream stream))
   (ecase operation
     (:listen
      ;; Return T if input available, :EOF for end-of-file, otherwise NIL.
@@ -830,7 +829,7 @@
     ((fd-stream-p stream)
      (fd-stream-element-mode stream))
     ((and (ansi-stream-p stream)
-          (funcall (ansi-stream-misc stream) stream :element-mode)))
+          (call-ansi-stream-misc stream :element-mode)))
     (t
      (stream-element-type-stream-element-mode
       (stream-element-type stream)))))
@@ -864,7 +863,7 @@
   (out-fun broadcast-bout write-byte byte)
   (out-fun broadcast-sout %write-string string start end))
 
-(defun broadcast-misc (stream operation &optional arg1 arg2)
+(defun broadcast-misc (stream operation arg1)
   (let ((streams (broadcast-stream-streams stream)))
     (case operation
       ;; FIXME: This may not be the best place to note this, but I
@@ -931,9 +930,8 @@
          (dolist (stream streams res)
            (setq res
                  (if (ansi-stream-p stream)
-                     (funcall (ansi-stream-misc stream) stream operation
-                              arg1 arg2)
-                     (stream-misc-dispatch stream operation arg1 arg2)))))))))
+                     (call-ansi-stream-misc stream operation arg1)
+                     (stream-misc-dispatch stream operation arg1)))))))))
 
 ;;;; synonym streams
 
@@ -964,7 +962,7 @@
   (in-fun synonym-bin read-byte eof-error-p eof-value)
   (in-fun synonym-n-bin read-n-bytes buffer start numbytes eof-error-p))
 
-(defun synonym-misc (stream operation &optional arg1 arg2)
+(defun synonym-misc (stream operation arg1)
   (declare (optimize (safety 1)))
   ;; CLHS 21.1.4 implies that CLOSE on a synonym stream closes the synonym stream in that
   ;; "The consequences are undefined if the synonym stream symbol is not bound to an open
@@ -988,8 +986,8 @@
           (:clear-input (clear-input syn))
           (:unread (unread-char arg1 syn))
           (t
-           (funcall (ansi-stream-misc syn) syn operation arg1 arg2)))
-        (stream-misc-dispatch syn operation arg1 arg2))))
+           (call-ansi-stream-misc syn operation arg1)))
+        (stream-misc-dispatch syn operation arg1))))
 
 ;;;; two-way streams
 
@@ -1038,7 +1036,7 @@
   (in-fun two-way-bin read-byte eof-error-p eof-value)
   (in-fun two-way-n-bin read-n-bytes buffer start numbytes eof-error-p))
 
-(defun two-way-misc (stream operation &optional arg1 arg2)
+(defun two-way-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
          (out (two-way-stream-output-stream stream))
          (in-ansi-stream-p (ansi-stream-p in))
@@ -1050,8 +1048,8 @@
            (listen in)))
       ((:finish-output :force-output :clear-output)
        (if out-ansi-stream-p
-           (funcall (ansi-stream-misc out) out operation arg1 arg2)
-           (stream-misc-dispatch out operation arg1 arg2)))
+           (call-ansi-stream-misc out operation arg1)
+           (stream-misc-dispatch out operation arg1)))
       (:clear-input (clear-input in))
       (:unread (unread-char arg1 in))
       (:element-type
@@ -1069,11 +1067,11 @@
        (set-closed-flame stream))
       (t
        (or (if in-ansi-stream-p
-               (funcall (ansi-stream-misc in) in operation arg1 arg2)
-               (stream-misc-dispatch in operation arg1 arg2))
+               (call-ansi-stream-misc in operation arg1)
+               (stream-misc-dispatch in operation arg1))
            (if out-ansi-stream-p
-               (funcall (ansi-stream-misc out) out operation arg1 arg2)
-               (stream-misc-dispatch out operation arg1 arg2)))))))
+               (call-ansi-stream-misc out operation arg1)
+               (stream-misc-dispatch out operation arg1)))))))
 
 ;;;; concatenated streams
 
@@ -1136,7 +1134,7 @@
       (when (zerop remaining-bytes) (return numbytes)))
     (setf (concatenated-stream-streams stream) (cdr streams))))
 
-(defun concatenated-misc (stream operation &optional arg1 arg2)
+(defun concatenated-misc (stream operation arg1)
   (let* ((left (concatenated-stream-streams stream))
          (current (car left)))
     (case operation
@@ -1146,7 +1144,7 @@
        (loop
         (let ((stuff (if (ansi-stream-p current)
                          (%ansi-stream-listen current)
-                         (stream-misc-dispatch current :listen))))
+                         (stream-misc-dispatch current :listen arg1))))
           (cond ((eq stuff :eof)
                  ;; Advance STREAMS, and try again.
                  (pop (concatenated-stream-streams stream))
@@ -1168,8 +1166,8 @@
       (t
        (when left
          (if (ansi-stream-p current)
-             (funcall (ansi-stream-misc current) current operation arg1 arg2)
-             (stream-misc-dispatch current operation arg1 arg2)))))))
+             (call-ansi-stream-misc current operation arg1)
+             (stream-misc-dispatch current operation arg1)))))))
 
 ;;;; echo streams
 
@@ -1278,9 +1276,8 @@
 
 (declaim (freeze-type string-input-stream))
 
-(defun string-in-misc (stream operation &optional arg1 arg2)
-  (declare (type string-input-stream stream)
-           (ignore arg2))
+(defun string-in-misc (stream operation arg1)
+  (declare (type string-input-stream stream))
   (case operation
     (:file-position
      (if arg1
@@ -1471,7 +1468,7 @@
              (reject (&rest args)
                (declare (ignore args))
                (error "Stream can not accept characters"))
-             (misc (stream operation &optional arg1 arg2)
+             (misc (stream operation arg1)
                ;; Intercept the misc handler to reset the Unicode state
                ;; (since the char handlers are local functions).
                ;; Technically this should be among the actions performed on :CLEAR-OUTPUT,
@@ -1480,7 +1477,7 @@
                    (setf (string-output-stream-unicode-p stream) nil
                          ;; resume checking for Unicode characters
                          (ansi-stream-out stream) #'default-out)
-                   (string-out-misc stream operation arg1 arg2))))
+                   (string-out-misc stream operation arg1))))
       (multiple-value-bind (element-type unicode-p out sout-aux)
           (case (%other-pointer-widetag buffer)
             #+sb-unicode
@@ -1675,8 +1672,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                    (setf (string-output-stream-pointer stream) (+ size diff)
                          (string-output-stream-index stream) pos))))))))
 
-(defun string-out-misc (stream operation &optional arg1 arg2)
-  (declare (ignore arg2))
+(defun string-out-misc (stream operation arg1)
   (declare (optimize speed))
   (case operation
     (:charpos
@@ -1748,7 +1744,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;; Reset UNICODE-P unless it was :IGNORE or element-type is CHARACTER.
     (when (and (eq (string-output-stream-element-type stream) :default)
                (eq (string-output-stream-unicode-p stream) t))
-      (funcall (ansi-stream-misc stream) stream :reset))
+      (call-ansi-stream-misc stream :reset))
 
     ;; There are exactly 3 cases that we have to deal with when copying:
     ;;  CHARACTER-STRING into BASE-STRING (without type-checking per character)
@@ -1830,8 +1826,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                     :start1 pointer :start2 start :end2 end)))
     (setf (finite-base-string-output-stream-pointer stream) new-pointer)))
 
-(defun finite-base-string-out-misc (stream operation &optional arg1 arg2)
-  (declare (ignore stream operation arg1 arg2))
+(defun finite-base-string-out-misc (stream operation arg1)
+  (declare (ignore stream operation arg1))
   (error "finite-base-string-out-misc needs an implementation"))
 
 ;;;; fill-pointer streams
@@ -1957,8 +1953,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                    :start1 offset-current :start2 start :end2 end)))
       dst-end)))
 
-(defun fill-pointer-misc (stream operation &optional arg1 arg2)
-  (declare (ignore arg2))
+(defun fill-pointer-misc (stream operation arg1)
   (case operation
     (:file-position
      (let ((buffer (fill-pointer-output-stream-string stream)))
@@ -2040,7 +2035,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                      #'case-frob-capitalize-first-sout)))
         (%make-case-frob-stream target out sout))))
 
-(defun case-frob-misc (stream op &optional arg1 arg2)
+(defun case-frob-misc (stream op arg1)
   (declare (type case-frob-stream stream))
   (case op
     (:close
@@ -2049,8 +2044,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (t
      (let ((target (case-frob-stream-target stream)))
        (if (ansi-stream-p target)
-           (funcall (ansi-stream-misc target) target op arg1 arg2)
-           (stream-misc-dispatch target op arg1 arg2))))))
+           (call-ansi-stream-misc target op arg1)
+           (stream-misc-dispatch target op arg1))))))
 
 (defun case-frob-upcase-out (stream char)
   (declare (type case-frob-stream stream)
@@ -2543,7 +2538,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; BROADCAST-STREAM entry.
   (unless (typep stream 'broadcast-stream)
     (stream-file-stream-or-lose stream))
-  (funcall (ansi-stream-misc stream) stream :file-length))
+  (call-ansi-stream-misc stream :file-length))
 
 ;; Placing this definition (formerly in "toplevel") after the important
 ;; stream types are known produces smaller+faster code than it did before.

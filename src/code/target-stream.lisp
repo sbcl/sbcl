@@ -107,14 +107,14 @@
               char
               (the character char))))))
 
-(defun echo-misc (stream operation &optional arg1 arg2)
+(defun echo-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
          (out (two-way-stream-output-stream stream)))
     (case operation
       (:listen
        (if (ansi-stream-p in)
            (%ansi-stream-listen in)
-           (stream-misc-dispatch in :listen)))
+           (stream-misc-dispatch in :listen arg1)))
       (:unread (setf (echo-stream-unread-stuff stream) t)
                (unread-char arg1 in))
       (:element-type
@@ -132,11 +132,11 @@
        (set-closed-flame stream))
       (t
        (or (if (ansi-stream-p in)
-               (funcall (ansi-stream-misc in) in operation arg1 arg2)
-               (stream-misc-dispatch in operation arg1 arg2))
+               (call-ansi-stream-misc in operation arg1)
+               (stream-misc-dispatch in operation arg1))
            (if (ansi-stream-p out)
-               (funcall (ansi-stream-misc out) out operation arg1 arg2)
-               (stream-misc-dispatch out operation arg1 arg2)))))))
+               (call-ansi-stream-misc out operation arg1)
+               (stream-misc-dispatch out operation arg1)))))))
 
 (defun echo-stream-peek-char (stream peek-type eof-error-p eof-value)
   (let* ((in (two-way-stream-input-stream stream))

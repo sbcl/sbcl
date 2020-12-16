@@ -121,8 +121,8 @@
                       (return))
                     (incf start count)))))))))))
 
-(defun pretty-misc (stream op &optional arg1 arg2)
-  (declare (ignore stream op arg1 arg2)))
+(defun pretty-misc (stream op arg)
+  (declare (ignore stream op arg)))
 
 ;;;; logical blocks
 

@@ -289,3 +289,9 @@
 ;;; This is not something that the standard macro permits.
 (defmacro %with-output-to-string ((var) &body body)
   (expand-with-output-to-string var ''character body t))
+
+(defmacro call-ansi-stream-misc (stream operation &optional (arg nil argp))
+  ;; Never stuff in a placeholder in the three operations that take an argument.
+  (aver (or argp (not (memq operation '(:file-position :file-string-lenth :unread)))))
+  `(funcall (ansi-stream-misc ,stream) ,stream
+            ,operation ,(if argp arg 0)))
