@@ -125,19 +125,9 @@ maintained."
                          :format-arguments (list ,svar)))
                 ,svar)))))
 
-;;; WITH-mumble-STREAM calls the function in the given SLOT of the
+;;; WITH-%OUT-STREAM calls the function in the given SLOT of the
 ;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
 ;;; ARGS for FUNDAMENTAL-STREAMs.
-(defmacro with-in-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(let ((stream (in-stream-from-designator ,stream)))
-    ,(if stream-dispatch
-         `(if (ansi-stream-p stream)
-              (funcall (,slot stream) stream ,@args)
-              ,@(when stream-dispatch
-                  `(,(destructuring-bind (function &rest args) stream-dispatch
-                       `(,function stream ,@args)))))
-         `(funcall (,slot stream) stream ,@args))))
-
 (defmacro %with-out-stream (stream (slot &rest args) &optional stream-dispatch)
   (when (and (eq slot 'ansi-stream-misc) (not (cdr args)))
     ;; Never stuff in a placeholder in the three operations that take an argument.
