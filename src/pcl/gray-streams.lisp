@@ -15,35 +15,17 @@
   `(progn (fmakunbound ',name)
           (defgeneric ,name ,@rest)
           (sb-pcl::!install-cross-compiled-methods ',name)
-          ;; You're supposed to signal TYPE-ERROR on a non-stream, but in order to
-          ;; do that while not signaling an error for streams, we need a fallback
-          ;; method on STREAM. CLOSE lacked a fallback, and since I generally disagree
-          ;; with that concept, I'm not adding it (a "foolish consistency" etc).
+          ;; Stream functions in the CL package that were upgraded to generic should
+          ;; signal type errors when called on a non-stream. One method on T that is
+          ;; ordinarily never selected can do it, though unfortunately this makes it
+          ;; impossible to detect absence of a primary method.
+          ;; CLOSE is different in that it is both specified as the public API *and*
+          ;; at the implementation layer in the quasi-standard Gray stream design.
+          ;; So it's allowed to hit no-applicable-method.
           ,@(unless (eq name 'close)
-              `((defmethod ,name ((stream stream))
-                  (bug-or-error stream ',name))
-                (defmethod ,name ((non-stream t))
-                  (error 'type-error :datum non-stream :expected-type 'stream))))))
-
-;;; BUG-OR-ERROR: because we have extensible streams, wherewith the
-;;; user is responsible for some of the protocol implementation, it's
-;;; not necessarily a bug in SBCL itself if we fall through to one of
-;;; these default methods.
-;;;
-;;; FIXME: there's a lot of similarity in these Gray stream
-;;; implementation generic functions.  All of them could (maybe
-;;; should?) have two default methods: one on STREAM calling
-;;; BUG-OR-ERROR, and one on T signalling a TYPE-ERROR.
-(declaim (ftype (function * nil) bug-or-error))
-(defun bug-or-error (stream fun)
-  (declare (optimize allow-non-returning-tail-call))
-  (error
-   "~@<The stream ~S has no suitable method for ~S, ~
-     and so has fallen through to this method.  If you think that this is ~
-     a bug, please report it to the applicable authority (bugs in SBCL itself ~
-     should go to the mailing lists referenced from ~
-     <http://www.sbcl.org/>).~@:>"
-   stream fun))
+              `((defmethod ,name (x)
+                  (unless (streamp x)
+                    (error 'type-error :datum x :expected-type 'stream)))))))
 
 (!def-stream-generic stream-element-type (stream)
   (:documentation
@@ -190,10 +172,6 @@
 
 (defmethod stream-clear-input ((stream fundamental-character-input-stream))
   nil)
-(defmethod stream-clear-input ((stream stream))
-  (bug-or-error stream 'stream-clear-input))
-(defmethod stream-clear-input ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-read-sequence (stream seq &optional start end)
   (:documentation
@@ -323,10 +301,6 @@
 
 (defmethod stream-finish-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-finish-output ((stream stream))
-  (bug-or-error stream 'stream-finish-output))
-(defmethod stream-finish-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-force-output (stream)
   (:documentation
@@ -335,10 +309,6 @@
 
 (defmethod stream-force-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-force-output ((stream stream))
-  (bug-or-error stream 'stream-force-output))
-(defmethod stream-force-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-clear-output (stream)
   (:documentation
@@ -347,10 +317,6 @@
 
 (defmethod stream-clear-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-clear-output ((stream stream))
-  (bug-or-error stream 'stream-clear-output))
-(defmethod stream-clear-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-advance-to-column (stream column)
   (:documentation
@@ -406,20 +372,10 @@
    "Used by READ-BYTE; returns either an integer, or the symbol :EOF
   if the stream is at end-of-file."))
 
-(defmethod stream-read-byte ((stream stream))
-  (bug-or-error stream 'stream-read-byte))
-(defmethod stream-read-byte ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
-
 (defgeneric stream-write-byte (stream integer)
   (:documentation
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
-
-(defmethod stream-write-byte ((stream stream) integer)
-  (bug-or-error stream 'stream-write-byte))
-(defmethod stream-write-byte ((non-stream t) integer)
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-file-position (stream &optional position-spec)
   (:documentation
@@ -427,11 +383,6 @@
 
 (defmethod stream-file-position ((stream ansi-stream) &optional position-spec)
   (ansi-stream-file-position stream position-spec))
-
-(defmethod stream-file-position ((stream t) &optional position-spec)
-  (declare (ignore stream position-spec))
-  nil)
-
 
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.
