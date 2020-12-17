@@ -621,30 +621,15 @@
 (defmethod stream-element-type ((stream simple-stream))
   '(unsigned-byte 8))
 
-(defun interactive-stream-p (stream)
-  "Return true if Stream does I/O on a terminal or other interactive device."
-  (etypecase stream
-    (simple-stream
+(defmethod interactive-stream-p ((stream simple-stream))
      (%check stream :open)
      (any-stream-instance-flags stream :interactive))
-    (ansi-stream
-     (sb-impl::call-ansi-stream-misc stream :interactive-p))
-    (fundamental-stream
-     nil)))
 
-(defun (setf interactive-stream-p) (flag stream)
-  (typecase stream
-    (simple-stream
+(defmethod (setf interactive-stream-p) (flag (stream simple-stream))
      (%check stream :open)
      (if flag
          (add-stream-instance-flags stream :interactive)
          (remove-stream-instance-flags stream :interactive)))
-    (t
-     (error 'simple-type-error
-            :datum stream
-            :expected-type 'simple-stream
-            :format-control "Can't set interactive flag on ~S."
-            :format-arguments (list stream)))))
 
 (defun file-string-length (stream object)
   (declare (type (or string character) object) (type stream stream))
