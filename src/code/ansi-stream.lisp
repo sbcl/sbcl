@@ -49,7 +49,7 @@
 ;;;  :line-length       - Return the length of a line of output.
 ;;;  :charpos           - Return current output position on the line.
 ;;;  :file-length       - Return the file length of a file stream.
-;;;  :file-position     - Return or change the current position of a
+;;;  :[gs]et-file-position  - Return or change the current position of a
 ;;;                       file stream.
 ;;;  :file-name         - Return the name of an associated file.
 ;;;  :interactive-p     - Is this an interactive device?
@@ -98,8 +98,8 @@
     (:force-output        2)
     (:finish-output       3)
     (:charpos             4)
-    (:file-position       5)
-    (:interactive-p       6)
+    (:get-file-position   5)
+    (:set-file-position   6)
     (:element-type        7)
     (:element-mode        8)
     (:external-format     9)
@@ -109,10 +109,11 @@
     (:clear-input        13)
     (:clear-output       14)
     (:close              15)
+    (:interactive-p      16)
     ;; This is used by string streams and is not an opcode seen
     ;; by STREAM-MISC-DISPATCH. The new stream pseudomethod convention
     ;; can't pass random keywords to the misc method.
-    (:reset-unicode-p    16))))
+    (:reset-unicode-p    17))))
 
 ;;; base class for ANSI standard streams (as opposed to the Gray
 ;;; streams extension)
@@ -143,7 +144,7 @@
   (sout #'ill-out :type function)               ; string output function
 
   ;; other, less-used methods
-  (misc #'no-op-placeholder :type (function (stream (integer 0 16) t) *))
+  (misc #'no-op-placeholder :type (function (stream (integer 0 17) t) *))
 
   ;; Absolute character position, acting also as a generalized boolean
   ;; in lieu of testing FORM-TRACKING-STREAM-P to see if we must
@@ -335,7 +336,7 @@
 
 (defmacro call-ansi-stream-misc (stream operation &optional (arg nil argp))
   ;; Never stuff in a placeholder in the three operations that take an argument.
-  (aver (or argp (not (memq operation '(:file-position :file-string-lenth :unread)))))
+  (aver (or argp (not (memq operation '(:set-file-position :file-string-lenth :unread)))))
   `(funcall (ansi-stream-misc ,stream) ,stream
             ;; If operation is a literal keyword, translate it, otherwise
             ;; it is a variable whose values is the opcode for passthru.

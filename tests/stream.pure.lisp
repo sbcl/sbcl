@@ -136,6 +136,11 @@
 ;;; Ideas?
 #+nil (assert (eq (interactive-stream-p *terminal-io*) t))
 
+;;; FILE-POSITION should not accept NIL
+(with-test (:name :file-position-smoke-test)
+  (let ((s (make-broadcast-stream)))
+    (assert-error (file-position s (opaque-identity nil)) type-error)))
+
 ;;; MAKE-STRING-INPUT-STREAM
 ;;;
 ;;; * Observe FILE-POSITION :START and :END, and allow setting of

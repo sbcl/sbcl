@@ -175,25 +175,20 @@
 (defun external-format-char-size (external-format)
   (ef-char-size (get-external-format external-format)))
 
-;;; Call the MISC method with the :FILE-POSITION operation.
-(declaim (inline !ansi-stream-file-position))
-(defun !ansi-stream-file-position (stream position)
+;;; Call the MISC method with the :GET-FILE-POSITION operation.
+(declaim (inline !ansi-stream-ftell)) ; named for the stdio inquiry function
+(defun !ansi-stream-ftell (stream)
   (declare (type stream stream))
-  (declare (type (or index (alien sb-unix:unix-offset) (member nil :start :end))
-                 position))
   ;; FIXME: It would be good to comment on the stuff that is done here...
   ;; FIXME: This doesn't look interrupt safe.
-  (cond
-    (position
-     (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-     (call-ansi-stream-misc stream :file-position position))
-    (t
-     (let ((res (call-ansi-stream-misc stream :file-position nil)))
-       (when res
+  (let ((res (call-ansi-stream-misc stream :get-file-position))
+        (delta (- +ansi-stream-in-buffer-length+
+                  (ansi-stream-in-index stream))))
+    (if (eql delta 0)
+        res
+        (when res
          #-sb-unicode
-         (- res
-            (- +ansi-stream-in-buffer-length+
-               (ansi-stream-in-index stream)))
+         (- res delta)
          #+sb-unicode
          (let ((char-size (if (fd-stream-p stream)
                               (fd-stream-char-size stream)
@@ -206,19 +201,41 @@
                        for i from start below +ansi-stream-in-buffer-length+
                        sum (funcall char-size (aref buffer i))))
                 (fixnum
-                 (* char-size
-                    (- +ansi-stream-in-buffer-length+
-                       (ansi-stream-in-index stream))))))))))))
+                 (* char-size delta)))))))))
 
-(defun file-position (stream &optional position)
-  (stream-api-dispatch (stream)
-    :native (!ansi-stream-file-position stream position)
-    :simple (s-%file-position stream position)
-    :gray
-      (let ((result (stream-file-position stream position)))
-        (if (numberp result)
-            result
-            (and result t)))))
+;;; You're not allowed to specify NIL for the position but we were permitting
+;;; it, which made it impossible to test for a bad call that tries to assign
+;;; the position, versus a inquiry for the current position.
+;;; CLHS specifies: file-position stream position-spec => success-p
+;;; and position-spec is a "file position designator" which precludes NIL
+;;; but the implementation methods can't detect supplied vs unsupplied.
+;;; What a fubar API at the CL: layer. Was #'(SETF FILE-POSITION) not invented?
+(defun file-position (stream &optional (position 0 suppliedp))
+  (if suppliedp
+      ;; Setter
+      (let ((arg (the (or index (alien sb-unix:unix-offset) (member :start :end))
+                      position)))
+        (stream-api-dispatch (stream)
+          :native (progn
+                    (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+                    (call-ansi-stream-misc stream :set-file-position arg))
+          ;; The impl method is expected to return a success indication as
+          ;; a generalized boolean.
+          :simple (s-%file-position stream arg)
+          ;; I think our fndb entry is overconstrained - it says that this returns
+          ;; either unsigned-byte or strict boolean, however CLHS says that setting
+          ;; FILE-POSITION returns a /generalized boolean/.
+          ;; A stream-specific method should be allowed to convey more information
+          ;; than T/NIL yet we are forced to discard that information,
+          ;; lest the return value constraint on this be violated.
+          :gray (let ((result (stream-file-position stream arg)))
+                  (if (numberp result) result (and result t)))))
+      ;; Getter
+      (let ((result (stream-api-dispatch (stream)
+                      :native (!ansi-stream-ftell stream)
+                      :simple (s-%file-position stream nil)
+                      :gray (stream-file-position stream))))
+        (the (or unsigned-byte null) result))))
 
 (defmethod stream-file-position ((stream ansi-stream) &optional position)
   ;; Excuse me for asking, but why is this even a thing?
@@ -227,7 +244,11 @@
   ;; which indirects to this. But if they do ... make it work.
   ;; And note that inlining of !ansi-stream-file-position would be pointless,
   ;; it's nearly 1K of code.
-  (file-position stream position))
+  ;; Oh, this is srsly wtf now. If POSITION is NIL,
+  ;; then you must not call FILE-POSITION with both arguments.
+  (if position
+      (file-position stream position)
+      (file-position stream)))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".
@@ -804,7 +825,9 @@
         (:charpos (charpos stream))
         (:file-length (file-length stream))
         (:file-string-length (file-string-length stream arg))
-        (:file-position (file-position stream arg)))
+        (:set-file-position (s-%file-position stream arg))
+        ;; yeesh, this wants a _required_ NIL argument to mean "inquire".
+        (:get-file-position (s-%file-position stream nil)))
 
       ;; Gray streams dispatch directly to a CLOS method.
       (stream-misc-case (operation)
@@ -821,7 +844,8 @@
        (:interactive-p (interactive-stream-p stream)) ; is generic
        (:line-length (stream-line-length stream))
        (:charpos (stream-line-column stream))
-       (:file-position (stream-file-position stream arg))
+       (:set-file-position (stream-file-position stream arg))
+       (:get-file-position (stream-file-position stream))
        ;; This last bunch of pseudo-methods will probably just signal an error
        ;; since they aren't generic and don't work on Gray streams.
        (:external-format (stream-external-format stream))
@@ -912,15 +936,15 @@
          (if last
              (file-length (car last))
              0)))
-      (:file-position
-       (if arg1
+      (:set-file-position
            (let ((res (or (eql arg1 :start) (eql arg1 0))))
              (dolist (stream streams res)
-               (setq res (file-position stream arg1))))
+               (setq res (file-position stream arg1)))))
+      (:get-file-position
            (let ((last (last streams)))
              (if last
                  (file-position (car last))
-                 0))))
+                 0)))
       (:file-string-length
        (let ((last (last streams)))
          (if last
@@ -1283,17 +1307,17 @@
 (defun string-in-misc (stream operation arg1)
   (declare (type string-input-stream stream))
   (stream-misc-case (operation :default nil)
-    (:file-position
-     (if arg1
+    (:set-file-position
          (setf (string-input-stream-index stream)
                (case arg1
                  (:start (string-input-stream-start stream))
                  (:end (string-input-stream-limit stream))
                  ;; We allow moving position beyond EOF. Errors happen
                  ;; on read, not move.
-                 (t (+ (string-input-stream-start stream) arg1))))
+                 (t (+ (string-input-stream-start stream) arg1)))))
+    (:get-file-position
          (- (string-input-stream-index stream)
-            (string-input-stream-start stream))))
+            (string-input-stream-start stream)))
     ;; According to ANSI: "Should signal an error of type type-error
     ;; if stream is not a stream associated with a file."
     ;; This is checked by FILE-LENGTH, so no need to do it here either.
@@ -1705,10 +1729,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
               pointer (length buffer))
         (/noshow0 "/string-out-misc charpos next")
         (go :next))))
-    (:file-position
-     (/noshow0 "/string-out-misc file-position")
-     (when arg1
-       (set-string-output-stream-file-position stream arg1))
+    (:set-file-position
+     (set-string-output-stream-file-position stream arg1)
+     t) ; just claim it worked, who cares (see lp#1839040)
+    (:get-file-position
      (string-output-stream-index stream))
     (:close
      (/noshow0 "/string-out-misc close")
@@ -1959,11 +1983,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                    :start1 offset-current :start2 start :end2 end)))
       dst-end)))
 
-(defun fill-pointer-misc (stream operation arg1)
+(defun fill-pointer-misc (stream operation arg1
+                          &aux (buffer (fill-pointer-output-stream-string stream)))
   (stream-misc-case (operation :default nil)
-    (:file-position
-     (let ((buffer (fill-pointer-output-stream-string stream)))
-       (if arg1
+    (:set-file-position
            (setf (fill-pointer buffer)
                  (case arg1
                    (:start 0)
@@ -1978,11 +2001,11 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                             (error "Cannot move FILE-POSITION beyond the end ~
                                     of WITH-OUTPUT-TO-STRING stream ~
                                     constructed with non-adjustable string.")))
-                      arg1)))
-           (fill-pointer buffer))))
+                      arg1))))
+    (:get-file-position
+           (fill-pointer buffer))
     (:charpos
-     (let* ((buffer (fill-pointer-output-stream-string stream))
-            (current (fill-pointer buffer)))
+     (let ((current (fill-pointer buffer)))
        (with-array-data ((string buffer) (start) (end current))
          (declare (simple-string string))
          (let ((found (position #\newline string :test #'char=
@@ -2543,6 +2566,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
+
+;;; FIXME: what's up with this?
+; in: DEFUN FILE-LENGTH
+; caught STYLE-WARNING:
+;   Result is a (VALUES (AND (NOT SB-KERNEL:INSTANCE) FILE-STREAM) &OPTIONAL),
+;            not a (VALUES (OR UNSIGNED-BYTE NULL) &OPTIONAL).
+
 (defun file-length (stream)
   ;; The description for FILE-LENGTH says that an error must be raised
   ;; for streams not associated with files (which broadcast streams

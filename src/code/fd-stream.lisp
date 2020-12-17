@@ -96,6 +96,8 @@
             (:conc-name fd-stream-)
             (:predicate fd-stream-p)
             (:include ansi-stream
+             ;; FIXME: would a type constraint on IN-BUFFER
+             ;; and/or CIN-BUFFER improve anything?
                       (misc #'fd-stream-misc-routine))
             (:copier nil))
 
@@ -2099,10 +2101,8 @@
      (etypecase arg1
        (character (fd-stream-character-size fd-stream arg1))
        (string (fd-stream-string-size fd-stream arg1))))
-    (:file-position
-     (if arg1
-         (fd-stream-set-file-position fd-stream arg1)
-         (fd-stream-get-file-position fd-stream)))))
+    (:get-file-position (fd-stream-get-file-position fd-stream))
+    (:set-file-position (fd-stream-set-file-position fd-stream arg1))))
 
 ;; FIXME: Think about this.
 ;;
@@ -2730,10 +2730,7 @@
   ;; so unreading is implemented entirely within ANSI-STREAM-UNREAD-CHAR.
   ;; But we do need to prevent attempts to change the absolute position.
   (stream-misc-case (operation)
-    (:file-position
-     (if arg1
-         (simple-stream-perror "~S is not positionable" stream)
-         (fd-stream-get-file-position stream)))
+    (:set-file-position (simple-stream-perror "~S is not positionable" stream))
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1))))
 
