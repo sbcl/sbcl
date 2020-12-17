@@ -366,15 +366,18 @@
   ;;  a. native simple, gray
   ;;  b. native, gray
   ;;  c. native, simple
-  ;; Most CL: stream APIs use explicit-check,m so we should assert that the thing
-  ;; is actually a stream. If gray streams are involved, let the GF signal
-  ;; no-applicable-method.
+  ;; Most CL: stream APIs use explicit-check, so we should assert that the thing
+  ;; is actually a stream.
+  ;; If the CL interface bypasses STREAM-API-DISPATCH then it is up to generic layer
+  ;; to signal an error, the class of which seems unfortunately subject to debate.
   (aver (and native (or simple gray)))
   `(let ,(if initform `((,streamvar ,initform)))
      ,(cond
         ((and gray (not simple))
          ;; Most of the APIs are like this before loading the simple-streams contrib
-         `(if (ansi-stream-p ,streamvar) ,native ,gray))
+         `(if (ansi-stream-p ,streamvar)
+              ,native
+              (let ((,streamvar (the stream ,streamvar))) ,gray)))
         ((not gray) ; just ANSI streams or a simple-stream
          `(cond ((not (%instancep ,streamvar))
                  (the stream ,streamvar)) ; signal an OBJECT-NOT-TYPE error
@@ -393,4 +396,4 @@
                        (return-from stream ,native))
                       ((logtest (layout-flags layout) +simple-stream-layout-flag+)
                        (return-from stream ,simple)))))
-            ,gray)))))
+            (let ((,streamvar (the stream ,streamvar))) ,gray))))))
