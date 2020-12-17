@@ -28,16 +28,16 @@
     ;; It's ignored during cold-init, but eventually takes effect.
     (assert (eq lambda-list :after))
     (setq qualifier lambda-list lambda-list (pop body)))
-  (ecase name
+  (case name
     (make-load-form
-     ;; Expect one mandatory class-name and the optional environment.
+     ;; Expect one specialized arg and one optional
      (assert (typep lambda-list
                     '(cons (cons symbol (cons symbol null))
                            (cons (eql &optional) (cons symbol null))))))
     (print-object
      ;; Expect one specialized arg and one unspecialized
      (assert (typep lambda-list '(cons (cons symbol (cons symbol null))
-                                       (cons symbol null))))))
+                                  (cons symbol null))))))
   (binding* ((specializer (cadar lambda-list)) ; only one allowd
              (unspecialized-ll `(,(caar lambda-list) ,@(cdr lambda-list)))
              ((forms decls) (parse-body body nil))) ; Note: disallowing docstring
@@ -120,6 +120,14 @@
   (trivial-call-a-method 'make-load-form object environment))
 (defun print-object (object stream)
   (trivial-call-a-method 'print-object object stream))
+
+(macrolet ((ensure-gfs (names)
+             `(progn ,@(mapcar (lambda (name)
+                                 `(defun ,name (x) (trivial-call-a-method ',name x)))
+                               names))))
+  (ensure-gfs (open-stream-p interactive-stream-p input-stream-p output-stream-p
+               stream-element-type)))
+(defun close (x &key abort) (trivial-call-a-method 'close x :abort abort))
 
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT

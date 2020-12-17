@@ -11,6 +11,20 @@
 
 (in-package "SB-GRAY")
 
+(defmacro !def-stream-generic (name &rest rest)
+  `(progn (fmakunbound ',name)
+          (defgeneric ,name ,@rest)
+          (sb-pcl::!install-cross-compiled-methods ',name)
+          ;; You're supposed to signal TYPE-ERROR on a non-stream, but in order to
+          ;; do that while not signaling an error for streams, we need a fallback
+          ;; method on STREAM. CLOSE lacked a fallback, and since I generally disagree
+          ;; with that concept, I'm not adding it (a "foolish consistency" etc).
+          ,@(unless (eq name 'close)
+              `((defmethod ,name ((stream stream))
+                  (bug-or-error stream ',name))
+                (defmethod ,name ((non-stream t))
+                  (error 'type-error :datum non-stream :expected-type 'stream))))))
+
 ;;; BUG-OR-ERROR: because we have extensible streams, wherewith the
 ;;; user is responsible for some of the protocol implementation, it's
 ;;; not necessarily a bug in SBCL itself if we fall through to one of
@@ -31,121 +45,61 @@
      <http://www.sbcl.org/>).~@:>"
    stream fun))
 
-(fmakunbound 'stream-element-type)
-
-(defgeneric stream-element-type (stream)
+(!def-stream-generic stream-element-type (stream)
   (:documentation
    "Return a type specifier for the kind of object returned by the
   STREAM. The class FUNDAMENTAL-CHARACTER-STREAM provides a default method
   which returns CHARACTER."))
 
-(defmethod stream-element-type ((stream ansi-stream))
-  (ansi-stream-element-type stream))
-
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
-
-(defmethod stream-element-type ((stream stream))
-  (bug-or-error stream 'stream-element-type))
-
-(defmethod stream-element-type ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
-(fmakunbound 'open-stream-p)
-
-(defgeneric open-stream-p (stream)
+(!def-stream-generic open-stream-p (stream)
   (:documentation
    "Return true if STREAM is not closed. A default method is provided
   by class FUNDAMENTAL-STREAM which returns true if CLOSE has not been
   called on the stream."))
 
-(defmethod open-stream-p ((stream ansi-stream))
-  (ansi-stream-open-stream-p stream))
-
 (defmethod open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
-
-(defmethod open-stream-p ((stream stream))
-  (bug-or-error stream 'open-stream-p))
-
-(defmethod open-stream-p ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
-(fmakunbound 'close)
-
-(defgeneric close (stream &key abort)
+(!def-stream-generic close (stream &key abort)
   (:documentation
    "Close the given STREAM. No more I/O may be performed, but
   inquiries may still be made. If :ABORT is true, an attempt is made
   to clean up the side effects of having created the stream."))
-
-(defmethod close ((stream ansi-stream) &key abort)
-  (ansi-stream-close stream abort))
 
 (defmethod close ((stream fundamental-stream) &key abort)
   (declare (ignore abort))
   (setf (stream-open-p stream) nil)
   t)
 
-(let ()
-  (fmakunbound 'input-stream-p)
-
-  (defgeneric input-stream-p (stream)
+(progn
+  (!def-stream-generic input-stream-p (stream)
     (:documentation "Can STREAM perform input operations?"))
-
-  (defmethod input-stream-p ((stream ansi-stream))
-    (ansi-stream-input-stream-p stream))
 
   (defmethod input-stream-p ((stream fundamental-stream))
     nil)
 
   (defmethod input-stream-p ((stream fundamental-input-stream))
-    t)
-
-  (defmethod input-stream-p ((stream stream))
-    (bug-or-error stream 'input-stream-p))
-
-  (defmethod input-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    t))
 
-(let ()
-  (fmakunbound 'interactive-stream-p)
-
-  (defgeneric interactive-stream-p (stream)
+(progn
+  (!def-stream-generic interactive-stream-p (stream)
     (:documentation "Is STREAM an interactive stream?"))
 
-  (defmethod interactive-stream-p ((stream ansi-stream))
-    (sb-impl::call-ansi-stream-misc stream :interactive-p))
-
   (defmethod interactive-stream-p ((stream fundamental-stream))
-    nil)
-
-  (defmethod interactive-stream-p ((stream stream))
-    (bug-or-error stream 'interactive-stream-p))
-
-  (defmethod interactive-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    nil))
 
-(let ()
-  (fmakunbound 'output-stream-p)
-
-  (defgeneric output-stream-p (stream)
+(progn
+  (!def-stream-generic output-stream-p (stream)
     (:documentation "Can STREAM perform output operations?"))
-
-  (defmethod output-stream-p ((stream ansi-stream))
-    (ansi-stream-output-stream-p stream))
 
   (defmethod output-stream-p ((stream fundamental-stream))
     nil)
 
   (defmethod output-stream-p ((stream fundamental-output-stream))
-    t)
-
-  (defmethod output-stream-p ((stream stream))
-    (bug-or-error stream 'output-stream-p))
-
-  (defmethod output-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    t))
 
 ;;; character input streams
 ;;;

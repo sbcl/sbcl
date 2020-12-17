@@ -39,7 +39,7 @@
 (let ((*print-pretty* t)) ; use pretty printer dispatch table, not PRINT-OBJECT
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
-  (!incorporate-cross-compiled-methods 'print-object))
+  (!install-cross-compiled-methods 'print-object))
 (unless (sb-impl::!c-runtime-noinform-p)
   (write-string " done
 "))

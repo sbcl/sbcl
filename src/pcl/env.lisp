@@ -158,7 +158,7 @@
 (fmakunbound 'make-load-form)
 (defgeneric make-load-form (object &optional environment))
 
-(defun !incorporate-cross-compiled-methods (gf-name &key except)
+(defun !install-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
   ;; Reversing installs less-specific methods first,
   ;; so that if perchance we crash mid way through the loop,
@@ -173,13 +173,15 @@
           (source-loc  (svref method 5)))
       (unless (member specializer except)
         (multiple-value-bind (specializers arg-info)
-               (ecase gf-name
+               (case gf-name
                  (print-object
                   (values (list (find-class specializer) (find-class t))
                           '(:arg-info (2))))
-                 (make-load-form
+                 ((make-load-form close)
                   (values (list (find-class specializer))
-                          '(:arg-info (1 . t)))))
+                          '(:arg-info (1 . t))))
+                 (t
+                  (values (list (find-class specializer)) '(:arg-info (1)))))
              (load-defmethod
               'standard-method gf-name
               (if qualifier (list qualifier)) specializers lambda-list
@@ -190,7 +192,7 @@
                    mf)
                 plist ,arg-info simple-next-method-call t)
               source-loc))))))
-(!incorporate-cross-compiled-methods 'make-load-form :except '(layout))
+(!install-cross-compiled-methods 'make-load-form :except '(layout))
 
 (defmethod make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably

@@ -117,8 +117,7 @@
         (maybe-resolve-synonym-stream result)
         result)))
 
-(defun ansi-stream-input-stream-p (stream)
-  (declare (type ansi-stream stream))
+(defmethod input-stream-p ((stream ansi-stream))
   (if (synonym-stream-p stream)
       (input-stream-p (resolve-synonym-stream stream))
       (and (not (eq (ansi-stream-in stream) #'closed-flame))
@@ -129,59 +128,30 @@
            (or (not (eq (ansi-stream-in stream) #'ill-in))
                (not (eq (ansi-stream-bin stream) #'ill-bin))))))
 
-;;; Temporary definition that gets overwritten by pcl/gray-streams
-(defun input-stream-p (stream)
-  (declare (type stream stream))
-  (and (ansi-stream-p stream)
-       (ansi-stream-input-stream-p stream)))
-
-(defun ansi-stream-output-stream-p (stream)
-  (declare (type ansi-stream stream))
+(defmethod output-stream-p ((stream ansi-stream))
   (if (synonym-stream-p stream)
       (output-stream-p (resolve-synonym-stream stream))
       (and (not (eq (ansi-stream-in stream) #'closed-flame))
            (or (not (eq (ansi-stream-out stream) #'ill-out))
                (not (eq (ansi-stream-bout stream) #'ill-bout))))))
 
-;;; Temporary definition that gets overwritten by pcl/gray-streams
-(defun output-stream-p (stream)
-  (declare (type stream stream))
-  (and (ansi-stream-p stream)
-       (ansi-stream-output-stream-p stream)))
-
-(declaim (inline ansi-stream-open-stream-p))
-(defun ansi-stream-open-stream-p (stream)
-  (declare (type ansi-stream stream))
+(defmethod open-stream-p ((stream ansi-stream))
   ;; CLHS 21.1.4 lets us not worry about synonym streams here.
   (not (eq (ansi-stream-in stream) #'closed-flame)))
 
-(defun open-stream-p (stream)
-  (ansi-stream-open-stream-p stream))
-
-(declaim (inline ansi-stream-element-type))
-(defun ansi-stream-element-type (stream)
-  (declare (type ansi-stream stream))
+(defmethod stream-element-type ((stream ansi-stream))
   (call-ansi-stream-misc stream :element-type))
-
-(defun stream-element-type (stream)
-  (ansi-stream-element-type stream))
 
 (defun stream-external-format (stream)
   (call-ansi-stream-misc stream :external-format))
 
-(defun interactive-stream-p (stream)
-  (declare (type stream stream))
+(defmethod interactive-stream-p ((stream ansi-stream))
   (call-ansi-stream-misc stream :interactive-p))
 
-(declaim (inline ansi-stream-close))
-(defun ansi-stream-close (stream abort)
-  (declare (type ansi-stream stream))
-  (when (ansi-stream-open-stream-p stream)
+(defmethod close ((stream ansi-stream) &key abort)
+  (unless (eq (ansi-stream-in stream) #'closed-flame)
     (call-ansi-stream-misc stream :close abort))
   t)
-
-(defun close (stream &key abort)
-  (ansi-stream-close stream abort))
 
 (defun set-closed-flame (stream)
   (setf (ansi-stream-in stream) #'closed-flame)
