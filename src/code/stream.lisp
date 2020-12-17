@@ -176,8 +176,8 @@
   (ef-char-size (get-external-format external-format)))
 
 ;;; Call the MISC method with the :FILE-POSITION operation.
-(declaim (inline ansi-stream-file-position))
-(defun ansi-stream-file-position (stream position)
+(declaim (inline !ansi-stream-file-position))
+(defun !ansi-stream-file-position (stream position)
   (declare (type stream stream))
   (declare (type (or index (alien sb-unix:unix-offset) (member nil :start :end))
                  position))
@@ -211,12 +211,23 @@
                        (ansi-stream-in-index stream))))))))))))
 
 (defun file-position (stream &optional position)
-  (if (ansi-stream-p stream)
-      (ansi-stream-file-position stream position)
+  (stream-api-dispatch (stream)
+    :native (!ansi-stream-file-position stream position)
+    :simple (s-%file-position stream position)
+    :gray
       (let ((result (stream-file-position stream position)))
         (if (numberp result)
             result
             (and result t)))))
+
+(defmethod stream-file-position ((stream ansi-stream) &optional position)
+  ;; Excuse me for asking, but why is this even a thing?
+  ;; Users are not supposed to call the stream implementation directly,
+  ;; they're supposed to call the function in the CL: package
+  ;; which indirects to this. But if they do ... make it work.
+  ;; And note that inlining of !ansi-stream-file-position would be pointless,
+  ;; it's nearly 1K of code.
+  (file-position stream position))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".

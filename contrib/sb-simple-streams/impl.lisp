@@ -56,7 +56,7 @@
 (defmethod close ((stream simple-stream) &key abort)
   (device-close stream abort))
 
-(defun %file-position (stream position)
+(defun sb-impl::s-%file-position (stream position)
   (declare (type simple-stream stream)
            (type (or (integer 0 *) (member nil :start :end)) position))
   (with-stream-class (simple-stream stream)
@@ -913,18 +913,6 @@ is supported only on simple-streams."
        (%check stream :output)
        (with-stream-class (simple-stream stream)
          (funcall-stm-handler-2 j-write-char #\Newline stream)))
-
-(defun file-position (stream &optional position)
-  "With one argument returns the current position within the file
-   File-Stream is open to.  If the second argument is supplied, then
-   this becomes the new file position.  The second argument may also
-   be :start or :end for the start and end of the file, respectively."
-  (declare (type (or sb-int:index (member nil :start :end)) position))
-  (etypecase stream
-    (simple-stream
-     (%file-position stream position))
-    (ansi-stream
-     (sb-kernel:ansi-stream-file-position stream position))))
 
 (defun file-length (stream)
   "This function returns the length of the file that File-Stream is open to."

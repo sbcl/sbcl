@@ -380,9 +380,7 @@
 (defgeneric stream-file-position (stream &optional position-spec)
   (:documentation
    "Used by FILE-POSITION. Returns or changes the current position within STREAM."))
-
-(defmethod stream-file-position ((stream ansi-stream) &optional position-spec)
-  (ansi-stream-file-position stream position-spec))
+(sb-pcl::!install-cross-compiled-methods 'stream-file-position)
 
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.
