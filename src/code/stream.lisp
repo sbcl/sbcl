@@ -2567,12 +2567,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 
-;;; FIXME: what's up with this?
-; in: DEFUN FILE-LENGTH
-; caught STYLE-WARNING:
-;   Result is a (VALUES (AND (NOT SB-KERNEL:INSTANCE) FILE-STREAM) &OPTIONAL),
-;            not a (VALUES (OR UNSIGNED-BYTE NULL) &OPTIONAL).
-
 (defun file-length (stream)
   ;; The description for FILE-LENGTH says that an error must be raised
   ;; for streams not associated with files (which broadcast streams
@@ -2581,6 +2575,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; BROADCAST-STREAM entry.
   (stream-api-dispatch (stream)
     :simple (s-%file-length stream)
+    ;; Perhaps if there were a generic function to obtain the pathname?
+    :gray (error "FILE-LENGTH is not defined for ~S" stream)
     :native (progn
               (unless (typep stream 'broadcast-stream)
                 (stream-file-stream-or-lose stream))
