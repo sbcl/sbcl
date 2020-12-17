@@ -107,7 +107,7 @@
                nil)))
           posn))))
 
-(defun %file-length (stream)
+(defun sb-impl::s-%file-length (stream)
   (declare (type simple-stream stream))
   (%check stream :open)
   (device-file-length stream))
@@ -138,7 +138,7 @@
       nil))
 
 
-(defun %file-string-length (stream object)
+(defun sb-impl::s-%file-string-length (stream object)
   (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :output)
@@ -631,18 +631,6 @@
          (add-stream-instance-flags stream :interactive)
          (remove-stream-instance-flags stream :interactive)))
 
-(defun file-string-length (stream object)
-  (declare (type (or string character) object) (type stream stream))
-  "Return the delta in STREAM's FILE-POSITION that would be caused by writing
-   OBJECT to STREAM. Non-trivial only in implementations that support
-   international character sets."
-  (typecase stream
-    (simple-stream (%file-string-length stream object))
-    (t
-     (etypecase object
-       (character 1)
-       (string (length object))))))
-
 (defun stream-external-format (stream)
   "Returns Stream's external-format."
   (etypecase stream
@@ -914,15 +902,6 @@ is supported only on simple-streams."
        (with-stream-class (simple-stream stream)
          (funcall-stm-handler-2 j-write-char #\Newline stream)))
 
-(defun file-length (stream)
-  "This function returns the length of the file that File-Stream is open to."
-  (etypecase stream
-    (simple-stream
-     (%file-length stream))
-    (ansi-stream
-     (sb-impl::stream-file-stream-or-lose stream)
-     (sb-impl::call-ansi-stream-misc stream :file-length))))
-
 (defun sb-impl::s-%charpos (stream)
        (with-stream-class (simple-stream stream)
          (%check stream :open)
@@ -951,19 +930,9 @@ is supported only on simple-streams."
            (wait-for-input-available (sb-sys:fd-stream-fd stream) timeout))))))
 
 ;; Make PATHNAME and NAMESTRING work
-(defun sb-int:file-name (stream &optional new-name)
-  (typecase stream
-    (file-simple-stream
+(defun sb-impl::s-%file-name (stream new-name)
      (with-stream-class (file-simple-stream stream)
        (cond (new-name
               (%file-rename stream new-name))
              (t
               (%file-name stream)))))
-    (sb-sys:fd-stream
-     (cond (new-name
-            (setf (sb-impl::fd-stream-pathname stream) new-name)
-            (setf (sb-impl::fd-stream-file stream)
-                  (%file-namestring new-name))
-            t)
-           (t
-            (sb-impl::fd-stream-pathname stream))))))

@@ -2694,7 +2694,9 @@
 ;;;
 ;;; FIXME: misleading name, screwy interface
 (defun file-name (stream &optional new-name)
-  (when (typep stream 'fd-stream)
+  (stream-api-dispatch (stream)
+    :native
+    (when (typep stream 'fd-stream)
       (cond (new-name
              (setf (fd-stream-pathname stream) new-name)
              (setf (fd-stream-file stream)
@@ -2702,7 +2704,8 @@
                                       :as-file t))
              t)
             (t
-             (fd-stream-pathname stream)))))
+             (fd-stream-pathname stream))))
+    :simple (s-%file-name stream new-name)))
 
 ;; Fix the INPUT-CHAR-POS slot of STREAM after having consumed characters
 ;; from the CIN-BUFFER. This operation is done upon exit from a FAST-READ-CHAR

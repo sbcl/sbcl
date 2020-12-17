@@ -270,7 +270,9 @@
              stream)))
 
 (defun file-string-length (stream object)
-  (call-ansi-stream-misc stream :file-string-length object))
+  (stream-api-dispatch (stream)
+    :simple (s-%file-string-length stream object)
+    :native (call-ansi-stream-misc stream :file-string-length object)))
 
 ;;;; input functions
 
@@ -2547,9 +2549,12 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; aren't according to the glossary). However, the behaviour of
   ;; FILE-LENGTH for broadcast streams is explicitly described in the
   ;; BROADCAST-STREAM entry.
-  (unless (typep stream 'broadcast-stream)
-    (stream-file-stream-or-lose stream))
-  (call-ansi-stream-misc stream :file-length))
+  (stream-api-dispatch (stream)
+    :simple (s-%file-length stream)
+    :native (progn
+              (unless (typep stream 'broadcast-stream)
+                (stream-file-stream-or-lose stream))
+              (call-ansi-stream-misc stream :file-length))))
 
 ;; Placing this definition (formerly in "toplevel") after the important
 ;; stream types are known produces smaller+faster code than it did before.

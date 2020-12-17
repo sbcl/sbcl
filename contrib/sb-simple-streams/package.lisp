@@ -14,7 +14,7 @@
   (:import-from #:sb-impl
                 #:in-stream-from-designator #:out-stream-from-designator)
   ;; FIXME: Using deffoo! or equivalent might be nicer.
-  (:implement #:common-lisp #:sb-kernel #:sb-int #:sb-impl)
+  (:implement #:common-lisp #:sb-impl)
   (:export ;; Stream classes
    #:STREAM
    #:SIMPLE-STREAM
