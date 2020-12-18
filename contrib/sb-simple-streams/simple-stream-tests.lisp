@@ -544,8 +544,8 @@ Nothing to see here, move along.")
 (deftest synonym-stream-11
     ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
-      (eql (stream-element-type (make-synonym-stream '*synonym*))
-           (stream-element-type *synonym*)))
+      (equal (stream-element-type (make-synonym-stream '*synonym*))
+             (stream-element-type *synonym*)))
   T)
 
 (deftest synonym-stream-12
@@ -893,8 +893,8 @@ Nothing to see here, move along.")
 (deftest concatenated-stream-11
     ;; STREAM-ELEMENT-TYPE (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
-      (eql (stream-element-type (make-concatenated-stream *synonym*))
-           (stream-element-type *synonym*)))
+      (equal (stream-element-type (make-concatenated-stream *synonym*))
+             (stream-element-type *synonym*)))
   T)
 
 (deftest concatenated-stream-12

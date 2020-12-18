@@ -785,7 +785,7 @@
   integer)
 
 
-(declaim (notinline read-char unread-char read-byte listen)) ; too big
+(declaim (notinline read-char unread-char read-byte)) ; too big
 
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
@@ -793,49 +793,40 @@
 (defun stream-misc-dispatch (stream operation arg)
   (if (simple-stream-p stream)
 
-      ;; A simple streams needs to re-call the CL: function because we don't (yet)
-      ;; have a way to invoke the function in sb-simple-streams:: directly.
-      ;; This is slightly inefficient in that the CL: function tests again whether
-      ;; the stream is T or NIL (a designator), and then whether it is a builtin
-      ;; type or Gray or simple stream. Not a big deal, but I do plan to fix that.
+      ;; Dispatch to a simple-stream implementation function
       (stream-misc-case (operation)
-        (:listen (listen stream))
-        (:unread (unread-char arg stream))
-        (:close (close stream))
-        (:clear-input (clear-input stream))
-        (:force-output (force-output stream))
-        (:finish-output (finish-output stream))
-        (:clear-output (clear-output stream))
+        (:listen (listen stream)) ; call the redefined LISTEN
+        (:unread (s-%unread-char stream arg))
+        (:close (error "Attempted to close inner stream ~S" stream))
+        (:clear-input (clear-input stream)) ; call the redefined CLEAR-INPUT
+        (:force-output (s-%force-output stream))
+        (:finish-output (s-%finish-output stream))
+        (:clear-output (s-%clear-output stream))
         ;; All simple-streams use (UNSIGNED-BYTE 8) - it's one of the
         ;; salient distinctions between simple-streams and Gray streams.
         ;; See (DEFMETHOD STREAM-ELEMENT-TYPE ((STREAM SIMPLE-STREAM)) ...)
-        ;; Should we be pedantic here and call the method? Probably not,
-        ;; but one of the tests compares lists by EQL and so expects an answer
-        ;; from here that is EQ to that method's return value.
-        ;; I don't want anyone to accuse me of adjusting a test to fit
-        ;; the code's behavior ... but the test is definitely poorly written.
-        (:element-type (stream-element-type stream))
+        (:element-type '(unsigned-byte 8))
         ;; FIXME: All simple-streams are actually bivalent. We historically have
         ;; returned UNSIGNED-BYTE based on element-type. But this is wrong!
         (:element-mode 'UNSIGNED-BYTE)
         ;; This call returns an instance of the format structure defined
         ;; by the SB-SIMPLE-STREAMS package, not the SB-IMPL:: structure.
         ;; This also needs to be fixed.
-        (:external-format (stream-external-format stream))
+        (:external-format (s-%stream-external-format stream))
         (:interactive-p (interactive-stream-p stream))
-        (:line-length (line-length stream))
-        (:charpos (charpos stream))
-        (:file-length (file-length stream))
-        (:file-string-length (file-string-length stream arg))
+        (:line-length (s-%line-length stream))
+        (:charpos (s-%charpos stream))
+        (:file-length (s-%file-length stream))
+        (:file-string-length (s-%file-string-length stream arg))
         (:set-file-position (s-%file-position stream arg))
         ;; yeesh, this wants a _required_ NIL argument to mean "inquire".
         (:get-file-position (s-%file-position stream nil)))
 
-      ;; Gray streams dispatch directly to a CLOS method.
+      ;; else call the generic function
       (stream-misc-case (operation)
        (:listen (stream-listen stream))
        (:unread (stream-unread-char stream arg)) ; specialized arg first
-       (:close (close stream))
+       (:close (error "Attempted to close inner stream ~S" stream))
        (:clear-input (stream-clear-input stream))
        (:force-output (stream-force-output stream))
        (:finish-output (stream-finish-output stream))
