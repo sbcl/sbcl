@@ -631,17 +631,10 @@
          (add-stream-instance-flags stream :interactive)
          (remove-stream-instance-flags stream :interactive)))
 
-(defun stream-external-format (stream)
-  "Returns Stream's external-format."
-  (etypecase stream
-    (simple-stream
+(defun sb-impl::s-%stream-external-format (stream)
      (with-stream-class (simple-stream)
        (%check stream :open)
        (sm external-format stream)))
-    (ansi-stream
-     :default)
-    (fundamental-stream
-     :default)))
 
 (defun open (filename &rest options
              &key (direction :input)

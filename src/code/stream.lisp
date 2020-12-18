@@ -143,7 +143,10 @@
   (call-ansi-stream-misc stream :element-type))
 
 (defun stream-external-format (stream)
-  (call-ansi-stream-misc stream :external-format))
+  (stream-api-dispatch (stream)
+    :simple (s-%stream-external-format stream)
+    :gray (error "~S is not defined for ~S" 'stream-external-format stream)
+    :native (call-ansi-stream-misc stream :external-format)))
 
 (defmethod interactive-stream-p ((stream ansi-stream))
   (call-ansi-stream-misc stream :interactive-p))
@@ -2566,7 +2569,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   seq)
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
-
 (defun file-length (stream)
   ;; The description for FILE-LENGTH says that an error must be raised
   ;; for streams not associated with files (which broadcast streams
@@ -2576,7 +2578,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (stream-api-dispatch (stream)
     :simple (s-%file-length stream)
     ;; Perhaps if there were a generic function to obtain the pathname?
-    :gray (error "FILE-LENGTH is not defined for ~S" stream)
+    :gray (error "~S is not defined for ~S" 'file-length stream)
     :native (progn
               (unless (typep stream 'broadcast-stream)
                 (stream-file-stream-or-lose stream))
