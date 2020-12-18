@@ -433,8 +433,11 @@ Please check that all strings which were not recognizable to the compiler
                sb-assem::*backend-instruction-set-package*)
            ;; Don't preserve macros in the machine assembler package.
            ;; Anything users might unportably rely on should be external
-           ;; and/or in the SB-VM package.
-           (eq accessibility :external)
+           ;; and/or in the SB-VM package, or be an opcode name.
+           ;; The opcodes can't be made external because their functions
+           ;; mustn't conflict with anything else, like PUSH and POP.
+           (or (eq accessibility :external)
+               (get symbol 'sb-disassem::instructions))
            ;; By default, retain any symbol with any attachments
            (or (sb-kernel:symbol-info symbol)
                (and (boundp symbol) (not (keywordp symbol))))))))
