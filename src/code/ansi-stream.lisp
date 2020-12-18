@@ -336,7 +336,7 @@
 
 (defmacro call-ansi-stream-misc (stream operation &optional (arg nil argp))
   ;; Never stuff in a placeholder in the three operations that take an argument.
-  (aver (or argp (not (memq operation '(:set-file-position :file-string-lenth :unread)))))
+  (aver (or argp (not (memq operation '(:set-file-position :file-string-length :unread)))))
   `(funcall (ansi-stream-misc ,stream) ,stream
             ;; If operation is a literal keyword, translate it, otherwise
             ;; it is a variable whose values is the opcode for passthru.
