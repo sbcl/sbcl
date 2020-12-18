@@ -429,9 +429,15 @@ Please check that all strings which were not recognizable to the compiler
        (member symbol '(sb-bignum:%allocate-bignum
                         sb-bignum:make-small-bignum)))
       (t
-       ;; By default, retain any symbol with any attachments
-       (or (sb-kernel:symbol-info symbol)
-           (and (boundp symbol) (not (keywordp symbol)))))))
+       (if (eq (symbol-package symbol)
+               sb-assem::*backend-instruction-set-package*)
+           ;; Don't preserve macros in the machine assembler package.
+           ;; Anything users might unportably rely on should be external
+           ;; and/or in the SB-VM package.
+           (eq accessibility :external)
+           ;; By default, retain any symbol with any attachments
+           (or (sb-kernel:symbol-info symbol)
+               (and (boundp symbol) (not (keywordp symbol))))))))
    :verbose nil :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl))
 
