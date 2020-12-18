@@ -160,14 +160,13 @@
       count)))
 
 
-(defun %read-line (stream eof-error-p eof-value recursive-p)
+(defun sb-impl::s-%read-line (stream eof-error-p eof-value)
   (declare (optimize (speed 3) (space 1) (safety 0) (debug 0))
-           (type simple-stream stream)
-           (ignore recursive-p))
+           (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
-      (return-from %read-line
+      (return-from sb-impl::s-%read-line
         (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     ;; for interactive streams, finish output first to force prompt
     (when (and (any-stream-instance-flags stream :output)
@@ -227,13 +226,12 @@
             (setf (cdr tail) (cons cbuf nil))
             (setf tail (cdr tail))))))))
 
-(defun %read-char (stream eof-error-p eof-value recursive-p blocking-p)
-  (declare (type simple-stream stream)
-           (ignore recursive-p))
+(defun sb-impl::s-%read-char (stream eof-error-p eof-value blocking-p)
+  (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
-      (return-from %read-char
+      (return-from sb-impl::s-%read-char
         (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     ;; for interactive streams, finish output first to force prompt
     (when (and (any-stream-instance-flags stream :output)
@@ -243,7 +241,7 @@
                          eof-error-p eof-value blocking-p)))
 
 
-(defun %unread-char (stream character)
+(defun sb-impl::s-%unread-char (stream character)
   (declare (type simple-stream stream) (ignore character))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
@@ -255,13 +253,12 @@
           (setf (sm last-char-read-size stream) 0)))))
 
 
-(defun %peek-char (stream peek-type eof-error-p eof-value recursive-p)
-  (declare (type simple-stream stream)
-           (ignore recursive-p))
+(defun sb-impl::s-%peek-char (stream peek-type eof-error-p eof-value)
+  (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
-      (return-from %peek-char
+      (return-from sb-impl::s-%peek-char
         (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     (let* ((encap (sm melded-stream stream))
            (char (funcall-stm-handler j-read-char encap
@@ -319,7 +316,7 @@
   (device-clear-input stream buffer-only))
 
 
-(defun %read-byte (stream eof-error-p eof-value)
+(defun sb-impl::s-%read-byte (stream eof-error-p eof-value)
   (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
@@ -565,46 +562,6 @@
       ))
   seq)
 
-
-(defun read-vector (vector stream &key (start 0) end (endian-swap :byte-8))
-  (declare (type (sb-kernel:simple-unboxed-array (*)) vector)
-           (type stream stream))
-  ;; START and END are octet offsets, not vector indices!  [Except for strings]
-  ;; Return value is index of next octet to be read into (i.e., start+count)
-  (etypecase stream
-    (simple-stream
-     (with-stream-class (simple-stream stream)
-       (cond ((stringp vector)
-              (let* ((start (or start 0))
-                     (end (or end (length vector)))
-                     (encap (sm melded-stream stream))
-                     (char (funcall-stm-handler j-read-char encap nil nil t)))
-                (when char
-                  (setf (schar vector start) char)
-                  (incf start)
-                  (+ start (funcall-stm-handler j-read-chars encap vector nil
-                                                start end nil)))))
-             ((any-stream-instance-flags stream :string)
-              (error "Can't READ-BYTE on string streams."))
-             (t
-              (do* ((encap (sm melded-stream stream))
-                    (index (or start 0) (1+ index))
-                    (end (or end (* (length vector) (vector-elt-width vector))))
-                    (endian-swap (endian-swap-value vector endian-swap))
-                    (flag t nil))
-                   ((>= index end) index)
-                (let ((byte (read-byte-internal encap nil nil flag)))
-                  (unless byte
-                    (return index))
-                  (setf (bref vector (logxor index endian-swap)) byte)))))))
-    ((or ansi-stream fundamental-stream)
-     (unless (typep vector '(or string
-                             (simple-array (signed-byte 8) (*))
-                             (simple-array (unsigned-byte 8) (*))))
-       (error "Wrong vector type for read-vector on stream not of type simple-stream."))
-     (read-sequence vector stream :start (or start 0) :end end))))
-
-
 ;;;
 ;;; USER-LEVEL FUNCTIONS
 ;;;
@@ -691,58 +648,7 @@
                       (symbol (find-class class t))
                       (class class)))))))
 
-
-;; These are not normally inlined.
-;; READ-CHAR is 1K of code, etc. This was probably either a brute-force
-;; way to optimize IN-SYNONYM-OF and/or optimize for known sub-hierarchy
-;; at compile-time, but how likely is that to help?
-(declaim (inline read-byte read-char read-char-no-hang unread-char))
-
-(defun read-byte (stream &optional (eof-error-p t) eof-value)
-  "Returns the next byte of the Stream."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
-       (let ((byte (%read-byte stream eof-error-p eof-value)))
-         (if (eq byte eof-value)
-             byte
-             (the integer byte))))
-      (ansi-stream
-       (sb-impl::ansi-stream-read-byte stream eof-error-p eof-value nil))
-      (fundamental-stream
-       (let ((byte (sb-gray:stream-read-byte stream)))
-         (if (eq byte :eof)
-             (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             (the integer byte)))))))
-
-(defun read-char (&optional (stream *standard-input*) (eof-error-p t)
-                            eof-value recursive-p)
-  "Inputs a character from Stream and returns it."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
-       (let ((char (%read-char stream eof-error-p eof-value recursive-p t)))
-         (if (eq char eof-value)
-             char
-             (the character char))))
-      (ansi-stream
-       (sb-impl::ansi-stream-read-char stream eof-error-p eof-value
-                                       recursive-p))
-      (fundamental-stream
-       (let ((char (sb-gray:stream-read-char stream)))
-         (if (eq char :eof)
-             (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             (the character char)))))))
-
-(defun read-char-no-hang (&optional (stream *standard-input*) (eof-error-p t)
-                                    eof-value recursive-p)
-  "Returns the next character from the Stream if one is availible, or nil."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
+(defun sb-impl::s-%read-char-no-hang (stream eof-error-p eof-value)
        (%check stream :input)
        (let ((char
               (with-stream-class (simple-stream)
@@ -750,72 +656,6 @@
          (if (or (eq char eof-value) (not char))
              char
              (the character char))))
-      (ansi-stream
-       (sb-impl::ansi-stream-read-char-no-hang stream eof-error-p eof-value
-                                               recursive-p))
-      (fundamental-stream
-       (let ((char (sb-gray:stream-read-char-no-hang stream)))
-         (if (eq char :eof)
-             (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             (the (or character null) char)))))))
-
-(defun unread-char (character &optional (stream *standard-input*))
-  "Puts the Character back on the front of the input Stream."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
-       (%unread-char stream character))
-      (ansi-stream
-       (sb-impl::ansi-stream-unread-char character stream))
-      (fundamental-stream
-       (sb-gray:stream-unread-char stream character))))
-  nil)
-
-(declaim (notinline read-byte read-char read-char-no-hang unread-char))
-
-(defun peek-char (&optional (peek-type nil) (stream *standard-input*)
-                            (eof-error-p t) eof-value recursive-p)
-  "Peeks at the next character in the input Stream.  See manual for details."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
-       (let ((char
-              (%peek-char stream peek-type eof-error-p eof-value recursive-p)))
-         (if (eq char eof-value)
-             char
-             (the character char))))
-      ;; FIXME: Broken on ECHO-STREAM (cf internal implementation?) --
-      ;; CSR, 2004-01-19
-      (ansi-stream
-       (sb-impl::ansi-stream-peek-char peek-type stream eof-error-p eof-value
-                                       recursive-p))
-      (fundamental-stream
-       ;; This seems to duplicate all the code of GENERALIZED-PEEKING-MECHANISM
-       (cond ((characterp peek-type)
-              (do ((char (sb-gray:stream-read-char stream)
-                         (sb-gray:stream-read-char stream)))
-                  ((or (eq char :eof) (char= char peek-type))
-                   (cond ((eq char :eof)
-                          (sb-impl::eof-or-lose stream eof-error-p eof-value))
-                         (t
-                          (sb-gray:stream-unread-char stream char)
-                          char)))))
-             ((eq peek-type t)
-              (do ((char (sb-gray:stream-read-char stream)
-                         (sb-gray:stream-read-char stream)))
-                  ((or (eq char :eof) (not (sb-impl::whitespace[2]p char)))
-                   (cond ((eq char :eof)
-                          (sb-impl::eof-or-lose stream eof-error-p eof-value))
-                         (t
-                          (sb-gray:stream-unread-char stream char)
-                          char)))))
-             (t
-              (let ((char (sb-gray:stream-peek-char stream)))
-                (if (eq char :eof)
-                    (sb-impl::eof-or-lose stream eof-error-p eof-value)
-                    (the character char)))))))))
 
 (defun listen (&optional (stream *standard-input*) (width 1))
   "Returns T if WIDTH octets are available on STREAM.  If WIDTH is
@@ -832,25 +672,6 @@ is supported only on simple-streams."
        (sb-impl::ansi-stream-listen stream))
       (fundamental-stream
        (sb-gray:stream-listen stream)))))
-
-
-(defun read-line (&optional (stream *standard-input*) (eof-error-p t)
-                            eof-value recursive-p)
-  "Returns a line of text read from the Stream as a string, discarding the
-  newline character."
-  (declare (sb-int:explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (etypecase stream
-      (simple-stream
-       (%read-line stream eof-error-p eof-value recursive-p))
-      (ansi-stream
-       (sb-impl::ansi-stream-read-line stream eof-error-p eof-value
-                                       recursive-p))
-      (fundamental-stream
-       (multiple-value-bind (string eof) (sb-gray:stream-read-line stream)
-         (if (and eof (zerop (length string)))
-             (values (sb-impl::eof-or-lose stream eof-error-p eof-value) t)
-             (values string eof)))))))
 
 (defun read-sequence (seq stream &key (start 0) (end nil) partial-fill)
   "Destructively modify SEQ by reading elements from STREAM.

@@ -381,18 +381,18 @@
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-read-line stream eof-error-p eof-value recursive-p)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (s-%read-line stream eof-error-p eof-value)
+    :native (ansi-stream-read-line stream eof-error-p eof-value recursive-p)
+    :gray
         (multiple-value-bind (string eof) (stream-read-line stream)
           (if (and eof (zerop (length string)))
               (values (eof-or-lose stream eof-error-p eof-value) t)
-              (values string eof))))))
+              (values string eof)))))
 
 ;;; We proclaim them INLINE here, then proclaim them NOTINLINE later on,
 ;;; so, except in this file, they are not inline by default, but they can be.
-(declaim (inline read-char unread-char read-byte listen))
+(declaim (inline read-char unread-char read-byte))
 
 (declaim (inline ansi-stream-read-char))
 (defun ansi-stream-read-char (stream eof-error-p eof-value recursive-p)
@@ -407,14 +407,18 @@
                             eof-value
                             recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :native (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
+    ;; The final T is BLOCKING-P. I removed the ignored recursive-p arg.
+    :simple (let ((char (s-%read-char stream eof-error-p eof-value t)))
+              (if (eq char eof-value)
+                  char
+                  (the character char)))
+    :gray
         (let ((char (stream-read-char stream)))
           (if (eq char :eof)
               (eof-or-lose stream eof-error-p eof-value)
-              (the character char))))))
+              (the character char)))))
 
 (declaim (inline ansi-stream-unread-char))
 (defun ansi-stream-unread-char (character stream)
@@ -434,11 +438,10 @@
 
 (defun unread-char (character &optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-unread-char character stream)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (stream-unread-char stream character)))
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (s-%unread-char stream character)
+    :native (ansi-stream-unread-char character stream)
+    :gray (stream-unread-char stream character))
   nil)
 
 (declaim (inline %ansi-stream-listen))
@@ -454,13 +457,12 @@
         nil
         result)))
 
+;;; XXX: Gets redefined by sb-simple-streams
 (defun listen (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-listen stream)
-        ;; Fall through to Gray streams FUNDAMENTAL-STREAM case.
-        (stream-listen stream))))
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :native (ansi-stream-listen stream)
+    :gray (stream-listen stream)))
 
 (declaim (inline ansi-stream-read-char-no-hang))
 (defun ansi-stream-read-char-no-hang (stream eof-error-p eof-value recursive-p)
@@ -474,28 +476,30 @@
                                     eof-value
                                     recursive-p)
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :native
         (ansi-stream-read-char-no-hang stream eof-error-p eof-value
                                        recursive-p)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
+    ;; Absence of EOF-OR-LOSE here looks a little suspicious
+    ;; considering that the impl function didn't use recursive-p
+    :simple (s-%read-char-no-hang stream eof-error-p eof-value)
+    :gray
         (let ((char (stream-read-char-no-hang stream)))
           (if (eq char :eof)
               (eof-or-lose stream eof-error-p eof-value)
-              (the (or character null) char))))))
+              (the (or character null) char)))))
 
 (declaim (inline ansi-stream-clear-input))
 (defun ansi-stream-clear-input (stream)
   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
   (call-ansi-stream-misc stream :clear-input))
 
+;;; XXX: Gets redefined by sb-simple-streams
 (defun clear-input (&optional (stream *standard-input*))
   (declare (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-clear-input stream)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (stream-clear-input stream)))
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :native (ansi-stream-clear-input stream)
+    :gray (stream-clear-input stream))
   nil)
 
 (declaim (inline ansi-stream-read-byte))
@@ -509,9 +513,13 @@
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
   (declare (explicit-check))
-  (if (ansi-stream-p stream)
-      (ansi-stream-read-byte stream eof-error-p eof-value nil)
-      ;; must be Gray streams FUNDAMENTAL-STREAM
+  (stream-api-dispatch (stream)
+    :native (ansi-stream-read-byte stream eof-error-p eof-value nil)
+    :simple (let ((byte (s-%read-byte stream eof-error-p eof-value)))
+              (if (eq byte eof-value)
+                  byte
+                  (the integer byte)))
+    :gray
       (let ((byte (stream-read-byte stream)))
         (if (eq byte :eof)
             (eof-or-lose stream eof-error-p eof-value)
@@ -776,17 +784,7 @@
   integer)
 
 
-;;; Meta: the following comment is mostly true, but gray stream support
-;;;   is already incorporated into the definitions within this file.
-;;;   But these need to redefinable, otherwise the relative order of
-;;;   loading sb-simple-streams and any user-defined code which executes
-;;;   (F #'read-char ...) is sensitive to the order in which those
-;;;   are loaded, though insensitive at compile-time.
-;;; (These were inline throughout this file, but that's not appropriate
-;;; globally.  And we must not inline them in the rest of this file if
-;;; dispatch to gray or simple streams is to work, since both redefine
-;;; these functions later.)
-(declaim (notinline read-char unread-char read-byte listen))
+(declaim (notinline read-char unread-char read-byte listen)) ; too big
 
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
@@ -2308,6 +2306,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;;; READ-SEQUENCE
 
+;;; XXX: Gets redefined by sb-simple-streams
 (defun read-sequence (seq stream &key (start 0) end)
   "Destructively modify SEQ by reading elements from STREAM.
   That part of SEQ bounded by START and END is destructively modified by
@@ -2320,10 +2319,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type index start)
            (type sequence-end end)
            (values index))
-  (if (ansi-stream-p stream)
-      (ansi-stream-read-sequence seq stream start end)
-      ;; must be Gray streams FUNDAMENTAL-STREAM
-      (stream-read-sequence stream seq start end)))
+  (stream-api-dispatch (stream)
+    :native (ansi-stream-read-sequence seq stream start end)
+    :gray (stream-read-sequence stream seq start end)))
 
 (declaim (inline read-sequence/read-function))
 (defun read-sequence/read-function (seq stream start %end

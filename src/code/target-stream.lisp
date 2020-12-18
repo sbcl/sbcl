@@ -86,11 +86,15 @@
                             eof-value
                             recursive-p)
   (declare (type (or character boolean) peek-type) (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (let ((char (s-%peek-char stream peek-type eof-error-p eof-value)))
+              ;; simple-streams -%PEEK-CHAR always ignored RECURSIVE-P
+              ;; so I removed it from the call.
+              (if (eq char eof-value) char (the character char)))
+    :native
         (ansi-stream-peek-char peek-type stream eof-error-p eof-value
                                recursive-p)
-        ;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
+    :gray
         (let ((char
                (generalized-peeking-mechanism
                 peek-type :eof char
@@ -105,7 +109,7 @@
                 (eof-or-lose stream eof-error-p eof-value))))
           (if (eq char eof-value)
               char
-              (the character char))))))
+              (the character char)))))
 
 (defun echo-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
@@ -173,3 +177,25 @@
             :eof
             (unread-char char in)
             (outfn char))))))
+
+;;; Stop wasting space with unnecessarily preserved inline definitions.
+;;; ANSI-STREAM-LISTEN, %ANSI-STREAM-LISTEN, ANSI-STREAM-CLEAR-INPUT
+;;; are needed for sb-simple-streams.
+;;; Maybe everything else can just get dropped entirely, the symbol and its
+;;; function, instead of just the inline sexpr.
+(dolist (name '(!ansi-stream-ftell
+                ansi-stream-read-line ansi-stream-read-char
+                ansi-stream-unread-char
+                ansi-stream-read-char-no-hang
+                ansi-stream-read-byte read-n-bytes
+                read-char unread-char read-byte
+                read-sequence/read-function write-sequence/write-function
+                stream-element-mode))
+  (clear-info :function :inlining-data name))
+;;; Can all the ANSI- function names be removed now? Maybe?
+(push '("SB-IMPL" ansi-stream-peek-char ansi-stream-unread-char)
+      *!removable-symbols*)
+;;; These two wants to get invoked by simple-streams but would get tree-shaken out
+;;; were they not externalized.
+(export '(sb-impl::in-stream-from-designator sb-impl::eof-or-lose)
+        'sb-impl)
