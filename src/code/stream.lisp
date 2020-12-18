@@ -295,6 +295,7 @@
 
 (defun file-string-length (stream object)
   (stream-api-dispatch (stream)
+    :gray (declare (ignore stream))
     :simple (s-%file-string-length stream object)
     :native (call-ansi-stream-misc stream :file-string-length object)))
 
@@ -457,10 +458,10 @@
         nil
         result)))
 
-;;; XXX: Gets redefined by sb-simple-streams
 (defun listen (&optional (stream *standard-input*))
   (declare (explicit-check))
   (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-listen stream)
     :gray (stream-listen stream)))
 
@@ -494,10 +495,10 @@
   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
   (call-ansi-stream-misc stream :clear-input))
 
-;;; XXX: Gets redefined by sb-simple-streams
 (defun clear-input (&optional (stream *standard-input*))
   (declare (explicit-check))
   (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-clear-input stream)
     :gray (stream-clear-input stream))
   nil)
@@ -2306,7 +2307,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;;; READ-SEQUENCE
 
-;;; XXX: Gets redefined by sb-simple-streams
 (defun read-sequence (seq stream &key (start 0) end)
   "Destructively modify SEQ by reading elements from STREAM.
   That part of SEQ bounded by START and END is destructively modified by
@@ -2320,6 +2320,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type sequence-end end)
            (values index))
   (stream-api-dispatch (stream)
+    :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-read-sequence seq stream start end)
     :gray (stream-read-sequence stream seq start end)))
 

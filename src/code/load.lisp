@@ -43,8 +43,6 @@
 
 ;;;; utilities for reading from fasl files
 
-(declaim (inline read-byte))
-
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.
 (defmacro fast-read-u-integer (n)
@@ -99,13 +97,7 @@
       `(with-fast-read-byte ((unsigned-byte 8) ,fasl-input-stream)
          (fast-read-u-integer ,n))))
 
-;; FIXME: on x86-64, these functions exceed 600, 900, and 1200 bytes of code
-;; respectively. Either don't inline them, or make a "really" fast inline case
-;; that punts if inapplicable. e.g. if the fast-read-byte buffer will not be
-;; refilled, then SAP-REF-WORD could work to read 8 bytes.
-;; But this would only be feasible on machines that are little-endian
-;; and that allow unaligned reads. (like x86)
-(declaim (inline read-byte-arg read-word-arg))
+(declaim (inline read-byte-arg))
 (defun read-byte-arg (stream)
   (declare (optimize (speed 0)))
   (read-arg 1 stream))
@@ -503,7 +495,6 @@
       (nuke-fop-vector (%fasl-input-stack fasl-input))))
   t)
 
-(declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 
