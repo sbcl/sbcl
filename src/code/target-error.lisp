@@ -31,19 +31,6 @@
 ;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
 ;;; extent.
 
-(defun !target-error-cold-init ()
-  ;; Anonymous lambdas are too complicated to dump as constants in genesis.
-  ;; (that's sad, I wish we could do something about it)
-  (setq **initial-handler-clusters**
-        `(((,(find-classoid-cell 'warning :create t)
-            .
-            ,(named-lambda "MAYBE-MUFFLE" (warning)
-               (when (muffle-warning-p warning)
-                 (muffle-warning warning))))
-           (,(find-classoid-cell 'step-condition)
-            .
-            sb-impl::invoke-stepper)))))
-
 (defmethod print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)

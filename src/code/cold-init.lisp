@@ -78,8 +78,6 @@
     #+(or x86 x86-64) (format t "COLD-INIT... ")
     #-(or x86 x86-64) (write-string "COLD-INIT... "))
   (!cold-init-hash-table-methods)
-  ;; Establish **initial-handler-clusters**
-  (show-and-call sb-kernel::!target-error-cold-init)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
   (sb-thread::init-main-thread)
 

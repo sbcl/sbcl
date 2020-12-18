@@ -13,6 +13,18 @@
 
 ;;;; general warm init compilation policy
 
+;;; First things first, bootstrap the WARNING handler.
+sb-kernel::
+(setq **initial-handler-clusters**
+      `(((,(find-classoid-cell 'warning) .
+           ,(named-lambda "MAYBE-MUFFLE" (warning)
+              (when (muffle-warning-p warning)
+                (muffle-warning warning))))
+         (,(find-classoid-cell 'step-condition) . sb-impl::invoke-stepper))))
+;;;; And now a trick: splice those into the oldest *HANDLER-CLUSTERS*
+;;;; which had a placeholder NIL reserved for this purpose.
+sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
+
 ;;;; Use the same settings as PROCLAIM-TARGET-OPTIMIZATION
 ;;;; I could not think of a trivial way to ensure that this stays functionally
 ;;;; identical to the corresponding code in 'compile-cold-sbcl'.
