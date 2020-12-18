@@ -35,7 +35,7 @@ else
 fi
 if [ -z "$SBCL_BUILDING_RELEASE_FROM" ]
 then
-    version_root=$(git merge-base HEAD origin/master)
+    version_root=`git merge-base HEAD origin/master`
 else
     version_root="$SBCL_BUILDING_RELEASE_FROM"
 fi
