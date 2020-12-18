@@ -11,21 +11,17 @@
 
 (in-package "SB-GRAY")
 
-(defmacro !def-stream-generic (name &rest rest)
+(defclass stream-function (standard-generic-function) ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(defmacro !def-stream-generic (name ll &rest rest)
   `(progn (fmakunbound ',name)
-          (defgeneric ,name ,@rest)
-          (sb-pcl::!install-cross-compiled-methods ',name)
-          ;; Stream functions in the CL package that were upgraded to generic should
-          ;; signal type errors when called on a non-stream. One method on T that is
-          ;; ordinarily never selected can do it, though unfortunately this makes it
-          ;; impossible to detect absence of a primary method.
-          ;; CLOSE is different in that it is both specified as the public API *and*
-          ;; at the implementation layer in the quasi-standard Gray stream design.
-          ;; So it's allowed to hit no-applicable-method.
-          ,@(unless (eq name 'close)
-              `((defmethod ,name (x)
-                  (unless (streamp x)
-                    (error 'type-error :datum x :expected-type 'stream)))))))
+          (defgeneric ,name ,ll (:generic-function-class stream-function) ,@rest)
+          (sb-pcl::!install-cross-compiled-methods ',name)))
+(defmethod no-applicable-method ((function stream-function) &rest args)
+  (let ((stream (car args)))
+    (if (streamp stream)
+        (call-next-method)
+        (error 'type-error :datum stream :expected-type 'stream))))
 
 (!def-stream-generic stream-element-type (stream)
   (:documentation
