@@ -315,31 +315,28 @@ any non-negative real number."
 ;;; Flush anything waiting on one of the ANSI Common Lisp standard
 ;;; output streams before proceeding.
 (defun flush-standard-output-streams ()
-  (let ((null *null-broadcast-stream*))
-    (dolist (name '(*debug-io*
-                    *error-output*
-                    *query-io*
-                    *standard-output*
-                    *trace-output*
-                    *terminal-io*))
       ;; 0. Pull out the underlying stream, so we know what it is.
       ;; 1. Handle errors on it. We're doing this on entry to
       ;;    debugger, so we don't want recursive errors here.
       ;; 2. Rebind the stream symbol in case some poor sod sees
       ;;    a broken stream here while running with *BREAK-ON-ERRORS*.
-      (let ((stream (stream-output-stream (symbol-value name))))
-        ;; This is kind of crummy because it checks in globaldb for each
-        ;; stream symbol whether it can be bound to a stream. The translator
-        ;; for PROGV could skip ABOUT-TO-MODIFY-SYMBOL-VALUE based on
-        ;; an aspect of a policy, but if users figure that out they could
-        ;; do something horrible like rebind T and NIL.
-        (progv (list name) (list null)
-          (handler-bind ((stream-error
-                           (lambda (c)
-                             (when (eq stream (stream-error-stream c))
-                               (go :next)))))
-            (force-output stream))))
-      :next))
+  (flet ((flush (stream)
+           (let ((stream (stream-output-stream stream)))
+             (handler-bind ((stream-error
+                             (lambda (c)
+                               (when (eq (stream-error-stream c) stream)
+                                 (return-from flush)))))
+               (force-output stream)))))
+    (let ((null-stream (load-time-value *null-broadcast-stream* t)))
+      (macrolet ((flush-all (&rest streamvars)
+                   `(progn
+                      ,@(mapcar (lambda (streamvar)
+                                  `(let ((stream ,streamvar)
+                                         (,streamvar null-stream))
+                                     (flush stream)))
+                                streamvars))))
+        (flush-all *debug-io* *error-output* *query-io* *standard-output*
+                   *trace-output* *terminal-io*))))
   (values))
 
 (defun process-eval/load-options (options)
