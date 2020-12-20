@@ -492,8 +492,7 @@ standard Lisp readtable when NIL."
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
   ;; non-white one). It always gets an error on end-of-file.
-  (let* ((stream (in-stream-from-designator stream))
-         (rt *readtable*)
+  (let* ((rt *readtable*)
          (base (base-char-syntax-array rt))
          (extended (extended-char-table rt)))
     (macrolet ((done-p ()
@@ -769,8 +768,9 @@ standard Lisp readtable when NIL."
   "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
   (declare (explicit-check))
-  (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
-  (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
+  (let ((stream (in-stream-from-designator stream)))
+    (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
+    (%read-preserving-whitespace stream eof-error-p eof-value recursive-p)))
 
 ;;; Read from STREAM given starting CHAR, returning 1 and the resulting
 ;;; object, unless CHAR is a macro yielding no value, then 0 and NIL,
@@ -797,7 +797,8 @@ standard Lisp readtable when NIL."
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
                        (eof-value nil)
-                       (recursive-p nil))
+                       (recursive-p nil)
+             &aux (stream (in-stream-from-designator stream)))
   "Read the next Lisp value from STREAM, and return it."
   (declare (explicit-check))
   (check-for-recursive-read stream recursive-p 'read)
@@ -834,16 +835,15 @@ standard Lisp readtable when NIL."
              'sb-kernel::character-decoding-error-in-macro-char-comment
              :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
-    (let ((stream (in-stream-from-designator stream)))
-      (if (ansi-stream-p stream)
-          (prepare-for-fast-read-char stream
+    (if (ansi-stream-p stream)
+        (prepare-for-fast-read-char stream
            (loop (let ((char (fast-read-char nil +EOF+)))
                    (when (or (eq char +EOF+) (char= char #\newline))
                      (return (done-with-fast-read-char))))))
           ;; CLOS stream
-          (loop (let ((char (read-char stream nil +EOF+)))
+        (loop (let ((char (read-char stream nil +EOF+)))
                   (when (or (eq char +EOF+) (char= char #\newline))
-                    (return)))))))
+                    (return))))))
   ;; Don't return anything.
   (values))
 
@@ -903,7 +903,9 @@ standard Lisp readtable when NIL."
   ;;; (This is a COMMON-LISP exported symbol.)
   (defun read-delimited-list (endchar &optional
                                       (input-stream *standard-input*)
-                                      recursive-p)
+                                      recursive-p
+                                      &aux (input-stream
+                                            (in-stream-from-designator input-stream)))
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
     (declare (explicit-check))
@@ -971,7 +973,6 @@ standard Lisp readtable when NIL."
     (let* ((token-buf *read-buffer*)
            (buf (token-buf-string token-buf))
            (rt *readtable*)
-           (stream (in-stream-from-designator stream))
            (suppress *read-suppress*)
            (lim (length buf))
            (ptr 0)
@@ -1482,8 +1483,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      SYMBOL ; not a dot, dots, or number
-      (let ((stream (in-stream-from-designator stream)))
-        (macrolet
+      (macrolet
            ((scan (read-a-char &optional finish)
              `(prog ()
                SYMBOL-LOOP
@@ -1502,7 +1502,7 @@ extended <package-name>::<form-in-package> syntax."
             (prepare-for-fast-read-char stream
               (scan (fast-read-char nil +EOF+) (done-with-fast-read-char)))
             ;; CLOS stream
-            (scan (read-char stream nil +EOF+)))))
+            (scan (read-char stream nil +EOF+))))
      SINGLE-ESCAPE ; saw a single-escape
       ;; Don't put the escape character in the read buffer.
       ;; READ-NEXT CHAR, put in buffer (no case conversion).
