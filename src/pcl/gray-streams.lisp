@@ -143,23 +143,19 @@
   calls to STREAM-READ-CHAR."))
 
 (defmethod stream-read-line ((stream fundamental-character-input-stream))
-  (let ((res (make-string 80))
-        (len 80)
-        (index 0))
-    (loop
-     (let ((ch (stream-read-char stream)))
-       (cond ((eq ch :eof)
-              (return (values (%shrink-vector res index) t)))
-             (t
-              (when (char= ch #\newline)
-                (return (values (%shrink-vector res index) nil)))
-              (when (= index len)
-                (setq len (* len 2))
-                (let ((new (make-string len)))
-                  (replace new res)
-                  (setq res new)))
-              (setf (schar res index) ch)
-              (incf index)))))))
+  (let (eof)
+    ;; This loop is simpler than the one in ansi-stream-read-line
+    ;; because here we always return a string for the primary value,
+    ;; and the caller tests for a 0-length string.
+    ;; Writing to a string-output-stream adds negligible overhead
+    ;; versus the method dispatch for each input character.
+    (values (with-output-to-string (s)
+              (loop (let ((ch (stream-read-char stream)))
+                      (case ch
+                        (#\newline (return))
+                        (:eof (return (setq eof t)))
+                        (t (funcall (ansi-stream-out s) s ch))))))
+            eof)))
 
 (defgeneric stream-clear-input (stream)
   (:documentation

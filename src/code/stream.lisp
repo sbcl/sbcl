@@ -342,49 +342,61 @@
             (progn (done-with-fast-read-char)
                    (eof-or-lose stream eof-error-p (values eof-value t))))))))
 
+;; to potentially avoid consing a bufer on sucessive calls to read-line
+;; (just consing the result string)
+(define-load-time-global *read-line-buffers* nil)
+(declaim (list *read-line-buffers*))
+
 (declaim (inline ansi-stream-read-line))
-(defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
-  (declare (ignore recursive-p))
+(defun ansi-stream-read-line (stream eof-error-p eof-value)
   (if (ansi-stream-cin-buffer stream)
       ;; Stream has a fast-read-char buffer. Copy large chunks directly
       ;; out of the buffer.
       (ansi-stream-read-line-from-frc-buffer stream eof-error-p eof-value)
       ;; Slow path, character by character.
-      (prepare-for-fast-read-char stream
-        (let ((res (make-string 80))
-              (len 80)
-              (index 0))
-          (loop
-             (let ((ch (fast-read-char nil nil)))
-               (cond (ch
-                      (when (char= ch #\newline)
-                        (done-with-fast-read-char)
-                        (return (values (%shrink-vector res index) nil)))
+      ;; There is no need to use PREPARE-FOR-FAST-READ-CHAR
+      ;; because the CIN-BUFER is known to be NIL.
+      (let ((ch (funcall (ansi-stream-in stream) stream nil 0)))
+        (case ch
+          (#\newline (values "" nil))
+          (0 (values (eof-or-lose stream eof-error-p eof-value) t))
+          (t
+           (let* ((buffer (or (atomic-pop *read-line-buffers*)
+                              (make-string 128)))
+                  (res buffer)
+                  (len (length res))
+                  (eof)
+                  (index 0))
+             (declare (type (simple-array character (*)) buffer))
+             (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+             (declare (index index))
+             (setf (schar res index) (truly-the character ch))
+             (incf index)
+             (loop (case (setq ch (funcall (ansi-stream-in stream) stream nil 0))
+                     (#\newline (return))
+                     (0 (return (setq eof t)))
+                     (t
                       (when (= index len)
                         (setq len (* len 2))
                         (let ((new (make-string len)))
                           (replace new res)
                           (setq res new)))
-                      (setf (schar res index) ch)
-                      (incf index))
-                     ((zerop index)
-                      (done-with-fast-read-char)
-                      (return (values (eof-or-lose stream
-                                                   eof-error-p
-                                                   eof-value)
-                                      t)))
-                     ;; Since FAST-READ-CHAR already hit the eof char, we
-                     ;; shouldn't do another READ-CHAR.
-                     (t
-                      (done-with-fast-read-char)
-                      (return (values (%shrink-vector res index) t))))))))))
+                      (setf (schar res index) (truly-the character ch))
+                      (incf index))))
+             (if (eq res buffer)
+                 (setq res (subseq buffer 0 index))
+                 (%shrink-vector res index))
+             ;; Do not push an enlarged buffer, only the original one.
+             (atomic-push buffer *read-line-buffers*)
+             (values res eof)))))))
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)
   (declare (explicit-check))
+  (declare (ignore recursive-p))
   (stream-api-dispatch (stream (in-stream-from-designator stream))
     :simple (s-%read-line stream eof-error-p eof-value)
-    :native (ansi-stream-read-line stream eof-error-p eof-value recursive-p)
+    :native (ansi-stream-read-line stream eof-error-p eof-value)
     :gray
         (multiple-value-bind (string eof) (stream-read-line stream)
           (if (and eof (zerop (length string)))
