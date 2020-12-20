@@ -372,6 +372,21 @@ Please check that all strings which were not recognizable to the compiler
 (fmakunbound 'sb-c::repack-xref)
 
 (progn
+  (defun asm-inst-p (symbol)
+    ;; Assembler instruction names can't be made external because to do so would
+    ;; conflict with common-lisp symbols. Notable examples are PUSH and POP.
+    ;; So other criteria must pertain to detecting the important symbols.
+    ;; And as we don't need to preserve Lisp macros but do need to retain
+    ;; assembler macro instructions, those merit special consideration.
+    ;; Additionally, a DEFUN may co-exist with an identically named macro
+    ;; instruction. (I'm not happy about it, but that's historical baggate).
+    ;; A macro instruction is recognizable to INST by a naming convention
+    ;; that is unused for anything else by way of being inconvenient to use -
+    ;; a symbol whose print name start with "M:" is a macro instruction.
+    (or (get symbol 'sb-disassem::instructions)
+        (let ((name (string symbol)))
+          (and (> (length name) 2)
+               (string= name "M:" :end1 2)))))
   (load (merge-pathnames "src/code/shaketree" *load-pathname*))
   (sb-impl::shake-packages
    ;; Development mode: retain all symbols with any system-related properties
@@ -431,13 +446,7 @@ Please check that all strings which were not recognizable to the compiler
       (t
        (if (eq (symbol-package symbol)
                sb-assem::*backend-instruction-set-package*)
-           ;; Don't preserve macros in the machine assembler package.
-           ;; Anything users might unportably rely on should be external
-           ;; and/or in the SB-VM package, or be an opcode name.
-           ;; The opcodes can't be made external because their functions
-           ;; mustn't conflict with anything else, like PUSH and POP.
-           (or (eq accessibility :external)
-               (get symbol 'sb-disassem::instructions))
+           (or (eq accessibility :external) (asm-inst-p symbol))
            ;; By default, retain any symbol with any attachments
            (or (sb-kernel:symbol-info symbol)
                (and (boundp symbol) (not (keywordp symbol))))))))
