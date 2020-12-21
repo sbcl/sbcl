@@ -349,7 +349,7 @@
     (funcall-stm-handler-2 j-write-char character (sm melded-stream stream))))
 
 
-(defun sb-impl::%fresh-line (stream)
+(defun sb-impl::s-%fresh-line (stream)
   (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :output)

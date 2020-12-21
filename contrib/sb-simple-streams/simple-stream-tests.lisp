@@ -85,6 +85,7 @@
                                             :direction :output
                                             :if-exists :overwrite
                                             :if-does-not-exist :create))
+          (fresh-line s)
           (string= (write-string *dumb-string* s) *dumb-string*))
       (delete-file *test-file*))
   t)
