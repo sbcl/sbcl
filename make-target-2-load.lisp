@@ -379,7 +379,7 @@ Please check that all strings which were not recognizable to the compiler
     ;; And as we don't need to preserve Lisp macros but do need to retain
     ;; assembler macro instructions, those merit special consideration.
     ;; Additionally, a DEFUN may co-exist with an identically named macro
-    ;; instruction. (I'm not happy about it, but that's historical baggate).
+    ;; instruction. (I'm not happy about it, but that's historical baggage).
     ;; A macro instruction is recognizable to INST by a naming convention
     ;; that is unused for anything else by way of being inconvenient to use -
     ;; a symbol whose print name start with "M:" is a macro instruction.
