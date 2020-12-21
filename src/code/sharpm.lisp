@@ -433,7 +433,6 @@
              'sb-kernel::character-decoding-error-in-dispatch-macro-char-comment
              :sub-char sub-char :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
-    (let ((stream (in-stream-from-designator stream)))
       (macrolet ((munch (get-char &optional finish)
                    `(do ((level 1)
                          (prev ,get-char char)
@@ -452,7 +451,7 @@
             (prepare-for-fast-read-char stream
               (munch (fast-read-char) (done-with-fast-read-char)))
             ;; fundamental-stream
-            (munch (read-char stream t)))))))
+            (munch (read-char stream t))))))
 
 ;;;; a grab bag of other sharp readmacros: #', #:, and #.
 
