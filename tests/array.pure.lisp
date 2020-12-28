@@ -633,3 +633,12 @@
                                       (declare ((array * (* *)) x))
                                       (array-has-fill-pointer-p x))))
                  `(function ((array * (* *))) (values null &optional)))))
+
+(with-test (:name :array-has-fill-pointer-p-transform)
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (let ((a (make-array n)))
+        (declare (vector a))
+        (map-into a #'identity a)))
+   ((0) #() :test #'equalp)))

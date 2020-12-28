@@ -1429,14 +1429,17 @@
 ;;; will result from MAP-INTO and other things which have
 ;;    (if (array-has-fill-pointer-p a) (setf (fill-pointer a) ...))
 ;; where the compiler knows that the input is simple.
-(deftransform array-has-fill-pointer-p ((array))
+(deftransform array-has-fill-pointer-p ((array) * * :node node)
   (let* ((array-type (lvar-type array))
-         (dims (array-type-dimensions-or-give-up array-type)))
+         (dims (array-type-dimensions-or-give-up array-type))
+         complexp)
     ;; If a vector and possibly non-simple, then perform the bit test,
     ;; otherwise the answer is definitely NIL.
     (cond ((and (listp dims) (/= (length dims) 1)) nil) ; dims = * is possibly a vector
-          ((eq (conservative-array-type-complexp array-type) nil) nil)
+          ((eq (setf complexp (conservative-array-type-complexp array-type)) nil) nil)
           (t
+           (when (eq complexp :maybe)
+             (delay-ir1-transform node :constraint))
            (if (vop-existsp :named test-header-bit)
                `(test-header-bit array sb-vm:+array-fill-pointer-p+)
                `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+))))))
