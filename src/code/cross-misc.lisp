@@ -30,6 +30,10 @@
 (defmacro truly-the (type expr)
   `(the ,type ,expr))
 
+(defmacro the* ((type &rest args) expr)
+  (declare (ignore args))
+  `(the ,type ,expr))
+
 (defmacro named-lambda (name args &body body)
   (declare (ignore name))
   `#'(lambda ,args ,@body))

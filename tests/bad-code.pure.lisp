@@ -579,3 +579,9 @@
 
 (with-test (:name :get-defined-fun-lambda-list-error)
   (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))
+
+(with-test (:name :dolist-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (dolist (x (the integer x))))
+                                      :allow-warnings 'sb-int:type-warning))))

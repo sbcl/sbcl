@@ -1693,7 +1693,13 @@ symbol-case giving up: case=((V U) (F))
                   (t
                    (values nil nil nil))))))
     `(block nil
-       (let ((,n-list ,(if clist-ok (list 'quote clist) list)))
+       (let ((,n-list ,(if clist-ok
+                           (list 'quote clist)
+                           ;; Don't want to use a cast because
+                           ;; the type will actually be checked by ENDP first.
+                           ;; But it doesn't detect the mismatch because the SETF
+                           ;; mixes in T with the initial type.
+                           `(the* (list :use-annotations t :source-form ,list) ,list))))
          (tagbody
             ,start
             (unless (endp ,n-list)

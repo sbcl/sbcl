@@ -3321,7 +3321,11 @@ is :ANY, the function name is not checked."
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
-                                          (lvar-all-sources lvar)
+                                          (let ((path (lvar-annotation-source-path annotation)))
+                                            (list
+                                             (if (eq (car path) 'original-source-start)
+                                                 (find-original-source path)
+                                                 (car path))))
                                           :condition condition))
           ((consp uses)
            (loop for use in uses
