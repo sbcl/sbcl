@@ -157,7 +157,7 @@ means to wait indefinitely.")
                  (if *forcibly-terminate-threads-on-exit*
                      (sb-thread::%exit-other-threads)
                      (with-deadline (:seconds nil :override t)
-                       (sb-impl::finalizer-thread-stop)
+                       #+sb-thread (finalizer-thread-stop)
                        (sb-thread:grab-mutex sb-thread::*make-thread-lock*)))
                  (setf ok t))
             (os-exit code :abort (not ok)))))))

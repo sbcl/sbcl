@@ -4172,7 +4172,7 @@ static void gc_allocate_ptes()
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
-    weakobj_init();
+    gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
 

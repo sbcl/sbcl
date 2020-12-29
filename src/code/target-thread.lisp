@@ -1469,12 +1469,12 @@ on this semaphore, then N of them is woken up."
    called by BREAK.")
 
 (defun %exit-other-threads ()
-  ;; Grabbing this lock prevents new threads from
-  ;; being spawned, and guarantees that *ALL-THREADS*
-  ;; is up to date.
   (with-deadline (:seconds nil :override t)
-    (sb-impl::finalizer-thread-stop)
+    ;; Grabbing this lock prevents new threads from
+    ;; being spawned, and guarantees that *ALL-THREADS*
+    ;; is up to date.
     (grab-mutex *make-thread-lock*)
+    #+sb-thread (sb-impl::finalizer-thread-stop)
     (let ((timeout sb-ext:*exit-timeout*)
           (code *exit-in-progress*)
           (current *current-thread*)
@@ -1863,27 +1863,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   (start-thread (%make-thread name t (make-semaphore :name name))
                 function arguments))
 
-;;; The purpose of splitting out START-THREAD from MAKE-THREAD is that when
-;;; starting the finalizer thread, we might be able to do:
-;;; (let ((thread (%make-thread "finalizer" t ...)))
-;;;   (when (cas *finalizer-thread* nil thread)
-;;;     (start-thread thread ...)
-;;; which is possibly an improvement in two ways:
-
-;;; (1) it ensures that there is no hidden state in the transition diagram
-;;;     when we are invisibly starting the finalizer thread but have not made it
-;;;     known to FINALIZER-THREAD-STOP that we are doing so. There would be a
-;;;     thread object published or not - and no "maybe starting" state.
-;;; (2) imagine two threads, each of which actually GC'd - so the 'gc_happened'
-;;;     flag in gc-common.c is T for both - and each wants to start the finalizer.
-;;;     They both get all the way into RUN only for one
-;;;     to lose the CAS on *FINALIZER-THREAD*. It's a lot of overhead to start
-;;;     a thread that does nothing and then exits.
-;;;
-;;; But it's not all fun and games, because we'd have to figure out how to
-;;; get FINALIZER-THREAD-STOP _not_ to attempt to join a thread that has not
-;;; yet sprung into being as an OS-level thread.
-
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.
 #+pauseless-threadstart
@@ -1966,7 +1945,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       ;; or SAVE-LISP-AND-DIE.
       ;; The locks also guards access to *STARTING-THREADS* - a lockfree list wouldn't
       ;; improve concurrency, as long as creation is synchronized anyway.
-      (with-system-mutex (*make-thread-lock*)
+      (dx-flet ((thunk ()
         ;; Consing THREAD into *STARTING-THREADS* pins it as well as some elements
         ;; of startup-info. Consequently those objects can be safely manipulated
         ;; from C before inserting the thread into 'all_threads'.
@@ -1989,7 +1968,11 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                  ;; It's ok if the thread changed 0 -> {1 | -1}, then failure here is correct.
                  (sb-ext:cas (thread-%visible thread) 0 1))
                 (t ; unlikely. Out of memory perhaps?
-                 (setq *starting-threads* old)))))
+                 (setq *starting-threads* old))))))
+        ;; System threads are created with the mutex already held
+        (if (thread-ephemeral-p thread)
+            (thunk)
+            (sb-thread::call-with-system-mutex #'thunk *make-thread-lock*)))
       (unless created ; Remove side-effects of trying to create
         (delete-from-all-threads (sap-int thread-sap))
         (when *session*
@@ -2001,12 +1984,12 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 #+(and sb-thread (not pauseless-threadstart))
 (defun start-thread (thread function arguments)
-    (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
-           #+(or win32 darwin freebsd)
-           (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
-                          (sb-vm:floating-point-modes))))
-      (declare (dynamic-extent setup-sem))
-      (dx-flet ((start-routine ()
+  (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
+         #+(or win32 darwin freebsd)
+         (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
+                        (sb-vm:floating-point-modes))))
+    (declare (dynamic-extent setup-sem))
+    (dx-flet ((start-routine ()
                   ;; Inherit parent thread's FP modes
                   #+(or win32 darwin)
                   (setf (sb-vm:floating-point-modes) fp-modes)
@@ -2020,13 +2003,13 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                       (with-local-interrupts
                           (run thread setup-sem function arguments)))))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
-        (aver (not *gc-inhibit*))
+      (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
         ;; thread is initialized properly. Wrap the whole thing in
         ;; WITHOUT-INTERRUPTS (via WITH-SYSTEM-MUTEX) because we pass
         ;; INITIAL-FUNCTION to another thread.
         ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
-        (with-system-mutex (*make-thread-lock*)
+      (dx-flet ((thunk ()
           (with-alien ((create-thread (function unsigned unsigned unsigned)
                                       :extern "create_thread"))
             (with-pinned-objects (thread #'start-routine)
@@ -2036,7 +2019,10 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                                       (get-lisp-obj-address #'start-routine))
                        0)
                   (setq thread nil)
-                  (wait-on-semaphore setup-sem)))))))
+                  (wait-on-semaphore setup-sem))))))
+        (if (thread-ephemeral-p thread)
+            (thunk)
+            (sb-thread::call-with-system-mutex #'thunk *make-thread-lock*)))))
     (or thread (error "Could not create a new thread.")))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)

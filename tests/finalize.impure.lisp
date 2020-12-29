@@ -14,11 +14,6 @@
 (defglobal *n-finalized-things* (or #+(and 64-bit (not sb-safepoint)) 20000 10000))
 (defglobal *weak-pointers* nil)
 
-#+sb-thread
-(progn
-  (sb-impl::finalizer-thread-stop)
-  (setf sb-impl::*finalizer-thread* t))
-
 (defun makejunk (_)
   (declare (ignore _))
   (let ((x (gensym)))
@@ -61,15 +56,11 @@
   (assert (typep sb-impl::*finalizer-thread* 'sb-thread::thread))
   ;; We're going to assert on an approximate count of finalizers that ran,
   ;; which is a bit sketchy.
-  ;; So call SCAN-FINALIZERS which actually does the work of helping out
-  ;; the finalizer thread. RUN-PENDING-FINALIZERS is not enough - it would just kick
-  ;; the thread and return right away, failing our requirement for being synchronous.
-  ;; Also, there's no reason to pre- or post-check how may finalizer are pending
-  ;; right now- it may be all of them, none of them, or anything in between,
-  ;; depending on what the thread has gotten to so far.
+  ;; So call RUN-PENDING-FINALIZERS which actually does the work of helping out
+  ;; the finalizer thread.
   ;; This also shows that it works to run finalization actions in two threads -
   ;; the finalizer thread and this. Hence the need for ATOMIC-INCF on *count*.
-  (sb-impl::scan-finalizers)
+  (sb-impl::run-pending-finalizers)
 
   ;; Make sure the thread is done.
   ;; This JOIN-THREADs it, so we know it's not executing.

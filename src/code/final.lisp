@@ -238,16 +238,17 @@ Examples:
 ;;; Nested invocations (from a GC forced by a finalizer) are not ok.
 ;;; See the trace at the bottom of this file.
 (defvar *in-a-finalizer* nil)
-(defun scan-finalizers ()
+(defun run-pending-finalizers ()
   ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
+     (when (zerop (extern-alien "finalizer_thread_runflag" int)) (return))
      (let ((cell (hash-table-culled-values hashtable)))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
        ;; Possible TODO: when no other work remains, free the *JOINABLE-THREADS*,
        ;; though MAKE-THREAD and JOIN-THREAD do that also, so there's no memory leak.
-       (loop (unless cell (return-from scan-finalizers))
+       (loop (unless cell (return-from run-pending-finalizers))
              (let ((actual (cas (hash-table-culled-values hashtable)
                                 cell (cdr cell))))
                (if (eq actual cell) (return) (setq cell actual))))
@@ -296,112 +297,45 @@ Examples:
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
                ((consp finalizers) (rplaca finalizers 0))))))))
 
+(define-load-time-global *finalizer-thread* nil)
+(declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
 #+sb-thread
-(progn
-  ;; *FINALIZER-THREAD* is either a boolean value indicating whether to start a
-  ;; thread, or a thread object (which is created no sooner than needed).
-  ;; Saving a core sets the flag to NIL so that finalizers which execute
-  ;; between stopping the thread and writing to disk will be synchronous.
-  ;; Restarting a saved core resets the flag to T.
-  (define-load-time-global *finalizer-thread* t)
-  (declaim (type (or sb-thread:thread boolean) *finalizer-thread*))
-  (define-load-time-global *finalizer-queue-lock*
-      (sb-thread:make-mutex :name "finalizer"))
-  (define-load-time-global *finalizer-queue*
-      (sb-thread:make-waitqueue :name "finalizer")))
+(defun finalizer-thread-notify ()
+  (alien-funcall (extern-alien "finalizer_thread_wake" (function void)))
+  nil)
 
-(defun run-pending-finalizers ()
-  (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
-    (cond #+sb-thread
-          ((%instancep *finalizer-thread*)
-           ;; Do absolutely nothing if in a finalizer. If we are then it's obvious
-           ;; that we're in the SCAN-FINALIZERS loop, and that the loop will just
-           ;; go on looping without further provocation.
-           (unless *in-a-finalizer*
-             (with-system-mutex (*finalizer-queue-lock*)
-               (sb-thread:condition-notify *finalizer-queue*))))
-          #+sb-thread
-          ((eq *finalizer-thread* t) ; Create a new thread
+;;; The following operations are synchronized by *MAKE-THREAD-LOCK* -
+;;;   FINALIZER-THREAD-{START,STOP}, S-L-A-D, SB-POSIX:FORK
+#+sb-thread
+(defun finalizer-thread-start ()
+  (with-system-mutex (sb-thread::*make-thread-lock*)
+    (aver (not *finalizer-thread*))
+    (setf (extern-alien "finalizer_thread_runflag" int) 1)
+    (setq *finalizer-thread* :start)
+    (let ((thread
            (sb-thread::make-ephemeral-thread
             "finalizer"
             (lambda ()
-              ;; If we already called FINALIZER-THREAD-STOP, then
-              ;; *FINALIZER-THREAD* is NIL, and this WHEN test is false.
-              (when (eq t (cas *finalizer-thread* t
-                               sb-thread:*current-thread*))
-                ;; Don't enter the loop if this thread lost the
-                ;; competition to become a finalizer thread.
-                (loop
-                  (scan-finalizers)
-                  ;; Wait for a notification
-                  ;; I think using SB-THREAD:WITH-MUTEX here was responsible for
-                  ;; deadlocks. So it is critical that this be the -SYSTEM- macro.
-                  (with-system-mutex (*finalizer-queue-lock*)
-                    ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
-                    (unless *finalizer-thread*
-                      (return))
-                    ;; The return value of CONDITION-WAIT is irrelevant
-                    ;; since it is always legal to call SCAN-FINALIZERS
-                    ;; even when it has nothing to do.
-                    ;; Spurious wakeup is of no concern to us here.
-                    (sb-thread:condition-wait
-                     *finalizer-queue* *finalizer-queue-lock*)))))
-            nil))
-          (t
-           (scan-finalizers)))))
+              (setf *finalizer-thread* sb-thread:*current-thread*)
+              (loop (run-pending-finalizers)
+                    (when (zerop (alien-funcall
+                                  (extern-alien "finalizer_thread_wait" (function int))))
+                      (return)))
+              (setq *finalizer-thread* nil))
+            nil)))
+      ;; Don't return from this function until *FINALIZER-THREAD* has a good value,
+      ;; but don't set it to a thread if the thread was not created, or exited already.
+      (cas *finalizer-thread* :start thread))))
 
-;;; If a finalizer thread was started, stop it and wait for it to finish.
-;;; Make no attempt to drain the queue of pending finalizers.
-;;; (When called from EXIT, the user must invoke a final GC if there is
-;;; an expectation that GC-based things run. Similarly when saving a core)
-;;; There's a data race involved during SAVE-LISP-AND-DIE (or SB-POSIX:FORK)
-;;; because *FINALIZER-THREAD* is assigned by that thread itself which means that
-;;; it has to run before we can detect that it exists.
-;;; There are few remedies involving some combination of these steps:
-;;; - Assign a THREAD instance into *finalizer-thread* before it shows
-;;;   up in *ALL-THREADS*. If *FINALIZER-THREAD* has a value but is not in
-;;;   *ALL-THREADS*, then it may be blocked on the mutex. Can we terminate it?
-;;; - During save, acquire the *MAKE-THREAD-LOCK* to get a consistent view of
-;;;   which threads are starting and running.
-;;; - the :pauseless-threadstart code adds new threads to *ALL-THREADS*
-;;;   before starting the posix thread. We could look there.
-;;;   The important thing is to avoid thinking that there is a thread running
-;;;   when it doesn't have a posix thread ID yet.
-;;; - Does acquiring the *MAKE-THREAD-LOCK* before assigning *FINALIZER-THREAD*
-;;;   help anything? Perhaps.
-;;; But first I'd like to entirely eliminate the non-pauseless-threadstart code
-;;; so that we don't have to reason about two totally different solutions.
+;;; You should almost always invoke this with *MAKE-THREAD-LOCK* held.
+;;; Some tests violate that, but they know what they're doing.
+#+sb-thread
 (defun finalizer-thread-stop ()
-  #+sb-thread
   (let ((thread *finalizer-thread*))
-    ;; valid state transitions:
-    ;;   T to a #<thread>
-    ;;   #<thread> to NIL
-    ;;   T to NIL
-    ;; If it was NIL, it is latched at that state, so we can ignore it.
-    (when (null thread)
-      (return-from finalizer-thread-stop))
-    ;; If user calls SAVE-LISP-AND-DIE or SB-POSIX:FORK in a finalizer...
-    (when (eq sb-thread:*current-thread* *finalizer-thread*)
-      (error "Can't stop finalizer thread from inside finalizer thread"))
-    (let ((oldval (cas *finalizer-thread* thread nil)))
-      ;; If GC had started the thread, and it got to its main body only after
-      ;; we observed *FINALIZER-THREAD* = T, then we could see a transition
-      ;; from T to #<thread> now. That is unlikely, but we must try once
-      ;; again to CAS the value to NIL.
-      (unless (eq oldval thread)
-        (setq thread oldval)
-        ;; Also, we could be racing with someone else trying to stop the
-        ;; thread, so we could see T | #<thread> -> NIL.
-        (when (null thread)
-          (return-from finalizer-thread-stop))
-        (aver (eq (cas *finalizer-thread* thread nil) thread))))
-    (when (%instancep thread)
-      ;; The finalizer thread will exit when we wake it up
-      ;; and it sees that *FINALIZER-THREAD* is NIL.
-      (with-system-mutex (*finalizer-queue-lock*)
-        (sb-thread:condition-notify *finalizer-queue*))
-      (sb-thread:join-thread thread)))) ; wait for it
+    (aver (sb-thread::thread-p thread))
+    (setf (extern-alien "finalizer_thread_runflag" int) 0)
+    (finalizer-thread-notify)
+    (sb-thread:join-thread thread)))
 
 #|
 ;;; This is a display produced by annotating parts of gc-common.c and

@@ -97,7 +97,7 @@ extern boolean scan_weak_hashtable(struct hash_table *hash_table,
                                    void (*)(lispobj*));
 extern int (*weak_ht_alivep_funs[4])(lispobj,lispobj);
 extern void gc_scav_pair(lispobj where[2]);
-extern void weakobj_init();
+extern void gc_common_init();
 extern boolean test_weak_triggers(int (*)(lispobj), void (*)(lispobj));
 
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);

@@ -263,6 +263,7 @@
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
+  #+sb-thread (finalizer-thread-start)
 
   ;; The show is on.
   (/show0 "going into toplevel loop")
@@ -338,8 +339,7 @@ process to continue normally."
     ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
-      (sb-thread::init-main-thread)
-      #+sb-thread (setq *finalizer-thread* t))
+      (sb-thread::init-main-thread))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed
@@ -357,6 +357,7 @@ process to continue normally."
   ;; re-disable ldb again.
   (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)
     (sb-debug::disable-debugger))
+  #+sb-thread (finalizer-thread-start)
   (call-hooks "initialization" *init-hooks*))
 
 ;;;; some support for any hapless wretches who end up debugging cold

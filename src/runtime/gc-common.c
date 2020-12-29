@@ -1192,8 +1192,43 @@ boolean test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
     return weak_objects.count != old_count;
 }
 
-void weakobj_init()
+int finalizer_thread_runflag = 1;
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_WIN32
+CRITICAL_SECTION finalizer_mutex;
+CONDITION_VARIABLE finalizer_condvar;
+int finalizer_thread_wait () {
+    EnterCriticalSection(&finalizer_mutex);
+    if (finalizer_thread_runflag)
+        SleepConditionVariableCS(&finalizer_condvar, &finalizer_mutex, INFINITE);
+    LeaveCriticalSection(&finalizer_mutex);
+    return finalizer_thread_runflag;
+}
+void finalizer_thread_wake () {
+    WakeAllConditionVariable(&finalizer_condvar);
+}
+#else
+pthread_mutex_t finalizer_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t finalizer_condvar = PTHREAD_COND_INITIALIZER;
+int finalizer_thread_wait () {
+    thread_mutex_lock(&finalizer_mutex);
+    if (finalizer_thread_runflag)
+        pthread_cond_wait(&finalizer_condvar, &finalizer_mutex);
+    thread_mutex_unlock(&finalizer_mutex);
+    return finalizer_thread_runflag;
+}
+void finalizer_thread_wake() {
+    pthread_cond_broadcast(&finalizer_condvar);
+}
+#endif
+#endif
+
+void gc_common_init()
 {
+#ifdef LISP_FEATURE_WIN32
+    InitializeCriticalSection(&finalizer_mutex);
+    InitializeConditionVariable(&finalizer_condvar);
+#endif
     hopscotch_init();
     hopscotch_create(&weak_objects, HOPSCOTCH_HASH_FUN_DEFAULT, N_WORD_BYTES,
                      32 /* logical bin count */, 0 /* default range */);

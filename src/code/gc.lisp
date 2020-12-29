@@ -243,6 +243,17 @@ statistics are appended to it."
                              (neq epoch *gc-pending*))
                     (return 0)))))))))
 
+#+sb-thread
+(defun post-gc ()
+  (sb-impl::finalizer-thread-notify)
+  (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
+  ;; Post-GC actions are invoked synchronously by the GCing thread,
+  ;; which is an arbitrary one. If those actions aquire any locks, or are sensitive
+  ;; to the state of *ALLOW-WITH-INTERRUPTS*, any deadlocks of what-have-you
+  ;; are user error. Hooks need to be sufficiently uncomplicated as to be harmless.
+  (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))
+
+#-sb-thread
 (defun post-gc ()
   ;; Outside the mutex, interrupts may be enabled: these may cause
   ;; another GC. FIXME: it can potentially exceed maximum interrupt
@@ -272,18 +283,7 @@ statistics are appended to it."
   ;; but it's not permissible to invoke CONDITION-NOTIFY from a
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
-  #+sb-thread (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
-  (let ((threadp #+sb-thread (%instancep sb-impl::*finalizer-thread*)))
-    (when threadp
-      ;; grabbing a lock, need to clear out any waiting-for to avoid
-      ;; spurios deadlock detections.
-      (sb-thread::without-thread-waiting-for ()
-        ;; It's OK to frob a condition variable regardless of
-        ;; *allow-with-interrupts*, and probably OK to start a thread.
-        ;; For consistency with the previous behavior, we delay finalization
-        ;; if there is no finalizer thread and interrupts are disabled.
-        ;; That's my excuse anyway, not having looked more in-depth.
-        (run-pending-finalizers)))
+
     ;; Here's one reason that MAX_INTERRUPTS is as high as it is.
     ;; If the thread that performed GC runs post-GC hooks which cons enough to
     ;; cause another GC while in the hooks, then as soon as interrupts are allowed
@@ -294,40 +294,19 @@ statistics are appended to it."
     ;; pseudo-atomic sequence to take a signal hit. So with interrupts eanbled,
     ;; we get back into the GC, which calls post-GC, which might cons ...
     ;; See the example at the bottom of src/code/final for a clear picture.
-    ;;
-    ;; To mitigate that problem, if you have no hooks, we can avoid inducing overflow
-    ;; of the interrupt contexts. Relegating post-GC actions to their own thread
-    ;; (as suggested above) would largely solve this - the post-GC action would be to
-    ;; just "kick" that thread to do its thing. If it doesn't finish in time (by the
-    ;; time we kick it again), that's its problem, not the GC's problem.
-    ;;
-    ;; If we do implement a general post-GC thread, there remains a question of
-    ;; of what to do with post-GC actions for #-sb-thread that cons too much,
-    ;; risking recursive invocation of GC. Pretty much don't do that.
-    ;;
-    (when (and *allow-with-interrupts*
-               ;; Continue if any of the following:
-               ;; - you want a finalizer thread but it hasn't been started
-               ;; - you don't want a finalizer thread, and we're not already
-               ;;   in SCAN-FINALIZERS
-               ;; - there are some hooks to run
-               ;; Logically, the finalizer existence test belongs in src/code/final,
-               ;; but the flaw in that is we're not going to call that code until unmasking
-               ;; interrupts, which is precisely the thing we need to NOT do if already
-               ;; in post-GC code of any kind (be it finalizer or other).
-               (or #+sb-thread (if sb-impl::*finalizer-thread*
-                                   (not threadp)
-                                   (not sb-impl::*in-a-finalizer*))
-                   #-sb-thread (and (sb-impl::hash-table-culled-values
-                                     (sb-impl::finalizer-id-map
-                                      sb-impl::**finalizer-store**))
-                                    (not sb-impl::*in-a-finalizer*))
+    ;; Logically, the finalizer existence test belongs in src/code/final,
+    ;; but the flaw in that is we're not going to call that code until unmasking
+    ;; interrupts, which is precisely the thing we need to NOT do if already
+    ;; in post-GC code of any kind (be it finalizer or other).
+  (when (and *allow-with-interrupts*
+               (or (and (sb-impl::hash-table-culled-values
+                         (sb-impl::finalizer-id-map sb-impl::**finalizer-store**))
+                        (not sb-impl::*in-a-finalizer*))
                    *after-gc-hooks*))
       (sb-thread::without-thread-waiting-for ()
         (with-interrupts
-          (unless threadp
-            (run-pending-finalizers))
-          (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
+          (run-pending-finalizers)
+          (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)

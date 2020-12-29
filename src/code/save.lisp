@@ -300,47 +300,24 @@ sufficiently motivated to do lengthy fixes."
   (call-hooks "save" *save-hooks*)
   #+sb-wtimer
   (itimer-emulation-deinit)
-  ;; FIXME: this logic should probably be surrounded by the *MAKE-THREAD-LOCK*
-  ;; but introducing potential new sources of deadlock requires due diligence.
   #+sb-thread
-  (progn
-    ;; Terminate finalizer thread now, especially given that the thread runs
-    ;; user-supplied code that might not even work in later steps of deinit.
-    ;; See also the comment at definition of THREAD-EPHEMERAL-P.
-    (finalizer-thread-stop)
-    #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
-    (let ((threads (sb-thread:list-all-threads)))
-        ;; Despite calling FINALIZER-THREAD-STOP, an unlucky thread schedule
-        ;; courtesy of the OS might notionally start the finalizer thread but not
-        ;; run it until now. Suppose it barely got to its lisp trampoline,
-        ;; at which point we see it in *ALL-THREADS* not having observed it
-        ;; in *FINALIZER-THREAD*. FINALIZER-THREAD-STOP didn't know to stop it.
-        ;; Without adding significantly more synchronization, the best recourse
-        ;; is to consider it as nonexistent whenever it was "stopped".
-        ;; A newly started finalizer thread can do nothing but exit immediately
-        ;; whenever *FINALIZER-THREAD* is NIL so we don't actually care
-        ;; what that thread is doing at this point.
-      (flet ((system-thread-p (thread)
-               (and (sb-thread::thread-%ephemeral-p thread)
-                    (string= (sb-thread:thread-name thread) "finalizer"))))
-        (when (cdr threads)
-          (let ((finalizer (find-if #'system-thread-p threads)))
-            (when finalizer
-              (sb-thread:join-thread finalizer)))
-          ;; Regardless of what happened above, grab the all-threads list again.
-          (setq threads (sb-thread:list-all-threads)))
-        (let ((starting
-                (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
-                      (delete 0 sb-thread::*starting-threads*)))
-              (joinable
-                (remove-if #'system-thread-p sb-thread::*joinable-threads*)))
-          (when (or (cdr threads) starting joinable)
-            (let* ((interactive (sb-thread::interactive-threads))
-                   (other (union (set-difference threads interactive)
-                                 (union starting joinable))))
-              (error 'save-with-multiple-threads-error
-                     :interactive-threads interactive
-                     :other-threads other)))))))
+  (let (err)
+    (with-system-mutex (sb-thread::*make-thread-lock*)
+      (finalizer-thread-stop)
+      #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
+      (let ((threads (sb-thread:list-all-threads))
+            (starting
+             (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
+                   (delete 0 sb-thread::*starting-threads*)))
+            (joinable sb-thread::*joinable-threads*))
+        (when (or (cdr threads) starting joinable)
+          (let* ((interactive (sb-thread::interactive-threads))
+                 (other (union (set-difference threads interactive)
+                               (union starting joinable))))
+            (make-condition 'save-with-multiple-threads-error
+                            :interactive-threads interactive
+                            :other-threads other)))))
+    (when err (error err)))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)

@@ -357,7 +357,7 @@ search_dynamic_space(void *pointer)
 void
 gc_init(void)
 {
-    weakobj_init();
+    gc_common_init();
 }
 
 /* noise to manipulate the gc trigger stuff */
