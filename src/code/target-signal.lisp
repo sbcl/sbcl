@@ -208,7 +208,8 @@
 (defmacro pthread-sigmask (how new old)
   `(let ((how ,how) (new ,new) (old ,old))
      (alien-funcall (extern-alien #+(and unix sb-thread) "pthread_sigmask"
-                                  #+(and unix (not sb-thread)) "sigprocmask"
+                                  #+netbsd "sb_sigprocmask"
+                                  #+(and unix (not sb-thread) (not netbsd)) "sigprocmask"
                                   #+win32 "_sbcl_pthread_sigmask"
                                   (function void int system-area-pointer system-area-pointer))
                     how

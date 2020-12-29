@@ -616,6 +616,13 @@ int sb_utimes(char *path, struct timeval times[2])
 {
     return utimes(path, times);
 }
+#ifndef LISP_FEATURE_SB_THREAD
+#include <signal.h>
+int sb_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+    return sigprocmask(how, set, oldset);
+}
+#endif
 #endif
 
 #ifdef LISP_FEATURE_WIN32
