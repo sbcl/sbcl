@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.11:
+changes in sbcl-2.1.0 relative to sbcl-2.0.11:
   * minor incompatible change: the MAKE-EA internal function, used in the
     assembler, has been removed (affecting some libraries defining their own
     Virtual Operations)
