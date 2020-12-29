@@ -1,5 +1,73 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.11:
+  * minor incompatible change: the MAKE-EA internal function, used in the
+    assembler, has been removed (affecting some libraries defining their own
+    Virtual Operations)
+  * new feature: SB-EXT:PRIMITIVE-OBJECT-SIZE can be used to interrogate the
+    low-level size in memory of objects.  (lp#1636910, reported by anquegi)
+  * platform support:
+    ** pass required -std argument to the compiler on Solaris (lp#1885751,
+       thanks to Jesse Off)
+    ** better treatment of non-ASCII program arguments on Windows (lp#1907970,
+       reported by Timofei Shatrov)
+    ** implement the improved TYPEP with structure types on all other
+       supported platforms (32-bit PowerPC, ARM, ARM64, MIPS, SPARC, RISC-V)
+  * enhancement: stream dispatch (to vanilla ANSI / Gray / Simple variants) has
+    been rewritten and optimized, fixing a number of bugs including:
+    ** performance of WRITE-SEQUENCE on composite streams (lp#309136)
+    ** handling of CLOSE on SYNONYM-STREAM (lp#1904257, reported by Richard M
+       Kreuter)
+    ** handling of CLOSE on BROADCAST-STREAM with no components (lp#1904722,
+       reported by Richard M Kreuter)
+    ** loading SB-SIMPLE-STREAMS breaks functionality of other stream classes
+       (lp#1908132)
+    ** some excessive consing in READ-LINE
+  * enhancements related to RUN-PROGRAM:
+    ** improved the documentation related to the ARGS argument (lp#806733,
+       reported by mon_key)
+    ** added a PRESERVE-FDS argument
+  * bug fix: ensure that TYPE-OF returns something even on internal instances,
+    which may become visible in the debugger.  (lp#1908261, reported by
+    Philipp Marek)
+  * bug fix: iteration variables established by standard forms should always
+    be considered used by the compiler.  (lp#719585, reported by Roman
+    Marynchak)
+  * bug fix: don't allow compiler transformations to weaken the requirement
+    against extended (list-form) function names in FUNCALL and related
+    operators.  (lp#310069)
+  * bug fix: improve automated version number generation in branches.
+    (lp#897867, thanks to Martin Cracauer)
+  * bug fix: add possibly-spurious futex wakes when unwinding from a call to
+    futex-wait, to avoid deadlocks from interrupted waits.  (lp#1038034)
+  * bug fixes in the compiler:
+    ** error on malformed DESTRUCTURING-BIND (lp#1738638)
+    ** error on malformed SPECIAL declaration (lp#1740756)
+    ** error from use of VALUES type in COERCE (lp#1887712)
+    ** enforcement of FTYPE types involving &OPTIONAL (lp#1903932)
+    ** checking for proper-list-ness before applying transforms (lp#1905512)
+    ** compilation of LAMBDA form including a malformed DEFUN (lp#1906056)
+    ** memory fault from VALUES-related handling in high DEBUG code
+       (lp#1906563)
+    ** transforms handle explicit NIL arguments in :END arguments to SEARCH
+       (lp#1907924)
+  * bug fix: return COMPILED-FUNCTION for TYPE-OF on compiled functions.
+    (lp#1906583)
+  * some bugs were also closed in this release cycle as obsolete, having been
+    fixed by the passage of time or other change in the environment:
+    ** floating point error reporting on OS X (lp#309454)
+    ** load-shared-library not working from non-main threads on OS X (lp#592425)
+  * optimization: CONSTANTLY on constant arguments returns a more efficient
+    function.  (lp#1852585)
+  * optimization: perform fewer Lisp/Alien representation conversions in
+    callbacks.
+  * optimization: perform fewer redundant widetag tests when doing type tests
+    of complicated union types.
+  * optimization: signed-integer division on machine-word sized operands is
+    now implemented using multiplication, affecting TRUNCATE, FLOOR, CEILING,
+    MOD and REM.  (This optimization was already performed on unsigned-integer
+    division)
+
 changes in sbcl-2.0.11 relative to sbcl-2.0.10:
   * minor incompatible change: (ARRAY NIL (*)) is not a subtype of STRING,
     as is consistent with a majority of maintained CL implementations.
