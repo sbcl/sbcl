@@ -371,8 +371,8 @@ Please check that all strings which were not recognizable to the compiler
   (sb-c::repack-xref :verbose 1))
 (fmakunbound 'sb-c::repack-xref)
 
-(progn
-  (defun asm-inst-p (symbol)
+(load (merge-pathnames "src/code/shaketree" *load-pathname*))
+(defun asm-inst-p (symbol)
     ;; Assembler instruction names can't be made external because to do so would
     ;; conflict with common-lisp symbols. Notable examples are PUSH and POP.
     ;; So other criteria must pertain to detecting the important symbols.
@@ -387,7 +387,12 @@ Please check that all strings which were not recognizable to the compiler
         (let ((name (string symbol)))
           (and (> (length name) 2)
                (string= name "M:" :end1 2)))))
-  (load (merge-pathnames "src/code/shaketree" *load-pathname*))
+(let ((counts
+       (mapcar (lambda (x)
+                 (list x
+                       (sb-impl::package-external-symbol-count x)
+                       (sb-impl::package-internal-symbol-count x)))
+               (sort (list-all-packages) #'string< :key 'package-name))))
   (sb-impl::shake-packages
    ;; Development mode: retain all symbols with any system-related properties
    #+sb-devel
@@ -451,7 +456,23 @@ Please check that all strings which were not recognizable to the compiler
            (or (sb-kernel:symbol-info symbol)
                (and (boundp symbol) (not (keywordp symbol))))))))
    :verbose nil :print nil)
-  (unintern 'sb-impl::shake-packages 'sb-impl))
+  (unintern 'sb-impl::shake-packages 'sb-impl)
+  (let ((sum-delta-ext 0)
+        (sum-delta-int 0))
+    (format t "~&~26TExternal   |    Internal~%")
+    (dolist (entry counts)
+      (let* ((ext (sb-impl::package-external-symbol-count (car entry)))
+             (int (sb-impl::package-internal-symbol-count (car entry)))
+             (delta-ext (- ext (cadr entry)))
+             (delta-int (- int (caddr entry))))
+        (incf sum-delta-ext delta-ext)
+        (incf sum-delta-int delta-int)
+        (format t "~20a | ~5d (~5@d) | ~5d (~5@d)~%"
+                (package-name (car entry))
+                ext delta-ext int delta-int)))
+    (format t "~28t (~5@d) |       (~5@d) = (~d)~%"
+            sum-delta-ext sum-delta-int
+            (+ sum-delta-ext sum-delta-int))))
 
 ;;; Use historical (stupid) behavior for storing pathname namestrings
 ;;; in fasls.
