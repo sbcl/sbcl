@@ -984,9 +984,11 @@
 
 (defun integer-float-p (float)
   (and (floatp float)
-       (multiple-value-bind (significand exponent) (integer-decode-float float)
-         (or (plusp exponent)
-             (<= (- exponent) (sb-kernel::first-bit-set significand))))))
+       (or
+        #-sb-xc-host
+        (multiple-value-bind (significand exponent) (integer-decode-float float)
+          (or (plusp exponent)
+              (<= (- exponent) (sb-kernel::first-bit-set significand)))))))
 
 (defun expt-derive-type-aux (x y same-arg)
   (declare (ignore same-arg))
