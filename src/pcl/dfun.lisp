@@ -715,16 +715,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (when (and ,applicable (not (memq ,gf *dfun-miss-gfs-on-stack*)))
       (let ((*dfun-miss-gfs-on-stack* (cons ,gf *dfun-miss-gfs-on-stack*)))
         ,@body))
-    ;; Create a FAST-INSTANCE-BOUNDP structure instance for a cached
-    ;; SLOT-BOUNDP so that INVOKE-EMF does the right thing, that is,
-    ;; does not signal a SLOT-UNBOUND error for a boundp test.
-    ,@(if type
-          ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
-          ;; slots?)
-          `((if (and (eq ,type 'boundp) (integerp ,nemf))
-                (invoke-emf (make-fast-instance-boundp :index ,nemf) ,args)
-                (invoke-emf ,nemf ,args)))
-          `((invoke-emf ,nemf ,args)))))
+    ,(if type
+         ;; Munge the EMF so that INVOKE-EMF can do the right thing:
+         ;; BOUNDP gets a structure, WRITER the logical not of the
+         ;; index, so that READER can use the raw index.
+         ;;
+         ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
+         ;; slots?)
+         `(if (integerp ,nemf)
+              (case ,type
+                (boundp (invoke-emf (make-fast-instance-boundp :index ,nemf) ,args))
+                (reader (invoke-emf ,nemf ,args))
+                (writer (invoke-emf (lognot ,nemf) ,args)))
+              (invoke-emf ,nemf ,args))
+         `(invoke-emf ,nemf ,args))))
 
 ;;; The dynamically adaptive method lookup algorithm is implemented is
 ;;; implemented as a kind of state machine. The kinds of

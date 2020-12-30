@@ -1574,14 +1574,14 @@ bootstrapping.
     (fixnum
      (cond ((null args)
             (%program-error "invalid number of arguments: 0"))
-           ((null (cdr args))
+           ((and (not (minusp emf)) (null (cdr args)))
             (let* ((slots (get-slots (car args)))
                    (value (clos-slots-ref slots emf)))
               (if (unbound-marker-p value)
                   (slot-unbound-internal (car args) emf)
                   value)))
-           ((null (cddr args))
-            (setf (clos-slots-ref (get-slots (cadr args)) emf)
+           ((and (minusp emf) (not (null (cdr args))) (null (cddr args)))
+            (setf (clos-slots-ref (get-slots (cadr args)) (lognot emf))
                   (car args)))
            (t (%program-error "invalid number of arguments"))))
     (fast-instance-boundp
