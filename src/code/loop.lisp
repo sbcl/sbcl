@@ -1405,15 +1405,17 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar var))
       (cond ((and var (symbolp var))
-             (loop-make-var var list data-type))
+             (loop-make-var var
+                            ;; Don't want to assert the type, as ENDP will do that
+                            `(the* (list :use-annotations t :source-form ,list) ,list)
+                            data-type))
             (t
              (loop-make-var (setq listvar (gensym)) list 't)
              (loop-make-var var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
         (let* ((first-endtest
-                ;; mysterious comment from original CMU CL sources:
-                ;;   the following should use `atom' instead of `endp',
-                ;;   per [bug2428]
+                ;; the following should use `atom' instead of `endp',
+                ;; per 6.1.2.1.3
                 `(atom ,listvar))
                (other-endtest first-endtest))
           (when (and constantp (listp list-value))
@@ -1434,7 +1436,10 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar (gensym "LOOP-LIST-")))
       (loop-make-var var nil data-type)
-      (loop-make-var listvar list t)
+      (loop-make-var listvar
+                     ;; Don't want to assert the type, as ENDP will do that
+                     `(the* (list :use-annotations t :source-form ,list) ,list)
+                     t)
       (let ((list-step (loop-list-step listvar)))
         (let* ((first-endtest `(endp ,listvar))
                (other-endtest first-endtest)

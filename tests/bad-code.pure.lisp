@@ -585,3 +585,13 @@
                      (checked-compile '(lambda (x)
                                         (dolist (x (the integer x))))
                                       :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :loop-list-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (loop for y in (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning)))
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (loop for y on (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning))))
