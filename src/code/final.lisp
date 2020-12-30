@@ -300,17 +300,18 @@ Examples:
 (define-load-time-global *finalizer-thread* nil)
 (declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
 #+sb-thread
+(progn
+(define-alien-variable finalizer-thread-runflag int)
 (defun finalizer-thread-notify ()
   (alien-funcall (extern-alien "finalizer_thread_wake" (function void)))
   nil)
 
 ;;; The following operations are synchronized by *MAKE-THREAD-LOCK* -
 ;;;   FINALIZER-THREAD-{START,STOP}, S-L-A-D, SB-POSIX:FORK
-#+sb-thread
 (defun finalizer-thread-start ()
   (with-system-mutex (sb-thread::*make-thread-lock*)
     (aver (not *finalizer-thread*))
-    (setf (extern-alien "finalizer_thread_runflag" int) 1)
+    (setf finalizer-thread-runflag 1)
     (setq *finalizer-thread* :start)
     (let ((thread
            (sb-thread::make-ephemeral-thread
@@ -329,13 +330,13 @@ Examples:
 
 ;;; You should almost always invoke this with *MAKE-THREAD-LOCK* held.
 ;;; Some tests violate that, but they know what they're doing.
-#+sb-thread
 (defun finalizer-thread-stop ()
   (let ((thread *finalizer-thread*))
     (aver (sb-thread::thread-p thread))
-    (setf (extern-alien "finalizer_thread_runflag" int) 0)
+    (setf finalizer-thread-runflag 0)
     (finalizer-thread-notify)
     (sb-thread:join-thread thread)))
+)
 
 #|
 ;;; This is a display produced by annotating parts of gc-common.c and

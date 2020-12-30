@@ -3888,6 +3888,7 @@ generation_index_t small_generation_limit = 1;
 
 // one pair of counters per widetag, though we're only tracking code as yet
 int n_scav_calls[64], n_scav_skipped[64];
+extern int finalizer_thread_runflag;
 
 /* GC all generations newer than last_gen, raising the objects in each
  * to the next older generation - we finish when all generations below
@@ -4111,6 +4112,14 @@ collect_garbage(generation_index_t last_gen)
 
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");
+    // Increment the finalizer runflag.  This acts as a count of the number
+    // of GCs as well as a notification to wake the finalizer thread.
+    if (finalizer_thread_runflag != 0) {
+        int newval = 1 + finalizer_thread_runflag;
+        // check if counter wrapped around. Don't store 0 as the new value,
+        // as that causes the thread to exit.
+        finalizer_thread_runflag = newval ? newval : 1;
+    }
 }
 
 /* Initialization of gencgc metadata is split into two steps:
