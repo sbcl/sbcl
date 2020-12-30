@@ -595,3 +595,13 @@
                      (checked-compile '(lambda (x)
                                         (loop for y on (the integer x)))
                                       :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :mapcar-list-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (z)
+                                        (mapl #'car  (the integer z)))
+                                      :allow-warnings 'sb-int:type-warning)))
+  (assert (nth-value 2
+                     (checked-compile '(lambda (f z x)
+                                        (mapcar f  (the integer z) (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning))))

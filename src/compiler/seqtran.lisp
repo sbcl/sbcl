@@ -61,7 +61,8 @@
                      arglists
                      `(,n-first ,@(rest arglists))))
         (let ((v (gensym)))
-          (do-clauses `(,v ,a (cdr ,v)))
+          (do-clauses `(,v (the* (list :use-annotations t :source-form ,a) ,a)
+                           (cdr ,v)))
           (tests `(endp ,v))
           (args-to-fn (if take-car `(car ,v) v))))
 
