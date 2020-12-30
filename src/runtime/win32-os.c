@@ -2015,7 +2015,7 @@ futex_wake(PVOID lock_word, int n)
 }
 #endif
 
-int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
+int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
   struct extra_thread_data* self = thread_extra_data(arch_os_get_current_thread());
   if (oldset)

@@ -32,7 +32,7 @@
 #if defined(LISP_FEATURE_SB_THREAD)
 
 #ifdef LISP_FEATURE_WIN32
-#define thread_sigmask _sbcl_pthread_sigmask
+#define thread_sigmask sb_pthread_sigmask
 // wrap CriticalSection operators in a function returning 0 to satisfy assertions
 static inline int cs_mutex_lock(void* l) { EnterCriticalSection(l); return 0; }
 static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 0; }

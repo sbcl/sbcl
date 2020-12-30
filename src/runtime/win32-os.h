@@ -86,6 +86,6 @@ char *dirname(char *path);
 boolean win32_maybe_interrupt_io(void* thread);
 void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len);
 
-int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
+int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 
 #endif  /* SBCL_INCLUDED_WIN32_OS_H */
