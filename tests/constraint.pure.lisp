@@ -98,3 +98,17 @@
                        ((= i 1) 3)
                        (t i))))))
           '(values (integer 2) &optional))))
+
+(with-test (:name :ir1-phases-delay)
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (n z)
+                     (when (typep n 'fixnum)
+                       (let ((ar (if (integerp n)
+                                     (make-array n)
+                                     z)))
+                         (declare (type vector ar))
+                         (print ar)
+                         (array-has-fill-pointer-p ar)))))))
+          '(values null &optional))))

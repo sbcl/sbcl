@@ -459,31 +459,43 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defparameter *reoptimize-limit* 10)
 
 (defun ir1-optimize-phase-1 (component)
-  (let ((loop-count 0))
-    (loop
-     (ir1-optimize-until-done component)
-     (when (or (component-new-functionals component)
-               (component-reanalyze-functionals component))
-       (maybe-mumble "Locall ")
-       (locall-analyze-component component))
-     (eliminate-dead-code component)
-     (dfo-as-needed component)
-     (when *constraint-propagate*
-       (maybe-mumble "Constraint ")
-       (constraint-propagate component))
-     (when (retry-delayed-ir1-transforms :constraint)
-       (setf loop-count 0) ;; otherwise nothing may get retried
-       (maybe-mumble "Rtran "))
-     (unless (or (component-reoptimize component)
-                 (component-reanalyze component)
-                 (component-new-functionals component)
-                 (component-reanalyze-functionals component))
-       (return))
-     (when (> loop-count *reoptimize-limit*)
-       (maybe-mumble "[Reoptimize Limit]")
-       (event reoptimize-maxed-out)
-       (return))
-     (incf loop-count))))
+  (let ((loop-count 0)
+        (*constraint-propagate* *constraint-propagate*))
+    (tagbody
+     again
+       (loop
+        (ir1-optimize-until-done component)
+        (when (or (component-new-functionals component)
+                  (component-reanalyze-functionals component))
+          (maybe-mumble "Locall ")
+          (locall-analyze-component component))
+        (eliminate-dead-code component)
+        (dfo-as-needed component)
+        (when *constraint-propagate*
+          (maybe-mumble "Constraint ")
+          (constraint-propagate component)
+          (when (retry-delayed-ir1-transforms :constraint)
+            (setf loop-count 0) ;; otherwise nothing may get retried
+            (maybe-mumble "Rtran ")))
+        (unless (or (component-reoptimize component)
+                    (component-reanalyze component)
+                    (component-new-functionals component)
+                    (component-reanalyze-functionals component))
+          (return))
+        (when (> loop-count *reoptimize-limit*)
+          (maybe-mumble "[Reoptimize Limit]")
+          (event reoptimize-maxed-out)
+          (return))
+        (incf loop-count))
+       ;; Do it once more for the transforms that will produce code
+       ;; that loses some information for further optimizations and
+       ;; it's better to insert it at the last moment.
+       ;; Such code shouldn't need constraint propagation, the slowest
+       ;; part, so avoid it.
+       (when (retry-delayed-ir1-transforms :ir1-phases)
+         (setf loop-count 0
+               *constraint-propagate* nil)
+         (go again)))))
 
 ;;; Do all the IR1 phases for a non-top-level component.
 (defun ir1-phases (component)

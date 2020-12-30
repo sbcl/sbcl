@@ -1439,7 +1439,10 @@
           ((eq (setf complexp (conservative-array-type-complexp array-type)) nil) nil)
           (t
            (when (eq complexp :maybe)
-             (delay-ir1-transform node :constraint))
+             ;; Delay as much as possible so that this transform and
+             ;; the CONSTRAINT-PROPAGATE-IF optimizer have the most
+             ;; chances to run.
+             (delay-ir1-transform node :ir1-phases))
            (if (vop-existsp :named test-header-bit)
                `(test-header-bit array sb-vm:+array-fill-pointer-p+)
                `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+))))))
