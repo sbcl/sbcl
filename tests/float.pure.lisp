@@ -567,3 +567,18 @@
   (let ((f (compile nil '(lambda (x) (signum (the double-float x))))))
     (assert (eql (funcall f -0d0) -0d0))
     (assert (eql (funcall f +0d0) +0d0))))
+
+
+(with-test (:name :expt-double-no-complex)
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (> (expt (the double-float x) 4d0)
+            (the double-float y)))
+    ((1d0 0d0) t))
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (> (expt (the (double-float 0d0) x) (the double-float y))
+            y))
+    ((1d0 0d0) t)))

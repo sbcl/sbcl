@@ -527,15 +527,15 @@
 (deftransform atan ((x y) (double-float double-float) *)
   `(%atan2 x y))
 
-(deftransform expt ((x y) ((single-float $0f0) single-float) *)
+(deftransform expt ((x y) (single-float single-float) single-float)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
-    'single-float))
-(deftransform expt ((x y) ((double-float $0d0) double-float) *)
+           'single-float))
+(deftransform expt ((x y) (double-float double-float) double-float)
   `(%pow x y))
-(deftransform expt ((x y) ((single-float $0f0) (signed-byte 32)) *)
+(deftransform expt ((x y) (single-float integer) double-float)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform expt ((x y) ((double-float $0d0) (signed-byte 32)) *)
+(deftransform expt ((x y) (double-float integer) double-float)
   `(%pow x (coerce y 'double-float)))
 
 ;;; ANSI says log with base zero returns zero.
@@ -867,11 +867,20 @@
             ;; Positive integer to an integer power is either an
             ;; integer or a rational.
             (let ((lo (or (interval-low bnd) '*))
-                  (hi (or (interval-high bnd) '*)))
-              (if (and (interval-low y-int)
-                       (>= (type-bound-number (interval-low y-int)) 0))
-                  (specifier-type `(integer ,lo ,hi))
-                  (specifier-type `(rational ,lo ,hi)))))
+                  (hi (or (interval-high bnd) '*))
+                  (y-lo (interval-low y-int))
+                  (y-hi (interval-high y-int)))
+              (cond ((and (eq lo '*)
+                          (eql y-lo y-hi)
+                          (typep y-lo 'unsigned-byte)
+                          (evenp y-lo))
+                     (specifier-type `(integer 0 ,hi)))
+                    ((and (interval-low y-int)
+                          (>= (type-bound-number y-lo) 0))
+
+                     (specifier-type `(integer ,lo ,hi)))
+                    (t
+                     (specifier-type `(rational ,lo ,hi))))))
            (rational
             ;; Positive integer to rational power is either a rational
             ;; or a single-float.
@@ -973,19 +982,25 @@
               (fixup-interval-expt type x-int y-int x y))
             (flatten-list (interval-expt x-int y-int)))))
 
+(defun integer-float-p (float)
+  (and (floatp float)
+       (multiple-value-bind (significand exponent) (integer-decode-float float)
+         (or (plusp exponent)
+             (<= (- exponent) (sb-kernel::first-bit-set significand))))))
+
 (defun expt-derive-type-aux (x y same-arg)
   (declare (ignore same-arg))
   (cond ((or (not (numeric-type-real-p x))
              (not (numeric-type-real-p y)))
          ;; Use numeric contagion if either is not real.
          (numeric-contagion x y))
-        ((csubtypep y (specifier-type 'integer))
+        ((or (csubtypep y (specifier-type 'integer))
+             (integer-float-p (nth-value 1 (type-singleton-p y))))
          ;; A real raised to an integer power is well-defined.
          (merged-interval-expt x y))
         ;; A real raised to a non-integral power can be a float or a
         ;; complex number.
-        ((or (csubtypep x (specifier-type '(rational 0)))
-             (csubtypep x (specifier-type '(float ($0d0)))))
+        ((csubtypep x (specifier-type '(real 0)))
          ;; But a positive real to any power is well-defined.
          (merged-interval-expt x y))
         ((and (csubtypep x (specifier-type 'rational))
