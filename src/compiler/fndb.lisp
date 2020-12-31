@@ -2109,3 +2109,12 @@
            sb-thread::call-with-system-mutex/without-gcing
            sb-thread::call-with-recursive-system-lock)
     (function t) *))
+
+#+round-float
+(progn
+  (defknown round-double (double-float #1=(member :round :floor :ceiling :truncate))
+      double-float
+      (foldable flushable movable always-translatable))
+
+  (defknown round-single (single-float #1#) single-float
+      (foldable flushable movable always-translatable)))

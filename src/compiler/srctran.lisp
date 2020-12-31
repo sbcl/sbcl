@@ -1692,33 +1692,6 @@
     (when (and quot rem)
       (make-values-type :required (list quot rem)))))
 
-(defun ftruncate-derive-type-quot (number-type divisor-type)
-  ;; The bounds are the same as for truncate. However, the first
-  ;; result is a float of some type. We need to determine what that
-  ;; type is. Basically it's the more contagious of the two types.
-  (let ((q-type (truncate-derive-type-quot number-type divisor-type))
-        (format (numeric-type-format
-                 (numeric-contagion number-type divisor-type))))
-    (make-numeric-type :class 'float
-                       :format format
-                       :low (coerce-for-bound (numeric-type-low q-type) format)
-                       :high (coerce-for-bound (numeric-type-high q-type) format))))
-
-(defun ftruncate-derive-type-quot-aux (n d same-arg)
-  (declare (ignore same-arg))
-  (when (and (numeric-type-real-p n)
-             (numeric-type-real-p d))
-    (ftruncate-derive-type-quot n d)))
-
-(defoptimizer (ftruncate derive-type) ((number divisor))
-  (let ((quot
-         (two-arg-derive-type number divisor
-                              #'ftruncate-derive-type-quot-aux #'ftruncate))
-        (rem (two-arg-derive-type number divisor
-                                  #'truncate-derive-type-rem-aux #'rem)))
-    (when (and quot rem)
-      (make-values-type :required (list quot rem)))))
-
 (defun %unary-truncate-derive-type-aux (number)
   (truncate-derive-type-quot number (specifier-type '(integer 1 1))))
 
@@ -1736,13 +1709,68 @@
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
                        #'%unary-truncate))
+#-round-float
+(progn
+  (defun ftruncate-derive-type-quot (number-type divisor-type)
+    ;; The bounds are the same as for truncate. However, the first
+    ;; result is a float of some type. We need to determine what that
+    ;; type is. Basically it's the more contagious of the two types.
+    (let ((q-type (truncate-derive-type-quot number-type divisor-type))
+          (format (numeric-type-format
+                   (numeric-contagion number-type divisor-type))))
+      (make-numeric-type :class 'float
+                         :format format
+                         :low (coerce-for-bound (numeric-type-low q-type) format)
+                         :high (coerce-for-bound (numeric-type-high q-type) format))))
 
-(defoptimizer (%unary-ftruncate derive-type) ((number))
-  (let ((divisor (specifier-type '(integer 1 1))))
-    (one-arg-derive-type number
-                         #'(lambda (n)
-                             (ftruncate-derive-type-quot-aux n divisor nil))
-                         #'%unary-ftruncate)))
+  (defun ftruncate-derive-type-quot-aux (n d same-arg)
+    (declare (ignore same-arg))
+    (when (and (numeric-type-real-p n)
+               (numeric-type-real-p d))
+      (ftruncate-derive-type-quot n d)))
+
+
+  (defoptimizer (ftruncate derive-type) ((number divisor))
+    (let ((quot
+            (two-arg-derive-type number divisor
+                                 #'ftruncate-derive-type-quot-aux #'ftruncate))
+          (rem (two-arg-derive-type number divisor
+                                    #'truncate-derive-type-rem-aux #'rem)))
+      (when (and quot rem)
+        (make-values-type :required (list quot rem)))))
+
+
+  (defoptimizer (%unary-ftruncate derive-type) ((number))
+    (let ((divisor (specifier-type '(integer 1 1))))
+      (one-arg-derive-type number
+                           #'(lambda (n)
+                               (ftruncate-derive-type-quot-aux n divisor nil))
+                           #'%unary-ftruncate))))
+
+#+round-float
+(macrolet ((derive (type fun)
+             `(case (lvar-value mode)
+                ,@(loop for mode in '(:round :floor :ceiling :truncate)
+                        collect
+                        `(,mode
+                          (one-arg-derive-type number
+                                               (lambda (type)
+                                                 (when (numeric-type-p type)
+                                                   (let ((lo (numeric-type-low type))
+                                                         (hi (numeric-type-high type)))
+                                                     (specifier-type (list ',type
+                                                                           (if lo
+                                                                               (,fun (type-bound-number lo) ,mode)
+                                                                               '*)
+                                                                           (if hi
+                                                                               (,fun (type-bound-number hi) ,mode)
+                                                                               '*))))))
+                                               (lambda (x)
+                                                 (,fun x ,mode))))))))
+  (defoptimizer (round-single derive-type) ((number mode))
+    (derive single-float round-single))
+  (defoptimizer (round-double derive-type) ((number mode))
+    (derive double-float round-double)))
 
 (defoptimizer (%unary-round derive-type) ((number))
   (one-arg-derive-type number
@@ -1838,55 +1866,6 @@
 
   (def floor floor-quotient-bound floor-rem-bound)
   (def ceiling ceiling-quotient-bound ceiling-rem-bound))
-
-;;; Define optimizers for FFLOOR and FCEILING
-(macrolet ((def (name q-name r-name)
-             (let ((q-aux (symbolicate "F" q-name "-AUX"))
-                   (r-aux (symbolicate r-name "-AUX")))
-               `(progn
-                  ;; Compute type of quotient (first) result.
-                  (defun ,q-aux (number-type divisor-type)
-                    (let* ((number-interval
-                             (numeric-type->interval number-type))
-                           (divisor-interval
-                             (numeric-type->interval divisor-type))
-                           (quot (,q-name (interval-div number-interval
-                                                        divisor-interval)))
-                           (res-type (numeric-contagion number-type
-                                                        divisor-type))
-                           (format (numeric-type-format res-type)))
-                      (make-numeric-type
-                       :class (numeric-type-class res-type)
-                       :format format
-                       :low  (coerce-for-bound (interval-low quot) format)
-                       :high (coerce-for-bound (interval-high quot) format))))
-
-                  (defoptimizer (,name derive-type) ((number divisor))
-                    (flet ((derive-q (n d same-arg)
-                             (declare (ignore same-arg))
-                             (when (and (numeric-type-real-p n)
-                                        (numeric-type-real-p d))
-                               (,q-aux n d)))
-                           (derive-r (num div same-arg)
-                             (declare (ignore same-arg))
-                             (cond ((not (and (numeric-type-real-p num)
-                                              (numeric-type-real-p div)))
-                                    nil)
-                                   ;; Floats introduce rounding errors
-                                   ((and (memq (numeric-type-class num) '(integer rational))
-                                         (memq (numeric-type-class div) '(integer rational)))
-                                    (,r-aux num div))
-                                   (t
-                                    (numeric-contagion num div)))))
-                      (let ((quot (two-arg-derive-type
-                                   number divisor #'derive-q #',name))
-                            (rem (two-arg-derive-type
-                                  number divisor #'derive-r #'mod)))
-                        (when (and quot rem)
-                          (make-values-type :required (list quot rem))))))))))
-
-  (def ffloor floor-quotient-bound floor-rem-bound)
-  (def fceiling ceiling-quotient-bound ceiling-rem-bound))
 
 ;;; The quotient for floats depends on the divisor,
 ;;; make the result conservative, without letting it cross 0

@@ -766,6 +766,7 @@
                  (- rounded)
                  rounded)))))))
 
+#-round-float
 (defun %unary-ftruncate (number)
   (number-dispatch ((number real))
     ((integer) (float number))

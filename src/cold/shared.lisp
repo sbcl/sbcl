@@ -213,6 +213,15 @@
 
 (load "src/cold/shebang.lisp")
 
+(defvar *shebang-backend-subfeatures*
+  (let* ((default-subfeatures nil)
+         (customizer-file-name "customize-backend-subfeatures.lisp")
+         (customizer (if (probe-file customizer-file-name)
+                         (compile nil
+                                  (read-from-file customizer-file-name))
+                         #'identity)))
+    (funcall customizer default-subfeatures)))
+
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to
@@ -261,6 +270,9 @@
           (setq target-feature-list
                 (remove :int4-breakpoints target-feature-list))
           (warn "Removed :INT4-BREAKPOINTS from target features"))
+        (when (or ;(member :arm64 target-feature-list)
+                  (member :sse4 *shebang-backend-subfeatures*))
+          (push :round-float target-feature-list))
         ;; Putting arch and gc choice first is visually convenient, versus
         ;; having to parse a random place in the line to figure out the value
         ;; of a binary choice {cheney vs gencgc} and architecture.
@@ -269,15 +281,6 @@
         (list* arch gc (sort (remove-duplicates
                               (remove arch (remove gc target-feature-list)))
                              #'string<))))
-
-(defvar *shebang-backend-subfeatures*
-  (let* ((default-subfeatures nil)
-         (customizer-file-name "customize-backend-subfeatures.lisp")
-         (customizer (if (probe-file customizer-file-name)
-                         (compile nil
-                                  (read-from-file customizer-file-name))
-                         #'identity)))
-    (funcall customizer default-subfeatures)))
 
 ;;; Call for effect of signaling an error if no target picked.
 (target-platform-keyword)

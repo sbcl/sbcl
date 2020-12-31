@@ -1572,3 +1572,43 @@
   (:generator 2
      (move r x)
      (inst shufpd r r #b01)))
+
+#+round-float
+(progn
+  (define-vop ()
+    (:translate round-double)
+    (:policy :fast-safe)
+    (:args (x :scs (double-reg) :target r))
+    (:arg-types double-float (:constant symbol))
+    (:info mode)
+    (:results (r :scs (double-reg)))
+    (:result-types double-float)
+    (:generator 2
+                (unless (location= r x)
+                  (inst xorpd r r))
+                (inst roundsd r x
+                      (logior #b1000
+                              (ecase mode
+                                (:round 0)
+                                (:floor 1)
+                                (:ceiling 2)
+                                (:truncate 3))))))
+
+ (define-vop ()
+   (:translate round-single)
+   (:policy :fast-safe)
+   (:args (x :scs (single-reg) :target r))
+   (:arg-types single-float (:constant symbol))
+   (:info mode)
+   (:results (r :scs (single-reg)))
+   (:result-types single-float)
+   (:generator 2
+               (unless (location= r x)
+                 (inst xorps r r))
+               (inst roundss r x
+                     (logior #b1000
+                             (ecase mode
+                               (:round 0)
+                               (:floor 1)
+                               (:ceiling 2)
+                               (:truncate 3)))))))
