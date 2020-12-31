@@ -582,3 +582,14 @@
          (> (expt (the (double-float 0d0) x) (the double-float y))
             y))
     ((1d0 0d0) t)))
+
+(with-test (:name :ftruncate-inline
+            :skipped-on :32-bit)
+  (checked-compile
+   `(lambda (v d)
+      (declare (optimize speed)
+               (double-float d)
+               ((simple-array double-float (2)) v))
+      (setf (aref v 0) (ffloor (aref v 0) d))
+      v)
+   :allow-notes nil))

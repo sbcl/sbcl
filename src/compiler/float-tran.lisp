@@ -1552,26 +1552,28 @@
 (defknown %unary-ftruncate/double (double-float) double-float
   (movable foldable flushable))
 
-#-sb-xc-host
-(defun %unary-ftruncate/single (x)
-  (declare (muffle-conditions compiler-note))
-  (declare (type single-float x))
-  (declare (optimize speed (safety 0)))
-  (let* ((bits (single-float-bits x))
-         (exp (ldb sb-vm:single-float-exponent-byte bits))
-         (biased (the single-float-exponent
-                   (- exp sb-vm:single-float-bias))))
-    (declare (type (signed-byte 32) bits))
-    (cond
-      ((= exp sb-vm:single-float-normal-exponent-max) x)
-      ((<= biased 0) (* x $0f0))
-      ((>= biased (float-digits x)) x)
-      (t
-       (let ((frac-bits (- (float-digits x) biased)))
-         (setf bits (logandc2 bits (- (ash 1 frac-bits) 1)))
-         (make-single-float bits))))))
+(deftransform %unary-ftruncate ((x) (single-float))
+  `(cond ((or (typep x '(single-float ($-1f0) ($0f0)))
+              (eql x $-0f0))
+          $-0f0)
+         ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) $1f0)
+                                  ,(float (1- (expt 2 sb-vm:single-float-digits)) $1f0)))
+          (float (truncate x) $1f0))
+         (t
+          x)))
 
-#-sb-xc-host
+#-32-bit
+(deftransform %unary-ftruncate ((x) (double-float))
+  `(cond ((or (typep x '(double-float ($-1d0) ($0d0)))
+              (eql x $-0d0))
+          $-0d0)
+         ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) $1d0)
+                                  ,(float (1- (expt 2 sb-vm:double-float-digits)) $1d0)))
+          (float (truncate x) $1d0))
+         (t
+          x)))
+
+#+(and (not sb-xc-host) 32-bit)
 (defun %unary-ftruncate/double (x)
   (declare (muffle-conditions compiler-note))
   (declare (type double-float x))
@@ -1580,7 +1582,7 @@
          (low (double-float-low-bits x))
          (exp (ldb sb-vm:double-float-exponent-byte high))
          (biased (the double-float-exponent
-                   (- exp sb-vm:double-float-bias))))
+                      (- exp sb-vm:double-float-bias))))
     (declare (type (signed-byte 32) high)
              (type (unsigned-byte 32) low))
     (cond
@@ -1596,12 +1598,9 @@
                 (setf high (logandc2 high (- (ash 1 (- frac-bits 32)) 1)))))
          (make-double-float high low))))))
 
-(macrolet
-    ((def (float-type fun)
-         `(deftransform %unary-ftruncate ((x) (,float-type))
-            '(,fun x))))
-  (def single-float %unary-ftruncate/single)
-  (def double-float %unary-ftruncate/double))
+#+32-bit
+(deftransform %unary-ftruncate ((x) (double-float))
+  `(%unary-ftruncate/double x))
 
 ;;;; TESTS
 
