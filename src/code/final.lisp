@@ -238,12 +238,13 @@ Examples:
 ;;; Nested invocations (from a GC forced by a finalizer) are not ok.
 ;;; See the trace at the bottom of this file.
 (defvar *in-a-finalizer* nil)
+#+sb-thread (define-alien-variable finalizer-thread-runflag int)
 (defun run-pending-finalizers ()
   ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
      ;; Perform no further work if trying to stop the thread, even if there is work.
-     (when (zerop finalizer-thread-runflag) (return))
+     #+sb-thread (when (zerop finalizer-thread-runflag) (return))
      (let ((cell (hash-table-culled-values hashtable)))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
@@ -302,7 +303,6 @@ Examples:
 (declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
 #+sb-thread
 (progn
-(define-alien-variable finalizer-thread-runflag int)
 (defun finalizer-thread-notify ()
   (alien-funcall (extern-alien "finalizer_thread_wake" (function void)))
   nil)
