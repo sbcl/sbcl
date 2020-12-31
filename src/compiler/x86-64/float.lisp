@@ -1584,15 +1584,15 @@
     (:results (r :scs (double-reg)))
     (:result-types double-float)
     (:generator 2
-                (unless (location= r x)
-                  (inst xorpd r r))
-                (inst roundsd r x
-                      (logior #b1000
-                              (ecase mode
-                                (:round 0)
-                                (:floor 1)
-                                (:ceiling 2)
-                                (:truncate 3))))))
+      (unless (location= r x)
+        (inst xorpd r r))
+      (inst roundsd r x
+            (logior #b1000
+                    (ecase mode
+                      (:round 0)
+                      (:floor 1)
+                      (:ceiling 2)
+                      (:truncate 3))))))
 
  (define-vop ()
    (:translate round-single)
@@ -1603,12 +1603,12 @@
    (:results (r :scs (single-reg)))
    (:result-types single-float)
    (:generator 2
-               (unless (location= r x)
-                 (inst xorps r r))
-               (inst roundss r x
-                     (logior #b1000
-                             (ecase mode
-                               (:round 0)
-                               (:floor 1)
-                               (:ceiling 2)
-                               (:truncate 3)))))))
+     (unless (location= r x)
+       (inst xorps r r))
+     (inst roundss r x
+           (logior #b1000
+                   (ecase mode
+                     (:round 0)
+                     (:floor 1)
+                     (:ceiling 2)
+                     (:truncate 3)))))))

@@ -802,3 +802,33 @@
   (:translate imagpart)
   (:note "complex double float imagpart")
   (:variant :imag))
+
+(define-vop ()
+  (:translate round-double)
+  (:policy :fast-safe)
+  (:args (x :scs (double-reg) :target r))
+  (:arg-types double-float (:constant symbol))
+  (:info mode)
+  (:results (r :scs (double-reg)))
+  (:result-types double-float)
+  (:generator 2
+    (ecase mode
+      (:round (inst frintn r x))
+      (:floor (inst frintm r x))
+      (:ceiling (inst frintp r x))
+      (:truncate (inst frintz r x)))))
+
+(define-vop ()
+  (:translate round-single)
+  (:policy :fast-safe)
+  (:args (x :scs (single-reg) :target r))
+  (:arg-types single-float (:constant symbol))
+  (:info mode)
+  (:results (r :scs (single-reg)))
+  (:result-types single-float)
+  (:generator 2
+    (ecase mode
+      (:round (inst frintn r x))
+      (:floor (inst frintm r x))
+      (:ceiling (inst frintp r x))
+      (:truncate (inst frintz r x)))))

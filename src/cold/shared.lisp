@@ -270,7 +270,7 @@
           (setq target-feature-list
                 (remove :int4-breakpoints target-feature-list))
           (warn "Removed :INT4-BREAKPOINTS from target features"))
-        (when (or ;(member :arm64 target-feature-list)
+        (when (or (member :arm64 target-feature-list)
                   (member :sse4 *shebang-backend-subfeatures*))
           (push :round-float target-feature-list))
         ;; Putting arch and gc choice first is visually convenient, versus

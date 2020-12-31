@@ -1748,9 +1748,10 @@
                            #'%unary-ftruncate))))
 
 #+round-float
-(macrolet ((derive (type fun)
+(macrolet ((derive (type)
              `(case (lvar-value mode)
                 ,@(loop for mode in '(:round :floor :ceiling :truncate)
+                        for fun in '(fround ffloor fceiling ftruncate)
                         collect
                         `(,mode
                           (one-arg-derive-type number
@@ -1760,17 +1761,17 @@
                                                          (hi (numeric-type-high type)))
                                                      (specifier-type (list ',type
                                                                            (if lo
-                                                                               (,fun (type-bound-number lo) ,mode)
+                                                                               (,fun (type-bound-number lo))
                                                                                '*)
                                                                            (if hi
-                                                                               (,fun (type-bound-number hi) ,mode)
+                                                                               (,fun (type-bound-number hi))
                                                                                '*))))))
                                                (lambda (x)
-                                                 (,fun x ,mode))))))))
+                                                 (values (,fun x)))))))))
   (defoptimizer (round-single derive-type) ((number mode))
-    (derive single-float round-single))
+    (derive single-float))
   (defoptimizer (round-double derive-type) ((number mode))
-    (derive double-float round-double)))
+    (derive double-float)))
 
 (defoptimizer (%unary-round derive-type) ((number))
   (one-arg-derive-type number
