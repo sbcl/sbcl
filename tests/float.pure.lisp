@@ -584,7 +584,7 @@
     ((1d0 0d0) t)))
 
 (with-test (:name :ftruncate-inline
-            :skipped-on :32-bit)
+            :skipped-on (not :64-bit))
   (checked-compile
    `(lambda (v d)
       (declare (optimize speed)
