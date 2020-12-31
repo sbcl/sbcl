@@ -2976,29 +2976,21 @@
                                             &key explicit-qword)
              `(define-instruction ,name (segment dst src imm)
                 (:printer
-                 ,(if op2 (if explicit-qword
-                              'ext-rex-2byte-reg/mem-xmm
-                              'ext-2byte-reg/mem-xmm)
-                      'ext-reg/mem-xmm)
+                 ,(if explicit-qword
+                      'ext-rex-2byte-reg/mem-xmm
+                      'ext-2byte-reg/mem-xmm)
                  ((prefix '(,prefix))
-                  ,@(if op2
-                        `((op1 '(,op1)) (op2 '(,op2)))
-                        `((op '(,op1))))
+                  (op1 '(,op1))
+                  (op2 '(,op2))
                   (imm nil :type 'imm-byte))
                  '(:name :tab reg/mem ", " reg ", " imm))
                 (:emitter
                  (aver (and (xmm-register-p src) (not (xmm-register-p dst))))
-                 ,(if op2
-                      `(emit-sse-inst-2byte segment dst src ,prefix ,op1 ,op2
-                                            :operand-size ,(if explicit-qword
-                                                               :qword
-                                                               :do-not-set)
-                                            :remaining-bytes 1)
-                      `(emit-sse-inst segment dst src ,prefix ,op1
+                 (emit-sse-inst-2byte segment src dst ,prefix ,op1 ,op2
                                       :operand-size ,(if explicit-qword
                                                          :qword
                                                          :do-not-set)
-                                      :remaining-bytes 1))
+                                      :remaining-bytes 1)
                  (emit-byte segment imm))))
 
            (define-insert-sse-instruction (name prefix op1 op2)
