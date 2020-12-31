@@ -260,7 +260,8 @@ created and old ones may exit at any time."
   (barrier (:read))
   (avltree-filter (lambda (node)
                     (let ((thread (avlnode-data node)))
-                      (when (= (thread-%visible thread) 1)
+                      (when (and (= (thread-%visible thread) 1)
+                                 (neq thread sb-impl::*finalizer-thread*))
                         thread)))
                   *all-threads*))
 
