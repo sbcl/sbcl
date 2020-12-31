@@ -242,7 +242,8 @@ Examples:
   ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
-     (when (zerop (extern-alien "finalizer_thread_runflag" int)) (return))
+     ;; Perform no further work if trying to stop the thread, even if there is work.
+     (when (zerop finalizer-thread-runflag) (return))
      (let ((cell (hash-table-culled-values hashtable)))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
@@ -319,9 +320,8 @@ Examples:
             (lambda ()
               (setf *finalizer-thread* sb-thread:*current-thread*)
               (loop (run-pending-finalizers)
-                    (when (zerop (alien-funcall
-                                  (extern-alien "finalizer_thread_wait" (function int))))
-                      (return)))
+                    (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))
+                    (when (zerop finalizer-thread-runflag) (return)))
               (setq *finalizer-thread* nil))
             nil)))
       ;; Don't return from this function until *FINALIZER-THREAD* has a good value,
@@ -333,8 +333,7 @@ Examples:
 (defun finalizer-thread-stop ()
   (let ((thread *finalizer-thread*))
     (aver (sb-thread::thread-p thread))
-    (setf finalizer-thread-runflag 0)
-    (finalizer-thread-notify)
+    (alien-funcall (extern-alien "finalizer_thread_stop" (function void)))
     (sb-thread:join-thread thread)))
 )
 

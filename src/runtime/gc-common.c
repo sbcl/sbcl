@@ -1206,16 +1206,11 @@ void finalizer_thread_wait () {
 void finalizer_thread_wake () {
     WakeAllConditionVariable(&finalizer_condvar);
 }
-#elif defined LISP_FEATURE_SB_FUTEX
-extern int futex_wait(int *lock_word, int oldval, long sec, unsigned long usec);
-extern int futex_wake(int *lock_word, int n);
-void finalizer_thread_wait () {
-    int runflag = finalizer_thread_runflag;
-    if (runflag)
-        futex_wait(&finalizer_thread_runflag, runflag, -1, 0);
-}
-void finalizer_thread_wake() {
-    futex_wake(&finalizer_thread_runflag, 1);
+void finalizer_thread_stop () {
+    EnterCriticalSection(&finalizer_mutex);
+    finalizer_thread_runflag = 0;
+    WakeAllConditionVariable(&finalizer_condvar);
+    LeaveCriticalSection(&finalizer_mutex);
 }
 #else
 pthread_mutex_t finalizer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1228,6 +1223,12 @@ void finalizer_thread_wait () {
 }
 void finalizer_thread_wake() {
     pthread_cond_broadcast(&finalizer_condvar);
+}
+void finalizer_thread_stop() {
+    thread_mutex_lock(&finalizer_mutex);
+    finalizer_thread_runflag = 0;
+    pthread_cond_broadcast(&finalizer_condvar);
+    thread_mutex_unlock(&finalizer_mutex);
 }
 #endif
 #endif
