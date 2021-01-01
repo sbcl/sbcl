@@ -88,7 +88,7 @@ SRCS = $(C_SRC) ${ASSEM_SRC}
 
 OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
-LIBS = ${OS_LIBS} -lm
+LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
 targets: $(TARGET) $(OBJTARGET) sbcl.mk
 
