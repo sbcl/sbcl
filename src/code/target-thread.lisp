@@ -446,12 +446,8 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
                                     #+freebsd unsigned #-freebsd (unsigned 32)
                                     long unsigned-long)
                           :extern "futex_wait"))
-        (nlx-protect
-         (with-interrupts
-           (alien-funcall %wait word-addr oldval to-sec to-usec))
-         ;; We're unwinding, unknown whether in the process of waking
-         ;; up or not, just do a spurious wake up
-         (futex-wake word-addr 1))))))
+        (with-interrupts
+          (alien-funcall %wait word-addr oldval to-sec to-usec))))))
 
 (defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
   (with-unique-names (n-thread n-lock new n-timeout)
@@ -709,27 +705,31 @@ returns NIL each time."
     (symbol-macrolet ((val (mutex-state mutex)))
       (let ((c (sb-ext:cas val 0 1))) ; available -> taken
         (unless (= c 0) ; Got it right off the bat?
-          (if (not stop-sec)
-              (loop ; untimed
-                ;; Mark it as contested, and sleep, unless it is now in state 0.
-                (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
-                  (with-pinned-objects (mutex)
-                    (futex-wait (mutex-state-address mutex) 2 -1 0)))
-                ;; Try to get it, still marking it as contested.
-                (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
-              (loop ; same as above but check for timeout
-                (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
-                  (if (eql 1 (with-pinned-objects (mutex)
-                               (futex-wait (mutex-state-address mutex) 2 to-sec to-usec)))
-                      ;; -1 = EWOULDBLOCK, possibly spurious wakeup
-                      ;;  0 = normal wakeup
-                      ;;  1 = ETIMEDOUT ***DONE***
-                      ;;  2 = EINTR, a spurious wakeup
-                      (return-from %%wait-for-mutex nil)))
-                (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
-                ;; Update timeout
-                (setf (values to-sec to-usec)
-                      (sb-impl::relative-decoded-times stop-sec stop-usec))))))
+          (nlx-protect
+           (if (not stop-sec)
+               (loop                    ; untimed
+                     ;; Mark it as contested, and sleep, unless it is now in state 0.
+                     (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                       (with-pinned-objects (mutex)
+                         (futex-wait (mutex-state-address mutex) 2 -1 0)))
+                     ;; Try to get it, still marking it as contested.
+                     (when (= 0 (setq c (sb-ext:cas val 0 2))) (return))) ; win
+               (loop             ; same as above but check for timeout
+                     (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+                       (if (eql 1 (with-pinned-objects (mutex)
+                                    (futex-wait (mutex-state-address mutex) 2 to-sec to-usec)))
+                           ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                           ;;  0 = normal wakeup
+                           ;;  1 = ETIMEDOUT ***DONE***
+                           ;;  2 = EINTR, a spurious wakeup
+                           (return-from %%wait-for-mutex nil)))
+                     (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
+                     ;; Update timeout
+                     (setf (values to-sec to-usec)
+                           (sb-impl::relative-decoded-times stop-sec stop-usec))))
+           ;; Unwinding because futex-wait allows interrupts, wake up another futex
+           (with-pinned-objects (mutex)
+             (futex-wake (mutex-state-address mutex) 1)))))
       (setf (mutex-%owner mutex) new-owner)
       t))
    #-sb-futex
@@ -914,6 +914,14 @@ IF-NOT-OWNER is :FORCE)."
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
+(defmacro nlx-protect-futex (protected &body cleanup)
+  (declare (ignorable cleanup))
+  #+sb-futex
+  `(nlx-protect ,protected
+                ,@cleanup)
+  #-sb-futex
+  protected)
+
 (declaim (inline %condition-wait))
 (defun %condition-wait (queue mutex
                         timeout to-sec to-usec stop-sec stop-usec deadlinep)
@@ -930,40 +938,41 @@ IF-NOT-OWNER is :FORCE)."
       ;; Need to disable interrupts so that we don't miss grabbing
       ;; the mutex on our way out.
       (without-interrupts
-        (unwind-protect
-            (cond
-             #+sb-futex
-             (t
-               (with-pinned-objects (queue)
-                 (setf (waitqueue-token queue) (my-kernel-thread-id))
+        (nlx-protect-futex
+         (unwind-protect
+              (cond
+                #+sb-futex
+                (t
+                 (with-pinned-objects (queue)
+                   (setf (waitqueue-token queue) (my-kernel-thread-id))
+                   (release-mutex mutex)
+                   ;; Now we go to sleep using futex-wait. If anyone else
+                   ;; manages to grab MUTEX and call CONDITION-NOTIFY during
+                   ;; this comment, it will change the token, and so futex-wait
+                   ;; returns immediately instead of sleeping. Ergo, no lost
+                   ;; wakeup. We may get spurious wakeups, but that's ok.
+                   (setf status
+                         (case (allow-with-interrupts
+                                 (futex-wait (waitqueue-token-address queue)
+                                             (my-kernel-thread-id)
+                                             ;; our way of saying "no
+                                             ;; timeout":
+                                             (or to-sec -1)
+                                             (or to-usec 0)))
+                           ((1)
+                            ;;  1 = ETIMEDOUT
+                            :timeout)
+                           (t
+                            ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                            ;;  0 = normal wakeup
+                            ;;  2 = EINTR, a spurious wakeup
+                            :ok)))))
+                #-sb-futex
+                (t
+                 (%with-cas-lock ((waitqueue-%owner queue))
+                   (%waitqueue-enqueue me queue))
                  (release-mutex mutex)
-                 ;; Now we go to sleep using futex-wait. If anyone else
-                 ;; manages to grab MUTEX and call CONDITION-NOTIFY during
-                 ;; this comment, it will change the token, and so futex-wait
-                 ;; returns immediately instead of sleeping. Ergo, no lost
-                 ;; wakeup. We may get spurious wakeups, but that's ok.
                  (setf status
-                       (case (allow-with-interrupts
-                               (futex-wait (waitqueue-token-address queue)
-                                           (my-kernel-thread-id)
-                                           ;; our way of saying "no
-                                           ;; timeout":
-                                           (or to-sec -1)
-                                           (or to-usec 0)))
-                         ((1)
-                          ;;  1 = ETIMEDOUT
-                          :timeout)
-                         (t
-                          ;; -1 = EWOULDBLOCK, possibly spurious wakeup
-                          ;;  0 = normal wakeup
-                          ;;  2 = EINTR, a spurious wakeup
-                          :ok)))))
-             #-sb-futex
-             (t
-              (%with-cas-lock ((waitqueue-%owner queue))
-                 (%waitqueue-enqueue me queue))
-              (release-mutex mutex)
-              (setf status
                        (or (flet ((wakeup ()
                                     (barrier (:read))
                                     (unless (eq queue (thread-waiting-for me))
@@ -972,43 +981,47 @@ IF-NOT-OWNER is :FORCE)."
                              (allow-with-interrupts
                                (%%wait-for #'wakeup stop-sec stop-usec)))
                            :timeout))))
-          #-sb-futex
-          (%with-cas-lock ((waitqueue-%owner queue))
-            (if (eq queue (thread-waiting-for me))
-                (%waitqueue-drop me queue)
-                (unless (eq :ok status)
-                  ;; CONDITION-NOTIFY thinks we've been woken up, but really
-                  ;; we're unwinding. Wake someone else up.
-                  (%waitqueue-wakeup queue 1))))
-          ;; Update timeout for mutex re-aquisition unless we are
-          ;; already past the requested timeout.
-          (when (and (eq :ok status) to-sec)
-            (setf (values to-sec to-usec)
-                  (sb-impl::relative-decoded-times stop-sec stop-usec))
-            (when (and (zerop to-sec) (not (plusp to-usec)))
-              (setf status :timeout)))
-          ;; If we ran into deadline, try to get the mutex before
-          ;; signaling. If we don't unwind it will look like a normal
-          ;; return from user perspective.
-          (when (and (eq :timeout status) deadlinep)
-            (let ((got-it (%try-mutex mutex me)))
-              (allow-with-interrupts
-                (signal-deadline)
-                (cond (got-it
-                       (return-from %condition-wait t))
-                      (t
-                       ;; The deadline may have changed.
-                       (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
-                             (decode-timeout timeout))
-                       (setf status :ok))))))
-          ;; Re-acquire the mutex for normal return.
-          (when (eq :ok status)
-            (unless (or (%try-mutex mutex me)
-                        (allow-with-interrupts
-                          (%wait-for-mutex mutex me timeout
-                                           to-sec to-usec
-                                           stop-sec stop-usec deadlinep)))
-              (setf status :timeout)))))
+           #-sb-futex
+           (%with-cas-lock ((waitqueue-%owner queue))
+             (if (eq queue (thread-waiting-for me))
+                 (%waitqueue-drop me queue)
+                 (unless (eq :ok status)
+                   ;; CONDITION-NOTIFY thinks we've been woken up, but really
+                   ;; we're unwinding. Wake someone else up.
+                   (%waitqueue-wakeup queue 1))))
+           ;; Update timeout for mutex re-aquisition unless we are
+           ;; already past the requested timeout.
+           (when (and (eq :ok status) to-sec)
+             (setf (values to-sec to-usec)
+                   (sb-impl::relative-decoded-times stop-sec stop-usec))
+             (when (and (zerop to-sec) (not (plusp to-usec)))
+               (setf status :timeout)))
+           ;; If we ran into deadline, try to get the mutex before
+           ;; signaling. If we don't unwind it will look like a normal
+           ;; return from user perspective.
+           (when (and (eq :timeout status) deadlinep)
+             (let ((got-it (%try-mutex mutex me)))
+               (allow-with-interrupts
+                 (signal-deadline)
+                 (cond (got-it
+                        (return-from %condition-wait t))
+                       (t
+                        ;; The deadline may have changed.
+                        (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
+                              (decode-timeout timeout))
+                        (setf status :ok))))))
+           ;; Re-acquire the mutex for normal return.
+           (when (eq :ok status)
+             (unless (or (%try-mutex mutex me)
+                         (allow-with-interrupts
+                           (%wait-for-mutex mutex me timeout
+                                            to-sec to-usec
+                                            stop-sec stop-usec deadlinep)))
+               (setf status :timeout))))
+          ;; Unwinding because futex-wait and %wait-for-mutex above
+          ;; allow interrupts, wake up another futex
+          (with-pinned-objects (queue)
+            (futex-wake (waitqueue-token-address queue) 1))))
       ;; Determine actual return value. :ok means (potentially
       ;; spurious) wakeup => T. :timeout => NIL.
       (case status
