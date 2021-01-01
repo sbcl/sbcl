@@ -382,7 +382,7 @@ sigaddset_deferrable(sigset_t *s)
 #else
     sigaddset(s, SIGPOLL);
 #endif
-#ifndef LISP_FEATURE_LIBUNWIND_BACKTRACE
+#ifndef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     sigaddset(s, SIGXCPU);
 #endif
     sigaddset(s, SIGXFSZ);
@@ -1979,7 +1979,7 @@ interrupt_init(void)
     sigaddset_gc(&gc_sigset);
 #endif
 
-#ifdef LISP_FEATURE_LIBUNWIND_BACKTRACE
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     // Use this only if you know what you're doing
     void backtrace_lisp_threads(int, siginfo_t*, os_context_t*);
     ll_install_handler(SIGXCPU, backtrace_lisp_threads);

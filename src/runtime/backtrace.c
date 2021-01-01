@@ -599,15 +599,16 @@ static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
   return 0;
 }
 
-#ifdef LISP_FEATURE_LIBUNWIND_BACKTRACE
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
 #define UNW_LOCAL_ONLY
+#ifdef HAVE_LIBUNWIND
 #include <libunwind.h>
+#endif
 #include "genesis/thread-instance.h"
 #include "genesis/mutex.h"
 static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};
 void libunwind_backtrace(struct thread *th, os_context_t *context)
 {
-    char procname[100];
     fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
 #ifdef LISP_FEATURE_SB_THREAD
     // the TLS area is not used if #-sb-thread. And if so, it must be "main thred"
@@ -636,6 +637,8 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
         putc('\n', stderr);
     }
 #endif
+#ifdef HAVE_LIBUNWIND
+    char procname[100];
     unw_cursor_t cursor;
     // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
     // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
@@ -659,6 +662,11 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
             fprintf(stderr, " %p ?\n", pc);
         }
     } while (unw_step(&cursor));
+#else
+    // If you don't have libunwind, this will almost surely not work,
+    // because we can't figure out how to get backwards past a signal frame.
+    log_backtrace_from_fp((void*)*os_context_fp_addr(context), 100, 0, stderr);
+#endif
 }
 void backtrace_lisp_threads(int __attribute__((unused)) signal,
                                    siginfo_t __attribute__((unused)) *info,
@@ -673,8 +681,9 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
     struct thread *th;
     int nthreads = 0;
     for_each_thread(th) { ++nthreads; }
-    fprintf(stderr, "Caught backtrace-all signal in tid %d, %d threads\n",
-            (int)arch_os_get_current_thread()->os_kernel_tid, nthreads);
+    if (signal)
+        fprintf(stderr, "Caught backtrace-all signal in tid %d, %d threads\n",
+                (int)arch_os_get_current_thread()->os_kernel_tid, nthreads);
     // Would be nice if we could forcibly stop all the other threads,
     // but pthread_mutex_trylock is not safe to use in a signal handler.
     if (nthreads > 1) {
@@ -697,5 +706,37 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
 #else
     libunwind_backtrace(arch_os_get_current_thread(), context);
 #endif
+}
+static int watchdog_pipe[2] = {-1,-1};
+static pthread_t watchdog_tid;
+static void* watchdog_thread(void* arg) {
+    struct timeval timeout;
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(watchdog_pipe[0], &fds);
+    timeout.tv_sec = (long)arg;
+    timeout.tv_usec = 0;
+    int nfds = select(watchdog_pipe[0]+1, &fds, 0, 0, &timeout);
+    if (nfds == 0) {
+        // Ensure this message comes out in one piece even if nothing following it does.
+        char msg[] = "Watchdog timer expired\n"; write(2, msg, sizeof msg-1);
+        backtrace_lisp_threads(0, 0, 0);
+        _exit(1); // cause the test suite to exit with failure
+    }
+    return 0;
+}
+void start_watchdog(int sec) {
+    if (pipe(watchdog_pipe)) lose("Can't make watchdog pipe");
+    pthread_create(&watchdog_tid, 0, watchdog_thread, (void*)(long)sec);
+    char msg[] = "Started watchdog thread\n"; write(2, msg, sizeof msg-1);
+}
+void stop_watchdog() {
+    char c[1] = {0};
+    write(watchdog_pipe[1], c, 1);
+    close(watchdog_pipe[1]);
+    void* result;
+    pthread_join(watchdog_tid, &result);
+    close(watchdog_pipe[0]);
+    watchdog_pipe[0] = watchdog_pipe[1] = -1;
 }
 #endif
