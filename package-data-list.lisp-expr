@@ -3140,7 +3140,6 @@ structure representations"
                "IS-LISP-POINTER"
                #+gencgc "LARGE-OBJECT-SIZE"
                "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
-               "LOCKFREE-LIST-NODE-FLAG"
                ;; FIXME: Possibly these other parameters (see
                ;; compiler/{x86,sparc}/parms.lisp) should be defined
                ;; conditionally on #+LONG-FLOAT)
@@ -3309,6 +3308,12 @@ structure representations"
       :use ("CL" "SB-INT" "SB-EXT")
       :shadow ("DELETE")
       :export ("INSERT" "DELETE" "FIND=" "FIND<="))
+
+   #s(sb-cold:package-data
+      :name "SB-LOCKLESS"
+      :doc "internal: lockfree lists"
+      :use ("CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")
+      :shadow ("ENDP"))
 
    #s(sb-cold:package-data
       :name "SB-WALKER"

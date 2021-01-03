@@ -1635,7 +1635,7 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; and descendant types. (The lockfree list uses one pointer bit
     ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
     (when (named-let has-custom-gc-method ((dd dd))
-            (cond ((eq (dd-name dd) 'list-node) t)
+            (cond ((eq (dd-name dd) 'sb-lockless::list-node) t)
                   ((dd-include dd)
                    (has-custom-gc-method
                     (layout-info (compiler-layout-or-lose (car (dd-include dd))))))))

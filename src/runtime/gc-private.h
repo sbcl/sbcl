@@ -364,12 +364,6 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]
 
-extern lispobj layout_of_layout;
-
-static inline int lockfree_list_node_layout_p(struct layout* layout) {
-    return layout->flags & flag_LockfreeListNode;
-}
-
 /* This is NOT the same value that lisp's %INSTANCE-LENGTH returns.
  * Lisp always uses the logical length (as originally allocated),
  * except when heap-walking which requires exact physical sizes */
@@ -413,14 +407,27 @@ static inline int instance_length(lispobj header)
 
 #endif
 
+static inline int layout_depth2_id(struct layout* layout) {
+    int32_t* vector = (int32_t*)&layout->id_word0;
+    return vector[0];
+}
+// Keep in sync with hardwired IDs in src/compiler/generic/genesis.lisp
+#define LAYOUT_LAYOUT_ID 3
+#define LFLIST_NODE_LAYOUT_ID 4
+
 /// Return true if 'thing' is a layout.
+/// This predicate is careful, as is it used to verify heap invariants.
 static inline boolean layoutp(lispobj thing)
 {
     lispobj base_ptr = thing - INSTANCE_POINTER_LOWTAG;
     lispobj layout;
     if ((base_ptr & LOWTAG_MASK) || !(layout = layout_of((lispobj*)base_ptr)))
         return 0;
-    return layout == layout_of_layout;
+    return layout_depth2_id(LAYOUT(layout)) == LAYOUT_LAYOUT_ID;
+}
+/// Return true if 'thing' is the layout of any subtype of sb-lockless::list-node.
+static inline boolean lockfree_list_node_layout_p(struct layout* layout) {
+    return layout_depth2_id(layout) == LFLIST_NODE_LAYOUT_ID;
 }
 
 #endif /* _GC_PRIVATE_H_ */

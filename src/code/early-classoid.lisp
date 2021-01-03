@@ -102,7 +102,6 @@
 (defconstant +file-stream-layout-flag+       #b00100000)
 (defconstant +string-stream-layout-flag+     #b01000000)
 (defconstant +stream-layout-flag+            #b10000000)
-(defconstant sb-vm:lockfree-list-node-flag  #b100000000) ; exported for use in gc-private.h
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for

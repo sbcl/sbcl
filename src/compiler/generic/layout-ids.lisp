@@ -112,7 +112,6 @@ SB-IMPL::PATTERN
 SB-C::LVAR-ANNOTATION
 SB-DI::COMPILED-DEBUG-BLOCK
 SB-C::ARG-INFO
-SB-KERNEL:LAYOUT
 SB-C::COMPILED-DEBUG-FUN-TOPLEVEL
 SB-C::COMPILED-DEBUG-FUN-CLEANUP
 SB-DI::COMPILED-FRAME
@@ -125,7 +124,7 @@ SB-C::LVAR-PROPER-SEQUENCE-ANNOTATION
 SB-DI:CODE-LOCATION
 SB-KERNEL:STRUCTURE-CLASSOID
 SB-C::LVAR-FUNCTION-DESIGNATOR-ANNOTATION
-;SB-LOCKLESS::LINKED-LIST
+SB-LOCKLESS::LINKED-LIST
 SB-C::LVAR-MODIFIED-ANNOTATION
 SB-DI::BOGUS-DEBUG-FUN
 #+sb-simd-pack SB-KERNEL:SIMD-PACK-TYPE
@@ -216,22 +215,26 @@ SB-ALIEN::SHARED-OBJECT
   #+(or arm mips) 'unsigned-byte
   #-(or arm mips) 'signed-byte)
 
+;;; There are a few wired IDs:
+;;;   1 = T
+;;;   2 = STRUCTURE-OBJECT
+;;;   3 = LAYOUT
+;;;   4 = SB-LOCKLESS::LIST-NODE
 (ecase layout-id-type
   (unsigned-byte
    ;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
-   (let ((id 2)) ; 1 and 2 are wired to T and STRUCTURE-OBJECT
+   (let ((id 4)) ; pre-increment when using
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item (incf id)))))
   (signed-byte
    ;; Assign all the above a (SIGNED-BYTE 8) layout-id.
-   ;; There is room for 74 more types that are encodable as such.
-   ;; It would be really interesting to figure out a way to allow user code
+   ;; There is room for more types that are encodable as one byte.
+   ;; It might be interesting to figure out a way to allow user code
    ;; to avail itself of some of that encoding space.
    (let ((id -128))
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item id)
-       (if (= id -1) ; hop over 0, 1, and 2
-           (setq id 3)
-           (incf id))))))
+       (setq id (if (= id -1) 5 ; hop over the wired IDs
+                    (1+ id)))))))

@@ -15,12 +15,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage "SB-LOCKLESS"
-  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL")
-  (:shadow "ENDP"))
-
 (in-package "SB-LOCKLESS")
-(setf (system-package-p *package*) t)
 
 ;;; The changes to GC to support this code were as follows:
 ;;;
@@ -42,25 +37,12 @@
 ;;; DO-REFERENCED-OBJECT can follow untagged pointers.
 ;;; This is potentially more of an annoyance than it is a bug.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (import 'sb-kernel::list-node))
-
-(defstruct (list-node
-            (:conc-name nil)
-            (:constructor %make-sentinel-node ())
-            (:copier nil))
-  (%node-next nil))
-
 (defstruct (keyed-node
             (:conc-name nil)
             (:include list-node)
             (:constructor make-node (node-key node-data)))
   (node-key 0 :read-only t)
   (node-data))
-
-(let ((layout (find-layout 'keyed-node)))
-  (setf (layout-flags layout)
-        (logior (layout-flags layout) sb-vm:lockfree-list-node-flag)))
 
 (declaim (inline ptr-markedp node-markedp))
 (defun ptr-markedp (bits) (fixnump bits))
@@ -78,20 +60,6 @@
     (setf (%node-next node) node)))
 
 (defmacro endp (node) `(eq ,node (load-time-value *tail-atom*)))
-
-;;; Specialized list variants will be created for
-;;;  fixnum, integer, real, string, generic "comparable"
-;;; but the node type and list type is the same regardless of key type.
-(defstruct (linked-list
-            (:constructor %make-lfl
-                          (head inserter deleter finder inequality equality))
-            (:conc-name list-))
-  (head       nil :type list-node :read-only t)
-  (inserter   nil :type function :read-only t)
-  (deleter    nil :type function :read-only t)
-  (finder     nil :type function :read-only t)
-  (inequality nil :type function :read-only t)
-  (equality   nil :type function :read-only t))
 
 (defconstant-eqx +predefined-key-types+
   #((fixnum  lfl-insert/fixnum  lfl-delete/fixnum  lfl-find/fixnum < =)

@@ -1154,6 +1154,8 @@ core and return a descriptor to it."
   (case name
     ((t) 1)
     (structure-object 2)
+    (layout 3)
+    (sb-lockless::list-node 4)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
            (ecase sb-kernel::layout-id-type
              (unsigned-byte

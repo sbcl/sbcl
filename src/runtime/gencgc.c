@@ -3343,19 +3343,6 @@ move_pinned_pages_to_newspace()
     }
 }
 
-lispobj layout_of_layout;
-void compute_layout_of_layout()
-{
-    // Compute layout_of_layout from some structure instance by taking the layout
-    // of its layout. T's package serves as an exemplar structure.
-    // If you use NIL, then you can't use the convenient casting macro SYMBOL
-    // which subtracts the wrong lowtag for ppc64 since NIL is primarily a list
-    // and only coincidentally a symbol if the lowtags work out right.
-    lispobj* package = (lispobj*)(SYMBOL(T)->package - INSTANCE_POINTER_LOWTAG);
-    lispobj layout = instance_layout(package);
-    layout_of_layout = instance_layout(LAYOUT(layout));
-}
-
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
@@ -3793,9 +3780,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
     g->num_gc = raise ? 0 : (1 + g->num_gc);
 
 maybe_verify:
-#ifndef LISP_FEATURE_IMMOBILE_SPACE
-    compute_layout_of_layout(); // if it moved
-#endif
     if (generation >= verify_gens)
         verify_heap(VERIFY_POST_GC | (generation<<16));
 }
@@ -4692,7 +4676,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
 void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
                            os_vm_offset_t offset, int fd)
 {
-    compute_layout_of_layout();
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
               == (size_t)total_bytes);
 
