@@ -313,23 +313,23 @@
 (defun descriptor-base-address (des)
   (logandc2 (descriptor-bits des) sb-vm:lowtag-mask))
 (defmethod print-object ((des descriptor) stream)
-  (let ((gspace (descriptor-intuit-gspace des))
-        (bits (descriptor-bits des))
-        (lowtag (descriptor-lowtag des)))
-    (print-unreadable-object (des stream :type t)
-      (cond ((is-fixnum-lowtag lowtag)
-             (format stream "for fixnum: ~W" (descriptor-fixnum des)))
-            ((is-other-immediate-lowtag lowtag)
-             (format stream
-                     "for other immediate: #X~X, type #b~8,'0B"
-                     (ash bits (- sb-vm:n-widetag-bits))
-                     (logand bits sb-vm:widetag-mask)))
-            (t
-             (format stream
-                     "for pointer: #X~X, lowtag #b~v,'0B, ~A"
-                     (descriptor-base-address des)
-                     sb-vm:n-lowtag-bits lowtag
-                     (if gspace (gspace-name gspace) "unknown")))))))
+  (print-unreadable-object (des stream :type t)
+    (let ((lowtag (descriptor-lowtag des))
+          (bits (descriptor-bits des)))
+      (multiple-value-call 'format stream
+        (cond ((is-fixnum-lowtag lowtag)
+               (values "for fixnum: ~W" (descriptor-fixnum des)))
+              ((is-other-immediate-lowtag lowtag)
+               (values "for other immediate: #X~X, type #b~8,'0B"
+                       (ash bits (- sb-vm:n-widetag-bits))
+                       (logand bits sb-vm:widetag-mask)))
+              ((descriptor-gspace des)
+               (values "for pointer: #X~X, lowtag #b~v,'0B, ~A"
+                       (descriptor-base-address des)
+                       sb-vm:n-lowtag-bits lowtag
+                       (gspace-name (descriptor-gspace des))))
+              (t
+               (format stream "bits: #X~X" bits)))))))
 
 ;;; Return a descriptor for a block of LENGTH bytes out of GSPACE. The
 ;;; free word index is boosted as necessary, and if additional memory
