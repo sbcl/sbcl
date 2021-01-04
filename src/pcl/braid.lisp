@@ -121,8 +121,6 @@
                           (find-class ',class) ,class)))
                classes)))
 
-(defun !wrapper-p (x) (and (sb-kernel::layout-p x) (layout-for-pcl-obj-p x)))
-
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
          standard-class-wrapper standard-class
@@ -209,7 +207,7 @@
                   (error "Slot allocation ~S is not supported in bootstrap."
                          (getf slot :allocation))))
 
-              (when (!wrapper-p wrapper)
+              (when (layout-for-pcl-obj-p wrapper)
                 (setf (layout-slot-list wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
@@ -226,7 +224,7 @@
                      standard-effective-slot-definition-wrapper t))
 
               (setf (layout-slot-table wrapper) (make-slot-table class slots t))
-              (when (!wrapper-p wrapper)
+              (when (layout-for-pcl-obj-p wrapper)
                 (setf (layout-slot-list wrapper) slots))
 
               (case meta
@@ -359,7 +357,7 @@
             (make-slot-table class slots
                              (member metaclass-name
                                      '(standard-class funcallable-standard-class))))
-      (when (!wrapper-p wrapper)
+      (when (layout-for-pcl-obj-p wrapper)
         (setf (layout-slot-list wrapper) slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
