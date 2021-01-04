@@ -1636,9 +1636,11 @@
          (number-interval (numeric-type->interval number-type))
          (divisor-interval (numeric-type->interval divisor-type))
          (rem (truncate-rem-bound number-interval divisor-interval)))
-    ;;(declare (type (member '(integer rational float)) rem-type))
-    ;; We have real numbers now.
-    (cond ((eq rem-type 'integer)
+    (cond ((and (numberp (interval-low divisor-interval))
+                (numberp (interval-high divisor-interval))
+                (zerop (interval-low divisor-interval)))
+           nil)
+          ((eq rem-type 'integer)
            ;; Since the remainder type is INTEGER, both args are
            ;; INTEGERs.
            (specifier-type `(,rem-type ,(or (interval-low rem) '*)

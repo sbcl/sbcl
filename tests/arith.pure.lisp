@@ -859,3 +859,13 @@
     (let ((result (funcall f 0)))
       (assert (equal result
                      '(#x9516A7 #x2531b4 0 0))))))
+
+(with-test (:name :truncate-by-zero-derivation)
+  (assert
+   (not (equal (cadr
+                (cdaddr (sb-kernel:%simple-fun-type
+                         (checked-compile
+                          `(lambda ()
+                             (truncate 5 0))
+                          :allow-style-warnings t))))
+               '(integer 0 0)))))
