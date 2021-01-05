@@ -32,7 +32,7 @@
         (room-info-name info)))
 
 (defconstant tiny-boxed-size-mask #xFF)
-(defun !compute-room-infos ()
+(defun compute-room-infos ()
   (let ((infos (make-array 256 :initial-element nil))
         (default-size-mask (mask-field (byte 23 0) -1)))
     (dolist (obj *primitive-objects*)
@@ -111,7 +111,7 @@
 
     infos))
 
-(define-load-time-global *room-info* (!compute-room-infos))
+(define-load-time-global *room-info* (compute-room-infos))
 (declaim (type (simple-vector 256) *room-info*))
 
 (defconstant-eqx +heap-spaces+
