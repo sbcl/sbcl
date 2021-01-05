@@ -922,8 +922,7 @@
             (let ((guts `((when (zerop (layout-clos-hash ,n-layout))
                             (setq ,n-layout
                                   (truly-the layout
-                                             (update-object-layout-or-invalid
-                                              object ',layout))))
+                                             (update-object-layout object))))
                           ,(ecase name
                             (stream
                              `(logtest (layout-flags ,n-layout) ,+stream-layout-flag+))

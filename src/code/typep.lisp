@@ -193,11 +193,10 @@
 
 ;;; Try to ensure that the object's layout is up-to-date only if it is an instance
 ;;; or funcallable-instance of other than a static or structure classoid type.
-;;; LAYOUT is the *expected* type, not the the layout currently in OBJECT.
-(defun update-object-layout-or-invalid (object layout)
+(defun update-object-layout (object)
   (if (%pcl-instance-p object)
       (sb-pcl::check-wrapper-validity object)
-      (sb-c::%layout-invalid-error object layout)))
+      (layout-of object)))
 
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 
@@ -208,14 +207,14 @@
 ;;; could be done in either order, * HOWEVER * it is less racy to perform
 ;;; them in this exact order. Consider the case that OBJ-LAYOUT is T
 ;;; for a class that satisfies CLASS-FINALIZED-P and suppose these operations were
-;;; reversed from the order below. UPDATE-OBJECT-LAYOUT-OR-INVALID is going to make
+;;; reversed from the order below. CHECK-WRAPPER-VALIDITY is going to make
 ;;; a new layout, registering it and installing into the classoid.
 ;;; Then %ENSURE-CLASSOID-VALID is going to call %FORCE-CACHE-FLUSHES which is going
 ;;; to make yet another new layout. The "transitivity of wrapper updates" usually
 ;;; causes the first new layout to automatically update to the second new layout,
 ;;; except that the other thread has already fetched the old layout.
 ;;; But by using the order below, there will not be two new layouts made, only one,
-;;; because UPDATE-OBJECT-LAYOUT-OR-INVALID is able to use the layout
+;;; because CHECK-WRAPPER-VALIDITY is able to use the layout
 ;;; that was updated into the classoid by %ENSURE-CLASSOID-VALID.
 ;;; All other things being equal, one new layout is better than two.
 ;;; At least I think that's what happens.
@@ -238,16 +237,27 @@
   ;; locking here makes Slime unusable with :SPAWN in post *WORLD-LOCK* world. So...
   ;; -- NS 2008-12-16
   (multiple-value-bind (obj-layout layout)
-      (do ((layout (classoid-layout classoid) (classoid-layout classoid))
-           (i 0 (+ i 1))
-           (obj-layout obj-layout))
-          ((and (not (layout-invalid obj-layout))
-                (not (layout-invalid layout)))
-           (values obj-layout layout))
-        (aver (< i 2))
-        (%ensure-classoid-valid classoid layout "typep")
-        (when (zerop (layout-clos-hash obj-layout))
-          (setq obj-layout (update-object-layout-or-invalid object layout))))
+      (cond ((not (layout-for-pcl-obj-p obj-layout))
+             ;; If the object is a structure or condition, just ensure validity of the class
+             ;; that we're testing against. Whether obj-layout is "valid" has no relevance.
+             ;; This is racy though because %ENSURE-CLASSOID-VALID should return
+             ;; the most up-to-date layout for the classoid, but it doesn't. Oh well.
+             (%ensure-classoid-valid classoid (classoid-layout classoid) "typep")
+             (values obj-layout (classoid-layout classoid)))
+            (t
+             ;; And this case is even more racy, naturally.
+             (do ((layout (classoid-layout classoid) (classoid-layout classoid))
+                  (i 0 (+ i 1))
+                  (obj-layout obj-layout))
+                 ((and (not (layout-invalid obj-layout))
+                       (not (layout-invalid layout)))
+                  (values obj-layout layout))
+               (aver (< i 2))
+               (%ensure-classoid-valid classoid layout "typep")
+               (when (zerop (layout-clos-hash obj-layout))
+                 (setq obj-layout (sb-pcl::check-wrapper-validity object))))))
+    ;; FIXME: if LAYOUT is for a structure, use the STRUCTURE-IS-A test
+    ;; which avoids iterating.
     (or (eq obj-layout layout)
         (let ((obj-inherits (layout-inherits obj-layout)))
           (dotimes (i (length obj-inherits) nil)

@@ -550,17 +550,12 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     (inst and :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x7f)))
 
 (define-vop ()
-  (:translate update-object-layout-or-invalid)
+  (:translate update-object-layout)
   (:args (obj :scs (descriptor-reg)))
-  (:info layout)
-  (:arg-types * (:constant t))
   (:results (res :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 1
-    (inst push (if (immediate-constant-sc layout)
-                   (make-fixup layout :layout)
-                   (make-constant-tn (sb-c::find-constant layout))))
     (inst push obj)
     (invoke-asm-routine 'call 'invalid-layout-trap vop)
     (inst pop res)))

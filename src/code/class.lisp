@@ -1167,8 +1167,9 @@ between the ~A definition and the ~A definition"
     (warn "making ~(~A~) class ~S writable" it (classoid-name classoid))
     (setf (classoid-state classoid) nil)))
 
-;;; Mark LAYOUT as invalid. Setting DEPTHOID -1 helps cause unsafe
-;;; structure type tests to fail. Remove class from all superclasses
+;;; Mark LAYOUT as invalid. This is called only on CONDITION and STRUCTURE
+;;; subtypes when redefining incompatibly. PCL objects use invalidate-wrapper.
+;;; Remove class from all superclasses
 ;;; too (might not be registered, so might not be in subclasses of the
 ;;; nominal superclasses.)  We set the layout-clos-hash slots to 0 to
 ;;; invalidate the wrappers for specialized dispatch functions, which
@@ -1177,7 +1178,6 @@ between the ~A definition and the ~A definition"
   (declare (type layout layout))
   #+sb-xc-host (warn "Why are we invalidating layout ~S?" layout)
   (setf (layout-invalid layout) t)
-  (assign-layout-slots layout :depthoid -1)
   ;; Ensure that the INVALID slot conveying ancillary data describing the
   ;; invalidity reason is published before causing the invalid layout trap.
   (sb-thread:barrier (:write))

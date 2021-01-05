@@ -167,15 +167,13 @@
     (test-cpu-feature cpu-has-ymm-registers)
     (inst jmp :z call-preserving-xmm-only)
     (with-registers-preserved (lisp ymm :except r11-tn)
-      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
-      (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
-      (call-static-fun 'update-object-layout-or-invalid 2)
-      (inst mov (ea 24 rbp-tn) rdx-tn)) ; result to arg passing loc
-    (inst ret 8)) ; remove 1 arg. Caller pops the result
+      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
+      (call-static-fun 'update-object-layout 1)
+      (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
+    (inst ret)) ; Caller pops the result
   call-preserving-xmm-only
   (with-registers-preserved (lisp xmm :except r11-tn)
-    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg1
-    (inst mov rdi-tn (ea 24 rbp-tn)) ; arg2
-    (call-static-fun 'update-object-layout-or-invalid 2)
-    (inst mov (ea 24 rbp-tn) rdx-tn)) ; result to arg passing loc
-  (inst ret 8)) ; remove 1 arg. Caller pops the result
+    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
+    (call-static-fun 'update-object-layout 1)
+    (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
+  (inst ret)) ;  Caller pops the result

@@ -23,7 +23,7 @@
             #P"/tmp/")))
 (require :sb-posix)
 
-;;; Believe it or not the x86-64-specific trap routine for UPDATE-OBJECT-LAYOUT-OR-INVALID
+;;; Believe it or not the x86-64-specific trap routine for UPDATE-OBJECT-LAYOUT
 ;;; could fail to return the correct layout after calling from assembly code into lisp,
 ;;; back to assembly code, back to the vop, and not a single regression test failed.
 (defclass astream (fundamental-output-stream) ())

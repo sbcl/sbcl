@@ -126,7 +126,6 @@
   (def "INVALID-ARG-COUNT"       sb-c::%arg-count-error       nil nargs)
   (def "LOCAL-INVALID-ARG-COUNT" sb-c::%local-arg-count-error nil nargs fname)
   (def "OBJECT-NOT-TYPE"         sb-c::%type-check-error      t   object ptype)
-  (def "LAYOUT-INVALID"          sb-c::%layout-invalid-error  nil object layout)
   (def "ODD-KEY-ARGS"            sb-c::%odd-key-args-error    nil)
   (def "UNKNOWN-KEY-ARG"         sb-c::%unknown-key-arg-error t   key)
   (def "ECASE-FAILURE"           ecase-failure                nil value keys)

@@ -326,6 +326,9 @@
       (invalid-array-error object)
       (error (if (and (%instancep object)
                       (layout-invalid (%instance-layout object)))
+                 ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
+                 ;; more information in that it says that the object may have at some point
+                 ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
                  'layout-invalid
                  'type-error)
              :datum object
@@ -337,11 +340,6 @@
                               (t
                                type))
              :context (sb-di:error-context))))
-
-(deferr layout-invalid-error (object layout)
-  (error 'layout-invalid
-         :datum object
-         :expected-type (layout-classoid layout)))
 
 (deferr odd-key-args-error ()
   (%program-error "odd number of &KEY arguments"))

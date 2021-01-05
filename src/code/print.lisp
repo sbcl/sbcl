@@ -379,11 +379,13 @@ variable: an unreadable object representing the error is printed instead.")
           (print-unreadable-object (object stream :identity t)
             (prin1 'instance stream))))
       (let ((classoid (layout-classoid layout)))
-        ;; Additionally, if the object is an obsolete CONDITION, don't crash.
-        ;; (There is no update-instance protocol for conditions)
+        ;; Additionally, don't crash if the object is an obsolete thing with
+        ;; no update protocol.
         (when (or (sb-kernel::undefined-classoid-p classoid)
                   (and (layout-invalid layout)
-                       (logtest (layout-flags layout) +condition-layout-flag+)))
+                       (logtest (layout-flags layout)
+                                (logior +structure-layout-flag+
+                                        +condition-layout-flag+))))
           (return-from output-ugly-object
             (print-unreadable-object (object stream :identity t)
               (format stream "UNPRINTABLE instance of ~W" classoid)))))))
