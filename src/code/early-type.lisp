@@ -350,17 +350,21 @@
 (defun make-numeric-type (&key class format (complexp :real) low high
                                enumerable)
   (declare (type (member integer rational float nil) class))
-  (macrolet ((unionize (types classes initargs)
+  (macrolet ((unionize (types classes formats)
                `(let (types)
                   (loop for thing in ',types
                         for class in ',classes
+                        for format in ',formats
                         do
                         (let ((low (coerce-numeric-bound low thing))
                               (high (coerce-numeric-bound high thing)))
                           (push (make-numeric-type
-                                 ,@initargs
+                                 :format format
                                  :class class
-                                 :complexp complexp :low low :high high :enumerable enumerable)
+                                 :complexp complexp
+                                 :low low
+                                 :high high
+                                 :enumerable enumerable)
                                 types)))
                   (apply #'type-union types))))
     (when (and (null class) (member complexp '(:real :complex)))
@@ -371,7 +375,7 @@
                 (specifier-type 'real))
             (unionize (rational single-float double-float)
                       (rational float float)
-                      (:format format)))))
+                      (nil single-float double-float)))))
     (when (and (eql class 'float) (member complexp '(:complex :real)) (eql format nil))
       (return-from make-numeric-type
         (if (bounds-unbounded-p low high)
@@ -380,7 +384,7 @@
                 (specifier-type 'real))
             (unionize (single-float double-float #+long-float (error "long-float"))
                       (float float)
-                      (:format thing))))))
+                      (single-float double-float))))))
   (multiple-value-bind (low high)
       (case class
         (integer

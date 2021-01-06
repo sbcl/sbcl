@@ -720,3 +720,9 @@
 (with-test (:name :type-of-empty-instance)
   (assert (eq (type-of (eval '(sb-kernel:%make-instance 12)))
               'sb-kernel:instance)))
+
+(with-test (:name :make-numeric-type-union)
+  (assert (equal (sb-kernel:type-specifier
+                  (sb-kernel:make-numeric-type :low '(-79106810381456307)))
+                 '(or (double-float (-7.91068103814563d16)) (single-float (-7.910681e16))
+                   (rational (-79106810381456307))))))
