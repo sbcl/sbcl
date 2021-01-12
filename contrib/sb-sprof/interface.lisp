@@ -127,8 +127,6 @@ The following keyword args are recognized:
            (stop-profiling)))
        ,@(when report-p `((report :type ,report))))))
 
-(defvar *timer* nil)
-
 #-win32
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)
@@ -185,8 +183,7 @@ The following keyword args are recognized:
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
       (setf *sampling* sampling
-            *samples* (make-samples :start-time (get-internal-real-time)
-                                    :max-depth max-depth
+            *samples* (make-samples :max-depth max-depth
                                     :max-samples max-samples
                                     :sample-interval sample-interval
                                     :alloc-interval alloc-interval
@@ -195,7 +192,18 @@ The following keyword args are recognized:
       (setf *profiled-threads* threads)
       (sb-sys:enable-interrupt sb-unix:sigprof
                                #'sigprof-handler)
-      (ecase mode
+      (flet (#+sb-thread
+             (map-threads (function &aux (threads *profiled-threads*))
+               (if (listp threads)
+                   (mapc function threads)
+                   (named-let visit ((node sb-thread::*all-threads*))
+                     (awhen (sb-thread::avlnode-left node) (visit it))
+                     (awhen (sb-thread::avlnode-right node) (visit it))
+                     (let ((thread (sb-thread::avlnode-data node)))
+                       (when (and (= (sb-thread::thread-%visible thread) 1)
+                                  (neq thread *timer*))
+                         (funcall function thread)))))))
+       (ecase mode
         (:alloc
          (let ((alloc-signal (1- alloc-interval)))
            #+sb-thread
@@ -208,27 +216,32 @@ The following keyword args are recognized:
                (progn
                  (setf sb-thread::*default-alloc-signal* alloc-signal)))
              ;; Turn on allocation profiling in existing threads.
-             (dolist (thread (profiled-threads))
-               (sb-thread::%set-symbol-value-in-thread 'sb-vm::*alloc-signal* thread alloc-signal)))
+             (map-threads
+              (lambda (thread)
+                (sb-thread::%set-symbol-value-in-thread 'sb-vm::*alloc-signal* thread alloc-signal))))
            #-sb-thread
            (setf sb-vm:*alloc-signal* alloc-signal)))
         (:cpu
          (unix-setitimer :profile secs usecs secs usecs))
         (:time
          #+sb-thread
-         (let ((setup (sb-thread:make-semaphore :name "Timer thread setup semaphore")))
-           (setf *timer-thread*
-                 (sb-thread:make-thread (lambda ()
-                                          (sb-thread:wait-on-semaphore setup)
-                                          (loop while (eq sb-thread:*current-thread* *timer-thread*)
-                                                do (sleep 1.0)))
-                                        :name "SB-SPROF wallclock timer thread"))
-           (sb-thread:signal-semaphore setup))
+         (sb-thread::start-thread
+          (setf *timer* (sb-thread::%make-thread "SPROF timer" nil (sb-thread:make-semaphore)))
+          (lambda ()
+            (loop (unless *timer* (return))
+                  (sleep sample-interval)
+                  (map-threads
+                   (lambda (thread)
+                     (sb-thread:with-deathlok (thread c-thread)
+                       (unless (= c-thread 0)
+                         (sb-thread:pthread-kill (sb-thread::thread-os-thread thread)
+                                                 sb-unix:sigprof)))))))
+          nil)
          #-sb-thread
-         (setf *timer-thread* nil)
-         (setf *timer* (make-timer #'thread-distribution-handler :name "SB-PROF wallclock timer"
-                                   :thread *timer-thread*))
-         (schedule-timer *timer* sample-interval :repeat-interval sample-interval)))
+         (schedule-timer
+          (setf *timer* (make-timer (lambda () (unix-kill 0 sb-unix:sigprof))
+                                    :name "SPROF timer"))
+          sample-interval :repeat-interval sample-interval))))
       (setq *profiling* mode)))
   (values))
 
@@ -248,14 +261,16 @@ The following keyword args are recognized:
         (:cpu
          (unix-setitimer :profile 0 0 0 0))
         (:time
-         (unschedule-timer *timer*)
-         (setf *timer* nil
-               *timer-thread* nil)))
+         (let ((timer *timer*))
+           ;; after this assignment, the timer thread will raise the
+           ;; profiling signal at most once more, and then stop.
+           (setf *timer* nil)
+           #-sb-thread (unschedule-timer timer)
+           #+sb-thread (sb-thread:join-thread timer))))
      (disable-call-counting)
      (setf *profiling* nil
            *sampling* nil
-           *profiled-threads* nil)
-     (setf (samples-end-time *samples*) (get-internal-real-time))))
+           *profiled-threads* nil)))
   (values))
 
 (defun reset ()

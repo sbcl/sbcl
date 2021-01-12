@@ -34,8 +34,7 @@
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples
              (:constructor
-              make-samples (&key start-time
-                                 mode sample-interval alloc-interval
+              make-samples (&key mode sample-interval alloc-interval
                                  max-depth max-samples
                             &aux (vector (make-sample-vector max-samples)))))
   ;; When this vector fills up, we allocate a new one and copy over
@@ -59,9 +58,6 @@
   (sampled-threads nil                  :type list)
 
   ;; Metadata
-  (start-time      (sb-int:missing-arg) :type sb-kernel:internal-time    :read-only t)
-  (end-time        nil                  :type (or null sb-kernel:internal-time))
-
   (mode            nil                  :type sampling-mode              :read-only t)
   (sample-interval (sb-int:missing-arg) :type (real (0))                 :read-only t)
   (alloc-interval  (sb-int:missing-arg) :type (integer (0))              :read-only t)
@@ -283,48 +279,18 @@ EXPERIMENTAL: Interface subject to change."
 (defvar *profiled-threads* nil)
 (declaim (type (or list (member :all)) *profiled-threads*))
 
-;;; Thread which runs the wallclock timers, if any.
-(defvar *timer-thread* nil)
-
-(defun profiled-threads ()
-  (let ((profiled-threads *profiled-threads*))
-    (remove *timer-thread*
-            (if (eq :all profiled-threads)
-                ;; FIXME: inefficient, probably memoize on a best-effort basis:
-                ;;  detect whether the tree has changed, and recompute only if it did.
-                (sb-thread:list-all-threads)
-                profiled-threads))))
+;;; In wallclock mode, *TIMER* is an instance of either SB-THREAD:THREAD
+;;; or SB-EXT:TIMER depending on whether thread support exists.
+(defglobal *timer* nil)
 
 (defun profiled-thread-p (thread)
   (let ((profiled-threads *profiled-threads*))
-    (or (and (eq :all profiled-threads)
-             (not (eq *timer-thread* thread)))
-        (member thread profiled-threads :test #'eq))))
+    (if (listp profiled-threads) (memq thread profiled-threads) (neq *timer* thread))))
 
 #+(and (or x86 x86-64) (not win32))
 (progn
   ;; Ensure that only one thread at a time will be doing profiling stuff.
-  (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
-  (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
-
-  ;;; A random thread will call this in response to either a timer firing,
-  ;;; This in turn will distribute the notice to those threads we are
-  ;;; interested using SIGPROF.
-  (defun thread-distribution-handler ()
-    (declare (optimize speed (space 0)))
-    #+sb-thread
-    (let ((lock *distribution-lock*))
-      ;; Don't flood the system with more interrupts if the last
-      ;; set is still being delivered.
-      (unless (sb-thread:mutex-owner lock)
-        (with-system-mutex (lock)
-          (dolist (thread (profiled-threads))
-            (sb-thread:with-deathlok (thread c-thread)
-              (unless (= c-thread 0)
-                (sb-thread:pthread-kill (sb-thread::thread-os-thread thread)
-                                        sb-unix:sigprof)))))))
-    #-sb-thread
-    (unix-kill 0 sb-unix:sigprof))
+  (defglobal *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
 
   (defun sigprof-handler (signal code scp)
     (declare (ignore signal code) (optimize speed)
