@@ -970,6 +970,39 @@
                    '(function ((complex rational)) (values null &optional))))
     (assert (not (funcall fun2 #C(10 10))))))
 
+(with-test (:name (:numeric float rational :contagion))
+  (flet ((check (operator type argument)
+           (let ((fun (checked-compile
+                       `(lambda (x)
+                          (declare (type ,type x))
+                          ,(ecase argument
+                             (1 `(,operator x 1/2))
+                             (2 `(,operator 1/2 x)))))))
+             (assert (null (ctu:find-code-constants fun :type 'ratio))))))
+    (dolist (operator '(+ * / - = < > <= >=))
+      (dolist (type '(single-float double-float))
+        (check operator type 1)
+        (check operator type 2)
+        (when (member operator '(+ * / - =))
+          (check operator `(complex ,type) 1)
+          (check operator `(complex ,type) 2))))))
+
+(with-test (:name (:numeric float float :contagion))
+  (flet ((check (operator type argument)
+           (let ((fun (checked-compile
+                       `(lambda (x)
+                          (declare (type ,type x))
+                          ,(ecase argument
+                             (1 `(,operator x 1.0f0))
+                             (2 `(,operator 1.0f0 x)))))))
+             (assert (null (ctu:find-code-constants fun :type 'single-float))))))
+    (dolist (operator '(+ * / - = < > <= >=))
+      (check operator 'double-float 1)
+      (check operator 'double-float 2)
+      (when (member operator '(+ * / - =))
+        (check operator '(complex double-float) 1)
+        (check operator '(complex double-float) 2)))))
+
 (with-test (:name :find-type-deriver)
   (checked-compile-and-assert
       ()
@@ -3052,4 +3085,3 @@
      `(lambda ()
         (,name :k 0f0))
      (() 0f0))))
-

@@ -343,28 +343,58 @@
 ;;; as simple as (ZEROP (THE FLOAT X)) because we _know_ that the thing
 ;;; is a float, but the ZEROP transform injected a rational 0,
 ;;; which we then go to the trouble of coercing to a float.
-(deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
-  (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
-          (safe-ctype-for-single-coercion-p (lvar-type x)))
-      `(,(lvar-fun-name (basic-combination-fun node))
-         (float x y) y)
-      (give-up-ir1-transform)))
-(deftransform float-contagion-arg2 ((x y) * * :defun-only t :node node)
-  (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type 'single-float)))
-          (safe-ctype-for-single-coercion-p (lvar-type y)))
-      `(,(lvar-fun-name (basic-combination-fun node))
-         x (float y x))
-      (give-up-ir1-transform)))
+(progn
+  (deftransform real-float-contagion-arg1 ((x y) * * :defun-only t :node node)
+    (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
+            (safe-ctype-for-single-coercion-p (lvar-type x)))
+        `(,(lvar-fun-name (basic-combination-fun node)) (float x y) y)
+        (give-up-ir1-transform #1="the first argument cannot safely be converted to SINGLE-FLOAT")))
+  (deftransform complex-float-contagion-arg1 ((x y) * * :defun-only t :node node)
+    (if (or (not (types-equal-or-intersect
+                  (lvar-type y) (specifier-type '(complex single-float))))
+            (safe-ctype-for-single-coercion-p (lvar-type x)))
+        `(,(lvar-fun-name (basic-combination-fun node))
+          (float x (realpart y)) y)
+        (give-up-ir1-transform #1#)))
+  (deftransform real-float-contagion-arg2 ((x y) * * :defun-only t :node node)
+    (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type 'single-float)))
+            (safe-ctype-for-single-coercion-p (lvar-type y)))
+        `(,(lvar-fun-name (basic-combination-fun node)) x (float y x))
+        (give-up-ir1-transform #2="the second argument cannot safely be converted to SINGLE-FLOAT")))
+  (deftransform complex-float-contagion-arg2 ((x y) * * :defun-only t :node node)
+    (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(complex single-float))))
+            (safe-ctype-for-single-coercion-p (lvar-type y)))
+        `(,(lvar-fun-name (basic-combination-fun node))
+          x (float y (realpart x)))
+        (give-up-ir1-transform #2#))))
 
-(dolist (x '(+ * / -))
-  (%deftransform x '(function (rational float) *) #'float-contagion-arg1)
-  (%deftransform x '(function (float rational) *) #'float-contagion-arg2))
+(flet ((def (operator float-type other-type complexp argument)
+         (multiple-value-bind (type1 type2 function)
+             (ecase argument
+               (1 (if complexp
+                      (values other-type `(complex ,float-type) #'complex-float-contagion-arg1)
+                      (values other-type float-type #'real-float-contagion-arg1)))
+               (2 (if complexp
+                      (values `(complex ,float-type) other-type #'complex-float-contagion-arg2)
+                      (values float-type other-type #'real-float-contagion-arg2))))
+           (let ((note (format nil "open-code float conversion of ~:R ~
+                                    argument in mixed ~S-~S numeric ~
+                                    operation"
+                               argument type1 type2)))
+             (%deftransform operator `(function (,type1 ,type2) *) function note :slightly)))))
 
-(dolist (x '(= < > <= >= + * / -))
-  (%deftransform x '(function (single-float double-float) *)
-                 #'float-contagion-arg1)
-  (%deftransform x '(function (double-float single-float) *)
-                 #'float-contagion-arg2))
+  (dolist (operator '(+ * / -))
+    (def operator 'float 'rational nil 1)
+    (def operator 'float 'rational nil 2)
+    (def operator 'float 'rational t   1)
+    (def operator 'float 'rational t   2))
+
+  (dolist (operator '(= < > <= >= + * / -))
+    (def operator 'double-float 'single-float nil 1)
+    (def operator 'double-float 'single-float nil 2)
+    (when (member operator '(= + * / -))
+      (def operator 'double-float 'single-float t 1)
+      (def operator 'double-float 'single-float t 2))))
 
 (macrolet ((def (type &rest args)
              `(deftransform * ((x y) (,type (constant-arg (member ,@args))) *
