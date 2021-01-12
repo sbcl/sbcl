@@ -4013,13 +4013,21 @@ used for a COMPLEX component.~:@>"
 
 ;;; This messy case of CTYPE for NUMBER is shared between the
 ;;; cross-compiler and the target system.
+;;; I'm not sure whether NaNs should be numeric types versus MEMBER (like
+;;; sigleton signed zero without the "other" sign), but it may not matter.
+;;; At a bare minimum this prevents crashing in min/max.
 (defun ctype-of-number (x)
   (let ((num (if (complexp x) (realpart x) x)))
     (multiple-value-bind (complexp low high)
-        (if (complexp x)
-            (let ((imag (imagpart x)))
-              (values :complex (sb-xc:min num imag) (sb-xc:max num imag)))
-            (values :real num num))
+        (cond ((complexp x)
+               (let ((imag (imagpart x)))
+                 (if (and (floatp num) (or (float-nan-p num) (float-nan-p imag)))
+                     (values :complex nil nil)
+                     (values :complex (sb-xc:min num imag) (sb-xc:max num imag)))))
+              ((and (floatp num) (float-nan-p num))
+               (values :real nil nil))
+              (t
+               (values :real num num)))
       (make-numeric-type :class (etypecase num
                                   (integer (if (complexp x)
                                                (if (integerp (imagpart x))

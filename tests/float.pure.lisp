@@ -593,3 +593,6 @@
       (setf (aref v 0) (ffloor (aref v 0) d))
       v)
    :allow-notes nil))
+
+(with-test (:name :ctype-of-nan)
+  (checked-compile '(lambda () #.(sb-kernel:make-single-float -1))))
