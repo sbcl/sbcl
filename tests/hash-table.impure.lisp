@@ -202,3 +202,32 @@
 (with-test (:name :weak-hash-table-with-explicit-lock)
   (let ((h (make-hash-table :weakness :key)))
     (with-locked-hash-table (h) (setf (gethash 'foo h) 1))))
+
+(with-test (:name :hash-table-iterator-no-notes)
+  (let ((f
+         (checked-compile
+          '(lambda (h)
+            (declare (optimize speed))
+            (let ((n 0))
+              (declare (fixnum n))
+              ;; Silly test - count items, unrolling by 2
+              (with-hash-table-iterator (iter h)
+                (loop
+                  (let ((a (iter)))
+                    (unless a (return)))
+                  (let ((a (iter)))
+                    (unless a
+                      (incf n)
+                      (return)))
+                  (incf n 2)))
+              n))
+          :allow-notes nil)))
+    ;; Test F
+    (maphash (lambda (classoid layout)
+               (declare (ignore layout))
+               (let ((subclasses
+                      (sb-kernel:classoid-subclasses classoid)))
+                 (when (hash-table-p subclasses)
+                   (assert (= (hash-table-count subclasses)
+                              (funcall f subclasses))))))
+             (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't)))))

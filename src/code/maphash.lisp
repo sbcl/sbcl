@@ -97,25 +97,32 @@ applies to all threads, not just the current one -- even for synchronized
 hash-tables. If the table may be mutated by another thread during iteration,
 use eg. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
 for."
-  (let ((function (gensymify* name "-FUN")))
-    `(let ((,function
-            (let* ((kv-vector (hash-table-pairs ,hash-table))
-                   (limit (1+ (* 2 (kv-vector-high-water-mark kv-vector))))
-                   (index 3))
-              (declare (fixnum index))
-              (flet ((,name ()
-                       (loop
-                        (when (> index limit) (return nil))
-                        (let ((i index))
-                          (incf (truly-the index index) 2)
-                          (let ((key (data-vector-ref kv-vector (1- i)))
-                                (value (data-vector-ref kv-vector i)))
-                            (unless (or (empty-ht-slot-p key)
-                                        (empty-ht-slot-p value))
-                              (return (values t key value))))))))
-                #',name))))
-       (macrolet ((,name () '(funcall ,function)))
-         ,@body))))
+  ;; If within the BODY code the stepping function is used exactly once, then
+  ;; it gets let-converted and so it should make no difference whether it returns
+  ;; one or more than one value (it would never need RETURN-MULTIPLE).
+  ;; However if the iterator is not let-converted then it is best to return
+  ;; a fixed number of values on success or failure.
+  (let ((kvv (make-symbol "KVV"))
+        (lim (make-symbol "LIMIT"))
+        (ind (make-symbol "INDEX"))
+        (step (make-symbol "THUNK")))
+    `(let* ((,kvv (hash-table-pairs ,hash-table))
+            (,lim (1+ (* 2 (kv-vector-high-water-mark ,kvv))))
+            (,ind 3))
+       (declare (fixnum ,ind))
+       (dx-flet ((,step ()
+                   (loop
+                     (when (> ,ind ,lim) (return (values t nil nil)))
+                     (let ((i ,ind))
+                       (incf (truly-the index ,ind) 2)
+                       (let ((k (data-vector-ref ,kvv (1- i)))
+                             (v (data-vector-ref ,kvv i)))
+                         (unless (or (empty-ht-slot-p k) (empty-ht-slot-p v))
+                           (return (values nil k v))))))))
+         (macrolet ((,name ()
+                      '(multiple-value-bind (endp k v) (,step)
+                         (unless endp (values t k v)))))
+           ,@body)))))
 
 (define-compiler-macro make-hash-table (&whole form &rest keywords)
   (let ((kind
