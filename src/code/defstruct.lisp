@@ -2318,8 +2318,18 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; It's easier for the compiler to recognize the output of M-L-F-S-S
 ;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.
 (defmacro new-instance (type) `(allocate-instance (find-class ',type)))
+(defmacro new-struct (type) `(allocate-struct ',type))
 (defmacro sb-pcl::set-slots (instance name-list &rest values)
   `(sb-pcl::%set-slots ,instance ',name-list ,@values))
+
+#-sb-xc-host
+(defun allocate-struct (type)
+  (let* ((layout (classoid-layout (the structure-classoid (find-classoid type))))
+         (structure (%make-instance (layout-length layout))))
+    (setf (%instance-layout structure) layout)
+    (dolist (dsd (dd-slots (layout-dd layout)) structure)
+      (when (eq (dsd-raw-type dsd) 't)
+        (setf (%instance-ref structure (dsd-index dsd)) (make-unbound-marker))))))
 
 ;;; We require that MAKE-LOAD-FORM-SAVING-SLOTS produce deterministic output
 ;;; and that its output take a particular recognizable form so that it can
@@ -2333,10 +2343,11 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; unless dictated otherwise by the SAFE-P flag in the DSD.
 ;;;  * (defstruct S a (b (error "Must supply me") :type symbol))
 ;;;  * (defmethod make-load-form ((x S) &optional e) (m-l-f-s-s x :slot-names '(a)))
-;;; After these definitions, a dumped S will have 0 in slot B.
+;;; After these definitions, a dumped S will have #<unbound> in slot B.
 ;;;
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p)
-                                                environment)
+                                                environment
+                                           &aux (type (type-of object)))
   (declare (ignore environment))
   (flet ((quote-p (thing) (not (self-evaluating-p thing))))
     (declare (inline quote-p))
@@ -2344,9 +2355,8 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; unless there is a MAKE-LOAD-FORM on the class without a proper-name.
     ;; This is better than returning a creation form that produces
     ;; something completely different.
-    (values (let ((type (type-of object)))
-              `(,(if (symbolp type) 'new-instance 'allocate-instance) ,type))
-            (if (typep object 'structure-object)
+    (if (typep object 'structure-object)
+        (values `(new-struct ,(the symbol type)) ; no anonymous defstructs
                 `(setf ,@(mapcan
                           (lambda (dsd)
                             (declare (type defstruct-slot-description dsd))
@@ -2357,8 +2367,9 @@ or they must be declared locally notinline at each call site.~@:>"
                                      (val (funcall acc object ind)))
                                 (list `(,acc ,object ,ind)
                                       (if (quote-p val) `',val val)))))
-                          (dd-slots (layout-dd (%instance-layout object)))))
-                #-sb-xc-host
+                          (dd-slots (layout-dd (%instance-layout object))))))
+        #-sb-xc-host
+        (values `(,(if (symbolp type) 'new-instance 'allocate-instance) ,type)
                 (loop for slot in (sb-mop:class-slots (class-of object))
                       for name = (sb-mop:slot-definition-name slot)
                       when (if slot-names-p
@@ -2403,8 +2414,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (error (condition) (sb-c:compiler-error condition)))
       (cond ((and (listp creation-form)
                   (typep constant 'structure-object)
-                  (typep creation-form
-                         '(cons (eql new-instance) (cons symbol null)))
+                  (typep creation-form '(cons (eql new-struct) (cons symbol null)))
                   (eq (second creation-form) (type-of constant))
                   (typep init-form '(cons (eql setf)))
                   (canonical-p (cdr init-form)

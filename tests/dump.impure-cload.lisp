@@ -246,7 +246,7 @@
       (assert-canonical '(y x)))
     ;; specifying only one slot is not canonical
     (assert (equal (let ((*foo-save-slots* '(x))) (sb-c::%make-load-form foo))
-                   '(sb-kernel::new-instance foo)))))
+                   '(sb-kernel::new-struct foo)))))
 
 ;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
 ;; prior to the optimization for using fops to dump.
@@ -486,3 +486,22 @@
     (let ((s (intern (format nil "MYSAP~d" i))))
       (assert (= (sb-sys:sap-int (symbol-value s))
                  (ash 1 i))))))
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (defstruct monkey
+    (x t)
+    (y 1 :type fixnum)
+    (data (cons 1 2))
+    (str "hi"))
+
+  (defmethod make-load-form ((self monkey) &optional e)
+    (make-load-form-saving-slots self :slot-names '(data) :environment e)))
+
+(defvar *amonkey* #.(make-monkey :x nil :y 3 :data '(ok)))
+(eval-when (:compile-toplevel) (makunbound '*amonkey*))
+(with-test (:name :dump-monkey)
+  (let ((a *amonkey*))
+    (assert (sb-kernel::unbound-marker-p (monkey-x a)))
+    (assert (sb-kernel::unbound-marker-p (monkey-y a)))
+    (assert (sb-kernel::unbound-marker-p (monkey-str a)))
+    (assert (equal (monkey-data a) '(ok)))))
