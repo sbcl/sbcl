@@ -245,7 +245,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx integer-cond-reg-name-vec
-  (coerce integer-condition-registers 'vector)
+  #.(coerce integer-condition-registers 'vector)
   #'equalp)
 
 (deftype integer-condition-register ()
@@ -308,7 +308,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx fp-cond-reg-name-vec
-  (coerce fp-condition-registers 'vector)
+  #.(coerce fp-condition-registers 'vector)
   #'equalp)
 
 (defparameter fp-condition-reg-symbols
@@ -485,7 +485,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx cond-move-cond-reg-name-vec
-  (coerce cond-move-condition-registers 'vector)
+  #.(coerce cond-move-condition-registers 'vector)
   #'equalp)
 
 (deftype cond-move-condition-register ()

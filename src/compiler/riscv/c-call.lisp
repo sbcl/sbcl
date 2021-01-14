@@ -13,25 +13,24 @@
 
 
 (defconstant-eqx c-saved-registers
-    (list* lip-offset
-           8 9 (loop for i from 18 to 27 collect i))
+    '#.`(,lip-offset 8 9 ,@(loop for i from 18 to 27 collect i))
   #'equal)
 
 (defconstant-eqx c-unsaved-registers
-    (append (list lip-offset)
-            (loop for i from 5 to 7 collect i)
-            (loop for i from 10 to 17 collect i)
-            (loop for i from 28 to 31 collect i))
+    '#.`(,lip-offset
+         ,@(loop for i from 5 to 7 collect i)
+         ,@(loop for i from 10 to 17 collect i)
+         ,@(loop for i from 28 to 31 collect i))
   #'equal)
 
 (defconstant-eqx c-saved-float-registers
-    (list* 8 9 (loop for i from 18 to 27 collect i))
+    '#.`(8 9 ,@(loop for i from 18 to 27 collect i))
   #'equal)
 
 (defconstant-eqx c-unsaved-float-registers
-    (append (loop for i from 0 to 7 collect i)
-            (loop for i from 10 to 17 collect i)
-            (loop for i from 28 to 31 collect i))
+    '#.`(,@(loop for i from 0 to 7 collect i)
+         ,@(loop for i from 10 to 17 collect i)
+         ,@(loop for i from 28 to 31 collect i))
   #'equal)
 
 (defun make-reg-tn (offset &optional (sc 'any-reg))

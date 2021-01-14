@@ -332,7 +332,8 @@
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
     (unless (constantp expr)
       ;; Using an allowlist ensure that nothing too crazy occurs.
-      (unless (memq symbol '(sb-vm::+common-static-symbols+
+      (unless (memq symbol '(sb-vm::+static-symbols+
+                             sb-vm::+common-static-symbols+
                              sb-c::+no-costs+
                              sb-c::+no-loads+
                              sb-format::!illegal-inside-justification
