@@ -322,25 +322,16 @@
 
 ;;; Special variant at cross-compile-time. Face it: the "croak-if-not-EQx" test
 ;;; is irrelevant - there can be no pre-existing value to test against.
-;;; The extra magic is that we force evaluation of the value form to occur
-;;; inside the macroexpander so that it can be dumped as a literal object,
-;;; which in turn allows a LOAD-TIME-VALUE form referencing the constant to work
+;;; The extra requirement is that the EXPR must satisfy CONSTANTP so that this
+;;; macroexpander can EVAL it, and then the constant value can be dumped as a literal.
+;;; This in turn allows a LOAD-TIME-VALUE form referencing the constant to work
 ;;; in genesis because the target representation of the value will be available.
 ;;; It would not be available if the form were computable only by target code.
 #-sb-xc-host
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
     (unless (constantp expr)
-      ;; Using an allowlist ensure that nothing too crazy occurs.
-      (unless (memq symbol '(sb-vm::+static-symbols+
-                             sb-vm::+common-static-symbols+
-                             sb-c::+no-costs+
-                             sb-c::+no-loads+
-                             sb-format::!illegal-inside-justification
-                             sb-impl::!+pcl-reader-name+
-                             sb-impl::!+pcl-writer-name+
-                             sb-impl::!+pcl-boundp-name+))
-        (error "Assuming constant value for ~s" symbol)))
+      (error "DEFCONSTANT-EQX requires a literal constant"))
     `(progn
        (eval-when (:compile-toplevel)
          (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)))
