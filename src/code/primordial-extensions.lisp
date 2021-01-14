@@ -322,20 +322,19 @@
 
 ;;; Special variant at cross-compile-time. Face it: the "croak-if-not-EQx" test
 ;;; is irrelevant - there can be no pre-existing value to test against.
-;;; The extra magic is that we need to discern between constants simple enough
-;;; to assigned during genesis (cold-load) from those assigned in cold-init.
-;;; This choice informs the compiler how to emit references to the symbol.
-(defvar sb-c::*!const-value-deferred* '())
+;;; The extra magic is that we force evaluation of the value form to occur
+;;; inside the macroexpander so that it can be dumped as a literal object,
+;;; which in turn allows a LOAD-TIME-VALUE form referencing the constant to work
+;;; in genesis because the target representation of the value will be available.
+;;; It would not be available if the form were computable only by target code.
 #-sb-xc-host
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
-    (let ((constp (constantp expr)))
-      `(progn
-         (eval-when (:compile-toplevel)
-           (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
-           ,@(unless constp
-               `((push ',symbol sb-c::*!const-value-deferred*))))
-         (eval-when (:load-toplevel)
-           (sb-c::%defconstant ',symbol
-             ,(if constp `',(constant-form-value expr) expr)
-             (sb-c:source-location) ,@(when doc (list doc))))))))
+    (unless (constantp expr)
+      (format t "~&Assuming constant value for ~s~%" symbol))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)))
+       (eval-when (:load-toplevel)
+         (sb-c::%defconstant ',symbol `',(eval expr)
+           (sb-c:source-location) ,@(when doc (list doc)))))))
