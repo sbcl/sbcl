@@ -331,10 +331,18 @@
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
     (unless (constantp expr)
-      (format t "~&Assuming constant value for ~s~%" symbol))
+      ;; Using an allowlist ensure that nothing too crazy occurs.
+      (unless (memq symbol '(sb-vm::+common-static-symbols+
+                             sb-c::+no-costs+
+                             sb-c::+no-loads+
+                             sb-format::!illegal-inside-justification
+                             sb-impl::!+pcl-reader-name+
+                             sb-impl::!+pcl-writer-name+
+                             sb-impl::!+pcl-boundp-name+))
+        (error "Assuming constant value for ~s" symbol)))
     `(progn
        (eval-when (:compile-toplevel)
          (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)))
        (eval-when (:load-toplevel)
-         (sb-c::%defconstant ',symbol `',(eval expr)
+         (sb-c::%defconstant ',symbol ',(eval expr)
            (sb-c:source-location) ,@(when doc (list doc)))))))
