@@ -2537,6 +2537,7 @@
 ;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
+  #+sb-xc-host (declare (notinline code-object-size)) ; forward ref
   (sb-vm::with-code-instructions (sap code)
     (ecase kind
       (:absolute
