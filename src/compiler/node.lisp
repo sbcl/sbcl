@@ -770,13 +770,13 @@
   (leaf-%source-name leaf))
 
 ;;; The CONSTANT structure is used to represent known constant values.
-;;; Since the same constant leaf may be shared between named and anonymous
-;;; constants, %SOURCE-NAME is never used.
+;;; When compiling to a file, named named and anonymous constants with the
+;;; same value will not necessarily share the same leaf.
 (defstruct (constant (:constructor make-constant (value
                                                   &optional
                                                   (type (ctype-of value))
-                                                  &aux
                                                   (%source-name '.anonymous.)
+                                                  &aux
                                                   (where-from :defined)))
                      (:copier nil)
                      (:include leaf))

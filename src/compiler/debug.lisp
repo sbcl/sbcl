@@ -107,7 +107,7 @@
                         (barf "strange CONSTANTS entry: ~S" v))
                       (dolist (n (leaf-refs v))
                         (check-node-reached n)))
-                    (eq-constants ns))
+                    (eql-constants ns))
 
            (maphash (lambda (k v)
                       (declare (ignore k))

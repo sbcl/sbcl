@@ -268,7 +268,9 @@ Examples:
 ;;; and at maximum load the table will have a load factor of 87.5%
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant kv-pairs-overhead-slots 3))
-(defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
+;;; This constant is referenced via its name in cold load, so it needs to
+;;; be evaluable in the host.
+(defconstant +min-hash-table-rehash-threshold+ #.(sb-xc:float 1/16 $1.0))
 
 ;; The GC will set this to 1 if it moves an address-sensitive key. This used
 ;; to be signaled by a bit in the header of the kv vector, but that

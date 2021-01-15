@@ -781,7 +781,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (maphash (lambda (k v)
              (declare (ignore k))
              (setf (leaf-info v) nil))
-           (eq-constants ns))
+           (eql-constants ns))
   (maphash (lambda (k v)
              (declare (ignore k))
              (when (constant-p v)
@@ -807,10 +807,10 @@ necessary, since type inference may take arbitrarily long to converge.")
              (eq (node-component x) component)))
     (blast (free-vars ns))
     (blast (free-funs ns))
-    ;; There can be more constants to blast when considering them by EQ rather
+    ;; There can be more constants to blast when considering them by EQL rather
     ;; than similarity. But it's totally OK to visit a #<CONSTANT> twice.
     ;; Its refs will be scanned redundantly, which is harmless.
-    (blast (eq-constants ns)))
+    (blast (eql-constants ns)))
   (values))
 
 ;;;; trace output
@@ -1965,8 +1965,7 @@ returning its filename.
 (defvar *constants-being-created* nil)
 (defvar *constants-created-since-last-init* nil)
 ;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
-(defun emit-make-load-form (constant &optional (name nil namep)
-                                     &aux (fasl *compile-object*))
+(defun emit-make-load-form (constant &aux (fasl *compile-object*))
   (aver (fasl-output-p fasl))
   (unless (fasl-constant-already-dumped-p constant fasl)
     (let ((circular-ref (assoc constant *constants-being-created* :test #'eq)))
@@ -1974,12 +1973,6 @@ returning its filename.
         (when (find constant *constants-created-since-last-init* :test #'eq)
           (throw constant t))
         (throw 'pending-init circular-ref)))
-    ;; If this is a global constant reference, we can call SYMBOL-GLOBAL-VALUE
-    ;; during LOAD as a fasl op, and not compile a lambda.
-    (when namep
-      (fopcompile `(symbol-global-value ',name) nil t nil)
-      (fasl-note-handle-for-constant constant (sb-fasl::dump-pop fasl) fasl)
-      (return-from emit-make-load-form nil))
     (multiple-value-bind (creation-form init-form) (%make-load-form constant)
       (cond
         ((eq init-form 'sb-fasl::fop-struct)

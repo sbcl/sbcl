@@ -2391,53 +2391,6 @@ is :ANY, the function name is not checked."
            ;; This area of the language spec seems to have been a clusterfsck.
            (equal x y)))))
 
-;;; FIXME: FIND-CONSTANT is rife with problems.
-;;;
-;;; - We sometimes fail to use `(SYMBOL-VALUE ,a-defconstant) when we should,
-;;;   which can break some EQ tests in user code. [This is not a conformance issue,
-;;;   but goes against what we try so very hard to do: reference non-EQL-comparable
-;;;   constants only through the global symbol at load time]
-;;;
-;;; - We can't detect similar arrays other than BIT-VECTOR and STRING.
-;;;
-;;; - There is no general notion of similarity for INSTANCE, yet CORE-COALESCE-P used to
-;;;   return T of instances ever since git rev 45bc305be4 "refactor handling of constants".
-;;;   What was it trying to achieve? Maybe capture PATHNAME , HASH-TABLE and RANDOM-STATE,
-;;;   which are implemented as INSTANCE types, except EQUAL does not descend into
-;;;   any of them but PATHNAME.
-;;;
-;;; - What was it trying to achieve with SYMBOLS beyond the EQ test? I guess it's ok
-;;;   to collapse uninterned symbols by STRING=, but EQUAL won't do that.
-;;;
-;;; - Overall the CORE-COALESCE-P is just massively confusing. The only constants that can
-;;    legally be collapsed when compiling to memory are numbers.  Characters would be EQ
-;;;   if they were EQL. Symbol and instances, as I expressed already - WTF is up with that?
-
-;;; I think the only way forward is twofold:
-;;; - design a hash-table that correctly implements SIMILAR,
-;;; - always prefer a named constant over an anonymous constant when they are similar.
-;;;   We'll have to do this by never coalescing a named constant with an unnamed,
-;;;   then postprocess the constants to remove any unnamed that are similar to
-;;;   a named constant that got inserted later. Minimal problem example:
-#|
-(defconstant +foo+ (if (boundp '+foo+) +foo+ (cons nil nil)))
-;;; A-MACRO by pure coincidence expands to contain a constant that
-;;; is similar to +FOO+ but not EQ to it.
-(defmacro a-macro () ''(nil))
-;;; Because A-MACRO is opaque, you don't know that it injects a constant
-;;; EQUAL to +FOO+. The compiler assumes that the "second" use of the same
-;;; constant might as well use the value from the first occurrence,
-;;; not realizing that you actually relied on the EQ-ness condition.
-(defun getfoo () (values (a-macro) +foo+))
-;;; Counterintuitively, compiled (ISFOO (NTH-VALUE 1 (GETFOO))) returns NIL.
-(defun isfoo (x) (eq x +foo+))
-;;;
-* (load "try.lisp")
-* (ISFOO (NTH-VALUE 1 (GETFOO))) => T
-* (load (compile-file "try.lisp"))
-* (ISFOO (NTH-VALUE 1 (GETFOO))) => NIL
-|#
-
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
 ;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
@@ -2446,21 +2399,91 @@ is :ANY, the function name is not checked."
 ;;;
 ;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
 ;;; when file-compiling, but not when using COMPILE.
-(defun find-constant (object &optional (name nil namep))
+;;; FIXME:
+;;;  - EQUAL (the comparator in the similarity hash-table) is both too strict
+;;;    and not strict enough. Too strict because it won't compare simple-vector;
+;;;    not strict enough because base-string and character-string can't coalesce.
+;;;    We deal with this fine, but a real SIMILAR kind of hash-table would be nice.
+;;;  - arrays other than the handled kinds can be similar.
+;;;
+;;; If SYMBOL is supplied, then we will never try to match OBJECT against
+;;; a constant already present in the FASL-OUTPUT-EQ-TABLE, but we _will_ add
+;;; items to the namespace's EQL table. The reason is extremely subtle:
+;;; * if an anonymous structure constant happens to be EQ to a named constant
+;;;   seen first, but there is no applicable make-load-form-method on the type of
+;;;   the object, we "accidentally" permit the structure lacking a load form
+;;;   to be used (as if dumped) by virtue of the fact that it sees the named constant.
+;;;   I can't imagine that the spec wants that to work as if by magic, when it sure
+;;;   seems like a user error. However, our own code relies on such in a few places:
+;;;    (1) we want to dump #<SB-KERNEL:NAMED-TYPE T> but only after seeing it referenced
+;;;        in the same file as SB-KERNEL:*UNIVERSAL-TYPE*.
+;;;        This occurs where ADD-EQUALITY-CONSTRAINTS calls FIND-CONSTANT.
+;;;    (2) src/code/aprof would get an error
+;;;            "don't know how to dump R13 (default MAKE-LOAD-FORM method called)."
+;;;        in the LIST IR2-converter for
+;;;            (load-time-value `((xor :qword ,p-a-flag ,(get-gpr :qword rbp-offset)) ...))
+;;;        where P-A-FLAG is
+;;;            (defconstant-eqx p-a-flag `(ea 40 ,(get-gpr :qword ...)))
+;;;        But it somehow loses the fact that p-a-flag was a defconstant.
+;;;
+;;; * if within the same file we are willing to coalesce a named constant and
+;;;   unnamed constant (where the unnamed was dumped first), but in a different file
+;;;   we did not see a use of a similar unnamed constant, and went directly to
+;;;   SYMBOL-GLOBAL-VALUE, then two functions which reference the same globally named
+;;;   constant C might end up seeing two different versions of the load-time constant -
+;;;   one whose load-time producing form is `(SYMBOL-VALUE ,C) and one whose
+;;;   producing form is whatever else it was.
+;;;   This would matter only if at load-time, the form which produced C assigns
+;;;   some completely different (not EQ and maybe not even similar) to the symbol.
+;;;   But some weird behavior was definitely observable in user code.
+
+(defun find-constant (object &optional name
+                             &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*))
+                                  (output *compile-object*))
+
   ;; Pick off some objects that aren't actually constants in user code.
   ;; These things appear as literals in forms such as `(%POP-VALUES ,x)
   ;; acting as a magic mechanism for passing data along.
   (when (opaque-box-p object) ; quote an object without examining it
     (return-from find-constant
       (make-constant (opaque-box-value object) *universal-type*)))
-  ;; Note that we haven't picked off LAYOUT yet for two reasons:
-  ;;  1. layouts go in the hash-table so that a code component references
-  ;;     any given layout at most once
-  ;;  2. STANDARD-OBJECT layouts use MAKE-LOAD-FORM
+
+  (when (or (core-object-p output)
+            ;; Git rev eded4f76 added an assertion that a named non-fixnum is referenced
+            ;; via its name at (defconstant +share-me-4+ (* 2 most-positive-fixnum))
+            ;; I'm not sure that test makes any sense, but whatever...
+            (if name
+                (sb-xc:typep object '(or fixnum character symbol))
+                (sb-xc:typep object '(or number character symbol))))
+    ;;  "The consequences are undefined if literal objects are destructively modified
+    ;;   For this purpose, the following operations are considered destructive:
+    ;;   array - Storing a new value into some element of the array ..."
+    ;; so a string, once used as a literal in source, becomes logically immutable.
+    (when (and (core-object-p output) (sb-xc:typep object '(simple-array * (*))))
+      #-sb-xc-host (logically-readonlyize object nil))
+    ;;  "The functions eval and compile are required to ensure that literal objects
+    ;;   referenced within the resulting interpreted or compiled code objects are
+    ;;   the _same_ as the corresponding objects in the source code.
+    ;;   ...
+    ;;   The constraints on literal objects described in this section apply only to
+    ;;   compile-file; eval and compile do not copy or coalesce constants."
+    ;;   (http://www.lispworks.com/documentation/HyperSpec/Body/03_bd.htm)
+    ;; The preceding notwithstanding, numbers are always freely copyable and coaelescible.
+    (return-from find-constant
+      (if namespace
+          (values (ensure-gethash object (eql-constants namespace) (make-constant object)))
+          (make-constant object))))
+
+  ;; From here down, we're dealing only with COMPILE-FILE and a constant
+  ;; whose type is (not (or number character symbol)).
+  ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when file-compiling.
+  ;; But this logic is incomplete, lacking PACKAGE, RANDOM-STATE, ARRAY, HASH-TABLE,
+  ;; and PATHNAME.
+  ;; ARRAY, PATHNAME, and possibly RANDOM-STATE, could be worthwhile to handle.
   ;;
   ;; Note also, that in this code COALESCE-P has two meanings:
-  ;; (1) _could_ you look up in the hash-table some object
-  ;;     which *contains* certain types.
+  ;; (1) _could_ you look up in the hash-table some object.
+  ;;     This is mainly a guarantee that testing EQUAL will not encounter circularity.
   ;; (2) _should_ you look up ...
   ;; Suppose you have a a cons of a string and an instance:
   ;;  ("foo" . #<AIRPLANE {10015815D3}>)
@@ -2473,11 +2496,8 @@ is :ANY, the function name is not checked."
   ;; you don't want to side-effect the instance by causing it to grow
   ;; a stable hash slot. Of course, in the case of the cons holding
   ;; an instance, it will cause the side-effect on the instance.
-  (let ((faslp (producing-fasl-file))
-        (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
-    (labels ((core-coalesce-p (x)
-               (sb-xc:typep x '(or symbol number character instance)))
-             (cons-coalesce-p (x)
+
+  (labels ((cons-coalesce-p (x)
                (if (eq +code-coverage-unmarked+ (cdr x))
                    ;; These are already coalesced, and the CAR should
                    ;; always be OK, so no need to check.
@@ -2494,73 +2514,53 @@ is :ANY, the function name is not checked."
                                                 (atom-colesce-p car))
                                       (return nil))))))
                        (descend x)))))
-             (atom-colesce-p (x)
-               (or (core-coalesce-p x)
-                   ;; Honestly I don't see why this list is so restrictive.
-                   ;; e.g. What's the harm in deciding that any array
-                   ;; may be a subpart of a coalescible object?
-                   ;; It seems quite bogus to presume that the similarity
-                   ;; relation would do the wrong thing and that we have to guard
-                   ;; against potential wrongdoing.
-                   (typep x '(or bit-vector string))))
-             (file-coalesce-p (x)
-               ;; CLHS 3.2.4.2.2: We are also allowed to coalesce various
-               ;; other things when file-compiling.
-               (if (consp x)
-                   (cons-coalesce-p x)
-                   (atom-colesce-p x))))
-      ;; When compiling to core we don't coalesce strings, because
-      ;;  "The functions eval and compile are required to ensure that literal objects
-      ;;   referenced within the resulting interpreted or compiled code objects are
-      ;;   the _same_ as the corresponding objects in the source code."
-      ;; but in a dumped image, if gc_coalesce_string_literals is 1 then GC will
-      ;; coalesce similar immutable strings to save memory,
-      ;; even if not technically permitted. According to CLHS 3.7.1
-      ;;  "The consequences are undefined if literal objects are destructively modified
-      ;;   For this purpose, the following operations are considered destructive:
-      ;;   array - Storing a new value into some element of the array ..."
-      ;; so a string, once used as a literal in source, becomes logically immutable.
-      #-sb-xc-host
-      (when (and (not faslp) (simple-string-p object))
-        (logically-readonlyize object nil))
-      ;; refer to named structured constants through their name
-      (when (and faslp (not (sb-fasl:dumpable-layout-p object)) namep)
-        (maybe-emit-make-load-forms object name))
-      ;; Has this identical object been seen before? Bail out early if so.
-      (awhen (and namespace (gethash object (eq-constants namespace)))
+           (atom-colesce-p (x)
+             (sb-xc:typep x '(or symbol instance character number bit-vector string))))
+    (let ((coalescep
+           ;; Objects of other than one of these types should only be looked up
+           ;; in the EQL table because our similarity predicate is deficient.
+           (typecase object
+             (cons (cons-coalesce-p object))
+             ((or number bit-vector string) t))))
+
+      ;; If the constant is named, always look in the named-constants table first.
+      ;; This ensure that there is no chance of referring to the constant at load-time
+      ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
+      ;; Additionally, replace any unnamed constant that is similar to this one
+      ;; with the named constant. (THIS IS VERY SUSPICIOUS)
+      (when name
+        (return-from find-constant
+          (or (gethash name (named-constants namespace))
+              (let ((new (make-constant object (ctype-of object) name)))
+                (setf (gethash name (named-constants namespace)) new
+                      ;; overwrite any EQL unnamed constant with the named constant
+                      (gethash object (eql-constants namespace)) new)
+                (when coalescep
+                  ;; overwrite any similar unnamed constant
+                  (do ((candidates (gethash object (similar-constants namespace))
+                                   (cdr candidates)))
+                      ((endp candidates)
+                       (push new (gethash object (similar-constants namespace))))
+                    (let ((candidate (car candidates)))
+                      (when (and (similarp (constant-value candidate) object)
+                                 (eq (leaf-%source-name candidate) '.anonymous.))
+                        (return (rplaca candidates new))))))
+                new))))
+
+      ;; Has the identical object been seen before? Despite being an EQL hash-table,
+      ;; this is effectively an EQ test since we've ruled out numbers and characters.
+      (awhen (gethash object (eql-constants namespace))
         (return-from find-constant it))
-      (let* ((coalescep (and namespace
-                             (if faslp
-                                 (file-coalesce-p object)
-                                 (core-coalesce-p object))))
-             (effectively-coalescible
-              ;; See comment at top about why NOT to look up some things.
-              ;; "effectively coalescible" means "would attempting to coalesce
-              ;; this object have any effect beyond merely using the EQ table?"
-              ;; This has to avoid being sensitive to the cross-compiler host.
-              ;; For example, the number #.(ash 1 32) is probably not an immediate
-              ;; value on any 32-bit lisp. It would extremely fortuitous to find
-              ;; it in the EQ table, but if it isn't there, we _should_ look in
-              ;; the similar table. In the target lisp, if on a 64-bit build,
-              ;; then EQUAL/similar is as good as EQ for that key.
-              (and coalescep
-                   (not (sb-xc:typep object '(or symbol instance
-                                              #-sb-xc-host fixnum))))))
-        ;; constants referred to by name must retain their identity:
-        ;; they must not be coalesced with some other similar-enough
-        ;; constant.
-        (when (and effectively-coalescible (not namep))
-          (dolist (candidate (gethash object (similar-constants namespace)))
-            (when (similarp (constant-value candidate) object)
-              (return-from find-constant candidate))))
-        (when (and faslp (not (sb-fasl:dumpable-layout-p object)) (not namep))
-          (maybe-emit-make-load-forms object))
-        (let ((new (make-constant object)))
-          (when namespace
-            (setf (gethash object (eq-constants namespace)) new)
-            (when effectively-coalescible
-              (push new (gethash object (similar-constants namespace)))))
-          new)))))
+      (when coalescep
+        (dolist (candidate (gethash object (similar-constants namespace)))
+          (when (similarp (constant-value candidate) object)
+            (return-from find-constant candidate))))
+      (ensure-externalizable object)
+      (let ((new (make-constant object)))
+        (setf (gethash object (eql-constants namespace)) new)
+        (when coalescep
+          (push new (gethash object (similar-constants namespace))))
+        new))))
 
 ;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot

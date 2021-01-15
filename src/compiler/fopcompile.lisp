@@ -261,10 +261,19 @@
                             system-area-pointer
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))
+      ;; STANDARD-OBJECT layouts use MAKE-LOAD-FORM, but all other layouts
+      ;; have the same status as symbols - composite objects but leaflike.
+      (and (typep obj 'layout) (not (layout-for-pcl-obj-p obj)))
       ;; The cross-compiler wants to dump CTYPE instances as leaves,
       ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
       #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
-      (sb-fasl:dumpable-layout-p obj)))
+      ;; FIXME: The target compiler wants to dump NAMED-TYPE instances,
+      ;; or maybe it doesn't, but we're forgetting to OPAQUELY-QUOTE them.
+      ;; For the moment I've worked around this with a backward-compatibility
+      ;; hack in FIND-CONSTANT which causes anonymous uses of #<named-type t>
+      ;; to be dumped as *UNIVERSAL-TYPE*.
+      ;; #+sb-xc (named-type-p obj)
+      ))
 
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.

@@ -88,9 +88,11 @@
   (free-funs (make-hash-table :test 'equal) :read-only t :type hash-table)
   ;; These hashtables translate from constants to the LEAFs that
   ;; represent them.
-  ;; Table 1: one entry for each distinct constant (according to object identity)
-  (eq-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; Table 2: one hash-table entry per EQUAL constant,
+  ;; Table 1: one entry per named constant
+  (named-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
+  ;; Table 2: one entry for each unnamed constant as compared by EQL
+  (eql-constants (make-hash-table :test 'eql) :read-only t :type hash-table)
+  ;; Table 3: one key per EQUAL constant,
   ;; with the caveat that lookups must discriminate amongst constants that
   ;; are EQUAL but not similar.  The value in the hash-table is a list of candidates
   ;; (#<constant1> #<constant2> ... #<constantN>) such that CONSTANT-VALUE

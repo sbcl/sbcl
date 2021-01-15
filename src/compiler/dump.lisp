@@ -980,7 +980,13 @@
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
-             (dump-object (sb-c::constant-value entry) fasl-output))
+             (let ((name (sb-c::leaf-%source-name entry)))
+               (cond ((eq name 'sb-c::.anonymous.)
+                      (dump-object (sb-c::constant-value entry) fasl-output))
+                     (t
+                      (dump-object 'symbol-global-value fasl-output)
+                      (dump-object (sb-c::leaf-source-name entry) fasl-output)
+                      (dump-fop 'fop-funcall fasl-output 1)))))
             (cons
              (ecase (car entry)
                (:constant ; anything that has not been wrapped in a #<CONSTANT>

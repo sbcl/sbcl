@@ -324,9 +324,10 @@
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
 ;;; CONSTANT might be circular. We also check that the constant (and
 ;;; any subparts) are dumpable at all.
-(defun maybe-emit-make-load-forms (constant &optional (name nil namep))
-  (let ((xset (alloc-xset)))
-    (labels ((grovel (value)
+(defun ensure-externalizable (constant)
+  (declare (inline alloc-xset))
+  (dx-let ((xset (alloc-xset)))
+    (named-let grovel ((value constant))
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
                (unless (dumpable-leaflike-p value)
@@ -376,11 +377,6 @@
                       "Objects of type ~/sb-impl:print-type-specifier/ ~
                        can't be dumped into fasl files."
                      (type-of value)))))))
-      ;; Dump all non-trivial named constants using the name.
-      (if (and namep (not (sb-xc:typep constant '(or symbol character fixnum
-                                                  #+64-bit single-float))))
-          (emit-make-load-form constant name)
-          (grovel constant))))
   (values))
 
 ;;;; some flow-graph hacking utilities

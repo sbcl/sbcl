@@ -486,10 +486,6 @@
 (defun layout-for-pcl-obj-p (x)
   (logtest (layout-flags x) +pcl-object-layout-flag+))
 
-(declaim (inline sb-fasl:dumpable-layout-p))
-(defun sb-fasl:dumpable-layout-p (x)
-  (and (typep x 'layout) (not (layout-for-pcl-obj-p x))))
-
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type
 ;;; system.  (FIXME: It's also a type specifier, though this might go
