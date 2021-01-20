@@ -2397,6 +2397,21 @@
 ;;; (partially) constant-fold backq-* functions, or convert to their
 ;;; plain CL equivalent (now that they're not needed for pprinting).
 
+;;; There's too much ambiguity around semantics of backquoted expressions
+;;; as pertains to constant-ness, and on top of that, how "folding" affects
+;;; whether any of the elements need a load-time-value of a global
+;;; defconstant that is not trivially dumpable.
+;;; Refer to the test case in backq-const-fold.impure-cload.
+
+;;; To stave off any edge cases I'm just going to implement a stricter
+;;; definition of constant-lvar-p for all the backquote constructors.
+;;; Granted there are plenty of ways to cause creation of constants
+;;; that have dubious behavior in the absence of a make-load-form method,
+;;; but backquote seems a particularly notorious culprit.
+(macrolet ((trivially-constant-lvar-p (x)
+             `(and (constant-lvar-p ,x)
+                   (trivially-externalizable-p (lvar-value ,x)))))
+
 ;; Pop constant values from the end, list/list* them if any, and link
 ;; the remainder with list* at runtime.
 (defun transform-backq-list-or-list* (function values)
@@ -2404,7 +2419,7 @@
         (reverse (reverse values))
         (constants '()))
     (loop while (and reverse
-                     (constant-lvar-p (car reverse)))
+                     (trivially-constant-lvar-p (car reverse)))
           do (push (lvar-value (pop reverse))
                    constants))
     (if (null constants)
@@ -2427,6 +2442,28 @@
 (deftransform sb-impl::|List*| ((&rest elts))
   (transform-backq-list-or-list* 'list* elts))
 
+(deftransform sb-impl::|Vector| ((&rest elts))
+  (let ((gensyms (make-gensym-list (length elts)))
+        constants)
+    ;; There's not much that can be done with semi-constant vectors-
+    ;; either we're going to call VECTOR at compile-time or runtime.
+    ;; There's little point to building up intermediate lists in the partially
+    ;; constant case. There are ways to expand using MULTIPLE-VALUE-CALL that
+    ;; might avoid consing intermediate lists if ,@ is involved
+    ;; though I doubt it would provide benefit to many real-world scenarios.
+    (dolist (elt elts)
+      (cond ((trivially-constant-lvar-p elt)
+             (push (lvar-value elt) constants))
+            (t
+             (setq constants :fail)
+             (return))))
+    `(lambda ,gensyms
+       ,@(cond ((listp constants)
+                `((declare (ignore ,@gensyms))
+                  ,(apply 'vector (nreverse constants))))
+               (t
+                `((vector ,@gensyms)))))))
+
 ;; Merge adjacent constant values
 (deftransform sb-impl::|Append| ((&rest elts))
   (let ((gensyms (make-gensym-list (length elts)))
@@ -2439,7 +2476,7 @@
                  (push `',constant arguments)))))
       (loop for gensym in gensyms
             for (elt . next) on elts by #'cdr
-            do (cond ((constant-lvar-p elt)
+            do (cond ((trivially-constant-lvar-p elt)
                       (let ((elt (lvar-value elt)))
                         (when (and next (not (proper-list-p elt)))
                           (abort-ir1-transform
@@ -2455,6 +2492,7 @@
       `(lambda ,gensyms
          (declare (ignore ,@ignored))
          (append ,@arguments)))))
+) ; end MACROLET
 
 (deftransform reverse ((sequence) (vector) * :important nil)
   `(sb-impl::vector-reverse sequence))

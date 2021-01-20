@@ -892,10 +892,10 @@
   (movable flushable))
 (defknown %make-list ((integer 0 (#.make-list-limit)) t) list (movable flushable))
 
-(defknown sb-impl::|List| (&rest t) list (movable flushable foldable))
-(defknown sb-impl::|List*| (t &rest t) t (movable flushable foldable))
-(defknown sb-impl::|Append| (&rest t) t (flushable foldable))
-(defknown sb-impl::|Vector| (&rest t) simple-vector (flushable foldable))
+(defknown sb-impl::|List| (&rest t) list (movable flushable))
+(defknown sb-impl::|List*| (t &rest t) t (movable flushable))
+(defknown sb-impl::|Append| (&rest t) t (movable flushable))
+(defknown sb-impl::|Vector| (&rest t) simple-vector (movable flushable))
 
 ;;; All but last must be of type LIST, but there seems to be no way to
 ;;; express that in this syntax.
