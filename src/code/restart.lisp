@@ -123,7 +123,7 @@
   ;;   for HANDLER-BIND
   ;; * MAKE-APPLY-AND-RETURN which generates TAGBODY entries executing
   ;;   the respective BODY.
-  (let ((block-tag (gensym "BLOCK"))
+  (let ((block-tag (sb-xc:gensym "BLOCK"))
         (temp-var (gensym)))
     (labels ((parse-keywords-and-body (keywords-and-body)
                (do ((form keywords-and-body (cddr form))
@@ -211,7 +211,7 @@
    If restart-name is not invoked, then all values returned by forms are
    returned. If control is transferred to this restart, it immediately
    returns the values NIL and T."
-  (let ((stream (gensym "STREAM")))
+  (let ((stream (sb-xc:gensym "STREAM")))
    `(restart-case
         ;; If there's just one body form, then don't use PROGN. This allows
         ;; RESTART-CASE to "see" calls to ERROR, etc.

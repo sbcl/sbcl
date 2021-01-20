@@ -219,7 +219,7 @@
            (give-up-ir1-transform "Element alignment is unknown."))
          (if (null dims)
              (values nil 0 element-type)
-             (let* ((arg (gensym))
+             (let* ((arg (sb-xc:gensym))
                     (args (list arg))
                     (offsetexpr arg))
                (dolist (dim (cdr dims))

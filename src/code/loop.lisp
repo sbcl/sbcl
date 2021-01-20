@@ -1364,7 +1364,7 @@ code to be loaded.
 
 (defun loop-for-across (var val data-type)
   (loop-make-var var nil data-type)
-  (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
+  (let ((vector-var (sb-xc:gensym "LOOP-ACROSS-VECTOR-"))
         (index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
@@ -1646,14 +1646,14 @@ code to be loaded.
             (setq endform (if limit-constantp
                               `',limit-value
                               (loop-make-var
-                                 (gensym "LOOP-LIMIT-") form
+                                 (sb-xc:gensym "LOOP-LIMIT-") form
                                  `(and ,indexv-type real)))))
            (:by
             (multiple-value-setq (form stepby-constantp stepby)
               (loop-constant-fold-if-possible form
                                               `(and ,indexv-type (real (0)))))
             (unless stepby-constantp
-              (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+              (loop-make-var (setq stepby (sb-xc:gensym "LOOP-STEP-BY-"))
                  form
                  `(and ,indexv-type (real (0)))
                  t)))

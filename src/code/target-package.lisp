@@ -897,7 +897,7 @@ Experimental: interface subject to change."
 ;;; of STRING. ENTRY-HASH is the entry-hash of the string and length.
 ;;; If the symbol is found, then FORMS are executed; otherwise not.
 
-(defmacro with-symbol (((symbol-var &optional (index-var (gensym))) table
+(defmacro with-symbol (((symbol-var &optional (index-var (sb-xc:gensym))) table
                        string length sxhash) &body forms)
   (with-unique-names (vec len h2 probed-thing name)
     `(let* ((,vec (package-hashtable-cells ,table))

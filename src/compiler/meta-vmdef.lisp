@@ -1792,8 +1792,8 @@
          (result-count (length (vop-parse-results parse)))
          (info-count (length (vop-parse-info-args parse)))
          (noperands (+ arg-count result-count info-count))
-         (n-node (gensym))
-         (n-block (gensym))
+         (n-node (sb-xc:gensym))
+         (n-block (sb-xc:gensym))
          (n-template (gensym)))
 
     (when (or (vop-parse-more-args parse) (vop-parse-more-results parse))
@@ -1810,7 +1810,7 @@
         (collect ((ibinds)
                   (ivars))
           (dolist (info (subseq operands arg-count (+ arg-count info-count)))
-            (let ((temp (gensym)))
+            (let ((temp (sb-xc:gensym)))
               (ibinds `(,temp ,info))
               (ivars temp)))
 
@@ -1852,7 +1852,7 @@
          (fixed-args (butlast args))
          (fixed-results (butlast results))
          (n-node (gensym))
-         (n-block (gensym))
+         (n-block (sb-xc:gensym))
          (n-template (gensym)))
 
     (unless (or (vop-parse-more-args parse)

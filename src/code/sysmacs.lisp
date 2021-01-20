@@ -86,7 +86,7 @@ maintained."
 ;;;
 ;;; FIXME: Shouldn't these be functions instead of macros?
 (defmacro in-stream-from-designator (stream)
-  (let ((svar (gensym)))
+  (let ((svar (sb-xc:gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
@@ -111,7 +111,7 @@ maintained."
               (t (return x))))))
 |#
 (defmacro out-stream-from-designator (stream)
-  (let ((svar (gensym)))
+  (let ((svar (sb-xc:gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
