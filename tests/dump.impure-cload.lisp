@@ -505,3 +505,12 @@
     (assert (sb-kernel::unbound-marker-p (monkey-y a)))
     (assert (sb-kernel::unbound-marker-p (monkey-str a)))
     (assert (equal (monkey-data a) '(ok)))))
+
+(defun use-numeric-vector-a ()
+  #.(make-array 5 :element-type '(signed-byte 8) :initial-contents '(90 100 5 -2 3)))
+
+(defun use-numeric-vector-b ()
+  #.(make-array 5 :element-type '(signed-byte 8) :initial-contents '(90 100 5 -2 3)))
+
+(with-test (:name :coalesce-numeric-arrays)
+  (assert (eq (use-numeric-vector-a) (use-numeric-vector-b))))

@@ -230,16 +230,7 @@
            (t
             (let ((room-info (aref *room-info* (%other-pointer-widetag object))))
               (cond ((typep room-info 'specialized-array-element-type-properties)
-                     (aver (typep object '(simple-array * (*))))
-                     (let* ((length (+ (length object) (saetp-n-pad-elements room-info)))
-                            (n-bits (saetp-n-bits room-info))
-                            (alignment-pad (floor 7 n-bits))
-                                     ;; This math confuses me. So there's a self-test
-                                     ;; against the C code which is known good.
-                            (n-data-octets (if (>= n-bits 8)
-                                               (* length (ash n-bits -3))
-                                               (ash (* (+ length alignment-pad) n-bits)
-                                                    -3))))
+                     (let ((n-data-octets (vector-n-data-octets object room-info)))
                        (+ (ceiling n-data-octets n-word-bytes) ; N data words
                           vector-data-offset)))
                     (t

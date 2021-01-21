@@ -2355,42 +2355,6 @@ is :ANY, the function name is not checked."
       (change-ref-leaf ref new-leaf)))
   (values))
 
-;;; Do almost the same thing that EQUAL does, but consider strings
-;;; to be dissimilar if their element types differ.
-;;; When cross-compiling, any STRING= strings are similar
-;;; because there is logically only a BASE-STRING type.
-;;; ISTM that the language botched this up by not defining a standard
-;;; predicate which returns T if and only if objects are similar.
-(defun similarp (x y)
-  #+sb-xc-host (equal x y)
-  #-sb-xc-host
-  (named-let recurse ((x x) (y y))
-    (cond ((%eql x y) t)
-          ((consp x)
-           (and (consp y)
-                (recurse (car x) (car y))
-                (recurse (cdr x) (cdr y))))
-          ((stringp x)
-           (and (stringp y)
-                ;; (= (widetag-of ...)) would be too strict, because a simple string
-                ;; can be be similar to a non-simple string.
-                (eq (array-element-type x)
-                    (array-element-type y))
-                (string= x y)))
-          (t ; PATHNAME and BIT-vector can fall back upon EQUAL
-           ;; This could be slightly wrong, but so it always was, because we use
-           ;; (and have used) EQUAL for PATHNAME in SB-C::FIND-CONSTANT, but:
-           ;;   "Two pathnames S and C are similar if all corresponding pathname components are similar."
-           ;; and we readily admit that similarity of strings requires equal element types.
-           ;; So this is slightly dubious:
-           ;; (EQUAL (MAKE-PATHNAME :NAME (COERCE "A" 'SB-KERNEL:SIMPLE-CHARACTER-STRING))
-           ;;        (MAKE-PATHNAME :NAME (COERCE "A" 'BASE-STRING))) => T
-           ;; On the other hand, nothing says that the pathname constructors such as
-           ;; MAKE-PATHNAME and MERGE-PATHNAMES don't convert to a canonical representation
-           ;; which renders them EQUAL when all strings are STRING=.
-           ;; This area of the language spec seems to have been a clusterfsck.
-           (equal x y)))))
-
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
 ;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
@@ -2477,26 +2441,9 @@ is :ANY, the function name is not checked."
   ;; From here down, we're dealing only with COMPILE-FILE and a constant
   ;; whose type is (not (or number character symbol)).
   ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when file-compiling.
-  ;; But this logic is incomplete, lacking PACKAGE, RANDOM-STATE, ARRAY, HASH-TABLE,
-  ;; and PATHNAME.
-  ;; ARRAY, PATHNAME, and possibly RANDOM-STATE, could be worthwhile to handle.
-  ;;
-  ;; Note also, that in this code COALESCE-P has two meanings:
-  ;; (1) _could_ you look up in the hash-table some object.
-  ;;     This is mainly a guarantee that testing EQUAL will not encounter circularity.
-  ;; (2) _should_ you look up ...
-  ;; Suppose you have a a cons of a string and an instance:
-  ;;  ("foo" . #<AIRPLANE {10015815D3}>)
-  ;; and another similar cons to that which has a STRING= string
-  ;; (same type), and an EQ instance. You _may_ look up that cons
-  ;; in the similarity table. But if the key to the table is just the
-  ;; #<AIRPLANE>, while you _may_ look it up, you SHOULD NOT look it up,
-  ;; because if it was not EQ to something, then it is not EQUAL either.
-  ;; Due to how our EQUAL hash-tables behave on INSTANCE types,
-  ;; you don't want to side-effect the instance by causing it to grow
-  ;; a stable hash slot. Of course, in the case of the cons holding
-  ;; an instance, it will cause the side-effect on the instance.
-
+  ;; But this logic is incomplete, lacking PACKAGE, RANDOM-STATE, SIMPLE-VECTOR,
+  ;; HASH-TABLE, and PATHNAME, and all arrays of rank other than 1.
+  ;; SIMPLE-VECTOR, PATHNAME, and possibly RANDOM-STATE, could be worthwhile to handle.
   (labels ((cons-coalesce-p (x)
                (if (eq +code-coverage-unmarked+ (cdr x))
                    ;; These are already coalesced, and the CAR should
@@ -2515,13 +2462,16 @@ is :ANY, the function name is not checked."
                                       (return nil))))))
                        (descend x)))))
            (atom-colesce-p (x)
-             (sb-xc:typep x '(or symbol instance character number bit-vector string))))
+             (sb-xc:typep x '(or (unboxed-array (*)) number symbol instance character))))
     (let ((coalescep
-           ;; Objects of other than one of these types should only be looked up
-           ;; in the EQL table because our similarity predicate is deficient.
-           (typecase object
-             (cons (cons-coalesce-p object))
-             ((or number bit-vector string) t))))
+           ;; When COALESCEP is true, the similarity table is "useful" for this object,
+           ;; and that also implies that the object is not circular.
+           (if (consp object)
+               (cons-coalesce-p object)
+               ;; Coalescing of SYMBOL, INSTANCE, CHARACTER is not useful - if OBJECT is
+               ;; one of those, it would only be findable in the EQL table.
+               ;; However, a coalescible objects with subparts may contain those.
+               (sb-xc:typep object '(or (unboxed-array (*)) number)))))
 
       ;; If the constant is named, always look in the named-constants table first.
       ;; This ensure that there is no chance of referring to the constant at load-time
@@ -2532,34 +2482,30 @@ is :ANY, the function name is not checked."
         (return-from find-constant
           (or (gethash name (named-constants namespace))
               (let ((new (make-constant object (ctype-of object) name)))
-                (setf (gethash name (named-constants namespace)) new
-                      ;; overwrite any EQL unnamed constant with the named constant
-                      (gethash object (eql-constants namespace)) new)
+                (setf (gethash name (named-constants namespace)) new)
+                ;; If there was no EQL constant, or an unnamed one, add NEW
+                (let ((old (gethash object (eql-constants namespace))))
+                  (when (or (not old) (eq (leaf-%source-name old) '.anonymous.))
+                    (setf (gethash object (eql-constants namespace)) new)))
+                ;; Same for SIMILAR table, if coalescible
                 (when coalescep
-                  ;; overwrite any similar unnamed constant
-                  (do ((candidates (gethash object (similar-constants namespace))
-                                   (cdr candidates)))
-                      ((endp candidates)
-                       (push new (gethash object (similar-constants namespace))))
-                    (let ((candidate (car candidates)))
-                      (when (and (similarp (constant-value candidate) object)
-                                 (eq (leaf-%source-name candidate) '.anonymous.))
-                        (return (rplaca candidates new))))))
+                  (let ((old (get-similar object (similar-constants namespace))))
+                    (when (or (not old) (eq (leaf-%source-name old) '.anonymous.))
+                      (setf (get-similar object (similar-constants namespace)) new))))
                 new))))
 
-      ;; Has the identical object been seen before? Despite being an EQL hash-table,
-      ;; this is effectively an EQ test since we've ruled out numbers and characters.
-      (awhen (gethash object (eql-constants namespace))
-        (return-from find-constant it))
-      (when coalescep
-        (dolist (candidate (gethash object (similar-constants namespace)))
-          (when (similarp (constant-value candidate) object)
-            (return-from find-constant candidate))))
+      ;; Has the identical object or a similar object been seen before?
+      (let ((found (or (gethash object (eql-constants namespace))
+                       (and coalescep
+                            (get-similar object (similar-constants namespace))))))
+        (when found
+          (return-from find-constant found)))
+
       (ensure-externalizable object)
       (let ((new (make-constant object)))
         (setf (gethash object (eql-constants namespace)) new)
         (when coalescep
-          (push new (gethash object (similar-constants namespace))))
+          (setf (get-similar object (similar-constants namespace)) new))
         new))))
 
 ;;; Return true if X and Y are lvars whose only use is a

@@ -98,7 +98,7 @@
   ;; (#<constant1> #<constant2> ... #<constantN>) such that CONSTANT-VALUE
   ;; of each is EQUAL to the key for the hash-table entry, but dissimilar
   ;; from each other. Notably, strings of different element types can't be similar.
-  (similar-constants (make-hash-table :test 'equal) :read-only t :type hash-table))
+  (similar-constants (sb-fasl::make-similarity-table) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
 (sb-impl::define-thread-local *ir1-namespace*)

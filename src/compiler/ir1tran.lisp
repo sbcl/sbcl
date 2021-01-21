@@ -328,33 +328,34 @@
   (declare (inline alloc-xset))
   (dx-let ((xset (alloc-xset)))
     (named-let grovel ((value constant))
-               ;; Unless VALUE is an object which which obviously
-               ;; can't contain other objects
-               (unless (dumpable-leaflike-p value)
-                 (if (xset-member-p value xset)
-                     (return-from grovel nil)
-                     (add-to-xset value xset))
-                 (typecase value
-                   (cons
-                    (grovel (car value))
-                    (grovel (cdr value)))
-                   (simple-vector
-                    (dotimes (i (length value))
-                      (grovel (svref value i))))
-                   ((vector t)
-                    (dotimes (i (length value))
-                      (grovel (aref value i))))
-                   ((simple-array t)
+      ;; Unless VALUE is an object which which can't contain other objects,
+      ;; or was visited, or is acccessible in a named constant ...
+      (unless (or (dumpable-leaflike-p value)
+                  (xset-member-p value xset)
+                  (gethash value (eql-constants *ir1-namespace*)))
+        (add-to-xset value xset)
+        ;; FIXME: shouldn't this be something like SB-XC:TYPECASE ?
+        (typecase value
+          (cons
+           (grovel (car value))
+           (grovel (cdr value)))
+          (simple-vector
+           (dotimes (i (length value))
+             (grovel (svref value i))))
+          ((vector t)
+           (dotimes (i (length value))
+             (grovel (aref value i))))
+          ((simple-array t)
                     ;; Even though the (ARRAY T) branch does the exact
                     ;; same thing as this branch we do this separately
                     ;; so that the compiler can use faster versions of
                     ;; array-total-size and row-major-aref.
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   ((array t)
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   (instance
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          ((array t)
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          (instance
                     ;; In the target SBCL, we can dump any instance, but
                     ;; in the cross-compilation host, %INSTANCE-FOO
                     ;; functions don't work on general instances, only on
@@ -366,17 +367,16 @@
                     ;;
                     ;; FIXME: What about funcallable instances with
                     ;; user-defined MAKE-LOAD-FORM methods?
-                    (when (emit-make-load-form value)
-                      #+sb-xc-host
-                      (aver (eql (layout-bitmap (%instance-layout value))
-                                 sb-kernel:+layout-all-tagged+))
-                      (do-instance-tagged-slot (i value)
-                        (grovel (%instance-ref value i)))))
-                   (t
-                    (compiler-error
-                      "Objects of type ~/sb-impl:print-type-specifier/ ~
-                       can't be dumped into fasl files."
-                     (type-of value)))))))
+           (when (emit-make-load-form value)
+             #+sb-xc-host
+             (aver (eql (layout-bitmap (%instance-layout value))
+                        sb-kernel:+layout-all-tagged+))
+             (do-instance-tagged-slot (i value)
+               (grovel (%instance-ref value i)))))
+          (t
+           (compiler-error
+            "Objects of type ~/sb-impl:print-type-specifier/ can't be dumped into fasl files."
+            (type-of value)))))))
   (values))
 
 ;;; A constant is trivially externalizable if it involves no INSTANCE types

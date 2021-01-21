@@ -783,7 +783,7 @@
   ;; the value of the constant
   (value (missing-arg) :type t))
 (defprinter (constant :identity t)
-  value)
+  value (%source-name :test (neq %source-name '.anonymous.)))
 
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.

@@ -180,6 +180,17 @@
                 :key #'sb-vm:saetp-specifier :test #'equal)
       (error "No saetp for ~S" element-type)))
 
+(defun vector-n-data-octets (vector saetp)
+  (declare (type (simple-array * (*)) vector))
+  (let* ((length (+ (length vector) (saetp-n-pad-elements saetp)))
+         (n-bits (saetp-n-bits saetp))
+         (alignment-pad (floor 7 n-bits)))
+    ;; This math confuses me. So there's a self-test
+    ;; against the C code which is known good.
+    (if (>= n-bits 8)
+        (* length (ash n-bits -3))
+        (ash (* (+ length alignment-pad) n-bits) -3))))
+
 (in-package "SB-C")
 
 (defun find-saetp (element-type)
