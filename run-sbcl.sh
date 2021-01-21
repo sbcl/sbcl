@@ -26,7 +26,12 @@ while [ -h "$this" ]; do
         this=`dirname "$this"`/"$link"
     fi
 done
-BASE=`dirname "$this"`
+
+# need realpath to BASE because relative paths
+# have bad interactions with asdf:load-system
+# for systems that try to require implementation
+# specific values found in SBCL_HOME
+BASE=$(realpath $(dirname "$this"))
 
 CORE_DEFINED=no
 
