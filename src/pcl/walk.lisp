@@ -854,14 +854,20 @@
   (and bindings
        (let ((binding (car bindings)))
          (recons bindings
-                 (if (symbolp binding)
+                 (typecase binding
+                   (symbol
                      (prog1 binding
-                       (note-var-binding binding new-env))
-                     (prog1 (relist binding
-                                    (car binding)
-                                    (walk-form-internal
-                                     (cadr binding) context old-env))
+                       (note-var-binding binding new-env)))
+                   ((cons symbol list)
+                     (prog1 (relist* binding
+                                     (car binding)
+                                     (walk-form-internal
+                                      (cadr binding) context old-env)
+                                     ;; Preserve "trailing junk"
+                                     (cddr binding))
                        (note-var-binding (car binding) new-env)))
+                   (t ; illegal syntax, (let (#(foo))) or (let (a . #*1)) etc
+                    binding))
                  (walk-bindings-1 (cdr bindings) old-env new-env context)))))
 
 (defun walk-lambda (form context old-env)

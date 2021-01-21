@@ -1074,4 +1074,9 @@ Form: C   Context: EVAL; lexically bound
 ;;; Old PCL hung up on this.
 (defmethod #:foo ()
   (defun #:bar ()))
+
+;; lp#1912362
+(defmethod zook (x) (let ((typep x 'vector)) typep))
+(test-util:with-test (:name :let-syntax-error)
+  (assertoid:assert-error (zook 1)))
 
