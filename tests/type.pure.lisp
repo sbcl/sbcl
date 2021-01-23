@@ -726,3 +726,8 @@
                   (sb-kernel:make-numeric-type :low '(-79106810381456307)))
                  '(or (double-float (-7.91068103814563d16)) (single-float (-7.910681e16))
                    (rational (-79106810381456307))))))
+
+(with-test (:name (:cons-union :lp1912863))
+  (let ((c (cons 2 4)))
+    (assert (not (typep c '(or (cons (integer 0 8) (integer 5 15))
+                               (cons (integer 3 15) (integer 4 14))))))))

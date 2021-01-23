@@ -3635,19 +3635,55 @@ used for a COMPLEX component.~:@>"
             ((type= cdr-type1 cdr-type2)
              (make-cons-type (type-union car-type1 car-type2)
                              cdr-type1))
+            ;; (or (cons A1 D1) (cons A2 D2))
+            ;;
+            ;; if A1 is a subtype of A2, this is equivalent to
+            ;;
+            ;; (or (cons A1 (or D1 D2)) (cons (and A2 (not A1)) D2))
             ((csubtypep car-type1 car-type2)
              (frob-car car-type1 car-type2 cdr-type1 cdr-type2))
             ((csubtypep car-type2 car-type1)
              (frob-car car-type2 car-type1 cdr-type2 cdr-type1))
-            ;; more general case of the above, but harder to compute
+            ;; in general
+            ;;
+            ;; (or (cons A1 D1) (cons A2 D2))
+            ;;
+            ;; is
+            ;;
+            ;; (or (cons (and A1 A2) (or D1 D2))
+            ;;     (cons (and A1 (not A2)) D1)
+            ;;     (cons (and (not A1) A2) D2))
+            ;;
+            ;; (or (cons (integer 0 8) (integer 5 15))
+            ;;     (cons (integer 3 15) (integer 4 14))
+            ;;
+            ;; ->
+            ;;
+            ;; (or (cons (integer 3 8) (integer 4 15))
+            ;;     (cons (integer 0 2) (integer 5 15))
+            ;;     (cons (integer 9 15) (integer 4 14))
+            ;;
+            ;; if A1 and A2 are disjoint no further simplification is
+            ;; possible.  However, if they are not disjoint, and we
+            ;; can tell that they are not disjoint, we should be able
+            ;; to break the type up into smaller pieces.
             ((multiple-value-bind (yes win)
                  (csubtypep car-type2 (setf car-not1 (type-negation car-type1)))
                (and (not yes) win))
-             (frob-car car-type1 car-type2 cdr-type1 cdr-type2 car-not1))
+             (let ((cdr-union (type-union cdr-type1 cdr-type2)))
+               (setf car-not2 (type-negation car-type2))
+               (type-union
+                (make-cons-type (type-intersection car-type1 car-type2) cdr-union)
+                (make-cons-type (type-intersection car-type1 car-not2) cdr-type1)
+                (make-cons-type (type-intersection car-not1 car-type2) cdr-type2))))
             ((multiple-value-bind (yes win)
                  (csubtypep car-type1 (setf car-not2 (type-negation car-type2)))
                (and (not yes) win))
-             (frob-car car-type2 car-type1 cdr-type2 cdr-type1 car-not2))
+             (let ((cdr-union (type-union cdr-type1 cdr-type2)))
+               (type-union
+                (make-cons-type (type-intersection car-type1 car-type2) cdr-union)
+                (make-cons-type (type-intersection car-type1 car-not2) cdr-type1)
+                (make-cons-type (type-intersection car-not1 car-type2) cdr-type2))))
             ;; Don't put these in -- consider the effect of taking the
             ;; union of (CONS (INTEGER 0 2) (INTEGER 5 7)) and
             ;; (CONS (INTEGER 0 3) (INTEGER 5 6)).

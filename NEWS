@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.1:
+  * bug fix: canonical unions of CONS types were being incorrectly computed.
+    (lp#1912863, reported by James Kalenius)
+
 changes in sbcl-2.1.1 relative to sbcl-2.1.0:
   * platform support:
     ** restore non-threaded NetBSD builds;
