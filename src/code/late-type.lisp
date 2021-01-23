@@ -3622,15 +3622,13 @@ used for a COMPLEX component.~:@>"
         car-not1
         car-not2)
     ;; UGH.  -- CSR, 2003-02-24
-    (macrolet ((frob-car (car1 car2 cdr1 cdr2
-                               &optional not1)
-                   `(let ((intersection (type-intersection ,car2
-                                                           ,(or not1
-                                                                `(type-negation ,car1)))))
-                      (unless (type= intersection ,car2)
-                        (type-union
-                         (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
-                         (make-cons-type intersection ,cdr2))))))
+    (macrolet ((frob-car (car1 car2 cdr1 cdr2 &optional not1)
+                 `(let ((intersection (type-intersection ,car2
+                                                         ,(or not1 `(type-negation ,car1)))))
+                    (unless (type= intersection ,car2)
+                      (type-union
+                       (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
+                       (make-cons-type intersection ,cdr2))))))
       (cond ((type= car-type1 car-type2)
              (make-cons-type car-type1
                              (type-union cdr-type1 cdr-type2)))
