@@ -869,3 +869,11 @@
                              (truncate 5 0))
                           :allow-style-warnings t))))
                '(integer 0 0)))))
+
+(with-test (:name :truncate-by-zero-derivation.2)
+  (checked-compile
+   `(lambda (x y)
+      (declare (type (unsigned-byte 8) x y)
+               (optimize speed (safety 0)))
+      (mod x y))
+   :allow-notes nil))

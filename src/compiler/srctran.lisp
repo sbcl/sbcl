@@ -1638,7 +1638,8 @@
          (rem (truncate-rem-bound number-interval divisor-interval)))
     (cond ((and (numberp (interval-low divisor-interval))
                 (numberp (interval-high divisor-interval))
-                (zerop (interval-low divisor-interval)))
+                (zerop (interval-low divisor-interval))
+                (zerop (interval-high divisor-interval)))
            nil)
           ((eq rem-type 'integer)
            ;; Since the remainder type is INTEGER, both args are
