@@ -70,7 +70,7 @@ The following keyword args are recognized:
    If specified, call REPORT with :TYPE <type> at the end.
 
  :RESET <bool>
-   It true, call RESET at the beginning.
+   If true, call RESET at the beginning.
 
  :THREADS <list-form>
    Form that evaluates to the list threads to profile, or :ALL to indicate
