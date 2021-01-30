@@ -716,6 +716,31 @@
 (define-data-processing-instruction movs #x1b t nil)
 (define-data-processing-instruction mvn  #x1e t nil)
 (define-data-processing-instruction mvns #x1f t nil)
+
+(define-instruction-format (movw-format 32
+                            :default-printer '(:name :tab rd ", #" immediate))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (immediate :fields (list (byte 4 16) (byte 12 0))
+             :prefilter (lambda (dstate high low)
+                          (declare (ignore dstate))
+                          (logior (ash high 12) low)))
+  (rd :field (byte 4 12) :type 'reg))
+
+(macrolet ((mov-imm-16 (segment rd imm half)
+	     `(emit-dp-instruction ,segment 14 #b00 #b1
+				   ,(ecase half
+				      (:low  #b10000)
+				      (:high #b10100))
+				   (ldb (byte 4 12) ,imm)
+				   (tn-offset ,rd)
+				   (ldb (byte 12 0) ,imm))))
+(define-instruction movw (segment rd imm) ; move wide (zero-extend)
+  (:printer movw-format ((opcode-8 #b00110000)))
+  (:emitter (mov-imm-16 segment rd imm :low)))
+(define-instruction movt (segment rd imm) ; move top bits (and keep bottom)
+  (:printer movw-format ((opcode-8 #b00110100)))
+  (:emitter (mov-imm-16 segment rd imm :high))))
 
 ;;;; Exception-generating instructions
 
