@@ -9,7 +9,7 @@ changes in sbcl-2.1.1 relative to sbcl-2.1.0:
     object being iterated over is known not to be a list.  (lp#1908819,
     reported by Michael Fiano)
   * bug fix: detect 2 or 1 as an invalid number of arguments passed to
-    optimized slot writing or reading effective method respectively.
+    optimized slot reading or writing effective method respectively.
     (lp#1909659, reported by Michal Herda)
   * bug fix: division by zero errors were in some cases not being signalled.
     (lp#1910098, reported by il71)
