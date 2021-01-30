@@ -2427,3 +2427,23 @@
        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
              (ldb (byte 16 0) value)))))
   nil)
+
+(define-instruction store-coverage-mark (segment path-index temp)
+  (:emitter
+   ;; No backpatch is needed to compute the offset into the code header
+   ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   (let ((offset (+ (component-header-length)
+                    n-word-bytes ; skip over jump table word
+                    path-index
+                    (- code-tn-lowtag))))
+     (inst* segment 'stb sb-vm::null-tn sb-vm::code-tn
+            (etypecase offset
+              ((unsigned-byte 15) offset)
+              ((unsigned-byte 31)
+               ;; This is redundant with the logic in %LR, but unfortunately
+               ;; %LR does not take a SEGMENT argument.
+               ;; We could probably do this whole sequence in just 2 instructions-
+               ;; an "ADDIS LIP, CODE, something" and a STB using LIP as the base.
+               (inst* segment 'lis temp (ldb (byte 15 16) offset))
+               (inst* segment 'ori temp (ldb (byte 16 16) offset))
+               temp))))))

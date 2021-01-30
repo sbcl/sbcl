@@ -1402,3 +1402,22 @@
        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
              (ldb (byte 16 0) value)))))
   nil)
+
+(define-instruction store-coverage-mark (segment path-index)
+  ;; Don't need to annotate the dependence on code-tn, I think?
+  (:dependencies (writes :memory))
+  (:delay 0)
+  (:emitter
+   ;; No backpatch is needed to compute the offset into the code header
+   ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   ;;
+   ;; If someone wants to be clever and allow larger offsets from code-tn,
+   ;; feel free to try to improve this, but given that ASSEM-SCHEDULER-P is T
+   ;; for MIPS, I very much suspect that something would go wrong
+   ;; by emitting more than 1 CPU instruction from within an emitter.
+   (let ((offset (+ (component-header-length)
+                    n-word-bytes ; skip over jump table word
+                    path-index
+                    (- other-pointer-lowtag))))
+     (inst* segment 'sb sb-vm::null-tn sb-vm::code-tn
+            (the (unsigned-byte 15) offset)))))

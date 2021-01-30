@@ -2445,22 +2445,18 @@ is :ANY, the function name is not checked."
   ;; HASH-TABLE, and PATHNAME, and all arrays of rank other than 1.
   ;; SIMPLE-VECTOR, PATHNAME, and possibly RANDOM-STATE, could be worthwhile to handle.
   (labels ((cons-coalesce-p (x)
-               (if (eq +code-coverage-unmarked+ (cdr x))
-                   ;; These are already coalesced, and the CAR should
-                   ;; always be OK, so no need to check.
-                   t
-                   (when (coalesce-tree-p x)
-                     (labels ((descend (x)
-                                (do ((y x (cdr y)))
-                                    ((atom y) (atom-colesce-p y))
-                                  ;; Don't just call file-coalesce-p, because it'll
-                                  ;; invoke COALESCE-TREE-P repeatedly
-                                  (let ((car (car y)))
-                                    (unless (if (consp car)
-                                                (descend car)
-                                                (atom-colesce-p car))
-                                      (return nil))))))
-                       (descend x)))))
+             (when (coalesce-tree-p x)
+               (labels ((descend (x)
+                          (do ((y x (cdr y)))
+                              ((atom y) (atom-colesce-p y))
+                            ;; Don't just call file-coalesce-p, because it'll
+                            ;; invoke COALESCE-TREE-P repeatedly
+                            (let ((car (car y)))
+                              (unless (if (consp car)
+                                          (descend car)
+                                        (atom-colesce-p car))
+                                (return nil))))))
+                 (descend x))))
            (atom-colesce-p (x)
              (sb-xc:typep x '(or (unboxed-array (*)) number symbol instance character))))
     (let ((coalescep

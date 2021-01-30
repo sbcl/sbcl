@@ -343,3 +343,10 @@
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
+
+(define-vop (sb-c::mark-covered)
+ (:info index)
+ (:generator 4
+   ;; Can't convert index to a code-relative index until the boxed header length
+   ;; has been determined.
+   (inst store-coverage-mark index)))

@@ -39,6 +39,13 @@
   (:generator 0
      (emit-label the-label)))
 
+;;; These guys use a single instruction to record a coverage mark
+;;; and (for better or worse) delay insertion of instrumentation until
+;;; assembling, just prior to which we try to combine sequences of marking
+;;; instructions that have no control flow and which record the same
+;;; path as hit. "compresion" should be performed in IR2 instead
+;;; so that all the architectures can benefit from it.
+#+(or x86 x86-64)
 (define-vop (mark-covered)
   (:info path)
   (:generator 0

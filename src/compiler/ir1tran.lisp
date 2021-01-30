@@ -959,30 +959,13 @@
             ;; If this source path has already been instrumented in
             ;; this block, don't instrument it again.
             start
-            (let ((store
-                   ;; Get an interned record cons for the path. A cons
-                   ;; with the same object identity must be used for
-                   ;; each instrument for the same block.
-                   (ensure-gethash path (code-coverage-records metadata)
-                                   (cons path +code-coverage-unmarked+)))
-                  (next (make-ctran))
+            (let ((next (make-ctran))
                   (*allow-instrumenting* nil))
-              #+(or x86-64 x86) (declare (ignore store)) ; eval'd for side-effect only
+              (ensure-gethash path (code-coverage-records metadata)
+                              (cons path +code-coverage-unmarked+))
               (push (ctran-block start)
                     (gethash path (code-coverage-blocks metadata)))
-              (ir1-convert start next nil
-                           #+(or x86-64 x86)
-                           `(%primitive mark-covered ',path)
-                           #-(or x86-64 x86)
-                           `(locally
-                                (declare (optimize speed
-                                                   (safety 0)
-                                                   (debug 0)
-                                                   (check-constant-modification 0)))
-                              ;; We're being naughty here, and
-                              ;; modifying constant data. That's ok,
-                              ;; we know what we're doing.
-                              (%rplacd ',store t)))
+              (ir1-convert start next nil `(%primitive mark-covered ',path))
               next)))
       start))
 

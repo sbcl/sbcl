@@ -278,10 +278,32 @@
          ;; ones can use a NOP which helps the disassembler not lose sync.
          (filler-pattern 0)
          (asmstream (make-asmstream))
+         (coverage-map)
          (*asmstream* asmstream))
 
+    (declare (ignorable coverage-map))
     (emit (asmstream-elsewhere-section asmstream)
           (asmstream-elsewhere-label asmstream))
+
+    #-(or x86 x86-64)
+    (let ((path->index (make-hash-table :test 'equal)))
+      ;; Pre-scan for MARK-COVERED vops and collect the set of
+      ;; distinct source paths that occur. Delay adding the coverage map to
+      ;; the boxed constant vector until all vop generators have run, because
+      ;; they can use EMIT-CONSTANT to add more constants,
+      ;; while the coverage map has to be the very last entry in the vector.
+      (do-ir2-blocks (block component)
+        (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+            ((null vop))
+          (when (eq (vop-name vop) 'mark-covered)
+            (setf (vop-codegen-info vop)
+                  (list (ensure-gethash (car (vop-codegen-info vop))
+                                        path->index
+                                        (hash-table-count path->index)))))))
+      (when (plusp (hash-table-count path->index))
+        (setf coverage-map (make-array (hash-table-count path->index)))
+        (maphash (lambda (path index) (setf (aref coverage-map index) path))
+                 path->index)))
 
     (do-ir2-blocks (block component)
       (let ((1block (ir2-block-block block)))
@@ -344,7 +366,16 @@
     (emit-jump-tables)
     ;; Todo: can we implement the flow-based aspect of coverage mark compression
     ;; in IR2 instead of waiting until assembly generation?
-    (coverage-mark-lowering-pass component asmstream)
+    #+(or x86 x86-64) (coverage-mark-lowering-pass component asmstream)
+    #-(or x86 x86-64)
+    (when coverage-map
+      (vector-push-extend (make-constant (cons 'coverage-map coverage-map))
+                          (ir2-component-constants (component-info component)))
+      ;; The mark vop can store the low byte from either ZERO-TN or NULLL-TN
+      ;; to avoid loading a constant. Either one won't match #xff.
+      (emit (asmstream-data-section asmstream)
+            `(.skip ,(length coverage-map) #xff)))
+
     (emit-inline-constants)
 
     (let* ((info (component-info component))

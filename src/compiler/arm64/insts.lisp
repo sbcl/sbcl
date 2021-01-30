@@ -2717,3 +2717,24 @@
        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))))
   nil)
+
+(define-instruction store-coverage-mark (segment path-index temp)
+  (:emitter
+   ;; No backpatch is needed to compute the offset into the code header
+   ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   (let* ((offset (+ (component-header-length)
+                     n-word-bytes ; skip over jump table word
+                     path-index
+                     (- other-pointer-lowtag)))
+          (addr
+           (@ sb-vm::code-tn
+              (etypecase offset
+                ((integer 0 4095) offset)
+                ((unsigned-byte 16)
+                 (inst* 'movz segment temp offset 0)
+                 temp)
+                ((unsigned-byte 32)
+                 (inst* 'movz segment temp (ldb (byte 16 16) offset) 16)
+                 (inst* 'movk segment temp (ldb (byte 16 0) offset) 0)
+                 temp)))))
+     (inst* segment 'strb sb-vm::null-tn addr))))

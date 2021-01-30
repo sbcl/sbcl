@@ -330,3 +330,11 @@
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
+
+(define-vop (sb-c::mark-covered)
+ (:info index)
+ (:temporary (:sc unsigned-reg) tmp)
+ (:generator 4
+   ;; Can't compute code-tn-relative index until the boxed header length
+   ;; is known. Some vops emit new boxed words via EMIT-CONSTANT.
+   (inst store-coverage-mark index tmp)))

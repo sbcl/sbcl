@@ -20,8 +20,10 @@
 
 (defmacro code-coverage-hashtable () `(car sb-c:*code-coverage-info*))
 
-;;;; New coverage representation (only for x86-64 as of now).
+;;;; New coverage representation.
 ;;;; One byte per coverage mark is stored in the unboxed constants of the code.
+;;;; x86[-64] use a slightly different but not significantly different
+;;; representation of the marks from other architectures.
 (defun %find-coverage-map (code)
   (declare (type (or sb-kernel:simple-fun
                      sb-kernel:code-component
@@ -36,6 +38,11 @@
     (let ((n (sb-kernel:code-header-words code)))
       (let ((map (sb-kernel:code-header-ref code (1- n))))
         (when (typep map '(cons (eql sb-c::coverage-map)))
+          (return-from %find-coverage-map (values (cdr map) code))))
+      ;; if code-boxed-words can't be an odd number, try one more slot
+      #-(or x86 x86-64)
+      (let ((map (sb-kernel:code-header-ref code (- n 2))))
+        (when (typep map '(cons (eql sb-c::coverage-map)))
           (return-from %find-coverage-map (values (cdr map) code))))))))
 
 ;;; Coverage marks are in the raw bytes following the jump tables
@@ -45,17 +52,6 @@
   (let ((insts (sb-kernel:code-instructions code)))
     (sb-sys:sap+ insts (ash (sb-kernel:code-jump-table-words code)
                             sb-vm:word-shift))))
-
-;;; Retun just the list of soure paths in CODE that are marked covered.
-(defun get-coverage (code)
-  (multiple-value-bind (map code) (%find-coverage-map code)
-    (when map
-      (sb-int:collect ((paths))
-        (sb-sys:with-pinned-objects (code)
-          (let ((sap (code-coverage-marks code)))
-            (dotimes (i (length map) (paths))
-              (unless (zerop (sb-sys:sap-ref-8 sap i))
-                (paths (svref map i))))))))))
 
 ;;;;
 
@@ -85,7 +81,24 @@ image."
              (let ((,var (sb-ext:weak-pointer-value (car cell))))
                (if ,var
                    (progn ,@body (setq predecessor cell))
-                   (rplacd predecessor (cdr cell)))))))))
+                   (rplacd predecessor (cdr cell))))))))
+     (empty-mark-word ()
+       #+(or x86-64 x86) 0
+       #-(or x86-64 x86) sb-ext:most-positive-word)
+     (byte-marked-p (byte)
+       #+(or x86-64 x86) `(/= ,byte 0)
+       #-(or x86-64 x86) `(/= ,byte #xFF)))
+
+;;; Retun just the list of soure paths in CODE that are marked covered.
+(defun get-coverage (code)
+  (multiple-value-bind (map code) (%find-coverage-map code)
+    (when map
+      (sb-int:collect ((paths))
+        (sb-sys:with-pinned-objects (code)
+          (let ((sap (code-coverage-marks code)))
+            (dotimes (i (length map) (paths))
+              (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
+                (paths (svref map i))))))))))
 
 (defun reset-coverage (&optional object)
   "Reset all coverage data back to the `Not executed` state."
@@ -95,7 +108,8 @@ image."
              (sb-sys:with-pinned-objects (code)
                (let ((sap (code-coverage-marks code)))
                  (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
-                   (setf (sb-sys:sap-ref-word sap (ash i sb-vm:n-word-bytes)) 0)))))))
+                   (setf (sb-sys:sap-ref-word sap (ash i sb-vm:n-word-bytes))
+                         (empty-mark-word))))))))
         (t ; reset everything
          (do-instrumented-code (code)
            (reset-coverage code))
@@ -110,7 +124,6 @@ image."
   ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
   ;; source paths to the legacy coverage record for that path in that file,
   ;;   e.g. (1 4 1) -> ((1 4 1) . SB-C::%CODE-COVERAGE-UNMARKED%)
-  #+(or x86-64 x86)
   (let ((namestring->path-tables (make-hash-table :test 'equal))
         (coverage-records (code-coverage-hashtable))
         (n-marks 0))
@@ -136,10 +149,13 @@ image."
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
             (dotimes (i (length map)) ; for each recorded mark
-              (unless (zerop (sb-sys:sap-ref-8 sap i))
+              (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
                 (incf n-marks)
                 ;; Set the legacy coverage mark for each path it touches
-                (dolist (path (svref map i))
+                ;; One mark byte for x86[-64] corresponds to a union of source paths.
+                ;; For everybody else, one mark is one path.
+                (dolist (path #+(or x86 x86-64) (svref map i)
+                              #-(or x86 x86-64) (list (svref map i)))
                   (let ((found (gethash path path-lookup-table)))
                     (if found
                         (rplacd found t)
