@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.0:
+changes in sbcl-2.1.1 relative to sbcl-2.1.0:
   * platform support:
     ** restore non-threaded NetBSD builds;
     ** adjust how the finalizer thread is started; (lp#1906571, lp#1907872)
