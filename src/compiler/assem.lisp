@@ -1600,9 +1600,20 @@
 ;;; As such, we must detect that we are emitting directly to machine code.
 ;;;
 (defun inst* (mnemonic &rest operands)
-  (declare (symbol mnemonic))
-  (let ((action (gethash mnemonic *inst-encoder*))
-        (dest *current-destination*))
+  (let ((dest
+         (etypecase mnemonic
+           (symbol
+            ;; If called by a vop, the first argument is a mnemonic.
+            *current-destination*)
+           (segment
+            ;; If called by an instruction encoder to encode other instructions,
+            ;; the first argument is a SEGMENT. This facilitates a different kind of
+            ;; macro-instruction, one which decides only at encoding time what other
+            ;; instructions to emit. Similar results could be achievedy by factoring
+            ;; out other emitters into callable functions, though the INST macro
+            ;; tends to be a more convenient interface.
+            (prog1 mnemonic (setq mnemonic (the symbol (pop operands)))))))
+        (action (gethash mnemonic *inst-encoder*)))
     (unless action ; try canonicalizing again
       (setq mnemonic (find-symbol (string mnemonic)
                                   *backend-instruction-set-package*)
