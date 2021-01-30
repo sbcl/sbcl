@@ -1,5 +1,36 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.0:
+  * platform support:
+    ** restore non-threaded NetBSD builds;
+    ** adjust how the finalizer thread is started; (lp#1906571, lp#1907872)
+    ** fix the encoding of PEXTR on x86-64;
+  * minor incompatible change: emit warnings for list iteration forms when the
+    object being iterated over is known not to be a list.  (lp#1908819,
+    reported by Michael Fiano)
+  * bug fix: detect 2 or 1 as an invalid number of arguments passed to
+    optimized slot writing or reading effective method respectively.
+    (lp#1909659, reported by Michal Herda)
+  * bug fix: division by zero errors were in some cases not being signalled.
+    (lp#1910098, reported by il71)
+  * bug fix: erroneous coercions in the type system could lose precision.
+    (lp#1910294)
+  * bug fix: literal (read-time evaluated) NaNs in source code no longer cause
+    compiler crashes.  (lp#1909881, reported by Michal Herda)
+  * bug fix: detect more erroneous syntax in method bodies.  (lp#1912362,
+    reported by Paul M. Rodriguez)
+  * optimization: the compiler's understanding of EXPT is improved, reducing
+    the introduction of COMPLEX types.  (lp#1908830, reported by Michael Fiano)
+  * optimization: the compiler is better at computing numeric contagion when
+    (COMPLEX FLOAT) types are involved.
+  * micro-optimizations:
+    ** moving from slightly-bigger-than-fixnum ranges is more efficient on x86-64;
+    ** encode character comparisons with smaller operands on x86-64;
+    ** truncating (and related operations) on floats can be inlined in more
+       cases on 64-bit platforms;
+    ** rounding can use specialized instructions on ARM64 and on x86-64 when
+       SSE4 is available;
+
 changes in sbcl-2.1.0 relative to sbcl-2.0.11:
   * minor incompatible change: the MAKE-EA internal function, used in the
     assembler, has been removed (affecting some libraries defining their own
