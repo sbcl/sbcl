@@ -1166,8 +1166,8 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             break;
         default:
             if (!leaf_obj_widetag_p(widetag_of(obj))) {
-                nwords = BOXED_NWORDS(*obj);
-                for(i=1; i<=nwords; ++i) RECURSE(obj[i]);
+                int size = sizetab[widetag_of(obj)](obj);
+                for(i=1; i<size; ++i) RECURSE(obj[i]);
             }
       }
 }
