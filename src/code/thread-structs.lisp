@@ -62,6 +62,9 @@ future."
 
 (declaim (sb-ext:freeze-type waitqueue semaphore))
 
+(sb-ext:define-load-time-global *profiled-threads* :all)
+(declaim (type (or (eql :all) list) *profiled-threads*))
+
 (sb-xc:defstruct (thread (:constructor %make-thread (name %ephemeral-p semaphore))
                          (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
@@ -118,6 +121,7 @@ in future versions."
   ;; This is almost-but-not-quite the same as what formerly
   ;; might have been known as the %ALIVE-P flag.
   (%visible 1 :type fixnum)
+  (sigprof-enable (if (eq *profiled-threads* :all) 1 0) :type sb-ext:word)
   (interruptions nil :type list)
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")

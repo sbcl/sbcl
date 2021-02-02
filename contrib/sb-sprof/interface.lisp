@@ -32,16 +32,12 @@ profiling, and :TIME for wallclock profiling.")
                                 (loop nil)
                                 (max-depth most-positive-fixnum)
                                 show-progress
-                                (threads '(list sb-thread:*current-thread*))
+                                (threads :all)
                                 (report nil report-p))
                           &body body)
   "Evaluate BODY with statistical profiling turned on. If LOOP is true,
 loop around the BODY until a sufficient number of samples has been collected.
 Returns the values from the last evaluation of BODY.
-
-In multithreaded operation, only the thread in which WITH-PROFILING was
-evaluated will be profiled by default. If you want to profile multiple
-threads, invoke the profiler with START-PROFILING.
 
 The following keyword args are recognized:
 
@@ -74,8 +70,7 @@ The following keyword args are recognized:
 
  :THREADS <list-form>
    Form that evaluates to the list threads to profile, or :ALL to indicate
-   that all threads should be profiled. Defaults to the current
-   thread. (Note: START-PROFILING defaults to all threads.)
+   that all threads should be profiled. Defaults to all threads.
 
    :THREADS has no effect on call-counting at the moment.
 
@@ -93,7 +88,6 @@ The following keyword args are recognized:
   (with-unique-names (values last-index oops)
     `(let* ((*sample-interval* ,sample-interval)
             (*alloc-interval* ,alloc-interval)
-            (*sampling* nil)
             (*sampling-mode* ,mode)
             (*max-samples* ,max-samples))
        ,@(when reset '((reset)))
@@ -133,8 +127,7 @@ The following keyword args are recognized:
                         (sample-interval *sample-interval*)
                         (alloc-interval *alloc-interval*)
                         (max-depth most-positive-fixnum)
-                        (threads :all)
-                        (sampling t))
+                        (threads :all))
   "Start profiling statistically in the current thread if not already profiling.
 The following keyword args are recognized:
 
@@ -160,8 +153,7 @@ The following keyword args are recognized:
 
    :THREADS <list>
      List threads to profile, or :ALL to indicate that all threads should be
-     profiled. Defaults to :ALL. (Note: WITH-PROFILING defaults to the current
-     thread.)
+     profiled. Defaults to :ALL.
 
      :THREADS has no effect on call-counting at the moment.
 
@@ -169,11 +161,7 @@ The following keyword args are recognized:
      not properly delivered to threads in proportion to their CPU usage
      when doing :CPU profiling. If you see empty call graphs, or are obviously
      missing several samples from certain threads, you may be falling afoul
-     of this.
-
-   :SAMPLING <bool>
-     If true, the default, start sampling right away.
-     If false, START-SAMPLING can be used to turn sampling on."
+     of this."
   #-gencgc
   (when (eq mode :alloc)
     (error "Allocation profiling is only supported for builds using the generational garbage collector."))
@@ -182,18 +170,25 @@ The following keyword args are recognized:
         (multiple-value-bind (secs rest)
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
-      (setf *sampling* sampling
-            *samples* (make-samples :max-depth max-depth
+      (setf *samples* (make-samples :max-depth max-depth
                                     :max-samples max-samples
                                     :sample-interval sample-interval
                                     :alloc-interval alloc-interval
                                     :mode mode))
       (enable-call-counting)
-      (setf *profiled-threads* threads)
+      (setf sb-thread::*profiled-threads* threads)
+      ;; Each existing threads' sprof-enable slot needs to reflect the desired set.
+      (sb-thread::avltree-filter
+       (lambda (node &aux (thread (sb-thread::avlnode-data node)))
+         (if (or (eq threads :all) (memq thread threads))
+             (start-sampling thread)
+             (stop-sampling thread)))
+       sb-thread::*all-threads*)
+      ;;
       (sb-sys:enable-interrupt sb-unix:sigprof
                                #'sigprof-handler)
       (flet (#+sb-thread
-             (map-threads (function &aux (threads *profiled-threads*))
+             (map-threads (function &aux (threads sb-thread::*profiled-threads*))
                (if (listp threads)
                    (mapc function threads)
                    (named-let visit ((node sb-thread::*all-threads*))
@@ -269,13 +264,12 @@ The following keyword args are recognized:
            #+sb-thread (sb-thread:join-thread timer))))
      (disable-call-counting)
      (setf *profiling* nil
-           *sampling* nil
-           *profiled-threads* nil)))
+           ;; :ALL means that new threads won't block SIGPROF by default
+           sb-thread::*profiled-threads* :all)))
   (values))
 
 (defun reset ()
   "Reset the profiler."
   (stop-profiling)
-  (setq *sampling* nil)
   (setq *samples* nil)
   (values))

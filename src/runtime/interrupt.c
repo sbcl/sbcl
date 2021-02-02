@@ -2186,3 +2186,21 @@ handle_trap(os_context_t *context, int trap)
         unhandled_trap_error(context);
     }
 }
+
+#ifndef LISP_FEATURE_WIN32
+// Return 1 if the signal was previously in the blocked set.
+int sb_toggle_sigprof(os_context_t* context, int block) {
+    if (context) {
+        sigset_t *mask = os_context_sigmask_addr(context);
+        int was_blocked = sigismember(mask, SIGPROF);
+        if (block) sigaddset(mask, SIGPROF); else sigdelset(mask, SIGPROF);
+        return was_blocked;
+    } else {
+        sigset_t sigset, old;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGPROF);
+        thread_sigmask(block ? SIG_BLOCK : SIG_UNBLOCK, &sigset, &old);
+        return sigismember(&old, SIGPROF);
+    }
+}
+#endif

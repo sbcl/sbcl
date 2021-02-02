@@ -196,8 +196,6 @@ EXPERIMENTAL: Interface subject to change."
 
 (defvar *profiling* nil)
 (declaim (type (or (eql nil) sampling-mode) *profiling*))
-(defvar *sampling* nil)
-(declaim (type boolean *sampling*))
 
 (defvar *show-progress* nil)
 
@@ -209,19 +207,50 @@ EXPERIMENTAL: Interface subject to change."
     (apply #'format t format-string args)
     (finish-output)))
 
-(defun start-sampling ()
-  "Switch on statistical sampling."
-  (setq *sampling* t))
+(define-alien-routine "sb_toggle_sigprof" int (context system-area-pointer) (state int))
 
-(defun stop-sampling ()
-  "Switch off statistical sampling."
-  (setq *sampling* nil))
+(defconstant +sigprof-enable+ 1)
+
+;;; If a thread wants sampling but had previously blocked SIGPROF,
+;;; it will have to unblock the signal. We can use INTERRUPT-THREAD
+;;; to tell it to do that.
+(defun start-sampling (&optional (thread sb-thread:*current-thread*))
+  "Unblock SIGPROF in the specified thread"
+  (cond ((logtest (sb-thread::thread-sigprof-enable thread) +sigprof-enable+)) ; do nothing
+        ((neq thread sb-thread:*current-thread*)
+         (ignore-errors (sb-thread:interrupt-thread thread #'start-sampling)))
+        (t
+         (setf (sb-thread::thread-sigprof-enable thread) +sigprof-enable+)
+         (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
+                                sb-kernel:*current-internal-error-context*
+                                (sb-sys:int-sap 0))
+                            0))) ; 0 = unmask it
+  nil)
+
+(defun stop-sampling (&optional (thread sb-thread:*current-thread*))
+  "Block SIGPROF in the specified thread"
+  (unless (zerop (sb-thread::thread-sigprof-enable thread))
+    (setf (sb-thread::thread-sigprof-enable thread) 0)
+    ;; Blocking the signal is done lazily in threads other than the current one.
+    (when (eq thread sb-thread:*current-thread*)
+      (sb-toggle-sigprof (sb-sys:int-sap 0) 1))) ; 1 = mask it
+  nil)
+
+(defun call-with-sampling (enable thunk)
+  (declare (dynamic-extent thunk))
+  (let ((thread sb-thread:*current-thread*))
+    (if (eq (logtest (sb-thread::thread-sigprof-enable thread) +sigprof-enable+) enable)
+        ;; Already in the correct state
+        (funcall thunk)
+        ;; Invert state, call thunk, invert again
+        (let ((sb-vm:*alloc-signal* sb-vm:*alloc-signal*))
+          (if enable (start-sampling) (stop-sampling))
+          (unwind-protect (funcall thunk)
+            (if enable (stop-sampling) (start-sampling)))))))
 
 (defmacro with-sampling ((&optional (on t)) &body body)
-  "Evaluate body with statistical sampling turned on or off."
-  `(let ((*sampling* ,on)
-         (sb-vm:*alloc-signal* sb-vm:*alloc-signal*))
-     ,@body))
+  "Evaluate body with statistical sampling turned on or off in the current thread."
+  `(call-with-sampling (if ,on t nil) (lambda () ,@body)))
 
 ;;; Return something serving as debug info for address PC.
 (declaim (inline debug-info))
@@ -275,16 +304,12 @@ EXPERIMENTAL: Interface subject to change."
     (record-sample samples info pc-or-offset)
     foreign))
 
-;;; List of thread currently profiled, or :ALL for all threads.
-(defvar *profiled-threads* nil)
-(declaim (type (or list (member :all)) *profiled-threads*))
-
 ;;; In wallclock mode, *TIMER* is an instance of either SB-THREAD:THREAD
 ;;; or SB-EXT:TIMER depending on whether thread support exists.
 (defglobal *timer* nil)
 
 (defun profiled-thread-p (thread)
-  (let ((profiled-threads *profiled-threads*))
+  (let ((profiled-threads sb-thread::*profiled-threads*))
     (if (listp profiled-threads) (memq thread profiled-threads) (neq *timer* thread))))
 
 #+(and (or x86 x86-64) (not win32))
@@ -297,24 +322,17 @@ EXPERIMENTAL: Interface subject to change."
              (disable-package-locks sb-di::x86-call-context)
              (muffle-conditions compiler-note)
              (type system-area-pointer scp))
+    (when (zerop (sb-thread::thread-sigprof-enable sb-thread:*current-thread*))
+      ;; This thread does not want sampling, but received a profiling signal.
+      (sb-toggle-sigprof scp 1) ; block further signals
+      (return-from sigprof-handler))
     (let ((self sb-thread:*current-thread*)
           (profiling *profiling*))
       ;; Turn off allocation counter when it is not needed. Doing this in the
       ;; signal handler means we don't have to worry about racing with the runtime
       (unless (eq :alloc profiling)
         (setf sb-vm::*alloc-signal* nil))
-      (when (and *sampling*
-                 ;; Normal SIGPROF gets practically speaking delivered to threads
-                 ;; depending on the run time they use, so we need to filter
-                 ;; out those we don't care about. For :ALLOC and :TIME profiling
-                 ;; only the interesting threads get SIGPROF in the first place.
-                 ;;
-                 ;; ...except that Darwin at least doesn't seem to work like we
-                 ;; would want it to, which makes multithreaded :CPU profiling pretty
-                 ;; pointless there -- though it may be that our mach magic is
-                 ;; partially to blame?
-                 (or (not (eq :cpu profiling)) (profiled-thread-p self)))
-        (with-code-pages-pinned (:dynamic)
+      (with-code-pages-pinned (:dynamic)
          (with-system-mutex (*profiler-lock*)
           (let ((samples *samples*)
                 ;; Don't touch the circularity hash-table
@@ -370,7 +388,7 @@ EXPERIMENTAL: Interface subject to change."
               ;; Reset thread-local allocation counter before interrupts
               ;; are enabled.
               (when (eq t sb-vm::*alloc-signal*)
-                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples))))))))))
+                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples)))))))))
     nil))
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
@@ -378,10 +396,13 @@ EXPERIMENTAL: Interface subject to change."
 #-(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code))
+  (when (zerop (sb-thread::thread-sigprof-enable sb-thread:*current-thread*))
+    ;; This thread does not want sampling, but received a profiling signal.
+    (sb-toggle-sigprof scp 1) ; block further signals
+    (return-from sigprof-handler))
   (sb-sys:without-interrupts
     (let ((samples *samples*))
-      (when (and *sampling*
-                 samples
+      (when (and samples
                  (< (samples-trace-count samples)
                     (samples-max-samples samples)))
         (sb-sys:without-gcing
