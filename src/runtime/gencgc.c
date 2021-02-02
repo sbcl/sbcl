@@ -3654,9 +3654,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #if GENCGC_IS_PRECISE
     /*
      * If not x86, we need to scavenge the interrupt context(s) and the
-     * control stack.
+     * control stack, unless in final GC then don't.
      */
-    {
+    if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
             scavenge_interrupt_contexts(th);
