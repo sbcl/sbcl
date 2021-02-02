@@ -728,13 +728,13 @@
   (rd :field (byte 4 12) :type 'reg))
 
 (macrolet ((mov-imm-16 (segment rd imm half)
-	     `(emit-dp-instruction ,segment 14 #b00 #b1
-				   ,(ecase half
-				      (:low  #b10000)
-				      (:high #b10100))
-				   (ldb (byte 4 12) ,imm)
-				   (tn-offset ,rd)
-				   (ldb (byte 12 0) ,imm))))
+             `(emit-dp-instruction ,segment 14 #b00 #b1
+                                   ,(ecase half
+                                      (:low  #b10000)
+                                      (:high #b10100))
+                                   (ldb (byte 4 12) ,imm)
+                                   (tn-offset ,rd)
+                                   (ldb (byte 12 0) ,imm))))
 (define-instruction movw (segment rd imm) ; move wide (zero-extend)
   (:printer movw-format ((opcode-8 #b00110000)))
   (:emitter (mov-imm-16 segment rd imm :low)))
