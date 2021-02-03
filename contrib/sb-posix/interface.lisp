@@ -128,7 +128,7 @@
 (macrolet ((def (x)
                `(progn
                  (define-call-internally open-with-mode ,x int minusp
-                   (pathname filename) (flags int) (mode mode-t))
+                   (pathname filename) (flags int) &optional (mode mode-t))
                  (define-call-internally open-without-mode ,x int minusp
                    (pathname filename) (flags int))
                  (define-entry-point ,x
@@ -245,9 +245,10 @@
   (define-call-internally fcntl-without-arg "fcntl" int minusp
                           (fd file-descriptor) (cmd int))
   (define-call-internally fcntl-with-int-arg "fcntl" int minusp
-                          (fd file-descriptor) (cmd int) (arg int))
+                          (fd file-descriptor) (cmd int) &optional (arg int))
   (define-call-internally fcntl-with-pointer-arg "fcntl" int minusp
                           (fd file-descriptor) (cmd int)
+                          &optional
                           (arg alien-pointer-to-anything-or-nil))
   (define-protocol-class flock alien-flock ()
    ((type :initarg :type :accessor flock-type
