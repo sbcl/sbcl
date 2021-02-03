@@ -177,3 +177,30 @@
 (defconstant gc-safepoint-trap-offset n-word-bytes)
 
 #+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
+
+#-darwin-jit
+(progn
+  (declaim (inline (setf sap-ref-word-jit)
+                   (setf signed-sap-ref-32-jit)
+                   signed-sap-ref-32-jit
+                   (setf sap-ref-32-jit)
+                   sap-ref-32-jit
+                   (setf sap-ref-8-jit)))
+  (defun (setf sap-ref-word-jit) (value sap offset)
+    (setf (sap-ref-word sap offset) value))
+
+  (defun (setf signed-sap-ref-32-jit) (value sap offset)
+    (setf (signed-sap-ref-32 sap offset) value))
+
+  (defun signed-sap-ref-32-jit (sap offset)
+    (signed-sap-ref-32 sap offset))
+
+  (defun (setf sap-ref-32-jit) (value sap offset)
+    (setf (sap-ref-32 sap offset) value))
+
+  (defun sap-ref-32-jit (sap offset)
+    (sap-ref-32 sap offset))
+
+  #-sb-xc-host
+  (defun (setf sap-ref-8-jit) (value sap offset)
+    (setf (sap-ref-8 sap offset) value)))

@@ -318,10 +318,18 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
          operation; \
          protect_page(page_address(page_index), page_index); }}
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ
+#define OS_VM_PROT_JIT_ALL OS_VM_PROT_READ | OS_VM_PROT_WRITE
+#else
+#define OS_VM_PROT_JIT_READ OS_VM_PROT_READ | OS_VM_PROT_EXECUTE
+#define OS_VM_PROT_JIT_ALL OS_VM_PROT_ALL
+#endif
+
 /* This is used bu the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
-    os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
+    os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
     __sync_fetch_and_and(pflagbits, ~WRITE_PROTECTED_FLAG);
@@ -329,9 +337,12 @@ static inline void unprotect_page_index(page_index_t page_index)
 
 static inline void protect_page(void* page_addr, page_index_t page_index)
 {
-    os_protect((void *)page_addr,
-               GENCGC_CARD_BYTES,
-               OS_VM_PROT_READ|OS_VM_PROT_EXECUTE);
+#ifdef LISP_FEATURE_DARWIN_JIT
+    if ((page_table[page_index].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE) {
+      return;
+    }
+#endif
+    os_protect((void *)page_addr, GENCGC_CARD_BYTES, OS_VM_PROT_JIT_READ);
 
     /* Note: we never touch the write_protected_cleared bit when protecting
      * a page. Consider two random threads that reach their SIGSEGV handlers

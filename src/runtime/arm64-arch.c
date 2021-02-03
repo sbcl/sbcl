@@ -150,10 +150,12 @@ void arch_install_interrupt_handlers()
 
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  THREAD_JIT(0);
   char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
+
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
-    return;
+    goto DONE;
   }
   /*
     ldr reg,=address
@@ -177,4 +179,7 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
   *(unsigned long *)inst_ptr++ = (unsigned long)target_addr;
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
+
+ DONE:
+  THREAD_JIT(1);
 }

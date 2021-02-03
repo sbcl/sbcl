@@ -109,7 +109,7 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 #define IS_GUARD_PAGE    8
 extern os_vm_address_t os_validate(int movable,
                                    os_vm_address_t addr,
-                                   os_vm_size_t len);
+                                   os_vm_size_t len, int execute, int jit);
 
 #ifdef LISP_FEATURE_WIN32
 void* os_commit_memory(os_vm_address_t addr, os_vm_size_t len);
@@ -122,6 +122,11 @@ extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
 /* This maps a file into memory, or calls lose(..) for various
  * failures. */
 extern void* load_core_bytes(int fd,
+                             os_vm_offset_t offset,
+                             os_vm_address_t addr,
+                             os_vm_size_t len,
+                             int execute);
+extern void* load_core_bytes_jit(int fd,
                              os_vm_offset_t offset,
                              os_vm_address_t addr,
                              os_vm_size_t len);

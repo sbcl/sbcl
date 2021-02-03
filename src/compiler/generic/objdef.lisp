@@ -202,7 +202,8 @@ during backtrace.
               :ref-known (flushable)
               :ref-trans %%code-debug-info
               :set-known ()
-              :set-trans (setf %code-debug-info))
+              :set-trans (setf #-darwin-jit %code-debug-info
+                               #+darwin-jit %%code-debug-info))
   ;; Define this slot if the architecture might ever use fixups.
   ;; x86-64 doesn't necessarily use them, depending on the feature set,
   ;; but this keeps things consistent.

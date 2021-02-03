@@ -498,14 +498,14 @@
           ;; by GC and so the jump table count word is 0.
           (loop for byte-index from (ash boxed word-shift) downto (ash 2 word-shift)
                 by n-word-bytes
-                do (setf (sap-ref-word sap byte-index) 0)))
+                do (setf (sap-ref-word-jit sap byte-index) 0)))
         ;; The 1st slot beyond the header stores the boxed header size in bytes
         ;; as an untagged number, which has the same representation as a tagged
         ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
         ;; This boxed-size MUST be 0 prior to writing any pointers into the object
         ;; because the boxed words will not necessarily have been pre-zeroed;
         ;; scavenging them prior to zeroing them out would see wild pointers.
-        (setf (sap-ref-word sap (ash code-boxed-size-slot word-shift))
+        (setf (sap-ref-word-jit sap (ash code-boxed-size-slot word-shift))
               ;; For 32-bit words, we'll have to add another primitive-object slot.
               ;; But so far nothing makes use of the n-named-calls value.
               (logior #+64-bit (ash n-named-calls 32)

@@ -1,0 +1,48 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -g -Wall -O2 -fdollars-in-identifiers
+
+# ifdef LISP_FEATURE_INODE64
+# CFLAGS += -D_DARWIN_USE_64_BIT_INODE
+# endif 
+
+OS_SRC = bsd-os.c arm64-bsd-os.c darwin-os.c arm64-darwin-os.c
+
+OS_LIBS = -lSystem -lc -ldl
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
+ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
+  LIBSBCL = libsbcl.a
+  USE_LIBSBCL = -Wl,-force_load libsbcl.a
+endif
+
+ASSEM_SRC = arm64-assem.S
+ARCH_SRC = arm64-arch.c
+
+LINKFLAGS += -dynamic -twolevel_namespace -bind_at_load
+
+CFLAGS += -fno-omit-frame-pointer
+DISABLE_PIE=no
+
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
+else
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+endif
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

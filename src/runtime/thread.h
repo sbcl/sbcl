@@ -425,4 +425,9 @@ extern int sb_GetTID();
 # define THREAD_ID_VALUE ((void*)thread_self())
 #endif
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define THREAD_JIT(x) pthread_jit_write_protect_np((x))
+#else
+#define THREAD_JIT(x)
+#endif
 #endif /* _INCLUDE_THREAD_H_ */

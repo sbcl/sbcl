@@ -50,9 +50,9 @@ static const int should_allocate_low =
 #endif
 
 static void
-ensure_space(int attributes, uword_t start, uword_t size)
+ensure_space(int attributes, uword_t start, uword_t size, int execute, int jit)
 {
-    if (os_validate(attributes, (os_vm_address_t)start, (os_vm_size_t)size)==NULL) {
+    if (os_validate(attributes, (os_vm_address_t)start, (os_vm_size_t)size, execute, jit)==NULL) {
         fprintf(stderr,
                 "ensure_space: failed to allocate %lu bytes at %p\n",
                 (long unsigned)size, (void*)start);
@@ -82,7 +82,7 @@ ensure_undefined_alien(void) {
 #else
     os_reported_page_size = getpagesize();
 #endif
-    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size);
+    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size, 0, 0);
     if (start) {
         undefined_alien_address = start;
     } else {
@@ -99,10 +99,12 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
     struct {
         uword_t start;
         unsigned size;
+        int execute;
+        int jit;
     } preinit_spaces[] = {
-      { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE },
-      { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE },
-      { STATIC_SPACE_START, STATIC_SPACE_SIZE },
+        { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, 1, 0},
+        { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE, 1, 2},
+        { STATIC_SPACE_START, STATIC_SPACE_SIZE, 0, 0},
     };
     int i;
     int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
@@ -111,10 +113,15 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
         if (!preinit_spaces[i].size) continue;
         if (hard_failp)
             ensure_space(NOT_MOVABLE | should_allocate_low,
-                         preinit_spaces[i].start, preinit_spaces[i].size);
+                         preinit_spaces[i].start,
+                         preinit_spaces[i].size,
+                         preinit_spaces[i].execute,
+                         preinit_spaces[i].jit);
         else if (!os_validate(NOT_MOVABLE | should_allocate_low,
                               (os_vm_address_t)preinit_spaces[i].start,
-                              preinit_spaces[i].size)) {
+                              preinit_spaces[i].size,
+                              preinit_spaces[i].execute,
+                              preinit_spaces[i].jit)) {
             success = 0;
             break;
         }
@@ -142,7 +149,7 @@ allocate_lisp_dynamic_space(boolean did_preinit)
 static inline void
 protect_page(void *page, int protect_p, os_vm_prot_t flags) {
     os_protect(page, os_vm_page_size, protect_p ?
-               flags : OS_VM_PROT_ALL);
+               flags : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
 }
 
 #define DEF_PROTECT_PAGE(name,page_name,flags)                          \

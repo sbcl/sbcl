@@ -141,7 +141,7 @@
                                (undefined-alien-tramp-tagged
                                 (+ xundefined-alien-tramp
                                    fun-pointer-lowtag))))
-    ((:temp r8-tn unsigned-reg r8-offset))
+    ((:temp r9-tn unsigned-reg r9-offset))
   HEADER
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'undefined-alien-tramp-tagged
@@ -151,7 +151,7 @@
 
   UNDEFINED-ALIEN-TRAMP
   (inst adr code-tn header fun-pointer-lowtag)
-  (error-call nil 'undefined-alien-fun-error r8-tn))
+  (error-call nil 'undefined-alien-fun-error r9-tn))
 
 (define-assembly-routine
     (xclosure-tramp (:return-style :none)

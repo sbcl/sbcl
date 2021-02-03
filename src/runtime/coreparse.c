@@ -827,7 +827,9 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
                 {
                     addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                                (os_vm_address_t)addr, request);
+                                                (os_vm_address_t)addr, request,
+                                                id == READ_ONLY_CORE_SPACE_ID,
+                                                id == DYNAMIC_CORE_SPACE_ID);
                 }
                 if (!addr) {
                     lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
@@ -882,7 +884,14 @@ process_directory(int count, struct ndir_entry *entry,
             if (compressed)
                 inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
             else
-                load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
+#ifdef LISP_FEATURE_DARWIN_JIT
+            if (id == DYNAMIC_CORE_SPACE_ID) {
+                load_core_bytes_jit(fd, offset + file_offset, (os_vm_address_t)addr, len);
+            } else
+#endif
+              {
+                load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len, id == READ_ONLY_CORE_SPACE_ID);
+            }
         }
 
 #ifdef MADV_MERGEABLE

@@ -25,7 +25,7 @@
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
      (:temp lra-save non-descriptor-reg nl5-offset)
-     (:temp vector descriptor-reg r8-offset)
+     (:temp vector descriptor-reg r9-offset)
      (:temp lr interior-reg lr-offset))
   (pseudo-atomic (pa-flag)
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))

@@ -88,7 +88,7 @@
      ;; These are needed by the blitting code.
      (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
      (:temp count any-reg nl3-offset)
-     (:temp temp descriptor-reg r8-offset)
+     (:temp temp descriptor-reg r9-offset)
      (:temp lip interior-reg lr-offset)
 
      ;; These are needed so we can get at the register args.
@@ -146,7 +146,7 @@
 (define-assembly-routine (throw
                              (:return-style :none))
     ((:arg target descriptor-reg r0-offset)
-     (:arg start any-reg r8-offset)
+     (:arg start any-reg r9-offset)
      (:arg count any-reg nargs-offset)
      (:temp catch any-reg r1-offset)
      (:temp tag descriptor-reg r2-offset))
@@ -173,7 +173,7 @@
                           (:translate %unwind)
                           (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) r0-offset)
-     (:arg start (any-reg descriptor-reg) r8-offset)
+     (:arg start (any-reg descriptor-reg) r9-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
      (:temp ocfp any-reg ocfp-offset)
      (:temp lra descriptor-reg lexenv-offset)

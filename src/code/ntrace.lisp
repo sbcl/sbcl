@@ -649,8 +649,8 @@ functions when called with no arguments."
     (let ((sap (int-sap (get-lisp-obj-address code))))
       ;; NB: This is not threadsafe on machines that don't promise that
       ;; stores to single bytes are atomic.
-      (setf (sap-ref-8 sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
-                           #+big-endian (- 6 sb-vm:other-pointer-lowtag))
+      (setf (sb-vm::sap-ref-8-jit sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
+                                      #+big-endian (- 6 sb-vm:other-pointer-lowtag))
             bit)
       ;; touch the card mark
       (setf (code-header-ref code 1) (code-header-ref code 1)))))
@@ -758,10 +758,14 @@ functions when called with no arguments."
             (setf (sap-ref-word (int-sap (get-lisp-obj-address traced-fun))
                                 (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
                   tracing-wrapper-entry)
-            #-(or x86 x86-64)
+            #-(or x86 x86-64 darwin-jit)
             (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
                                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
-                  tracing-wrapper))))))
+                  tracing-wrapper)
+            #+darwin-jit
+            (setf (sb-vm::sap-ref-word-jit (int-sap (get-lisp-obj-address traced-fun))
+                                           (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                  (get-lisp-obj-address tracing-wrapper)))))))
     ;; Update fdefn's raw-addr slot to point to the tracing wrapper
     (when (and fdefn (eq (fdefn-fun fdefn) traced-fun))
       (setf (fdefn-fun fdefn) tracing-wrapper))

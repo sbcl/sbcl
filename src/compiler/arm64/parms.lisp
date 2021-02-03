@@ -109,8 +109,12 @@
     (defparameter dynamic-0-space-end   #x66fff000)))
 
 #+gencgc
-(!gencgc-space-setup #+(or linux openbsd) #xF0000000 #+netbsd #x2F0000000
-                     :dynamic-space-start #x1000000000)
+(!gencgc-space-setup #+(or linux openbsd) #xF0000000
+                     #+darwin #x300000000
+                     #+netbsd #x2F0000000
+                     :dynamic-space-start
+                     #-darwin #x1000000000
+                     #+darwin #x7003000000)
 
 (defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size 16)

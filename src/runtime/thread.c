@@ -854,7 +854,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
         // if any newly started thread could refer a dead thread's heap objects.
         zeroize_stack = 1;
     } else {
-        spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE);
+        spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE, 0, 0);
         if (!spaces) return NULL;
     }
     /* Aligning up is safe as THREAD_STRUCT_SIZE has

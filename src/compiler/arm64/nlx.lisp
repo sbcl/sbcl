@@ -15,7 +15,7 @@
 ;;; Make a TN for the argument count passing location for a
 ;;; non-local entry.
 (defun make-nlx-entry-arg-start-location ()
-  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn r8-offset))
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn r9-offset))
 
 ;;; Save and restore dynamic environment.
 (define-vop (current-stack-pointer)
@@ -240,7 +240,7 @@
          (catch-block :scs (any-reg descriptor-reg)))
   (:arg-types system-area-pointer system-area-pointer t t t)
   (:temporary (:sc unsigned-reg) temp)
-  (:temporary (:sc descriptor-reg :offset r8-offset) saved-function)
+  (:temporary (:sc descriptor-reg :offset r9-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
   (:temporary (:sc descriptor-reg :offset lexenv-offset) lexenv)
   (:temporary (:scs (interior-reg)) lip)
@@ -250,7 +250,7 @@
     (let ((entry-label (gen-label)))
       ;; Store the function into a non-stack location, since we'll be
       ;; unwinding the stack and destroying register contents before we
-      ;; use it.  It turns out that R8 is preserved as part of the
+      ;; use it.  It turns out that R9 is preserved as part of the
       ;; normal multiple-value handling of an unwind, so use that.
       (move saved-function function)
 

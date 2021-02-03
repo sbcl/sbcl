@@ -57,15 +57,21 @@
 ;;; FUN must be pinned when calling this.
 (declaim (inline assign-simple-fun-self))
 (defun assign-simple-fun-self (fun)
-  (setf (%simple-fun-self fun)
-        ;; x86 backends store the address of the entrypoint in 'self'
-        #+(or x86 x86-64)
-        (%make-lisp-obj
-         (truly-the word (+ (get-lisp-obj-address fun)
-                            (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
-                            (- sb-vm:fun-pointer-lowtag))))
-        ;; non-x86 backends store the function itself (what else?) in 'self'
-        #-(or x86 x86-64) fun))
+  (let ((self ;; x86 backends store the address of the entrypoint in 'self'
+          #+(or x86 x86-64)
+          (%make-lisp-obj
+           (truly-the word (+ (get-lisp-obj-address fun)
+                              (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
+                              (- sb-vm:fun-pointer-lowtag))))
+          ;; non-x86 backends store the function itself (what else?) in 'self'
+          #-(or x86 x86-64) fun))
+    #-darwin-jit
+    (setf (%simple-fun-self fun) self)
+    #+darwin-jit
+    (sb-vm::jit-patch (+ (get-lisp-obj-address fun)
+                  (- sb-vm:fun-pointer-lowtag)
+                  (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
+               (get-lisp-obj-address self))))
 
 (flet ((fixup (code-obj offset sym kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))
@@ -174,7 +180,10 @@
          (copy (allocate-code-object
                 :dynamic (code-n-named-calls code) boxed unboxed)))
     (with-pinned-objects (code copy)
+      #-darwin-jit
       (%byte-blt (code-instructions code) 0 (code-instructions copy) 0 unboxed)
+      #+darwin-jit
+      (sb-vm::jit-memcpy (code-instructions copy) (code-instructions code) unboxed)
       ;; copy boxed constants so that the fixup step (if needed) sees the 'fixups'
       ;; slot from the new object.
       (loop for i from 2 below boxed
@@ -245,7 +254,7 @@
          (insts (code-instructions code-obj))
          (jumptable-word (sap-ref-word insts 0)))
     (aver (zerop (ash jumptable-word -14)))
-    (setf (sap-ref-word insts 0) ; insert serialno
+    (setf (sb-vm::sap-ref-word-jit insts 0) ; insert serialno
           (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
                   jumptable-word))))
 
@@ -280,7 +289,12 @@
              ;; is GC-safe because we no longer need to know where simple-funs are embedded
              ;; within the object to trace pointers. We *do* need to know where the funs
              ;; are when transporting the object, but it's currently pinned.
+             #-darwin-jit
              (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
+             #+darwin-jit
+             (with-pinned-objects (bytes)
+               (sb-vm::jit-memcpy (code-instructions code-obj) (vector-sap bytes) (length bytes)))
+
              ;; Serial# shares a word with the jump-table word count,
              ;; so we can't assign serial# until after all raw bytes are copied in.
              (assign-code-serialno code-obj))
@@ -293,8 +307,8 @@
            ;; That is, C code can't deal with an interior code pointer until the fun-table
            ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
            ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
-           (setf (%code-debug-info code-obj) debug-info)
-           (apply-core-fixups fixup-notes code-obj))))
+            (setf (%code-debug-info code-obj) debug-info)
+            (apply-core-fixups fixup-notes code-obj))))
 
       ;; Don't need code pinned now
       ;; (It will implicitly be pinned on the conservatively scavenged backends)

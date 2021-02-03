@@ -122,11 +122,33 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int executable, int jit)
 {
-    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
-    attributes &= ~IS_GUARD_PAGE;
+    int protection;
     int flags = 0;
+
+    if (attributes & IS_GUARD_PAGE)
+        protection = OS_VM_PROT_NONE;
+    else
+#ifndef LISP_FEATURE_DARWIN_JIT
+        protection = OS_VM_PROT_ALL;
+#else
+    if (jit) {
+        if (jit == 2)
+            protection = OS_VM_PROT_ALL;
+        else
+            protection = OS_VM_PROT_READ | OS_VM_PROT_WRITE;
+        flags = MAP_JIT;
+    }
+    else if (executable) {
+        protection = OS_VM_PROT_READ | OS_VM_PROT_EXECUTE;
+    }
+    else {
+        protection = OS_VM_PROT_READ | OS_VM_PROT_WRITE;
+    }
+#endif
+
+    attributes &= ~IS_GUARD_PAGE;
 
 #ifndef LISP_FEATURE_DARWIN // Do not use MAP_FIXED, because the OS is sane.
 
@@ -216,7 +238,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
                     " mounted with wxallowed?\n");
         else
 #endif
-        perror("mmap");
+            perror("mmap");
         return NULL;
     }
 
@@ -234,7 +256,11 @@ void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
+
         perror("mprotect");
+#ifdef LISP_FEATURE_DARWIN_JIT
+        lose("%p %lu", address, length);
+#endif
     }
 }
 

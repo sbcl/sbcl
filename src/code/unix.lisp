@@ -178,11 +178,13 @@ corresponds to NAME, or NIL if there is none."
   #+win32 (sb-win32:unixlike-open path flags :overlapped overlapped)
   #-win32
   (with-restarted-syscall (value errno)
-    (int-syscall ("open" c-string int int)
-                 path
-                 (logior #+largefile o_largefile
-                         flags)
-                 mode)))
+    (locally
+        (declare (optimize (sb-c::float-accuracy 0)))
+      (let ((result (alien-funcall (extern-alien "open" (function int c-string int &optional int))
+                                   path (logior flags) mode)))
+        (if (minusp result)
+            (values nil (get-errno))
+            (values result 0))))))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
 ;;; associated with it.

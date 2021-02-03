@@ -61,7 +61,8 @@ void pick_fuzzed_addresses(unsigned long *addr1,
 }
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
+            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     void *fuzzed = addr;

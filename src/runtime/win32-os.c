@@ -773,7 +773,8 @@ uword_t get_monotonic_time()
 #endif
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
+            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
 {
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
@@ -847,7 +848,8 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
  * thing to maintain).
  */
 
-void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
+void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
+                      int __attribute__((unused)) execute)
 {
     os_commit_memory(addr, len);
 #ifdef LISP_FEATURE_64_BIT

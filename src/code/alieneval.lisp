@@ -1135,7 +1135,7 @@
   (arg-types (missing-arg) :type list)
   ;; The 3rd-party CFFI library uses presence of &REST in an argument list
   ;; as indicative of "..." in the C prototype. We can record that too.
-  (varargs nil :type (or boolean (eql :unspecified)))
+  (varargs nil :type (or boolean fixnum (eql :unspecified)))
   (stub nil :type (or null function))
   (convention nil :type calling-convention))
 ;;; The safe default is to assume that everything is varargs.
@@ -1153,6 +1153,7 @@
 ;;; result-type in this case. If convention is ever to become a part
 ;;; of result-type, such a syntax can be retained.
 
+
 (define-alien-type-translator function (result-type &rest arg-types
                                                     &environment env)
   (binding* (((bare-result-type calling-convention)
@@ -1160,14 +1161,21 @@
                 ((cons calling-convention *)
                  (values (second result-type) (first result-type)))
                 (t result-type)))
-             (varargs (eq (car (last arg-types)) '&rest)))
+             (varargs (or (eq (car (last arg-types)) '&rest)
+                          (position '&optional arg-types)))
+             (arg-types (if (integerp varargs)
+                            (remove '&optional arg-types)
+                            arg-types)))
     (make-alien-fun-type
      :convention calling-convention
      :result-type (let ((*values-type-okay* t))
                     (parse-alien-type bare-result-type env))
      :varargs (or varargs *alien-fun-type-varargs-default*)
-     :arg-types (mapcar (lambda (arg-type) (parse-alien-type arg-type env))
-                        (if varargs (butlast arg-types) arg-types)))))
+     :arg-types (mapcar (lambda (arg-type)
+                          (parse-alien-type arg-type env))
+                        (if (eql varargs t)
+                            (butlast arg-types)
+                            arg-types)))))
 
 (define-alien-type-method (fun :unparse) (type)
   `(function ,(let ((result-type

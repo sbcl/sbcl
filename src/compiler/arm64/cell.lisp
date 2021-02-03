@@ -482,6 +482,7 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-ref)
 
+#-darwin-jit
 (define-full-setter code-header-set * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-set)
 

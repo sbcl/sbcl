@@ -78,3 +78,63 @@
         (setf (context-register context lexenv-offset) fun-addr
               (context-register context lr-offset) entry)
         (set-context-pc context entry)))))
+
+#+darwin-jit
+(progn
+  (define-alien-routine jit-patch
+    void
+    (address unsigned)
+    (value unsigned))
+
+  (define-alien-routine jit-patch-int
+    void
+    (address unsigned)
+    (value int))
+
+  (define-alien-routine jit-patch-uint
+    void
+    (address unsigned)
+    (value unsigned-int))
+
+  (define-alien-routine jit-patch-uchar
+    void
+    (address unsigned)
+    (value unsigned-char))
+
+  (define-alien-routine jit-memcpy
+    void
+    (dst (* char))
+    (src (* char))
+    (char signed))
+
+  (defun (setf sap-ref-word-jit) (value sap offset)
+    (jit-patch (+ (sap-int sap) offset) value))
+
+  (defun (setf signed-sap-ref-32-jit) (value sap offset)
+    (jit-patch-int (+ (sap-int sap) offset) value))
+
+  (defun signed-sap-ref-32-jit (sap offset)
+    (signed-sap-ref-32 sap offset))
+
+  (defun (setf sap-ref-32-jit) (value sap offset)
+    (jit-patch-uint (+ (sap-int sap) offset) value))
+
+  (defun sap-ref-32-jit (sap offset)
+    (sap-ref-32 sap offset))
+
+  (defun (setf sap-ref-8-jit) (value sap offset)
+    (jit-patch-uchar (+ (sap-int sap) offset) value))
+
+  (defun code-header-set (code index value)
+    (with-pinned-objects (code value)
+      (jit-patch (+ (get-lisp-obj-address code)
+                    (- other-pointer-lowtag)
+                    (* index n-word-bytes))
+                 (get-lisp-obj-address value))))
+
+  (defun (setf %code-debug-info) (value code)
+    (with-pinned-objects (code value)
+      (jit-patch (+ (get-lisp-obj-address code)
+                    (- other-pointer-lowtag)
+                    (* code-debug-info-slot n-word-bytes))
+                 (get-lisp-obj-address value)))))

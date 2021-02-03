@@ -275,7 +275,23 @@
   (defun (setf signed-sap-ref-32) (newval sap offset)
     (setf (access bvref-32) (ldb (byte 32 0) (the (signed-byte 32) newval))))
   (defun (setf sap-ref-64) (newval sap offset)
-    (setf (access bvref-64) newval)))
+    (setf (access bvref-64) newval))
+  #+darwin-jit
+  (progn
+    (defun (setf sb-vm::sap-ref-word-jit) (value sap offset)
+      (setf (sap-ref-64 sap offset) value))
+
+    (defun (setf sb-vm::signed-sap-ref-32-jit) (value sap offset)
+      (setf (signed-sap-ref-32 sap offset) value))
+
+    (defun sb-vm::signed-sap-ref-32-jit (sap offset)
+      (signed-sap-ref-32 sap offset))
+
+    (defun (setf sb-vm::sap-ref-32-jit) (value sap offset)
+      (setf (sap-ref-32 sap offset) value))
+
+    (defun sb-vm::sap-ref-32-jit (sap offset)
+      (sap-ref-32 sap offset))))
 
 ;;;; representation of descriptors
 

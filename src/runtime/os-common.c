@@ -74,7 +74,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
          * zero-filled. */
 
         os_invalidate(block_start, block_size);
-        addr = os_validate(NOT_MOVABLE, block_start, block_size);
+        addr = os_validate(NOT_MOVABLE, block_start, block_size, 0, 0);
 
         if (addr == NULL || addr != block_start)
             lose("os_zero: block moved! %p ==> %p", block_start, addr);
@@ -85,7 +85,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
 os_vm_address_t
 os_allocate(os_vm_size_t len)
 {
-    return os_validate(MOVABLE, (os_vm_address_t)NULL, len);
+    return os_validate(MOVABLE, (os_vm_address_t)NULL, len, 0, 0);
 }
 
 void
@@ -218,7 +218,7 @@ gc_managed_heap_space_p(lispobj addr)
 
 /* Remap a part of an already existing memory mapping from a file,
  * and/or create a new mapping as need be */
-void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
+void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len, int execute)
 {
     int fail = 0;
     os_vm_address_t actual;
@@ -228,7 +228,11 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
                   // However, the addr=0 case is for 'editcore' which unfortunately _does_
                   // write the memory. I'd prefer that it not,
                   // but that's not the concern here.
+#ifdef LISP_FEATURE_DARWIN_JIT
+                  OS_VM_PROT_READ | (execute ?  OS_VM_PROT_EXECUTE : OS_VM_PROT_WRITE),
+#else
                   addr ? OS_VM_PROT_ALL : OS_VM_PROT_READ | OS_VM_PROT_WRITE,
+#endif
                   // Do not pass MAP_FIXED with addr of 0, because most OSes disallow that.
                   MAP_PRIVATE | (addr ? MAP_FIXED : 0),
                   fd, (off_t) offset);
@@ -242,6 +246,32 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
         lose("load_core_bytes(%d,%zx,%p,%zx) failed", fd, offset, addr, len);
     return (void*)actual;
 }
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+void* load_core_bytes_jit(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
+{
+    ssize_t count;
+
+    lseek(fd, offset, SEEK_SET);
+
+    char* buf = malloc(65536);
+
+    while (len) {
+        count = read(fd, buf, len);
+
+        if (count <= -1) {
+            perror("read");
+        }
+
+        memcpy(addr, buf, count);
+        addr += count;
+        len -= count;
+    }
+    free(buf);
+    return (void*)0;
+}
+#endif
+
 #endif
 
 boolean
@@ -261,5 +291,3 @@ gc_managed_addr_p(lispobj addr)
     }
     return 0;
 }
-
-

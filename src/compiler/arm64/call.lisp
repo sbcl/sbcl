@@ -344,7 +344,7 @@
   ;; NARGS is live.  FP has been set up by the caller, SP is
   ;; protecting our stack arguments, but is otherwise not set up.  NFP
   ;; is not yet set up.  CODE and NULL are set up.  SP and NFP must be
-  ;; correctly set up by the time we're done, and OCFP and R8 are
+  ;; correctly set up by the time we're done, and OCFP and R9 are
   ;; available for use as temporaries.  If we were any more register
   ;; constrained, we'd be spilling registers manually (rather than
   ;; allowing PACK to do it for us).  -- AJB, 2012-Oct-30
@@ -355,7 +355,7 @@
   ;; live).
   (:temporary (:sc any-reg :offset ocfp-offset :to :eval) count)
   (:temporary (:sc any-reg :offset ocfp-offset :from :eval) dest)
-  (:temporary (:sc descriptor-reg :offset r8-offset) temp)
+  (:temporary (:sc descriptor-reg :offset r9-offset) temp)
   (:info fixed)
   (:generator 20
     ;; We open up with a LET to obtain a TN for NFP.  We'll call it

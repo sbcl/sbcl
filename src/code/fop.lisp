@@ -539,7 +539,13 @@
           ;; * DO * NOT * SEPARATE * THESE * STEPS *
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
           ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
+          #-darwin-jit
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
+          #+darwin-jit
+          (let ((buf (make-array n-code-bytes :element-type '(unsigned-byte 8))))
+            (read-n-bytes (fasl-input-stream) buf 0 n-code-bytes)
+            (with-pinned-objects (buf)
+              (sb-vm::jit-memcpy (code-instructions code) (vector-sap buf) n-code-bytes)))
           ;; Serial# shares a word with the jump-table word count,
           ;; so we can't assign serial# until after all raw bytes are copied in.
           (sb-c::assign-code-serialno code)
