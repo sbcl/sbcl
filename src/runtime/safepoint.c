@@ -177,7 +177,7 @@ void safepoint_init()
         InitializeConditionVariable(&gc_state.phase_cond[i]);
     InitializeCriticalSection(&gc_state.lock);
 #else
-    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
+    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES, 0, 0);
 #endif
     gc_state.phase = GC_NONE;
 }
