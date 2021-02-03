@@ -119,12 +119,12 @@ code:
     (as-c "#define CAST_SIGNED(x) ((sizeof(x) == 4)? (long long) (long) (x): (x))")
     #+(and (not win32) x86-64)
     (as-c "#define CAST_SIGNED(x) ((sizeof(x) == 4)? (long) (int) (x): (x))")
-    ;; the C compiler on macOS warns that %ld is the wrong format for an int
+    ;; the C compiler on x86 macOS warns that %ld is the wrong format for an int
     ;; even though 'long' and 'int' are both 4 bytes.
-    #+x86
-    (as-c "#define CAST_SIGNED(x) ((long) (x))")
-    #-(or x86 x86-64)
+    #-(or x86 64-bit)
     (as-c "#define CAST_SIGNED(x) ((int) (x))")
+    #+(and (not x86-64) (or x86 64-bit))
+    (as-c "#define CAST_SIGNED(x) ((long) (x))")
     (as-c "int main(int argc, char *argv[]) {")
     (as-c "    FILE *out;")
     (as-c "    if (argc != 2) {")
