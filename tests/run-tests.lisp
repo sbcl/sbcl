@@ -154,16 +154,26 @@
              (namestring (make-pathname :name (pathname-name thing)
                                         :type (pathname-type thing))))
            (stem= (a b)
-             (string= (stem-of a) (stem-of b))))
+             (string= (stem-of a) (stem-of b)))
+           (starts-with-p (string prefix)
+             (= (mismatch string prefix) (length prefix))))
     (unless (eq (pathname-host filename) sb-impl::*physical-host*)
       (return-from check-manifest))
     (let ((string (namestring filename)))
       (when (or (find #\* (stem-of filename)) ; wild
-                (= (mismatch string "/dev/") 5) ; dev/null and dev/random
-                (= (mismatch string "/tmp/") 5)
-                (= (mismatch string "/var/tmp/") 9)
-                (= (mismatch string "/proc/self") 10)
-                (eql (search "/private/var/folders/" string) 0)
+                (starts-with-p string "/dev/") ; dev/null and dev/random
+                (starts-with-p string "/proc/self")
+                ;; Temp files created by test-util's scratch file routine
+                (starts-with-p (stem-of string) *scratch-file-prefix*)
+                ;; These are likely candidates for scratch files'
+                ;; directories. However, if we're testing these cases,
+                ;; FILENAME wasn't created using SCRATCH-FILE-NAME,
+                ;; and might be bypassing the value of TMPDIR; so the
+                ;; test that produces FILENAME should be double-checked.
+                (and (or (starts-with-p string "/tmp/")
+                         (starts-with-p string "/var/tmp/")
+                         (starts-with-p string "/private/var/folders/"))
+                     (warn "ignoring dubious temporary file ~A" filename))
                 (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
                                              "a.txt" "b.lisp"

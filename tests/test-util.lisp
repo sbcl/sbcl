@@ -32,6 +32,7 @@
            #:get-simple-fun-instruction-model
 
            #:scratch-file-name
+           #:*scratch-file-prefix*
            #:with-scratch-file
            #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
@@ -855,12 +856,13 @@
 ;;; Return a random file name to avoid writing into the source tree.
 ;;; We can't use any of the interfaces provided in libc because those are inadequate
 ;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
+(defvar *scratch-file-prefix* "sbcl-scratch")
 (defun scratch-file-name (&optional extension)
   (let ((a (make-array 10 :element-type 'character)))
     (dotimes (i 10)
       (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
     (let ((dir (posix-getenv #+win32 "TMP" #+unix "TMPDIR"))
-          (file (format nil "sbcl~d~a~@[.~a~]"
+          (file (format nil "~a~d~a~@[.~a~]" *scratch-file-prefix*
                         (sb-unix:unix-getpid) a extension)))
       (if dir
           (namestring
