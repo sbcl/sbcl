@@ -1472,22 +1472,30 @@ We could try a few things to mitigate this:
           (+ start sb-vm:gencgc-card-bytes)))
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
-(defun code-from-serialno (serial)
-  (dx-flet ((visit (obj type size)
+(defun map-code-objects (fun)
+  (dx-flet ((filter (obj type size)
               (declare (ignore size))
-              #+gencgc (aver (= type sb-vm:code-header-widetag))
-              (when (= (%code-serialno obj) serial)
-                (return-from code-from-serialno obj))))
-    #+cheneygc (map-allocated-objects #'visit :all)
+              (when (= type sb-vm:code-header-widetag)
+                (funcall fun obj)))
+            (nofilter (obj type size)
+              (declare (ignore type size))
+              (funcall fun obj)))
+    #+cheneygc (map-allocated-objects #'filter :all)
     #+gencgc
     (progn
       #+immobile-code
-      (map-objects-in-range #'visit
+      (map-objects-in-range #'nofilter
                             (ash varyobj-space-start (- n-fixnum-tag-bits))
                             (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
-      (walk-dynamic-space #'visit
+      (walk-dynamic-space #'nofilter
                           #b1111111 ; all generations
                           3 3))))
+
+(defun code-from-serialno (serial)
+  (dx-flet ((visit (obj)
+              (when (= (%code-serialno obj) serial)
+                (return-from code-from-serialno obj))))
+    (map-code-objects #'visit)))
 
 (defun show-all-layouts ()
   (let ((l (sb-vm::list-allocated-objects :all :test #'sb-kernel::layout-p))
