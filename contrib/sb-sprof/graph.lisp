@@ -253,7 +253,11 @@
 
 ;;; Make a NODE for debug-info INFO.
 (defun make-node (info)
-  (flet ((clean-name (name)
+  (flet ((code-bounds (code)
+           (let* ((start (code-start code))
+                  (end (+ start (sb-kernel:%code-text-size code))))
+             (values start end)))
+         (clean-name (name)
            (if (and (consp name)
                     (member (first name)
                             '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
@@ -262,7 +266,7 @@
                (second name)
                name)))
     (typecase info
-      (sb-kernel::code-component
+      (sb-kernel:code-component
        (multiple-value-bind (start end)
            (code-bounds info)
          (values

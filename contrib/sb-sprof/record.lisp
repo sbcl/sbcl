@@ -423,9 +423,3 @@ EXPERIMENTAL: Interface subject to change."
   (declare (type sb-kernel:code-component code))
   (sap-int (sb-kernel:code-instructions code)))
 
-;;; Return start and end address of CODE as multiple values.
-(defun code-bounds (code)
-  (declare (type sb-kernel:code-component code))
-  (let* ((start (code-start code))
-         (end (+ start (sb-kernel:%code-text-size code))))
-    (values start end)))
