@@ -425,7 +425,10 @@
 (defun make-call-graph (max-depth)
   (stop-profiling)
   (show-progress "~&Computing call graph ")
-  (let ((call-graph (without-gcing (make-call-graph-1 max-depth))))
+  ;; I _think_ the reason for pinning all code is that the graph logic
+  ;; compares absolute PC locations. Wonderfully commented, it is.
+  (let ((call-graph (with-code-pages-pinned (:dynamic)
+                      (make-call-graph-1 max-depth))))
     (show-progress "~&Finding cycles")
     #+nil
     (reduce-call-graph call-graph)
