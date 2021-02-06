@@ -8,7 +8,7 @@
 (defun sample-counts-by-pc (samples)
   (let* ((unique-pc-count-guess (isqrt (truncate (samples-index samples) 2)))
          (sample-counts-by-pc (make-hash-table :size unique-pc-count-guess)))
-    (map-all-samples (lambda (info pc-or-offset)
+    (map-all-pc-locs (lambda (info pc-or-offset)
                        (let ((pc (sample-pc info pc-or-offset)))
                          (incf (gethash pc sample-counts-by-pc 0))))
                      samples)

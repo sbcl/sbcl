@@ -123,7 +123,7 @@ The signature of FUNCTION must be compatible with (thread trace).
 
 FUNCTION is called once for each trace where THREAD is the SB-THREAD:TREAD
 instance which was sampled to produce TRACE, and TRACE is an opaque object
-to be passed to MAP-TRACE-SAMPLES.
+to be passed to MAP-TRACE-PC-LOCS.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
@@ -138,15 +138,10 @@ EXPERIMENTAL: Interface subject to change."
             do (let ((trace (list vector start end)))
                  (funcall function thread trace))))))
 
-;;; FIXME: rename to MAP-TRACE-PC-LOCS,
-;;; and also maybe rename SAMPLE-PC to PC-LOC-PC.
-(defun map-trace-samples (function trace)
-  "Call FUNCTION on each sample in TRACE.
-
-The signature of FUNCTION must be compatible with (info pc-or-offset).
-TRACE is an object as received by the function passed to MAP-TRACES.
-
-EXPERIMENTAL: Interface subject to change."
+;;; Call FUNCTION on each PC location in TRACE.
+;;; The signature of FUNCTION must be compatible with (info pc-or-offset).
+;;; TRACE is an object as received by the function passed to MAP-TRACES.
+(defun map-trace-pc-locs (function trace)
   (let ((function (sb-kernel:%coerce-callable-to-fun function)))
     (destructuring-bind (samples start end) trace
       (loop for i from (- end +elements-per-pc-loc+)
@@ -156,25 +151,26 @@ EXPERIMENTAL: Interface subject to change."
             for pc-or-offset = (aref samples (1+ i))
             do (funcall function info pc-or-offset)))))
 
-(declaim (special *samples*))
-(defun map-all-samples (function &optional (samples *samples*))
-  "Call FUNCTION on each sample in SAMPLES.
+;;; One "sample" is a trace, usually. But also it means an instance of SAMPLES,
+;;; but also it means a PC location expressed as code + offset.
+;;; So when is a sample not a sample? When it's a PC location.
+(declaim (type (or null samples) *samples*))
+(defglobal *samples* nil)
 
-The signature of FUNCTION must be compatible with (info pc-or-offset).
-
-SAMPLES is usually the value of *SAMPLES* after a profiling run.
-
-EXPERIMENTAL: Interface subject to change."
+;;; Call FUNCTION on each PC location in SAMPLES which is usually
+;;; the value of *SAMPLES* after a profiling run.
+;;; The signature of FUNCTION must be compatible with (info pc-or-offset).
+(defun map-all-pc-locs (function &optional (samples *samples*))
   (sb-int:dx-flet ((do-trace (thread trace)
                      (declare (ignore thread))
-                     (map-trace-samples function trace)))
+                     (map-trace-pc-locs function trace)))
     (map-traces #'do-trace samples)))
 
 (defun sample-pc (info pc-or-offset)
   "Extract and return program counter from INFO and PC-OR-OFFSET.
 
-Can be applied to the arguments passed by MAP-TRACE-SAMPLES and
-MAP-ALL-SAMPLES.
+Can be applied to the arguments passed by MAP-TRACE-PC-LOCS and
+MAP-ALL-PC-LOCS.
 
 EXPERIMENTAL: Interface subject to change."
   (etypecase info
@@ -190,9 +186,6 @@ EXPERIMENTAL: Interface subject to change."
        (+ start-pc pc-or-offset)))))
 
 ;;; Sampling
-
-(defvar *samples* nil)
-(declaim (type (or null samples) *samples*))
 
 (defvar *profiling* nil)
 (declaim (type (or (eql nil) sampling-mode) *profiling*))

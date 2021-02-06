@@ -170,6 +170,14 @@ The following keyword args are recognized:
         (multiple-value-bind (secs rest)
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
+      ;; I'm 99% sure that unconditionally assigning *SAMPLES* is a bug,
+      ;; because doing it makes the RESET function (and the :RESET keyword
+      ;; to WITH-PROFILING) meaningless - what's the difference between
+      ;; resetting and not resetting if either way causes all previously
+      ;; acquired traces to disappear? My intuition would have been that
+      ;; start/stop/start/stop should leave *SAMPLES* holding a union of all
+      ;; traces captured by both "on" periods, whereas with a RESET in between
+      ;; it would not. But they behave identically, because this is a reset.
       (setf *samples* (make-samples :max-depth max-depth
                                     :max-samples max-samples
                                     :sample-interval sample-interval

@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.1:
+  * incompatible change: MAP-ALL-SAMPLES and MAP-TRACE-SAMPLES
+    are no longer present in the SB-SPROF contrib module.
   * minor incompatible change: SB-SPROF:WITH-PROFILING defaults to all
     threads. SB-SPROF:START-PROFILING no longer accepts a :SAMPLING keyword.
   * bug fix: canonical unions of CONS types were being incorrectly computed.

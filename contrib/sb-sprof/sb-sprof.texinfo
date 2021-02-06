@@ -131,10 +131,6 @@ depth of more than two levels is only supported on x86 and x86-64.
 
 @include fun-sb-sprof-map-traces.texinfo
 
-@include fun-sb-sprof-map-trace-samples.texinfo
-
-@include fun-sb-sprof-map-all-samples.texinfo
-
 @include fun-sb-sprof-sample-pc.texinfo
 
 @include fun-sb-sprof-report.texinfo

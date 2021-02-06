@@ -349,7 +349,7 @@
                (depth 0)
                (caller nil))
            (block calls
-             (map-trace-samples
+             (map-trace-pc-locs
               (lambda (debug-info pc-offset)
                 (declare (ignore pc-offset))
                 (when (> depth max-depth)
