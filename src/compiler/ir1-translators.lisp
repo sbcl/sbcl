@@ -298,7 +298,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
     ;; Do this after processing, since the definitions can be malformed.
     (unless (= (length definitions)
                (length (remove-duplicates definitions :key #'first)))
-      (compiler-style-warn "Duplicate definitions in ~S" definitions))
+      (compiler-warn "Duplicate definitions in ~S" definitions))
     (funcall fun processed-definitions)))
 
 ;;; Tweak LEXENV to include the DEFINITIONS from a MACROLET, then
@@ -861,7 +861,11 @@ also processed as top level forms."
                      ,@decls
                      (block ,(fun-name-block-name name)
                        . ,forms)))))))
-    (values (names) (defs))))
+    (let ((names (names)))
+      (unless (= (length names)
+                 (length (remove-duplicates names :test #'equal)))
+        (compiler-warn "Duplicate definitions in ~S" definitions))
+      (values names (defs)))))
 
 (defun parse-fletish (definitions body context)
   (multiple-value-bind (forms declarations) (parse-body body nil)
