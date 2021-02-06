@@ -89,6 +89,7 @@ The following keyword args are recognized:
     `(let* ((*sample-interval* ,sample-interval)
             (*alloc-interval* ,alloc-interval)
             (*sampling-mode* ,mode)
+            (*show-progress* ,show-progress)
             (*max-samples* ,max-samples))
        ,@(when reset '((reset)))
        (flet ((,oops ()
@@ -104,10 +105,9 @@ The following keyword args are recognized:
                           (when (>= (samples-trace-count *samples*)
                                     (samples-max-samples *samples*))
                             (return))
-                          ,@(when show-progress
-                              `((format t "~&===> ~d of ~d samples taken.~%"
-                                        (samples-trace-count *samples*)
-                                        (samples-max-samples *samples*))))
+                          (show-progress "~&===> ~d of ~d samples taken.~%"
+                                         (samples-trace-count *samples*)
+                                         (samples-max-samples *samples*))
                           (let ((,last-index (samples-index *samples*)))
                             (setf ,values (multiple-value-list (progn ,@body)))
                             (when (= ,last-index (samples-index *samples*))
