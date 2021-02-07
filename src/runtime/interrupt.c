@@ -918,10 +918,8 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 
     foreign_function_call_active_p(thread) = 0;
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    /* garbage_collect_generation may access it in parallel after
-       FREE_INTERRUPT_CONTEXT_INDEX has been updated, stuff a zero to
-       keep it from being confused. */
+#ifdef LISP_FEATURE_SB_THREAD
+    // Never leave stale pointers in the signal context array
     nth_interrupt_context(fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread)) - 1, thread) = NULL;
 #endif
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
@@ -2191,6 +2189,13 @@ handle_trap(os_context_t *context, int trap)
 // Return 1 if the signal was previously in the blocked set.
 int sb_toggle_sigprof(os_context_t* context, int block) {
     if (context) {
+        // This case is used with INTERRUPT-THREAD to unmask SIGPROF in any thread
+        // other than the current thread.
+        gc_assert(!block);
+        // Alter the mask on return from the _outermost_ signal context, which
+        // should usually be the supplied context, but not if nesting happened.
+        context = nth_interrupt_context(0, arch_os_get_current_thread());
+        gc_assert(context);
         sigset_t *mask = os_context_sigmask_addr(context);
         int was_blocked = sigismember(mask, SIGPROF);
         if (block) sigaddset(mask, SIGPROF); else sigdelset(mask, SIGPROF);

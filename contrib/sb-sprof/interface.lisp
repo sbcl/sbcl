@@ -54,7 +54,7 @@ The following keyword args are recognized:
 
  :MAX-SAMPLES <max>
    Repeat evaluating body until <max> samples are taken.
-   Default is *MAX-SAMPLES*.
+   Default is *MAX-SAMPLES*.  No effect if :LOOP is NIL (the default).
 
  :MAX-DEPTH <max>
    Maximum call stack depth that the profiler should consider. Only
@@ -143,7 +143,7 @@ The following keyword args are recognized:
      in wallclock profiling mode.
 
    :MAX-SAMPLES <max>
-     Maximum number of samples.  Default is *MAX-SAMPLES*.
+     Maximum number of stack traces to collect.  Default is *MAX-SAMPLES*.
 
    :MAX-DEPTH <max>
      Maximum call stack depth that the profiler should consider. Only
