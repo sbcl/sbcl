@@ -431,6 +431,8 @@
                 ;; It wasn't hung, it just wasn't getting CPU time. For me anyway.
                 (when (search "QEMU" result)
                   .00000001)) ; 10 nanoseconds
+              #+(and darwin arm64)
+               0.01
               0))
          (threads (list*
                    (sb-thread:make-thread (lambda ()
