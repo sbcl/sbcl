@@ -102,14 +102,8 @@ struct extra_thread_data
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
 
-#if defined(LISP_FEATURE_DARWIN)
-#define CONTROL_STACK_ALIGNMENT_BYTES 8192 /* darwin wants page-aligned stacks */
-#define THREAD_ALIGNMENT_BYTES CONTROL_STACK_ALIGNMENT_BYTES
-#else
 #define THREAD_ALIGNMENT_BYTES BACKEND_PAGE_BYTES
-#define CONTROL_STACK_ALIGNMENT_BYTES 16
-#endif
-
+#define CONTROL_STACK_ALIGNMENT_BYTES BACKEND_PAGE_BYTES
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)

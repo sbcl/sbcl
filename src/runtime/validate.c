@@ -167,11 +167,9 @@ DEF_PROTECT_PAGE(control_stack_hard_guard_page,
                  CONTROL_STACK_HARD_GUARD_PAGE,
                  OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(control_stack_guard_page,
-                 CONTROL_STACK_GUARD_PAGE,
-                 OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
+                 CONTROL_STACK_GUARD_PAGE, OS_VM_PROT_READ)
 DEF_PROTECT_PAGE(control_stack_return_guard_page,
-                 CONTROL_STACK_RETURN_GUARD_PAGE,
-                 OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
+                 CONTROL_STACK_RETURN_GUARD_PAGE, OS_VM_PROT_READ)
 
 DEF_PROTECT_PAGE(binding_stack_hard_guard_page,
                  BINDING_STACK_HARD_GUARD_PAGE,
