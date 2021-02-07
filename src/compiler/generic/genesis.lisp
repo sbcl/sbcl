@@ -191,7 +191,8 @@
   (defvar *immobile-varyobj*)
   (defvar *immobile-space-map* nil))
 
-(defconstant max-core-space-id (+ 3 #+immobile-space 2))
+(defconstant max-core-space-id (+ 3 #+immobile-space 2
+                                    #+darwin-jit 1))
 
 (defstruct page
   (type nil :type (member nil :code :mixed))

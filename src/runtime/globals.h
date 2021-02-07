@@ -91,6 +91,11 @@ extern lispobj *dynamic_space_free_pointer;
 #endif
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+lispobj *static_code_space_free_pointer;
+#endif
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern lispobj *varyobj_free_pointer;
 extern lispobj *fixedobj_free_pointer;

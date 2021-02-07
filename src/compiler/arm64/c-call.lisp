@@ -410,9 +410,13 @@
       ;; Now that the segment is done, convert it to a static
       ;; vector we can point foreign code to.
       (let* ((buffer (sb-assem:segment-buffer segment))
-             (vector (make-static-vector (length buffer)
+             (vector #-darwin-jit
+                     (make-static-vector (length buffer)
                                          :element-type '(unsigned-byte 8)
-                                         :initial-contents buffer))
+                                         :initial-contents buffer)
+                     #+darwin-jit
+                     (make-static-code-vector (length buffer)
+                                              buffer))
              (sap (vector-sap vector)))
         (alien-funcall
          (extern-alien "os_flush_icache"

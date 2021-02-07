@@ -249,6 +249,9 @@ gc_managed_heap_space_p(lispobj addr)
         || (DYNAMIC_1_SPACE_START <= addr &&
             addr < DYNAMIC_1_SPACE_START + dynamic_space_size)
 #endif
+#ifdef LISP_FEATURE_DARWIN_JIT
+        || (STATIC_CODE_SPACE_START <= addr && addr < STATIC_CODE_SPACE_END)
+#endif
         )
         return 1;
     return 0;

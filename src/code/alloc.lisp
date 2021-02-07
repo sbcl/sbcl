@@ -54,6 +54,25 @@
              :format-control
              "Not enough room left in static space to allocate vector.")))
 
+#+darwin-jit
+(defun allocate-static-code-vector (widetag length words)
+  (declare (type (unsigned-byte #.n-widetag-bits) widetag)
+           (type word words)
+           (type index length))
+  (or (with-system-mutex (*allocator-mutex*)
+        (let* ((pointer *static-code-space-free-pointer*)
+               (nbytes (pad-data-block (+ words vector-data-offset)))
+               (new-pointer (sap+ pointer nbytes)))
+          (when (sap<= new-pointer (int-sap static-code-space-end))
+            (setf (sap-ref-word-jit pointer (ash vector-length-slot word-shift))
+                  (fixnumize length))
+            (setf (sap-ref-word-jit pointer 0) widetag)
+            (setf *static-code-space-free-pointer* new-pointer)
+            (%make-lisp-obj (logior (sap-int pointer) other-pointer-lowtag)))))
+      (error 'simple-storage-condition
+             :format-control
+             "Not enough room left in static code space to allocate vector.")))
+
 #+immobile-space
 (progn
 

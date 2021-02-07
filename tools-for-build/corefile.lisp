@@ -15,6 +15,7 @@
            ;;
            #:read-only-core-space-id
            #:static-core-space-id
+           #:static-code-core-space-id
            #:dynamic-core-space-id
            #:immobile-fixedobj-core-space-id
            #:immobile-varyobj-core-space-id
@@ -52,4 +53,5 @@
 (defconstant read-only-core-space-id 3)
 (defconstant immobile-fixedobj-core-space-id 4)
 (defconstant immobile-varyobj-core-space-id 5)
+(defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)

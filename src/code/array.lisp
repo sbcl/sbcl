@@ -613,6 +613,17 @@ of specialized arrays is supported."
             (t
              vector)))))
 
+#+darwin-jit
+(defun make-static-code-vector (length initial-contents)
+  "Allocate vector of LENGTH elements in static space. Only allocation
+of specialized arrays is supported."
+  (let ((vector (allocate-static-code-vector sb-vm:simple-array-unsigned-byte-8-widetag
+                                             length
+                                             (* length n-word-bytes))))
+    (with-pinned-objects (initial-contents)
+      (jit-memcpy (vector-sap vector) (vector-sap initial-contents) length))
+    vector))
+
 ;;; DATA-VECTOR-FROM-INITS returns a simple vector that has the
 ;;; specified array characteristics. Dimensions is only used to pass
 ;;; to FILL-DATA-VECTOR for error checking on the structure of

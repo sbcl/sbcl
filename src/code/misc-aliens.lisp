@@ -18,6 +18,10 @@
 (define-alien-variable ("static_space_free_pointer" sb-vm:*static-space-free-pointer*)
   system-area-pointer)
 
+#+darwin-jit
+(define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)
+  system-area-pointer)
+
 (declaim (inline memmove))
 (define-alien-routine ("memmove" memmove) void
   (dest (* char))

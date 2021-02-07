@@ -83,7 +83,9 @@
                            #+sb-safepoint
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
-                           (static ,small-space-size))
+                           (static ,small-space-size)
+                           #+darwin-jit
+                           (static-code ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
                            (varyobj ,varyobj-space-size*))))

@@ -315,6 +315,14 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  static_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
+#ifdef LISP_FEATURE_DARWIN_JIT
+    output_space(file,
+                 STATIC_CODE_CORE_SPACE_ID,
+                 (lispobj *)STATIC_CODE_SPACE_START,
+                 static_code_space_free_pointer,
+                 core_start_pos,
+                 core_compression_level);
+#endif
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  current_dynamic_space,

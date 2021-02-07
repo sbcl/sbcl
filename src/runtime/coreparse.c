@@ -704,13 +704,23 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
         // This order is determined by constants in compiler/generic/genesis
         {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
+
         {0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+        {0, 0, STATIC_CODE_SPACE_START, &static_code_space_free_pointer},
+#endif
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         {FIXEDOBJ_SPACE_SIZE | 1, 0,
             FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
         {1, 0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
 #endif
     };
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+    static_code_space_free_pointer = (lispobj *)STATIC_CODE_SPACE_START;
+#endif
 
 #if ELFCORE
     if (&lisp_code_start) {
