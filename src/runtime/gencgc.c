@@ -3315,12 +3315,10 @@ static void unprotect_all_pages()
     page_index_t start = 0, end;
     while (start  < next_free_page) {
 
-        if(!is_code(page_table[start].type)) {
-            /* page_table[start].write_protected = 0; */
+        if(!is_code(page_table[start].type) && page_bytes_used(start)) {
             for (end = start + 1; end < next_free_page; end++) {
-                if (is_code(page_table[end].type))
+                if (is_code(page_table[end].type) || !page_bytes_used(end))
                     break;
-                /* page_table[end].write_protected = 0; */
             }
             os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_READ | OS_VM_PROT_WRITE);
             start = end+1;
