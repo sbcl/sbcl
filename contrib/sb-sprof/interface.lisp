@@ -14,9 +14,7 @@
 (declaim (type (integer (0)) *alloc-interval*))
 
 (defvar *max-samples* 50000
-  "Default number of traces taken. This variable is somewhat misnamed:
-each trace may actually consist of an arbitrary number of samples, depending
-on the depth of the call stack.")
+  "Default maximum number of stack traces collected.")
 (declaim (type sb-int:index *max-samples*))
 
 (defvar *sampling-mode* :cpu
