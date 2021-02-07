@@ -895,7 +895,7 @@ process_directory(int count, struct ndir_entry *entry,
                 inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
             else
 #ifdef LISP_FEATURE_DARWIN_JIT
-            if (id == DYNAMIC_CORE_SPACE_ID) {
+            if (id == DYNAMIC_CORE_SPACE_ID || id == STATIC_CODE_CORE_SPACE_ID) {
                 load_core_bytes_jit(fd, offset + file_offset, (os_vm_address_t)addr, len);
             } else
 #endif
@@ -1019,6 +1019,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     if (val != CORE_MAGIC)
         lose("invalid magic number in core: %"OBJ_FMTX" should have been %x",
              (lispobj)val, CORE_MAGIC);
+
+    THREAD_JIT(0);
 
     for ( ; ; ptr += remaining_len) {
         val = *ptr++;
