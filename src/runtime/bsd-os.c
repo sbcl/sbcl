@@ -319,6 +319,12 @@ os_install_interrupt_handlers(void)
 #endif
                                                  memory_fault_handler);
 #endif
+
+#ifdef LISP_FEATURE_DARWIN
+    /* Unmapped pages get this and not SIGBUS. */
+    ll_install_handler(SIGSEGV, memory_fault_handler);
+#endif
+
     }
 
 #ifdef LISP_FEATURE_SB_THREAD
