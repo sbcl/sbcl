@@ -2187,7 +2187,7 @@
          (%coerce-callable-to-fun ,key)
          #'identity)))
 
-(macrolet ((define-find-position (fun-name values-index &optional preamble)
+(macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
                                              from-end (start 0) end
                                              key test test-not)
@@ -2202,12 +2202,101 @@
                       (return-from ,fun-name
                         '(lambda (&rest args) (declare (ignore args)) nil))))
                 (let ((effective-test
-                       (unless test-not
-                         (if test (lvar-fun-name* test) 'eql)))
+                        (unless test-not
+                          (if test (lvar-fun-name* test) 'eql)))
                       (test-form '(effective-find-position-test test test-not))
                       (const-seq (when (constant-lvar-p sequence)
                                    (lvar-value sequence))))
-                  ,@preamble
+                  ;; Destructive modification of constants is illegal.
+                  ;; Therefore if this sequence would have been output as a code header
+                  ;; constant, its contents can't change. We don't need to reference
+                  ;; the sequence itself to compare elements.
+                  ;; There are two transforms to try in this situation:
+                  ;; 1) Use CASE if the sequence contains only perfectly-hashed symbols.
+                  ;;    There is no upper limit on the sequence length- as it increases,
+                  ;;    so does the bias against using a series of IFs.  In fact, CASE
+                  ;;    might even consider the constant-returning mode to allow
+                  ;;    some hash colllisions, which it doesn't currently.
+                  ;; 2) Otherwise, use COND, not to exceed some length limit.
+                  (when (and const-seq
+                             (member effective-test '(eql eq char= char-equal))
+                             (not start) (not end) (not key)
+                             (or (not from-end) (constant-lvar-p from-end)))
+                    (let ((items (coerce const-seq 'list))
+                          ;; It seems silly to use :from-end and a constant list
+                          ;; in a way where it actually matters (with repeated elements),
+                          ;; but we either have to do it right or not do it.
+                          (reversedp (and from-end (lvar-value from-end))))
+                      (when (and (every #'symbolp items)
+                                 (memq effective-test '(eql eq))
+                                 ;; PICK-BEST will stupidly hash dups and call that a collision.
+                                 (= (pick-best-sxhash-bits (remove-duplicates items) 'sxhash) 1))
+                        ;; Construct a map from symbol to position so that correct results
+                        ;; are obtained for :from-end, and/or with duplicates present.
+                        ;; Precomputing it is easier than trying to roll the logic into the
+                        ;; production of the result form. :TEST can be ignored.
+                        (let ((map (loop for x in items for i from 0
+                                         collect (cons x
+                                                       (ecase ',fun-name
+                                                         (position i)
+                                                         (find `',x)))))
+                              (clauses)
+                              (seen))
+                          (dolist (x (if reversedp (reverse map) map))
+                            (let ((sym (car x)))
+                              (unless (member sym seen)
+                                ;; NIL, T, OTHERWISE need wrapping in () since they should not signify
+                                ;; an empty list of keys or the "otherwise" case respectively.
+                                (push (list (if (memq sym '(nil t otherwise))
+                                                (list sym)
+                                                sym)
+                                            (cdr x))
+                                      clauses)
+                                (push sym seen))))
+                          ;; CASE could decide not to use hash-based lookup, as there is a
+                          ;; minimum item count cutoff, but that's ok, the code is good either way.
+                          (return-from ,fun-name
+                            `(lambda (item sequence &rest rest)
+                               (declare (ignore sequence rest))
+                               (case item
+                                 ,@(nreverse clauses)
+                                 ;; This CASE looks like it could return NIL, which is potentially
+                                 ;; in conflict with the derived type of POSITION when we have already
+                                 ;; determined that the item is in the list. So the fallthrough
+                                 ;; value has to be numeric. It's actually unreachable.
+                                 ,@(when (and (eq ',fun-name 'position)
+                                              (csubtypep (lvar-type item) (specifier-type `(member ,@seen))))
+                                     `(((t 0)))))))))
+                      (unless (nthcdr 10 items)
+                        (let ((clauses (loop for x in items for i from 0
+                                             ;; Later transforms will change EQL to EQ if appropriate.
+                                             collect `((,effective-test item ',x)
+                                                       ,(ecase ',fun-name
+                                                          (position i)
+                                                          (find
+                                                           (cond
+                                                             ((memq effective-test '(eq char=))
+                                                              'item)
+                                                             ((and (eq effective-test 'eql)
+                                                                   (typep x 'eq-comparable-type))
+                                                              'item)
+                                                             ((and (eq effective-test 'char-equal)
+                                                                   (not (both-case-p x)))
+                                                              'item)
+                                                             (t
+                                                              `',x))))))))
+                          ;; FIXME: dups cause more than one test on the same key because IR1
+                          ;; doesn't propagate information about which IFs can't possibly match.
+                          ;; FIXME: suffers from same type derivation issue as above.
+                          ;;        e.g. (- (position (the (member 10 20) x) #(1 2 5 10 15 20 30)))
+                          ;; -> "Constant NIL conflicts with its asserted type NUMBER."
+                          ;; But a fix for the general case (with any :TEST) has to figure out
+                          ;; whether the returned value must definitely be non-NIL before doing
+                          ;; the same thing as above which we claim is unreachable.
+                          (return-from ,fun-name
+                            `(lambda (item sequence &rest rest)
+                               (declare (ignore sequence rest))
+                               (cond ,@(if reversedp (nreverse clauses) clauses))))))))
                   ;; For both FIND and POSITION, try to optimize EQL into EQ.
                   (when (and (eq effective-test 'eql)
                              const-seq
@@ -2233,78 +2322,7 @@
                                               (effective-find-position-key key)
                                               ,test-form))))))
   (define-find-position find 0)
-  (define-find-position position 1
-    ;; Destructive modification of constants is illegal.
-    ;; Therefore if this sequence would have been output as a code header
-    ;; constant, its contents can't change. We don't need to reference
-    ;; the sequence itself to compare elements.
-    ;; There are two transforms to try in this situation:
-    ;; 1) Use CASE if the sequence contains only perfectly-hashed symbols.
-    ;;    There is no upper limit on the sequence length- as it increases,
-    ;;    so does the bias against using a series of IFs.  In fact, CASE
-    ;;    might even consider the constant-returning mode to allow
-    ;;    some hash colllisions, which it doesn't currently.
-    ;; 2) Otherwise, use COND, not to exceed some length limit.
-   ((when (and const-seq
-               (member effective-test '(eql eq))
-               (not start) (not end) (not key)
-               (or (not from-end) (constant-lvar-p from-end)))
-      (let ((items (coerce const-seq 'list))
-            ;; It seems silly to use :from-end and a constant list
-            ;; in a way where it actually matters (with repeated elements),
-            ;; but we either have to do it right or not do it.
-            (reversedp (and from-end (lvar-value from-end))))
-        (when (every #'symbolp items)
-          ;; PICK-BEST will stupidly hash dups and call that a collision.
-          (when (= (pick-best-sxhash-bits (remove-duplicates items) 'sxhash) 1)
-            ;; Construct a map from symbol to position so that correct results
-            ;; are obtained for :from-end, and/or with duplicates present.
-            ;; Precomputing it is easier than trying to roll the logic into the
-            ;; production of the result form. :TEST can be ignored.
-            (let ((map (loop for x in items for i from 0
-                             collect (cons x i)))
-                  (clauses)
-                  (seen))
-              (dolist (x (if reversedp (reverse map) map))
-                (let ((sym (car x)))
-                  (unless (member sym seen)
-                    ;; NIL, T, OTHERWISE need wrapping in () since they should not signify
-                    ;; an empty list of keys or the "otherwise" case respectively.
-                    (push (list (if (memq sym '(nil t otherwise))
-                                    (list sym)
-                                    sym)
-                                (cdr x))
-                          clauses)
-                    (push sym seen))))
-              ;; CASE could decide not to use hash-based lookup, as there is a
-              ;; minimum item count cutoff, but that's ok, the code is good either way.
-              (return-from position
-                `(lambda (item sequence &rest rest)
-                   (declare (ignore sequence rest))
-                   (case item
-                     ,@(nreverse clauses)
-                     ;; This CASE looks like it could return NIL, which is potentially
-                     ;; in conflict with the derived type of POSITION when we have already
-                     ;; determined that the item is in the list. So the fallthrough
-                     ;; value has to be numeric. It's actually unreachable.
-                     ,@(when (csubtypep (lvar-type item) (specifier-type `(member ,@seen)))
-                         `(((t 0))))))))))
-        (unless (nthcdr 10 items)
-          (let ((clauses (loop for x in items for i from 0
-                               ;; Later transforms will change EQL to EQ if appropriate.
-                               collect `((,effective-test item ',x) ,i))))
-            ;; FIXME: dups cause more than one test on the same key because IR1
-            ;; doesn't propagate information about which IFs can't possibly match.
-            ;; FIXME: suffers from same type derivation issue as above.
-            ;;        e.g. (- (position (the (member 10 20) x) #(1 2 5 10 15 20 30)))
-            ;; -> "Constant NIL conflicts with its asserted type NUMBER."
-            ;; But a fix for the general case (with any :TEST) has to figure out
-            ;; whether the returned value must definitely be non-NIL before doing
-            ;; the same thing as above which we claim is unreachable.
-            (return-from position
-              `(lambda (item sequence &rest rest)
-                 (declare (ignore sequence rest))
-                 (cond ,@(if reversedp (nreverse clauses) clauses)))))))))))
+  (define-find-position position 1))
 
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key
