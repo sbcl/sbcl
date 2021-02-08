@@ -45,13 +45,22 @@
         (when (typep map '(cons (eql sb-c::coverage-map)))
           (return-from %find-coverage-map (values (cdr map) code))))))))
 
+#+darwin-jit
+(declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*)))))
 ;;; Coverage marks are in the raw bytes following the jump tables
 ;;; preceding any other unboxed constants. This way we don't have to store
 ;;; a pointer to the coverage marks since their location is implicit.
 (defun code-coverage-marks (code)
+  #-darwin-jit
   (let ((insts (sb-kernel:code-instructions code)))
     (sb-sys:sap+ insts (ash (sb-kernel:code-jump-table-words code)
-                            sb-vm:word-shift))))
+                            sb-vm:word-shift)))
+  #+darwin-jit
+  (let* ((words (sb-kernel:code-header-words code))
+         (last (sb-kernel:code-header-ref code (- words 2))))
+    (if (vectorp last)
+        last
+        (sb-kernel:code-header-ref code (- words 3)))))
 
 ;;;;
 
@@ -94,23 +103,32 @@ image."
   (multiple-value-bind (map code) (%find-coverage-map code)
     (when map
       (sb-int:collect ((paths))
+        #-darwin-jit
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
             (dotimes (i (length map) (paths))
               (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
-                (paths (svref map i))))))))))
+                (paths (svref map i))))))
+        #+darwin-jit
+        (let ((marks (code-coverage-marks code)))
+          (dotimes (i (length map) (paths))
+            (when (byte-marked-p (aref marks i))
+              (paths (svref map i)))))))))
 
 (defun reset-coverage (&optional object)
   "Reset all coverage data back to the `Not executed` state."
   (cond (object ; reset only this object
          (multiple-value-bind (map code) (%find-coverage-map object)
            (when map
+             #-darwin-jit
              (sb-sys:with-pinned-objects (code)
                (let ((sap (code-coverage-marks code)))
                  (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
                    (setf (sb-sys:sap-ref-word sap (ash i sb-vm:n-word-bytes))
-                         (empty-mark-word))))))))
-        (t ; reset everything
+                         (empty-mark-word)))))
+             #+darwin-jit
+             (fill (code-coverage-marks code) #xFF))))
+        (t                              ; reset everything
          (do-instrumented-code (code)
            (reset-coverage code))
          (sb-c:reset-code-coverage))))
@@ -146,9 +164,10 @@ image."
                 (gethash namestring namestring->path-tables) path-lookup-table)
           (dolist (item legacy-coverage-marks)
             (setf (gethash (car item) path-lookup-table) item)))
+        #-darwin-jit
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
-            (dotimes (i (length map)) ; for each recorded mark
+            (dotimes (i (length map))   ; for each recorded mark
               (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
                 (incf n-marks)
                 ;; Set the legacy coverage mark for each path it touches
@@ -161,7 +180,15 @@ image."
                         (rplacd found t)
                         #+nil
                         (warn "Missing coverage entry for ~S in ~S"
-                              path namestring))))))))))
+                              path namestring))))))))
+        #+darwin-jit
+        (let ((marks (code-coverage-marks code)))
+          (dotimes (i (length map))     ; for each recorded mark
+            (when (byte-marked-p (aref marks i))
+              (incf n-marks)
+              (let ((found (gethash (svref map i) path-lookup-table)))
+                (if found
+                    (rplacd found t))))))))
     (values coverage-records n-marks)))
 
 ) ; end MACROLET

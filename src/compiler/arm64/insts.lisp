@@ -2718,23 +2718,47 @@
              (ash (- value (+ (sap-int sap) offset)) -2)))))
   nil)
 
-(define-instruction store-coverage-mark (segment path-index temp)
+(define-instruction store-coverage-mark (segment path-index temp #+darwin-jit vector)
   (:emitter
    ;; No backpatch is needed to compute the offset into the code header
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
-   (let* ((offset (+ (component-header-length)
-                     n-word-bytes ; skip over jump table word
-                     path-index
-                     (- other-pointer-lowtag)))
-          (addr
-           (@ sb-vm::code-tn
-              (etypecase offset
-                ((integer 0 4095) offset)
-                ((unsigned-byte 16)
-                 (inst* 'movz segment temp offset 0)
-                 temp)
-                ((unsigned-byte 32)
-                 (inst* 'movz segment temp (ldb (byte 16 16) offset) 16)
-                 (inst* 'movk segment temp (ldb (byte 16 0) offset) 0)
-                 temp)))))
-     (inst* segment 'strb sb-vm::null-tn addr))))
+   (flet ((encode-index (offset &optional word)
+            (cond
+              ((if word
+                   (typep offset '(integer 0 255))
+                   (typep offset '(integer 0 4095)))
+               offset)
+              ((typep offset '(unsigned-byte 16))
+               (inst* segment 'movz temp offset 0)
+               temp)
+              ((typep offset '(unsigned-byte 32))
+               (inst* segment 'movz temp (ldb (byte 16 16) offset) 16)
+               (inst* segment 'movk temp (ldb (byte 16 0) offset) 0)
+               temp)
+              (t
+               (error "Bad offset ~a" offset)))))
+    #-darwin-jit
+    (let* ((offset (+ (component-header-length)
+                      n-word-bytes      ; skip over jump table word
+                      path-index
+                      (- other-pointer-lowtag)))
+           (addr
+             (@ sb-vm::code-tn (encode-index offset))))
+      (inst* segment 'strb sb-vm::null-tn addr))
+    #+darwin-jit
+    (let* ((vector-offset (-
+                           (* n-word-bytes
+                              (- (length (ir2-component-constants
+                                          (component-info *component-being-compiled*)))
+                                 2))
+                           other-pointer-lowtag))
+           (vector-addr
+             (@ sb-vm::code-tn
+                (encode-index vector-offset t)))
+           (offset (+ (* sb-vm:vector-data-offset n-word-bytes)
+                      path-index
+                      (- other-pointer-lowtag)))
+           (addr
+             (@ vector (encode-index offset))))
+      (inst* segment 'ldr vector vector-addr)
+      (inst* segment 'strb sb-vm::null-tn addr)))))
