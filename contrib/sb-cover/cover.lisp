@@ -46,7 +46,7 @@
           (return-from %find-coverage-map (values (cdr map) code))))))))
 
 #+darwin-jit
-(declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*)))))
+(declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
 ;;; Coverage marks are in the raw bytes following the jump tables
 ;;; preceding any other unboxed constants. This way we don't have to store
 ;;; a pointer to the coverage marks since their location is implicit.
