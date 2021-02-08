@@ -267,19 +267,16 @@ created and old ones may exit at any time."
 
 ;;; used by debug-int.lisp to access interrupt contexts
 
+(declaim (inline current-thread-sap))
+(defun current-thread-sap ()
+  #+sb-thread (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
+  #-sb-thread (extern-alien "all_threads" system-area-pointer))
+
 #-sb-thread
 (progn
   (declaim (inline sb-vm::current-thread-offset-sap))
   (defun sb-vm::current-thread-offset-sap (n)
-    (sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
-                 (* n sb-vm:n-word-bytes))))
-
-(declaim (inline current-thread-sap))
-(defun current-thread-sap ()
-  #+sb-thread
-  (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
-  #-sb-thread
-  (int-sap 0))
+    (sap-ref-sap (current-thread-sap) (* n sb-vm:n-word-bytes))))
 
 (sb-ext:define-load-time-global *initial-thread* nil)
 
@@ -2174,18 +2171,13 @@ subject to change."
 #+linux
 (defun thread-os-tid (thread)
   (declare (ignorable thread))
-  #+sb-thread
   (if (eq *current-thread* thread)
       (my-kernel-thread-id)
       (with-deathlok (thread c-thread)
         (unless (= c-thread 0)
           (sap-ref-32 (int-sap c-thread)
                       (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
-                         #+(and 64-bit big-endian) 4)))))
-  ;; The man page for gettid() says
-  ;;   "In a single-threaded process, the thread ID is equal to the process ID"
-  ;; It probably would be fine to return 0 here; nothing internal uses the value.
-  #-sb-thread (sb-unix:unix-getpid))
+                         #+(and 64-bit big-endian) 4))))))
 
 (defun interrupt-thread (thread function)
   (declare (ignorable thread))
@@ -2260,7 +2252,7 @@ Short version: be careful out there."
   (when (with-deathlok (thread c-thread)
           (declare (ignorable c-thread))
           ;; Return T if couldn't interrupt.
-          (cond #+sb-thread ((eql c-thread 0) t)
+          (cond ((eql c-thread 0) t)
                 (t
                  (enqueue)
                  ;; We use SIGURG because it satisfies a lot of requirements that
@@ -2498,7 +2490,7 @@ mechanism for inter-thread communication."
 
 ;;;; Diagnostic tool
 
-#+(and sb-thread sb-devel)
+#+sb-devel
 (defun dump-thread ()
   (let* ((primobj (find 'sb-vm::thread sb-vm:*primitive-objects*
                         :key #'sb-vm::primitive-object-name))
@@ -2513,18 +2505,21 @@ mechanism for inter-thread communication."
                (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
                      ((= word sb-vm:unbound-marker-widetag) :unbound)
                      (t (sap-ref-lispobj sap offset)))))
-           (show (tlsindex val)
+           (show (sym val)
              (let ((*print-right-margin* 128)
                    (*print-lines* 4))
                (format t " ~3d ~30a : ~s~%"
-                       (ash tlsindex (- sb-vm:word-shift))
+                       #+sb-thread (ash tlsindex (- sb-vm:word-shift))
+                       #-sb-thread 0
                        ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
                        ;; which is not defined during cross-compilation.
-                       (funcall 'sb-impl::find-symbol-from-tls-index tlsindex)
+                       #+sb-thread (funcall 'sb-impl::find-symbol-from-tls-index sym)
+                       #-sb-thread sym
                        val))))
       (format t "~&TLS: (base=~x)~%" (sap-int sap))
       (loop for tlsindex from sb-vm:n-word-bytes below
-            (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
+            #+sb-thread (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
+            #-sb-thread (ash thread-obj-len sb-vm:word-shift)
             by sb-vm:n-word-bytes
             do (let ((thread-slot-name
                        (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
@@ -2542,6 +2537,7 @@ mechanism for inter-thread communication."
         (loop
           (when (sap>= from to) (return))
           (let ((val (safely-read from 0))
-                (tlsindex (sap-ref-word from sb-vm:n-word-bytes)))
-            (show tlsindex val))
+                (sym #+sb-thread (sap-ref-word from sb-vm:n-word-bytes) ; a TLS index
+                     #-sb-thread (sap-ref-lispobj from sb-vm:n-word-bytes)))
+            (show sym val))
           (setq from (sap+ from (* sb-vm:binding-size sb-vm:n-word-bytes))))))))
