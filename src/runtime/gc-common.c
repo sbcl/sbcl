@@ -1841,7 +1841,7 @@ valid_lisp_pointer_p(lispobj pointer)
     return 0;
 }
 
-static boolean can_invoke_post_gc(struct thread* th,
+static boolean can_invoke_post_gc(__attribute__((unused)) struct thread* th,
                                   sigset_t *context_sigmask)
 {
 #ifdef LISP_FEATURE_SB_THREAD

@@ -107,7 +107,7 @@ void sb_dump_mcontext(char *reason, ucontext_t* context)
 #define REMAINING sizeof obuf - ptr
     ptr = 0;
     ptr = snprintf(obuf, REMAINING,
-                   "Thread %d CPU state (%s): PC=%lx Flags={%s}\n",
+                   THREAD_ID_LABEL" CPU state (%s): PC=%lx Flags={%s}\n",
                    THREAD_ID_VALUE, reason,
                    (uword_t)context->uc_mcontext.gregs[REG_RIP],
                    smallbuf+1);

@@ -261,7 +261,8 @@ gc_managed_heap_space_p(lispobj addr)
 
 /* Remap a part of an already existing memory mapping from a file,
  * and/or create a new mapping as need be */
-void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len, int execute)
+void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
+                      int __attribute__((unused)) execute)
 {
     int fail = 0;
     os_vm_address_t actual;
