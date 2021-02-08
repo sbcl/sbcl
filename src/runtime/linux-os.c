@@ -379,15 +379,15 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    if (!handle_safepoint_violation(context, addr))
+    if (handle_safepoint_violation(context, addr)) return;
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-    if (!gencgc_handle_wp_violation(addr))
+    if (gencgc_handle_wp_violation(addr)) return;
 #else
-    if (!cheneygc_handle_wp_violation(context, addr))
+    if (cheneygc_handle_wp_violation(context, addr)) return;
 #endif
-        if (!handle_guard_page_triggered(context, addr))
+    if (!handle_guard_page_triggered(context, addr))
             sbcl_fallback_sigsegv_handler(signal, info, context);
 }
 

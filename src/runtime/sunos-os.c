@@ -89,8 +89,9 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
             return;
 #endif
 
-    if (!gencgc_handle_wp_violation(fault_addr))
-        if(!handle_guard_page_triggered(context, fault_addr))
+    if (gencgc_handle_wp_violation(fault_addr)) return;
+
+    if (!handle_guard_page_triggered(context, fault_addr))
             lisp_memory_fault_error(context, fault_addr);
 }
 
@@ -101,10 +102,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
-    if (!cheneygc_handle_wp_violation(context, addr)) {
-        if (!handle_guard_page_triggered(context,addr))
+    if (cheneygc_handle_wp_violation(context, addr)) return;
+
+    if (!handle_guard_page_triggered(context,addr))
             lisp_memory_fault_error(context, addr);
-    }
 }
 
 #endif
