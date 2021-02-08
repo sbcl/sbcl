@@ -2278,7 +2278,7 @@
                                                              ((memq effective-test '(eq char=))
                                                               'item)
                                                              ((and (eq effective-test 'eql)
-                                                                   (typep x 'eq-comparable-type))
+                                                                   (sb-xc:typep x 'eq-comparable-type))
                                                               'item)
                                                              ((and (eq effective-test 'char-equal)
                                                                    (not (both-case-p x)))
