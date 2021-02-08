@@ -1020,8 +1020,6 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         lose("invalid magic number in core: %"OBJ_FMTX" should have been %x",
              (lispobj)val, CORE_MAGIC);
 
-    THREAD_JIT(0);
-
     for ( ; ; ptr += remaining_len) {
         val = *ptr++;
         len = *ptr++;

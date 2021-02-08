@@ -4836,6 +4836,14 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
             start = end;
         }
     }
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+    /* For some reason doing an early pthread_jit_write_protect_np sometimes fails.
+       Which is weird, because it's done many times in arch_write_linkage_table_entry later.
+       Adding the executable bit here avoids calling pthread_jit_write_protect_np */
+    os_protect((os_vm_address_t)STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, OS_VM_PROT_ALL);
+#endif
+
 }
 
 /* Prepare the array of corefile_ptes for save */

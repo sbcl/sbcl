@@ -106,7 +106,7 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
         { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE, 1, 2},
         { STATIC_SPACE_START, STATIC_SPACE_SIZE, 0, 0},
 #ifdef LISP_FEATURE_DARWIN_JIT
-        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, 1, 2},
+        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, 1, 1},
 #endif
     };
     int i;
