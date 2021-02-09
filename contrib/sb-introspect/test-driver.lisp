@@ -320,6 +320,23 @@
   (&optional sb-kernel::element-type sb-kernel::size)
   t)
 
+;;; Check correctness of METHOD-COMBINATION-LAMBDA-LIST
+(deftest method-combination-lambda-list.1
+    (method-combination-lambda-list 'standard)
+  nil)
+
+(deftest method-combination-lambda-list.2
+    (method-combination-lambda-list
+     (sb-mop:find-method-combination #'documentation 'cl-user::r nil))
+  (&optional (sb-pcl::order :most-specific-first)))
+
+(define-method-combination long-form-mc (foo &rest args &key bar) ())
+
+(deftest method-combination-lambda-list.3
+    (method-combination-lambda-list 'long-form-mc)
+  (foo &rest args &key bar))
+
+
 ;;; Test allocation-information
 
 (defun tai (x kind info &key ignore)

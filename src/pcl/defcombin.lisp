@@ -39,6 +39,7 @@
           (expand-short-defcombin form))))
 
 (defstruct method-combination-info
+  (lambda-list nil :type list)
   (constructor (error "missing arg") :type function)
   (cache nil :type list)
   (source-location nil :type (or null sb-c:definition-source-location)))
@@ -103,6 +104,7 @@
 
 (defun load-short-defcombin (type-name operator ioa doc source-location)
   (let ((info (make-method-combination-info
+               :lambda-list '(&optional (order :most-specific-first))
                :source-location source-location
                :constructor (lambda (options)
                               (short-combine-methods type-name options operator ioa source-location doc))))
@@ -182,12 +184,13 @@
           type-name lambda-list method-group-specifiers args-option gf-var
           body)
       `(load-long-defcombin ',type-name ',documentation #',function
-                            ',args-option (sb-c:source-location)))))
+                            ',lambda-list ',args-option (sb-c:source-location)))))
 
 (define-load-time-global *long-method-combination-functions* (make-hash-table :test 'eq))
 
-(defun load-long-defcombin (type-name doc function args-lambda-list source-location)
+(defun load-long-defcombin (type-name doc function lambda-list args-lambda-list source-location)
   (let ((info (make-method-combination-info
+               :lambda-list lambda-list
                :constructor (lambda (options)
                               (make-instance 'long-method-combination
                                              :type-name type-name

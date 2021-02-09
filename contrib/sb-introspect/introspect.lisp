@@ -34,6 +34,7 @@
            "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
            "FUNCTION-TYPE"
+           "METHOD-COMBINATION-LAMBDA-LIST"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
@@ -520,6 +521,18 @@ value."
     (if (functionp f)
         (values (%fun-lambda-list f) t)
         (values nil nil))))
+
+(defun method-combination-lambda-list (method-combination)
+  "Return the lambda-list of METHOD-COMBINATION designator.
+METHOD-COMBINATION can be a method combination object,
+or a method combination name."
+  (let* ((name (etypecase method-combination
+                 (symbol method-combination)
+                 (method-combination
+                  (sb-pcl::method-combination-type-name method-combination))))
+         (info (or (gethash name sb-pcl::**method-combinations**)
+                   (error "~S: no such method combination." name))))
+    (sb-pcl::method-combination-info-lambda-list info)))
 
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."

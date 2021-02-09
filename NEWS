@@ -7,6 +7,8 @@ changes relative to sbcl-2.1.1:
     are no longer present in the SB-SPROF contrib module.
   * minor incompatible change: SB-SPROF:WITH-PROFILING defaults to all
     threads. SB-SPROF:START-PROFILING no longer accepts a :SAMPLING keyword.
+  * enhancement: the sb-introspect contrib now supports finding the lambda
+    lists of method combinations.  (thanks to Didier Verna)
   * bug fix: canonical unions of CONS types were being incorrectly computed.
     (lp#1912863, reported by James Kalenius)
 
