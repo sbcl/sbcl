@@ -211,7 +211,9 @@ EXPERIMENTAL: Interface subject to change."
   "Unblock SIGPROF in the specified thread"
   (cond ((logtest (sb-thread::thread-sigprof-enable thread) +sigprof-enable+)) ; do nothing
         ((neq thread sb-thread:*current-thread*)
-         (ignore-errors (sb-thread:interrupt-thread thread #'start-sampling)))
+         (sb-thread:with-deathlok (thread c-thread)
+           (unless (= c-thread 0)
+             (sb-thread:interrupt-thread thread #'start-sampling))))
         (t
          (setf (sb-thread::thread-sigprof-enable thread) +sigprof-enable+)
          (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)

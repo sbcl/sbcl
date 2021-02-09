@@ -2237,42 +2237,40 @@ the state of a thread:
   (interrupt-thread thread #'break)
 
 Short version: be careful out there."
-  (macrolet ((enqueue ()
-               ;; Append to the end of the interruptions queue. It's
-               ;; O(N), but it does not hurt to slow interruptors down a
-               ;; bit when the queue gets long.
-              `(setf (thread-interruptions thread)
-                     (append (thread-interruptions thread)
-                             (list (lambda ()
-                                     (barrier (:memory)) ; why???
-                                     (without-interrupts
-                                       (allow-with-interrupts
-                                        (funcall function)))))))))
   ;; POSIX says:
   ;; "If an application attempts to use a thread ID whose lifetime has ended,
   ;;  the behavior is undefined."
   ;; so we use the death lock to keep the thread alive, unless it already isn't.
   ;;
   (when (with-deathlok (thread c-thread)
-          (declare (ignorable c-thread))
           ;; Return T if couldn't interrupt.
           (cond ((eql c-thread 0) t)
-                (t
-                 (enqueue)
-                 ;; We use SIGURG because it satisfies a lot of requirements that
-                 ;; other people have thought about more than we have.
-                 ;; See https://golang.org/src/runtime/signal_unix.go where they describe
-                 ;; which signal works best for their sigPreempt.
-                 ;; It's basically the same use-case as here.
-                 #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigurg)
-                 #+sb-safepoint
-                 (with-alien ((wake (function void system-area-pointer)
-                                    :extern "wake_thread"))
-                   (with-pinned-objects (thread)
-                     (alien-funcall wake (sap+ (int-sap (get-lisp-obj-address thread))
-                                               (- sb-vm:instance-pointer-lowtag)))))
-                 nil)))
-    (error 'interrupt-thread-error :thread thread))))
+                (t (%interrupt-thread thread function) nil)))
+    (error 'interrupt-thread-error :thread thread)))
+
+(defun %interrupt-thread (thread function)
+  ;; Append to the end of the interruptions queue. It's
+  ;; O(N), but it does not hurt to slow interruptors down a
+  ;; bit when the queue gets long.
+  (setf (thread-interruptions thread)
+        (append (thread-interruptions thread)
+                ;; It seems to me that this junk should be in RUN-INTERRUPTION,
+                ;; but it doesn't really matter where it goes.
+                (list (lambda ()
+                        (barrier (:memory)) ; why???
+                        (without-interrupts (allow-with-interrupts (funcall function)))))))
+  ;; We use SIGURG because it satisfies a lot of requirements that
+  ;; other people have thought about more than we have.
+  ;; See https://golang.org/src/runtime/signal_unix.go where they describe
+  ;; which signal works best for their sigPreempt.
+  ;; It's basically the same use-case as here.
+  #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigurg)
+  #+sb-safepoint
+  (with-alien ((wake (function void system-area-pointer) :extern "wake_thread"))
+    (with-pinned-objects (thread)
+      (alien-funcall wake (sap+ (int-sap (get-lisp-obj-address thread))
+                                (- sb-vm:instance-pointer-lowtag)))))
+  nil)
 
 (defun terminate-thread (thread)
   "Terminate the thread identified by THREAD, by interrupting it and
