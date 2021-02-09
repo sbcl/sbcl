@@ -63,12 +63,11 @@
            (some-thread (sb-thread:make-thread #'sb-thread:wait-on-semaphore :arguments sem)))
       (sb-sprof:stop-sampling some-thread)
       (sb-sprof:start-sampling some-thread)
-      (sb-thread:signal-semaphore sem))))
+      (sb-thread:signal-semaphore sem))
+    t))
 
 ;; For debugging purposes, print output for visual inspection to see if
 ;; the allocation sequence gets hit in the right places (i.e. not at all
 ;; in traditional builds, and everywhere if SB-SAFEPOINT-STRICTLY is
 ;; enabled.)
 #+nil (disassemble #'consalot)
-
-
