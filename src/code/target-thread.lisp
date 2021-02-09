@@ -2511,7 +2511,7 @@ mechanism for inter-thread communication."
              (let ((*print-right-margin* 128)
                    (*print-lines* 4))
                (format t " ~3d ~30a : ~s~%"
-                       #+sb-thread (ash tlsindex (- sb-vm:word-shift))
+                       #+sb-thread (ash sym (- sb-vm:word-shift))
                        #-sb-thread 0
                        ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
                        ;; which is not defined during cross-compilation.
