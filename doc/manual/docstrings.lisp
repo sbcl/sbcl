@@ -739,7 +739,7 @@ followed another tabulation label or a tabulation body."
 ;;; KLUDGE: &AUX *PRINT-PRETTY* here means "no linebreaks please"
 (defun texinfo-begin (doc &aux *print-pretty*)
   (let ((kind (get-kind doc)))
-    (format *texinfo-output* "@~A {~:(~A~)} ~(~A~@[ ~{~A~^ ~}~]~)~%"
+    (format *texinfo-output* "@~A {~:(~A~)} ~(~A~)"
             (case kind
               ((package constant variable)
                "defvr")
@@ -748,15 +748,25 @@ followed another tabulation label or a tabulation body."
               (t
                "deffn"))
             (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
-            (title-name doc)
-            ;; &foo would be amusingly bold in the pdf thanks to TeX/Texinfo
-            ;; interactions,so we escape the ampersand -- amusingly for TeX.
-            ;; sbcl.texinfo defines macros that expand @andkey and friends to &key.
-            (mapcar (lambda (name)
-                      (if (member name lambda-list-keywords)
-                          (format nil "@and~A{}" (remove #\- (subseq (string name) 1)))
-                          name))
-                    (lambda-list doc)))))
+            (title-name doc))
+    (let ((lambda-list (lambda-list doc)))
+      (case lambda-list
+        ((nil))
+        (:unknown
+         (format *texinfo-output* " @emph{lambda list not known}"))
+        (t
+         ;; &foo would be amusingly bold in the pdf thanks to
+         ;; TeX/Texinfo interactions,so we escape the ampersand --
+         ;; amusingly for TeX.  sbcl.texinfo defines macros that
+         ;; expand @andkey and friends to &key.
+         (format *texinfo-output* " ~(~{~A~^ ~}~)"
+                 (mapcar (lambda (name)
+                           (if (member name lambda-list-keywords)
+                               (format nil "@and~A{}"
+                                       (remove #\- (subseq (string name) 1)))
+                               name))
+                         lambda-list)))))
+    (format *texinfo-output* "~%")))
 
 (defun texinfo-inferred-body (doc)
   (when (member (get-kind doc) '(class structure condition))
