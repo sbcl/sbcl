@@ -2204,8 +2204,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SIMPLE-FUN-INFO"
                "%SIMPLE-FUN-LEXPR"
                "%SIMPLE-FUN-NAME"
-               "%SIMPLE-FUN-NEXT" ; FIXME: remove
-               "%SIMPLE-FUN-SELF" ; FIXME: don't export
                "%SIMPLE-FUN-TEXT-LEN"
                "%SIMPLE-FUN-SOURCE"
                "%SIMPLE-FUN-TYPE"

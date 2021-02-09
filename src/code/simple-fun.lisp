@@ -352,10 +352,6 @@
           (if (and form doc) (cons form doc) (or form doc))))
   doc)
 
-(defun %simple-fun-next (simple-fun) ; DO NOT USE IN NEW CODE
-  (%code-entry-point (fun-code-header simple-fun)
-                     (1+ (%simple-fun-index simple-fun))))
-
 ;;; Return the number of bytes to subtract from the untagged address of SIMPLE-FUN
 ;;; to obtain the untagged address of its code component.
 ;;; See also CODE-FROM-FUNCTION.

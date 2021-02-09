@@ -66,7 +66,7 @@
           ;; non-x86 backends store the function itself (what else?) in 'self'
           #-(or x86 x86-64) fun))
     #-darwin-jit
-    (setf (%simple-fun-self fun) self)
+    (setf (sb-vm::%simple-fun-self fun) self)
     #+darwin-jit
     (sb-vm::jit-patch (+ (get-lisp-obj-address fun)
                   (- sb-vm:fun-pointer-lowtag)
