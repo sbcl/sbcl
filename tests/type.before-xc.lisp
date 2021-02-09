@@ -429,3 +429,57 @@
     (sb-vm::primitive-type (specifier-type 'cons))
   (assert (and (eq result (sb-vm::primitive-type-or-lose 'list))
                (not exactp))))
+
+(let ((bs (specifier-type 'base-string))
+      (not-sbs (specifier-type '(not simple-base-string)))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection bs not-sbs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  ;; should be commutative
+  (let ((intersect (type-intersection not-sbs bs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  ;; test when the righthand side is a larger negation type
+  (let ((intersect (type-intersection bs not-ss)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  (let ((intersect (type-intersection not-sbs bs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array)))))))
+
+#+sb-unicode
+(let ((cs (specifier-type 'sb-kernel::character-string))
+      (not-scs (specifier-type '(not sb-kernel:simple-character-string)))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection cs not-scs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  (let ((intersect (type-intersection not-scs cs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  ;; test when the righthand side is a larger negation type
+  (let ((intersect (type-intersection cs not-ss)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  (let ((intersect (type-intersection not-ss cs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array)))))))
+
+#+sb-unicode
+(let ((s (specifier-type 'string))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection s not-ss)))
+    (assert (union-type-p intersect))
+    (assert (type= intersect (specifier-type '(and string (not simple-array))))))
+  (let ((intersect (type-intersection not-ss s)))
+    (assert (union-type-p intersect))
+    (assert (type= intersect (specifier-type '(and string (not simple-array)))))))
+
+(let ((left (specifier-type '(array bit (2 2))))
+      (right (specifier-type '(not (simple-array bit)))))
+  (let ((intersect (type-intersection left right)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type
+                              '(and (array bit (2 2))
+                                    (not simple-array)))))))

@@ -1832,17 +1832,30 @@
        nil))))
 
 (defun maybe-complex-array-refinement (type1 type2)
+  ;; a :MAYBE complex array <type> intersected with (NOT <type'>)
+  ;; where <type'> is the same in all aspects as <type> except that
+  ;; its complexp value is in {T,NIL} should return <type> altered
+  ;; with its COMPLEXP being the negation of the value from <type'>.
+  ;; As a particular case which is no longer special in handling it,
+  ;; the righthand side could be TYPE= to (NOT SIMPLE-ARRAY)
+  ;; which will match any lefthand side and do what it always did.
   (let* ((ntype (negation-type-type type2))
          (ndims (array-type-dimensions ntype))
          (ncomplexp (array-type-complexp ntype))
          (nseltype (array-type-specialized-element-type ntype))
          (neltype (array-type-element-type ntype)))
-    (if (and (eql ndims '*) (null ncomplexp)
-             (eq neltype *wild-type*) (eq nseltype *wild-type*))
-        (make-array-type (array-type-dimensions type1)
-                         :complexp t
-                         :element-type (array-type-element-type type1)
-                         :specialized-element-type (array-type-specialized-element-type type1)))))
+    (when (and (eq (array-type-complexp type1) :maybe)
+               (neq ncomplexp :maybe)
+               (or (eql ndims '*)
+                   (equal (array-type-dimensions type1) ndims))
+               (or (eq nseltype *wild-type*)
+                   (eq (array-type-specialized-element-type type1) nseltype))
+               (or (eq neltype *wild-type*)
+                   (type= (array-type-element-type type1) neltype)))
+      (make-array-type (array-type-dimensions type1)
+                       :complexp (not (array-type-complexp ntype))
+                       :specialized-element-type (array-type-specialized-element-type type1)
+                       :element-type (array-type-element-type type1)))))
 
 (define-type-method (negation :complex-intersection2) (type1 type2)
   (cond
