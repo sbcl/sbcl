@@ -205,7 +205,7 @@ EXPERIMENTAL: Interface subject to change."
 (defconstant +sigprof-enable+ 1)
 
 ;;; If a thread wants sampling but had previously blocked SIGPROF,
-;;; it will have to unblock the signal. We can use INTERRUPT-THREAD
+;;; it will have to unblock the signal. We can use %INTERRUPT-THREAD
 ;;; to tell it to do that.
 (defun start-sampling (&optional (thread sb-thread:*current-thread*))
   "Unblock SIGPROF in the specified thread"
@@ -213,7 +213,7 @@ EXPERIMENTAL: Interface subject to change."
         ((neq thread sb-thread:*current-thread*)
          (sb-thread:with-deathlok (thread c-thread)
            (unless (= c-thread 0)
-             (sb-thread:interrupt-thread thread #'start-sampling))))
+             (sb-thread::%interrupt-thread thread #'start-sampling))))
         (t
          (setf (sb-thread::thread-sigprof-enable thread) +sigprof-enable+)
          (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)

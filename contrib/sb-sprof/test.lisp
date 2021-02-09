@@ -64,3 +64,10 @@
 ;; in traditional builds, and everywhere if SB-SAFEPOINT-STRICTLY is
 ;; enabled.)
 #+nil (disassemble #'consalot)
+
+(let ((some-thread
+       (sb-thread:make-thread
+        (lambda ()
+          (sleep 3)))))
+  (sb-sprof:stop-sampling some-thread)
+  (sb-sprof:start-sampling some-thread))
