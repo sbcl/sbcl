@@ -65,9 +65,9 @@
 ;; enabled.)
 #+nil (disassemble #'consalot)
 
-(let ((some-thread
-       (sb-thread:make-thread
-        (lambda ()
-          (sleep 3)))))
+#+sb-thread
+(let* ((sem (sb-thread:make-semaphore))
+       (some-thread (sb-thread:make-thread #'sb-thread:wait-on-semaphore :arguments sem)))
   (sb-sprof:stop-sampling some-thread)
-  (sb-sprof:start-sampling some-thread))
+  (sb-sprof:start-sampling some-thread)
+  (sb-thread:signal-semaphore sem))
