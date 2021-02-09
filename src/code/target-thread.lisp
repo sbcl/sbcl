@@ -1415,7 +1415,11 @@ on this semaphore, then N of them is woken up."
       (with-deathlok (thread)
         (when sem ; ordinary lisp thread, not FOREIGN-THREAD
           (setf (thread-startup-info thread) c-thread))
-        (setf (thread-primitive-thread thread) 0)
+        ;; Accept no further interruptions. Other threads can't add new ones to the queue
+        ;; as doing so requires gabbing the per-thread mutex which we currently own.
+        ;; Perhaps we should also block SIGURG here?
+        (setf (thread-interruptions thread) nil
+              (thread-primitive-thread thread) 0)
         (barrier (:write)))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
