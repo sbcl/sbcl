@@ -190,7 +190,6 @@
 ;; self-pointer (trampoline) slot. Scavenging the self-pointer is unnecessary
 ;; though harmless. This intricate and/or obfuscated calculation of #b110
 ;; is insensitive to the index of the trampoline slot, probably.
-#+immobile-code
 (defun make-immobile-funinstance (layout slot-vector)
   (let ((gf (truly-the funcallable-instance
              (alloc-immobile-fixedobj 6 ; KLUDGE

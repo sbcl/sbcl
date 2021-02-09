@@ -365,7 +365,7 @@ not supported."
                  ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
                  ;; So we need to go lower-level to sense whether any exist.
                  (sb-thread:avltree-list sb-thread::*all-threads*)))
-      #+sb-thread (sb-impl::finalizer-thread-start)
+      (sb-impl::finalizer-thread-start)
       (error "Cannot fork with multiple threads running."))
     (let ((pid (posix-fork)))
       #+darwin (when (= pid 0) (darwin-reinit))
