@@ -423,30 +423,30 @@ stack_pointer_p(struct thread* thread, void *p)
 }
 
 static int
-ra_pointer_p (void *ra)
+ra_pointer_p (struct thread* th, void *ra)
 {
   /* the check against 4096 is still a mystery to everyone interviewed about
    * it, but recent changes to sb-sprof seem to suggest that such values
    * do occur sometimes. */
-  return ((uword_t) ra) > 4096 && !stack_pointer_p (ra);
+  return ((uword_t) ra) > 4096 && !stack_pointer_p (th, ra);
 }
 
 static int NO_SANITIZE_MEMORY
-x86_call_context (void *fp, void **ra, void **ocfp)
+x86_call_context (struct thread* th, void *fp, void **ra, void **ocfp)
 {
   void *c_ocfp;
   void *c_ra;
   int c_valid_p;
 
-  if (!stack_pointer_p(fp))
+  if (!stack_pointer_p(th, fp))
     return 0;
 
   c_ocfp    = *((void **) fp);
   c_ra      = *((void **) fp + 1);
 
   c_valid_p = (c_ocfp > fp
-               && stack_pointer_p(c_ocfp)
-               && ra_pointer_p(c_ra));
+               && stack_pointer_p(th, c_ocfp)
+               && ra_pointer_p(th, c_ra));
 
   if (c_valid_p)
     *ra = c_ra, *ocfp = c_ocfp;
@@ -510,7 +510,7 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
  * example when debugging threading deadlocks.
  */
 void NO_SANITIZE_MEMORY
-log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
+log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE *f)
 {
   int i = start;
 
@@ -518,14 +518,15 @@ log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
     void *ra;
     void *next_fp;
 
-    if (!x86_call_context(fp, &ra, &next_fp))
+    if (!x86_call_context(th, fp, &ra, &next_fp))
       break;
     print_backtrace_frame(ra, next_fp, i, f);
     fp = next_fp;
   }
 }
 void backtrace_from_fp(void *fp, int nframes, int start) {
-    log_backtrace_from_fp(fp, nframes, start, stdout);
+    log_backtrace_from_fp(arch_os_get_current_thread(),
+                          fp, nframes, start, stdout);
 }
 
 void backtrace_from_context(os_context_t *context, int nframes) {
