@@ -219,12 +219,10 @@ struct call_info {
     int interrupted;
     struct code *code;
     lispobj lra;
-    int pc; /* Note: this is the trace file offset, not the actual pc. */
+    /* 'pc' is the byte displacement from CODE-INSTRUCTIONS of 'code',
+     * not an absolute pc */
+    int pc;
 };
-
-// simple-fun headers have a pointer to layout-of-function in the
-// upper bytes if words are 8 bytes, so mask off those bytes.
-#define HEADER_LENGTH(header) (((header)>>8) & FUN_HEADER_NWORDS_MASK)
 
 static int previous_info(struct call_info *info);
 
@@ -238,7 +236,7 @@ code_pointer(lispobj object)
             break;
         case RETURN_PC_WIDETAG:
         case SIMPLE_FUN_WIDETAG:
-            len = HEADER_LENGTH(*headerp);
+            len = (HeaderValue(*headerp) & FUN_HEADER_NWORDS_MASK);
             if (len == 0)
                 headerp = NULL;
             else
@@ -299,8 +297,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         pc = *os_context_pc_addr(context);
     }
     if (info->code != NULL)
-        info->pc = pc - (uword_t) info->code -
-            (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
+        info->pc = (char*)pc - code_text_start(info->code);
     else
         info->pc = 0;
 }
