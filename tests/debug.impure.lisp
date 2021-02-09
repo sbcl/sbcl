@@ -700,3 +700,9 @@
           (assert (= (file-length fasl1) (file-length fasl2)))
           (loop repeat (file-length fasl1)
                 do (assert (= (read-byte fasl1) (read-byte fasl2)))))))))
+
+;; lp#1901781
+(defun ll-unknown (x y) (declare (optimize (debug 0))) (+ x y))
+(compile 'll-unknown)
+(with-test (:name :unknown-lambda-list)
+  (assert (eq (sb-kernel:%fun-lambda-list #'ll-unknown) :unknown)))

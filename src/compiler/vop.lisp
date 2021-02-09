@@ -396,7 +396,7 @@
   ;; some string that is intended to be informative.
   (name "<not computed>" :type (or simple-string list symbol))
   ;; the argument list that the function was defined with.
-  (arguments nil :type list)
+  (arguments :unknown :type (or list (eql :unknown)))
   ;; source form and/or docstring
   (form/doc nil :type (or list string (cons t string)))
   ;; a function type specifier representing the arguments and results
