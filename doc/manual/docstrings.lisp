@@ -414,7 +414,10 @@ there is no corresponding docstring."
                       (cond ((or key optional) (car x))
                             (t (clean (car x))))
                       (clean (cdr x) :key key :optional optional))))))
-         (clean (sb-introspect:function-lambda-list (get-name doc))))))))
+         (multiple-value-bind (ll valid) (sb-introspect:function-lambda-list (get-name doc))
+           (if valid
+               (clean ll)
+               (values nil nil))))))))
 
 (defun get-string-name (x)
   (let ((name (get-name x)))
@@ -749,23 +752,22 @@ followed another tabulation label or a tabulation body."
                "deffn"))
             (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
             (title-name doc))
-    (let ((lambda-list (lambda-list doc)))
-      (case lambda-list
-        ((nil))
-        (:unknown
-         (format *texinfo-output* " @emph{lambda list not known}"))
-        (t
-         ;; &foo would be amusingly bold in the pdf thanks to
-         ;; TeX/Texinfo interactions,so we escape the ampersand --
-         ;; amusingly for TeX.  sbcl.texinfo defines macros that
-         ;; expand @andkey and friends to &key.
-         (format *texinfo-output* " ~(~{~A~^ ~}~)"
-                 (mapcar (lambda (name)
-                           (if (member name lambda-list-keywords)
-                               (format nil "@and~A{}"
-                                       (remove #\- (subseq (string name) 1)))
-                               name))
-                         lambda-list)))))
+    (multiple-value-bind (lambda-list valid) (lambda-list doc)
+      (cond ((not valid)
+             (format *texinfo-output* " @emph{lambda list not known}"))
+            ((not lambda-list))
+            (t
+             ;; &foo would be amusingly bold in the pdf thanks to
+             ;; TeX/Texinfo interactions,so we escape the ampersand --
+             ;; amusingly for TeX.  sbcl.texinfo defines macros that
+             ;; expand @andkey and friends to &key.
+             (format *texinfo-output* " ~(~{~A~^ ~}~)"
+                     (mapcar (lambda (name)
+                               (if (member name lambda-list-keywords)
+                                   (format nil "@and~A{}"
+                                           (remove #\- (subseq (string name) 1)))
+                                   name))
+                             lambda-list)))))
     (format *texinfo-output* "~%")))
 
 (defun texinfo-inferred-body (doc)

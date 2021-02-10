@@ -493,22 +493,25 @@ If an unsupported TYPE is requested, the function will return NIL.
   (function-lambda-list function))
 
 (defun function-lambda-list (function)
-  "Describe the lambda list for the extended function designator FUNCTION.
+  "Return the lambda list for the extended function designator FUNCTION.
 Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
-function designator."
-  (let ((raw-result
-         (cond ((and (symbolp function) (special-operator-p function))
-                (function-lambda-list (info :function :ir1-convert function)))
-               ((valid-function-name-p function)
-                (function-lambda-list (or (and (symbolp function)
-                                               (macro-function function))
-                                          (fdefinition function))))
-               ((typep function 'generic-function)
-                (sb-pcl::generic-function-pretty-arglist function))
-               (t
-                (%fun-lambda-list function)))))
-    (if (eq raw-result :unknown) nil raw-result)))
+function designator.
+
+The second value indicates whether the primary value is actually a lambda-list."
+  (cond ((and (symbolp function) (special-operator-p function))
+         (function-lambda-list (info :function :ir1-convert function)))
+        ((valid-function-name-p function)
+         (function-lambda-list (or (and (symbolp function)
+                                        (macro-function function))
+                                   (fdefinition function))))
+        ((typep function 'generic-function)
+         (sb-pcl::generic-function-pretty-arglist function))
+        (t
+         (let ((raw-result (%fun-lambda-list function)))
+           (if (eq raw-result :unknown)
+               (values nil nil)
+               (values raw-result t))))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
