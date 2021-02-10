@@ -30,6 +30,10 @@
     (function-lambda-list 'cl-user::one)
   (cl-user::a cl-user::b cl-user::c))
 
+(deftest function-lambda-list.1a
+    (function-lambda-list 'cl-user::0-debug)
+  ())
+
 (deftest function-lambda-list.2
     (function-lambda-list 'the)
   (sb-c::value-type sb-c::form))

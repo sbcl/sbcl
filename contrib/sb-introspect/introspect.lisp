@@ -497,17 +497,18 @@ If an unsupported TYPE is requested, the function will return NIL.
 Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
 function designator."
-  ;; FIXME: sink this logic into SB-KERNEL:%FUN-LAMBDA-LIST and just call that?
-  (cond ((and (symbolp function) (special-operator-p function))
-         (function-lambda-list (info :function :ir1-convert function)))
-        ((valid-function-name-p function)
-         (function-lambda-list (or (and (symbolp function)
-                                        (macro-function function))
-                                   (fdefinition function))))
-        ((typep function 'generic-function)
-         (sb-pcl::generic-function-pretty-arglist function))
-        (t
-         (%fun-lambda-list function))))
+  (let ((raw-result
+         (cond ((and (symbolp function) (special-operator-p function))
+                (function-lambda-list (info :function :ir1-convert function)))
+               ((valid-function-name-p function)
+                (function-lambda-list (or (and (symbolp function)
+                                               (macro-function function))
+                                          (fdefinition function))))
+               ((typep function 'generic-function)
+                (sb-pcl::generic-function-pretty-arglist function))
+               (t
+                (%fun-lambda-list function)))))
+    (if (eq raw-result :unknown) nil raw-result)))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
