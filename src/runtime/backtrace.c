@@ -187,7 +187,7 @@ print_entry_name (lispobj name, FILE *f)
     }
 }
 
-static void
+static void __attribute__((unused))
 print_entry_points (struct code *code, FILE *f)
 {
     int n_funs = code_n_funs(code);
@@ -219,9 +219,9 @@ struct call_info {
     int interrupted;
     struct code *code;
     lispobj lra;
-    /* 'pc' is the byte displacement from CODE-INSTRUCTIONS of 'code',
-     * not an absolute pc */
-    int pc;
+    // Byte offset from 'code' base address to program counter,
+    // unless 'code' is 0, then an absolute PC.
+    uword_t pc;
 };
 
 static int previous_info(struct thread*, struct call_info *info);
@@ -284,7 +284,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         pc = *os_context_pc_addr(context);
     }
     if (info->code != NULL)
-        info->pc = (char*)pc - code_text_start(info->code);
+        info->pc = (char*)pc - (char*)info->code;
     else
         info->pc = 0;
 }
@@ -321,14 +321,12 @@ previous_info(struct thread *thread, struct call_info *info)
         }
     } else if (fixnump(lra)) {
         info->code = (struct code*)native_pointer(this_frame->code);
-        // FIXME: is this right? fixnumish LRAs are based off the object base address
-        // and not the code text start?
-        info->pc = (uword_t)(info->code + lra);
+        info->pc = lra;
         info->lra = NIL;
     } else {
         info->code = code_pointer(lra);
         if (info->code != NULL)
-            info->pc = (char*)native_pointer(info->lra) - code_text_start(info->code);
+            info->pc = (char*)native_pointer(info->lra) - (char*)info->code;
         else
             info->pc = 0;
     }
@@ -349,38 +347,56 @@ lisp_backtrace(int nframes)
     info.pc = 0;
 
     int i = 0;
+    int footnotes = 0;
     do {
         if (!previous_info(thread, &info)) {
-            printf("Bad frame pointer %p\n", info.frame);
-            return;
+            if (info.frame) // 0 is normal termination of the call chain
+                printf("Bad frame pointer %p [valid range=%p..%p]\n", info.frame,
+                       thread->control_stack_start, thread->control_stack_end);
+            break;
         }
         printf("%4d: ", i);
+        // Print spaces to keep the alignment nice
+        if (info.lra == NIL || info.interrupted) {
+            putchar('[');
+            if (info.interrupted) { footnotes |= 1; putchar('I'); }
+            if (info.lra == NIL) { footnotes |= 2; putchar('*'); }
+            putchar(']');
+            if (!(info.lra == NIL && info.interrupted)) putchar(' ');
+        } else {
+            printf("    ");
+        }
+        printf("%p ", info.frame);
+        void* absolute_pc = 0;
+        if (info.code) {
+            absolute_pc = (char*)info.code + info.pc;
+            printf("pc=%p {%p+%04x} ", absolute_pc, info.code, (int)info.pc);
+        } else {
+            absolute_pc = (char*)info.pc;
+            printf("pc=%p ", absolute_pc);
+        }
 
-        if (info.code != (struct code *) 0) {
-            struct compiled_debug_fun *df ;
-            if (info.lra != NIL &&
-                (df = debug_function_from_pc((struct code *)info.code, (void *)info.lra)))
+        // If LRA does not match the PC, print it. This should not happen.
+        if (info.lra != make_lispobj(absolute_pc, OTHER_POINTER_LOWTAG)
+            && info.lra != NIL)
+            printf("LRA=%p ", (void*)info.lra);
+
+        if (info.code) {
+            struct compiled_debug_fun *df;
+            if (absolute_pc &&
+                (df = debug_function_from_pc((struct code *)info.code, absolute_pc)))
                 print_entry_name(df->name, stdout);
             else
-                print_entry_points((struct code *)info.code, stdout);
-
-            printf(" %p", (void*)((uword_t) info.code | OTHER_POINTER_LOWTAG));
+                // I can't imagine a scenario where we have info.code
+                // but do not have an absolute_pc, or debug-fun can't be found.
+                // Anyway, we can uniquely identify code by serial# now.
+                printf("{code_serialno=%x}", code_serialno(info.code));
         }
-        else
-            printf("CODE = ???");
-        printf("%s fp = %p", info.interrupted ? " [interrupted]" : "",
-               info.frame);
 
-        if (info.lra != NIL)
-            printf(" LRA = %p", (void*)info.lra);
-        else
-            printf(" <no LRA>");
-
-        if (info.pc)
-            printf(" pc_ofs = %p", (void*)(long)info.pc);
         putchar('\n');
 
     } while (++i <= nframes);
+    if (footnotes) printf("Note: [I] = interrupted, [*] = no LRA\n");
 }
 
 #else
@@ -484,22 +500,22 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
 
     p = component_ptr_from_pc(pc);
 
+    fprintf(f, "fp=%p pc=%p ", fp, pc);
     if (p) {
         struct code *cp = (struct code *) p;
         struct compiled_debug_fun *df = debug_function_from_pc(cp, pc);
         if (df)
             print_entry_name(df->name, f);
         else
-            print_entry_points(cp, f);
-        fprintf(f, ", pc = %p, fp = %p", pc, fp);
+            fprintf(f, "{code_serialno=%x}", code_serialno(cp));
     } else {
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
         Dl_info info;
         if (dladdr(pc, &info)) {
-            fprintf(f, "Foreign function %s, pc = %p, fp = %p", info.dli_sname, pc, fp);
+            fprintf(f, "Foreign function %s", info.dli_sname);
         } else
 #endif
-            fprintf(f, "Foreign function, pc = %p, fp = %p", pc, fp);
+            fprintf(f, "Foreign function");
     }
 
     putc('\n', f);
