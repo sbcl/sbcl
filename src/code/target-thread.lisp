@@ -1416,10 +1416,14 @@ on this semaphore, then N of them is woken up."
         (when sem ; ordinary lisp thread, not FOREIGN-THREAD
           (setf (thread-startup-info thread) c-thread))
         ;; Accept no further interruptions. Other threads can't add new ones to the queue
-        ;; as doing so requires gabbing the per-thread mutex which we currently own.
-        ;; Perhaps we should also block SIGURG here?
+        ;; as doing so requires grabbing the per-thread mutex which we currently own.
+        ;; Deferrable signals are masked at this point, but it is best to tidy up
+        ;; any stray data such as captured closure values.
         (setf (thread-interruptions thread) nil
               (thread-primitive-thread thread) 0)
+        (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
+                         (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
+              0)
         (barrier (:write)))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
@@ -1773,6 +1777,14 @@ session."
                           (prog1 (svref (thread-startup-info *current-thread*) 3)
                             (setf (thread-startup-info *current-thread*) 0)))))
        (flet ((unmask-signals ()
+                ;; New threads should start with SIGPROF blocked if profiling is enabled
+                ;; on just a subset of threads. Ideally we'd add to the blocked mask
+                ;; right now, but it suffices to just leave the enabling bit at its default
+                ;; of 0; at worst, one undesired signal would be received.
+                (when (eq *profiled-threads* :all)
+                  (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
+                                   (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
+                        1))
                 (let ((mask (svref (thread-startup-info *current-thread*) 4)))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,

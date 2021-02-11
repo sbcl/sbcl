@@ -3281,6 +3281,7 @@ structure representations"
                 "LINKAGE-TABLE-ENTRY-SIZE")
                #+sb-safepoint "GC-SAFEPOINT-PAGE-ADDR"
                #+sb-safepoint "GC-SAFEPOINT-TRAP-OFFSET"
+               "THREAD-STATE-WORD-SLOT"
                "TLS-SIZE" "N-WIDETAG-BITS" "WIDETAG-MASK"
                "INSTANCE-LENGTH-SHIFT"
                "UNBOUND-MARKER-WIDETAG"

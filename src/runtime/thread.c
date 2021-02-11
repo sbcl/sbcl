@@ -268,6 +268,7 @@ void create_main_lisp_thread(lispobj function) {
     struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
+    th->state_word.sprof_enable = 1;
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&specials, 0);
 #endif
@@ -954,6 +955,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #endif
 
     th->state_word.state = STATE_RUNNING;
+    th->state_word.sprof_enable = 0;
     th->state_word.user_thread_p = 1;
 
 #ifdef ALIEN_STACK_GROWS_DOWNWARD

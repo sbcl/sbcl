@@ -15,13 +15,16 @@
 #include "genesis/static-symbols.h"
 
 struct thread_state_word {
+  // - control_stack_guard_page_protected is referenced from
+  //   hand-written assembly code. (grep "THREAD_STATE_WORD_OFFSET")
+  // - sprof_enable is referenced with SAPs.
+  //   (grep "sb-vm:thread-state-word-slot")
   char control_stack_guard_page_protected;
-  char user_thread_p; // opposite of lisp's ephemeral-p
+  char sprof_enable; // statistical CPU profiler switch
   char state;
+  char user_thread_p; // opposite of lisp's ephemeral-p
 #ifdef LISP_FEATURE_64_BIT
-  char padding[5];
-#else
-  char padding[1];
+  char padding[4];
 #endif
 };
 

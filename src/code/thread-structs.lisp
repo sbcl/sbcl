@@ -121,7 +121,6 @@ in future versions."
   ;; This is almost-but-not-quite the same as what formerly
   ;; might have been known as the %ALIVE-P flag.
   (%visible 1 :type fixnum)
-  (sigprof-enable (if (eq *profiled-threads* :all) 1 0) :type sb-ext:word)
   (interruptions nil :type list)
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")
