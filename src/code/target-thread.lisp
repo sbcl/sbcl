@@ -1777,14 +1777,6 @@ session."
                           (prog1 (svref (thread-startup-info *current-thread*) 3)
                             (setf (thread-startup-info *current-thread*) 0)))))
        (flet ((unmask-signals ()
-                ;; New threads should start with SIGPROF blocked if profiling is enabled
-                ;; on just a subset of threads. Ideally we'd add to the blocked mask
-                ;; right now, but it suffices to just leave the enabling bit at its default
-                ;; of 0; at worst, one undesired signal would be received.
-                (when (eq *profiled-threads* :all)
-                  (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
-                                   (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
-                        1))
                 (let ((mask (svref (thread-startup-info *current-thread*) 4)))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,
@@ -1835,6 +1827,14 @@ session."
             (without-interrupts
               (unwind-protect
                    (with-local-interrupts
+                     ;; New threads should start with SIGPROF blocked if profiling is enabled
+                     ;; on just a subset of threads. Ideally we'd add to the blocked mask
+                     ;; right now, but it suffices to just leave the enabling bit at its default
+                     ;; of 0; at worst, one undesired signal would be received.
+                     (when (eq *profiled-threads* :all)
+                       (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
+                                        (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
+                             1))
                      (unmask-signals)
                      (let ((list
                              (multiple-value-list

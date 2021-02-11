@@ -84,6 +84,7 @@ The following keyword args are recognized:
    evaluate BODY."
   (declare (type report-type report))
   (check-type loop boolean)
+  #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
   (let ((message "~@<No sampling progress; run too short, sampling frequency too low, ~
 inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
     (with-unique-names (values last-index)
@@ -160,6 +161,7 @@ The following keyword args are recognized:
   #-gencgc
   (when (eq mode :alloc)
     (error "Allocation profiling is only supported for builds using the generational garbage collector."))
+  #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
   (unless *profiling*
     (multiple-value-bind (secs usecs)
         (multiple-value-bind (secs rest)
@@ -179,7 +181,7 @@ The following keyword args are recognized:
                                     :alloc-interval alloc-interval
                                     :mode mode))
       (enable-call-counting)
-      (setf sb-thread::*profiled-threads* threads)
+      #+sb-thread (setf sb-thread::*profiled-threads* threads)
       ;; Each existing threads' sprof-enable slot needs to reflect the desired set.
       (sb-thread::avltree-filter
        (lambda (node &aux (thread (sb-thread::avlnode-data node)))
@@ -266,9 +268,9 @@ The following keyword args are recognized:
            #-sb-thread (unschedule-timer timer)
            #+sb-thread (sb-thread:join-thread timer))))
      (disable-call-counting)
-     (setf *profiling* nil
-           ;; :ALL means that new threads won't block SIGPROF by default
-           sb-thread::*profiled-threads* :all)))
+     ;; New threads should not mask SIGPROF by default
+     #+sb-thread (setf sb-thread::*profiled-threads* :all)
+     (setf *profiling* nil)))
   (values))
 
 (defun reset ()
