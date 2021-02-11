@@ -498,7 +498,8 @@ Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
 function designator.
 
-The second value indicates whether the primary value is actually a lambda-list."
+If the function does not have a lambda list (compiled with debug 0),
+then two values are returned: (values nil t)"
   (cond ((and (symbolp function) (special-operator-p function))
          (function-lambda-list (info :function :ir1-convert function)))
         ((valid-function-name-p function)
@@ -510,8 +511,8 @@ The second value indicates whether the primary value is actually a lambda-list."
         (t
          (let ((raw-result (%fun-lambda-list function)))
            (if (eq raw-result :unknown)
-               (values nil nil)
-               (values raw-result t))))))
+               (values nil t)
+               (values raw-result nil))))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return

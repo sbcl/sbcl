@@ -29,22 +29,22 @@
 (deftest function-lambda-list.1
     (function-lambda-list 'cl-user::one)
   (cl-user::a cl-user::b cl-user::c)
-  t)
+  nil)
 
 (deftest function-lambda-list.1a
     (function-lambda-list 'cl-user::0-debug)
   ()
-  nil)
+  t)
 
 (deftest function-lambda-list.2
     (function-lambda-list 'the)
   (sb-c::value-type sb-c::form)
-  t)
+  nil)
 
 (deftest function-lambda-list.3
     (function-lambda-list #'(sb-pcl::slow-method cl-user::j (t)))
   (sb-pcl::method-args sb-pcl::next-methods)
-  t)
+  nil)
 
 (deftest macro-lambda-list.1
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x b)
