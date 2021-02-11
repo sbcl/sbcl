@@ -53,8 +53,9 @@ The following keyword args are recognized:
    in wallclock profiling mode.
 
  :MAX-SAMPLES <max>
-   Repeat evaluating body until <max> samples are taken.
-   Default is *MAX-SAMPLES*.  No effect if :LOOP is NIL (the default).
+   If :LOOP is NIL (the default), collect no more than <max> samples.
+   If :LOOP is T, repeat evaluating body until <max> samples are taken.
+   Default is *MAX-SAMPLES*.
 
  :MAX-DEPTH <max>
    Maximum call stack depth that the profiler should consider. Only
@@ -83,23 +84,19 @@ The following keyword args are recognized:
    evaluate BODY."
   (declare (type report-type report))
   (check-type loop boolean)
-  (with-unique-names (values last-index oops)
-    `(let* ((*sample-interval* ,sample-interval)
-            (*alloc-interval* ,alloc-interval)
-            (*sampling-mode* ,mode)
-            (*show-progress* ,show-progress)
-            (*max-samples* ,max-samples))
-       ,@(when reset '((reset)))
-       (flet ((,oops ()
-                (warn "~@<No sampling progress; run too short, sampling interval ~
-                       too long, inappropriate set of sampled thread, or possibly ~
-                       a profiler bug.~:@>")))
+  (let ((message "~@<No sampling progress; run too short, sampling frequency too low, ~
+inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
+    (with-unique-names (values last-index)
+      `(let ((*show-progress* ,show-progress))
+         ,@(when reset '((reset)))
          (unwind-protect
               (progn
-                (start-profiling :max-depth ,max-depth :threads ,threads)
+                (start-profiling :mode ,mode :max-depth ,max-depth :max-samples ,max-samples
+                                 :sample-interval ,sample-interval :alloc-interval ,alloc-interval
+                                 :threads ,threads)
                 ,(if loop
                      `(let (,values)
-                        (loop
+                        (loop ; Uh, shouldn't this be a trailing test, not a leading test?
                           (when (>= (samples-trace-count *samples*)
                                     (samples-max-samples *samples*))
                             (return))
@@ -109,15 +106,15 @@ The following keyword args are recognized:
                           (let ((,last-index (samples-index *samples*)))
                             (setf ,values (multiple-value-list (progn ,@body)))
                             (when (= ,last-index (samples-index *samples*))
-                              (,oops)
+                              (warn ,message)
                               (return))))
                         (values-list ,values))
                      `(let ((,last-index (samples-index *samples*)))
                         (multiple-value-prog1 (progn ,@body)
                           (when (= ,last-index (samples-index *samples*))
-                            (,oops))))))
-           (stop-profiling)))
-       ,@(when report-p `((report :type ,report))))))
+                            (warn ,message))))))
+           (stop-profiling))
+         ,@(when report-p `((report :type ,report)))))))
 
 #-win32
 (defun start-profiling (&key (max-samples *max-samples*)
