@@ -62,28 +62,3 @@
    (frob extended-sequence *extended-sequence-type*))
 
 (!defun-from-collected-cold-init-forms !primordial-type-cold-init)
-
-;;; A HAIRY-TYPE represents anything too weird to be described
-;;; reasonably or to be useful, such as NOT, SATISFIES, unknown types,
-;;; and unreasonably complicated types involving AND. We just remember
-;;; the original type spec.
-;;; A possible improvement would be for HAIRY-TYPE to have a subtype
-;;; named SATISFIES-TYPE for the hairy types which are specifically
-;;; of the form (SATISFIES pred) so that we don't have to examine
-;;; the sexpr repeatedly to decide whether it takes that form.
-;;; And as a further improvement, we might want a table that maps
-;;; predicates to their exactly recognized type when possible.
-;;; We have such a table in fact - *BACKEND-PREDICATE-TYPES*
-;;; as a starting point. But something like PLUSP isn't in there.
-;;; On the other hand, either of these points may not be sources of
-;;; inefficiency, and the latter if implemented might have undesirable
-;;; user-visible ramifications, though it seems unlikely.
-(defstruct (hairy-type (:include ctype)
-                       (:constructor %make-hairy-type
-                           (specifier &aux (%bits (pack-ctype-bits hairy))))
-                       (:constructor !make-interned-hairy-type
-                           (specifier &aux (%bits (pack-interned-ctype-bits 'hairy))))
-                       (:copier nil))
-  ;; the Common Lisp type-specifier of the type we represent.
-  ;; For other than an unknown type, this must be a (SATISFIES f) expression.
-  (specifier nil :type t :read-only t))
