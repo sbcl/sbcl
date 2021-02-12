@@ -30,7 +30,9 @@
              (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
                      tree)))
     (let ((*package* (find-package (package-data-name data))))
-      (export (mapcar 'intern (flatten (package-data-export data)))))))
+      (dolist (x (flatten (package-data-export data)))
+        (let ((symbol (intern x)))
+          (ignore-errors (export symbol)))))))
 
 (sb-ext:unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP"
