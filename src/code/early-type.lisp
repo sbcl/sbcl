@@ -171,13 +171,9 @@
 (defstruct (values-type
             (:include args-type (%bits (pack-ctype-bits values)))
             (:constructor %make-values-type)
-            (:predicate %values-type-p)
             (:copier nil)))
 
-(declaim (inline values-type-p))
-(defun values-type-p (x)
-  (or (eq x *wild-type*)
-      (%values-type-p x)))
+(declaim (freeze-type values-type))
 
 (defun-cached (make-values-type-cached
                :hash-bits 8
@@ -1043,30 +1039,31 @@
 ;;; CONTEXT is either an instance of TYPE-CONTEXT or NIL.
 ;;; SUBCONTEXT is a symbol denoting the head of the current expression, or NIL.
 (defun specifier-type (type-specifier &optional context subcontext)
-  (let ((ctype
-         (if context
-             (basic-parse-typespec type-specifier context)
-             (dx-let ((context (make-type-context type-specifier)))
-               (basic-parse-typespec type-specifier context)))))
-    (when (values-type-p ctype)
-      ;; We have to see how it was spelled to give an intelligent message.
-      ;; If it's instance of VALUES-TYPE, then it was spelled as VALUES
-      ;; whereas if it isn't, the user either spelled it as (VALUES) or *.
-      ;; The case where this heuristic doesn't work is a DEFTYPE that expands
-      ;; to *, but that's not worth worrying about.
-      (cond ((or (%values-type-p ctype) (consp type-specifier))
-             (error "VALUES type illegal in this context:~% ~
+  (let* ((ctype
+           (if context
+               (basic-parse-typespec type-specifier context)
+               (dx-let ((context (make-type-context type-specifier)))
+                 (basic-parse-typespec type-specifier context))))
+         (wildp (eq ctype *wild-type*)))
+    ;; We have to see how it was spelled to give an intelligent message.
+    ;; If it's instance of VALUES-TYPE, then it was spelled as VALUES
+    ;; whereas if it isn't, the user either spelled it as (VALUES) or *.
+    ;; The case where this heuristic doesn't work is a DEFTYPE that expands
+    ;; to *, but that's not worth worrying about.
+    (cond ((or (values-type-p ctype)
+               (and wildp (consp type-specifier)))
+           (error "VALUES type illegal in this context:~% ~
                ~/sb-impl:print-type-specifier/"
                   type-specifier))
-            (subcontext
-             (error "* is not permitted as an argument to the ~S type specifier"
-                    subcontext))
-            (t
-             (error "* is not permitted as a type specifier~@[ in the context ~S~]"
-                    ;; If the entire surrounding context is * then there's not much
-                    ;; else to say. Otherwise, show the original expression.
-                    (when (and context (neq (type-context-spec context) '*))
-                      (type-context-spec context))))))
+          (wildp
+           (if subcontext
+               (error "* is not permitted as an argument to the ~S type specifier"
+                      subcontext)
+               (error "* is not permitted as a type specifier~@[ in the context ~S~]"
+                      ;; If the entire surrounding context is * then there's not much
+                      ;; else to say. Otherwise, show the original expression.
+                      (when (and context (neq (type-context-spec context) '*))
+                        (type-context-spec context))))))
     ctype))
 
 (defun single-value-specifier-type (x &optional context)

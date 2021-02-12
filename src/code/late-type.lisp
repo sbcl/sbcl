@@ -593,15 +593,13 @@
 
 ;;; VALUES type with a single value.
 (defun type-single-value-p (type)
-  (and (%values-type-p type)
+  (and (values-type-p type)
        (not (values-type-rest type))
        (null (values-type-optional type))
        (singleton-p (values-type-required type))))
 
 ;;; Return the type of the first value indicated by TYPE. This is used
 ;;; by people who don't want to have to deal with VALUES types.
-(declaim (freeze-type values-type))
-; (inline single-value-type))
 (defun single-value-type (type)
   (declare (type ctype type))
   (cond ((eq type *wild-type*)

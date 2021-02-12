@@ -1550,7 +1550,8 @@
                                         * :result result)
                   (let* ((result-type (and result
                                            (lvar-derived-type result)))
-                         (compute-all (and (values-type-p result-type)
+                         (compute-all (and (or (eq result-type *wild-type*)
+                                               (values-type-p result-type))
                                            (not (type-single-value-p result-type)))))
                     (if (or (not y)
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
