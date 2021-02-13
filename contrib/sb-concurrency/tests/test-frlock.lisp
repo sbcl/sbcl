@@ -22,6 +22,7 @@
   #+(or openbsd netbsd sunos) 0.01
   #-(or openbsd netbsd sunos) 0.0001)
 
+#+sb-thread
 (defun test-frlocks (&key (reader-count (min (* 12 *cpus*) 200))
                           (read-count 1000000)
                           (outer-read-pause 0) (inner-read-pause 0)
