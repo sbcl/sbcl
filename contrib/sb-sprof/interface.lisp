@@ -117,6 +117,10 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
            (stop-profiling))
          ,@(when report-p `((report :type ,report)))))))
 
+;;; In wallclock mode, *TIMER* is an instance of either SB-THREAD:THREAD
+;;; or SB-EXT:TIMER depending on whether thread support exists.
+(defglobal *timer* nil)
+
 #-win32
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)

@@ -260,8 +260,8 @@ resulting call-graph, or NIL if there are no samples (eg. right after
 calling RESET.)
 
 Profiling is stopped before the call graph is generated."
-  (cond (*samples*
-         (let ((graph (or call-graph (make-call-graph most-positive-fixnum))))
+  (acond (*samples*
+          (let ((graph (or call-graph (make-call-graph it most-positive-fixnum))))
            (ecase type
              (:flat
               (print-flat graph :stream stream :max max :min-percent min-percent))
@@ -269,6 +269,6 @@ Profiling is stopped before the call graph is generated."
               (print-graph graph :stream stream :max max :min-percent min-percent))
              ((nil)))
            graph))
-        (t
-         (format stream "~&; No samples to report.~%")
-         nil)))
+         (t
+          (format stream "~&; No samples to report.~%")
+          nil)))

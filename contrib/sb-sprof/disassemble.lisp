@@ -46,16 +46,15 @@
 
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
-  (when *samples*
-    (let* ((samples *samples*)
-           (counts (ensure-sample-counts samples))
-           (location (sb-disassem:dstate-cur-addr dstate))
-           (count (pc-sample-count location counts)))
+  (binding* ((samples *samples* :exit-if-null)
+             (counts (ensure-sample-counts samples))
+             (location (sb-disassem:dstate-cur-addr dstate))
+             (count (pc-sample-count location counts)))
       (unless (zerop count)
         (let* ((total-count (samples-trace-count samples))
                (width (length (write-to-string total-count :base 10))))
           (sb-disassem::note (format nil "~VD/~VD samples"
                                      width count width total-count)
-                             dstate))))))
+                             dstate)))))
 
 (pushnew 'add-disassembly-profile-note sb-disassem::*default-dstate-hooks*)

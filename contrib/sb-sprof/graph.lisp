@@ -14,7 +14,7 @@
   (root        nil :type (or null vertex))
   (dfn           0 :type fixnum)
   (edges        () :type list)
-  (scc-vertices () :type list))
+  (scc-vertices () :type list :read-only t))
 
 (defstruct edge
   (vertex (sb-impl::missing-arg) :type vertex))
@@ -147,15 +147,15 @@
                        (:constructor %make-call-graph))
   ;; the value of *SAMPLE-INTERVAL* or *ALLOC-INTERVAL* at the time
   ;; the graph was created (depending on the current allocation mode)
-  (sample-interval (sb-impl::missing-arg) :type (real (0)))
+  (sample-interval (sb-impl::missing-arg) :type (real (0)) :read-only t)
   ;; the sampling-mode that was used for the profiling run
-  (sampling-mode   (sb-impl::missing-arg) :type sampling-mode)
+  (sampling-mode   (sb-impl::missing-arg) :type sampling-mode :read-only t)
   ;; number of samples taken
-  (nsamples        (sb-impl::missing-arg) :type sb-int:index)
+  (nsamples        (sb-impl::missing-arg) :type sb-int:index :read-only t)
   ;; threads that have been sampled
   (sampled-threads '()                    :type list)
   ;; sample count for samples not in any function
-  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index))
+  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index :read-only t))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -181,13 +181,13 @@
   (start-pc-or-offset 0 :type address)
   (end-pc-or-offset 0 :type address)
   ;; the name of the function
-  (name nil :type t)
+  (name nil :type t :read-only t)
   ;; sample count for this function
   (count 0 :type fixnum)
   ;; count including time spent in functions called from this one
   (accrued-count 0 :type fixnum)
   ;; the debug-info that this node was created from
-  (debug-info nil :type t)
+  (debug-info nil :type t :read-only t)
   ;; list of NODEs for functions calling this one
   (callers () :type list)
   ;; the call count for the function that corresponds to this node (or NIL
@@ -339,7 +339,7 @@
      collect node))
 
 ;;; Value is a CALL-GRAPH for the current contents of *SAMPLES*.
-(defun make-call-graph-1 (max-depth)
+(defun make-call-graph-1 (samples max-depth)
   (let ((elsewhere-count 0))
     (with-lookup-tables ()
       (map-traces
@@ -377,17 +377,17 @@
               (incf (node-accrued-count caller)))
              (t
               (incf elsewhere-count)))))
-       *samples*)
+       samples)
       (let ((sorted-nodes (sort (collect-nodes) #'> :key #'node-count)))
         (loop for node in sorted-nodes and i from 1 do
              (setf (node-index node) i))
-        (%make-call-graph :nsamples (samples-trace-count *samples*)
-                          :sample-interval (if (eq (samples-mode *samples*)
+        (%make-call-graph :nsamples (samples-trace-count samples)
+                          :sample-interval (if (eq (samples-mode samples)
                                                    :alloc)
-                                               (samples-alloc-interval *samples*)
-                                               (samples-sample-interval *samples*))
+                                               (samples-alloc-interval samples)
+                                               (samples-sample-interval samples))
                           :sampling-mode (samples-mode *samples*)
-                          :sampled-threads (samples-sampled-threads *samples*)
+                          :sampled-threads (samples-sampled-threads samples)
                           :elsewhere-count elsewhere-count
                           :vertices sorted-nodes)))))
 
@@ -422,13 +422,13 @@
 ;;; *SAMPLES*.  The result contain a list of nodes sorted by self-time
 ;;; in the FLAT-NODES slot, and a dag in VERTICES, with call cycles
 ;;; reduced to CYCLE structures.
-(defun make-call-graph (max-depth)
+(defun make-call-graph (samples max-depth)
   (stop-profiling)
-  (show-progress "~&Computing call graph ")
+  (show-progress "~&Computing call graph")
   ;; I _think_ the reason for pinning all code is that the graph logic
   ;; compares absolute PC locations. Wonderfully commented, it is.
   (let ((call-graph (with-code-pages-pinned (:dynamic)
-                      (make-call-graph-1 max-depth))))
+                      (make-call-graph-1 samples max-depth))))
     (show-progress "~&Finding cycles")
     #+nil
     (reduce-call-graph call-graph)

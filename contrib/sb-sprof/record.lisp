@@ -298,10 +298,6 @@ EXPERIMENTAL: Interface subject to change."
     (record-sample samples info pc-or-offset)
     foreign))
 
-;;; In wallclock mode, *TIMER* is an instance of either SB-THREAD:THREAD
-;;; or SB-EXT:TIMER depending on whether thread support exists.
-(defglobal *timer* nil)
-
 #+(and (or x86 x86-64) (not win32))
 (progn
   ;; Ensure that only one thread at a time will be doing profiling stuff.
