@@ -381,10 +381,19 @@
         (if (bounds-unbounded-p low high)
             (if (eq complexp :complex)
                 (specifier-type '(complex float))
-                (specifier-type 'real))
+                (specifier-type 'float))
             (unionize (single-float double-float #+long-float (error "long-float"))
                       (float float)
-                      (single-float double-float))))))
+                      (single-float double-float)))))
+    (when (and (null complexp)
+               (or class format low high))
+      (return-from make-numeric-type
+        (type-union (make-numeric-type :class class :format format
+                                       :low low :high high :enumerable enumerable
+                                       :complexp :complex)
+                    (make-numeric-type :class class :format format
+                                       :low low :high high :enumerable enumerable
+                                       :complexp :real)))))
   (multiple-value-bind (low high)
       (case class
         (integer
