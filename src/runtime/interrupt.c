@@ -2167,11 +2167,6 @@ handle_trap(os_context_t *context, int trap)
         arch_skip_instruction(context);
         break;
 #endif
-#if defined(LISP_FEATURE_SPARC) && defined(LISP_FEATURE_GENCGC)
-    case trap_Allocation:
-        arch_handle_allocation_trap(context);
-        break;
-#endif
 #if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK) && !defined(LISP_FEATURE_WIN32)
     case trap_MemoryFaultEmulation:
         handle_memory_fault_emulation_trap(context);

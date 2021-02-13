@@ -246,10 +246,8 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 }
 
 #ifdef LISP_FEATURE_GENCGC
-void
-arch_handle_allocation_trap(os_context_t *context)
+static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
 {
-    unsigned int* pc;
     unsigned int or_inst;
     int rs1;
     int size;
@@ -259,7 +257,8 @@ arch_handle_allocation_trap(os_context_t *context)
     if (foreign_function_call_active)
       lose("Allocation trap inside foreign code.");
 
-    pc = (unsigned int*) *os_context_pc_addr(context);
+    struct thread* thread = arch_os_get_current_thread();
+
     or_inst = pc[-1];
 
     /*
@@ -267,8 +266,8 @@ arch_handle_allocation_trap(os_context_t *context)
      * instruction!
      */
     if (!(((or_inst >> 30) == 2) && (((or_inst >> 19) & 0x1f) == 2)))
-        lose("Allocation trap not preceded by an OR instruction: 0x%08x",
-             or_inst);
+        lose("Allocation trap @ %p not preceded by an OR instruction: 0x%08x",
+             pc, or_inst);
 
     /*
      * An OR instruction.  RS1 is the register we want to allocate to.
@@ -291,7 +290,7 @@ arch_handle_allocation_trap(os_context_t *context)
      */
     lispobj* memory;
     {
-        struct interrupt_data *data = &thread_interrupt_data(arch_os_get_current_thread());
+        struct interrupt_data *data = &thread_interrupt_data(thread);
         data->allocation_trap_context = context;
         extern lispobj *alloc(sword_t), *alloc_list(sword_t);
         memory = (rd & 1) ? alloc_list(size) : alloc(size);
@@ -313,9 +312,13 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
         unsigned int inst;
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
 
+        if (!gc_managed_heap_space_p((lispobj)pc))
+          lose("Illegal instruction not in lisp: %p [%x]\n", pc, *pc);
+
         inst = *pc;
         trap = inst & 0xff;
-        handle_trap(context,trap);
+        if (trap == trap_Allocation) handle_allocation_trap(context, pc);
+        else handle_trap(context,trap);
     }
     else if ((siginfo->si_code) == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {
