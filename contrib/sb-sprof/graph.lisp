@@ -254,9 +254,9 @@
 ;;; Make a NODE for debug-info INFO.
 (defun make-node (info)
   (flet ((code-bounds (code)
-           (let* ((start (code-start code))
-                  (end (+ start (sb-kernel:%code-text-size code))))
-             (values start end)))
+           (let* ((start (sb-kernel:code-instructions code))
+                  (end (sap+ start (sb-kernel:%code-text-size code))))
+             (values (sap-int start) (sap-int end))))
          (clean-name (name)
            (if (and (consp name)
                     (member (first name)

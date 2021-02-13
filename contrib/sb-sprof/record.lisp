@@ -181,9 +181,8 @@ EXPERIMENTAL: Interface subject to change."
     ;; Lisp functions might move, so we've stored a offset from the
     ;; start of the code component.
     (sb-di::compiled-debug-fun
-     (let* ((component (sb-di::compiled-debug-fun-component info))
-            (start-pc (code-start component)))
-       (+ start-pc pc-or-offset)))))
+     (let ((component (sb-di::compiled-debug-fun-component info)))
+       (sap-int (sap+ (sb-kernel:code-instructions component) pc-or-offset))))))
 
 ;;; Sampling
 
@@ -270,9 +269,7 @@ EXPERIMENTAL: Interface subject to change."
            (values (sb-disassem::find-assembler-routine pc-int)
                    pc-int :asm-routine))
           (t
-           (let* ((code-header-len (* (sb-kernel:code-header-words code)
-                                      sb-vm:n-word-bytes))
-                  ;; Give up if we land in the 2 or 3 instructions of a
+           (let* (;; Give up if we land in the 2 or 3 instructions of a
                   ;; code component sans simple-fun that is not an asm routine.
                   ;; While it's conceivable that this could be improved,
                   ;; the problem will be different or nonexistent after
@@ -282,18 +279,14 @@ EXPERIMENTAL: Interface subject to change."
                                      'sb-c::compiled-debug-info)
                         (return-from debug-info
                           (values code pc-int nil))))
-                  (pc-offset (- pc-int
-                                (- (sb-kernel:get-lisp-obj-address code)
-                                   sb-vm:other-pointer-lowtag)
-                                code-header-len))
+                  (pc-offset (sap- (int-sap pc-int) (sb-kernel:code-instructions code)))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
              #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
                     (values code pc-int nil))
                    (df
                     ;; The code component might be moved by the GC. Store
-                    ;; a PC offset, and reconstruct the data in
-                    ;; SAMPLE-PC-FROM-PC-OR-OFFSET.
+                    ;; a PC offset, and reconstruct the data in SAMPLE-PC
                     (values df pc-offset nil))
                    (t
                     (values nil 0 nil))))))))
@@ -414,9 +407,3 @@ EXPERIMENTAL: Interface subject to change."
                                    (int-sap fp)
                                    (* sb-vm::lra-save-offset sb-vm::n-word-bytes)))))
               (record-trace-end samples))))))))
-
-;;; Return the start address of CODE.
-(defun code-start (code)
-  (declare (type sb-kernel:code-component code))
-  (sap-int (sb-kernel:code-instructions code)))
-
