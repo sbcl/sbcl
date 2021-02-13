@@ -596,3 +596,21 @@
 
 (with-test (:name :ctype-of-nan)
   (checked-compile '(lambda () #.(sb-kernel:make-single-float -1))))
+
+;; bug #1914094
+(with-test (:name :float-type-derivation :skipped-on (not :64-bit))
+  (labels ((car-type-equal (x y)
+             (and (subtypep (car x) (car y))
+                  (subtypep (car y) (car x)))))
+    (let ((long #+long-float 'long-float
+                #-long-float 'double-float))
+      (checked-compile-and-assert () '(lambda (x) (ctu:compiler-derived-type (* 3d0 x)))
+        ((1) (values `(or ,long (complex ,long)) t) :test #'car-type-equal))
+      (checked-compile-and-assert () '(lambda (x) (ctu:compiler-derived-type (* 3f0 x)))
+        ((1) (values `(or single-float ,long (complex single-float) (complex ,long)) t)
+         :test #'car-type-equal))
+      (checked-compile-and-assert () '(lambda (x) (ctu:compiler-derived-type (* 3f0 x)))
+        ((1) (values `(or single-float ,long (complex single-float) (complex ,long)) t)
+         :test #'car-type-equal))
+      (checked-compile-and-assert () '(lambda (x y) (ctu:compiler-derived-type (atan x y)))
+        ((1 2) (values `(or ,long single-float (complex ,long) (complex single-float)) t) :test #'car-type-equal)))))

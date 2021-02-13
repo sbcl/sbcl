@@ -2562,10 +2562,10 @@ used for a COMPLEX component.~:@>"
         (return f)))))
 
 ;;; Return the result of an operation on TYPE1 and TYPE2 according to
-;;; the rules of numeric contagion. This is always NUMBER, some float
-;;; format (possibly complex) or RATIONAL. Due to rational
-;;; canonicalization, there isn't much we can do here with integers or
-;;; rational complex numbers.
+;;; the rules of numeric contagion. This is NUMBER, some float
+;;; format (possibly complex) or RATIONAL or a UNION-TYPE of
+;;; these. Due to rational canonicalization, there isn't much we can
+;;; do here with integers or rational complex numbers.
 ;;;
 ;;; If either argument is not a NUMERIC-TYPE, then return NUMBER. This
 ;;; is useful mainly for allowing types that are technically numbers,
@@ -2578,10 +2578,7 @@ used for a COMPLEX component.~:@>"
             (format2 (numeric-type-format type2))
             (complexp1 (numeric-type-complexp type1))
             (complexp2 (numeric-type-complexp type2)))
-        (cond ((or (null complexp1)
-                   (null complexp2))
-               (specifier-type 'number))
-              ((eq class1 'float)
+        (cond ((eq class1 'float)
                (make-numeric-type
                 :class 'float
                 :format (ecase class2
@@ -2600,10 +2597,12 @@ used for a COMPLEX component.~:@>"
                            (if (eq format1 'long-float)
                              'long-float
                              nil)))
-                :complexp (if (or (eq complexp1 :complex)
-                                  (eq complexp2 :complex))
-                              :complex
-                              :real)))
+                :complexp (cond ((and (eq complexp1 :real)
+                                      (eq complexp2 :real))
+                                 :real)
+                                ((or (null complexp1) (null complexp2))
+                                 nil)
+                                (t :complex))))
               ((eq class2 'float) (numeric-contagion type2 type1))
               ((and (eq complexp1 :real) (eq complexp2 :real))
                (make-numeric-type

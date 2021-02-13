@@ -1885,9 +1885,10 @@
                    ;; Detect cases like (LOOP FOR 1.0 to 5.0 ...), where
                    ;; the initial and the step are of different types,
                    ;; and the step is less contagious.
-                   (numeric-type-equal initial-type
-                                       (numeric-contagion initial-type
-                                                          step-type))))
+                   (let ((contagion-type (numeric-contagion initial-type
+                                                          step-type)))
+                     (and (numeric-type-p contagion-type)
+                          (numeric-type-equal initial-type contagion-type)))))
       (labels ((leftmost (x y cmp cmp=)
                  (cond ((eq x nil) nil)
                        ((eq y nil) nil)
