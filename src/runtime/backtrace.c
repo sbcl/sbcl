@@ -207,24 +207,7 @@ print_entry_points (struct code *code, FILE *f)
 /* KLUDGE: Sigh ... I know what the call frame looks like and it had
  * better not change. */
 
-struct call_frame {
-        struct call_frame *old_cont;
-        lispobj saved_lra;
-        lispobj code;
-        lispobj other_state[5];
-};
-
-struct call_info {
-    struct call_frame *frame;
-    int interrupted;
-    struct code *code;
-    lispobj lra;
-    // Byte offset from 'code' base address to program counter,
-    // unless 'code' is 0, then an absolute PC.
-    uword_t pc;
-};
-
-static int previous_info(struct thread*, struct call_info *info);
+#include "callframe.inc"
 
 static struct code *
 code_pointer(lispobj object)
@@ -290,8 +273,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 }
 
 // Return 1 if we have a valid frame, 0 if not.
-static int
-previous_info(struct thread *thread, struct call_info *info)
+int lisp_frame_previous(struct thread *thread, struct call_info *info)
 {
     struct call_frame *this_frame;
     int free_ici;
@@ -349,7 +331,7 @@ lisp_backtrace(int nframes)
     int i = 0;
     int footnotes = 0;
     do {
-        if (!previous_info(thread, &info)) {
+        if (!lisp_frame_previous(thread, &info)) {
             if (info.frame) // 0 is normal termination of the call chain
                 printf("Bad frame pointer %p [valid range=%p..%p]\n", info.frame,
                        thread->control_stack_start, thread->control_stack_end);
