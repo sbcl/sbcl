@@ -17,7 +17,7 @@
   (scc-vertices () :type list :read-only t))
 
 (defstruct edge
-  (vertex (sb-impl::missing-arg) :type vertex))
+  (vertex (sb-int:missing-arg) :type vertex))
 
 (defstruct graph
   (vertices () :type list))
@@ -147,15 +147,15 @@
                        (:constructor %make-call-graph))
   ;; the value of *SAMPLE-INTERVAL* or *ALLOC-INTERVAL* at the time
   ;; the graph was created (depending on the current allocation mode)
-  (sample-interval (sb-impl::missing-arg) :type (real (0)) :read-only t)
+  (sample-interval (sb-int:missing-arg) :type (real (0)) :read-only t)
   ;; the sampling-mode that was used for the profiling run
-  (sampling-mode   (sb-impl::missing-arg) :type sampling-mode :read-only t)
+  (sampling-mode   (sb-int:missing-arg) :type sampling-mode :read-only t)
   ;; number of samples taken
-  (nsamples        (sb-impl::missing-arg) :type sb-int:index :read-only t)
+  (nsamples        (sb-int:missing-arg) :type sb-int:index :read-only t)
   ;; threads that have been sampled
   (sampled-threads '()                    :type list)
   ;; sample count for samples not in any function
-  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index :read-only t))
+  (elsewhere-count (sb-int:missing-arg) :type sb-int:index :read-only t))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
