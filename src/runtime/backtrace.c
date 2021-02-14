@@ -477,19 +477,30 @@ describe_thread_state(void)
 }
 
 static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
-    lispobj *p;
-    fprintf(f, "%4d: ", i);
-
-    p = component_ptr_from_pc(pc);
-
-    fprintf(f, "fp=%p pc=%p ", fp, pc);
-    if (p) {
-        struct code *cp = (struct code *) p;
-        struct compiled_debug_fun *df = debug_function_from_pc(cp, pc);
+    fprintf(f, "%4d: fp=%p pc=%p ", i, fp, pc);
+    struct code *code = (void*)component_ptr_from_pc(pc);
+    if (code) {
+        struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
         if (df)
             print_entry_name(df->name, f);
+        else if (pc >= (char*)asm_routines_start && pc < (char*)asm_routines_end)
+            fprintf(f, "(assembly routine)");
         else
-            fprintf(f, "{code_serialno=%x}", code_serialno(cp));
+            fprintf(f, "{code_serialno=%x}", code_serialno(code));
+    } else if (gc_managed_heap_space_p((uword_t)pc)) {
+#ifdef LISP_FEATURE_X86
+        // can't actually have a PC inside a random object, it's got to be a frame
+        // that didn't set up the pointer chain, quite possibly a signal frame such as:
+        //   7: fp=0xd78c8460 pc=0xf7fb51b0 Foreign function __kernel_rt_sigreturn
+        //   8: fp=0xd78c8478 pc=0xd9c43159 (bad PC)
+        //   9: fp=0xd78c84ec pc=0xd849a17e (FLET SB-C::DO-1-USE :IN SB-C::TENSION-IF-IF-1)
+        // where, if you print the PC actually from the context, line 8 would be 0xd823ea78.
+        fprintf(f, "(bad PC)");
+#else
+        // It could be a generic-function with self-contained tramponline code,
+        // or the executable JMP instruction in an fdefn.
+        fprintf(f, "(unknown lisp object)");
+#endif
     } else {
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
         Dl_info info;
