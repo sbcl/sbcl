@@ -632,7 +632,7 @@
     ((union-type-p arg)
      (apply #'type-union
             (loop for type in (union-type-types arg)
-                  collect (float-or-complex-float-type type))))
+                  collect (float-or-complex-float-type type lo hi))))
     (t (specifier-type 'number))))
 
 (eval-when (:compile-toplevel :execute)
