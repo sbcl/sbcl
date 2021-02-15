@@ -301,11 +301,11 @@ If an unsupported TYPE is requested, the function will return NIL.
                    (eq (car name) 'setf))
           (setf name (cadr name)))
         (let ((expander (info :setf :expander name)))
-          (when expander
-            (find-definition-source
-             (cond ((symbolp expander) (symbol-function expander))
-                   ((listp expander) (cdr expander))
-                   (t expander))))))
+          (cond ((typep expander '(cons symbol))
+                 (translate-source-location (cddr expander)))
+                (expander
+                 (find-definition-source
+                  (if (listp expander) (cdr expander) expander))))))
        ((:structure)
         (let ((class (get-class name)))
           (if class

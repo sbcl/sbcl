@@ -1196,7 +1196,7 @@ unless :NAMED is also specified.")))
                                          ,place)))
                    (if (eq type-spec t) place `(the* (,type-spec :derive-type-only t) ,place)))))
           (when (singleton-p (cdr args))
-            (let ((inverse (info :setf :expander (car place))))
+            (let ((inverse (car (info :setf :expander (car place)))))
               (flet ((check (newval)
                        (if (eq type-spec t)
                            newval

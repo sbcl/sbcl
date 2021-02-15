@@ -61,12 +61,11 @@
                      (info-number :type :documentation))
                     ((info :typed-structure :info name)
                      (info-number :typed-structure :documentation))))
-             (type (info-number :type :documentation))
-             (setf (info-number :setf :documentation))))))
+             (type (info-number :type :documentation))))))
     (cond (info-number
            (if string
                (set-info-value name info-number string)
-             (clear-info-values name (list info-number))))
+               (clear-info-values name (list info-number))))
           ((eq doc-type 'function)
            ;; FIXME: this silently loses
            ;; * (setf (documentation '(a bad name) 'function) "x") => "x"
@@ -233,10 +232,7 @@
 
   (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
     (awhen (compiler-macro-function x)
-      (documentation it t)))
-
-  (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
-    (values (info :setf :documentation x))))
+      (documentation it t))))
 
 (defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
   (setf (fun-doc x) new-value))
@@ -258,8 +254,21 @@
   (awhen (compiler-macro-function x)
     (setf (documentation it t) new-value)))
 
+;;; SETF documentation is attached to the function that performs expansion,
+;;; except for short form DEFSETF which is in the globaldb value directly.
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (setf (%doc-info x 'setf) new-value))
+  (let ((expander (info :setf :expander x)))
+    (typecase expander
+      ((cons symbol) (setf (second expander) new-value))
+      (cons (setf (documentation (cdr expander) 'function) new-value))
+      (function (setf (documentation expander 'function) new-value)))))
+
+(defmethod documentation ((x symbol) (doc-type (eql 'setf)))
+  (let ((expander (info :setf :expander x)))
+    (typecase expander
+      ((cons symbol) (second expander))
+      (cons (documentation (cdr expander) 'function))
+      (function (documentation expander 'function)))))
 
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))

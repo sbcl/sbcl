@@ -253,7 +253,10 @@ Please check that all strings which were not recognizable to the compiler
        :all)
       ;; 2. Variables, types, and anything else
       (do-all-symbols (s)
-        (dolist (category '(:variable :type :typed-structure :setf))
+        (let ((expander (sb-int:info :setf :expander s)))
+          (when (typep expander '(cons t (cons string)))
+            (setf (second expander) nil)))
+        (dolist (category '(:variable :type :typed-structure))
           (clear-it (sb-int:info category :documentation s)))
         (clear-it (sb-int:info :random-documentation :stuff s))))
     (when (plusp count)

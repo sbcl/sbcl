@@ -696,12 +696,14 @@
       (describe-block (stream "~A has a compiler-macro:" name)
         (describe-documentation it t stream)
         (describe-function-source it stream)))
+    ;; It seems entirely bogus to claim that, for example (SETF CAR)
+    ;; has a setf expander when what we mean is that CAR has.
     (when (and (consp name) (eq 'setf (car name)) (not (cddr name)))
       (let* ((name2 (second name))
              (expander (info :setf :expander name2)))
-        (cond ((typep expander '(and symbol (not null)))
+        (cond ((typep expander '(cons symbol))
                (describe-block (stream "~A has setf-expansion: ~S"
-                                       name expander)
+                                       name (car expander))
                  (describe-documentation name2 'setf stream)))
               (expander
                (when (listp expander)
