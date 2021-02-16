@@ -328,6 +328,7 @@ created and old ones may exit at any time."
     (init-thread-local-storage thread)
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
+    (setq *session* (new-session thread))
     (setq *all-threads*
           (avl-insert nil
                       (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
@@ -1343,11 +1344,6 @@ on this semaphore, then N of them is woken up."
 (defun new-session (thread)
   (make-session :threads (list thread)
                 :interactive-threads (list thread)))
-
-(defun init-job-control ()
-  (/show0 "Entering INIT-JOB-CONTROL")
-  (setf *session* (new-session *current-thread*))
-  (/show0 "Exiting INIT-JOB-CONTROL"))
 
 (defun %delete-thread-from-session (thread &aux (session *session*))
   (with-session-lock (session)

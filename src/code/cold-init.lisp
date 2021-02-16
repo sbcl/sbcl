@@ -91,9 +91,6 @@
   ;; this to be initialized, so we initialize it right away.
   (show-and-call !random-cold-init)
 
-  ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
-  ;; requires that the main thread be properly initialized.
-  (show-and-call thread-init-or-reinit)
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
   (show-and-call !package-cold-init)
@@ -329,10 +326,6 @@ process to continue normally."
 
 ;;;; initialization functions
 
-(defun thread-init-or-reinit ()
-  (sb-thread::init-job-control)
-  (sb-thread::get-foreground))
-
 (defun reinit (total)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
@@ -345,7 +338,6 @@ process to continue normally."
     ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
     (os-cold-init-or-reinit)
-    (thread-init-or-reinit)
     #-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
     (setf (extern-alien "internal_errors_enabled" int) 1)
