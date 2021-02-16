@@ -418,7 +418,7 @@ unregister_thread(struct thread *th,
 
     struct extra_thread_data *semaphores = thread_extra_data(th);
 #ifdef LISP_FEATURE_UNIX
-    sem_destroy(&semaphores->sprof_sem);
+    os_sem_destroy(&semaphores->sprof_sem);
 #endif
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_destroy(&semaphores->state_sem);
