@@ -1893,14 +1893,8 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
-#if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    if(signal==SIG_MEMORY_FAULT) {
-        sa.sa_flags |= SA_ONSTACK;
-# if defined LISP_FEATURE_SB_SAFEPOINT && !defined LISP_FEATURE_DARWIN
-        sigaddset(&sa.sa_mask, SIGRTMIN);
-        sigaddset(&sa.sa_mask, SIGRTMIN+1);
-# endif
-    }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    if (signal==SIG_MEMORY_FAULT) sa.sa_flags |= SA_ONSTACK;
 #endif
 
     sigaction(signal, &sa, NULL);
