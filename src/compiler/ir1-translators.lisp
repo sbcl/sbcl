@@ -571,8 +571,12 @@ Return VALUE without evaluating it."
     (t
      (compiler-error "~S is not a legal function name." thing))))
 
-(def-ir1-translator %fun-name-leaf ((thing) start next result)
-  (fun-name-leaf thing)
+;;; Convert a lambda without referencing it, side-effecting the
+;;; compile-time environment. This is useful for converting named
+;;; lambdas not meant to have entry points during block compilation,
+;;; since references will create entry points.
+(def-ir1-translator %refless-defun ((thing) start next result)
+  (ir1-convert-lambdalike thing :debug-name (name-lambdalike thing))
   (ir1-convert start next result nil))
 
 (defun enclose (start next funs)

@@ -130,10 +130,7 @@ tree structure resulting from the evaluation of EXPRESSION."
            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
          ,(if (block-compilation-non-entry-point name)
               `(progn
-                 ;; Tell the compiler to convert the lambda without
-                 ;; referencing it, so no stray reference stays around
-                 ;; and find-initial-dfo works correctly.
-                 (sb-c::%fun-name-leaf ,named-lambda)
+                 (sb-c::%refless-defun ,named-lambda)
                  ',name)
               `(%defun ',name ,named-lambda
                        ,@(when (or inline-thing extra-info) `(,inline-thing))
