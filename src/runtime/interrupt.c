@@ -1852,7 +1852,7 @@ extern void restore_sbcl_signals () {
     int signal;
     for (signal = 0; signal < NSIG; signal++) {
         interrupt_handler_t handler = interrupt_low_level_handlers[signal];
-        if (handler) {
+        if ((void*)handler != (void*)SIG_DFL) {
             ll_install_handler(signal, handler);
         }
     }
@@ -1866,31 +1866,35 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     RESTORE_ERRNO;
 }
 
+/* Install a handler for a synchronous signal. These are predominantly
+ * SIG{SEGV, ILL, TRAP, FPE, ABRT}. Low-level handlers might or might not
+ * involve calling Lisp.
+ * As well there are two asynchronous signals installed via this function:
+ * - STOP_FOR_GC is low-level, but might defer the signal through
+ *   an intricate bunch of decisions about the state of the world.
+ * - SIGURG without sb-thruption is a high-level (Lisp) handler,
+ *   but with sb-thruption is low-level handler that uses different
+ *   criteria for when to defer. */
 void
 ll_install_handler (int signal, interrupt_handler_t handler)
 {
     struct sigaction sa;
 
-    if (0 > signal || signal >= NSIG) {
-        lose("bad signal number %d", signal);
-    }
-
-    if (ARE_SAME_HANDLER(handler, SIG_DFL))
-        sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
-    else if (
+    if (0 > signal || signal >= NSIG
 #ifdef LISP_FEATURE_SB_THRUPTION
-    /* It's in `deferrable_sigset' so that we block&unblock it properly,
+    /* SIGURG is in `deferrable_sigset' so that we block&unblock it properly,
      * but we don't actually want to defer it, at least not here.
      * (It might get deferred until a safepoint). And if we put it only
      * into blockable_sigset, we'd have to special-case it around thread
      * creation at least. */
-             (signal == SIGURG) ||
+        || (signal != SIGURG && sigismember(&deferrable_sigset,signal))
+#else
+        || sigismember(&deferrable_sigset,signal)
 #endif
-             !sigismember(&deferrable_sigset,signal))
-        sa.sa_sigaction = low_level_handle_now_handler;
-    else
-        lose("Can't install low-level handler");
+        || (void*)handler == (void*)SIG_DFL)
+        lose("ll_install_handler: bad args: sig=%d, fn=%p", signal, handler);
 
+    sa.sa_sigaction = low_level_handle_now_handler;
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -1898,8 +1902,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 #endif
 
     sigaction(signal, &sa, NULL);
-    interrupt_low_level_handlers[signal] =
-        (ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
+    interrupt_low_level_handlers[signal] = handler;
 }
 #endif
 
