@@ -38,27 +38,28 @@
                     count (scc-p v))))
     (if (eq (call-graph-sampling-mode call-graph) :alloc)
         (format t "~2&Number of samples:     ~d~%~
+                      Unique traces:         ~d~%~
                       Alloc interval:        ~a regions (approximately ~a kB)~%~
-                      Total sampling amount: ~a regions (approximately ~a kB)~%~
-                      Number of cycles:      ~d~%~
-                      Sampled threads:~{~%   ~S~}~2%"
+                      Total sampling amount: ~a regions (approximately ~a kB)"
                 nsamples
+                (call-graph-unique-trace-count call-graph)
                 interval
                 (truncate (* interval +alloc-region-size+) 1024)
                 (* nsamples interval)
-                (truncate (* nsamples interval +alloc-region-size+) 1024)
-                ncycles
-                (call-graph-sampled-threads call-graph))
+                (truncate (* nsamples interval +alloc-region-size+) 1024))
         (format t "~2&Number of samples:   ~d~%~
                       Sample interval:     ~f seconds~%~
-                      Total sampling time: ~f seconds~%~
-                      Number of cycles:    ~d~%~
-                      Sampled threads:~{~% ~S~}~2%"
+                      Total sampling time: ~f seconds"
                 nsamples
                 interval
-                (* nsamples interval)
-                ncycles
-                (call-graph-sampled-threads call-graph)))))
+                (* nsamples interval)))
+    (format t "~%Graph cycles:        ~d~%~
+               Sampled threads:~%" ncycles)
+    (loop for (thread bytes-used bytes-reserved buckets-used)
+          in (call-graph-sampled-threads call-graph)
+          do (format t "   ~a (~d/~d bytes, ~d hash buckets)~%"
+                     thread bytes-used bytes-reserved buckets-used))
+    (terpri)))
 
 (declaim (type report-sort-key *report-sort-by*))
 (defvar *report-sort-by* :samples

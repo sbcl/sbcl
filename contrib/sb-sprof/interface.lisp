@@ -9,10 +9,6 @@
   "Default number of seconds between samples.")
 (declaim (type (real (0)) *sample-interval*))
 
-(defvar *alloc-interval* 4
-  "Default number of allocation region openings between samples.")
-(declaim (type (integer (0)) *alloc-interval*))
-
 (defvar *max-samples* 50000
   "Default maximum number of stack traces collected.")
 (declaim (type sb-int:index *max-samples*))
@@ -23,12 +19,12 @@ profiling, and :TIME for wallclock profiling.")
 (declaim (type sampling-mode *sampling-mode*))
 
 (defmacro with-profiling ((&key (sample-interval '*sample-interval*)
-                                (alloc-interval '*alloc-interval*)
+                                alloc-interval
                                 (max-samples '*max-samples*)
                                 (reset nil)
                                 (mode '*sampling-mode*)
                                 (loop nil)
-                                (max-depth most-positive-fixnum)
+                                max-depth
                                 show-progress
                                 (threads :all)
                                 (report nil report-p))
@@ -42,11 +38,6 @@ The following keyword args are recognized:
  :SAMPLE-INTERVAL <n>
    Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
 
- :ALLOC-INTERVAL <n>
-   Take a sample every time <n> allocation regions (approximately
-   8kB) have been allocated since the last sample. Default is
-   *ALLOC-INTERVAL*.
-
  :MODE <mode>
    If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run the
    profiler in allocation profiling mode. If :TIME, run the profiler
@@ -56,10 +47,6 @@ The following keyword args are recognized:
    If :LOOP is NIL (the default), collect no more than <max> samples.
    If :LOOP is T, repeat evaluating body until <max> samples are taken.
    Default is *MAX-SAMPLES*.
-
- :MAX-DEPTH <max>
-   Maximum call stack depth that the profiler should consider. Only
-   has an effect on x86 and x86-64.
 
  :REPORT <type>
    If specified, call REPORT with :TYPE <type> at the end.
@@ -85,6 +72,8 @@ The following keyword args are recognized:
   (declare (type report-type report))
   (check-type loop boolean)
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
+  (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
+  (when max-depth (warn "MAX-DEPTH is ignored"))
   (let ((message "~@<No sampling progress; run too short, sampling frequency too low, ~
 inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
     (with-unique-names (values last-index)
@@ -92,27 +81,25 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
          ,@(when reset '((reset)))
          (unwind-protect
               (progn
-                (start-profiling :mode ,mode :max-depth ,max-depth :max-samples ,max-samples
-                                 :sample-interval ,sample-interval :alloc-interval ,alloc-interval
+                (start-profiling :mode ,mode :max-samples ,max-samples
+                                 :sample-interval ,sample-interval
                                  :threads ,threads)
                 ,(if loop
                      `(let (,values)
                         (loop ; Uh, shouldn't this be a trailing test, not a leading test?
-                          (when (>= (samples-trace-count *samples*)
-                                    (samples-max-samples *samples*))
+                          (when (>= trace-count max-traces)
                             (return))
                           (show-progress "~&===> ~d of ~d samples taken.~%"
-                                         (samples-trace-count *samples*)
-                                         (samples-max-samples *samples*))
-                          (let ((,last-index (samples-index *samples*)))
+                                         trace-count trace-limit)
+                          (let ((,last-index trace-count))
                             (setf ,values (multiple-value-list (progn ,@body)))
-                            (when (= ,last-index (samples-index *samples*))
+                            (when (= ,last-index trace-count)
                               (warn ,message)
                               (return))))
                         (values-list ,values))
-                     `(let ((,last-index (samples-index *samples*)))
+                     `(let ((,last-index trace-count))
                         (multiple-value-prog1 (progn ,@body)
-                          (when (= ,last-index (samples-index *samples*))
+                          (when (= ,last-index trace-count)
                             (warn ,message))))))
            (stop-profiling))
          ,@(when report-p `((report :type ,report)))))))
@@ -125,19 +112,14 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)
                         (sample-interval *sample-interval*)
-                        (alloc-interval *alloc-interval*)
-                        (max-depth most-positive-fixnum)
+                        alloc-interval
+                        max-depth
                         (threads :all))
   "Start profiling statistically in the current thread if not already profiling.
 The following keyword args are recognized:
 
    :SAMPLE-INTERVAL <n>
      Take a sample every <n> seconds.  Default is *SAMPLE-INTERVAL*.
-
-   :ALLOC-INTERVAL <n>
-     Take a sample every time <n> allocation regions (approximately
-     8kB) have been allocated since the last sample. Default is
-     *ALLOC-INTERVAL*.
 
    :MODE <mode>
      If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
@@ -146,10 +128,6 @@ The following keyword args are recognized:
 
    :MAX-SAMPLES <max>
      Maximum number of stack traces to collect.  Default is *MAX-SAMPLES*.
-
-   :MAX-DEPTH <max>
-     Maximum call stack depth that the profiler should consider. Only
-     has an effect on x86 and x86-64.
 
    :THREADS <list>
      List threads to profile, or :ALL to indicate that all threads should be
@@ -162,6 +140,8 @@ The following keyword args are recognized:
      when doing :CPU profiling. If you see empty call graphs, or are obviously
      missing several samples from certain threads, you may be falling afoul
      of this."
+  (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
+  (when max-depth (warn "MAX-DEPTH is ignored"))
   #-gencgc
   (when (eq mode :alloc)
     (error "Allocation profiling is only supported for builds using the generational garbage collector."))
@@ -179,11 +159,8 @@ The following keyword args are recognized:
       ;; start/stop/start/stop should leave *SAMPLES* holding a union of all
       ;; traces captured by both "on" periods, whereas with a RESET in between
       ;; it would not. But they behave identically, because this is a reset.
-      (setf *samples* (make-samples :max-depth max-depth
-                                    :max-samples max-samples
-                                    :sample-interval sample-interval
-                                    :alloc-interval alloc-interval
-                                    :mode mode))
+      (setf *samples* (make-samples mode sample-interval))
+      (setf trace-limit max-samples trace-count 0)
       (enable-call-counting)
       #+sb-thread (setf sb-thread::*profiled-threads* threads)
       ;; Each existing threads' sprof-enable slot needs to reflect the desired set.
@@ -193,9 +170,11 @@ The following keyword args are recognized:
              (start-sampling thread)
              (stop-sampling thread)))
        sb-thread::*all-threads*)
-      ;;
-      (sb-sys:enable-interrupt sb-unix:sigprof
-                               #'sigprof-handler)
+      ;; The signal handler is entirely in C now. install_handler() uses the argument
+      ;; as a boolean flag. -1 means "install", 0 means "uninstall" which we don't do.
+      (unless (eq mode :alloc)
+        (with-alien ((%sigaction (function void int signed) :extern "install_handler"))
+          (alien-funcall %sigaction sb-unix:sigprof -1)))
       (flet (#+sb-thread
              (map-threads (function &aux (threads sb-thread::*profiled-threads*))
                (if (listp threads)
@@ -209,22 +188,7 @@ The following keyword args are recognized:
                          (funcall function thread)))))))
        (ecase mode
         (:alloc
-         (let ((alloc-signal (1- alloc-interval)))
-           #+sb-thread
-           (progn
-             (when (eq :all threads)
-               ;; Set the value new threads inherit.
-               ;; This used to acquire the all-threads lock, but I fail to see how
-               ;; doing so ensured anything at all. Maybe because our locks tend
-               ;; to act as memory barriers? Anyway, what's the point?
-               (progn
-                 (setf sb-thread::*default-alloc-signal* alloc-signal)))
-             ;; Turn on allocation profiling in existing threads.
-             (map-threads
-              (lambda (thread)
-                (sb-thread::%set-symbol-value-in-thread 'sb-vm::*alloc-signal* thread alloc-signal))))
-           #-sb-thread
-           (setf sb-vm:*alloc-signal* alloc-signal)))
+         (setq enable-alloc-profiler 1))
         (:cpu
          (unix-setitimer :profile secs usecs secs usecs))
         (:time
@@ -254,14 +218,10 @@ The following keyword args are recognized:
   (let ((profiling *profiling*))
     (when profiling
       ;; Even with the timers shut down we cannot be sure that there is no
-      ;; undelivered sigprof. The handler is also responsible for turning the
-      ;; *ALLOC-SIGNAL* off in individual threads.
+      ;; undelivered sigprof.
       (ecase profiling
         (:alloc
-         #+sb-thread
-         (setf sb-thread::*default-alloc-signal* nil)
-         #-sb-thread
-         (setf sb-vm:*alloc-signal* nil))
+         (setq enable-alloc-profiler 0))
         (:cpu
          (unix-setitimer :profile 0 0 0 0))
         (:time
@@ -274,6 +234,9 @@ The following keyword args are recognized:
      (disable-call-counting)
      ;; New threads should not mask SIGPROF by default
      #+sb-thread (setf sb-thread::*profiled-threads* :all)
+     (let ((samples *samples*))
+       (aver samples)
+       (setf (samples-trace-count samples) trace-count))
      (setf *profiling* nil)))
   (values))
 
@@ -281,4 +244,6 @@ The following keyword args are recognized:
   "Reset the profiler."
   (stop-profiling)
   (setq *samples* nil)
+  (setf trace-count 0)
+  (call-with-each-profile-buffer (lambda (x y z) (declare (ignore x y z))))
   (values))

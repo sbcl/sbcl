@@ -317,7 +317,8 @@ sufficiently motivated to do lengthy fixes."
             (make-condition 'save-with-multiple-threads-error
                             :interactive-threads interactive
                             :other-threads other)))))
-    (when err (error err)))
+    (when err (error err))
+    (setq sb-thread::*sprof-data* nil))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)

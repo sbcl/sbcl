@@ -152,8 +152,9 @@
   (sampling-mode   (sb-int:missing-arg) :type sampling-mode :read-only t)
   ;; number of samples taken
   (nsamples        (sb-int:missing-arg) :type sb-int:index :read-only t)
+  (unique-trace-count (sb-int:missing-arg) :type sb-int:index :read-only t)
   ;; threads that have been sampled
-  (sampled-threads '()                    :type list)
+  (sampled-threads '()                    :type list :read-only t)
   ;; sample count for samples not in any function
   (elsewhere-count (sb-int:missing-arg) :type sb-int:index :read-only t))
 
@@ -382,11 +383,11 @@
         (loop for node in sorted-nodes and i from 1 do
              (setf (node-index node) i))
         (%make-call-graph :nsamples (samples-trace-count samples)
-                          :sample-interval (if (eq (samples-mode samples)
-                                                   :alloc)
-                                               (samples-alloc-interval samples)
+                          :unique-trace-count (samples-unique-trace-count samples)
+                          :sample-interval (if (eq (samples-mode samples) :alloc)
+                                               1
                                                (samples-sample-interval samples))
-                          :sampling-mode (samples-mode *samples*)
+                          :sampling-mode (samples-mode samples)
                           :sampled-threads (samples-sampled-threads samples)
                           :elsewhere-count elsewhere-count
                           :vertices sorted-nodes)))))
@@ -424,6 +425,12 @@
 ;;; reduced to CYCLE structures.
 (defun make-call-graph (samples max-depth)
   (stop-profiling)
+  (when (zerop (length (samples-vector samples)))
+    (show-progress "~&Aggregating raw data")
+    (setf (values (samples-vector samples)
+                  (samples-unique-trace-count samples)
+                  (samples-sampled-threads samples))
+          (convert-raw-data)))
   (show-progress "~&Computing call graph")
   ;; I _think_ the reason for pinning all code is that the graph logic
   ;; compares absolute PC locations. Wonderfully commented, it is.

@@ -243,13 +243,6 @@ an error in that case."
          (let ((new (avl-insert old addr ,thread)))
            (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return)))))))
 
-(defvar *default-alloc-signal* nil)
-;;; *ALLOC-SIGNAL* is in PER-THREAD-C-INTERFACE-SYMBOLS. Hence it doesn't require
-;;; the aspect of DEFINE-THREAD-LOCAL that ensures a nonzero TLS index.
-;;; (In fact you must not use DEFINE-THREAD-LOCAL, because it's incompatible
-;;; with the numbering assigned to the C interface symbols)
-(defvar sb-vm:*alloc-signal*)
-
 (defun list-all-threads ()
   "Return a list of the live threads. Note that the return value is
 potentially stale even before the function returns, as new threads may be
@@ -1382,6 +1375,8 @@ on this semaphore, then N of them is woken up."
            `((let ((,c-thread (thread-primitive-thread ,thread))) ,@body))
            body)))
 
+(sb-ext:define-load-time-global *sprof-data* nil)
+
 #+sb-thread
 (progn
 ;;; Remove thread from its session, if it has one, and from *all-threads*.
@@ -1420,6 +1415,17 @@ on this semaphore, then N of them is woken up."
         (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
                          (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
               0)
+        ;; Take ownership of our statistical profiling data and transfer the results to
+        ;; the global pool. This doesn't need to synchronize with the signal handler,
+        ;; which is effectively disabled now, but does synchronize via the interruptions
+        ;; mutex with any other thread trying to read this thread's data.
+        (let ((sprof-data (sb-vm::current-thread-offset-sap sb-vm:thread-sprof-data-slot)))
+          (unless (= (sap-int sprof-data) 0)
+            (setf (sap-ref-word (descriptor-sap c-thread)
+                                (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
+                  0)
+            ;; Operation on the global list must be atomic.
+            (sb-ext:atomic-push (cons sprof-data thread) *sprof-data*)))
         (barrier (:write)))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
@@ -2468,8 +2474,6 @@ mechanism for inter-thread communication."
   ;; I wonder how to to prevent user code from doing this, but it isn't a new problem per se.
   ;; Perhaps this should be symbol-macro with a vop behind it and no setf expander.
   (setf *current-thread* thread)
-  ;; This is made thread-local by "src/runtime/genesis/thread-init.inc"
-  (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   thread)
 
 (eval-when (:compile-toplevel)

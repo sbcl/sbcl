@@ -548,6 +548,8 @@ during backtrace.
   ;; a struct containing {starting, running, suspended, dead}
   ;; and some other state fields.
   (state-word :c-type "struct thread_state_word")
+  ;; Statistical CPU profiler data recording buffer
+  (sprof-data)
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)

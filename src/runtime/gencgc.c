@@ -4264,13 +4264,11 @@ static void gc_allocate_ptes()
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
+int gencgc_alloc_profiler;
 NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(struct alloc_region *region, sword_t nbytes,
            int page_type_flag, struct thread *thread)
 {
-#ifndef LISP_FEATURE_WIN32
-    lispobj alloc_signal;
-#endif
     os_vm_size_t trigger_bytes = 0;
 
     gc_assert(nbytes > 0);
@@ -4359,19 +4357,16 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
         }
     }
 
-#ifndef LISP_FEATURE_WIN32
-    /* for sb-prof, and not supported on Windows yet */
-    alloc_signal = read_TLS(ALLOC_SIGNAL,thread);
-    if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
-        if ((sword_t) alloc_signal <= 0) {
-            write_TLS(ALLOC_SIGNAL, T, thread);
-            raise(SIGPROF);
-        } else {
-            write_TLS(ALLOC_SIGNAL,
-                           alloc_signal - (1 << N_FIXNUM_TAG_BITS),
-                           thread);
-        }
-    }
+#if !(defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 \
+      || defined LISP_FEATURE_SPARC || defined LISP_FEATURE_WIN32)
+    // Architectures which utilize a trap instruction to invoke the overflow
+    // handler use the signal context from which to record a backtrace.
+    // That's reliable, but access_control_frame_pointer(thread) isn't.
+    // x86[-64] use the ABI frame pointer register which seems not to work
+    // for win32, but sb-sprof never did work there anyway.
+    extern void allocator_record_backtrace(void*, struct thread*);
+    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+        allocator_record_backtrace(__builtin_frame_address(0), thread);
 #endif
 
     return (new_obj);

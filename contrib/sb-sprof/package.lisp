@@ -19,7 +19,7 @@
    #:report
 
    ;; Interface
-   #:*sample-interval* #:*max-samples* #:*alloc-interval*
+   #:*sample-interval* #:*max-samples*
    #:start-profiling #:stop-profiling #:with-profiling
    #:reset))
 (eval-when (:compile-toplevel :load-toplevel :execute)

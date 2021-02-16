@@ -165,7 +165,6 @@
   `((*free-interrupt-context-index* 0)
     (sb-sys:*allow-with-interrupts* t)
     (sb-sys:*interrupts-enabled* t)
-    *alloc-signal*
     sb-sys:*interrupt-pending*
     #+sb-thruption sb-sys:*thruption-pending*
     *in-without-gcing*

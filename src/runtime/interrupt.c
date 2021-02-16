@@ -387,7 +387,6 @@ sigaddset_deferrable(sigset_t *s)
 #endif
     sigaddset(s, SIGXFSZ);
     sigaddset(s, SIGVTALRM);
-    sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
 }
 
@@ -409,6 +408,9 @@ sigaddset_blockable(sigset_t *sigset)
     // deferrable set, but it _is_ blockable. If you're doing something wherein SIGPIPE
     // interrupts a pseudo-atomic section, then you're doing something wrong for sure.
     sigaddset(sigset, SIGPIPE);
+    // SIGPROF does not need to be deferred- our new handler is signal-safe, and trying to
+    // hide non-async-safety of a SIGPROF handler behind a deferral mechanism is horrible.
+    sigaddset(sigset, SIGPROF);
 }
 
 /* initialized in interrupt_init */
@@ -1907,23 +1909,34 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 }
 #endif
 
+extern void sigprof_handler(int, siginfo_t*, void*);
+
 /* This is called from Lisp. */
 void install_handler(int signal, lispobj handler)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
 
     if (interrupt_low_level_handlers[signal]) {
         // When there's a low-level handler, we must leave it alone.
         // Give it the lisp function to call if it decides to forward a signal.
         // SIG_IGN and SIG_DFL don't always do what you think in such case.
         lisp_sig_handlers[signal] = functionp(handler) ? handler : 0;
+    } else if (signal == SIGPROF) {
+        if (handler) sa.sa_sigaction = sigprof_handler;
+        else         sa.sa_handler   = SIG_DFL;
+        // The handler is signal-safe, but because it uses component_ptr_from_pc(),
+        // it must block GC, lest crashes occur from dereferencing wild pointers.
+        sa.sa_mask = blockable_sigset;
+        sa.sa_flags = SA_SIGINFO | SA_RESTART;
+        sigaction(signal, &sa, NULL);
+        return;
     } else {
         // Our "abstract" values for SIG_DFL and SIG_IGN are 0 and 1
         // respectively which are probably the real values from signal.h
         // but this way way don't need to put them in grovel-headers.c
         if (handler==0 || handler==1) {
-            memset(&sa, 0, sizeof sa);
             sa.sa_handler = handler ? SIG_IGN : SIG_DFL;
             // assign the OS level action before clearing the lisp function.
             // (If a signal were to be delivered to the C trampoline when the lisp

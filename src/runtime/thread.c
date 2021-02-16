@@ -416,13 +416,15 @@ unregister_thread(struct thread *th,
 
     arch_os_thread_cleanup(th);
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
     struct extra_thread_data *semaphores = thread_extra_data(th);
+#ifdef LISP_FEATURE_UNIX
+    sem_destroy(&semaphores->sprof_sem);
+#endif
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
 #endif
-
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_destroy(th);
@@ -953,6 +955,11 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     os_sem_init(&extra_data->state_not_running_sem, 0);
     os_sem_init(&extra_data->state_not_stopped_sem, 0);
 #endif
+#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
+    os_sem_init(&extra_data->sprof_sem, 0);
+#endif
+    extra_data->sprof_lock = 0;
+    th->sprof_data = 0;
 
     th->state_word.state = STATE_RUNNING;
     th->state_word.sprof_enable = 0;

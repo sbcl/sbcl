@@ -1,0 +1,50 @@
+New data recorder:
+
+* Each thread gets its own trace buffer.
+
+* There are almost no mutexes involved nor any WITHOUT-GCING
+  nor synchronized hash-table.
+
+* Trace buffers store the program counter locations as code serial#
+  and displacement so that they are stable across GC.
+
+* For gencgc only, code on a pseudo-static page will store absolute PCs
+  which avoids looking for the object base address while sampling.
+  Therefore profiling a saved core is far more efficient.
+
+* Traces are hashed so that multiple hits at the same call stack
+  will entail only an increment of a counter for that trace.
+  This optimization makes :ALLOC mode collect far fewer traces
+  since many allocations have the same call stack.
+
+Known limitations:
+
+* A code object that gets GC'd after it has been recorded as serial# + displacement
+  may show up as an unknown function in the report. We could be slightly better
+  here by marking code objects as ineligible for GC if they appear in a profile buffer,
+  or we could have GC scan the profile buffers (which would defeat
+  the point of the stable representation), or we could just make all code ineligible
+  for GC if any profile buffers exist.
+
+* The code serial# field wraps around at 32 bits for 64-bit machines
+  (and 18 bits for 32-bit machines), which is a theoretical problem, but unlikely
+  to be a problem in practice.  We could create a recycle list for serial#
+  assignment if it were ever a problem in practice.
+  The be on the safe side, the logic which assigs the number should refuse to
+  allocate new numbers after it hits the limit. Subsequently allocated code objects
+  would all get the number 0.
+
+* Non-x86 can still not walk more than one stack frame back.
+  This seems to have to do with the fact that it is unreliable (i.e. crash-prone)
+  to try to walk the stack when interrupted at an arbitrary instruction, because
+  our frame establishing instructions are not atomic.
+  This is contrary to most machine-native ABIs where the specification
+  is that frame creation be be atomic. e.g. on ppc it's a store-with-update.
+
+* The "missing frames" marker probably probably needs better treatment
+  if it occurs in a graph-based report so that the generator does not think
+  than all "missing frames" pseudo-functions are the same function.
+
+* The graphing routine does not currently take advantage of the compressed
+  representation of traces with multiple hits, so it takes more time than
+  should be required to preprocess the graph.

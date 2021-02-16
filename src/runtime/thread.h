@@ -82,6 +82,16 @@ struct extra_thread_data
     uint32_t state_not_running_waitcount;
     uint32_t state_not_stopped_waitcount;
 #endif
+#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_UNIX
+    // According to https://github.com/adrienverge/openfortivpn/issues/105
+    //   "using GCD semaphore in signal handlers is documented to be unsafe"
+    // which seems almost impossible to believe, considering that sem_t is
+    // documented to be safe, yet the sem_ functions produce a warning:
+    //  warning: 'sem_init' is deprecated [-Wdeprecated-declarations]
+    // So how could there be no signal-safe replacement?
+    os_sem_t sprof_sem;
+#endif
+    int sprof_lock;
 #ifdef LISP_FEATURE_WIN32
     // these are different from the masks that interrupt_data holds
     sigset_t pending_signal_set;
@@ -338,6 +348,8 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
     return 1;
 #endif
 }
+
+extern void record_backtrace_from_context(void*,struct thread*);
 
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
 extern kern_return_t mach_lisp_thread_init(struct thread *thread);

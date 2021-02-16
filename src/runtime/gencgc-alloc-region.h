@@ -34,5 +34,6 @@ extern struct alloc_region  gc_alloc_region[3];
 #define code_region    gc_alloc_region[CODE_PAGE_TYPE-1]
 
 extern generation_index_t from_space, new_space;
+extern int gencgc_alloc_profiler;
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */
