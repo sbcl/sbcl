@@ -203,9 +203,7 @@
   (values))
 
 ;;; Emit code to load a function object implementing FUNCTIONAL into
-;;; RES. This gets interesting when the referenced function is a
-;;; closure: we must make the closure and move the closed-over values
-;;; into it.
+;;; RES.
 ;;;
 ;;; FUNCTIONAL is either a :TOPLEVEL-XEP functional or the XEP lambda
 ;;; for the called function, since local call analysis converts all
@@ -272,63 +270,54 @@
     current-fp
     (find-in-physenv what this-env)))
 
-(defoptimizer (%allocate-closures ltn-annotate) ((leaves) node ltn-policy)
-  (declare (ignore ltn-policy))
-  (when (lvar-dynamic-extent leaves)
-    (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
-      (setf (ir2-lvar-kind info) :delayed)
-      (setf (lvar-info leaves) info)
-      (setf (ir2-lvar-stack-pointer info)
-            (make-stack-pointer-tn)))))
-
-(defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
-  (let ((dx-p (lvar-dynamic-extent leaves)))
+;;; Emit code to create function objects implementing the FUNCTIONALs
+;;; of the enclose node. This gets interesting when the functions are
+;;; mutually referential closures as in LABELS constructs: we must
+;;; make the closures first and move the closed-over values into them
+;;; in such a way that any closed over closures are initialized before
+;;; they are moved into environments. A simple solution: we postpone
+;;; the initialization of the closures until after they have all been
+;;; created, though this may require more registers. TODO: it may be
+;;; possible to improve on this somehow.
+(defun ir2-convert-enclose (node ir2-block)
+  (declare (type enclose node)
+           (type ir2-block ir2-block))
+  (let ((funs (enclose-funs node))
+        (lvar (node-lvar node))) ; non-null when DX
+    (when lvar
+      (vop current-stack-pointer node ir2-block (ir2-lvar-stack-pointer (lvar-info lvar))))
     (collect ((delayed))
-      (when dx-p
-        (vop current-stack-pointer call 2block
-             (ir2-lvar-stack-pointer (lvar-info leaves))))
-      (dolist (leaf (lvar-value leaves))
-        (binding* ((xep (awhen (functional-entry-fun leaf)
-                          ;; if the xep's been deleted then we can skip it
-                          (if (eq (functional-kind it) :deleted)
-                              nil it))
-                        :exit-if-null)
-                   (nil (aver (xep-p xep)))
-                   (entry-info (lambda-info xep) :exit-if-null)
-                   (tn (entry-info-closure-tn entry-info) :exit-if-null)
-                   (closure (physenv-closure (get-lambda-physenv xep)))
-                   #-x86-64
-                   (entry (make-load-time-constant-tn :entry xep)))
-          (let ((this-env (node-physenv call))
-                (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
-            (aver (entry-info-offset entry-info))
-            (vop make-closure call 2block #-x86-64 entry
-                 (entry-info-offset entry-info) (length closure)
-                 leaf-dx-p tn)
-            (loop for what in closure and n from 0 do
-                  (unless (and (lambda-var-p what)
-                               (null (leaf-refs what)))
-                    ;; In LABELS a closure may refer to another closure
-                    ;; in the same group, so we must be sure that we
-                    ;; store a closure only after its creation.
-                    ;;
-                    ;; TODO: Here is a simple solution: we postpone
-                    ;; putting of all closures after all creations
-                    ;; (though it may require more registers).
-                    (if (lambda-p what)
-                      (delayed (list tn (find-in-physenv what this-env) n))
-                      (let ((initial-value (closure-initial-value
-                                            what this-env nil)))
-                        (if initial-value
-                          (vop closure-init call 2block
-                               tn initial-value n)
-                          ;; An initial-value of NIL means to stash
-                          ;; the frame pointer... which requires a
-                          ;; different VOP.
-                          (vop closure-init-from-fp call 2block tn n)))))))))
+      (dolist (fun funs)
+        (let ((xep (functional-entry-fun fun)))
+          ;; If there is no XEP then no closure needs to be created.
+          (when (and xep (not (eq (functional-kind xep) :deleted)))
+            (aver (xep-p xep))
+            (let ((closure (physenv-closure (get-lambda-physenv xep))))
+              (when closure
+                (let* ((entry-info (lambda-info xep))
+                       (tn (entry-info-closure-tn entry-info))
+                       #-x86-64
+                       (entry (make-load-time-constant-tn :entry xep))
+                       (env (node-physenv node))
+                       (leaf-dx-p (and lvar (leaf-dynamic-extent fun))))
+                  (aver (entry-info-offset entry-info))
+                  (vop make-closure node ir2-block #-x86-64 entry
+                                    (entry-info-offset entry-info) (length closure)
+                                    leaf-dx-p tn)
+                  (loop for what in closure and n from 0 do
+                    (unless (and (lambda-var-p what)
+                                 (null (leaf-refs what)))
+                      (if (lambda-p what)
+                          (delayed (list tn (find-in-physenv what env) n))
+                          (let ((initial-value (closure-initial-value what env nil)))
+                            (if initial-value
+                                (vop closure-init node ir2-block tn initial-value n)
+                                ;; An initial-value of NIL means to stash
+                                ;; the frame pointer... which requires a
+                                ;; different VOP.
+                                (vop closure-init-from-fp node ir2-block tn n))))))))))))
       (loop for (tn what n) in (delayed)
-            do (vop closure-init call 2block
-                    tn what n))))
+            do (vop closure-init node ir2-block tn what n))))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
@@ -2326,7 +2315,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
          (when (exit-entry node)
            (ir2-convert-exit node 2block)))
         (entry
-         (ir2-convert-entry node 2block)))))
+         (ir2-convert-entry node 2block))
+        (enclose
+         (ir2-convert-enclose node 2block)))))
 
   (finish-ir2-block block)
 

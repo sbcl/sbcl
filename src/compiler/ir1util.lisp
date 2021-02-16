@@ -224,8 +224,7 @@
 ;;; uninteresting nodes intervening.
 ;;;
 ;;; Uninteresting nodes are nodes in the same block which are either
-;;; REFs, external CASTs to the same destination, or known combinations
-;;; that never unwind.
+;;; REFs, ENCLOSEs, or external CASTs to the same destination.
 (defun almost-immediately-used-p (lvar node)
   (declare (type lvar lvar)
            (type node node))
@@ -248,13 +247,8 @@
                      (when (and (memq (cast-type-check node) '(:external nil))
                                 (eq dest (node-dest node)))
                        (go :next)))
-                    (combination
-                     ;; KLUDGE: Unfortunately we don't have an attribute for
-                     ;; "never unwinds", so we just special case
-                     ;; %ALLOCATE-CLOSURES: it is easy to run into with eg.
-                     ;; FORMAT and a non-constant first argument.
-                     (when (eq '%allocate-closures (combination-fun-source-name node nil))
-                       (go :next))))))
+                    (enclose
+                     (go :next)))))
              (t
               ;; Loops shouldn't cause a problem, either it will
               ;; encounter a not "uninteresting" node, or the destination
@@ -1938,6 +1932,7 @@
                (delete node (basic-var-sets var)))))
       (cast
        (flush-dest (cast-value node)))
+      (enclose)
       (no-op)))
 
   (remove-from-dfo block)

@@ -995,9 +995,9 @@
   (arg-documentation nil :type (or list (member :unspecified)))
   ;; the documentation string for the lambda
   (documentation nil :type (or null string))
-  ;; Node, allocating closure for this lambda. May be NIL when we are
-  ;; sure that no closure is needed.
-  (allocator nil :type (or null combination))
+  ;; the enclose node allocating the closure for this lambda. May be
+  ;; NIL when we are sure that no closure is needed.
+  (enclose nil :type (or null enclose))
   ;; various rare miscellaneous info that drives code generation & stuff
   (plist () :type list)
   ;; xref information for this functional (only used for functions with an
@@ -1613,6 +1613,14 @@
 
 (defstruct (no-op (:include node)
                   (:copier nil)))
+
+;;; The ENCLOSE node marks the place at which closure allocation code
+;;; would be emitted, if necessary.
+(defstruct (enclose (:include valued-node) ; this node uses a dummy lvar for dx analysis
+                    (:copier nil))
+  ;; the list of functionals that this ENCLOSE node allocates.
+  (funs nil :type list))
+
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined

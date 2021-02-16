@@ -79,7 +79,7 @@
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry mv-combination cast exit))
+    ((or creturn cif entry mv-combination cast exit enclose))
     (combination
      ;; Record references to globals made using SYMBOL-VALUE.
      (let ((fun (principal-lvar-use (combination-fun node)))

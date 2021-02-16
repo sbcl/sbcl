@@ -479,6 +479,16 @@
       (annotate-unknown-values-lvar value)))
   (values))
 
+(defun ltn-analyze-enclose (node)
+  (declare (type enclose node))
+  (let ((lvar (node-lvar node)))
+    (when lvar ; only DX encloses use lvars.
+      (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
+        (setf (lvar-info lvar) info)
+        (setf (ir2-lvar-kind info) :delayed)
+        (setf (ir2-lvar-stack-pointer info)
+              (make-stack-pointer-tn))))))
+
 ;;; We need a special method for %UNWIND-PROTECT that ignores the
 ;;; cleanup function. We don't annotate either arg, since we don't
 ;;; need them at run-time.
@@ -984,6 +994,7 @@
       (exit (ltn-analyze-exit node))
       (cset (ltn-analyze-set node))
       (cast (ltn-analyze-cast node))
+      (enclose (ltn-analyze-enclose node))
       (mv-combination
        (ecase (basic-combination-kind node)
          (:local

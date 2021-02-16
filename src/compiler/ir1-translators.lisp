@@ -575,15 +575,12 @@ Return VALUE without evaluating it."
   (fun-name-leaf thing)
   (ir1-convert start next result nil))
 
-(def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
-  (aver (eq result 'nil))
-  (let ((lambdas leaves))
-    ;; Opaquely quoting this list avoids recursing in find-constant
-    ;; to check for dumpability of sub-parts as it would otherwise do.
-    (ir1-convert start next result `(%allocate-closures ,(opaquely-quote lambdas)))
-    (let ((allocator (node-dest (ctran-next start))))
-      (dolist (lambda lambdas)
-        (setf (functional-allocator lambda) allocator)))))
+(defun enclose (start next funs)
+  (let ((enclose (make-enclose :funs funs)))
+    (link-node-to-previous-ctran enclose start)
+    (use-ctran enclose next)
+    (dolist (fun funs)
+      (setf (functional-enclose fun) enclose))))
 
 (defmacro with-fun-name-leaf ((leaf thing start &key global-function) &body body)
   `(multiple-value-bind (,leaf allocate-p)
@@ -592,7 +589,7 @@ Return VALUE without evaluating it."
            (fun-name-leaf ,thing))
      (if allocate-p
          (let ((.new-start. (make-ctran)))
-           (ir1-convert ,start .new-start. nil `(%%allocate-closures ,leaf))
+           (enclose ,start .new-start. (list ,leaf))
            (let ((,start .new-start.))
              ,@body))
          (locally
@@ -881,14 +878,13 @@ also processed as top level forms."
     (when dx-p
       (ctran-starts-block ctran)
       (ctran-starts-block next))
-    (ir1-convert start ctran nil `(%%allocate-closures ,@funs))
+    (enclose start ctran funs)
     (cond (dx-p
            (let* ((dummy (make-ctran))
                   (entry (make-entry))
                   (cleanup (make-cleanup :kind :dynamic-extent
                                          :mess-up entry
-                                         :info (list (node-dest
-                                                      (ctran-next start))))))
+                                         :info (list (ctran-next start)))))
              (push entry (lambda-entries (lexenv-lambda *lexenv*)))
              (setf (entry-cleanup entry) cleanup)
              (link-node-to-previous-ctran entry ctran)
@@ -1276,7 +1272,7 @@ to TAG."
                 :debug-name (debug-name 'escape-fun tag))))
         (ctran (make-ctran)))
     (setf (functional-kind fun) :escape)
-    (ir1-convert start ctran nil `(%%allocate-closures ,fun))
+    (enclose start ctran (list fun))
     (reference-leaf ctran next result fun)))
 
 ;;; Yet another special special form. This one looks up a local

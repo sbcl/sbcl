@@ -1041,7 +1041,12 @@
                      (cast-type-to-check node)
                      (cast-asserted-type node))))
           (no-op
-           (princ "no-op")))
+           (princ "no-op"))
+          (enclose
+           (write-string "enclose ")
+           (dolist (leaf (enclose-funs node))
+             (print-leaf leaf)
+             (write-char #\space))))
         (pprint-newline :mandatory)))
 
     (awhen (block-info block)
