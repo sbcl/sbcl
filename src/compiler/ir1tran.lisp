@@ -121,7 +121,7 @@
 
 #-sb-devel
 (declaim (start-block find-free-fun find-lexically-apparent-fun
-                      ;; needed by with-fun-name-leaf
+                      ;; needed by ir1-translators
                       find-global-fun))
 
 (defun maybe-defined-here (name where)

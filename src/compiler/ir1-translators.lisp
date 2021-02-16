@@ -557,17 +557,27 @@ Return VALUE without evaluating it."
      (compiler-error "Not a valid lambda expression:~%  ~S"
                      thing))))
 
-(defun fun-name-leaf (thing)
+(defun enclose (start next funs)
+  (let ((enclose (make-enclose :funs funs)))
+    (link-node-to-previous-ctran enclose start)
+    (use-ctran enclose next)
+    (dolist (fun funs)
+      (setf (functional-enclose fun) enclose))))
+
+;;; Get the leaf corresponding to THING, allocating and converting it
+;;; if it's a lambda expression or otherwise finding the lexically
+;;; apparent function associated to it.
+(defun find-or-convert-fun-leaf (thing start)
   (cond
-    ((typep thing
-            '(cons (member lambda named-lambda lambda-with-lexenv)))
-     (values (ir1-convert-lambdalike
-              thing :debug-name (name-lambdalike thing))
-             t))
+    ((typep thing '(cons (member lambda named-lambda lambda-with-lexenv)))
+     (let ((ctran (make-ctran))
+           (leaf (ir1-convert-lambdalike thing
+                                         :debug-name (name-lambdalike thing))))
+       (enclose start ctran (list leaf))
+       (values leaf ctran)))
     ((legal-fun-name-p thing)
-     (values (find-lexically-apparent-fun
-              thing "as the argument to FUNCTION")
-             nil))
+     (values (find-lexically-apparent-fun thing "as the argument to FUNCTION")
+             start))
     (t
      (compiler-error "~S is not a legal function name." thing))))
 
@@ -579,40 +589,20 @@ Return VALUE without evaluating it."
   (ir1-convert-lambdalike thing :debug-name (name-lambdalike thing))
   (ir1-convert start next result nil))
 
-(defun enclose (start next funs)
-  (let ((enclose (make-enclose :funs funs)))
-    (link-node-to-previous-ctran enclose start)
-    (use-ctran enclose next)
-    (dolist (fun funs)
-      (setf (functional-enclose fun) enclose))))
-
-(defmacro with-fun-name-leaf ((leaf thing start &key global-function) &body body)
-  `(multiple-value-bind (,leaf allocate-p)
-       (if ,global-function
-           (find-global-fun ,thing t)
-           (fun-name-leaf ,thing))
-     (if allocate-p
-         (let ((.new-start. (make-ctran)))
-           (enclose ,start .new-start. (list ,leaf))
-           (let ((,start .new-start.))
-             ,@body))
-         (locally
-             ,@body))))
-
 (def-ir1-translator function ((thing) start next result)
   "FUNCTION name
 
 Return the lexically apparent definition of the function NAME. NAME may also
 be a lambda expression."
-  (with-fun-name-leaf (leaf thing start)
+  (multiple-value-bind (leaf start)
+      (find-or-convert-fun-leaf thing start)
     (reference-leaf start next result leaf)))
 
 ;;; Like FUNCTION, but ignores local definitions and inline
 ;;; expansions, and doesn't nag about undefined functions.
 ;;; Used for optimizing things like (FUNCALL 'FOO).
 (def-ir1-translator global-function ((thing) start next result)
-  (with-fun-name-leaf (leaf thing start :global-function t)
-    (reference-leaf start next result leaf)))
+  (reference-leaf start next result (find-global-fun thing t)))
 
 ;;; Return T if THING is a constant value and either a symbol (if EXTENDEDP is NIL)
 ;;; or an extended-function-name (if EXTENDEDP is T).
@@ -684,10 +674,14 @@ be a lambda expression."
   (let ((function (handler-case (%macroexpand function *lexenv*)
                     (error () function))))
     (if (typep function '(cons (member function global-function) (cons t null)))
-        (with-fun-name-leaf (leaf (cadr function) start
-                                  :global-function (eq (car function)
-                                                       'global-function))
-          (ir1-convert start next result `(,leaf ,@args)))
+        ;; We manually frob the function to get the leaf like this so
+        ;; we let setf functions have their source transforms fire.
+        (destructuring-bind (operator definition) function
+          (multiple-value-bind (leaf start)
+              (ecase operator
+                (function (find-or-convert-fun-leaf definition start))
+                (global-function (values (find-global-fun definition t) start)))
+            (ir1-convert start next result `(,leaf ,@args))))
         (let ((ctran (make-ctran))
               (fun-lvar (make-lvar)))
           (ir1-convert start ctran fun-lvar `(the function ,function))
