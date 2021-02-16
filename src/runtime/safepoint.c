@@ -631,8 +631,7 @@ static boolean can_invoke_post_gc(struct thread* th)
 }
 
 // returns 0 if skipped, 1 otherwise
-int
-check_pending_gc(os_context_t *ctx)
+int check_pending_gc(__attribute((unused)) os_context_t *ctx)
 {
     odxprint(misc, "check_pending_gc");
     struct thread * self = arch_os_get_current_thread();
@@ -1016,8 +1015,9 @@ void* os_get_csp(struct thread* th)
 # ifdef LISP_FEATURE_SB_THRUPTION
 /* This is basically what 'low_level_maybe_now_maybe_later' was (which doesn't exist),
  * but with a different name, and different way of deciding to defer the signal */
-void
-thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
+void thruption_handler(__attribute__((unused)) int signal,
+                       __attribute__((unused)) siginfo_t *info,
+                       os_context_t *ctx)
 {
     struct thread *self = arch_os_get_current_thread();
 
