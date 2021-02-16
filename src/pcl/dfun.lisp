@@ -889,8 +889,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (t
            (make-final-caching-dfun gf classes-list new-class)))))
 
-(define-load-time-global *pcl-misc-random-state* (make-random-state))
-
 (defun accessor-miss (gf new object dfun-info)
   (let* ((ostate (type-of dfun-info))
          (otype (dfun-info-accessor-type dfun-info))
@@ -904,7 +902,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       ;; which are the parameters of the new state, and get other
       ;; information from the lexical variables bound above.
       (flet ((two-class (index w0 w1)
-               (when (zerop (random 2 *pcl-misc-random-state*))
+               (when (zerop (random 2 (load-time-value *pcl-misc-random-state*)))
                  (psetf w0 w1 w1 w0))
                (dfun-update gf
                             #'make-two-class-accessor-dfun

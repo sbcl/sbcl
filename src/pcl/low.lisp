@@ -78,9 +78,12 @@
      (declare (fixnum ,var))
      ,@body))
 
+(define-load-time-global *pcl-misc-random-state* (make-random-state))
+
 (declaim (inline random-fixnum))
 (defun random-fixnum ()
-  (random (1+ most-positive-fixnum)))
+  (random (1+ most-positive-fixnum)
+          (load-time-value *pcl-misc-random-state*)))
 
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.
