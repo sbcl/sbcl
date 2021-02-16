@@ -140,9 +140,7 @@ os_get_errno(void)
     return errno;
 }
 
-#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT \
-  && !defined CANNOT_USE_POSIX_SEM_T
-
+#if defined LISP_FEATURE_SB_THREAD && !defined USE_DARWIN_GCD_SEMAPHORES
 void
 os_sem_init(os_sem_t *sem, unsigned int value)
 {
