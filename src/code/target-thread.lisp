@@ -313,6 +313,8 @@ created and old ones may exit at any time."
   `(setf (thread-control-stack-start ,this) (get-lisp-obj-address sb-vm:*control-stack-start*)
          (thread-control-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)))
 
+(defvar *session*)
+
 ;;; Not uncoincidentally, the variables assigned here are also
 ;;; listed in SB-KERNEL::*SAVE-LISP-CLOBBERED-GLOBALS*
 (defun init-main-thread ()
@@ -1311,8 +1313,6 @@ on this semaphore, then N of them is woken up."
   (interactive-threads nil)
   (interactive-threads-queue (make-waitqueue :name "session")))
 (declaim (sb-ext:freeze-type session))
-
-(defvar *session* nil)
 
 ;;; The debugger itself tries to acquire the session lock, don't let
 ;;; funny situations (like getting a sigint while holding the session
