@@ -6,9 +6,9 @@
 #include "gc-assert.h"
 #include "arch.h" // why is component_ptr_from_pc declared here???
 #include "gc-internal.h"
+#include "lispregs.h"
 #if !defined LISP_FEATURE_X86 && !defined LISP_FEATURE_X86_64
 #include "callframe.inc"
-#include "lispregs.h"
 #endif
 #include "genesis/compiled-debug-fun.h"
 
@@ -255,7 +255,7 @@ static int gather_trace_from_context(struct thread* thread, os_context_t* contex
     int len = 1;
     STORE_PC(*trace, 0, pc);
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
-    uword_t* fp = (uword_t*)*os_context_fp_addr(context);
+    uword_t* fp = (uword_t*)os_context_frame_pointer(context);
     uword_t* sp = (uword_t*)*os_context_sp_addr(context);
     if (fp >= sp && fp < thread->control_stack_end) { // plausible frame-pointer
         // TODO: This should be replaced with more sophisticated backtrace routine
@@ -277,7 +277,7 @@ static int gather_trace_from_context(struct thread* thread, os_context_t* contex
         // If the PC was in lisp code, then the frame register is probably correct,
         // and so it's probably the case that 'frame->saved_lra' is a tagged PC
         // in the caller. Unfortunately it is not 100% reliable in a signal handler,
-        // so we don't try to walk back more than one frmae.
+        // so we don't try to walk back more than one frame.
         struct call_frame* frame = (void*)(*os_context_register_addr(context, reg_CFP));
         if (in_stack_range((uword_t)frame, thread)
             && lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG

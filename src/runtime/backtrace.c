@@ -539,11 +539,7 @@ void backtrace_from_fp(void *fp, int nframes, int start) {
 }
 
 void backtrace_from_context(os_context_t *context, int nframes) {
-#ifdef LISP_FEATURE_X86
-    void *fp = (void *)*os_context_register_addr(context,reg_EBP);
-#elif defined (LISP_FEATURE_X86_64)
-    void *fp = (void *)*os_context_register_addr(context,reg_RBP);
-#endif
+    void *fp = (void *)os_context_frame_pointer(context);
     print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0, stdout);
     backtrace_from_fp(fp, nframes - 1, 1);
 }
