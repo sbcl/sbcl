@@ -2133,6 +2133,33 @@
 ;;; creating absurdly complex unions of numeric types.
 (defvar *approximate-numeric-unions* nil)
 
+(defun rational-integer-union (rational integer)
+  (let ((formatr (numeric-type-format rational))
+        (formati (numeric-type-format integer))
+        (complexpr (numeric-type-complexp rational))
+        (complexpi (numeric-type-complexp integer)))
+    (when (and (eq formatr formati) (eq complexpr complexpi))
+      (cond
+        ;; handle the special-case that a single integer expands the
+        ;; rational interval.
+        ((and (integerp (numeric-type-low integer))
+              (integerp (numeric-type-high integer))
+              (= (numeric-type-low integer) (numeric-type-high integer))
+              (or *approximate-numeric-unions*
+                  (numeric-types-adjacent integer rational)
+                  (numeric-types-adjacent rational integer)))
+         (make-numeric-type
+          :class 'rational
+          :format formatr
+          :complexp complexpr
+          :low (numeric-bound-max (numeric-type-low rational)
+                                  (numeric-type-low integer)
+                                  <= < t)
+          :high (numeric-bound-max (numeric-type-high rational)
+                                   (numeric-type-high integer)
+                                   >= > t)))
+        (t nil)))))
+
 (define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
   (cond ((csubtypep type1 type2) type2)
@@ -2162,48 +2189,11 @@
                :high (numeric-bound-max (numeric-type-high type1)
                                         (numeric-type-high type2)
                                         >= > t)))
-             ;; FIXME: These two clauses are almost identical, and the
-             ;; consequents are in fact identical in every respect.
-             ((and (eq class1 'rational)
-                   (eq class2 'integer)
-                   (eq format1 format2)
-                   (eq complexp1 complexp2)
-                   (integerp (numeric-type-low type2))
-                   (integerp (numeric-type-high type2))
-                   (= (numeric-type-low type2) (numeric-type-high type2))
-                   (or *approximate-numeric-unions*
-                       (numeric-types-adjacent type1 type2)
-                       (numeric-types-adjacent type2 type1)))
-              (make-numeric-type
-               :class 'rational
-               :format format1
-               :complexp complexp1
-               :low (numeric-bound-max (numeric-type-low type1)
-                                       (numeric-type-low type2)
-                                       <= < t)
-               :high (numeric-bound-max (numeric-type-high type1)
-                                        (numeric-type-high type2)
-                                        >= > t)))
-             ((and (eq class1 'integer)
-                   (eq class2 'rational)
-                   (eq format1 format2)
-                   (eq complexp1 complexp2)
-                   (integerp (numeric-type-low type1))
-                   (integerp (numeric-type-high type1))
-                   (= (numeric-type-low type1) (numeric-type-high type1))
-                   (or *approximate-numeric-unions*
-                       (numeric-types-adjacent type1 type2)
-                       (numeric-types-adjacent type2 type1)))
-              (make-numeric-type
-               :class 'rational
-               :format format1
-               :complexp complexp1
-               :low (numeric-bound-max (numeric-type-low type1)
-                                       (numeric-type-low type2)
-                                       <= < t)
-               :high (numeric-bound-max (numeric-type-high type1)
-                                        (numeric-type-high type2)
-                                        >= > t)))
+
+             ((and (eq class1 'rational) (eq class2 'integer))
+              (rational-integer-union type1 type2))
+             ((and (eq class1 'integer) (eq class2 'rational))
+              (rational-integer-union type2 type1))
              (t nil))))))
 
 
