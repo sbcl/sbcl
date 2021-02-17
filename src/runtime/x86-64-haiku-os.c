@@ -1,5 +1,6 @@
 #include "os.h"
 #include "gencgc-alloc-region.h"
+#include "thread.h"
 #include "genesis/thread.h"
 #include <signal.h>
 

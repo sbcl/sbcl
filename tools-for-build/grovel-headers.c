@@ -86,11 +86,14 @@
            (((bar.cname=-1)<0) ? "signed" : "unsigned"), \
            (8LU * (sizeof bar.cname)))
 
-void
-defconstant(char* lisp_name, unsigned long unix_number)
-{
-    printf("(defconstant %s %lu) ; #x%lx\n",
-           lisp_name, unix_number, unix_number);
+#define DEFCONSTANT(lispname,cname) \
+  if (cname<0) defconstant_neg(lispname, cname); else defconstant(lispname,cname)
+
+void defconstant(char* lisp_name, unsigned long unix_number) {
+    printf("(defconstant %s %lu) ; #x%lx\n", lisp_name, unix_number, unix_number);
+}
+void defconstant_neg(char* lisp_name, long unix_number) {
+    printf("(defconstant %s %ld) ; %x%lx\n", lisp_name, unix_number, unix_number);
 }
 
 #ifdef __HAIKU__
@@ -341,9 +344,9 @@ main(int argc, char __attribute__((unused)) *argv[])
     printf("\n");
 
 #ifdef LISP_FEATURE_UNIX
-    defconstant("clock-realtime", CLOCK_REALTIME);
-    defconstant("clock-monotonic", CLOCK_MONOTONIC);
-    defconstant("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
+    DEFCONSTANT("clock-realtime", CLOCK_REALTIME);
+    DEFCONSTANT("clock-monotonic", CLOCK_MONOTONIC);
+    DEFCONSTANT("clock-process-cputime-id", CLOCK_PROCESS_CPUTIME_ID);
 #endif
 #ifdef LISP_FEATURE_LINUX
 #ifdef CLOCK_REALTIME_ALARM
@@ -361,7 +364,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef CLOCK_BOOTTIME_ALARM
     defconstant("clock-boottime-alarn", CLOCK_BOOTTIME_ALARM);
 #endif
-    defconstant("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
+    DEFCONSTANT("clock-thread-cputime-id", CLOCK_THREAD_CPUTIME_ID);
 #endif
     printf(";;; structures\n");
     DEFSTRUCT(timeval, struct timeval,
