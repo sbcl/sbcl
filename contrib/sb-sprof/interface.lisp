@@ -202,8 +202,8 @@ The following keyword args are recognized:
                    (lambda (thread)
                      (sb-thread:with-deathlok (thread c-thread)
                        (unless (= c-thread 0)
-                         (sb-thread:pthread-kill (sb-thread::thread-os-thread thread)
-                                                 sb-unix:sigprof)))))))
+                         (sb-unix:pthread-kill (sb-thread::thread-os-thread thread)
+                                               sb-unix:sigprof)))))))
           nil)
          #-sb-thread
          (schedule-timer

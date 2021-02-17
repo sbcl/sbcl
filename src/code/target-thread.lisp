@@ -15,8 +15,6 @@
 (export '(%thread-local-references
           current-thread-sap
           get-spinlock
-          pthread-kill
-          raise
           release-spinlock
           spinlock
           with-deathlok
@@ -2125,25 +2123,6 @@ subject to change."
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
-;;; raise() is defined to send the signal to pthread_self() if multithreaded.
-(defmacro raise (signal)
-  `(alien-funcall (extern-alien "raise" (function int int)) ,signal))
-
-;;; A macro, because OS-THREAD is a WORD which could cause boxing if passed
-;;; to a function.
-(defmacro pthread-kill (os-thread signal)
-  (declare (ignorable os-thread))
-  ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
-  ;; And raise() - as we use it - can't fail, so just ignore the result.
-  ;; (The signal number is always SIGURG or SIGINT, and the process is obviously not dead)
-  ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
-  #-sb-thread `(raise ,signal)
-  #+sb-thread
-  `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"
-                                             (function int unsigned int))
-                               ,os-thread ,signal))
-     (error "pthread_kill() failed")))
-
 ;;; Called from the signal handler.
 #-(or sb-thruption win32)
 (defun run-interruption ()
@@ -2154,7 +2133,7 @@ subject to change."
     ;; OS's point of view the signal we are in the handler for is no
     ;; longer pending, so the signal will not be lost.
     (when (thread-interruptions *current-thread*)
-      (raise sb-unix:sigurg))
+      (sb-unix:raise sb-unix:sigurg))
     ;; FIXME: does this really respect the promised ordering of interruptions?
     ;; It looks backwards to raise first and run the popped function second.
     (when interruption
@@ -2278,7 +2257,7 @@ Short version: be careful out there."
   ;; See https://golang.org/src/runtime/signal_unix.go where they describe
   ;; which signal works best for their sigPreempt.
   ;; It's basically the same use-case as here.
-  #-sb-safepoint (pthread-kill (thread-os-thread thread) sb-unix:sigurg)
+  #-sb-safepoint (sb-unix:pthread-kill (thread-os-thread thread) sb-unix:sigurg)
   #+sb-safepoint
   (with-alien ((wake (function void system-area-pointer) :extern "wake_thread"))
     (with-pinned-objects (thread)

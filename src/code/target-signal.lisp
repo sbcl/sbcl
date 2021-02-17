@@ -27,6 +27,25 @@
   (pgrp int)
   (signal int))
 
+;;; A macro, because OS-THREAD is a WORD which could cause boxing if passed
+;;; to a function.
+(defmacro pthread-kill (os-thread signal)
+  (declare (ignorable os-thread))
+  ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
+  ;; And raise() - as we use it - can't fail, so just ignore the result.
+  ;; (The signal number is always SIGURG or SIGINT, and the process is obviously not dead)
+  ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
+  #-sb-thread `(raise ,signal)
+  #+sb-thread
+  `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"
+                                             (function int unsigned int))
+                               ,os-thread ,signal))
+     (error "pthread_kill() failed")))
+
+;;; raise() is defined to send the signal to pthread_self() if multithreaded.
+(defmacro raise (signal)
+  `(alien-funcall (extern-alien "raise" (function int int)) ,signal))
+
 ;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).
 ;;;

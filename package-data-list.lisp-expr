@@ -2989,10 +2989,9 @@ no guarantees of interface stability."
                "POLLFD" "POLLIN" "POLLOUT" "POLLHUP" "POLLNVAL" "POLLERR"
                "FD" "EVENTS" "REVENTS"
                "FD-ISSET" "FD-SET" "UNIX-FAST-SELECT"
-               "UNIX-KILL"
+               "PTHREAD-KILL" "RAISE" "UNIX-KILL" "UNIX-KILLPG"
                "FD-ZERO" "FD-CLR"
-               "FD-SETSIZE"
-               "UNIX-KILLPG"))
+               "FD-SETSIZE"))
 
    #s(sb-cold:package-data
       :name "SB-VM"

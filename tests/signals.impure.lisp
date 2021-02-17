@@ -77,7 +77,7 @@
   (assert (eq :condition
               (handler-case
                   (progn
-                    (sb-thread::raise sb-unix:sigint)
+                    (sb-unix:raise sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it
