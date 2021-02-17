@@ -175,7 +175,7 @@ os_context_register_t *os_context_lr_addr(os_context_t *context);
 #ifdef ARCH_HAS_STACK_POINTER
 os_context_register_t *os_context_sp_addr(os_context_t *context);
 #if (defined(LISP_FEATURE_X86)||defined(LISP_FEATURE_X86_64)) && \
-    (defined(LISP_FEATURE_DARWIN)||defined(LISP_FEATURE_LINUX)||defined(LISP_FEATURE_WIN32))
+    (defined(LISP_FEATURE_BSD)||defined(LISP_FEATURE_LINUX)||defined(LISP_FEATURE_WIN32))
 os_context_register_t *os_context_fp_addr(os_context_t *context);
 #define os_context_frame_pointer(context) *os_context_fp_addr(context)
 #else
