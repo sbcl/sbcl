@@ -2137,28 +2137,83 @@
   (let ((formatr (numeric-type-format rational))
         (formati (numeric-type-format integer))
         (complexpr (numeric-type-complexp rational))
-        (complexpi (numeric-type-complexp integer)))
+        (complexpi (numeric-type-complexp integer))
+        (lowi (numeric-type-low integer))
+        (highi (numeric-type-high integer))
+        (lowr (numeric-type-low rational))
+        (highr (numeric-type-high rational)))
     (when (and (eq formatr formati) (eq complexpr complexpi))
       (cond
         ;; handle the special-case that a single integer expands the
         ;; rational interval.
-        ((and (integerp (numeric-type-low integer))
-              (integerp (numeric-type-high integer))
-              (= (numeric-type-low integer) (numeric-type-high integer))
+        ((and (integerp lowi) (integerp highi) (= lowi highi)
               (or *approximate-numeric-unions*
                   (numeric-types-adjacent integer rational)
                   (numeric-types-adjacent rational integer)))
          (make-numeric-type
-          :class 'rational
-          :format formatr
-          :complexp complexpr
-          :low (numeric-bound-max (numeric-type-low rational)
-                                  (numeric-type-low integer)
-                                  <= < t)
-          :high (numeric-bound-max (numeric-type-high rational)
-                                   (numeric-type-high integer)
-                                   >= > t)))
-        (t nil)))))
+          :class 'rational :format formatr :complexp complexpr
+          :low (numeric-bound-max lowr lowi <= < t)
+          :high (numeric-bound-max highr highi >= > t)))
+        ;; the general case:
+        ;;
+        ;; 1. expand the integer type by those integers contained by
+        ;; the rational type, if possible.
+        ;;
+        ;; 2. turn open bounds in the rational contained in the
+        ;; integer type into closed ones.
+        ;;
+        ;; (if neither of these applies, return NIL)
+        (t
+         (let* ((integers-of-rational
+                 (make-numeric-type
+                  :class 'integer :format formatr :complexp complexpr
+                  :low (round-numeric-bound lowr 'integer formatr t)
+                  :high (round-numeric-bound highr 'integer formatr nil)))
+                (new-integer
+                 (and (numeric-type-p integers-of-rational)
+                      (or *approximate-numeric-unions*
+                          (numeric-types-intersect integers-of-rational integer)
+                          (numeric-types-adjacent integers-of-rational integer)
+                          (numeric-types-adjacent integer integers-of-rational))
+                     (let ((new-lowi (numeric-bound-max
+                                     lowi
+                                     (numeric-type-low integers-of-rational)
+                                     <= < t))
+                           (new-highi (numeric-bound-max
+                                      highi
+                                      (numeric-type-high integers-of-rational)
+                                      >= > t)))
+                       (and (or (not (eql new-lowi lowi))
+                                (not (eql new-highi highi)))
+                            (make-numeric-type
+                             :class 'integer :format formatr :complexp complexpr
+                             :low new-lowi :high new-highi)))))
+                (new-lowr
+                 (and (consp lowr)
+                      (integerp (car lowr))
+                      (let ((low-integer
+                             (make-numeric-type
+                              :class 'integer :format formati :complexp complexpi
+                              :low (car lowr) :high (car lowr))))
+                        (and (numeric-types-intersect integer low-integer)
+                             (numeric-type-low low-integer)))))
+                (new-highr
+                 (and (consp highr) (integerp (car highr))
+                      (let ((high-integer
+                             (make-numeric-type
+                              :class 'integer :format formati :complexp complexpi
+                              :low (car highr) :high (car highr))))
+                        (and (numeric-types-intersect integer high-integer)
+                             (numeric-type-high high-integer)))))
+                (new-rational
+                 (and (or new-lowr new-highr)
+                      (make-numeric-type
+                       :class 'rational :format formatr :complexp complexpr
+                       :low (or new-lowr lowr) :high (or new-highr highr)))))
+           (cond
+             ((or new-integer new-rational)
+              (make-union-type nil (list (or new-integer integer) (or new-rational rational))))
+             (t nil))))))))
 
 (define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
@@ -2322,10 +2377,6 @@ used for a COMPLEX component.~:@>"
 ;;; problems, we can go back and rip out support for separate FLOAT
 ;;; and REAL flavors of NUMERIC-TYPE. The new way was added in
 ;;; sbcl-0.6.11.22, 2001-03-21.
-;;;
-;;; FIXME: It's probably necessary to do something to fix the
-;;; analogous problem with INTEGER and RATIONAL types. Perhaps
-;;; bounded RATIONAL types should be represented as (OR RATIO INTEGER).
 (defun coerce-bound (bound type upperp inner-coerce-bound-fun)
   (declare (type function inner-coerce-bound-fun))
   (if (eq bound '*)
