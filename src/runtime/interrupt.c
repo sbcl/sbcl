@@ -340,8 +340,6 @@ static void record_signal(int sig, void* context)
 
 static void run_deferred_handler(struct interrupt_data *data,
                                  os_context_t *context);
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-
 
 /* Generic signal related utilities. */
 
@@ -471,24 +469,19 @@ deferrables_blocked_p(sigset_t *sigset)
     sigset_tostring(sigset, buf, sizeof buf);
     lose("deferrable signals partially blocked: {%s}", buf);
 }
-#endif
 
 void
 check_deferrables_unblocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (deferrables_blocked_p(sigset))
         lose("deferrables blocked");
-#endif
 }
 
 void
 check_deferrables_blocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (!deferrables_blocked_p(sigset))
         lose("deferrables unblocked");
-#endif
 }
 
 static void assert_blockables_blocked()
@@ -551,17 +544,13 @@ check_gc_signals_unblocked_or_lose(sigset_t *sigset)
 void
 block_deferrable_signals(sigset_t *old)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_BLOCK, &deferrable_sigset, old);
-#endif
 }
 
 void
 block_blockable_signals(sigset_t *old)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_BLOCK, &blockable_sigset, old);
-#endif
 }
 
 // Do one of two things depending on whether the specified 'where'
@@ -572,7 +561,6 @@ block_blockable_signals(sigset_t *old)
 void
 unblock_deferrable_signals(sigset_t *where)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (interrupt_handler_pending_p())
         lose("unblock_deferrable_signals: losing proposition");
 #ifndef LISP_FEATURE_SB_SAFEPOINT
@@ -596,7 +584,6 @@ unblock_deferrable_signals(sigset_t *where)
         sigmask_logandc(where, sigset);
     else
         thread_sigmask(SIG_UNBLOCK, sigset, 0);
-#endif
 }
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
@@ -610,7 +597,6 @@ void unblock_gc_signals(void) {
 void
 unblock_signals_in_context_and_maybe_warn(os_context_t *context)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     sigset_t *sigset = os_context_sigmask_addr(context);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     if (sigismember(sigset, SIG_STOP_FOR_GC)) {
@@ -624,7 +610,6 @@ they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
     if (!interrupt_handler_pending_p()) {
         unblock_deferrable_signals(sigset);
     }
-#endif
 }
 
 
@@ -704,7 +689,6 @@ in_leaving_without_gcing_race_p(struct thread __attribute__((unused)) *thread)
 static void
 check_interrupt_context_or_lose(os_context_t *context)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
     int interrupt_deferred_p = (data->pending_handler != 0);
@@ -776,7 +760,6 @@ check_interrupt_context_or_lose(os_context_t *context)
         check_gc_signals_unblocked_or_lose(sigset);
 #endif
     }
-#endif
 }
 
 /*
@@ -1210,10 +1193,8 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
     assert_blockables_blocked();
 
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
-#endif
 
     were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
     if (were_in_lisp)
@@ -1976,7 +1957,6 @@ interrupt_init(void)
 #ifdef ATOMIC_LOGGING
     eventdata = calloc(EVENTBUFMAX, N_WORD_BYTES);
 #endif
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     int __attribute__((unused)) i;
     SHOW("entering interrupt_init()");
     sigemptyset(&deferrable_sigset);
@@ -1985,7 +1965,6 @@ interrupt_init(void)
     sigaddset_deferrable(&deferrable_sigset);
     sigaddset_blockable(&blockable_sigset);
     sigaddset_gc(&gc_sigset);
-#endif
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     // Use this only if you know what you're doing
