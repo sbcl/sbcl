@@ -768,3 +768,9 @@
              (assert-tri-eq t t (subtypep t1 t2))
              (assert-tri-eq t t (subtypep `(not (or ,t2 ,t3)) `(not ,t1)))
              (assert-tri-eq t t (subtypep `(and (not ,t2) (not ,t3)) `(not ,t1))))))))
+
+(with-test (:name (:lp1916040 :answer))
+  (let* ((t1 '(cons sequence short-float))
+         (t2 '(or (cons t atom) (cons function t)))
+         (answer (multiple-value-list (subtypep t1 t2))))
+    (assert (member answer '((nil nil) (t t)) :test 'equal))))

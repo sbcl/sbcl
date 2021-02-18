@@ -3459,8 +3459,7 @@ used for a COMPLEX component.~:@>"
             (values nil t)
             (multiple-value-bind (subtype certain?)
                 (csubtypep type2 type1)
-              (declare (ignore subtype))
-              (values nil certain?))))))
+              (values nil (and (not subtype) certain?)))))))
 
 (define-type-method (union :complex-=) (type1 type2)
   (declare (ignore type1))
