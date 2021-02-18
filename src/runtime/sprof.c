@@ -474,9 +474,22 @@ void record_backtrace_from_context(void *context, struct thread* thread) {
     if (!success) diagnose_failure(thread);
 }
 
+/* The SIGPROF handler. This used to be deferrable via the can_handle_now_test()
+ * check in interrupt.c, which would return false during GC, because Lisp binds
+ * *INTERRUPTS-ENABLED* to NIL in the thread which performs the GC; and all other
+ * threads are in their stop_for_gc handler which blocks async signals including
+ * SIGPROF, as per the sa_mask in the sigaction() call that assigned the handler.
+ * But now that SIGPROF is never deferred, we have to be careful around GC.
+ * There's a complicated solution and an easy solution. The complicated is to have
+ * component_ptr_from_pc() fail safely if called, so that taking a sample is fine
+ * provided that all PC locations are pseudo-static - in that case we do not use
+ * component_ptr_from_pc() in the signal handler.
+ * The easy out is just to drop the sample; so that's what we do, and versus
+ * blocking/unblocking SIGPROF in collect_garbage(), it avoids 2 system calls. */
 void sigprof_handler(int sig, __attribute__((unused)) siginfo_t* info,
                      void *context)
 {
+    if (gc_active_p) return; // no mem barrier needed to read this
     int _saved_errno = errno;
     struct thread* thread = arch_os_get_current_thread();
     // We can only profile Lisp threads.
