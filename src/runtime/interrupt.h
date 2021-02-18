@@ -18,8 +18,6 @@
 
 extern void sigset_tostring(const sigset_t *sigset, char* result, int result_length);
 
-/* Set all deferrable signals into *s. */
-extern void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
 extern void sigaddset_blockable(sigset_t *s);
 

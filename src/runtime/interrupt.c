@@ -364,7 +364,7 @@ sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 
 /* Deferrables, blockables, gc signals. */
 
-void
+static void
 sigaddset_deferrable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
