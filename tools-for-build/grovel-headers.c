@@ -93,7 +93,7 @@ void defconstant(char* lisp_name, unsigned long unix_number) {
     printf("(defconstant %s %lu) ; #x%lx\n", lisp_name, unix_number, unix_number);
 }
 void defconstant_neg(char* lisp_name, long unix_number) {
-    printf("(defconstant %s %ld) ; %x%lx\n", lisp_name, unix_number, unix_number);
+    printf("(defconstant %s %ld)\n", lisp_name, unix_number);
 }
 
 #ifdef __HAIKU__
