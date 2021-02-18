@@ -321,7 +321,7 @@ EXPERIMENTAL: Interface subject to change."
         (loop
           (let ((data (atomic-pop sb-thread::*sprof-data*)))
             (unless data (return))
-            (destructuring-bind (sap thread) data
+            (destructuring-bind (sap . thread) data
               ;; Avoid double-free of the foreign memory, in case two threads try to
               ;; reset the profiler at the same time (which constitutes user error)
               (when (and sap (eq (cas (car data) sap nil) sap))

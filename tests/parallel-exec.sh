@@ -25,6 +25,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --no-userinit --no-sysinit --noprint --disable-debugger $* << EOF
 (pop *posix-argv*)
 (require :sb-posix)
+(require :sb-sprof)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 (in-package run-tests)
@@ -125,6 +126,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    ;; if exec fails, just exit with a wrong (not 104) status
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
+                   (sb-sprof:start-profiling :sample-interval .001)
                    (setq sb-c::*static-vop-usage-counts* (make-hash-table))
                    (let ((*features* (cons :parallel-test-runner *features*)))
                      (pure-runner (list (concatenate 'string file ".lisp"))
@@ -138,6 +140,8 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        (let ((*print-pretty* nil))
                          (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
                            (format output "~7d ~s~%" count name)))))
+                   (sb-sprof:stop-profiling)
+                   (sb-sprof:report :type :flat)
                    (exit :code (if (unexpected-failures) 1 104)))))
           (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))
           (incf subprocess-count)
