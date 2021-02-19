@@ -661,7 +661,7 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
 #else
     // If you don't have libunwind, this will almost surely not work,
     // because we can't figure out how to get backwards past a signal frame.
-    log_backtrace_from_fp((void*)*os_context_fp_addr(context), 100, 0, stderr);
+    log_backtrace_from_fp(th, (void*)*os_context_fp_addr(context), 100, 0, stderr);
 #endif
 }
 void backtrace_lisp_threads(int __attribute__((unused)) signal,
