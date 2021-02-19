@@ -1850,86 +1850,121 @@
                   high (max this-high (or high this-high))))))
       type))
 
-;;; Iteration variable: exactly one SETQ of the form:
+;;; Iteration variable: only SETQs of the form:
 ;;;
 ;;; (let ((var initial))
 ;;;   ...
-;;;   (setq var (+ var step))
+;;;   (setq var (+/- var step_1))
+;;;   ...
+;;;   (setq var (+/- var step_k))
 ;;;   ...)
+;;;
+;;; such that the modifications either all increment or all decrement
+;;; VAR.
+(declaim (inline %inc-or-dec-p))
+(defun %inc-or-dec-p (node)
+  (and (combination-p node)
+       (eq (combination-kind node) :known)
+       (fun-info-p (combination-fun-info node))
+       (not (node-to-be-deleted-p node))
+       (let ((source-name (combination-fun-source-name node)))
+         (when (memq source-name '(- +))
+           source-name))))
+
+(defun %analyze-set-uses (sets var initial-type)
+  (let ((some-plusp nil)
+        (some-minusp nil)
+        (set-types '())
+        (every-set-type-suitable-p t))
+    (dolist (set sets)
+      (let* ((set-use (principal-lvar-use (set-value set)))
+             (function (%inc-or-dec-p set-use)))
+        (unless function ; every use must be + or -
+          (return-from %analyze-set-uses nil))
+        (let ((args (basic-combination-args set-use)))
+          ;; Every use must be of the form ({+,-} VAR STEP).
+          (unless (and (proper-list-of-length-p args 2 2)
+                       (let ((first (principal-lvar-use (first args))))
+                         (and (ref-p first)
+                              (eq (ref-leaf first) var))))
+            (return-from %analyze-set-uses nil))
+          (let ((step-type (lvar-type (second args)))
+                (set-type (lvar-type (set-value set))))
+            ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
+            ;; type matching INITIAL-TYPE.
+            (unless (and (numeric-type-p step-type)
+                         (or (numeric-type-equal initial-type step-type)
+                             ;; Detect cases like (LOOP FOR 1.0 to 5.0
+                             ;; ...), where the initial and the step
+                             ;; are of different types, and the step
+                             ;; is less contagious.
+                             (let ((contagion-type (numeric-contagion initial-type
+                                                                      step-type)))
+                               (and (numeric-type-p contagion-type)
+                                    (numeric-type-equal initial-type contagion-type)))))
+              (return-from %analyze-set-uses nil))
+            ;; Track the directions of the increments/decrements.
+            (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
+                  (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
+              (cond ((or (and (eq function '+) non-negative-p)
+                         (and (eq function '-) non-positive-p))
+                     (setf some-plusp t))
+                    ((or (and (eq function '-) non-negative-p)
+                         (and (eq function '+) non-positive-p))
+                     (setf some-minusp t))))
+            ;; Ultimately, the derived types of the sets must match
+            ;; INITIAL-TYPE if we are going to derive new bounds.
+            (unless (and (numeric-type-p set-type)
+                         (numeric-type-equal set-type initial-type))
+              (setf every-set-type-suitable-p nil))
+            (push set-type set-types)))))
+    (values (cond ((and some-plusp (not some-minusp)) '+)
+                  ((and some-minusp (not some-plusp)) '-)
+                  (t '*))
+            set-types every-set-type-suitable-p)))
+
 (defun maybe-infer-iteration-var-type (var initial-type)
   (binding* ((sets (lambda-var-sets var) :exit-if-null)
-             (set (first sets))
-             (() (null (rest sets)) :exit-if-null)
-             (set-use (principal-lvar-use (set-value set)))
-             (() (and (combination-p set-use)
-                      (eq (combination-kind set-use) :known)
-                      (fun-info-p (combination-fun-info set-use))
-                      (not (node-to-be-deleted-p set-use))
-                      (or (eq (combination-fun-source-name set-use) '+)
-                          (eq (combination-fun-source-name set-use) '-)))
-              :exit-if-null)
-             (minusp (eq (combination-fun-source-name set-use) '-))
-             (+-args (basic-combination-args set-use))
-             (() (and (proper-list-of-length-p +-args 2 2)
-                      (let ((first (principal-lvar-use
-                                    (first +-args))))
-                        (and (ref-p first)
-                             (eq (ref-leaf first) var))))
-              :exit-if-null)
-             (step-type (lvar-type (second +-args)))
-             (set-type (lvar-type (set-value set)))
-             (initial-type (weaken-numeric-union-type initial-type)))
-    (when (and (numeric-type-p initial-type)
-               (numeric-type-p step-type)
-               (or (numeric-type-equal initial-type step-type)
-                   ;; Detect cases like (LOOP FOR 1.0 to 5.0 ...), where
-                   ;; the initial and the step are of different types,
-                   ;; and the step is less contagious.
-                   (let ((contagion-type (numeric-contagion initial-type
-                                                          step-type)))
-                     (and (numeric-type-p contagion-type)
-                          (numeric-type-equal initial-type contagion-type)))))
-      (labels ((leftmost (x y cmp cmp=)
-                 (cond ((eq x nil) nil)
-                       ((eq y nil) nil)
-                       ((listp x)
-                        (let ((x1 (first x)))
-                          (cond ((listp y)
-                                 (let ((y1 (first y)))
-                                   (if (funcall cmp x1 y1) x y)))
-                                (t
-                                 (if (funcall cmp x1 y) x y)))))
-                       ((listp y)
-                        (let ((y1 (first y)))
-                          (if (funcall cmp= x y1) x y)))
-                       (t (if (funcall cmp x y) x y))))
-               (max* (x y) (leftmost x y #'> #'>=))
-               (min* (x y) (leftmost x y #'< #'<=)))
-        (multiple-value-bind (low high)
-            (let ((step-type-non-negative (csubtypep step-type (specifier-type
-                                                                '(real 0 *))))
-                  (step-type-non-positive (csubtypep step-type (specifier-type
-                                                                '(real * 0)))))
-              (cond ((or (and step-type-non-negative (not minusp))
-                         (and step-type-non-positive minusp))
-                     (values (numeric-type-low initial-type)
-                             (when (and (numeric-type-p set-type)
-                                        (numeric-type-equal set-type initial-type))
-                               (max* (numeric-type-high initial-type)
-                                     (numeric-type-high set-type)))))
-                    ((or (and step-type-non-positive (not minusp))
-                         (and step-type-non-negative minusp))
-                     (values (when (and (numeric-type-p set-type)
-                                        (numeric-type-equal set-type initial-type))
-                               (min* (numeric-type-low initial-type)
-                                     (numeric-type-low set-type)))
-                             (numeric-type-high initial-type)))
-                    (t
-                     (values nil nil))))
-          (modified-numeric-type initial-type
-                                 :low low
-                                 :high high
-                                 :enumerable nil))))))
+             (initial-type (weaken-numeric-union-type initial-type))
+             ((direction set-types every-set-type-suitable-p)
+              (when (numeric-type-p initial-type)
+                (%analyze-set-uses sets var initial-type))
+              :exit-if-null))
+    (labels ((leftmost (x y cmp cmp=)
+               (cond ((eq x nil) nil)
+                     ((eq y nil) nil)
+                     ((listp x)
+                      (let ((x1 (first x)))
+                        (cond ((listp y)
+                               (let ((y1 (first y)))
+                                 (if (funcall cmp x1 y1) x y)))
+                              (t
+                               (if (funcall cmp x1 y) x y)))))
+                     ((listp y)
+                      (let ((y1 (first y)))
+                        (if (funcall cmp= x y1) x y)))
+                     (t (if (funcall cmp x y) x y)))))
+      (multiple-value-bind (low high)
+          (ecase direction
+            (+
+             (values (numeric-type-low initial-type)
+                     (when every-set-type-suitable-p
+                       (reduce (lambda (x y) (leftmost x y #'> #'>=)) set-types
+                               :initial-value (numeric-type-high initial-type)
+                               :key #'numeric-type-high)))
+             )
+            (-
+             (values (when every-set-type-suitable-p
+                       (reduce (lambda (x y) (leftmost x y #'< #'<=)) set-types
+                               :initial-value (numeric-type-low initial-type)
+                               :key #'numeric-type-low))
+                     (numeric-type-high initial-type)))
+            (*
+             (values nil nil)))
+        (modified-numeric-type initial-type :low low
+                                            :high high
+                                            :enumerable nil)))))
+
 (deftransform + ((x y) * * :result result)
   "check for iteration variable reoptimization"
   (let ((dest (principal-lvar-end result))
@@ -1943,7 +1978,7 @@
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
-;;; values and to a PROPAGATE-TO-REFS with this type.
+;;; values and do a PROPAGATE-TO-REFS with this type.
 (defun propagate-from-sets (var initial-type)
   (let ((types nil))
     (dolist (set (lambda-var-sets var))
