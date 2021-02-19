@@ -2922,12 +2922,14 @@ used for a COMPLEX component.~:@>"
          (wild1 (eq eltype1 *wild-type*))
          (wild2 (eq eltype2 *wild-type*)))
     (cond
-      ((type= eltype1 eltype2)
+      ((and wild1 wild2)
        (values eltype1 stype1 t))
       (wild1
        (values eltype1 stype1 type1))
       (wild2
        (values eltype2 stype2 type2))
+      ((type= eltype1 eltype2)
+       (values eltype1 stype1 t))
       ((not (type= stype1 stype2))
        ;; non-wild types that don't share UAET don't unite
        (values :incompatible nil nil))

@@ -774,3 +774,7 @@
          (t2 '(or (cons t atom) (cons function t)))
          (answer (multiple-value-list (subtypep t1 t2))))
     (assert (member answer '((nil nil) (t t)) :test 'equal))))
+
+(with-test (:name (:lp1916233))
+  (assert-tri-eq t t (subtypep '(cons (or (simple-array ratio) simple-array) nil) nil))
+  (assert-tri-eq t t (subtypep '(or (array ratio) sequence) t)))
