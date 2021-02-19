@@ -1014,3 +1014,11 @@
 (compile 'd8-p)
 (with-test (:name :deep-structure-is-a)
   (assert (d8-p (opaque-identity (make-d8)))))
+
+(with-test (:name :intersection-complex-=)
+  (let ((unk (sb-kernel:specifier-type '(and unknown unknown2))))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type t) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'integer) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'float) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'pathname) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'sequence) unk))))

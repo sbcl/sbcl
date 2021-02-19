@@ -532,14 +532,13 @@
         (funcall (the function method-fun) type1 type2)
         (values subtypep win))))
 
-;;; KLUDGE: This function is dangerous, as its overuse could easily
-;;; cause stack exhaustion through unbounded recursion.  We only use
-;;; it in one place; maybe it ought not to be a function at all?
+(defvar *invoked-complex-=-other-method* nil)
 (defun invoke-complex-=-other-method (type1 type2)
   (let* ((type-class (type-class type1))
          (method-fun (type-class-complex-= type-class)))
-    (if method-fun
-        (funcall (the function method-fun) type2 type1)
+    (if (and method-fun (not *invoked-complex-=-other-method*))
+        (let ((*invoked-complex-=-other-method* t))
+          (funcall (the function method-fun) type2 type1))
         (values nil t))))
 
 ;;;; miscellany

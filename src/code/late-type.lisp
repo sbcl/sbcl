@@ -3220,9 +3220,38 @@ used for a COMPLEX component.~:@>"
 ;;; instead, since SUBTYPEP is the usual relationship that we care
 ;;; most about, so it would be good to leverage any ingenuity there
 ;;; in this more obscure method?
+;;;
+;;; Possibly yes, but then the SUBTYPEP methods would have to be
+;;; rewritten not to use TYPE= (see the discussion around UNION
+;;; :SIMPLE=)
 (define-type-method (intersection :simple-=) (type1 type2)
   (type=-set (intersection-type-types type1)
              (intersection-type-types type2)))
+
+(define-type-method (intersection :complex-=) (type1 type2)
+  (let ((seen-uncertain nil))
+    (dolist (itype (intersection-type-types type2)
+             (if seen-uncertain
+                 (values nil nil)
+                 (invoke-complex-=-other-method type1 type2)))
+      (let ((trial-intersection (type-intersection2 type1 itype)))
+        (if (null trial-intersection)
+            (setq seen-uncertain (type-might-contain-other-types-p itype))
+            ;; C != (Ai n Aj...) if (C n Ai) < C.
+            ;;
+            ;; (CSUBTYPEP (AND C Ai) C) is T, T by construction.
+            ;; We ask (SUBTYPEP C (AND C Ai)):
+            ;;
+            ;; T  , T  : OK, continue -- C = (AND C Ai)
+            ;; NIL, T  : return early -- C > (AND C Ai)
+            ;; NIL, NIL: don't know!  If we get to the end, return NIL, NIL, but
+            ;;           give other types in the intersection a chance to return
+            ;;           early.
+            (multiple-value-bind (subtype certain?)
+                (csubtypep type1 trial-intersection)
+              (cond
+                ((not certain?) (setq seen-uncertain t))
+                ((not subtype) (return (values nil t))))))))))
 
 (defun %intersection-complex-subtypep-arg1 (type1 type2)
   (type= type1 (type-intersection type1 type2)))
