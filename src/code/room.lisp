@@ -1482,11 +1482,12 @@ We could try a few things to mitigate this:
               (funcall fun obj)))
     #+cheneygc (map-allocated-objects #'filter :all)
     #+gencgc
-    (progn
+    (without-gcing
       #+immobile-code
       (map-objects-in-range #'nofilter
                             (ash varyobj-space-start (- n-fixnum-tag-bits))
                             (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
+      (alien-funcall (extern-alien "close_code_region" (function void)))
       (walk-dynamic-space #'nofilter
                           #b1111111 ; all generations
                           3 3))))

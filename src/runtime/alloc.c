@@ -58,8 +58,7 @@ lispobj alloc_code_object (unsigned total_words)
     int result = thread_mutex_lock(&code_allocator_lock);
     gc_assert(!result);
     struct code *code = (struct code *)
-      lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1], total_words*N_WORD_BYTES,
-                 CODE_PAGE_TYPE, th);
+      lisp_alloc(&code_region, total_words*N_WORD_BYTES, CODE_PAGE_TYPE, th);
     result = thread_mutex_unlock(&code_allocator_lock);
     gc_assert(!result);
     THREAD_JIT(0);
@@ -71,6 +70,12 @@ lispobj alloc_code_object (unsigned total_words)
     THREAD_JIT(1);
 
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
+}
+void close_code_region() {
+    int result = thread_mutex_lock(&code_allocator_lock);
+    gc_assert(!result);
+    ensure_region_closed(&code_region, CODE_PAGE_TYPE);
+    thread_mutex_unlock(&code_allocator_lock);
 }
 #endif
 
