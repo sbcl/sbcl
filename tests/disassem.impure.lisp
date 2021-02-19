@@ -108,4 +108,6 @@
                   (progn
                     (disassemble-everything nil)
                     (get-bytes-consed))))
-    (assert (< (- after before) 17000000))))
+    (assert (< (- after before)
+               #+parallel-test-runner 28000000
+               #-parallel-test-runner 17000000))))
