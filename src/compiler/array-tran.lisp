@@ -753,7 +753,8 @@
                    `(truly-the ,type-spec ,array))))
            (with-alloc-form (&optional data-wrapper)
              (cond (complex
-                    (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
+                    (let* ((constant-fill-pointer-p (and fill-pointer
+                                                         (constant-lvar-p fill-pointer)))
                            (fill-pointer-value (and constant-fill-pointer-p
                                                     (lvar-value fill-pointer)))
                            (length-expr
@@ -1059,7 +1060,8 @@
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))
     (let ((dims (lvar-value dims))
-          (element-type-ctype (and (constant-lvar-p element-type)
+          (element-type-ctype (and element-type
+                                   (constant-lvar-p element-type)
                                    (ir1-transform-specifier-type
                                     (lvar-value element-type)))))
       (when (or (contains-unknown-type-p element-type-ctype)
