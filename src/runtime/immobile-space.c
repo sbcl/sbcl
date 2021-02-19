@@ -652,6 +652,19 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         if (page < 0) break;
         page = next_varyobj_root_page(1+page, end_bitmap_index, genmask);
     }
+    extern int sb_sprof_enabled;
+    if (sb_sprof_enabled) {
+        // Make another pass over all code and enliven all of 'from_space'
+        lispobj* where = (lispobj*)VARYOBJ_SPACE_START;
+        lispobj* limit = varyobj_free_pointer;
+        while (where < limit) {
+            if (widetag_of(where) == CODE_HEADER_WIDETAG
+                && immobile_obj_gen_bits(where) == from_space
+                && code_serialno((struct code*)where) != 0)
+                enliven_immobile_obj(where, 1);
+            where += sizetab[widetag_of(where)](where);
+        }
+    }
     scavenge_immobile_newspace();
 }
 

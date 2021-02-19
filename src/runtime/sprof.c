@@ -264,6 +264,11 @@ static int gather_trace_from_context(struct thread* thread, os_context_t* contex
         for(;;) {
             uword_t prev_fp = *fp;
             uword_t prev_pc = fp[1];
+#ifdef LISP_FEATURE_64_BIT
+            // If this can't possibly be a valid program counter,
+            // change it to the "unknown" value.
+            if ((sword_t)prev_pc < 0) prev_pc = (sword_t)-1;
+#endif
             STORE_PC(*trace, len, prev_pc);
             if (++len == limit) break;
             // Ensure that the next FP and PC are reasonable.
@@ -303,6 +308,11 @@ static int gather_trace_from_frame(struct thread* thread, uword_t* fp,
         for(;;) {
             uword_t prev_fp = *fp;
             uword_t prev_pc = fp[1];
+#ifdef LISP_FEATURE_64_BIT
+            // If this can't possibly be a valid program counter,
+            // change it to the "unknown" value.
+            if ((sword_t)prev_pc < 0) prev_pc = (sword_t)-1;
+#endif
             STORE_PC(*trace, len, prev_pc);
             if (++len == limit) break;
             // Ensure that the next FP and PC are reasonable.
@@ -336,8 +346,9 @@ static int gather_trace_from_frame(struct thread* thread, uword_t* fp,
     return len;
 }
 
-#define LOCKED_BY_SELF 1
+#define LOCKED_BY_SELF  1
 #define LOCKED_BY_OTHER 2
+#define LOCK_CONTESTED  (LOCKED_BY_SELF|LOCKED_BY_OTHER)
 
 static void* initialize_sprof_data(struct thread* thread)
 {
@@ -366,13 +377,15 @@ static struct sprof_data* enlarge_buffer(struct sprof_data* current,
 
 #define SPROF_LOCK(th) thread_extra_data(th)->sprof_lock
 
-#define TRY_LOCK(th) (__sync_val_compare_and_swap(&SPROF_LOCK(th), 0, LOCKED_BY_SELF)==0)
-
 #ifdef LISP_FEATURE_SB_THREAD
+/* If this thread acquired an uncontested lock (old == LOCKED_BY_SELF), release it.
+ * If this thread didn't acquire the lock (old == 0 or old == 2), do nothing.
+ * The only interesting case is LOCK_CONTESTED */
 #define RELEASE_LOCK(th) \
-  if (__sync_val_compare_and_swap(&SPROF_LOCK(th), LOCKED_BY_SELF, 0) \
-      != LOCKED_BY_SELF) { \
-        SPROF_LOCK(th) = LOCKED_BY_OTHER; \
+  int oldval = __sync_val_compare_and_swap(&SPROF_LOCK(th), LOCKED_BY_SELF, 0); \
+  if (oldval == LOCK_CONTESTED) { \
+        oldval = __sync_val_compare_and_swap(&SPROF_LOCK(th), LOCK_CONTESTED, LOCKED_BY_OTHER); \
+        gc_assert(oldval == LOCK_CONTESTED); \
         os_sem_post(&thread_extra_data(th)->sprof_sem, "sprof"); \
     }
 #else
@@ -382,15 +395,13 @@ static struct sprof_data* enlarge_buffer(struct sprof_data* current,
 int sb_sprof_trace_ct;
 int sb_sprof_trace_ct_max;
 
-#define BUMP_SAMPLE_COUNT() \
-    int oldcount = __sync_fetch_and_add(&sb_sprof_trace_ct, 1); \
-    if (oldcount >= sb_sprof_trace_ct_max) { \
-        __sync_fetch_and_sub(&sb_sprof_trace_ct, 1); \
-        return; \
-    }
-
 static int collect_backtrace(struct thread* th, int contextp, void* context_or_fp)
 {
+    int oldcount = __sync_fetch_and_add(&sb_sprof_trace_ct, 1);
+    if (oldcount >= sb_sprof_trace_ct_max) {
+        __sync_fetch_and_sub(&sb_sprof_trace_ct, 1);
+        return -1; // sample limit exceeded
+    }
     struct trace trace;
     int len;
     if (contextp)
@@ -410,6 +421,11 @@ static int collect_backtrace(struct thread* th, int contextp, void* context_or_f
     // PCs to stable PCs can be skipped, if there is a hash match.
     uword_t hash = compute_hash(trace.locs, len);
     store_trace_header(&trace, hash, len);
+
+    // Try to acquire the lock
+    if (__sync_val_compare_and_swap(&SPROF_LOCK(th), 0, LOCKED_BY_SELF)!=0)
+        return -2; // already locked
+
     struct sprof_data* data = (void*)th->sprof_data;
     if (!data) data = initialize_sprof_data(th);
     uint32_t* pcount;
@@ -460,10 +476,6 @@ static void diagnose_failure(struct thread* thread) {
 }
 
 void record_backtrace_from_context(void *context, struct thread* thread) {
-    // Don't exceed the maximum total number of traces collected
-    BUMP_SAMPLE_COUNT();
-    // Toggle the lock to locked-by-self. Bail out if already locked.
-    if (!TRY_LOCK(thread)) return;
     int success = collect_backtrace(thread, 1, context) == 1;
     // Release the lock. This synchronizes with acquire_sprof_data_lock()
     // which atomically adds LOCKED_BY_OTHER to the lock field.
@@ -508,8 +520,6 @@ void sigprof_handler(int sig, __attribute__((unused)) siginfo_t* info,
 #if !(defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_SPARC)
 void allocator_record_backtrace(void* frame_ptr, struct thread* thread)
 {
-    BUMP_SAMPLE_COUNT();
-    if (!TRY_LOCK(thread)) return;
     int success = collect_backtrace(thread, 0, frame_ptr) == 1;
     RELEASE_LOCK(thread);
     if (!success) diagnose_failure(thread);

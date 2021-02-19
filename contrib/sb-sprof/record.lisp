@@ -254,12 +254,22 @@ EXPERIMENTAL: Interface subject to change."
                ;; Convert serial# + base-address-relative pc-offset
                ;; to tagged code object + CODE-INSTRUCTIONS-relative pc-offset.
                ;; This can fail only if the code was GCed in the meantime.
-               `(let ((code (gethash ,serialno serialno-to-code)))
+               `(let* ((id ,serialno)
+                       (code (gethash id serialno-to-code))
+                       (rel-pc ,offset))
+                  (when (and (not code) (/= id 0))
+                    ;; If the serial# could not be found, something has gone wrong in GC.
+                    ;; This really should not happen. If it does, simulate a random code blob
+                    ;; named with that serial#.
+                    (setf code (sb-kernel:fun-code-header
+                                (compile nil `(named-lambda ,(format nil "Unknown fn ~d" id) ())))
+                          (gethash id serialno-to-code) code
+                          rel-pc 0))
                   (if code
                       (with-pinned-objects (code)
                         (debug-info (sap+ (int-sap (logandc2 (sb-kernel:get-lisp-obj-address code)
                                                              sb-vm:lowtag-mask))
-                                          ,offset)
+                                          rel-pc)
                                     code))
                       (let ((code (sb-kernel:fun-code-header #'unknown-function)))
                         (debug-info (sb-kernel:code-instructions code) code)))))
@@ -356,6 +366,7 @@ EXPERIMENTAL: Interface subject to change."
        (lambda (sap thread memusage)
          (push (cons thread memusage) threads)
          (push (cons (extract-traces sap ht) thread) aggregate-data)))
+      (setf (extern-alien "sb_sprof_enabled" int) 0)
       (sb-toggle-sigprof (int-sap 0) saved-sigprof-mask))
     ;; Precompute the length of the new SAMPLES-VECTOR
     (let ((vector

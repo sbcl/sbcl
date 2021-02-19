@@ -175,6 +175,8 @@ The following keyword args are recognized:
       (unless (eq mode :alloc)
         (with-alien ((%sigaction (function void int signed) :extern "install_handler"))
           (alien-funcall %sigaction sb-unix:sigprof -1)))
+      ;; Keep all code live no matter if apparently unreferenced
+      #+gencgc (setf (extern-alien "sb_sprof_enabled" int) 1)
       (flet (#+sb-thread
              (map-threads (function &aux (threads sb-thread::*profiled-threads*))
                (if (listp threads)

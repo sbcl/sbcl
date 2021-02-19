@@ -3401,6 +3401,13 @@ move_pinned_pages_to_newspace()
     }
 }
 
+/* If sb_sprof_enabled was used and the data are not in the final form
+ * (in the *SAMPLES* instance) then all code remains live.
+ * This is a weaker constraint than 'pin_all_dynamic_space_code'
+ * because the latter implies that all code is not potential garbage and not
+ * movable, whereas this only implies not potential garbage */
+int sb_sprof_enabled;
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
@@ -3793,6 +3800,42 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (lisp_init_function) scavenge(&lisp_init_function, 1);
     if (gc_object_watcher)  scavenge(&gc_object_watcher, 1);
     if (alloc_profile_data) scavenge(&alloc_profile_data, 1);
+
+    /* If SB-SPROF was used, enliven all pages of code.
+     * Note that some objects may have already been transported off the page.
+     * Despite the extra scan, it is more efficient than scanning all trace buffers
+     * and potentially updating them and/or invalidating hashes */
+    if (sb_sprof_enabled) {
+        page_index_t first = 0;
+        while (first < next_free_page) {
+            if (page_table[first].gen != from_space
+                || (page_table[first].type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE
+                || !page_bytes_used(first)) {
+                ++first;
+                continue;
+            }
+            page_index_t last = first;
+            while (!page_ends_contiguous_block_p(last, from_space)) ++last;
+            // [first,last] are inclusive bounds on a code range
+            lispobj* where = (lispobj*)page_address(first);
+            lispobj* limit = (lispobj*)(page_address(last) + page_bytes_used(last));
+            while (where < limit) {
+                if (forwarding_pointer_p(where)) {
+                    lispobj* copy = native_pointer(forwarding_pointer_value(where));
+                    where += sizetab[widetag_of(copy)](copy);
+                } else {
+                    sword_t nwords = sizetab[widetag_of(where)](where);
+                    if (widetag_of(where) == CODE_HEADER_WIDETAG
+                        && code_serialno((struct code*)where) != 0) {
+                        lispobj ptr = make_lispobj(where, OTHER_POINTER_LOWTAG);
+                        scavenge(&ptr, 1);
+                    }
+                    where += nwords;
+                }
+            }
+            first = last + 1;
+        }
+    }
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
