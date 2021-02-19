@@ -22,7 +22,7 @@
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
                                   (simple-string &optional boolean))
-  (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
+  (if (and (constant-lvar-p symbol) (and datap (constant-lvar-p datap)))
       (if (lvar-value datap)
           `(foreign-symbol-dataref-sap symbol)
           `(foreign-symbol-sap symbol))

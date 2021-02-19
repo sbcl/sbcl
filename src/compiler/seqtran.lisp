@@ -681,7 +681,7 @@
                      (t
                       (aver (integer-type-p element-ctype))
                       :bits))))
-    (if (constant-lvar-p item)
+    (if (and item (constant-lvar-p item))
         (let* ((basher-name (format nil "UB~D-BASH-FILL" n-bits))
                (basher (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
                            (abort-ir1-transform
@@ -1332,17 +1332,17 @@
       (let* ((pattern (lvar-value pattern))
              (pattern-start (cond ((not (proper-sequence-p pattern))
                                    (give-up-ir1-transform))
-                                  ((constant-lvar-p start1)
-                                   (lvar-value start1))
                                   ((not start1)
                                    0)
+                                  ((constant-lvar-p start1)
+                                   (lvar-value start1))
                                   (t
                                    (give-up-ir1-transform))))
-             (pattern-end (cond ((constant-lvar-p end1)
+             (pattern-end (cond ((not end1)
+                                 (length pattern))
+                                ((constant-lvar-p end1)
                                  (or (lvar-value end1)
                                      (length pattern)))
-                                ((not end1)
-                                 (length pattern))
                                 (t
                                  (give-up-ir1-transform))))
              (pattern (if (and (= (- pattern-end pattern-start) 1)
@@ -1451,13 +1451,17 @@
                                                &key start1 end1 start2 end2
                                                from-end
                                                &allow-other-keys))
-  (let* ((constant-start1 (and (constant-lvar-p start1)
+  (let* ((constant-start1 (and start1
+                               (constant-lvar-p start1)
                                (lvar-value start1)))
-         (constant-end1 (and (constant-lvar-p end1)
+         (constant-end1 (and end1
+                             (constant-lvar-p end1)
                              (lvar-value end1)))
-         (constant-start2 (and (constant-lvar-p start2)
+         (constant-start2 (and start2
+                               (constant-lvar-p start2)
                                (lvar-value start2)))
-         (constant-end2 (and (constant-lvar-p end2)
+         (constant-end2 (and end2
+                             (constant-lvar-p end2)
                              (lvar-value end2)))
          (not-from-end (or (not from-end)
                            (and (constant-lvar-p from-end)
@@ -1494,9 +1498,11 @@
                          null))))
 
 (defun index-into-sequence-derive-type (sequence start end &key (inclusive t))
-  (let* ((constant-start (and (constant-lvar-p start)
+  (let* ((constant-start (and start
+                              (constant-lvar-p start)
                               (lvar-value start)))
-         (constant-end (and (constant-lvar-p end)
+         (constant-end (and end
+                            (constant-lvar-p end)
                             (lvar-value end)))
          (min-result (or constant-start 0))
          (max-result (or constant-end (1- array-dimension-limit)))
@@ -1592,7 +1598,8 @@
   (let* ((sequence-type (lvar-type sequence))
          (constant-start (and (constant-lvar-p start)
                               (lvar-value start)))
-         (constant-end (and (constant-lvar-p end)
+         (constant-end (and end
+                            (constant-lvar-p end)
                             (lvar-value end)))
          (index-length (and constant-start constant-end
                             (- constant-end constant-start)))

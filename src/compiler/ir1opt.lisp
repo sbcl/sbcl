@@ -20,59 +20,54 @@
 
 ;;; Return true for an LVAR whose sole use is a reference to a
 ;;; constant leaf.
-(defun constant-lvar-p (thing)
-  (declare (type (or lvar null) thing))
-  (and (lvar-p thing)
-       (let* ((type (lvar-type thing))
-              (principal-lvar (principal-lvar thing))
-              (principal-use (lvar-uses principal-lvar))
-              leaf)
-         (or (and (ref-p principal-use)
-                  (constant-p (setf leaf (ref-leaf principal-use)))
-                  ;; LEAF may be a CONSTANT behind a cast that will
-                  ;; later turn out to be of the wrong type.
-                  ;; And ir1-transforms suffer from this because
-                  ;; they expect LVAR-VALUE to be of a restricted type.
-                  (or (not (lvar-reoptimize principal-lvar))
-                      (ctypep (constant-value leaf) type)))
-             ;; check for EQL types and singleton numeric types
-             (values (type-singleton-p type))))))
+(defun constant-lvar-p (lvar)
+  (declare (type lvar lvar))
+  (let* ((type (lvar-type lvar))
+         (principal-lvar (principal-lvar lvar))
+         (principal-use (lvar-uses principal-lvar))
+         leaf)
+    (or (and (ref-p principal-use)
+             (constant-p (setf leaf (ref-leaf principal-use)))
+             ;; LEAF may be a CONSTANT behind a cast that will
+             ;; later turn out to be of the wrong type.
+             ;; And ir1-transforms suffer from this because
+             ;; they expect LVAR-VALUE to be of a restricted type.
+             (or (not (lvar-reoptimize principal-lvar))
+                 (ctypep (constant-value leaf) type)))
+        ;; check for EQL types and singleton numeric types
+        (values (type-singleton-p type)))))
 
-(defun constant-lvar-ignore-types-p (thing)
-  (declare (type (or lvar null) thing))
-  (and (lvar-p thing)
-       (let* ((type (lvar-type thing))
-              (principal-lvar (principal-lvar thing))
-              (principal-use (lvar-uses principal-lvar)))
-         (or (and (ref-p principal-use)
-                  (constant-p (ref-leaf principal-use)))
-             ;; check for EQL types and singleton numeric types
-             (values (type-singleton-p type))))))
+(defun constant-lvar-ignore-types-p (lvar)
+  (declare (type lvar lvar))
+  (let ((use (principal-lvar-use lvar)))
+    (or (and (ref-p use)
+             (constant-p (ref-leaf use)))
+        ;; check for EQL types and singleton numeric types
+        (values (type-singleton-p (lvar-type lvar))))))
 
 ;;; Are all the uses constant?
-(defun constant-lvar-uses-p (thing)
-  (declare (type (or lvar null) thing))
-  (and (lvar-p thing)
-       (let* ((type (lvar-type thing))
-              (principal-lvar (principal-lvar thing))
-              (uses (lvar-uses principal-lvar))
-              leaf)
-         (when (consp uses)
-           (loop for use in uses
-                 always
-                 (and (ref-p use)
-                      (constant-p (setf leaf (ref-leaf use)))
-                      ;; LEAF may be a CONSTANT behind a cast that will
-                      ;; later turn out to be of the wrong type.
-                      ;; And ir1-transforms suffer from this because
-                      ;; they expect LVAR-VALUE to be of a restricted type.
-                      (or (not (lvar-reoptimize principal-lvar))
-                          (ctypep (constant-value leaf) type))))))))
+(defun constant-lvar-uses-p (lvar)
+  (declare (type lvar lvar))
+  (let* ((type (lvar-type lvar))
+         (principal-lvar (principal-lvar lvar))
+         (uses (lvar-uses principal-lvar))
+         leaf)
+    (when (consp uses)
+      (loop for use in uses
+            always
+            (and (ref-p use)
+                 (constant-p (setf leaf (ref-leaf use)))
+                 ;; LEAF may be a CONSTANT behind a cast that will
+                 ;; later turn out to be of the wrong type.
+                 ;; And ir1-transforms suffer from this because
+                 ;; they expect LVAR-VALUE to be of a restricted type.
+                 (or (not (lvar-reoptimize principal-lvar))
+                     (ctypep (constant-value leaf) type)))))))
 
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
-(declaim (ftype (function (lvar) t) lvar-value))
 (defun lvar-value (lvar)
+  (declare (type lvar lvar))
   (let ((use  (principal-lvar-use lvar))
         (type (lvar-type lvar))
         leaf)
@@ -85,6 +80,7 @@
           value))))
 
 (defun lvar-uses-values (lvar)
+  (declare (type lvar lvar))
   (let ((uses (principal-lvar-use lvar)))
     (loop for use in uses
           for leaf = (ref-leaf use)
