@@ -24,10 +24,8 @@
     ;; next MAKE-THREAD so that new threads need not synchronize with creators for exclusive
     ;; access to the list. But threads can safely RPLACA their own cell in *STARTING-THREADS*
     ;; allowing it to be GC'd even if nothing subsequently prunes out un-needed cons cells]
-    (when sb-thread::*starting-threads*
-      (assert (sb-thread::thread-p sb-impl::*finalizer-thread*))
-      (assert (equal sb-thread::*starting-threads* '(0)))
-      (setq sb-thread::*starting-threads* nil))
+    (assert (or (null sb-thread::*starting-threads*)
+                (equal sb-thread::*starting-threads* '(0))))
 
     (unwind-protect
          (progn (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
@@ -37,8 +35,8 @@
                                            "Could not create new OS thread.")))))
       (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
     (assert (null sb-thread::*starting-threads*))
-    (assert (equal (remove sb-impl::*finalizer-thread*
-                           (sb-thread::avltree-list sb-thread::*all-threads*))
+    (assert (equal (remove-if #'sb-thread:thread-ephemeral-p
+                              (sb-thread::avltree-list sb-thread::*all-threads*))
                    (list sb-thread::*initial-thread*)))))
 
 (defun actually-get-stack-roots (current-sp
