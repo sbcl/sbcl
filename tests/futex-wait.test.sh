@@ -5,7 +5,7 @@
 run_sbcl --noinform <<EOF
  ;; The desired output differs by many factors, but an arbitrary slop allowance
  ;; could let the old bug creep back in.
- #+(and linux sb-thread) (exit :code #+(or x86 x86-64) 40
+ #+(and linux sb-thread) (exit :code #+(or x86 x86-64) 45
                                      #-(or x86 x86-64) 100)
  ;; can't run the test
  (exit :code 0)
