@@ -69,7 +69,7 @@
   ;; is one dx cons cell for the whole cluster.
   ;; Otherwise it takes 1+2N cons cells where N is the number of bindings.
   ;;
-  (collect ((local-functions) (cluster-entries) (dummy-forms))
+  (collect ((local-functions) (cluster-entries) (dummy-forms) (complex-initforms))
     (flet ((const-cons (test handler)
              ;; If possible, render HANDLER as a load-time constant so that
              ;; consing the test and handler is also load-time constant.
@@ -166,34 +166,37 @@
                 ;; Unless the expression is ({FUNCTION|QUOTE} <sym>), then create a
                 ;; new local function. If the supplied handler is spelled
                 ;; (LAMBDA ...) or #'(LAMBDA ...), then the local function is the
-                ;; lambda but named. If not spelled as such, the function funcalls
-                ;; the user's sexpr so that the compiler enforces callable-ness.
+                ;; lambda but named.  If not spelled as such, the function funcalls
+                ;; the user's sexpr through a variable binding so that the compiler
+                ;; enforces callable-ness but evaluates the supplied form only once.
                 (if (typep handler '(cons (member function quote) (cons symbol null)))
                     handler
-                    (let ((lexpr
-                           (typecase handler
-                             ;; These two are merely expansion prettifiers,
-                             ;; and not strictly necessary.
-                             ((cons (eql function) (cons (cons (eql lambda)) null))
-                              (cadr handler))
-                             ((cons (eql lambda))
-                              handler)
-                             (t
-                              ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
-                              ;; but the cast kills DX allocation.
-                              `(lambda (c) (funcall ,handler c)))))
-                          (name (let ((*gensym-counter*
-                                       (length (cluster-entries))))
-                                  (sb-xc:gensym "H"))))
+                    (let* ((name (let ((*gensym-counter*
+                                        (length (cluster-entries))))
+                                   (sb-xc:gensym "H")))
+                           (lexpr
+                            (typecase handler
+                              ;; These two are merely expansion prettifiers,
+                              ;; and not strictly necessary.
+                              ((cons (eql function) (cons (cons (eql lambda)) null))
+                               (cadr handler))
+                              ((cons (eql lambda))
+                               handler)
+                              (t
+                               (complex-initforms `(,name ,handler))
+                               ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
+                               ;; but the cast kills DX allocation.
+                               `(lambda (c) (funcall ,name c))))))
                       (local-functions `(,name ,@(rest lexpr)))
                       `#',name))))))))
 
-      `(dx-flet ,(local-functions)
-         ,@(dummy-forms)
+      `(dx-let ,(complex-initforms)
+        (dx-flet ,(local-functions)
+                 ,@(dummy-forms)
          (dx-let ((*handler-clusters*
                    (cons ,(const-list (cluster-entries))
                          *handler-clusters*)))
-           ,form)))))
+           ,form))))))
 
 (sb-xc:defmacro handler-bind (bindings &body forms)
   "(HANDLER-BIND ( {(type handler)}* ) body)
