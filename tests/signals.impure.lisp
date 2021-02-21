@@ -72,12 +72,19 @@
 ;; for POSIX (i.e. not win32), but it doesn't, at least not now.
 ;; The special case in kill_safely() for the current thread is pthread_kill()
 ;; and not a thing more, unless on win32, which skips this test.
-#-win32
+;; Note also that RAISE sends a thread-directed signal as per the man page
+;; "In a multithreaded program it is equivalent to pthread_kill(pthread_self(), sig);"
+;; but thread-directed SIGINT is not the right thing, as it does not accurately
+;; model the effect of pressing control-C; hence we should use UNIX-KILL here,
+;; which sends a process-directed signal, letting the OS pick a thread.
+;; Whether it picks the finalizer thread or main thread, things should work,
+;; because we forward to the signal to our foreground thread.
+#+unix
 (with-test (:name :handle-interactive-interrupt)
   (assert (eq :condition
               (handler-case
                   (progn
-                    (sb-unix:raise sb-unix:sigint)
+                    (sb-unix:unix-kill (sb-unix:unix-getpid) sb-unix:sigint)
                     #+sb-safepoint-strictly
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it
