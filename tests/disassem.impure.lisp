@@ -61,13 +61,17 @@
 ;;; Unfortunately I think is too slow to make part of the test suite,
 ;;; which speaks to the terrible performance of our disassembler.
 (in-package "SB-DISASSEM")
-(defun disassemble-everything (&optional (show-progress t)
+(defun list-all-code ()
+  (sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
+
+(defun disassemble-everything (objects
+                               &optional (show-progress t)
                                &aux (dstate (make-dstate)) (i 0))
   (declare (inline %make-segment))
   (when show-progress
     (format t "~&Start ...  ")
     (force-output))
-  (dolist (code (funcall 'sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
+  (dolist (code objects)
     (when show-progress
       (write-char #\backspace)
       (write-char (aref "\\|/-" (mod (incf i) 4)))
@@ -93,6 +97,17 @@
     (format t " done~%")))
 (compile 'disassemble-everything)
 
+(defun install-counting-wrapper (discount)
+  (declare (ignorable discount))
+  #+x86-64
+  (sb-int:encapsulate
+   'sb-x86-64-asm::print-mem-ref 'test
+   (lambda (realfun &rest args)
+     ;; Each mem ref disassembled is one cons cell
+     (incf (car discount) (* sb-vm:cons-size sb-vm:n-word-bytes))
+     (apply realfun args))))
+(compile 'install-counting-wrapper)
+
 ;;; Disassembling everything takes around .8 seconds and conses ~14MB for me.
 ;;; To ensure that things don't get drastically worse, assert that we're within
 ;;; some fuzz factor of the expected consing. One small mistake in target-disassem
@@ -101,13 +116,20 @@
                       ;; Only the x86-64 disassembler is able to disassemble
                       ;; with output into the dstate rather than a stream.
                       ;; The others choke with "NIL is not of type STREAM"
-                      :skipped-on (:not (:and :x86-64 :linux)))
-  (multiple-value-bind (before after)
-      (sb-sys:without-gcing
-          (values (get-bytes-consed)
-                  (progn
-                    (disassemble-everything nil)
-                    (get-bytes-consed))))
-    (assert (< (- after before)
-               #+parallel-test-runner 28000000
-               #-parallel-test-runner 17000000))))
+                            :skipped-on (:not :x86-64))
+  (let ((code (list-all-code)) ;; Avoid counting bytes consed in the list
+        (discount (list 0)))
+    (install-counting-wrapper discount)
+    ;; Build the inst space outside the test to avoid influencing bytes consed
+    (sb-disassem:get-inst-space)
+    (multiple-value-bind (before after)
+        (sb-sys:without-gcing
+            (values (get-bytes-consed)
+                    (progn
+                      (disassemble-everything code nil)
+                      (get-bytes-consed))))
+      (let* ((after (- after (car discount)))
+             (delta (- after before)))
+        (format t "~&Consed ~D bytes discounting ~D bytes~%" delta (car discount))
+        ;; Should be less than this amount of overhead
+        (assert (< delta 500000))))))
