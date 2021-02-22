@@ -453,3 +453,10 @@
        (list 'list a b store)
        b)))
   (assert (eql (funcall (compile nil `(lambda () (shiftf (shiftf-let*) 21)))) 11)))
+
+(locally
+    (declare (optimize (debug 0)))
+  (defsetf ffff (x) (y) `(list ,x ,y)))
+
+(with-test (:name :unknown-lambda-var-names)
+  (checked-compile '(lambda (x) (setf (ffff x) nil))))

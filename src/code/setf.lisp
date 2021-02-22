@@ -507,7 +507,8 @@
 ;;
 (defun collect-setf-temps (sexprs environment name-hints)
   (labels ((next-name-hint ()
-             (let ((sym (pop name-hints))) ; OK if list was nil
+             ;; OK if list was nil or :UNKNOWN
+             (let ((sym (and (listp name-hints) (pop name-hints))))
                (case sym
                  (&optional (next-name-hint))
                  ((&key &rest) (setq name-hints nil))
