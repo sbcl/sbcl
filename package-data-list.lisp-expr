@@ -1128,7 +1128,6 @@ possibly temporarily, because it might be used internally."
                "CALL-HOOKS"
                ;; Constant form evaluation
                "CONSTANT-FORM-VALUE"
-               "CONSTANT-TYPEP"
 
                ;; stepping control
                "*STEPPING*"

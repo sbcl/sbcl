@@ -29,11 +29,3 @@ If ENVIRONMENT is provided, the FORM is first macroexpanded in it."
 is undefined unless CONSTANTP has been first used to determine the
 constantness of the FORM in ENVIRONMENT."
   (%constant-form-value form environment envp))
-
-(declaim (inline constant-typep))
-(defun constant-typep (form type &optional (environment nil envp))
-  (and (%constantp form environment envp)
-       ;; FIXME: We probably should be passing the environment to
-       ;; TYPEP too, but (1) our XC version of typep AVERs that the
-       ;; environment is null (2) our real version ignores it anyhow.
-       (sb-xc:typep (%constant-form-value form environment envp) type)))

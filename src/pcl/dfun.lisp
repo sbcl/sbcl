@@ -667,7 +667,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (declaim (inline make-callable))
 (defun make-callable (generator method-alist wrappers)
-  (function-funcall generator method-alist wrappers))
+  (funcall (the function generator) method-alist wrappers))
 
 (defun make-dispatch-dfun (gf)
   (values (get-dispatch-function gf) nil (dispatch-dfun-info)))
