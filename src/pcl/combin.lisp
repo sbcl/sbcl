@@ -397,16 +397,16 @@
            (effective-method-lambda (expand-effective-method-function
                                      generic-function effective-method)))
       (multiple-value-bind (cfunction constants)
-          (get-fun1 effective-method-lambda
-                    (lambda (form)
-                      (memf-test-converter form generic-function
-                                           method-alist-p wrappers-p))
-                    (lambda (form)
-                      (memf-code-converter form generic-function
-                                           metatypes applyp
-                                           method-alist-p wrappers-p))
-                    (lambda (form)
-                      (memf-constant-converter form generic-function)))
+          (get-fun effective-method-lambda
+                   (lambda (form)
+                     (memf-test-converter form generic-function
+                                          method-alist-p wrappers-p))
+                   (lambda (form)
+                     (memf-code-converter form generic-function
+                                          metatypes applyp
+                                          method-alist-p wrappers-p))
+                   (lambda (form)
+                     (memf-constant-converter form generic-function)))
         (lambda (method-alist wrappers)
           (flet ((compute-constant (constant)
                    (if (consp constant)
