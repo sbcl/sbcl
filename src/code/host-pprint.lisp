@@ -33,7 +33,3 @@
   (only-initial-entries nil :type boolean))
 
 (declaim (freeze-type pprint-dispatch-table))
-
-#+sb-xc
-(defmethod print-object ((table pprint-dispatch-table) stream)
-  (print-unreadable-object (table stream :type t :identity t)))

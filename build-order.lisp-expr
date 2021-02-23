@@ -213,7 +213,7 @@
  ("src/code/mipsstrops" :not-host)
 
  ("src/code/early-time" :c-headers)
- ;; 32-bit implementatin of GET-INTERNAL-REAL-TIME needs some thread slots
+ ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
  ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
  ("src/code/unix" :not-host)
  #+win32 ("src/code/win32" :not-host)

@@ -756,6 +756,9 @@ line break."
             (pprint-dispatch-entry-priority entry)
             (pprint-dispatch-entry-initial-p entry))))
 
+(defmethod print-object ((table pprint-dispatch-table) stream)
+  (print-unreadable-object (table stream :type t :identity t)))
+
 ;; Return T iff E1 is strictly less preferable than E2.
 (defun entry< (e1 e2)
   (declare (type pprint-dispatch-entry e1 e2))
