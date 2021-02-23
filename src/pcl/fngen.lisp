@@ -48,8 +48,8 @@
                  (test-converter #'default-test-converter)
                  (code-converter #'default-code-converter)
                  (constant-converter #'default-constant-converter))
-  (function-apply (get-fun-generator lambda test-converter code-converter)
-                  (compute-constants lambda constant-converter)))
+  (apply (the function (get-fun-generator lambda test-converter code-converter))
+         (compute-constants lambda constant-converter)))
 
 (defun get-fun1 (lambda &optional
                   (test-converter #'default-test-converter)

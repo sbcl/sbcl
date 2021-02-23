@@ -181,12 +181,3 @@
       (if bind-object
           `(let ,bind-object ,form)
           form))))
-
-(defmacro function-funcall (form &rest args)
-  `(funcall (the function ,form) ,@args))
-
-(defmacro function-apply (form &rest args)
-  `(apply (the function ,form) ,@args))
-
-(defun get-setf-fun-name (name)
-  `(setf ,name))
