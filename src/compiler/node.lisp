@@ -572,9 +572,9 @@
   ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
   ;; cleanup. This is filled when the cleanup is created (now by
   ;; locall call analysis) and is rechecked by physical environment
-  ;; analysis. (For closures this is a list of the allocating node -
-  ;; during IR1, and a list of the argument LVAR of the allocator -
-  ;; after physical environment analysis.)
+  ;; analysis. (For closures this is a list of the enclose node during
+  ;; IR1, and a list of the LVAR of the enclose after physical
+  ;; environment analysis.)
   (info nil :type list)
   ;; Used by propagate-ref-dx to check that the new ref is inside the
   ;; original let
