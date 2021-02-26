@@ -488,11 +488,7 @@ during backtrace.
   ;; Furthermore, it is technically possibly for a pthread_t to be smaller than a word
   ;; (a 4-byte identifier, not a pointer, on 64-bit) but that seems not to be true
   ;; for any system that we care about.
-  ;;
-  ;; And this slot is badly named, it should be "Pthread" since it's the POSIX
-  ;; (or emulated POSIX) thread object, not necessarily the OS's thread notion.
-  ;;
-  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj"
+  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
                      #-(or win32 (not sb-thread)) "pthread_t")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
