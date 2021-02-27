@@ -72,7 +72,7 @@ lispobj alloc_code_object (unsigned total_words)
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 void close_code_region() {
-    int result = thread_mutex_lock(&code_allocator_lock);
+    __attribute__((unused)) int result = thread_mutex_lock(&code_allocator_lock);
     gc_assert(!result);
     ensure_region_closed(&code_region, CODE_PAGE_TYPE);
     thread_mutex_unlock(&code_allocator_lock);
