@@ -1,5 +1,3 @@
-;;;; This file contains early compiler-related structure definitions.
-
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;

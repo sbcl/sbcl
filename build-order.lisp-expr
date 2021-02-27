@@ -102,7 +102,7 @@
  ("src/code/early-constants" :c-headers)
 
  ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
- ("src/compiler/early-lexenv" :c-headers)
+ ("src/compiler/vop-existsp" :c-headers)
  ("src/compiler/early-globaldb" :c-headers)
 
  ;; comes early so that stuff can reason about function names
