@@ -14,16 +14,71 @@
 ;;; a value for an optimization declaration
 (deftype policy-quality () '(integer 0 3))
 
-(defvar *macro-policy* nil)
-;;; global policy restrictions as a POLICY object or nil
-(defvar *policy-min* nil)
-(defvar *policy-max* nil)
+(defconstant-eqx +policy-primary-qualities+
+        #(;; ANSI standard qualities
+          compilation-speed
+          debug
+          safety
+          space
+          speed
+          ;; SBCL extensions
+          ;;
+          ;; FIXME: INHIBIT-WARNINGS is a misleading name for this.
+          ;; Perhaps BREVITY would be better. But the ideal name would
+          ;; have connotations of suppressing not warnings but only
+          ;; optimization-related notes, which is already mostly the
+          ;; behavior, and should probably become the exact behavior.
+          ;; Perhaps INHIBIT-NOTES?
+          inhibit-warnings)
+    #'equalp)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant n-policy-primary-qualities (length +policy-primary-qualities+))
+  ;; 1 bit per quality is stored to indicate whether it was explicitly given
+  ;; a value in a lexical policy. In addition to the 5 ANSI-standard qualities,
+  ;; SBCL defines one more "primary" quality and 16 dependent qualities.
+  ;; Both kinds take up 1 bit in the mask of specified qualities.
+  (defconstant max-policy-qualities 32))
+
+;; Each primary and dependent quality policy is assigned a small integer index.
+;; The POLICY struct represents a set of policies in an order-insensitive way
+;; that facilitates quicker lookup than scanning an alist.
+(defstruct (policy (:constructor make-policy
+                       (primary-qualities &optional
+                                          presence-bits dependent-qualities)))
+  ;; Mask with a 1 for each quality that has an explicit value in this policy.
+  ;; Primary qualities fill the mask from left-to-right and dependent qualities
+  ;; from right-to-left.
+  ;; xc has trouble folding this MASK-FIELD, but it works when host-evaluated.
+  (presence-bits #.(mask-field
+                    (byte n-policy-primary-qualities
+                          (- max-policy-qualities n-policy-primary-qualities))
+                    -1)
+                 :type (unsigned-byte #.max-policy-qualities))
+  ;; For efficiency, primary qualities are segregated because there are few
+  ;; enough of them to fit in a fixnum.
+  (primary-qualities 0 :type (unsigned-byte #.(* 2 n-policy-primary-qualities)))
+  ;; 2 bits per dependent quality is a fixnum on 64-bit build, not on 32-bit.
+  ;; It would certainly be possible to constrain this to storing exactly
+  ;; the 16 currently defined dependent qualities,
+  ;; but that would be overly limiting.
+  (dependent-qualities 0
+   :type (unsigned-byte #.(* (- max-policy-qualities n-policy-primary-qualities)
+                             2))))
+(declaim (freeze-type policy))
+
 ;;; *POLICY* holds the current global compiler policy information, as
 ;;; a POLICY object mapping from the compiler-assigned index (unique per
 ;;; quality name) to quality value.
 ;;; This used to be an alist, but tail-sharing was never really possible
 ;;; because for deterministic comparison the list was always freshly
 ;;; consed so that destructive sorting could be done for canonicalization.
+(defvar *policy*)
+(defvar *macro-policy* nil)
+;;; global policy restrictions as a POLICY object or nil
+(defvar *policy-min* nil)
+(defvar *policy-max* nil)
+
 (declaim (type policy *policy*)
          (type (or policy null) *policy-min* *policy-max*))
 

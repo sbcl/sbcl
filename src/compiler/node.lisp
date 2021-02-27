@@ -100,6 +100,21 @@
 (defun null-lexenv-p (lexenv)
   (not (lexenv-%policy lexenv)))
 
+;;; an object suitable for input to standard functions that accept
+;;; "environment objects" (of the ANSI glossary)
+(def!type lexenv-designator () '(or abstract-lexenv null))
+
+;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
+;;; to be taken as a null lexical environment.
+;;; Of course this is a mostly pointless "idiom" because NIL *is*
+;;; an environment, as far as most environment inquiry functions care.
+(defun coerce-to-lexenv (x)
+  (etypecase x
+    (null (make-null-lexenv))
+    (lexenv x)
+    #+(and sb-fasteval (not sb-xc-host))
+    (sb-interpreter:basic-env (sb-interpreter:lexenv-from-env x))))
+
 ;;; The front-end data structure (IR1) is composed of nodes,
 ;;; representing actual evaluations. Linear sequences of nodes in
 ;;; control-flow order are combined into blocks (but see

@@ -13,7 +13,7 @@
 
 ;;; Subtypes of this show up as the environment argument to inquiry functions.
 (defstruct (abstract-lexenv
-             (:constructor nil) (:copier nil) (:predicate nil)))
+            (:constructor nil) (:copier nil) (:predicate nil)))
 
 (declaim (inline constantp))
 (defun constantp (form &optional (environment nil envp))

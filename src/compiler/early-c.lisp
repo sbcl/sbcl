@@ -141,6 +141,9 @@
 (defvar *compile-object* nil)
 (defvar *location-context* nil)
 
+(defvar *handled-conditions* nil)
+(defvar *disabled-package-locks* nil)
+
 (defvar *stack-allocate-dynamic-extent* t
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
 and stack allocates otherwise inaccessible parts of the object whenever
