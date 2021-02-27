@@ -14,6 +14,10 @@
 
 (declaim (special *compiler-error-bailout*))
 
+;;; the lexical environment we are currently converting in
+(defvar *lexenv*)
+(declaim (type lexenv *lexenv*))
+
 ;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
 ;;; form number to associate with a source path. This should be bound
 ;;; to an initial value of 0 before the processing of each truly

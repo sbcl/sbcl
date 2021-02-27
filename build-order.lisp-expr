@@ -126,7 +126,6 @@
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
  ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
- ("src/compiler/parse-lambda-list" :c-headers)
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
 
  ("src/code/early-cl")
@@ -175,12 +174,7 @@
  ("src/compiler/generic/pinned-objects" :not-host)
  ("src/compiler/generic/layout-ids" :c-headers)
  ("src/code/early-classoid" :c-headers)
- ("src/code/alieneval" :c-headers)
  ("src/code/target-error" :not-host)
-
- ;; "src/code/toplevel.lisp" is the first to need this. It's generated
- ;; automatically by grovel_headers.c, i.e. it's not under source control.
- ("output/stuff-groveled-from-headers" :not-host)
 
  ("src/code/cold-error"  :not-host)
  ;; Define at most one INTERPRETED-FUNCTION type based on target features
@@ -193,12 +187,6 @@
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/debug-var-io")
 
- ("src/code/target-alieneval" :not-host)
- ("src/code/target-c-call"    :not-host)
-
- ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
- ("src/code/misc-aliens" :not-host)
-
  ("src/code/early-float")
  ("src/code/pred" :not-host)
 
@@ -207,52 +195,20 @@
  ("src/code/coerce" :not-host)
 
  ("src/code/huffman")
- ("src/code/target-char"    :not-host)
- ("src/code/target-unicode" :not-host)
- ("src/code/string"     :not-host)
- ("src/code/mipsstrops" :not-host)
 
  ("src/code/early-time" :c-headers)
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
  ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
- ("src/code/unix" :not-host)
- #+win32 ("src/code/win32" :not-host)
-
- #+android ("src/code/android-os" :not-host)
- #+sunos ("src/code/sunos-os" :not-host)
- #+bsd   ("src/code/bsd-os"   :not-host)
- #+linux ("src/code/linux-os" :not-host)
- #+haiku ("src/code/haiku-os" :not-host)
- #+win32 ("src/code/win32-os" :not-host)
-
- ("src/code/share-vm" :not-host)
-
- ("src/code/thread" :not-host :block-compile) ; provides *CURRENT-THREAD* for target-signal
- ("src/code/target-signal-common" :not-host)
 
  ("src/code/bignum"     :not-host)
  ("src/code/number-dispatch" :not-host)
  ("src/code/float-inf-nan"   :not-host)
- ("src/code/numbers"    :not-host)
- ("src/code/float-trap" :not-host)
- ("src/code/float"      :not-host)
-
- ("src/code/irrat"      :not-host)
 
  ("src/code/misc" :c-headers)
 
- ("src/code/symbol"        :not-host)
- ("src/code/fd-stream"     :not-host)
- ("src/code/stream"        :not-host)
  ("src/code/early-format")
 
- ("src/code/common-os" :not-host)
-
- ("src/code/deadline" :not-host)
- ("src/code/serve-event" :not-host)
-
  ("src/code/query"  :not-host)
-
  ("src/code/sort"  :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -261,8 +217,12 @@
 
  ("src/compiler/policies")
 
+  ;; needed by "compiler/vop"
+ ("src/compiler/sset" :c-headers)
+ ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
+ ("src/compiler/node" :c-headers :block-compile)
+ ("src/compiler/parse-lambda-list" :c-headers)
  ("src/compiler/macros" :c-headers)
-
  ("src/compiler/constantp" :c-headers)
  ("src/compiler/info-functions" :c-headers)
  ("src/code/specializable-array" :not-target)
@@ -270,8 +230,6 @@
  ("src/compiler/generic/vm-macs" :c-headers)
  ("src/compiler/generic/objdef" :c-headers)
 
- ;; needed by "compiler/vop"
- ("src/compiler/sset" :c-headers)
  ("src/code/early-type" :c-headers)
  ;; sparc-vm and ppc-vm need sc+offset defined to get at internal
  ;; error args. This file contains stuff previously in
@@ -279,8 +237,6 @@
  ;; 2002-02-05
  ("src/code/sc-offset" :c-headers)
 
- ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
- ("src/compiler/node" :c-headers :block-compile)
  ;; RECONSTRUCT-LEXENV needs types GLOBAL-VAR and DEFINED-FUN
  ("src/compiler/lexenv")
 
@@ -308,16 +264,16 @@
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm" :c-headers)
 
- ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
- ;; instead of a bunch of reader macros. -- WHN 19990308
- #+sparc ("src/code/sparc-vm" :not-host)
- #+x86   ("src/code/x86-vm"   :not-host)
- #+x86-64("src/code/x86-64-vm"   :not-host)
- #+(or ppc ppc64) ("src/code/ppc-vm" :not-host)
- #+mips  ("src/code/mips-vm" :not-host)
- #+arm   ("src/code/arm-vm" :not-host)
- #+arm64 ("src/code/arm64-vm" :not-host)
- #+riscv ("src/code/riscv-vm" :not-host)
+ ("src/code/alieneval" :c-headers)
+ ;; "src/code/toplevel.lisp" is the first to need this. It's generated
+ ;; automatically by grovel_headers.c, i.e. it's not under source control.
+ ("output/stuff-groveled-from-headers" :not-host)
+ ("src/code/target-alieneval" :not-host)
+ ("src/code/target-c-call"    :not-host)
+
+ ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
+ ("src/code/misc-aliens" :not-host)
+ ("src/code/thread" :not-host :block-compile) ; provides *CURRENT-THREAD* for target-signal
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,
@@ -340,43 +296,31 @@
  ("src/code/source-location")
  ("src/code/early-class")
  ("src/code/condition" :not-host)
- #-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
- #+win32 ("src/code/target-exception" :not-host)
- ("src/code/toplevel"  :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
- ;; Target-only stuff should usually be compiled late unless it has
- ;; compile-time side-effects. This file could probably be later,
- ;; but should certainly be no earlier than the definitions
- ;; of FORMAT-ERROR and FORMAT-DIRECTIVE.
- ("src/code/target-format" :not-host)
 
  ("src/compiler/generic/primtype" :c-headers)
-
- ("src/code/host-c-call")
 
  ;; SB-XC:DEFTYPE is needed in order to compile late-type
  ;; in the host Common Lisp, and in order to run, it needs
  ;; %COMPILER-DEFTYPE.
  ("src/compiler/compiler-deftype" :c-headers)
 
- ;; These appear here in the build sequence because they require
- ;;   * the macro INFO, defined in globaldb.lisp, and
- ;;   * the function PARSE-DEFMACRO, defined in parse-defmacro.lisp,
- ;; and because they define
- ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
- ("src/code/late-type" :c-headers)
- ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
- ;; and all type-classes are defined.
- ("src/code/deftypes-for-target" :c-headers)
-
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :c-headers :not-target)
- ("src/compiler/generic/vm-type" :c-headers)
  ("src/compiler/proclaim" :c-headers)
+
+ ("src/compiler/generic/vm-type" :c-headers)
+ ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
+ ;; and all type-classes are defined.
+ ("src/code/deftypes-for-target" :c-headers)
+ ;; These appear here in the build sequence because they require
+ ;;   * the macro INFO, defined in globaldb.lisp
+ ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
+ ("src/code/late-type" :c-headers)
 
  ("src/code/class-init" :c-headers)
 
@@ -421,10 +365,24 @@
 
  ("src/compiler/bit-util")
 
- ("src/code/load")
-
  ("src/code/linkage-table" :not-host)
- ("src/code/foreign" :not-host)
+ ("src/code/foreign"       :not-host)
+ ("src/code/unix"          :not-host)
+ ("src/code/symbol"        :not-host)
+ ("src/code/fd-stream"     :not-host)
+ ("src/code/stream"        :not-host)
+ ("src/code/load")
+ ("src/code/deadline"  :not-host)
+ ("src/code/toplevel"  :not-host)
+ ("src/code/common-os" :not-host)
+
+ ("src/code/numbers"    :not-host)
+ ("src/code/float-trap" :not-host)
+ ("src/code/float"      :not-host)
+ ("src/code/irrat"      :not-host)
+
+ ("src/code/host-c-call")
+
  #+os-provides-dlopen ("src/code/foreign-load" :not-host)
  #+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
  #+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
@@ -589,13 +547,46 @@
  ;; needed by various unhappy-path cases in the cross-compiler
  ("src/code/error")
 
- ;; This wasn't in classic CMU CL "comcom.lisp", but it has some stuff
- ;; that Python-as-cross-compiler has turned out to need.
- ("src/code/macroexpand")
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; files which depend in some way (directly or indirectly) on stuff
  ;; compiled as part of the compiler
+
+ ("src/code/macroexpand")
+ ("src/code/target-char"    :not-host)
+ ("src/code/target-unicode" :not-host)
+ ("src/code/mipsstrops" :not-host)
+ ("src/code/string"     :not-host)
+
+ #+win32 ("src/code/win32" :not-host)
+ #+android ("src/code/android-os" :not-host)
+ #+sunos ("src/code/sunos-os" :not-host)
+ #+bsd   ("src/code/bsd-os"   :not-host)
+ #+linux ("src/code/linux-os" :not-host)
+ #+haiku ("src/code/haiku-os" :not-host)
+ #+win32 ("src/code/win32-os" :not-host)
+
+ ("src/code/share-vm" :not-host)
+
+ ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
+ ;; instead of a bunch of reader macros. -- WHN 19990308
+ #+sparc ("src/code/sparc-vm" :not-host)
+ #+x86   ("src/code/x86-vm"   :not-host)
+ #+x86-64("src/code/x86-64-vm"   :not-host)
+ #+(or ppc ppc64) ("src/code/ppc-vm" :not-host)
+ #+mips  ("src/code/mips-vm" :not-host)
+ #+arm   ("src/code/arm-vm" :not-host)
+ #+arm64 ("src/code/arm64-vm" :not-host)
+ #+riscv ("src/code/riscv-vm" :not-host)
+
+ ("src/code/target-signal-common" :not-host)
+ #-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
+ #+win32 ("src/code/target-exception" :not-host)
+ ("src/code/serve-event" :not-host)
+ ;; Target-only stuff should usually be compiled late unless it has
+ ;; compile-time side-effects. This file could probably be later,
+ ;; but should certainly be no earlier than the definitions
+ ;; of FORMAT-ERROR and FORMAT-DIRECTIVE.
+ ("src/code/target-format" :not-host)
 
  ("src/code/late-extensions") ; needs condition system
  ("src/compiler/generic/target-core" :not-host) ; uses stuff from

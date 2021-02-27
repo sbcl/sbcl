@@ -347,7 +347,7 @@ with bits from the corresponding position in the new value."
 ;;; so that result = (in & ~mask) | (flag ? mask : 0)
 ;;; Additionally (setf (logbitp N x) t) is extremely stupid- it first clears
 ;;; and then sets the bit, though it does manage to pre-shift the constants.
-   (%defsetf 'logbitp (info :setf :expander 'ldb))))
+  (%defsetf 'logbitp (info :setf :expander 'ldb))))
 
 ;;; Rather than have a bunch of SB-PCL::FAST-METHOD function names all point
 ;;; to one that is randomly chosen - and therefore looks confusing -

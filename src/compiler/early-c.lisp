@@ -196,47 +196,6 @@ the stack without triggering overflow protection.")
   (warnings () :type list))
 (declaim (freeze-type undefined-warning))
 
-;;; Delete any undefined warnings for NAME and KIND. This is for the
-;;; benefit of the compiler, but it's sometimes called from stuff like
-;;; type-defining code which isn't logically part of the compiler.
-(declaim (ftype (function ((or symbol cons) keyword) (values))
-                note-name-defined))
-(defun note-name-defined (name kind)
-  #-sb-xc-host (atomic-incf *type-cache-nonce*)
-  ;; We do this BOUNDP check because this function can be called when
-  ;; not in a compilation unit (as when loading top level forms).
-  (when (boundp '*undefined-warnings*)
-    (let ((name (uncross name)))
-      (setq *undefined-warnings*
-            (delete-if (lambda (x)
-                         (and (equal (undefined-warning-name x) name)
-                              (eq (undefined-warning-kind x) kind)))
-                       *undefined-warnings*))))
-  (values))
-
-;;; to be called when a variable is lexically bound
-(declaim (ftype (function (symbol) (values)) note-lexical-binding))
-(defun note-lexical-binding (symbol)
-    ;; This check is intended to protect us from getting silently
-    ;; burned when we define
-    ;;   foo.lisp:
-    ;;     (DEFVAR *FOO* -3)
-    ;;     (DEFUN FOO (X) (+ X *FOO*))
-    ;;   bar.lisp:
-    ;;     (DEFUN BAR (X)
-    ;;       (LET ((*FOO* X))
-    ;;         (FOO 14)))
-    ;; and then we happen to compile bar.lisp before foo.lisp.
-  (when (looks-like-name-of-special-var-p symbol)
-    ;; FIXME: should be COMPILER-STYLE-WARNING?
-    (style-warn 'asterisks-around-lexical-variable-name
-                :format-control
-                "using the lexical binding of the symbol ~
-                 ~/sb-ext:print-symbol-with-prefix/, not the~@
-                 dynamic binding"
-                :format-arguments (list symbol)))
-  (values))
-
 ;;; This is DEF!STRUCT so that when SB-C:DUMPABLE-LEAFLIKE-P invokes
 ;;; SB-XC:TYPEP in make-host-2, it does not need need to signal PARSE-UNKNOWN
 ;;; for each and every constant seen up until this structure gets defined.
