@@ -237,9 +237,6 @@
  ;; 2002-02-05
  ("src/code/sc-offset" :c-headers)
 
- ;; RECONSTRUCT-LEXENV needs types GLOBAL-VAR and DEFINED-FUN
- ("src/compiler/lexenv")
-
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
  ;; and LABEL, needed by IR2-NLX-INFO
  ("src/compiler/early-assem")
