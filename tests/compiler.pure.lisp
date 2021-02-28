@@ -6425,3 +6425,10 @@
 ;;; pointer arithmetic is not what's being tested.
 (with-test (:name :sap+-immediate)
   (compile nil '(lambda (x) (sb-sys:sap+ x 65536))))
+
+(with-test (:name (compile handler-bind :no-note))
+  (checked-compile
+   `(lambda (x)
+      (handler-bind ((error (constantly nil)))
+        (pathname-type x)))
+   :allow-notes nil))

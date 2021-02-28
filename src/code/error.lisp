@@ -190,13 +190,13 @@
                       (local-functions `(,name ,@(rest lexpr)))
                       `#',name))))))))
 
-      `(dx-let ,(complex-initforms)
-        (dx-flet ,(local-functions)
-                 ,@(dummy-forms)
-         (dx-let ((*handler-clusters*
-                   (cons ,(const-list (cluster-entries))
-                         *handler-clusters*)))
-           ,form))))))
+      `(let ,(complex-initforms)
+         (dx-flet ,(local-functions)
+           ,@(dummy-forms)
+           (dx-let ((*handler-clusters*
+                     (cons ,(const-list (cluster-entries))
+                           *handler-clusters*)))
+             ,form))))))
 
 (sb-xc:defmacro handler-bind (bindings &body forms)
   "(HANDLER-BIND ( {(type handler)}* ) body)
