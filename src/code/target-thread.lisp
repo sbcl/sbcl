@@ -403,15 +403,6 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 #+sb-thread
 (progn
-  (declaim (inline %block-deferrable-signals))
-  (define-alien-routine ("block_deferrable_signals" %block-deferrable-signals)
-      void
-    (where unsigned)
-    (old   unsigned))
-
-  (defun block-deferrable-signals ()
-    (%block-deferrable-signals 0 0))
-
   #+sb-futex
   (progn
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
@@ -1849,7 +1840,9 @@ session."
                        (setf (thread-result *current-thread*) list)))
                 ;; we're going down, can't handle interrupts
                 ;; sanely anymore. gc remains enabled.
-                (block-deferrable-signals)
+                (with-alien ((%block (function int system-area-pointer)
+                                     :extern "block_deferrable_signals"))
+                  (alien-funcall %block (int-sap 0)))
                 ;; we don't want to run interrupts in a dead
                 ;; thread when we leave without-interrupts.
                 ;; this potentially causes important
