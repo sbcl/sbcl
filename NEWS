@@ -2,15 +2,34 @@
 
 changes relative to sbcl-2.1.1:
   * platform support:
-    ** Support for ARM64 macOS
+    ** support for ARM64 macOS;
+    ** improvement in coverage mark implementation on non-x86oid backends,
+       approaching the existing x86oid support;
+    ** more empirically-robust retrieval of the program counter from illegal
+       instruction traps on SPARC;
+    ** retain fewer dead objects when saving cores with precise collectors.
   * incompatible change: MAP-ALL-SAMPLES and MAP-TRACE-SAMPLES
     are no longer present in the SB-SPROF contrib module.
   * minor incompatible change: SB-SPROF:WITH-PROFILING defaults to all
     threads. SB-SPROF:START-PROFILING no longer accepts a :SAMPLING keyword.
   * enhancement: the sb-introspect contrib now supports finding the lambda
     lists of method combinations.  (thanks to Didier Verna)
+  * enhancement: short-form DEFSETF now stores a source-location.
   * bug fix: canonical unions of CONS types were being incorrectly computed.
     (lp#1912863, reported by James Kalenius)
+  * bug fix: better understanding of array simplicity (or otherwise) in the
+    type system.  (lp#1903241)
+  * bug fix: unions of rational and integer types now have a single canonical
+    form, allowing more correct reasoning about them in the type system.
+  * bug fix: less likely to overclaim certainty about type equality of union
+    types.  (lp#1916040)
+  * bug fix: HANDLER-BIND evaluates the forms producing handler functions only
+    once.  (lp#1916302, reported by Christophe Junke)
+  * optimization: FIND on constant sequences can be compiled into a jump
+    table, in a similar manner to POSITION
+  * optimization: the compiler's awareness of numeric contagion rules for
+    operations on pairs of floating point numbers is improved.  (lp#1914094,
+    thanks to Andrew Berkley)
 
 changes in sbcl-2.1.1 relative to sbcl-2.1.0:
   * platform support:
