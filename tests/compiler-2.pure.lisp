@@ -1592,7 +1592,7 @@
                 (values (funcall f x) (> x 1d0)))))))
     (ctu:assert-no-consing (funcall f #'identity 1d0))))
 
-(with-test (:name (:infer-iteration-var-type :step-is-range))
+(with-test (:name :infer-iteration-var-type)
   (let ((f (checked-compile
             '(lambda (s)
               (declare ((integer 1 2) s))
@@ -1602,24 +1602,6 @@
                 r)))))
     (assert (equal (sb-impl::%simple-fun-type f)
                    '(function ((integer 1 2)) (values (integer 16 31) &optional))))))
-
-(with-test (:name (:infer-iteration-var-type :multiple-sets))
-  (let ((f (checked-compile
-            '(lambda (x)
-               (declare (optimize speed)
-                        (type (integer 3 10) x))
-               (let ((y x))
-                 (tagbody
-                  :start
-                    (when (plusp y)
-                      (decf y)
-                      (when (plusp y)
-                        (decf y)
-                        (go :start))))
-                 y))
-            :allow-notes nil)))
-    (assert (equal (sb-impl::%simple-fun-type f)
-                   '(function ((integer 3 10)) (values (integer 0 0) &optional))))))
 
 (with-test (:name :delay-transform-until-constraint-loop)
   (checked-compile-and-assert
