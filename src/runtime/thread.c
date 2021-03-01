@@ -562,9 +562,7 @@ void* new_thread_trampoline(void* arg)
                     GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
     funcall0(function);
     unregister_thread(th, &scribble);
-#ifdef LISP_FEATURE_WIN32
     free_thread_struct(th); // no recycling of 'struct thread'
-#endif
 
 #endif
     return 0;
