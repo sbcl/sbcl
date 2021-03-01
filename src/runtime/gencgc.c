@@ -4421,16 +4421,11 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 # define MY_REGION SINGLE_THREAD_BOXED_REGION
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
-// FIXME: I suspect that we can forgo manipulation of the PA flag, which appears
-// to have been present here only to satisfy an assertion in lisp_alloc.
+#ifdef LISP_FEATURE_SB_SAFEPOINT
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
    lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = arch_os_get_current_thread(); \
-    int was_pseudo_atomic = get_pseudo_atomic_atomic(self); \
-    if (!was_pseudo_atomic) set_pseudo_atomic_atomic(self); \
     lispobj *result = lisp_alloc(MY_REGION, nbytes, page_type, self); \
-    if (!was_pseudo_atomic) clear_pseudo_atomic_atomic(self); \
     return result; \
    }
 #else

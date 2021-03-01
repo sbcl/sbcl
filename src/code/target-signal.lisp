@@ -63,26 +63,10 @@
     nil))
 
 
-;;;; interface to enabling and disabling signal handlers
+;;;; interface to installing signal handlers
 
-;;; Note on the SYNCHRONOUS argument: On builds without pseudo-atomic,
-;;; we have no way of knowing whether interrupted code was in an
-;;; allocation sequence, and cannot delay signals until after
-;;; allocation.  Any signal that can occur asynchronously must be
-;;; considered unsafe for immediate execution, and the invocation of its
-;;; lisp handler will get delayed into a newly spawned signal handler
-;;; thread.  However, there are signals which we must handle
-;;; immediately, because they occur synchonously (hence the boolean flag
-;;; SYNCHRONOUS to this function), luckily implying that the signal
-;;; happens only in specific places (illegal instructions, floating
-;;; point instructions, certain system calls), hopefully ruling out the
-;;; possibility that we would trigger it during allocation.
-
-;;; FIXME: terrible name. doesn't actually "enable" in the sense of unmasking.
-(defun enable-interrupt (signal handler &key synchronous)
+(defun enable-interrupt (signal handler)
   (declare (type (or function (member :default :ignore)) handler))
-  (when synchronous
-    (error ":SYNCHRONOUS is broken and should not be used"))
   (%install-handler signal handler)
   ;; This used to return the previously installed handler, if any.
   ;; It no longer does, but the old handler can be obtained via SAP-REF-LISPOBJ
@@ -111,29 +95,6 @@
                          (:ignore 1)
                          (t (sb-kernel:get-lisp-obj-address #'run-handler)))))))
   nil)
-
-;;;; Support for signal handlers which aren't.
-;;;;
-;;;; On safepoint builds, user-defined Lisp signal handlers do not run
-;;;; in the handler for their signal, because we have no pseudo atomic
-;;;; mechanism to prevent handlers from hitting during allocation.
-;;;; Rather, the signal spawns off a fresh native thread, which calls
-;;;; into lisp with a fake context through this callback:
-
-#+sb-safepoint-strictly
-(defun signal-handler-callback (run-handler signal args)
-  ;; SAPs are dx allocated, close over the values, not the SAPs.
-  (let ((thread (without-gcing
-                  ;; Hold off GCing until *current-thread* is set up
-                  (setf sb-thread:*current-thread*
-                        (sb-thread::make-signal-handling-thread :name "signal handler"
-                                                                :signal-number signal))))
-        (info (sap-ref-sap args 0))
-        (context (sap-ref-sap args sb-vm:n-word-bytes)))
-    (dx-flet ((callback ()
-                (funcall run-handler signal info context)))
-      (sb-thread::run thread nil #'callback nil))))
-
 
 ;;;; default LISP signal handlers
 ;;;;
@@ -234,7 +195,9 @@
                     (cond ((system-area-pointer-p new) new)
                           (new (vector-sap new))
                           (t (int-sap 0)))
-                    (if old (vector-sap old) (int-sap 0)))))
+                    (cond ((system-area-pointer-p old) old)
+                          (old (vector-sap old))
+                          (t (int-sap 0))))))
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
@@ -255,10 +218,20 @@
   (%install-handler sigpipe :ignore)
   ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
   ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.
-  (dx-let ((mask (make-array sb-unix::sizeof-sigset_t :element-type '(unsigned-byte 8)
-                                                      :initial-element 0)))
+  (dx-let ((mask (make-array sizeof-sigset_t :element-type '(unsigned-byte 8)
+                                             :initial-element 0)))
     (with-pinned-objects (mask)
-      (pthread-sigmask sb-unix::SIG_SETMASK mask nil)))
+      #+(and unix sb-safepoint)
+      ;; For safepoints we unblock SIGURG (to receive interrupt-thread),
+      ;; SIGPROF (because why not), and SIGPIPE (because it's synchronous
+      ;; and not in deferrables). Everything else stays blocked.
+      (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
+        (alien-funcall sigaddset (vector-sap mask) sigurg)
+        (alien-funcall sigaddset (vector-sap mask) sigprof)
+        (alien-funcall sigaddset (vector-sap mask) sigpipe)
+        (pthread-sigmask SIG_UNBLOCK mask nil))
+      ;; The normal thing is to start with no signals blocked
+      #-(and unix sb-safepoint) (pthread-sigmask SIG_SETMASK mask nil)))
   (values))
 
 ;;;; etc.
@@ -266,3 +239,29 @@
 ;;; extract si_code from siginfo_t
 (define-alien-routine ("siginfo_code" siginfo-code) int
   (info system-area-pointer))
+
+;;;; On safepoint builds, user-defined Lisp signal handlers all run
+;;;; in one thread that waits for signals.
+;;;; Keyboard interrupts work by forwarding SIGINT from that thread
+;;;; to the foreground thread via INTERRUPT-THREAD, which is the only
+;;;; quasi-asynchronous signal allowed to run in arbitrary threads.
+#+sb-safepoint
+(progn
+(define-load-time-global *sighandler-thread* nil)
+(declaim (type (or sb-thread:thread null) *sighandler-thread*))
+(defun signal-handler-loop ()
+  (with-alien ((sigwait (function int system-area-pointer (* int)) :extern "sigwait")
+               (mask (array (unsigned 8) #.sizeof-sigset_t))
+               (num int))
+    (pthread-sigmask SIG_BLOCK nil (alien-sap mask)) ; Retrieve current mask
+    (loop (let ((result (alien-funcall sigwait (alien-sap mask) (addr num))))
+            (when (and (= result 0) (= num sigterm) (not *sighandler-thread*))
+              (return))
+            (when (and (= result 0) (> num 0))
+              (let ((fun (sap-ref-lispobj (foreign-symbol-sap "lisp_sig_handlers" t)
+                                          (ash num sb-vm:word-shift))))
+                (when (functionp fun)
+                  (let ((userfun (sb-kernel:%closure-index-ref fun 0)))
+                    ;; We could potentially use sigwaitinfo() but I don't see the point.
+                    ;; This is just minimal functionality.
+                    (funcall userfun num nil nil))))))))))

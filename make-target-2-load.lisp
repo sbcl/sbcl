@@ -58,7 +58,7 @@
            ;; and would probably mess up something if made non-public,
            ;; though I don't think they should all be public.
            :MSAN
-           :SB-SAFEPOINT :SB-SAFEPOINT-STRICTLY
+           :SB-SAFEPOINT
            :SB-THREAD :SB-UNICODE
            ;; Things which (I think) at least one person has requested be kept around
            :SB-LDB

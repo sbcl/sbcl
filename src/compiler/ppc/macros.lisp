@@ -304,9 +304,9 @@
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   (declare (ignorable sync))
-  #+sb-safepoint-strictly
+  #+sb-safepoint
   `(progn ,flag-tn ,@forms (emit-safepoint))
-  #-sb-safepoint-strictly
+  #-sb-safepoint
   `(progn
      (without-scheduling ()
        ;; Extra debugging stuff:
@@ -327,9 +327,7 @@
      #+debug
      (progn
        (inst andi. ,flag-tn alloc-tn lowtag-mask)
-       (inst twi :ne ,flag-tn 0))
-     #+sb-safepoint
-     (emit-safepoint)))
+       (inst twi :ne ,flag-tn 0))))
 
 #+sb-safepoint
 (defun emit-safepoint ()

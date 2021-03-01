@@ -149,9 +149,7 @@
     #+win32 sb-kernel::handle-win32-exception
     #+sb-thruption sb-thread::run-interruption
     enter-alien-callback
-    #+sb-thread sb-thread::enter-foreign-callback
-    #+(and sb-safepoint-strictly (not win32))
-    sb-unix::signal-handler-callback)
+    #+sb-thread sb-thread::enter-foreign-callback)
   #'equal)
 
 ;;; (potentially) static symbols that C code must be able to set/get

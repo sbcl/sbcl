@@ -2459,8 +2459,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-OS-TID"
                "THREAD-YIELD"
                "FOREIGN-THREAD"
-               #+(and sb-safepoint-strictly (not win32))
-               "SIGNAL-HANDLING-THREAD"
                ;; Memory barrier
                "BARRIER"
                ;; Mutexes

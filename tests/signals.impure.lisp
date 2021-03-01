@@ -85,7 +85,7 @@
               (handler-case
                   (progn
                     (sb-unix:unix-kill (sb-unix:unix-getpid) sb-unix:sigint)
-                    #+sb-safepoint-strictly
+                    #+sb-safepoint
                     ;; In this case, the signals handler gets invoked
                     ;; indirectly through an INTERRUPT-THREAD.  Give it
                     ;; enough time to hit.

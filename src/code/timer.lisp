@@ -378,7 +378,7 @@ triggers."
                               (os-wait-for-wtimer *waitable-timer-handle*))
                              *waitable-timer-handle*)
                          doing (run-expired-timers)))
-                 nil)))))
+                 nil nil)))))
 
   (defun itimer-emulation-deinit ()
     (with-scheduler-lock ()

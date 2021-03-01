@@ -301,8 +301,6 @@
           ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thruption (not sb-safepoint))" ":SB-THRUPTION requires :SB-SAFEPOINT")
-         ("(and unix sb-safepoint-strictly)"
-          ":SB-SAFEPOINT-STRICTLY not supported on this platform")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"
@@ -315,8 +313,6 @@
           "One of :GENCGC or :CHENEYGC must be enabled")
          ("(and sb-safepoint (not (or arm64 ppc x86 x86-64)))"
           ":SB-SAFEPOINT not supported on selected architecture")
-         ("(and sb-safepoint-strictly (not sb-safepoint))"
-          ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")
          ("(not (or elf mach-o win32))"
           "No execute object file format feature defined")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")

@@ -331,9 +331,9 @@
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   (declare (ignorable sync))
-  #+sb-safepoint-strictly
+  #+sb-safepoint
   `(progn ,flag-tn ,@forms (emit-safepoint))
-  #-sb-safepoint-strictly
+  #-sb-safepoint
   `(progn
      (inst ori alloc-tn alloc-tn pseudo-atomic-flag)
      ,@forms
@@ -350,9 +350,7 @@
          (inst mfmq (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg) :offset 1))
          (emit-label continue))
        #-sigill-traps
-       (inst twi :ne ,flag-tn 0))
-     #+sb-safepoint
-     (emit-safepoint)))
+       (inst twi :ne ,flag-tn 0))))
 
 #+sb-safepoint
 (defun emit-safepoint ()

@@ -310,9 +310,9 @@
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   (declare (ignorable sync))
-  #+sb-safepoint-strictly
+  #+sb-safepoint
   `(progn ,@forms (emit-safepoint))
-  #-sb-safepoint-strictly
+  #-sb-safepoint
   `(progn
      (without-scheduling ()
        #-sb-thread
@@ -341,9 +341,7 @@
        (let ((not-interrputed (gen-label)))
          (inst cbz ,flag-tn not-interrputed)
          (inst brk pending-interrupt-trap)
-         (emit-label not-interrputed))
-       #+sb-safepoint
-       (emit-safepoint))))
+         (emit-label not-interrputed)))))
 
 ;;;; memory accessor vop generators
 

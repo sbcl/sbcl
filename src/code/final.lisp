@@ -311,6 +311,10 @@ Examples:
 ;;;   FINALIZER-THREAD-{START,STOP}, S-L-A-D, SB-POSIX:FORK
 (defun finalizer-thread-start ()
   (with-system-mutex (sb-thread::*make-thread-lock*)
+    #+(and unix sb-safepoint)
+    (sb-thread::make-ephemeral-thread "sigwait"
+                                      #'sb-unix::signal-handler-loop
+                                      nil 'sb-unix::*sighandler-thread*)
     (aver (not *finalizer-thread*))
     (setf finalizer-thread-runflag 1)
     (setq *finalizer-thread* :start)
@@ -323,7 +327,7 @@ Examples:
                     (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))
                     (when (zerop finalizer-thread-runflag) (return)))
               (setq *finalizer-thread* nil))
-            nil)))
+            nil nil)))
       ;; Don't return from this function until *FINALIZER-THREAD* has a good value,
       ;; but don't set it to a thread if the thread was not created, or exited already.
       (cas *finalizer-thread* :start thread))))
@@ -331,6 +335,14 @@ Examples:
 ;;; You should almost always invoke this with *MAKE-THREAD-LOCK* held.
 ;;; Some tests violate that, but they know what they're doing.
 (defun finalizer-thread-stop ()
+  #+(and unix sb-safepoint)
+  (let ((thread sb-unix::*sighandler-thread*))
+    (aver (sb-thread::thread-p thread))
+    (setq sb-unix::*sighandler-thread* nil)
+    ;; This kill causes the thread's sigwait() syscall to return normally
+    ;; and then not invoke any handler.
+    (sb-unix:pthread-kill (sb-thread::thread-os-thread thread) sb-unix:sigterm)
+    (sb-thread:join-thread thread))
   (let ((thread *finalizer-thread*))
     (aver (sb-thread::thread-p thread))
     (alien-funcall (extern-alien "finalizer_thread_stop" (function void)))

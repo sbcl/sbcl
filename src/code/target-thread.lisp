@@ -1879,9 +1879,12 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; System-internal use only
 #+sb-thread
-(defun make-ephemeral-thread (name function arguments)
-  (start-thread (%make-thread name t (make-semaphore :name name))
-                function arguments))
+(defun make-ephemeral-thread (name function arguments symbol)
+  (let ((thread (%make-thread name t (make-semaphore :name name))))
+    (when symbol
+      (aver (not (symbol-value symbol)))
+      (set symbol thread))
+    (start-thread thread function arguments)))
 
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.

@@ -158,14 +158,6 @@ in future versions."
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
 
-#+(and sb-safepoint-strictly (not win32))
-(sb-xc:defstruct (signal-handling-thread
-                  (:copier nil)
-                  (:include foreign-thread)
-                  (:conc-name "THREAD-"))
-  "Asynchronous signal handling thread."
-  (signal-number nil :type integer))
-
 (declaim (sb-ext:freeze-type mutex thread))
 #-sb-xc-host
 (progn

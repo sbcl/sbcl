@@ -364,9 +364,14 @@ sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 
 /* Deferrables, blockables, gc signals. */
 
-static void
-sigaddset_deferrable(sigset_t *s)
-{
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+static void sigaddset_deferrable(sigset_t *s) {
+    sigaddset(s, SIGURG);
+}
+static void sigaddset_async(sigset_t *s) {
+#else
+static void sigaddset_deferrable(sigset_t *s) {
+#endif
     sigaddset(s, SIGHUP);
     sigaddset(s, SIGINT);
     sigaddset(s, SIGTERM);
@@ -399,8 +404,12 @@ sigaddset_gc(sigset_t __attribute__((unused)) *sigset)
 void
 sigaddset_blockable(sigset_t *sigset)
 {
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    sigaddset_async(sigset);
+#else
     sigaddset_deferrable(sigset);
     sigaddset_gc(sigset);
+#endif
     // SIGPIPE is *NOT* an asynchronous signal. In normal usage you receive this signal
     // synchronously in response to a system call. As such we do not place it in the
     // deferrable set, but it _is_ blockable. If you're doing something wherein SIGPIPE
@@ -439,6 +448,13 @@ deferrables_blocked_p(sigset_t *sigset)
         thread_sigmask(SIG_BLOCK, 0, &current);
         sigset = &current;
     }
+#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_SAFEPOINT
+    /* The only signal whose mask bit we manipulate is SIGURG.
+     * All other deferrable signals remain permanently in a blocked state.
+     * Therefore the answer to the question of whether deferrables
+     * are blocked is simply whether SIGURG is blocked */
+    return sigismember(sigset, SIGURG);
+#else
     /* SIGPROF must not be here. Some people use an async-signal-safe profiler
      * which not only doesn't rely on signal deferral, but wants to manipulate the
      * blocked/unblocked bit completely independently of SBCL's requirements.
@@ -468,6 +484,7 @@ deferrables_blocked_p(sigset_t *sigset)
     char buf[3*64]; // assuming worst case 64 signals present in sigset
     sigset_tostring(sigset, buf, sizeof buf);
     lose("deferrable signals partially blocked: {%s}", buf);
+#endif
 }
 
 void
@@ -572,8 +589,7 @@ unblock_deferrable_signals(sigset_t *where)
     if (arch_os_get_current_thread()->state_word.user_thread_p) {
         sigset = &deferrable_sigset;
     } else {
-        /* ASSUMPTION: the baseline signal mask for non-user threads
-         * is the deferrable mask minus SIGALRM.
+        /* ASSUMPTION: system threads never want to receive SIGALRM.
          * Actually, if we get here in the finalizer thread, things are
          * in bad shape - stack exhaustion or something */
         localmask = deferrable_sigset;

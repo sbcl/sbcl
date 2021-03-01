@@ -57,6 +57,5 @@
 
 ;; For debugging purposes, print output for visual inspection to see if
 ;; the allocation sequence gets hit in the right places (i.e. not at all
-;; in traditional builds, and everywhere if SB-SAFEPOINT-STRICTLY is
-;; enabled.)
+;; in traditional builds, and everywhere if SB-SAFEPOINT is enabled.)
 #+nil (disassemble #'consalot)
