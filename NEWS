@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.1:
+changes in sbcl-2.1.2 relative to sbcl-2.1.1:
   * platform support:
     ** support for ARM64 macOS;
     ** improvement in coverage mark implementation on non-x86oid backends,
