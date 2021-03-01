@@ -3064,6 +3064,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format stream "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
           (map 'list #'cddr sb-c:+backend-internal-errors+)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import 'sb-vm::primitive-object-variable-length-p))
+
 (defun write-tagnames-h (out)
   (labels
       ((pretty-name (symbol strip)
@@ -3093,16 +3096,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; this -2 shift depends on every OTHER-IMMEDIATE-?-LOWTAG
     ;; ending with the same 2 bits. (#b10)
     (write-tags "" "-WIDETAG" (ash (1+ sb-vm:widetag-mask) -2) -2))
-  (dolist (prim-obj '(symbol ratio complex sb-vm::code simple-fun
-                      closure funcallable-instance
-                      weak-pointer fdefn sb-vm::value-cell))
+  (dolist (name '(symbol ratio complex sb-vm::code simple-fun
+                  closure funcallable-instance
+                  weak-pointer fdefn sb-vm::value-cell))
     (format out "static char *~A_slots[] = {~%~{ \"~A: \",~} NULL~%};~%"
-            (c-name (string-downcase prim-obj))
-            (mapcar (lambda (x) (c-name (string-downcase (sb-vm:slot-name x))))
-                    (remove-if 'sb-vm:slot-rest-p
-                               (sb-vm:primitive-object-slots
-                                (find prim-obj sb-vm:*primitive-objects*
-                                      :key 'sb-vm:primitive-object-name))))))
+            (c-name (string-downcase name))
+            (map 'list (lambda (x) (c-name (string-downcase (sb-vm:slot-name x))))
+                 (let* ((obj (sb-vm::primitive-object name))
+                        (slots (coerce (sb-vm:primitive-object-slots obj) 'list)))
+                   (butlast slots
+                            (if (primitive-object-variable-length-p obj) 1 0))))))
   (values))
 
 (defun write-c-print-dispatch (out)
@@ -3140,18 +3143,19 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (format t "struct ~A {~%" c-name)
              (when (sb-vm:primitive-object-widetag obj)
                (format t "    lispobj header;~%"))
-             (dolist (slot slots)
+             (dovector (slot slots)
                (format t "    ~A ~A~@[[1]~];~%"
-                       (getf (sb-vm:slot-options slot) :c-type "lispobj")
+                       (getf (cddr slot) :c-type "lispobj")
                        (c-name (string-downcase (sb-vm:slot-name slot)))
-                       (sb-vm:slot-rest-p slot)))
+                       (and (primitive-object-variable-length-p obj)
+                            (eq slot (aref slots (1- (length slots)))))))
              (format t "};~%")
              (when (member name '(cons vector symbol fdefn))
                (write-cast-operator name c-name lowtag)))
            (output-asm ()
              (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
              (format t " * so they work directly on tagged addresses. */~2%")
-             (dolist (slot slots)
+             (dovector (slot slots)
                (format t "#define ~A_~A_OFFSET ~D~%"
                        (c-symbol-name name)
                        (c-symbol-name (sb-vm:slot-name slot))

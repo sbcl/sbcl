@@ -2485,8 +2485,7 @@ mechanism for inter-thread communication."
 
 #+sb-devel
 (defun dump-thread ()
-  (let* ((primobj (find 'sb-vm::thread sb-vm:*primitive-objects*
-                        :key #'sb-vm::primitive-object-name))
+  (let* ((primobj (sb-vm::primitive-object 'sb-vm::thread))
          (slots (sb-vm::primitive-object-slots primobj))
          (sap (current-thread-sap))
          (thread-obj-len (sb-vm::primitive-object-length primobj))

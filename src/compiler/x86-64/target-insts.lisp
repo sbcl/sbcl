@@ -258,9 +258,9 @@
     (sap-ref-word (int-sap addr) 0)))
 
 (define-load-time-global thread-slot-names
-    (let* ((slots (primitive-object-slots
-                   (find 'sb-vm::thread *primitive-objects*
-                         :key #'primitive-object-name)))
+    (let* ((slots (coerce (primitive-object-slots
+                           (sb-vm::primitive-object 'sb-vm::thread))
+                          'list))
            (a (make-array (1+ (slot-offset (car (last slots))))
                           :initial-element nil)))
       (dolist (slot slots a)

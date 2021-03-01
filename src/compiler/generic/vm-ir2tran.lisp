@@ -406,25 +406,24 @@
 ;;; Return a list of parameters with which to call MAKE-ARRAY-HEADER*
 ;;; given the mandatory slots for a simple array of rank 0 or > 1.
 (defun make-array-header-inits (storage n-elements dimensions)
-  (nconc (mapcar (lambda (slot)
-                   (ecase (slot-name slot)
-                     (data           storage)
-                     (fill-pointer   n-elements)
-                     (elements       n-elements)
-                     (displacement   0)
-                     (displaced-p    nil)
-                     (displaced-from nil)))
-                 (butlast (primitive-object-slots
-                           (find 'array *primitive-objects*
-                                 :key 'primitive-object-name))))
-         dimensions))
+  (let ((primitive-obj (load-time-value (primitive-object 'array) t)))
+    (nconc (loop with slots = (primitive-object-slots primitive-obj)
+                 for i from 0 below (1- (length slots))
+                 collect
+                 (let ((slot (svref slots i)))
+                     (ecase (slot-name slot)
+                       (data           storage)
+                       (fill-pointer   n-elements)
+                       (elements       n-elements)
+                       (displacement   0)
+                       (displaced-p    nil)
+                       (displaced-from nil))))
+           dimensions)))
 
 ;;; This order is used by SB-C::TRANSFORM-MAKE-ARRAY-VECTOR
 ;;; The slot formerly known as FILL-POINTER-P is 1 bit in the header now.
-(assert (equal (mapcar #'slot-name
-                       (primitive-object-slots
-                        (find 'array *primitive-objects*
-                              :key 'primitive-object-name)))
+(assert (equal (map 'list #'slot-name
+                    (primitive-object-slots (primitive-object 'array)))
                '(fill-pointer elements data
                  displacement displaced-p displaced-from dimensions)))
 

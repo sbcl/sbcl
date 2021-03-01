@@ -65,8 +65,7 @@
       (let ((found (assq symbol (cdr list))))
         (if found
             (setf (cadr found) initform)
-            (let* ((thread-struct (find 'sb-vm::thread sb-vm:*primitive-objects*
-                                        :key #'sb-vm:primitive-object-name))
+            (let* ((thread-struct (sb-vm::primitive-object 'sb-vm::thread))
                    (n-fixed (+ (sb-vm:primitive-object-length thread-struct)
                                (count-if-not
                                 (lambda (x)

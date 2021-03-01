@@ -174,9 +174,8 @@ function addresses and register values.")
     (#.sb-vm::thread-offset
      (let* ((thread-slots
               (load-time-value
-               (primitive-object-slots
-                (find 'sb-vm::thread *primitive-objects*
-                      :key #'primitive-object-name)) t))
+               (primitive-object-slots (sb-vm::primitive-object 'sb-vm::thread))
+               t))
             (slot (find (ash offset (- word-shift)) thread-slots
                         :key #'slot-offset)))
        (when slot

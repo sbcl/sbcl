@@ -23,8 +23,7 @@
 (defconstant extended-symbol-size (1+ symbol-size))
 
 #+sb-thread
-(dolist (slot (primitive-object-slots
-               (find 'thread *primitive-objects* :key #'primitive-object-name)))
+(dovector (slot (primitive-object-slots (primitive-object 'thread)))
   (when (slot-special slot)
     (setf (info :variable :wired-tls (slot-special slot))
           (ash (slot-offset slot) word-shift))))

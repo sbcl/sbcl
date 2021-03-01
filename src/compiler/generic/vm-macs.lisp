@@ -32,30 +32,25 @@
          (list* (car options) (cadr options)
                 (remove-keywords (cddr options) keywords)))))
 
-(defstruct (prim-object-slot
-             (:constructor make-slot (name rest-p offset special options))
-             (:copier nil)
-             (:conc-name slot-))
-  (name nil :type symbol :read-only t)
-  (rest-p nil :type (member t nil) :read-only t)
-  (offset 0 :type fixnum :read-only t)
-  (options nil :type list :read-only t)
-  ;; On some targets (e.g. x86-64) slots of the thread structure are
-  ;; referenced as special variables, this slot holds the name of that variable.
-  (special nil :type symbol :read-only t))
-
 (defstruct (primitive-object (:copier nil))
   (name nil :type symbol :read-only t)
   (widetag nil :type symbol :read-only t)
   (lowtag nil :type symbol :read-only t)
-  (options nil :type list :read-only t)
-  (slots nil :type list :read-only t)
   (length 0 :type fixnum :read-only t)
-  (variable-length-p nil :type (member t nil) :read-only t))
+  (variable-length-p nil :type boolean :read-only t)
+  (slots nil :type vector :read-only t))
 
-(declaim (freeze-type prim-object-slot primitive-object))
+(defun slot-offset (slot) (car slot))
+(defun slot-name (slot) (cadr slot))
+(defun slot-special (slot) (getf (cddr slot) :special))
+
+(declaim (freeze-type primitive-object))
 
 (define-load-time-global *primitive-objects* nil)
+(defun primitive-object (name)
+  (find name *primitive-objects* :key #'primitive-object-name))
+(defun primitive-object-slot (obj name)
+  (find name (primitive-object-slots obj):key #'slot-name))
 
 (defun !%define-primitive-object (primobj)
   (let ((name (primitive-object-name primobj)))
@@ -89,8 +84,10 @@
                        &allow-other-keys)
             (if (atom spec) (list spec) spec)
           (declare (ignorable pointer))
-          (slots `(make-slot ',slot-name ,rest-p ,offset ',special
-                             ',(remove-keywords options '(:rest-p :length))))
+          (slots (list* offset slot-name
+                        (remove-keywords
+                         options
+                         `(#+sb-xc :c-type :rest-p ,@(if (= length 1) '(:length))))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
             (constants
@@ -141,7 +138,7 @@
             (make-primitive-object :name ',name
                                    :widetag ',widetag
                                    :lowtag ',lowtag
-                                   :slots (list ,@(slots))
+                                   :slots ,(coerce (slots) 'vector)
                                    :length ,offset
                                    :variable-length-p ,variable-length-p))
          ,@(constants)
