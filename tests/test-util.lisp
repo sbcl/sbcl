@@ -922,3 +922,21 @@
             (when (>= (sb-disassem:dstate-cur-offs dstate) (sb-disassem:seg-length segment))
               (return)))
       (result))))
+
+;;; If a test file is not very tolerant of the statistical profiler, then
+;;; it should call this. There seem to be at least 2 common categories of failure:
+;;;  * the stack exhaustion test can get a profiling signal when you're already
+;;;    near exhaustion, and then the profiler exhausts the stack, which isn't
+;;;    handled very well. Example:
+;;;    Control stack exhausted, fault: 0xd76b9ff8, PC: 0x806cad2
+;;;       0: fp=0xd76ba008 pc=0x806cad2 Foreign function search_dynamic_space
+;;;       1: fp=0xd76ba028 pc=0x80633d1 Foreign function search_all_gc_spaces
+;;;       2: fp=0xd76ba048 pc=0x805647e Foreign function component_ptr_from_pc
+;;;       3: fp=0xd76baa18 pc=0x8065dfd Foreign function (null)
+;;;       4: fp=0xd76baa98 pc=0x806615a Foreign function record_backtrace_from_context
+;;;       5: fp=0xd76baab8 pc=0x806625e Foreign function sigprof_handler
+;;;  * debugger-related tests. I'm not sure why.
+(defun disable-profiling ()
+  (when (find-package "SB-SPROF")
+    (format t "INFO: disabling SB-SPROF~%")
+    (funcall (intern "STOP-PROFILING" "SB-SPROF"))))
