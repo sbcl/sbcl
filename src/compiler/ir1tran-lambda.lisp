@@ -1055,6 +1055,7 @@
             (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
         (careful-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
+#-sb-devel
 (declaim (start-block maybe-inline-syntactic-closure))
 
 ;;; Take the lexenv surrounding an inlined function and extract things

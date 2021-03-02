@@ -2486,8 +2486,9 @@ mechanism for inter-thread communication."
          (sap (current-thread-sap))
          (thread-obj-len (sb-vm::primitive-object-length primobj))
          (names (make-array thread-obj-len :initial-element "")))
-    (dolist (slot slots)
-      (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
+    (loop for slot across slots
+          do
+          (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
     (flet ((safely-read (sap offset)
              (let ((word (sap-ref-word sap offset)))
                (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
