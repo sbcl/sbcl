@@ -119,6 +119,7 @@
   (define-arg-type ldr-str-annotation :printer #'annotate-ldr-str-imm)
 
   (define-arg-type ldr-str-reg-annotation :printer #'annotate-ldr-str-reg)
+  (define-arg-type ldr-literal-annotation :printer #'annotate-ldr-literal :sign-extend t)
 
   (define-arg-type label :sign-extend t :use-label #'use-label))
 
@@ -1279,11 +1280,12 @@
   (rt 5 0))
 
 (define-instruction-format (ldr-literal 32
-                            :default-printer '(:name :tab rt ", " label)
+                            :default-printer '(:name :tab rt ", " label literal-annotation)
                             :include ldr-str)
   (op2 :value #b011)
   (label :field (byte 19 5) :type 'label)
-  (rt :fields (list (byte 2 30) (byte 5 0))))
+  (rt :fields (list (byte 2 30) (byte 5 0)))
+  (literal-annotation :field (byte 19 5) :type 'ldr-literal-annotation))
 
 (defun ldr-str-offset-encodable (offset &optional (size 64))
   (or (typep offset '(signed-byte 9))

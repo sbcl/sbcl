@@ -319,7 +319,6 @@
      (note-code-constant offset dstate))
     (#.sb-vm::null-offset
      (let ((offset (+ sb-vm:nil-value offset)))
-       (maybe-note-assembler-routine offset nil dstate)
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                               dstate)))
     #+sb-thread
@@ -363,6 +362,12 @@
                             (decode-scaled-immediate value)
                             value)
                         dstate))))
+
+(defun annotate-ldr-literal (value stream dstate)
+  (declare (ignore stream))
+  (let* ((addr (+ (dstate-cur-addr dstate) (* value 4))))
+    (let ((value (sap-ref-word (int-sap addr) 0)))
+      (maybe-note-assembler-routine value nil dstate))))
 
 ;;;; special magic to support decoding internal-error and related traps
 (defun snarf-error-junk (sap offset trap-number &optional length-only)
