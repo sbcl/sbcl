@@ -448,7 +448,7 @@ deferrables_blocked_p(sigset_t *sigset)
         thread_sigmask(SIG_BLOCK, 0, &current);
         sigset = &current;
     }
-#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     /* The only signal whose mask bit we manipulate is SIGURG.
      * All other deferrable signals remain permanently in a blocked state.
      * Therefore the answer to the question of whether deferrables
