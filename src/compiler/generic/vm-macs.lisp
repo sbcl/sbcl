@@ -38,7 +38,7 @@
   (lowtag nil :type symbol :read-only t)
   (length 0 :type fixnum :read-only t)
   (variable-length-p nil :type boolean :read-only t)
-  (slots nil :type vector :read-only t))
+  (slots #() :type vector :read-only t))
 
 (defun slot-offset (slot) (car slot))
 (defun slot-name (slot) (cadr slot))
