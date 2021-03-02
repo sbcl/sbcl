@@ -108,7 +108,7 @@ collect_garbage(generation_index_t ignore)
     unsigned long size_retained;
     lispobj *current_static_space_free_pointer;
     sigset_t old;
-    struct thread *th=arch_os_get_current_thread();
+    struct thread *th=get_sb_vm_thread();
 
 #ifdef PRINTNOISE
     printf("[Collecting garbage ... \n");
@@ -437,7 +437,7 @@ boolean
 cheneygc_handle_wp_violation(os_context_t *context, void *addr)
 {
     if(!foreign_function_call_active && gc_trigger_hit(addr)){
-        struct thread *thread=arch_os_get_current_thread();
+        struct thread *thread=get_sb_vm_thread();
         clear_auto_gc_trigger();
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC

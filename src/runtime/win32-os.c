@@ -74,9 +74,6 @@
 #define EH_EXIT_UNWIND 0x04
 #endif
 
-/* Tired of writing arch_os_get_current_thread each time. */
-#define this_thread (arch_os_get_current_thread())
-
 /* Documented limit for ReadConsole/WriteConsole is 64K bytes.
    Real limit observed on W2K-SP3 is somewhere in between 32KiB and 64Kib...
 */
@@ -132,14 +129,14 @@ intptr_t win_aver(intptr_t value, char* comment, char* file, int line,
             fprintf(stderr, report_template,
                     file, line,
                     comment, value,
-                    this_thread,
+                    get_sb_vm_thread(),
                     (unsigned)errorCode, errorMessage,
                     posixerrno, posixstrerror);
         } else {
             lose(report_template,
                     file, line,
                     comment, value,
-                    this_thread,
+                    get_sb_vm_thread(),
                     (unsigned)errorCode, errorMessage,
                     posixerrno, posixstrerror);
         }
@@ -671,7 +668,7 @@ int os_preinit(char *argv[], char *envp[])
             if (TlsGetValue(key)!=NULL)
                 lose("TLS slot assertion failed: fresh slot value is not NULL");
             TlsSetValue(OUR_TLS_INDEX, (void*)(intptr_t)0xFEEDBAC4);
-            if ((intptr_t)(void*)arch_os_get_current_thread()!=(intptr_t)0xFEEDBAC4)
+            if ((intptr_t)(void*)get_sb_vm_thread()!=(intptr_t)0xFEEDBAC4)
                 lose("TLS slot assertion failed: TIB layout change detected");
             TlsSetValue(OUR_TLS_INDEX, NULL);
             break;
@@ -908,7 +905,7 @@ c_level_backtrace(const char* header, int depth)
     for (lastseh = get_seh_frame(); lastseh && (lastseh!=(void*)-1);
          lastseh = *lastseh);
 
-    fprintf(stderr, "Backtrace: %s (thread %p)\n", header, this_thread);
+    fprintf(stderr, "Backtrace: %s (thread %p)\n", header, get_sb_vm_thread());
     for (frame = __builtin_frame_address(0); frame; frame=*(void**)frame)
     {
         if ((n++)>depth)
@@ -1162,7 +1159,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
         /* Undo any dynamic bindings. */
         unbind_to_here(exception_frame->bindstack_pointer,
-                       arch_os_get_current_thread());
+                       get_sb_vm_thread());
         return ExceptionContinueSearch;
     }
 
@@ -1178,7 +1175,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     DWORD lastError = GetLastError();
     DWORD lastErrno = errno;
 
-    struct thread* self = arch_os_get_current_thread();
+    struct thread* self = get_sb_vm_thread();
 
     os_context_t context, *ctx = &context;
     context.win32_context = win32_context;
@@ -1253,7 +1250,7 @@ veh(EXCEPTION_POINTERS *ep)
     EXCEPTION_DISPOSITION disp;
 
     RESTORING_ERRNO() {
-        if (!arch_os_get_current_thread())
+        if (!get_sb_vm_thread())
             return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -1275,7 +1272,7 @@ veh(EXCEPTION_POINTERS *ep)
 os_context_register_t
 carry_frame_pointer(os_context_register_t default_value)
 {
-    struct thread* self = arch_os_get_current_thread();
+    struct thread* self = get_sb_vm_thread();
     os_context_register_t bp = thread_extra_data(self)->carried_base_pointer;
     return bp ? bp : default_value;
 }
@@ -1386,6 +1383,7 @@ boolean io_begin_interruptible(HANDLE handle)
     if (!ptr_CancelIoEx)
         return 1;
 
+    struct thread* this_thread = get_sb_vm_thread();
     if (!__sync_bool_compare_and_swap(&thread_extra_data(this_thread)->synchronous_io_handle_and_flag,
                                       0, handle)) {
         ResetEvent(thread_private_events(this_thread,0));
@@ -1404,7 +1402,7 @@ io_end_interruptible(HANDLE handle)
     if (!ptr_CancelIoEx)
         return;
     thread_mutex_lock(&interrupt_io_lock);
-    __sync_bool_compare_and_swap(&thread_extra_data(this_thread)->synchronous_io_handle_and_flag,
+    __sync_bool_compare_and_swap(&thread_extra_data(get_sb_vm_thread())->synchronous_io_handle_and_flag,
                                  handle, 0);
     thread_mutex_unlock(&interrupt_io_lock);
 }
@@ -1717,7 +1715,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
 {
     DWORD written_bytes;
     OVERLAPPED overlapped;
-    struct thread * self = arch_os_get_current_thread();
+    struct thread * self = get_sb_vm_thread();
     BOOL waitInGOR;
     LARGE_INTEGER file_position;
     BOOL seekable;
@@ -1792,7 +1790,7 @@ win32_unix_read(HANDLE handle, void * buf, int count)
 {
     OVERLAPPED overlapped = {.Internal=0};
     DWORD read_bytes = 0;
-    struct thread * self = arch_os_get_current_thread();
+    struct thread * self = get_sb_vm_thread();
     DWORD errorCode = 0;
     BOOL waitInGOR = FALSE;
     BOOL ok = FALSE;
@@ -1922,7 +1920,7 @@ DWORD
 win32_wait_object_or_signal(HANDLE waitFor)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    struct thread *self = arch_os_get_current_thread();
+    struct thread *self = get_sb_vm_thread();
     HANDLE handles[] = {waitFor, thread_private_events(self,1)};
     return
         WaitForMultipleObjects(2,handles, FALSE, INFINITE);
@@ -1935,7 +1933,7 @@ DWORD
 win32_wait_for_multiple_objects_or_signal(HANDLE *handles, DWORD count)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    struct thread *self = arch_os_get_current_thread();
+    struct thread *self = get_sb_vm_thread();
     handles[count] = thread_private_events(self,1);
     return
         WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE);
@@ -1995,7 +1993,7 @@ int
 futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
   DWORD timeout = sec < 0 ? INFINITE : (sec * 1000) + (usec / 1000);
-  struct thread* th = arch_os_get_current_thread();
+  struct thread* th = get_sb_vm_thread();
   thread_extra_data(th)->waiting_on_address = lock_word;
   int result = WaitOnAddress(lock_word, &oldval, 4, timeout);
   thread_extra_data(th)->waiting_on_address = 0;
@@ -2019,7 +2017,7 @@ futex_wake(PVOID lock_word, int n)
 
 int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-  struct extra_thread_data* self = thread_extra_data(arch_os_get_current_thread());
+  struct extra_thread_data* self = thread_extra_data(get_sb_vm_thread());
   if (oldset)
     *oldset = self->blocked_signal_set;
   if (set) {
@@ -2046,7 +2044,7 @@ int sb_pthr_kill(struct thread* thread, int signum)
 
 int sigpending(sigset_t *set)
 {
-    struct extra_thread_data* data = thread_extra_data(arch_os_get_current_thread());
+    struct extra_thread_data* data = thread_extra_data(get_sb_vm_thread());
     *set = InterlockedCompareExchange((volatile LONG*)&data->pending_signal_set,
                                       0, 0);
     return 0;

@@ -638,7 +638,7 @@ static void print_fun_or_otherptr(lispobj obj)
             print_obj("fun: ", symbol_function(ptr-1));
 #ifdef LISP_FEATURE_SB_THREAD
         int tlsindex = tls_index_of((struct symbol*)(ptr-1));
-        struct thread*th = arch_os_get_current_thread();
+        struct thread*th = get_sb_vm_thread();
         if (th != 0 && tlsindex != 0) {
             lispobj v = *(lispobj*)(tlsindex + (char*)th);
             print_obj("tlsval: ", v);

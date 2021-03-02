@@ -267,7 +267,7 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
  * simple-base-string and won't move, this is slightly ok */
 __attribute__((unused)) static char* cur_thread_name()
 {
-    struct thread* th = arch_os_get_current_thread();
+    struct thread* th = get_sb_vm_thread();
     struct thread_instance *lispthread =
         (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
     struct vector* name = VECTOR(lispthread->name);
@@ -313,7 +313,7 @@ void dump_eventlog()
 static void record_signal(int sig, void* context)
 {
     event3("sig%d @%p in %d", sig, (void*)*os_context_pc_addr(context),
-           (int)arch_os_get_current_thread()->os_kernel_tid);
+           (int)get_sb_vm_thread()->os_kernel_tid);
 }
 #define RECORD_SIGNAL(sig,ctxt) if(sig!=SIGSEGV)record_signal(sig,ctxt);
 #else
@@ -586,7 +586,7 @@ unblock_deferrable_signals(sigset_t *where)
     check_gc_signals_unblocked_or_lose(where);
 #endif
     sigset_t localmask, *sigset;
-    if (arch_os_get_current_thread()->state_word.user_thread_p) {
+    if (get_sb_vm_thread()->state_word.user_thread_p) {
         sigset = &deferrable_sigset;
     } else {
         /* ASSUMPTION: system threads never want to receive SIGALRM.
@@ -632,7 +632,7 @@ they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
 inline static void
 check_interrupts_enabled_or_lose(os_context_t *context)
 {
-    __attribute__((unused)) struct thread *thread = arch_os_get_current_thread();
+    __attribute__((unused)) struct thread *thread = get_sb_vm_thread();
     if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL)
         lose("interrupts not enabled");
     if (arch_pseudo_atomic_atomic(context))
@@ -649,7 +649,7 @@ void
 maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
 {
 #ifndef LISP_FEATURE_WIN32
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
     sigset_t oldset;
     /* Obviously, this function is called when signals may not be
@@ -705,7 +705,7 @@ in_leaving_without_gcing_race_p(struct thread __attribute__((unused)) *thread)
 static void
 check_interrupt_context_or_lose(os_context_t *context)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
     int interrupt_deferred_p = (data->pending_handler != 0);
     int interrupt_pending = (read_TLS(INTERRUPT_PENDING,thread) != NIL);
@@ -848,7 +848,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 void fake_foreign_function_call_noassert(os_context_t *context)
 {
     int context_index;
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread *thread=get_sb_vm_thread();
 
 #ifdef reg_ALLOC
 #ifdef LISP_FEATURE_SB_THREAD
@@ -913,7 +913,7 @@ void fake_foreign_function_call(os_context_t *context)
 void
 undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 {
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread *thread=get_sb_vm_thread();
     /* Block all blockable signals. */
     block_blockable_signals(0);
 
@@ -1006,7 +1006,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 boolean
 interrupt_handler_pending_p(void)
 {
-    struct interrupt_data *data = &thread_interrupt_data(arch_os_get_current_thread());
+    struct interrupt_data *data = &thread_interrupt_data(get_sb_vm_thread());
     return (data->pending_handler != 0);
 }
 
@@ -1034,7 +1034,7 @@ interrupt_handle_pending(os_context_t *context)
      * It gets run precisely at those places where it is safe to process
      * pending asynchronous tasks. */
 
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
 
     if (arch_pseudo_atomic_atomic(context)) {
@@ -1212,7 +1212,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
 
-    were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
+    were_in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
     if (were_in_lisp)
     {
         // Use the variant of fake_ffc that doesn't do another pthread_sigmask syscall,
@@ -1306,7 +1306,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
     assert_blockables_blocked();
 #endif
 
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending");
@@ -1355,7 +1355,7 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     SAVE_ERRNO(signal,context,void_context);
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
     if (can_handle_now(interrupt_handle_now, data, signal, info, context))
         interrupt_handle_now(signal, info, context);
@@ -1371,7 +1371,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
                         siginfo_t __attribute__((unused)) *info,
                         os_context_t *context)
 {
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread *thread=get_sb_vm_thread();
     boolean was_in_lisp;
 
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
@@ -1393,7 +1393,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
     /* Not PA and GC not inhibited -- we can stop now. */
 
-    was_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
+    was_in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
 
     if (was_in_lisp) {
         /* need the context stored so it can have registers scavenged */
@@ -1635,7 +1635,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_register_addr(context,reg_RSI) = 0;        /* arg. array */
     *os_context_register_addr(context,reg_RDX) = 0;        /* no. args */
 #else
-    struct thread *th=arch_os_get_current_thread();
+    struct thread *th=get_sb_vm_thread();
     build_fake_control_stack_frames(th,context);
 #endif
 
@@ -1729,7 +1729,7 @@ void reset_thread_control_stack_guard_page(struct thread *th)
 boolean
 handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
-    struct thread *th=arch_os_get_current_thread();
+    struct thread *th=get_sb_vm_thread();
 
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
@@ -2194,7 +2194,7 @@ int sb_toggle_sigprof(os_context_t* context, int block) {
         gc_assert(!block);
         // Alter the mask on return from the _outermost_ signal context, which
         // should usually be the supplied context, but not if nesting happened.
-        context = nth_interrupt_context(0, arch_os_get_current_thread());
+        context = nth_interrupt_context(0, get_sb_vm_thread());
         gc_assert(context);
         sigset_t *mask = os_context_sigmask_addr(context);
         int was_blocked = sigismember(mask, SIGPROF);

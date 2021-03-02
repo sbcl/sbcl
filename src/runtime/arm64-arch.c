@@ -63,7 +63,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 #ifdef LISP_FEATURE_GENCGC
-    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 #else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
@@ -72,12 +72,12 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    set_pseudo_atomic_interrupted(arch_os_get_current_thread());
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    clear_pseudo_atomic_interrupted(arch_os_get_current_thread());
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)

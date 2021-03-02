@@ -209,7 +209,7 @@ static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
     uword_t* fp = __builtin_frame_address(0);
     char* return_pc = 0;
 
-    if (th != arch_os_get_current_thread()) {
+    if (th != get_sb_vm_thread()) {
         int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
         os_context_t *c = nth_interrupt_context(i-1, th);
         fp = (uword_t*)*os_context_register_addr(c,reg_FP);
@@ -243,7 +243,7 @@ deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
     for_each_thread(th) {
         void **esp=(void **)-1;
         sword_t i,free;
-        if (th == arch_os_get_current_thread())
+        if (th == get_sb_vm_thread())
             esp = (void **)((void *)&pointer);
         else {
             void **esp1;
@@ -350,7 +350,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
                 *thread_pc = 0;
                 // Scan just the current thread's stack
                 // (We don't know where the other stack pointers are)
-                th = arch_os_get_current_thread();
+                th = get_sb_vm_thread();
                 void **esp = __builtin_frame_address(0);
                 void **where;
                 for (where = ((void **)th->control_stack_end)-1; where >= esp;  --where)

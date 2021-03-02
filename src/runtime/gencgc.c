@@ -1264,7 +1264,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
 void
 gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     /* Write basic information before doing anything else: if we don't
      * call to lisp this is a must, and even if we do there is always
      * the danger that we bounce back here before the error has been
@@ -3552,7 +3552,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
              * chosen so that the current context on the stack is
              * covered by the stack scan.  See also set_csp_from_context(). */
 #  ifndef LISP_FEATURE_WIN32
-            if (th != arch_os_get_current_thread()) {
+            if (th != get_sb_vm_thread()) {
                 long k = fixnum_value(
                     read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0) {
@@ -3564,7 +3564,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
-            if(th==arch_os_get_current_thread()) {
+            if(th==get_sb_vm_thread()) {
                 esp = (void*)&raise;
             } else {
                 sword_t i,free;
@@ -4424,14 +4424,14 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
    lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
-    struct thread *self = arch_os_get_current_thread(); \
+    struct thread *self = get_sb_vm_thread(); \
     lispobj *result = lisp_alloc(MY_REGION, nbytes, page_type, self); \
     return result; \
    }
 #else
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
    NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
-    struct thread *self = arch_os_get_current_thread(); \
+    struct thread *self = get_sb_vm_thread(); \
     gc_assert(get_pseudo_atomic_atomic(self)); \
     return lisp_alloc(MY_REGION, nbytes, page_type, self); \
    }
@@ -4604,7 +4604,7 @@ prepare_for_final_gc ()
 #ifdef LISP_FEATURE_SB_THREAD
     // Avoid tenuring of otherwise-dead objects referenced by
     // dynamic bindings which disappear on image restart.
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     char *start = (char*)&thread->lisp_thread;
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);

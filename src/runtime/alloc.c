@@ -39,7 +39,7 @@ pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 lispobj alloc_code_object (unsigned total_words)
 {
-    struct thread *th = arch_os_get_current_thread();
+    struct thread *th = get_sb_vm_thread();
 #if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
 #  define REQUIRE_GC_INHIBIT 0
 #else

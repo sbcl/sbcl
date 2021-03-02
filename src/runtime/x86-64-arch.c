@@ -226,20 +226,20 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t __attribute__((unused)) *context)
 {
-    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t __attribute__((unused)) *context)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     set_pseudo_atomic_interrupted(thread);
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t __attribute__((unused)) *context)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     clear_pseudo_atomic_interrupted(thread);
 }
 
@@ -368,7 +368,7 @@ sigtrap_handler(int __attribute__((unused)) signal,
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
-    access_control_stack_pointer(arch_os_get_current_thread()) =
+    access_control_stack_pointer(get_sb_vm_thread()) =
         (lispobj *)*os_context_sp_addr(context);
 
     /* On entry %rip points just after the INT3 byte and aims at the

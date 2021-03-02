@@ -184,7 +184,7 @@ Lstack:
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
 	movq	%fs:(THREAD_BASE_REG), THREAD_BASE_REG
 #elif defined LISP_FEATURE_WIN32
-	call    PIC_CALL(GNAME(get_current_vm_thread))
+	call    PIC_CALL(GNAME(read_current_thread))
 	mov	%rax, THREAD_BASE_REG
 #else
 	LOAD_PIC_VAR(specials, %rdi)

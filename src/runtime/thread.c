@@ -248,10 +248,9 @@ struct thread *alloc_thread_struct(void*,lispobj);
 #endif
 
 #ifdef LISP_FEATURE_WIN32
-// Need a function callable from assembly code. The inline one won't do.
-// This is basically pthread_getspecific without an argument.
-void* get_current_vm_thread() {
-  return arch_os_get_current_thread();
+// Need a function callable from assembly code, where the inline one won't do.
+void* read_current_thread() {
+  return get_sb_vm_thread();
 }
 #endif
 
@@ -438,7 +437,7 @@ unregister_thread(struct thread *th,
 #endif
 
     /* Undo the association of the current pthread to its `struct thread',
-     * such that we can call arch_os_get_current_thread() later in this
+     * such that we can call get_sb_vm_thread() later in this
      * thread and cleanly get back NULL. */
     /* FIXME: what if, after we blocked signals, someone uses INTERRUPT-THREAD
      * on this thread? It's no longer a lisp thread; I suspect the signal
@@ -692,7 +691,7 @@ static void attach_os_thread(init_thread_data *scribble)
 
 static void detach_os_thread(init_thread_data *scribble)
 {
-    struct thread *th = arch_os_get_current_thread();
+    struct thread *th = get_sb_vm_thread();
 
     unregister_thread(th, scribble);
 
@@ -759,7 +758,7 @@ callback_wrapper_trampoline(
 #endif
     lispobj arg0, lispobj arg1, lispobj arg2)
 {
-    struct thread* th = arch_os_get_current_thread();
+    struct thread* th = get_sb_vm_thread();
     if (!th) {                  /* callback invoked in non-lisp thread */
         init_thread_data scribble;
         attach_os_thread(&scribble);
@@ -1046,7 +1045,7 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
     struct thread *th;
 
     /* Must defend against async unwinds. */
-    if (read_TLS(INTERRUPTS_ENABLED, arch_os_get_current_thread()) != NIL)
+    if (read_TLS(INTERRUPTS_ENABLED, get_sb_vm_thread()) != NIL)
         lose("create_thread is not safe when interrupts are enabled.");
 
     /* Assuming that a fresh thread struct has no lisp objects in it,
@@ -1134,7 +1133,7 @@ void release_gc_lock() { pthread_mutex_unlock(&in_gc_lock); }
  * the memory shouldn't be there) */
 void gc_stop_the_world()
 {
-    struct thread *th, *me = arch_os_get_current_thread();
+    struct thread *th, *me = get_sb_vm_thread();
     int rc;
 
     /* Keep threads from registering with GC while the world is stopped. */
@@ -1176,7 +1175,7 @@ void gc_stop_the_world()
 
 void gc_start_the_world()
 {
-    struct thread *th, *me = arch_os_get_current_thread();
+    struct thread *th, *me = get_sb_vm_thread();
     int lock_ret;
     /* if a resumed thread creates a new thread before we're done with
      * this loop, the new thread will be suspended waiting to acquire
@@ -1250,7 +1249,7 @@ void wake_thread(struct thread_instance* lispthread)
          * there is no need to take locks, roll thread to safepoint
          * etc. */
         struct thread* thread = (void*)lispthread->primitive_thread;
-        if (thread == arch_os_get_current_thread()) {
+        if (thread == get_sb_vm_thread()) {
             sb_pthr_kill(thread, 1); // can't fail
             check_pending_thruptions(NULL);
             return;

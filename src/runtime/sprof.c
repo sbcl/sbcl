@@ -503,7 +503,7 @@ void sigprof_handler(int sig, __attribute__((unused)) siginfo_t* info,
 {
     if (gc_active_p) return; // no mem barrier needed to read this
     int _saved_errno = errno;
-    struct thread* thread = arch_os_get_current_thread();
+    struct thread* thread = get_sb_vm_thread();
     // We can only profile Lisp threads.
     if (thread) {
         if (thread->state_word.sprof_enable)

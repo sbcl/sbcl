@@ -264,7 +264,7 @@ static int parse_regnum(char *s)
 
 int parse_lispobj(char **ptr, lispobj *output)
 {
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread *thread=get_sb_vm_thread();
     char *token = parse_token(ptr);
     uword_t pointer;
     lispobj result;

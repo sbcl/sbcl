@@ -1872,7 +1872,7 @@ boolean
 maybe_gc(os_context_t *context)
 {
     lispobj gc_happened;
-    __attribute__((unused)) struct thread *thread = arch_os_get_current_thread();
+    __attribute__((unused)) struct thread *thread = get_sb_vm_thread();
     boolean were_in_lisp = !foreign_function_call_active_p(thread);
 
     if (were_in_lisp) {
@@ -2007,7 +2007,7 @@ maybe_gc(os_context_t *context)
 void
 scrub_control_stack()
 {
-    scrub_thread_control_stack(arch_os_get_current_thread());
+    scrub_thread_control_stack(get_sb_vm_thread());
 }
 
 void

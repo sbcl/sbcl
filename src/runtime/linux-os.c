@@ -85,7 +85,7 @@ void lisp_mutex_event(char *string) {
         int id = __sync_fetch_and_add(&eventcount, 1);
         if (id >= MAXEVENTS) lose("event buffer overflow");
         clock_gettime(CLOCK_REALTIME, &events[id].ts);
-        events[id].th = current_thread;
+        events[id].th = get_sb_vm_thread();
         events[id].label = string;
         events[id].mutex_name = 0;
         events[id].timeout = -1;
@@ -96,7 +96,7 @@ void lisp_mutex_event1(char *string, char *string2) {
         int id = __sync_fetch_and_add(&eventcount, 1);
         if (id >= MAXEVENTS) lose("event buffer overflow");
         clock_gettime(CLOCK_REALTIME, &events[id].ts);
-        events[id].th = current_thread;
+        events[id].th = get_sb_vm_thread();
         events[id].label = string;
         events[id].mutex_name = string2;
         events[id].timeout = -1;
@@ -107,7 +107,7 @@ void lisp_mutex_event2(char *string, char *string2, uword_t usec) {
         int id = __sync_fetch_and_add(&eventcount, 1);
         if (id >= MAXEVENTS) lose("event buffer overflow");
         clock_gettime(CLOCK_REALTIME, &events[id].ts);
-        events[id].th = current_thread;
+        events[id].th = get_sb_vm_thread();
         events[id].label = string;
         events[id].mutex_name = string2;
         events[id].timeout = usec;

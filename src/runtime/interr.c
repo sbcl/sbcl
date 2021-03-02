@@ -47,7 +47,7 @@ default_lossage_handler(void)
         // This may not be exactly the right condition for determining
         // whether it might be possible to backtrace, but at least it prevents
         // lose() from itself losing early in startup.
-        if (arch_os_get_current_thread()) lisp_backtrace(100);
+        if (get_sb_vm_thread()) lisp_backtrace(100);
     }
     exit(1);
 }
@@ -144,7 +144,7 @@ void tprintf(char *fmt, ...)
     char buf[200];
     char *ptr;
     const char spaces[] = "                                           ";
-    struct thread*th = arch_os_get_current_thread();
+    struct thread*th = get_sb_vm_thread();
     buf[0] = ';'; buf[1] = ' ';
     ptr = buf+2;
     if (th->os_kernel_tid == 'A') {

@@ -319,7 +319,7 @@ int lisp_frame_previous(struct thread *thread, struct call_info *info)
 void
 lisp_backtrace(int nframes)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct call_info info;
 
     info.frame = (struct call_frame *)access_control_frame_pointer(thread);
@@ -457,7 +457,7 @@ x86_call_context (struct thread* th, void *fp, void **ra, void **ocfp)
 void
 describe_thread_state(void)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
 #ifndef LISP_FEATURE_WIN32
     sigset_t mask;
@@ -534,8 +534,7 @@ log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE 
   }
 }
 void backtrace_from_fp(void *fp, int nframes, int start) {
-    log_backtrace_from_fp(arch_os_get_current_thread(),
-                          fp, nframes, start, stdout);
+    log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
 }
 
 void backtrace_from_context(os_context_t *context, int nframes) {
@@ -547,7 +546,7 @@ void backtrace_from_context(os_context_t *context, int nframes) {
 void
 lisp_backtrace(int nframes)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     int free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (free_ici) {
@@ -668,7 +667,7 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
                                    siginfo_t __attribute__((unused)) *info,
                                    os_context_t *context)
 {
-    struct thread* this_thread = arch_os_get_current_thread();
+    struct thread* this_thread = get_sb_vm_thread();
 #ifdef LISP_FEATURE_SB_THREAD
     if (backtrace_completion_pipe[1] >= 0) {
         libunwind_backtrace(current_thread, context);
