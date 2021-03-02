@@ -312,14 +312,14 @@ Examples:
 (defun finalizer-thread-start ()
   (with-system-mutex (sb-thread::*make-thread-lock*)
     #+(and unix sb-safepoint)
-    (sb-thread::make-ephemeral-thread "sigwait"
-                                      #'sb-unix::signal-handler-loop
-                                      nil 'sb-unix::*sighandler-thread*)
+    (sb-thread::make-system-thread "sigwait"
+                                   #'sb-unix::signal-handler-loop
+                                   nil 'sb-unix::*sighandler-thread*)
     (aver (not *finalizer-thread*))
     (setf finalizer-thread-runflag 1)
     (setq *finalizer-thread* :start)
     (let ((thread
-           (sb-thread::make-ephemeral-thread
+           (sb-thread::make-system-thread
             "finalizer"
             (lambda ()
               (setf *finalizer-thread* sb-thread:*current-thread*)

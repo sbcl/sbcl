@@ -8,36 +8,24 @@
   (let ((encapsulation
           (compile nil
                    '(lambda (realfun thread stack-base)
-                     (if (string= (sb-thread:thread-name thread) "finalizer")
+                     (if (sb-thread:thread-ephemeral-p thread)
                          (funcall realfun thread stack-base)
                          nil))))
         (success))
-    ;; This test checks that if pthread_create fails, nothing is added to *STARTING-THREADS*.
-    ;; If there were an entry spuriously added, it would remain forever, as the thread we're
-    ;; attempting to create would not consume and clear out its startup data.
-    ;; So as a precondition to the test, *STARTING-THREADS* must be NIL. If it isn't, then
-    ;; there must have been a finalizer thread started, and it would have left a 0 in the list,
-    ;; which is the telltale mark of a thread that smashed its startup data.
-    ;; So if the list is not NIL right now, assert that there is a finalizer thread,
-    ;; and then set the list to NIL.
-    ;; [The rationale for the 0 is that responsibility for deletion from the list falls to the
-    ;; next MAKE-THREAD so that new threads need not synchronize with creators for exclusive
-    ;; access to the list. But threads can safely RPLACA their own cell in *STARTING-THREADS*
-    ;; allowing it to be GC'd even if nothing subsequently prunes out un-needed cons cells]
-    (assert (or (null sb-thread::*starting-threads*)
-                (equal sb-thread::*starting-threads* '(0))))
-
+    (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
     (unwind-protect
-         (progn (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
-                (handler-case (sb-thread:make-thread #'list :name "thisfails")
-                  (error (e)
-                    (setq success (string= (write-to-string e)
-                                           "Could not create new OS thread.")))))
+         (handler-case (sb-thread:make-thread #'list :name "thisfails")
+           (error (e)
+             (setq success (search "Could not create new OS thread" (write-to-string e)))))
       (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
-    (assert (null sb-thread::*starting-threads*))
-    (assert (equal (remove-if #'sb-thread:thread-ephemeral-p
-                              (sb-thread::avltree-list sb-thread::*all-threads*))
-                   (list sb-thread::*initial-thread*)))))
+    (assert success))
+  (let ((threads sb-thread::*starting-threads*))
+    (when (find-if-not #'sb-thread:thread-ephemeral-p threads)
+      (error "Should not see new thread in starting list: ~S" threads)))
+  (let ((threads (remove sb-thread::*initial-thread*
+                         (sb-thread::avltree-list sb-thread::*all-threads*))))
+    (when (find-if-not #'sb-thread:thread-ephemeral-p threads)
+      (error "Should not see new thread in running list: ~S" threads))))
 
 (defun actually-get-stack-roots (current-sp
                                  &key allwords (print t)

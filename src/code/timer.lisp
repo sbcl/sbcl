@@ -370,7 +370,7 @@ triggers."
         (prog1
             (setf *waitable-timer-handle* (os-create-wtimer))
           (setf *timer-thread*
-                (sb-thread::make-ephemeral-thread
+                (sb-thread::make-system-thread
                  "System timer watchdog thread"
                  (lambda ()
                    (loop while

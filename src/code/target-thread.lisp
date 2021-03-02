@@ -1372,15 +1372,14 @@ on this semaphore, then N of them is woken up."
 ;;; Also clobber the pointer to the primitive thread
 ;;; which makes THREAD-ALIVE-P return false hereafter.
 (defmacro handle-thread-exit ()
-  '(progn
-    (/show0 "HANDLING THREAD EXIT")
-    (when *exit-in-progress*
-      (%exit))
-    ;; Lisp-side cleanup
-    (let* ((thread *current-thread*)
+  '(let* ((thread *current-thread*)
            ;; use the "funny fixnum" representation
            (c-thread (%make-lisp-obj (thread-primitive-thread thread)))
            (sem (thread-semaphore thread)))
+      ;; System threads exit peacefully when asked, and they don't bother anyone.
+      ;; They must not participate in shutting other threads down.
+      (when (and *exit-in-progress* (not (thread-ephemeral-p thread)))
+        (%exit))
       ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
       ;; That in turn caused a failure in GC because a fixnum is not a legal value
       ;; for the startup info when observed by GC.
@@ -1453,7 +1452,7 @@ on this semaphore, then N of them is woken up."
         ;; our own kind of semaphore, we simply signal it using an arbitrarily huge count.
         ;; See the comment in 'thread-structs.lisp' about why this isn't CONDITION-BROADCAST
         ;; on a condition var. (Good luck trying to make this many threads)
-        (signal-semaphore sem 1000000)))))
+        (signal-semaphore sem 1000000))))
 
 ;;; The "funny fixnum" address format would do no good - AVL-FIND and AVL-DELETE
 ;;; expect normal happy lisp integers, even if a bignum.
@@ -1834,7 +1833,8 @@ session."
                                        (sb-c::inspect-unwinding
                                         (apply-real-function)
                                         #'sb-di::catch-runaway-unwind))
-                                  (when *exit-in-progress*
+                                  (when (and *exit-in-progress*
+                                             (not (thread-ephemeral-p *current-thread*)))
                                     (sb-impl::call-exit-hooks))))))
                        #+sb-safepoint (sb-kernel::gc-safepoint)
                        (setf (thread-result *current-thread*) list)))
@@ -1879,7 +1879,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; System-internal use only
 #+sb-thread
-(defun make-ephemeral-thread (name function arguments symbol)
+(defun make-system-thread (name function arguments symbol)
   (let ((thread (%make-thread name t (make-semaphore :name name))))
     (when symbol
       (aver (not (symbol-value symbol)))
