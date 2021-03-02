@@ -15,6 +15,9 @@
   "Returns a string describing the type of the local machine."
   "SPARC")
 
+(defun return-machine-address (scp)
+  (+ (context-register scp lip-offset) 8))
+
 
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.
 ;;;;

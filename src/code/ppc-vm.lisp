@@ -6,6 +6,10 @@
   "Returns a string describing the type of the local machine."
   #-64-bit "PowerPC"
   #+64-bit "PowerPC64")
+
+(defun return-machine-address (scp)
+  (sap-int (context-lr scp)))
+
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then

@@ -6,6 +6,14 @@
   "Return a string describing the type of the local machine."
   #-64-bit "RV32G" #+64-bit "RV64G")
 
+(defun return-machine-address (scp)
+  ;; KLUDGE: Taken from SPARC backend. Why does `8' need to be added
+  ;; to the return address? Without it, backtraces get truncated and
+  ;; are incorrect. Are the other backends wrong as well by not adding
+  ;; 8?
+  (+ (context-register scp lip-offset) 8))
+
+
 ;;; CONTEXT-FLOAT-REGISTER
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))

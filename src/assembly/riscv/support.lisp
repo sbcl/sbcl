@@ -29,11 +29,3 @@
     (:none)
     (:raw
      `((inst jalr zero-tn lip-tn 0)))))
-
-#-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
-(defun return-machine-address (scp)
-  ;; KLUDGE: Taken from SPARC backend. Why does `8' need to be added
-  ;; to the return address? Without it, backtraces get truncated and
-  ;; are incorrect. Are the other backends wrong as well by not adding
-  ;; 8?
-  (+ (context-register scp lip-offset) 8))

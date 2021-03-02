@@ -68,7 +68,3 @@
                                     :offset lip-offset)
                     :offset 2)))
     (:none)))
-
-#-sb-xc-host ; CONTEXT-LR is not defined at xc-time
-(defun return-machine-address (scp)
-  (sap-int (context-lr scp)))

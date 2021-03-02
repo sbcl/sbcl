@@ -5,6 +5,10 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "ARM")
+
+(defun return-machine-address (scp)
+  (context-register scp lr-offset))
+
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.

@@ -6,6 +6,9 @@
   "Returns a string describing the type of the local machine."
   "MIPS")
 
+(defun return-machine-address (scp)
+  (context-register scp lip-offset))
+
 (define-alien-routine ("os_context_bd_cause" context-bd-cause-int)
     unsigned-int
   (context (* os-context-t) :in))
