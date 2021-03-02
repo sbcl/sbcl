@@ -2248,10 +2248,10 @@
                                  (ldb (byte 19 2) low)
                                  (tn-offset lip))
                (assemble (segment vop)
-                 (inst movz tmp-tn high 16)
+                 (inst movz dest high 16)
                  (if negative
-                     (inst sub dest lip (lsl tmp-tn 3))
-                     (inst add dest lip (lsl tmp-tn 3))))))
+                     (inst sub dest lip (lsl dest 3))
+                     (inst add dest lip (lsl dest 3))))))
            (one-instruction-emitter (segment position)
              (let ((delta (funcall compute-delta position)))
                ;; ADR
@@ -2312,10 +2312,10 @@
                                  (ldb (byte 19 2) low)
                                  (tn-offset lip))
                (assemble (segment vop)
-                 (inst movz tmp-tn high 16)
-                 (inst ldr dest (@ lip (extend tmp-tn (if negative
-                                                          :sxtw
-                                                          :lsl)
+                 (inst movz dest high 16)
+                 (inst ldr dest (@ lip (extend dest (if negative
+                                                        :sxtw
+                                                        :lsl)
                                                3))))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
