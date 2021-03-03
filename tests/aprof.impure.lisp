@@ -102,7 +102,7 @@ sb-vm::
 
 #-win32
 (import '(sb-vm::temp-reg-tn sb-vm::thread-base-tn
-          sb-vm::thread-pseudo-atomic-bits-slot sb-vm::thread-alloc-region-slot
+          sb-vm::thread-alloc-region-slot
           sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
           sb-vm:cons-size sb-vm:n-word-bytes
           sb-vm::ea sb-vm:nil-value
