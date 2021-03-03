@@ -112,3 +112,14 @@
                          (print ar)
                          (array-has-fill-pointer-p ar)))))))
           '(values null &optional))))
+
+(with-test (:name :--sign)
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (x y)
+                     (declare (integer x y))
+                     (if (<= x y)
+                         (- x y)
+                         -10)))))
+          '(values (integer * 0) &optional))))

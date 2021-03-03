@@ -214,18 +214,25 @@
                       (when constr
                         (if (constraint-not-p constr)
                             ,@(if pos
-                                  `((go POS) (go NEG))
-                                  `((go NEG) (go POS))))))))
+                                  `((go GTEZ) (go LTZ))
+                                  `((go LTEZ) (go GTZ)))))))
+                 (derive (type)
+                   `(progn
+                      (derive-node-type node (specifier-type ',type))
+                      (go DONE))))
         (tagbody
            (f < x y t)
            (f > x y nil)
            (f > y x t)
            (f < y x nil)
            (go DONE)
-         POS
-           (derive-node-type node (specifier-type '(integer 0)))
-           (go DONE)
-         NEG
-           (derive-node-type node (specifier-type '(integer * (0))))
+         GTZ
+           (derive (integer (0)))
+         LTZ
+           (derive (integer * (0)))
+         GTEZ
+           (derive (integer 0))
+         LTEZ
+           (derive (integer * 0))
          DONE))))
   :give-up)
