@@ -1582,6 +1582,9 @@
   (throw 'give-up-ir1-transform (values :failure args)))
 (defun abort-ir1-transform (&rest args)
   (throw 'give-up-ir1-transform (values :aborted args)))
+
+(defvar *delayed-ir1-transforms*)
+
 (defun delay-ir1-transform (node &rest reasons)
   (let ((assoc (assoc node *delayed-ir1-transforms*)))
     (cond ((not assoc)

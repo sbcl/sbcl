@@ -103,6 +103,15 @@
 (defconstant +string-stream-layout-flag+     #b01000000)
 (defconstant +stream-layout-flag+            #b10000000)
 
+;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
+;;; Each occupies two bytes of the %BITS slot when possible,
+;;; otherwise a slot unto itself.
+(def!type layout-depthoid () '(integer -1 #x7FFF))
+(def!type layout-length () '(integer 0 #xFFFF))
+(def!type layout-bitmap () 'integer)
+;;; ID must be an fixnum for either value of n-word-bits.
+(def!type layout-id () '(signed-byte 30))
+
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
 ;;; type checking and garbage collection. Whenever a class is

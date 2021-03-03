@@ -40,18 +40,6 @@
 
 ;;;; miscellaneous types used both in the cross-compiler and on the target
 
-;;;; FIXME: The INDEX and LAYOUT-DEPTHOID definitions probably belong
-;;;; somewhere else, not "early-c", since they're after all not part
-;;;; of the compiler.
-
-;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
-;;; Each occupies two bytes of the %BITS slot when possible,
-;;; otherwise a slot unto itself.
-(def!type layout-depthoid () '(integer -1 #x7FFF))
-(def!type layout-length () '(integer 0 #xFFFF))
-(def!type layout-bitmap () 'integer)
-;;; ID must be an fixnum for either value of n-word-bits.
-(def!type layout-id () '(signed-byte 30))
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:
@@ -126,7 +114,6 @@
 (defvar *constraint-universe*)
 (defvar *current-path*)
 (defvar *current-component*)
-(defvar *delayed-ir1-transforms*)
 #+sb-dyncount
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere-label*)
