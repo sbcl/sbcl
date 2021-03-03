@@ -397,18 +397,6 @@ os_install_interrupt_handlers(void)
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
     ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
     }
-
-    /* OAOOM c.f. sunos-os.c.
-     * Should we have a reusable function gc_install_interrupt_handlers? */
-#ifdef LISP_FEATURE_SB_THREAD
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-#  ifdef LISP_FEATURE_SB_THRUPTION
-    ll_install_handler(SIGURG, thruption_handler);
-#  endif
-# else
-    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
-# endif
-#endif
 }
 
 char *os_get_runtime_executable_path()

@@ -718,6 +718,11 @@ sbcl_main(int argc, char *argv[], char *envp[])
     arch_install_interrupt_handlers();
 #ifndef LISP_FEATURE_WIN32
     os_install_interrupt_handlers();
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+    ll_install_handler(SIGURG, thruption_handler);
+# elif defined LISP_FEATURE_SB_THREAD
+    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
+# endif
 #else
 /*     wos_install_interrupt_handlers(handler); */
     wos_install_interrupt_handlers(&exception_frame);

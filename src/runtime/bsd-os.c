@@ -327,18 +327,6 @@ os_install_interrupt_handlers(void)
 #endif
 
     }
-
-#ifdef LISP_FEATURE_SB_THREAD
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-#  ifdef LISP_FEATURE_SB_THRUPTION
-    ll_install_handler(SIGURG, thruption_handler);
-#  endif
-# else
-    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
-# endif
-#endif
-
-    SHOW("leaving os_install_interrupt_handlers()");
 }
 
 #else /* Currently PPC/Darwin/Cheney only */
@@ -358,7 +346,6 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 os_install_interrupt_handlers(void)
 {
-    SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
     ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
 }
 

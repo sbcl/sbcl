@@ -82,9 +82,6 @@ void
 os_install_interrupt_handlers(void)
 {
     ll_install_handler(SIGSEGV, sigsegv_handler);
-#ifdef LISP_FEATURE_SB_THREAD
-    ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
-#endif
 }
 
 int pthread_getattr_np(pthread_t thread, pthread_attr_t *attr)
