@@ -125,13 +125,7 @@
   ;; needs to wait, to have a facsimile of the situation prior to implementation
   ;; of the so-called pauseless thread start feature.
   ;; Wouldn't you know, it's just reintroducing a startup semaphore.
-  ;; And interruption tests are even more likely to fail with sb-thruption
-  ;; because sb-thruption is flawed: it presumes that there is enough synchronization
-  ;; between sender/receiver that checking the INVOKED variable (shared via a closure)
-  ;; makes any sense at all, which it doesn't. (In addition, it supposes that merely
-  ;; by polling at safepoints, interrupts somehow become safe, which is not true
-  ;; in general - it is only true of the GC "interrupt" delivered by the kernel
-  ;; when the safepoint page trap is hit.)
+  ;; And interruption tests are even more likely to fail with :sb-safepoint.
   ;; Noneless, this tries to be robust enough to pass.
   (let* ((sem (sb-thread:make-semaphore))
          (child  (make-kill-thread

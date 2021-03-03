@@ -27,7 +27,7 @@
                   sb-unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*
                   *interrupt-pending*
-                  #+sb-thruption *thruption-pending*
+                  #+sb-safepoint *thruption-pending*
                   #+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
                   #-gencgc

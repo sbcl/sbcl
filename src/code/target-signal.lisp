@@ -170,7 +170,7 @@
   (declare (ignore signal code context))
   (exit))
 
-#-sb-thruption
+#-sb-safepoint
 ;;; SIGURG is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
@@ -212,7 +212,7 @@
 " sb-sys:*stderr*))
   #-(or linux android) (%install-handler sigsys #'sigsys-handler)
   #-sb-wtimer (%install-handler sigalrm #'sigalrm-handler)
-  #-sb-thruption (%install-handler sigurg #'sigurg-handler)
+  #-sb-safepoint (%install-handler sigurg #'sigurg-handler)
   (%install-handler sigchld #'sigchld-handler)
   ;; Don't want to silently quit on broken pipes.
   (%install-handler sigpipe :ignore)

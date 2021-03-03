@@ -132,11 +132,11 @@ means to wait indefinitely.")
 ;;; cancelation points (system and C library calls) which check for cancelation,
 ;;; perform whatever cleanups were pushed by pthread_cleanup_push() and then stop.
 ;;;
-;;; P.S. To see that #+sb-thruption is no magic fix - suppose you have a stack
+;;; P.S. To see that #+sb-safepoint is no magic fix - suppose you have a stack
 ;;; with Lisp -> C -> -> Lisp where C acquired a resource and the currently
 ;;; top-of-stack Lisp function took a safepoint trap. It would be fine if all it
 ;;; wanted to do was GC, but is not safe in general.
-;;; Hence #+sb-thruption paints a dangerously attractive veneer over an unsafe
+;;; Hence #+sb-safepoint paints a dangerously attractive veneer over an unsafe
 ;;; concept, making it more subtly bad instead of very obviously bad.
 ;;;
 ;;; So this is a bad default. Bad bad bad. But it's backward-compatible.

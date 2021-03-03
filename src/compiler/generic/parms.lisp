@@ -147,7 +147,7 @@
     sb-di::handle-breakpoint
     sb-di::handle-single-step-trap
     #+win32 sb-kernel::handle-win32-exception
-    #+sb-thruption sb-thread::run-interruption
+    #+sb-safepoint sb-thread::run-interruption
     enter-alien-callback
     #+sb-thread sb-thread::enter-foreign-callback)
   #'equal)
@@ -164,7 +164,7 @@
     (sb-sys:*allow-with-interrupts* t)
     (sb-sys:*interrupts-enabled* t)
     sb-sys:*interrupt-pending*
-    #+sb-thruption sb-sys:*thruption-pending*
+    #+sb-safepoint sb-sys:*thruption-pending*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*

@@ -484,7 +484,7 @@ thread_register_gc_trigger()
     }
 }
 
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
 static inline int
 thread_may_thrupt(os_context_t *ctx)
 {
@@ -740,7 +740,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
      * SUB-GC.  Phase is either GC_QUIET or GC_NONE. */
     if (check_gc_and_thruptions) {
         check_pending_gc(ctxptr);
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
         while(check_pending_thruptions(ctxptr));
 #endif
     }
@@ -798,7 +798,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             }
         }
     }
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     if (was_in_alien) {
         while(check_pending_thruptions(ctxptr));
     }
@@ -826,7 +826,7 @@ void thread_interrupted(os_context_t *ctxptr)
         }
     }
     check_pending_gc(ctxptr);
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     while(check_pending_thruptions(ctxptr));
 #endif
 }
@@ -896,7 +896,7 @@ void gc_start_the_world()
 }
 
 
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
 /* wake_thread(thread) -- ensure a thruption delivery to
  * `thread'. */
 
@@ -997,7 +997,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
     thread_sigmask(SIG_SETMASK, &oldset, 0);
 }
 #endif /* !LISP_FEATURE_WIN32 */
-#endif /* LISP_FEATURE_SB_THRUPTION */
+#endif /* LISP_FEATURE_SB_SAFEPOINT */
 
 void* os_get_csp(struct thread* th)
 {
@@ -1012,7 +1012,7 @@ void* os_get_csp(struct thread* th)
 
 #ifndef LISP_FEATURE_WIN32
 
-# ifdef LISP_FEATURE_SB_THRUPTION
+# ifdef LISP_FEATURE_SB_SAFEPOINT
 /* This is basically what 'low_level_maybe_now_maybe_later' was (which doesn't exist),
  * but with a different name, and different way of deciding to defer the signal */
 void thruption_handler(__attribute__((unused)) int signal,

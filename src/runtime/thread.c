@@ -1260,12 +1260,12 @@ void wake_thread(struct thread_instance* lispthread)
         block_deferrable_signals(&oldset);
         thread_mutex_lock(&all_threads_lock);
         sb_pthr_kill(thread, 1); // can't fail
-# ifdef LISP_FEATURE_SB_THRUPTION
+# ifdef LISP_FEATURE_SB_SAFEPOINT
         wake_thread_impl(lispthread);
 # endif
         thread_mutex_unlock(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
-#elif defined LISP_FEATURE_SB_THRUPTION
+#elif defined LISP_FEATURE_SB_SAFEPOINT
     wake_thread_impl(lispthread);
 #else
     pthread_kill(lispthread->os_thread, SIGURG);

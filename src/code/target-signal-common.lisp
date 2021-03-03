@@ -41,7 +41,7 @@
               (let (*unblock-deferrables-on-enabling-interrupts-p*)
                 (unblock-deferrable-signals)
                 (when (or *interrupt-pending*
-                          #+sb-thruption *thruption-pending*)
+                          #+sb-safepoint *thruption-pending*)
                   (receive-pending-interrupt))
                 (funcall function))
            (alien-funcall (extern-alien "block_deferrable_signals"
@@ -50,7 +50,7 @@
         (t
          (when (and enable-interrupts
                     (or *interrupt-pending*
-                        #+sb-thruption *thruption-pending*))
+                        #+sb-safepoint *thruption-pending*))
            (receive-pending-interrupt))
          (funcall function))))
 

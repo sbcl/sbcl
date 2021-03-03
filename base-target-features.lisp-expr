@@ -290,15 +290,7 @@
  ;; (Replaces use of SIG_STOP_FOR_GC.)
  ; :sb-safepoint
 
- ;; When compiling with safepoints, the INTERRUPT-THREAD mechanism can
- ;; also use safepoints to roll the target thread to a point at which it
- ;; can be interrupted safely, instead of using a signal for this
- ;; purpose.  Enable this feature in addition to :SB-SAFEPOINT to enable
- ;; such behaviour.
- ;; (Replaces use of SIGURG, except to wake up syscalls.)
- ; :sb-thruption
-
- ;; When compiling with safepoints and thruptions, the TIMER facility
+ ;; When compiling with safepoints, the TIMER facility
  ;; can replace its use of setitimer with a background thread.
  ;; (Replaces use of SIGALRM.)
  ; :sb-wtimer

@@ -300,8 +300,6 @@
          ("(and pauseless-threadstart (not sb-thread))"
           ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
-         ("(and sb-thruption (not sb-safepoint))" ":SB-THRUPTION requires :SB-SAFEPOINT")
-         ("(and (not sb-thruption) sb-safepoint)" ":SB-SAFEPOINT requires :SB-THRUPTION")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"

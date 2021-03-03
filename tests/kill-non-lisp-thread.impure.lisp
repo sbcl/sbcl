@@ -44,8 +44,8 @@
     (push (lambda ()
             (setq receivedp t))
           (sb-thread::thread-interruptions sb-thread:*current-thread*))
-    #+sb-thruption
-    ;; On sb-thruption builds, the usual resignalling of SIGURG will
+    #+sb-safepoint
+    ;; On sb-safepoint builds, the usual resignalling of SIGURG will
     ;; work without problems, but the signal handler won't ordinarily
     ;; think that there's anything to be done.  Since we're poking at
     ;; INTERRUPT-THREAD internals anyway, let's help it along.

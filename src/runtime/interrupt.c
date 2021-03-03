@@ -1171,7 +1171,7 @@ interrupt_handle_pending(os_context_t *context)
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
         run_deferred_handler(data, context);
     }
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     if (read_TLS(THRUPTION_PENDING,thread)==T)
         /* Special case for the following situation: There is a
          * thruption pending, but a signal had been deferred.  The
@@ -1863,8 +1863,8 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  * As well there are two asynchronous signals installed via this function:
  * - STOP_FOR_GC is low-level, but might defer the signal through
  *   an intricate bunch of decisions about the state of the world.
- * - SIGURG without sb-thruption is a high-level (Lisp) handler,
- *   but with sb-thruption is low-level handler that uses different
+ * - SIGURG without :SB-SAFEPOINT is a high-level (Lisp) handler,
+ *   but with :SB-SAFEPOINT is low-level handler that uses different
  *   criteria for when to defer. */
 void
 ll_install_handler (int signal, interrupt_handler_t handler)
@@ -1872,7 +1872,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
     struct sigaction sa;
 
     if (0 > signal || signal >= NSIG
-#ifdef LISP_FEATURE_SB_THRUPTION
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     /* SIGURG is in `deferrable_sigset' so that we block&unblock it properly,
      * but we don't actually want to defer it, at least not here.
      * (It might get deferred until a safepoint). And if we put it only

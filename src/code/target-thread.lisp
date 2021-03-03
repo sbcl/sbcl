@@ -1849,7 +1849,7 @@ session."
                 ;; interupts to be lost: sigint comes to
                 ;; mind.
                 (setq *interrupt-pending* nil)
-                #+sb-thruption
+                #+sb-safepoint
                 (setq *thruption-pending* nil)
                 (handle-thread-exit)))))))
   ;; this returns to C, so return a single value
@@ -2120,7 +2120,7 @@ subject to change."
           (function destroy-thread :replacement terminate-thread)))
 
 ;;; Called from the signal handler.
-#-(or sb-thruption win32)
+#-(or sb-safepoint win32)
 (defun run-interruption ()
   (let ((interruption (with-deathlok (*current-thread*)
                         (pop (thread-interruptions *current-thread*)))))
@@ -2135,7 +2135,7 @@ subject to change."
     (when interruption
       (funcall interruption))))
 
-#+sb-thruption
+#+sb-safepoint
 (defun run-interruption (*current-internal-error-context*)
   (in-interruption () ;the non-thruption code does this in the signal handler
     (let ((interruption (with-deathlok (*current-thread*)

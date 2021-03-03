@@ -26,7 +26,7 @@ do
   echo ":$arch" >> $ltf
   # x86 and x86-64 are tested as if #+win32. Unix is otherwise plenty tested.
   if [ $arch = x86 -o $arch = x86-64 ]; then
-    echo ':win32 :sb-thread :sb-safepoint :sb-thruption :sb-wtimer' >> $ltf
+    echo ':win32 :sb-thread :sb-safepoint :sb-wtimer' >> $ltf
   else
     echo ':unix :linux :elf' >> $ltf
   fi
