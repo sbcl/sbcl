@@ -1901,7 +1901,7 @@ maybe_gc(os_context_t *context)
      * A kludgy alternative is to propagate the sigmask change to the
      * outer context.
      */
-#if !(defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_SAFEPOINT))
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
     unblock_gc_signals();
 #endif

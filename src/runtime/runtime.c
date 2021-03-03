@@ -42,7 +42,7 @@
 
 #include <time.h>
 
-#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
+#ifndef LISP_FEATURE_WIN32
 #include "signal.h"
 #endif
 

@@ -1067,9 +1067,7 @@ interrupt_handle_pending(os_context_t *context)
          * the os_context for the signal we're currently in the
          * handler for. This should ensure that when we return from
          * the handler the blocked signals are unblocked. */
-#ifndef LISP_FEATURE_WIN32
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
-#endif
         data->gc_blocked_deferrables = 0;
     }
 #endif
@@ -1077,14 +1075,11 @@ interrupt_handle_pending(os_context_t *context)
     if (read_TLS(GC_INHIBIT,thread)==NIL) {
         void *original_pending_handler = data->pending_handler;
 
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_SAFEPOINT
         /* handles the STOP_FOR_GC_PENDING case, plus THRUPTIONS */
         if (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL
-# ifdef LISP_FEATURE_SB_THRUPTION
              || (read_TLS(THRUPTION_PENDING,thread) != NIL
-                 && read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
-# endif
-            ) {
+                 && read_TLS(INTERRUPTS_ENABLED, thread) != NIL)) {
             /* We ought to take this chance to do a pitstop now. */
             fake_foreign_function_call(context);
             thread_in_lisp_raised(context);
@@ -1496,9 +1491,8 @@ arrange_return_to_c_function(os_context_t *context,
                              call_into_lisp_lookalike funptr,
                              lispobj function)
 {
-#if !(defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_SAFEPOINT))
-    check_gc_signals_unblocked_or_lose
-        (os_context_sigmask_addr(context));
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+    check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
 #endif
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
@@ -2120,7 +2114,7 @@ handle_trap(os_context_t *context, int trap)
         trap = trap_Error;
     }
     switch(trap) {
-#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
+#ifndef LISP_FEATURE_WIN32
     case trap_PendingInterrupt:
         FSHOW((stderr, "/<trap pending interrupt>\n"));
         arch_skip_instruction(context);

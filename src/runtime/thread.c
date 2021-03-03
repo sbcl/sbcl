@@ -833,7 +833,7 @@ callback_wrapper_trampoline(
 
 struct thread *
 alloc_thread_struct(void* spaces, lispobj start_routine) {
-#if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
+#ifdef LISP_FEATURE_SB_THREAD
     unsigned int i;
 #endif
 

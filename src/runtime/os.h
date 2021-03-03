@@ -66,8 +66,7 @@
 
 extern os_vm_size_t os_vm_page_size;
 
-#if (defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)) \
-  || defined(LISP_FEATURE_LINUX)
+#if defined LISP_FEATURE_WIN32 || defined LISP_FEATURE_LINUX
 boolean os_preinit(char *argv[], char *envp[]);
 #else
 #define os_preinit(dummy1,dummy2) (0)

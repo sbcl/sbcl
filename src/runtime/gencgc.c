@@ -28,9 +28,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "sbcl.h"
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-//
-#else
+#ifndef LISP_FEATURE_WIN32
 #include <signal.h>
 #endif
 #include "runtime.h"
@@ -1280,7 +1278,7 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
     else {
         /* FIXME: assert free_pages_lock held */
         (void)thread_mutex_unlock(&free_pages_lock);
-#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
+#ifndef LISP_FEATURE_WIN32
         gc_assert(get_pseudo_atomic_atomic(thread));
         clear_pseudo_atomic_atomic(thread);
         if (get_pseudo_atomic_interrupted(thread))

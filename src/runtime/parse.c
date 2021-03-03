@@ -16,7 +16,7 @@
 #include <ctype.h>
 
 #include "sbcl.h"
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_WIN32
 #include "pthreads_win32.h"
 #else
 #include <signal.h>
