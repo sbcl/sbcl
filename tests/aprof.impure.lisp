@@ -116,8 +116,7 @@ sb-vm::
   (values (make-this-struct) (make-that-struct)))
 (compile 'make-structs)
 #-win32
-(with-test (:name :aprof-instance
-            :fails-on (or (not :immobile-space) :sb-safepoint))
+(with-test (:name :aprof-instance :skipped-on (not :immobile-space))
   (let (seen-this seen-that)
     (dolist (line (split-string
                    (with-output-to-string (s)

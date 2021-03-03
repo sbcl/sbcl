@@ -139,6 +139,7 @@
       (layout-classoid-name (make-lisp-obj ptr))))
 
 ;;; These EAs are s-expressions, not instances of EA or MACHINE-EA.
+#-sb-safepoint
 (defconstant-eqx p-a-flag `(ea ,(ash sb-vm::thread-pseudo-atomic-bits-slot sb-vm:word-shift)
                                ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn)))
   #'equal)
@@ -344,11 +345,20 @@
     (push `($result . ,(cdr (assq '$free bindings))) bindings))
   (let ((bindings
          (matchp iterator
+                 ;; instance allocation completes the pseudoatomic part after storing widetag
+                 ;; and length, before storing the layout; so we look for either pending-interrupt
+                 ;; or safepoint trap in between some stores.
                  (load-time-value
+                  #+sb-safepoint
+                  `((test :byte ,(get-gpr :byte sb-vm::rax-offset)
+                          (ea ,(- sb-vm:static-space-start sb-vm:gc-safepoint-trap-offset) nil))
+                    (mov :dword (ea 1 $result) $layout))
+                  #-sb-safepoint
                   `((xor :qword ,p-a-flag ,(get-gpr :qword rbp-offset))
                     (jmp :eq $_)
                     (break . ignore)
-                    (mov :dword (ea 1 $result) $layout)) t)
+                    (mov :dword (ea 1 $result) $layout))
+                  t)
                  bindings)))
     (if (eq bindings :fail)
         'instance
@@ -397,6 +407,7 @@
               (incf (car iterator)))))))
 
     ;; Expect a store to the pseudo-atomic flag
+    #-sb-safepoint
     (when (eq (matchp iterator
                       (load-time-value `((mov :qword ,p-a-flag ,(get-gpr :qword rbp-offset))) t)
                       nil) :fail)
