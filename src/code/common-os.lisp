@@ -35,7 +35,7 @@
 (define-load-time-global *core-string* "")
 (define-load-time-global *core-pathname* nil
     "The absolute pathname of the running SBCL core.")
-
+(define-load-time-global *software-version* nil)
 (define-load-time-global *runtime-pathname* nil
     "The absolute pathname of the running SBCL runtime.")
 (define-load-time-global *sbcl-homedir-pathname* nil)

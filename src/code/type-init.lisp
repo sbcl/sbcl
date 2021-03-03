@@ -17,11 +17,21 @@
 
 (in-package "SB-KERNEL")
 
+;;; the Common Lisp defined type spec symbols
+(defconstant-eqx +!standard-type-names+
+  '(array atom bignum bit bit-vector character compiled-function
+    complex cons double-float extended-char fixnum float function
+    hash-table integer keyword list long-float nil null number package
+    pathname random-state ratio rational real readtable sequence
+    short-float simple-array simple-bit-vector simple-string simple-vector
+    single-float standard-char stream string base-char symbol t vector)
+  #'equal)
+
 ;;; built-in symbol type specifiers
 
 ;;; Predefined types that are of kind :INSTANCE can't have their
 ;;; :BUILTIN property set, so we cull them out. This used to operate
-;;; on all *!STANDARD-TYPE-NAMES* because !PRECOMPUTE-TYPES was ok to
+;;; on all +!STANDARD-TYPE-NAMES+ because !PRECOMPUTE-TYPES was ok to
 ;;; call on unknown types. This relied upon the knowledge that
 ;;; VALUES-SPECIFIER-TYPE avoided signaling a PARSE-UNKNOWN-TYPE
 ;;; condition while in cold-init. This is terrible! It means that
@@ -38,7 +48,7 @@
  (remove-if (lambda (x)
               (memq x '(compiled-function hash-table package pathname
                         random-state readtable)))
-            *!standard-type-names*))
+            +!standard-type-names+))
 
 #+sb-xc-host (setf *type-system-initialized* t)
 

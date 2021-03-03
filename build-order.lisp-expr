@@ -128,7 +128,6 @@
  ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
 
- ("src/code/early-cl")
  ("src/code/ansi-stream" :not-host)
  ("src/code/early-fasl" :c-headers)
 
