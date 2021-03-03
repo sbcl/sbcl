@@ -349,10 +349,6 @@ parse_size_arg(char *arg, char *arg_name)
 
 char *core_string;
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-void pthreads_win32_init();
-#endif
-
 static void print_environment(int argc, char *argv[])
 {
     int n = 0;
