@@ -163,7 +163,9 @@
 #-sb-wtimer
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
-  (declare (type system-area-pointer context))
+  ;; Safepoint invokes the "signal handler" without a signal context,
+  ;; since it's not a signal handler.
+  #-sb-safepoint (declare (type system-area-pointer context))
   (sb-impl::run-expired-timers))
 
 (defun sigterm-handler (signal code context)
