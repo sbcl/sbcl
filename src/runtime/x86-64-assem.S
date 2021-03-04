@@ -191,10 +191,6 @@ Lstack:
 	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax, THREAD_BASE_REG
 #endif
-#elif defined(LISP_FEATURE_SB_SAFEPOINT)
-        /* We need this to find the CSP trap page.  This does no harm,
-	 * as the compiler doesn't use THREAD_BASE_REG on non-threaded builds. */
-        LOAD_PIC_VAR(all_threads, THREAD_BASE_REG)
 #endif
 	pop	%rcx	# num args
 	pop	%rbx	# arg vector

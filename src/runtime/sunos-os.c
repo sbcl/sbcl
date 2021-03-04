@@ -84,11 +84,6 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     void* fault_addr = (void*)info->si_addr;
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    if (handle_safepoint_violation(context, fault_addr))
-            return;
-#endif
-
     if (gencgc_handle_wp_violation(fault_addr)) return;
 
     if (!handle_guard_page_triggered(context, fault_addr))

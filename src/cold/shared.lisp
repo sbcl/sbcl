@@ -310,8 +310,8 @@
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
-         ("(and sb-safepoint (not (or arm64 ppc x86 x86-64)))"
-          ":SB-SAFEPOINT not supported on selected architecture")
+         ("(and sb-safepoint (not (and (or arm64 x86 x86-64) (or darwin linux win32))))"
+          ":SB-SAFEPOINT not supported on selected arch/OS")
          ("(not (or elf mach-o win32))"
           "No execute object file format feature defined")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")

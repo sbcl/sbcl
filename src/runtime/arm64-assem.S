@@ -41,7 +41,7 @@
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         str value,[reg_NULL, reg_TMP]
 #ifdef LISP_FEATURE_SB_THREAD
-        #define ENTER_PA \
+#define ENTER_PA \
         str reg_wNULL,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
 #define LEAVE_PA \
         str wzr,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]       ;\
@@ -326,12 +326,7 @@ GNAME(call_into_c):
 	LEAVE_PA
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* OK to run GC without stopping this thread from this point on. */
-#  ifdef LISP_FEATURE_SB_THREAD
 	str     reg_CSP, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-#  else
-	ldr     reg_NL9, =GNAME(all_threads)
-	str     reg_CSP, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
-#  endif
 #endif
 
         // And call the C function.
@@ -364,12 +359,7 @@ GNAME(call_into_c):
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* No longer OK to run GC except at safepoints. */
-#  ifdef LISP_FEATURE_SB_THREAD
 	str     xzr, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-#  else
-	ldr     reg_NL9, =GNAME(all_threads)
-	str     xzr, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
-#  endif
 # endif
 
 	ENTER_PA

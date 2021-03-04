@@ -129,11 +129,6 @@ Low Address
 	ld 0, 16(sp) ; mtlr 0       /* Restore LR  */ ; \
 	lwz 0, 8(sp) ; mtcr 0       /* Restore CR */
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-/* the CSP page sits right before the thread */
-# define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
-#endif
-
 /* We create a pointer into the actual csymbol
    This way the symbol ptr_ symbol lives within a 32 bits offset
    of the TOC. See Store and Load macros in this file */
@@ -344,16 +339,6 @@ lra:
 	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-	/* OK to run GC without stopping this thread from this point on. */
-#  ifdef LISP_FEATURE_SB_THREAD
-	std reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
-#  else
-	load(reg_CFUNC,all_threads)
-	std reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_CFUNC)
-#  endif
-#endif
-
 	mr reg_NL3,reg_NARGS
 
 	/* "If a function changes the value of the TOC pointer register,
@@ -410,16 +395,6 @@ lra:
 	li reg_THREAD,0
 #endif
 	li reg_LIP,0
-
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-	/* No longer OK to run GC except at safepoints. */
-#  ifdef LISP_FEATURE_SB_THREAD
-	std reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
-#  else
-	load(reg_BSP,all_threads)
-	std reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_BSP)
-#  endif
-# endif
 
 	/* Atomic ... */
 	li reg_ALLOC,flag_PseudoAtomic
