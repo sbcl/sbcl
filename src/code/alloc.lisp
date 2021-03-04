@@ -513,8 +513,8 @@
         ;; (Could dead immobile objects be converted to use FILLER-WIDETAG instead?)
         (unless (immobile-space-obj-p code)
           ;; Before writing the boxed word count, zeroize up to and including 1 word
-          ;; after the boxed header so that all point words can be safely read
-          ;; by GC and so the jump table count word is 0.
+          ;; after the boxed header so that all pointers can be safely read by GC,
+          ;; and so that the jump table count word is 0.
           (loop for byte-index from (ash boxed word-shift) downto (ash 2 word-shift)
                 by n-word-bytes
                 do (setf (sap-ref-word-jit sap byte-index) 0)))
@@ -529,6 +529,14 @@
               ;; But so far nothing makes use of the n-named-calls value.
               (logior #+64-bit (ash n-named-calls 32)
                       (ash boxed word-shift)))))
+
+    ;; FIXME: there may be random values in the unboxed payload and it's not obvious
+    ;; that all callers of ALLOCATE-CODE-OBJECT always write all raw bytes.
+    ;; LOAD-CODE and MAKE-CORE-COMPONENT certainly do because the representation
+    ;; of simple-funs requires that the final 2 bytes be aligned to the physical end
+    ;; of the object so that we can find the function table.
+    ;; But what about other things that create code objects?
+    ;; It could be a subtle source of nondeterministic core images.
 
     ;; FIXME: Sort out 64-bit and cheneygc.
     #+(and 64-bit cheneygc)

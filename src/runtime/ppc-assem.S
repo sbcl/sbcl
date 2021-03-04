@@ -660,11 +660,6 @@ lra:
 	.globl CSYMBOL(fun_end_breakpoint_trap)
 	.globl CSYMBOL(fun_end_breakpoint_end)
 
-	/* Due to pointer verification in MAKE-LISP-OBJ, this must
-	include its header data (the offset from the start of the
-	code-object to the LRA). */
-	.long  (((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
-
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
 	b fun_end_breakpoint_multiple_values
@@ -679,7 +674,8 @@ lra:
 	between the two addresses.
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_LRA, ((CODE_SIZE+1)&~1)*-N_WORD_BYTES
+        /* KLUDGE: the extra 2 words are for the jump table prefix and padding. */
+	addi reg_CODE, reg_LRA, (2+((CODE_SIZE+1)&~1))*-N_WORD_BYTES
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */
@@ -702,6 +698,7 @@ lra:
 fun_end_breakpoint_multiple_values:
 	/* Compute the correct value for reg_CODE.  See the
 	explanation for the single-value case, above. */
+        /* XXX: I have literally no idea why this constant is -24 */
 	addi reg_CODE, reg_LRA, -24
 
 	/* The actual magic trap. */

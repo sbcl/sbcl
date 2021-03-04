@@ -219,7 +219,6 @@ call_into_c:
 	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	(((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	b	1f
 	nop
 	mov	reg_CSP, reg_OCFP

@@ -485,11 +485,6 @@ lra:
 	.globl fun_end_breakpoint_trap
 	.globl fun_end_breakpoint_end
 
-	/* Due to pointer verification in MAKE-LISP-OBJ, this must
-	include its header data (the offset from the start of the
-	code-object to the LRA). */
-	.quad  (((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
-
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
 	b fun_end_breakpoint_multiple_values
@@ -504,7 +499,8 @@ lra:
 	boxed words (see calculation for RETURN_PC_WIDETAG, above).
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_LRA, ((CODE_SIZE+1)&~1)*-N_WORD_BYTES-OTHER_POINTER_LOWTAG
+        /* KLUDGE: the extra 2 words are for the jump table prefix and padding. */
+	addi reg_CODE, reg_LRA, (2+((CODE_SIZE+1)&~1))*-N_WORD_BYTES-OTHER_POINTER_LOWTAG
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */

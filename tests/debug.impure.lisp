@@ -18,7 +18,15 @@
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:exit :code 104))
-(test-util::disable-profiling)
+
+#+(or x86 x86-64)
+(with-test (:name :legal-bpt-lra-object)
+  (sb-int:binding* ((code (sb-kernel:fun-code-header #'read))
+                    (sap (sb-sys:sap+ (sb-kernel:code-instructions code) 13)) ; random
+                    ((bpt-sap bpt-code-obj) (sb-di::make-bpt-lra sap)))
+    (declare (ignore bpt-sap))
+    ;; This was causing heap corruption
+    (assert (zerop (sb-kernel:code-jump-table-words bpt-code-obj)))))
 
 
 ;;;; Check that we get debug arglists right.

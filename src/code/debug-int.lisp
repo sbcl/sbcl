@@ -3503,40 +3503,45 @@ register."
              ;; Ensure required boxed header alignment.
              (align-up (+ sb-vm:code-constants-offset 1 #+(or x86-64 x86) 1)
                        sb-c::code-boxed-words-align)
-             ;; 2 extra raw bytes represent CODE-N-ENTRIES (which is zero)
-             (+ length 2))))
+             (+ length
+                sb-vm:n-word-bytes ; Jump Table prefix word
+                ;; Alignment padding, LRA header
+                #-(or x86 x86-64) (* 2 sb-vm:n-word-bytes)
+                ;; 2 extra raw bytes represent CODE-N-ENTRIES (which is zero)
+                2))))
       (setf (%code-debug-info code-object) :bpt-lra)
       (with-pinned-objects (code-object)
-        (system-area-ub8-copy (int-sap src-start) 0
-                              (code-instructions code-object) 0 length))
-      #+(or x86 x86-64)
-      (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
-        (setf (code-header-ref code-object real-lra-slot) code
-              (code-header-ref code-object (1+ real-lra-slot)) offset)
-        ;; Holy hell, returning a SAP looks GC-unsafe, but it's OK.
-        ;; It points into CODE-OBJECT which is implicitly pinned.
-        ;; WITHOUT-GCING which formerly enclosed this function was disingenuous
-        ;; because we escaped from its scope when returning the SAP.
-        (values (code-instructions code-object) code-object (trap-offset)))
-      #-(or x86 x86-64)
-      (progn
-        ;; We used to set the header value of the LRA here to the
-        ;; offset from the enclosing component to the LRA header, but
-        ;; MAKE-LISP-OBJ actually checks the value before we get a
-        ;; chance to set it, so it's now done in arch-assem.S.
-        ;; KLUDGE: The preceding concern is rendered irrelevant by
-        ;; use of unsafe %MAKE-LISP-OBJ, but we do still copy the lisp header
-        ;; from arch-assem.S which is horrible. Either that assembly code
-        ;; should be emitted as Lisp asm routine so that it has access to
-        ;; SB-VM:CODE-CONSTANTS-OFFSET, or we should emit the header.
-        ;; The issue is that the backpointer (word count) from the LRA to
-        ;; its containing code object has to be right.
-        (setf (code-header-ref code-object real-lra-slot) real-lra)
-        (values (with-pinned-objects (code-object)
-                  (%make-lisp-obj (logior (sap-int (code-instructions code-object))
-                                          sb-vm:other-pointer-lowtag)))
-                (sb-vm:sanctify-for-execution code-object)
-                (trap-offset))))))
+        #+(or x86 x86-64)
+        (let ((instructions ; Don't touch the jump table prefix word
+               (sap+ (code-instructions code-object) sb-vm:n-word-bytes)))
+          (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
+            (setf (code-header-ref code-object real-lra-slot) code
+                  (code-header-ref code-object (1+ real-lra-slot)) offset)
+            (system-area-ub8-copy (int-sap src-start) 0 instructions 0 length)
+            ;; CODE-OBJECT is implicitly pinned after leaving WITH-PINNED-OBJECTS
+            ;; (and would be pinned even if the W-P-O were deleted), so we're OK
+            ;; to return a SAP to the instructions.
+            ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the trapping
+            ;; opcode, for which we have to account for the jump table prefix word.
+            (values instructions code-object (+ (trap-offset) sb-vm:n-word-bytes))))
+        #-(or x86 x86-64)
+        (let* ((lra-header-addr
+                ;; Skip over the jump table prefix, and align properly for LRA header
+                (sap+ (code-instructions code-object) (* 2 sb-vm:n-word-bytes)))
+               ;; Compute the LRA->code backpointer in words
+               (delta (ash (sap- lra-header-addr
+                                 (int-sap (logandc2 (get-lisp-obj-address code-object)
+                                                    sb-vm:lowtag-mask)))
+                           (- sb-vm:word-shift))))
+          (setf (code-header-ref code-object real-lra-slot) real-lra)
+          (setf (sap-ref-word lra-header-addr 0)
+                (logior (ash delta sb-vm:n-widetag-bits) sb-vm:return-pc-widetag))
+          (system-area-ub8-copy (int-sap src-start) 0
+                                (sap+ lra-header-addr sb-vm:n-word-bytes)
+                                0 length)
+          (values (%make-lisp-obj (logior (sap-int lra-header-addr) sb-vm:other-pointer-lowtag))
+                  (sb-vm:sanctify-for-execution code-object)
+                  (+ (trap-offset) (* 3 sb-vm:n-word-bytes))))))))
 
 ;;;; miscellaneous
 
