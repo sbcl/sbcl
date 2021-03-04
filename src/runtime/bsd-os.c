@@ -44,10 +44,6 @@
 #include "validate.h"
 #include "gc-internal.h"
 
-#if defined(LISP_FEATURE_SB_WTIMER) && !defined(LISP_FEATURE_DARWIN)
-# include <sys/event.h>
-#endif
-
 
 
 #ifdef __NetBSD__
@@ -684,61 +680,4 @@ os_dlsym(void *handle, const char *symbol)
     return ret;
 }
 
-#endif
-
-#if defined(LISP_FEATURE_SB_WTIMER) && !defined(LISP_FEATURE_DARWIN)
-/*
- * Waitable timer implementation for the safepoint-based (SIGALRM-free)
- * timer facility using kqueue.
- */
-int
-os_create_wtimer()
-{
-    int kq = kqueue();
-    if (kq == -1)
-        lose("os_create_wtimer: kqueue");
-    return kq;
-}
-
-int
-os_wait_for_wtimer(int kq)
-{
-    struct kevent ev;
-    int n;
-    if ( (n = kevent(kq, 0, 0, &ev, 1, 0)) == -1) {
-        if (errno != EINTR)
-            lose("os_wtimer_listen failed");
-        n = 0;
-    }
-    return n != 1;
-}
-
-void
-os_close_wtimer(int kq)
-{
-    if (close(kq) == -1)
-        lose("os_close_wtimer failed");
-}
-
-void
-os_set_wtimer(int kq, int sec, int nsec)
-{
-    long long msec
-        = ((long long) sec) * 1000 + (long long) (nsec+999999) / 1000000;
-    if (msec > INT_MAX) msec = INT_MAX;
-
-    struct kevent ev;
-    EV_SET(&ev, 1, EVFILT_TIMER, EV_ADD|EV_ENABLE|EV_ONESHOT, 0, (int)msec, 0);
-    if (kevent(kq, &ev, 1, 0, 0, 0) == -1)
-        perror("os_set_wtimer: kevent");
-}
-
-void
-os_cancel_wtimer(int kq)
-{
-    struct kevent ev;
-    EV_SET(&ev, 1, EVFILT_TIMER, EV_DISABLE, 0, 0, 0);
-    if (kevent(kq, &ev, 1, 0, 0, 0) == -1 && errno != ENOENT)
-        perror("os_cancel_wtimer: kevent");
-}
 #endif

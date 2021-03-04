@@ -575,7 +575,7 @@
  #+riscv ("src/code/riscv-vm" :not-host)
 
  ("src/code/target-signal-common" :not-host)
- #-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
+ #+unix ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
  #+win32 ("src/code/target-exception" :not-host)
  ("src/code/serve-event" :not-host)
  ;; Target-only stuff should usually be compiled late unless it has

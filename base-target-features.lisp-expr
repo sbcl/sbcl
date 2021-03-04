@@ -290,11 +290,6 @@
  ;; (Replaces use of SIG_STOP_FOR_GC.)
  ; :sb-safepoint
 
- ;; When compiling with safepoints, the TIMER facility
- ;; can replace its use of setitimer with a background thread.
- ;; (Replaces use of SIGALRM.)
- ; :sb-wtimer
-
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

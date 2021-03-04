@@ -59,31 +59,20 @@
                            time)
     (loop until finishedp)))
 
-;;; This test has to be skipped on darwin + safepoint because if those features
-;;; are present, then sb-wtimer should be too, but it can't be, because the
-;;; code in 'darwin-os.c' says:
-;;;  # error Completely untested. Go ahead! Remove this line, try your luck!
-;;; and of course it doesn't work.
-;;; But win32 has wtimer so the skipped test is more than just
-;;; (:and :sb-safepoint (:not :sb-wtimer)) because that wouldn't
-;;; explain why win32 doesn't pass.
-(with-test (:name (:timer :deferrables-blocked)
-                  :skipped-on (or :win32 (:and :darwin :sb-safepoint)))
+(with-test (:name (:timer :deferrables-blocked) :skipped-on :win32)
   (make-and-schedule-and-wait (lambda ()
                                 (check-deferrables-blocked-or-lose 0))
                               (random 0.1))
   (check-deferrables-unblocked-or-lose 0))
 
-(with-test (:name (:timer :deferrables-unblocked)
-                  :skipped-on (or :win32 (:and :darwin :sb-safepoint)))
+(with-test (:name (:timer :deferrables-unblocked) :skipped-on :win32)
   (make-and-schedule-and-wait (lambda ()
                                 (sb-sys:with-interrupts
                                   (check-deferrables-unblocked-or-lose 0)))
                               (random 0.1))
   (check-deferrables-unblocked-or-lose 0))
 
-(with-test (:name (:timer :deferrables-unblocked :unwind)
-                  :skipped-on (or :win32 (:and :darwin :sb-safepoint)))
+(with-test (:name (:timer :deferrables-unblocked :unwind) :skipped-on :win32)
   (catch 'xxx
     (make-and-schedule-and-wait (lambda ()
                                   (check-deferrables-blocked-or-lose 0)

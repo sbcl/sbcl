@@ -298,8 +298,7 @@ sufficiently motivated to do lengthy fixes."
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)
-  #+sb-wtimer
-  (itimer-emulation-deinit)
+  #+win32 (itimer-emulation-deinit)
   #+sb-thread
   (let (err)
     (with-system-mutex (sb-thread::*make-thread-lock*)

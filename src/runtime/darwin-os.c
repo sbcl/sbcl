@@ -36,12 +36,6 @@
 #include <libkern/OSAtomic.h>
 #endif
 
-#if defined(LISP_FEATURE_SB_WTIMER)
-# include <sys/types.h>
-# include <sys/event.h>
-# include <sys/time.h>
-#endif
-
 char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
@@ -241,74 +235,6 @@ os_sem_destroy(os_sem_t *sem)
     dispatch_release(*sem);
 }
 
-#endif
-
-#if defined(LISP_FEATURE_SB_WTIMER)
-
-# error Completely untested. Go ahead! Remove this line, try your luck!
-
-/*
- * Waitable timer implementation for the safepoint-based (SIGALRM-free)
- * timer facility using kqueue.
- *
- * Unlike FreeBSD with its ms (!) timer resolution, Darwin supports ns
- * timer resolution -- or at least it pretends to do so on the API
- * level (?).  To use it, we need the *64 versions of the functions and
- * structures.
- *
- * Unfortunately, I don't run Darwin, and can't test this code, so it's
- * just a hopeful translation from FreeBSD.
- */
-
-int
-os_create_wtimer()
-{
-    int kq = kqueue();
-    if (kq == -1)
-        lose("os_create_wtimer: kqueue");
-    return kq;
-}
-
-int
-os_wait_for_wtimer(int kq)
-{
-    struct kevent64_s ev;
-    int n;
-    if ( (n = kevent64(kq, 0, 0, &ev, 1, 0, 0)) == -1) {
-        if (errno != EINTR)
-            lose("os_wtimer_listen failed");
-        n = 0;
-    }
-    return n != 1;
-}
-
-void
-os_close_wtimer(int kq)
-{
-    if (close(kq) == -1)
-        lose("os_close_wtimer failed");
-}
-
-void
-os_set_wtimer(int kq, int sec, int nsec)
-{
-    int64_t nsec = ((int64_t) sec) * 1000000000 + (int64_t) nsec;
-
-    struct kevent64_s ev;
-    EV_SET64(&ev, 1, EVFILT_TIMER, EV_ADD|EV_ENABLE|EV_ONESHOT, NOTE_NSECONDS,
-             nsec, 0, 0, 0);
-    if (kevent64(kq, &ev, 1, 0, 0, 0, 0) == -1)
-        perror("os_set_wtimer: kevent");
-}
-
-void
-os_cancel_wtimer(int kq)
-{
-    struct kevent64_s ev;
-    EV_SET64(&ev, 1, EVFILT_TIMER, EV_DISABLE, 0, 0, 0, 0, 0);
-    if (kevent64(kq, &ev, 1, 0, 0, 0, 0) == -1 && errno != ENOENT)
-        perror("os_cancel_wtimer: kevent");
-}
 #endif
 
 /* nanosleep() is not re-entrant on some versions of Darwin,

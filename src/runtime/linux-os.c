@@ -49,9 +49,6 @@
 #include "thread.h"
 #include "gc-internal.h"
 #include <fcntl.h>
-#ifdef LISP_FEATURE_SB_WTIMER
-# include <sys/timerfd.h>
-#endif
 
 #ifdef LISP_FEATURE_X86
 /* Prototype for personality(2). Done inline here since the header file
@@ -412,61 +409,3 @@ char *os_get_runtime_executable_path()
 
     return copied_string(path);
 }
-
-#ifdef LISP_FEATURE_SB_WTIMER
-/*
- * Waitable timer implementation for the safepoint-based (SIGALRM-free)
- * timer facility using timerfd_create().
- */
-int
-os_create_wtimer()
-{
-    int fd = timerfd_create(CLOCK_MONOTONIC, 0);
-    if (fd == -1)
-        lose("os_create_wtimer: timerfd_create");
-
-    /* Cannot count on TFD_CLOEXEC availability, so do it manually: */
-    if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1)
-        lose("os_create_wtimer: fcntl");
-
-    return fd;
-}
-
-int
-os_wait_for_wtimer(int fd)
-{
-    unsigned char buf[8];
-    int n = read(fd, buf, sizeof(buf));
-    if (n == -1) {
-        if (errno == EINTR)
-            return -1;
-        lose("os_wtimer_listen failed");
-    }
-    if (n != sizeof(buf))
-        lose("os_wtimer_listen read too little");
-    return 0;
-}
-
-void
-os_close_wtimer(int fd)
-{
-    if (close(fd) == -1)
-        lose("os_close_wtimer failed");
-}
-
-void
-os_set_wtimer(int fd, int sec, int nsec)
-{
-    struct itimerspec spec = { {0,0}, {0,0} };
-    spec.it_value.tv_sec = sec;
-    spec.it_value.tv_nsec = nsec;
-    if (timerfd_settime(fd, 0, &spec, 0) == -1)
-        lose("timerfd_settime");
-}
-
-void
-os_cancel_wtimer(int fd)
-{
-    os_set_wtimer(fd, 0, 0);
-}
-#endif
