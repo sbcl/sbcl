@@ -893,13 +893,13 @@ process_directory(int count, struct ndir_entry *entry,
             sword_t offset = os_vm_page_size * (1 + entry->data_page);
             if (compressed) {
 #ifdef LISP_FEATURE_DARWIN_JIT
-                if (id == READ_ONLY_CORE_SPACE_ID) 
+                if (id == READ_ONLY_CORE_SPACE_ID)
                     os_protect((os_vm_address_t)addr, len, OS_VM_PROT_WRITE);
 #endif
                 inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-                if (id == READ_ONLY_CORE_SPACE_ID) 
+                if (id == READ_ONLY_CORE_SPACE_ID)
                     os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
 #endif
 
