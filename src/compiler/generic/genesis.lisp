@@ -3774,7 +3774,11 @@ III. initially undefined function references (alphabetically):
                        (list (cold-intern
                               (and (null qual) (predicate-for-specializer class)))
                              (cold-intern qual)
-                             (cold-intern class)
+                             (acond ((gethash class *cold-layouts*)
+                                     (cold-layout-descriptor it))
+                                    (t
+                                     (aver (predicate-for-specializer class))
+                                     (cold-intern class)))
                              fun
                              lambda-list source-loc))))))))
 

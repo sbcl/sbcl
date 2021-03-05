@@ -171,6 +171,8 @@
           (fmf         (svref method 3))
           (lambda-list (svref method 4))
           (source-loc  (svref method 5)))
+      (when (sb-kernel::layout-p specializer)
+        (setq specializer (classoid-name (layout-classoid specializer))))
       (unless (member specializer except)
         (multiple-value-bind (specializers arg-info)
                (case gf-name

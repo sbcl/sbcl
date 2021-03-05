@@ -93,6 +93,7 @@
          (applicable-method
           ;; Each "method" is represented as a vector:
           ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
+          ;; SPECIALIZER is either a symbol for a classoid, or a genesis-time #<LAYOUT>.
           ;; Pick the first applicable one.
           (find-if (lambda (method)
                      ;; LAYOUT-OF can't be called until its constants have been patched in,
@@ -106,9 +107,11 @@
                             (let ((guard (the symbol (svref method 0))))
                               (if (fboundp guard)
                                   (funcall guard specialized-arg)
-                                  (let ((test (find-layout (svref method 2))))
-                                    (or (eq test arg-layout)
-                                        (find test (layout-inherits arg-layout)))))))))
+                                  (let ((test-layout (svref method 2)))
+                                    (and (sb-kernel::layout-p test-layout)
+                                         (or (eq test-layout arg-layout)
+                                             (find test-layout
+                                                   (layout-inherits arg-layout))))))))))
                    methods)))
     (if applicable-method
         ;; Call using no permutation-vector / no precomputed next method.
