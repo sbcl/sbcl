@@ -244,10 +244,13 @@
   #-sb-thread 1024) ; crazy value
 
 ;;; Thread slots accessed at negative indices relative to struct thread.
-;;; sb-safepoint needs to access one word below thread-base-tn for the
-;;; foreign call safepoint trap word, so this trick doesn't work.
+;;; This number could be 16 for non-safepoint, or for safepoint, 15, so that -16
+;;; would be on the safepoint page. I had trouble with an odd number of slots
+;;; as there seems to be an alignment requirement. 14 works in general, and the
+;;; safepoint slot is -15 which presents no problem.
 (defconstant thread-header-slots
-  (+ #+(and x86-64 (not sb-safepoint)) 16))
+  #+x86-64 14
+  #-x86-64 0)
 
 #+gencgc
 (progn

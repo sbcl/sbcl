@@ -374,7 +374,7 @@ void wake_thread(struct thread_instance*),
      wake_thread_impl(struct thread_instance*);
 # endif
 
-#define csp_around_foreign_call(thread) *(((lispobj*)thread) - 1)
+#define csp_around_foreign_call(thread) *(((lispobj*)thread)-(1+THREAD_HEADER_SLOTS))
 
 static inline
 void push_gcing_safety(struct gcing_safety *into)

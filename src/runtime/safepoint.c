@@ -288,7 +288,7 @@ thread_blocks_gc(struct thread *thread)
     return read_TLS(GC_INHIBIT,thread)==T;
 }
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
-   flag (Lisp Stack Top) of the thread `p'. The flag may be modified
+   flag (Lisp Stack Top) of the thread `th'. The flag may be modified
    if `writable' is true.
 
    Return true if there is a non-null value in the flag.
@@ -305,13 +305,13 @@ thread_blocks_gc(struct thread *thread)
    are switched to read-only for race-free examine + wait + use
    scenarios. */
 static inline boolean
-set_thread_csp_access(struct thread* p, boolean writable)
+set_thread_csp_access(struct thread* th, boolean writable)
 {
-    os_protect((char *) p - THREAD_CSP_PAGE_SIZE,
+    os_protect((char*)th - (THREAD_HEADER_SLOTS*N_WORD_BYTES) - THREAD_CSP_PAGE_SIZE,
                THREAD_CSP_PAGE_SIZE,
                writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
                : (OS_VM_PROT_READ));
-    return csp_around_foreign_call(p) != 0;
+    return csp_around_foreign_call(th) != 0;
 }
 
 static inline void gc_notify_early()
@@ -1071,7 +1071,7 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
         return 1;
     }
 
-    if (1+(lispobj*)fault_address == (lispobj*)self) {
+    if ((1+THREAD_HEADER_SLOTS)+(lispobj*)fault_address == (lispobj*)self) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         arrange_return_to_c_function(ctx, handle_csp_safepoint_violation, 0);
 #else

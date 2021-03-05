@@ -451,22 +451,20 @@ during backtrace.
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
 (defglobal *thread-header-slot-names*
   (append '(msan-xor-constant)
+          ;; The following slot's existence must NOT be conditional on #+msan
+          #+x86-64 '(msan-param-tls) ; = &__msan_param_tls
           #+immobile-space '(function-layout
                              varyobj-space-addr
                              varyobj-card-count
                              varyobj-card-marks)))
 
-#+sb-safepoint
-(defglobal *thread-trailer-slots* (mapcar #'list *thread-header-slot-names*))
-#-sb-safepoint
 (macrolet ((assign-header-slot-indices ()
              (let ((i 0))
                `(progn
                   ,@(mapcar (lambda (x)
                               `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
                             *thread-header-slot-names*)))))
-  (assign-header-slot-indices)
-  (defglobal *thread-trailer-slots* nil))
+  (assign-header-slot-indices))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -509,8 +507,6 @@ during backtrace.
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   (stepping)
-  ;; The following slot's existence must NOT be conditional on #+msan
-  #+x86-64 (msan-param-tls) ; = &__msan_param_tls
   (dynspace-addr)
   (dynspace-card-count)
   (dynspace-pte-base)
@@ -565,10 +561,6 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
-  ;; If we need the header slots, but they can't precede this structure
-  ;; for technical reasons having to do with no writable memory being there,
-  ;; then stuff them at the end, for lack of any place better.
-  ,@*thread-trailer-slots*
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
   (lisp-thread :pointer t :special sb-thread:*current-thread*))

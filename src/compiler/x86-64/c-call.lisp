@@ -247,7 +247,7 @@
    (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))))
 
 #+sb-safepoint
-(defconstant thread-saved-csp-offset -1)
+(defconstant thread-saved-csp-offset (- (1+ sb-vm::thread-header-slots)))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun destroyed-c-registers ()
