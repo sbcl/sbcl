@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.2:
+  * bug fix: structures and conditions are now TYPEP all classes in the class
+    precedence list of their class.  (reported by Luis Oliveira)
+
 changes in sbcl-2.1.2 relative to sbcl-2.1.1:
   * platform support:
     ** support for ARM64 macOS;

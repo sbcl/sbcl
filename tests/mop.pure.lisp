@@ -193,3 +193,11 @@
           (dolist (slot-name (mapcar #'sb-mop:slot-definition-name
                                      (sb-mop:class-slots class)))
             (assert (sb-pcl::find-slot-cell layout slot-name))))))))
+
+(with-test (:name (typep sb-mop:class-precedence-list))
+  (let* ((objs (list (make-hash-table) (make-pathname) (make-condition 'warning)
+                     (find-class 't) #'make-instance)))
+    (dolist (obj objs)
+      (let ((cpl (sb-mop:class-precedence-list (class-of obj))))
+        (dolist (sc cpl)
+          (assert (typep obj sc)))))))

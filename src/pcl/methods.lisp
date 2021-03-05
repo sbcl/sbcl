@@ -1083,8 +1083,6 @@
 (defmacro class-test (arg class)
   (cond
     ((eq class *the-class-t*) t)
-    ((eq class *the-class-slot-object*)
-     `(not (typep (classoid-of ,arg) 'system-classoid)))
     ((eq class *the-class-standard-object*)
      `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
     ((eq class *the-class-funcallable-standard-object*)

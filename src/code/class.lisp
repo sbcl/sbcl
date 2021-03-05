@@ -1027,6 +1027,12 @@ between the ~A definition and the ~A definition"
       :direct-superclasses (symbol list)
       :prototype-form 'nil)
 
+     (sb-pcl::slot-object
+      :translation (or structure-object standard-object condition)
+      :hierarchical-p nil
+      :state :read-only
+      :prototype-form (make-defstruct-description t 'arbitrary))
+
      ;; KLUDGE: the length must match the subsequent defstruct.
      (pathname :depth 1
                :length ,(+ 7 sb-vm:instance-data-start)

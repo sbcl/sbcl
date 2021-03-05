@@ -219,7 +219,8 @@
                                  ;; SYSTEM-CLASSes) from the
                                  ;; BUILT-IN-CLASS list
                                  '(t function stream sequence
-                                     file-stream string-stream)))
+                                   file-stream string-stream
+                                   slot-object)))
                        sb-kernel::+!built-in-classes+))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
