@@ -255,7 +255,7 @@ void* read_current_thread() {
 #endif
 
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-    extern pthread_key_t sigwait_bug_mitigation;
+extern pthread_key_t foreign_thread_ever_lispified;
 #endif
 
 void create_main_lisp_thread(lispobj function) {
@@ -272,7 +272,7 @@ void create_main_lisp_thread(lispobj function) {
     pthread_key_create(&specials, 0);
 #endif
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-    pthread_key_create(&sigwait_bug_mitigation, 0);
+    pthread_key_create(&foreign_thread_ever_lispified, 0);
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
@@ -692,7 +692,9 @@ static void attach_os_thread(init_thread_data *scribble)
 static void detach_os_thread(init_thread_data *scribble)
 {
     struct thread *th = get_sb_vm_thread();
-
+#ifdef LISP_FEATURE_DARWIN
+    pthread_setspecific(foreign_thread_ever_lispified, (void*)1);
+#endif
     unregister_thread(th, scribble);
 
     /* We have to clear a STOP_FOR_GC signal if pending. Consider:
@@ -709,28 +711,13 @@ static void detach_os_thread(init_thread_data *scribble)
      *  - but STOP_FOR_GC is pending because it was in the blocked set.
      * Bad things happen unless we clear the pending GC signal.
      */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if !defined LISP_FEATURE_SB_SAFEPOINT && !defined LISP_FEATURE_DARWIN
     sigset_t pending;
     sigpending(&pending);
     if (sigismember(&pending, SIG_STOP_FOR_GC)) {
         int sig, rc;
         rc = sigwait(&gc_sigset, &sig);
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
-#ifdef LISP_FEATURE_DARWIN
-        sigpending(&pending);
-        if (sigismember(&pending, SIG_STOP_FOR_GC)) {
-            // fprintf(stderr, "Trying sigwait bug mitigation\n");
-            pthread_setspecific(sigwait_bug_mitigation, (void*)1);
-            sigfillset(&pending);
-            sigdelset(&pending, SIG_STOP_FOR_GC);
-            // This might hang forever now, because the signal disappears
-            // despite that we just observed it to be pending.
-            // Basically you're screwed one way or the other - either
-            // by a spurious signal or a lost signal.
-            sigsuspend(&pending);
-            // fprintf(stderr, "Back from sigsuspend\n");
-        }
-#endif
     }
 #endif
     put_recyclebin_item(th);
@@ -1142,26 +1129,21 @@ void gc_stop_the_world()
 
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for_each_thread(th) {
-        gc_assert(th->os_thread != 0);
-        /* We were going to extremes here to use acquire semantics on the state,
-         * while NOT ACTUALLY PREVENTING CHANGE OF THAT STATE. i.e. we released the
-         * state lock before returning with the determined state. That's no help.
-         * Just do an atomic load and we're good */
-        int state = get_thread_state(th);
-        if (th != me && state == STATE_RUNNING) {
-            /* This pthread_kill is safe.
-             * A RUNNING thread can transition to DEAD but can't disappear either
-             * in terms of 'struct thread' being unmapped or the pthread exiting,
-             * because it'll be blocked on the all_threads lock */
-            rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
-            /* This used to bogusly check for ESRCH.
-             * I changed the ESRCH case to just fall into lose() */
-            if (rc) {
-                lose("cannot suspend thread %p: %d, %s",
+        if (th != me) {
+            gc_assert(th->os_thread != 0);
+            struct extra_thread_data *semaphores = thread_extra_data(th);
+            os_sem_wait(&semaphores->state_sem, "notify stop");
+            int state = get_thread_state(th);
+            if (state == STATE_RUNNING) {
+                rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
+                /* This used to bogusly check for ESRCH.
+                 * I changed the ESRCH case to just fall into lose() */
+                if (rc) lose("cannot suspend thread %p: %d, %s",
                      // KLUDGE: assume that os_thread can be cast as pointer.
                      // See comment in 'interr.h' about that.
                      (void*)th->os_thread, rc, strerror(rc));
             }
+            os_sem_post(&semaphores->state_sem, "notified stop");
         }
     }
     for_each_thread(th) {

@@ -192,7 +192,7 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
  * maybe all deferrables. */
 
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-pthread_key_t sigwait_bug_mitigation;
+pthread_key_t foreign_thread_ever_lispified;
 int sigwait_bug_mitigation_count;
 #endif
 
@@ -203,10 +203,14 @@ static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
-    if (signal == SIG_STOP_FOR_GC && pthread_getspecific(sigwait_bug_mitigation)) {
-        // fprintf(stderr, "ignored a STOP_FOR_GC signal\n");
+    if (signal == SIG_STOP_FOR_GC && pthread_getspecific(foreign_thread_ever_lispified)) {
+        // This may be error-prone, I'm not sure.  Suppose there is a lingering
+        // stop-for-gc signal after we've demoted a lisp thread back to being
+        // a foreign thread. Suppose that thread then calls into lisp again so it re-promoted
+        // to a lisp thread. Is the next stop-for-gc signal real, or to be ignored?
+        // It'll be treated as real even if it was the lingering signal which ought to have
+        // been ignored. That probably won't happen, but "probably" is not a guarantee.
         __sync_fetch_and_add(&sigwait_bug_mitigation_count, 1);
-        pthread_setspecific(sigwait_bug_mitigation, 0);
         return;
     }
 #endif
