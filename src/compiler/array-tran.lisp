@@ -31,6 +31,10 @@
 ;;; known supertype of the upgraded-array-element-type, if if the exact
 ;;; U-A-E-T is not known. (If it is NIL, the primary return value is as good
 ;;; as it gets.)
+;;; FIXME: poorly named, it sounds like an accessor on an instance of ARRAY-TYPE,
+;;; but unfortunately UPGRADED-ARRAY-ELEMENT-TYPE is a CL: symbol
+;;; and %UPGRADED-ARRAY-ELEMENT-TYPE is already a thing as well.
+;;; Perhaps ARRAY-IMPLIED-ELEMENT-TYPE would be less misleading?
 (defun array-type-upgraded-element-type (type)
   (typecase type
     ;; Note that this IF mightn't be satisfied even if the runtime
@@ -109,7 +113,7 @@
      ;; 2002-08-21
      (values *wild-type* nil))))
 
-(defun array-type-declared-element-type (type)
+(defun declared-array-element-type (type)
   (if (array-type-p type)
       (array-type-element-type type)
       *wild-type*))
@@ -1678,8 +1682,7 @@
   (let ((elt-type (or (when (symbolp vector)
                         (let ((var (lexenv-find vector vars)))
                           (when (lambda-var-p var)
-                            (type-specifier
-                             (array-type-declared-element-type (lambda-var-type var))))))
+                            (declared-array-element-type (lambda-var-type var)))))
                       t)))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
@@ -1691,8 +1694,7 @@
   (let ((elt-type (or (when (symbolp vector)
                         (let ((var (lexenv-find vector vars)))
                           (when (lambda-var-p var)
-                            (type-specifier
-                             (array-type-declared-element-type (lambda-var-type var))))))
+                            (declared-array-element-type (lambda-var-type var)))))
                       t)))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
@@ -1779,13 +1781,13 @@
             (null (array-type-complexp type))
             (neq element-ctype *wild-type*)
             (eql (length (array-type-dimensions type)) 1))
-       (let* ((declared-element-ctype (array-type-declared-element-type type))
+       (let* ((declared-element-ctype (array-type-element-type type))
               (bare-form
                 `(data-vector-ref array
                                   (check-bound array (array-dimension array 0) index))))
          (if (type= declared-element-ctype element-ctype)
              bare-form
-             `(the ,(type-specifier declared-element-ctype) ,bare-form))))
+             `(the ,declared-element-ctype ,bare-form))))
       ((policy node (zerop insert-array-bounds-checks))
        `(hairy-data-vector-ref array index))
       (t `(hairy-data-vector-ref/check-bounds array index)))))
@@ -1803,8 +1805,7 @@
              `(deftransform ,name ((array index ,@extra))
                 (let* ((type (lvar-type array))
                        (element-type (array-type-upgraded-element-type type))
-                       (declared-type (type-specifier
-                                       (array-type-declared-element-type type))))
+                       (declared-type (declared-array-element-type type)))
                   ;; If an element type has been declared, we want to
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array

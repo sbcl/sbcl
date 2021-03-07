@@ -188,7 +188,7 @@
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (array-type-declared-element-type type)))
+         (declared-element-ctype (declared-array-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -282,7 +282,7 @@
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (array-type-declared-element-type type)))
+         (declared-element-ctype (declared-array-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
