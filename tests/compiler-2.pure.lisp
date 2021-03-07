@@ -3099,3 +3099,8 @@
      `(lambda ()
         (,name :k 0f0))
      (() 0f0))))
+
+(with-test (:name :no-*-as-type)
+  (multiple-value-bind (fun warn err) (compile nil '(lambda (x) (the * x)))
+    (assert (and warn err))
+    (assert-error (funcall fun 1))))

@@ -875,7 +875,7 @@
 ;;;  SPECIFIER-TYPE:
 ;;;    disallow (VALUES ...) even if single value, and disallow *
 ;;;  VALUES-SPECIFIER-TYPE:
-;;;    allow VALUES and *
+;;;    allow VALUES, disallow *
 ;;; TYPE-OR-NIL-IF-UNKNOWN:
 ;;;    like SPECIFIER-TYPE, but return NIL if contains unknown
 ;;; all the above are funneled through BASIC-PARSE-TYPESPEC.
@@ -1031,8 +1031,11 @@
 ;;; This takes no CONTEXT (which implies lack of recursion) because
 ;;; you can't reasonably place a VALUES type inside another type.
 (defun values-specifier-type (type-specifier)
-  (dx-let ((context (make-type-context type-specifier)))
-    (basic-parse-typespec type-specifier context)))
+  (let ((parse (dx-let ((context (make-type-context type-specifier)))
+                 (basic-parse-typespec type-specifier context))))
+    (if (eq parse *wild-type*)
+        (error "* is not permitted as a type specifier")
+        parse)))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.

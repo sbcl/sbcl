@@ -1670,6 +1670,11 @@
   (define-frob schar %scharset simple-string)
   (define-frob char %charset string))
 
+(defun the-unwild (type expr)
+  (if (or (null type) (eq type *wild-type*)) expr `(the ,type ,expr)))
+(defun truly-the-unwild (type expr)
+  (if (or (null type) (eq type *wild-type*)) expr `(truly-the ,type ,expr)))
+
 ;;; We transform SVREF and %SVSET directly into DATA-VECTOR-REF/SET: this is
 ;;; around 100 times faster than going through the general-purpose AREF
 ;;; transform which ends up doing a lot of work -- and introducing many
@@ -1679,33 +1684,30 @@
 ;;; FIXME: [S]CHAR, and [S]BIT above would almost certainly benefit from a similar
 ;;; treatment.
 (define-source-transform svref (vector index)
-  (let ((elt-type (or (when (symbolp vector)
-                        (let ((var (lexenv-find vector vars)))
-                          (when (lambda-var-p var)
-                            (declared-array-element-type (lambda-var-type var)))))
-                      t)))
+  (let ((elt-type (let ((var (and (symbolp vector) (lexenv-find vector vars))))
+                    (when (lambda-var-p var)
+                      (declared-array-element-type (lambda-var-type var))))))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
-         (the ,elt-type (data-vector-ref
+         ,(the-unwild elt-type `(data-vector-ref
                          (the simple-vector ,n-vector)
                          (check-bound ,n-vector (length ,n-vector) ,index)))))))
 
 (define-source-transform %svset (vector index value)
-  (let ((elt-type (or (when (symbolp vector)
-                        (let ((var (lexenv-find vector vars)))
-                          (when (lambda-var-p var)
-                            (declared-array-element-type (lambda-var-type var)))))
-                      t)))
+  (let ((elt-type (let ((var (and (symbolp vector) (lexenv-find vector vars))))
+                    (when (lambda-var-p var)
+                      (declared-array-element-type (lambda-var-type var))))))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
-         (truly-the ,elt-type (data-vector-set
+         ,(truly-the-unwild elt-type
+                             `(data-vector-set
                                (the simple-vector
                                     (with-annotations
                                         (,(make-lvar-modified-annotation :caller
                                                                          '(setf svref)))
                                       ,n-vector))
                                (check-bound ,n-vector (length ,n-vector) ,index)
-                               (the ,elt-type ,value)))))))
+                               ,(the-unwild elt-type value)))))))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call
@@ -1822,15 +1824,15 @@
                        "Upgraded element type of array is not known at compile time.")))
                   ,expr))))
   (define hairy-data-vector-ref/check-bounds ((array index))
-    `(the ,declared-type
-          (hairy-data-vector-ref
+    (the-unwild declared-type
+          `(hairy-data-vector-ref
            array (check-bound array (array-dimension array 0) index))))
   (define hairy-data-vector-set/check-bounds ((array index new-value))
-    `(truly-the ,declared-type
-                (hairy-data-vector-set
+    (truly-the-unwild declared-type
+                `(hairy-data-vector-set
                  array
                  (check-bound array (array-dimension array 0) index)
-                 (the ,declared-type new-value)))))
+                 ,(the-unwild declared-type 'new-value)))))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the

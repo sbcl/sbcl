@@ -598,11 +598,10 @@
   (unless (and (constant-lvar-p type)
                (alien-fun-type-p (lvar-value type)))
     (error "Something is broken."))
-  (let ((type (lvar-value type)))
-    (values-specifier-type
-     (compute-alien-rep-type
-      (alien-fun-type-result-type type)
-      :result))))
+  (let ((spec (compute-alien-rep-type
+               (alien-fun-type-result-type (lvar-value type))
+               :result)))
+    (if (eq spec '*) *wild-type* (values-specifier-type spec))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
               ((function type &rest args) node ltn-policy)

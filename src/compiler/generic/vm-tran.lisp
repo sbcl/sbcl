@@ -207,8 +207,7 @@
                   ((type= element-ctype declared-element-ctype)
                    bare-form)
                   (t
-                   `(the ,(type-specifier declared-element-ctype)
-                         ,bare-form))))))))
+                   (the-unwild declared-element-ctype bare-form))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
@@ -294,10 +293,9 @@
                   (type ,element-type-specifier new-value))
          ,(if (type= element-ctype declared-element-ctype)
               '(data-vector-set array index new-value)
-              `(truly-the ,(type-specifier declared-element-ctype)
-                 (data-vector-set array index
-                  (the ,(type-specifier declared-element-ctype)
-                       new-value))))))))
+              (truly-the-unwild declared-element-ctype
+                 `(data-vector-set array index
+                   ,(the-unwild declared-element-ctype new-value))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
