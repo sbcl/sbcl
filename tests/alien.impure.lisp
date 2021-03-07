@@ -531,3 +531,10 @@
     (t (c)
       (assert (typep c 'sb-kernel::undefined-alien-function-error))
       (assert (equal (cell-error-name c) "bar")))))
+
+(defconstant fleem 3)
+;; We used to expand into
+;; (SYMBOL-MACROLET ((FLEEM (SB-ALIEN-INTERNALS:%ALIEN-VALUE
+;; which conflicted with the symbol as global variable.
+(with-test (:name :def-alien-rtn-use-gensym)
+  (checked-compile '(lambda () (define-alien-routine "fleem" int (x int)))))

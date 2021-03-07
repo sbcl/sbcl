@@ -767,8 +767,13 @@ way that the argument is passed.
       passed, with the object being initialized from the supplied argument
       and the return value being determined by accessing the object on
       return."
-  (multiple-value-bind (lisp-name alien-name)
-      (pick-lisp-and-alien-names name)
+  (binding* (((lisp-name alien-name) (pick-lisp-and-alien-names name))
+             ;; The local name is uninterned so that we don't preclude
+             ;;   (defconstant kill 9)
+             ;;   (define-alien-routine "kill" int (pid int) (sig int))
+             ;; which, if we didn't hide the local name, would get:
+             ;;  "Attempt to bind a constant variable with SYMBOL-MACROLET: KILL"
+             (local-name (copy-symbol lisp-name)))
     (collect ((docs) (lisp-args) (lisp-arg-types)
               (lisp-result-types
                (cond ((eql result-type 'void)
@@ -826,13 +831,13 @@ way that the argument is passed.
          (defun ,lisp-name ,(lisp-args)
            ,@(docs)
            (with-alien
-            ((,lisp-name (function ,result-type ,@(arg-types))
+            ((,local-name (function ,result-type ,@(arg-types))
                          :extern ,alien-name)
              ,@(alien-vars))
              ,@(if (eq 'void result-type)
-                   `((alien-funcall ,lisp-name ,@(alien-args))
+                   `((alien-funcall ,local-name ,@(alien-args))
                      (values nil ,@(results)))
-                   `((values (alien-funcall ,lisp-name ,@(alien-args))
+                   `((values (alien-funcall ,local-name ,@(alien-args))
                              ,@(results))))))))))
 
 (defun alien-typep (object type)
