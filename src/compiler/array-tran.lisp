@@ -1800,9 +1800,8 @@
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
-(macrolet ((define (name transform-to extra extra-type)
-             (declare (ignore extra-type))
-             `(deftransform ,name ((array index ,@extra))
+(macrolet ((define (name args expr)
+             `(deftransform ,name ,args
                 (let* ((type (lvar-type array))
                        (element-type (array-type-upgraded-element-type type))
                        (declared-type (declared-array-element-type type)))
@@ -1821,22 +1820,17 @@
                               (not (null (array-type-complexp type))))
                       (give-up-ir1-transform
                        "Upgraded element type of array is not known at compile time.")))
-                  ,(if extra
-                       ``(truly-the ,declared-type
-                                    (,',transform-to array
-                                                     (check-bound array
-                                                                  (array-dimension array 0)
-                                                                  index)
-                                                     (the ,declared-type ,@',extra)))
-                       ``(the ,declared-type
-                           (,',transform-to array
-                                            (check-bound array
-                                                         (array-dimension array 0)
-                                                         index))))))))
-  (define hairy-data-vector-ref/check-bounds
-      hairy-data-vector-ref nil nil)
-  (define hairy-data-vector-set/check-bounds
-      hairy-data-vector-set (new-value) (*)))
+                  ,expr))))
+  (define hairy-data-vector-ref/check-bounds ((array index))
+    `(the ,declared-type
+          (hairy-data-vector-ref
+           array (check-bound array (array-dimension array 0) index))))
+  (define hairy-data-vector-set/check-bounds ((array index new-value))
+    `(truly-the ,declared-type
+                (hairy-data-vector-set
+                 array
+                 (check-bound array (array-dimension array 0) index)
+                 (the ,declared-type new-value)))))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
