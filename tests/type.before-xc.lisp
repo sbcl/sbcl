@@ -483,3 +483,12 @@
     (assert (type= intersect (specifier-type
                               '(and (array bit (2 2))
                                     (not simple-array)))))))
+
+;;; The instance-typep transform shouldn't need two different lowtag tests
+;;; on instance types other than [funcallable-]standard-object.
+;;; And for some reason we suppose that STREAM may be either funcallable or not.
+(dolist (type '(pathname logical-pathname condition))
+  (multiple-value-bind (answer certain)
+      (csubtypep (find-classoid type) (specifier-type 'funcallable-instance))
+    (assert (and (not answer) certain)))
+  (aver (csubtypep (find-classoid type) (specifier-type 'instance))))
