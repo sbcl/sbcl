@@ -322,43 +322,6 @@
   `(ceiling (max 0 (- ,depthoid ,layout-id-vector-fixed-capacity))
             ,(/ sb-vm:n-word-bytes 4)))
 
-(defun set-layout-inherits (layout inherits structurep this-id)
-  (declare (ignorable structurep this-id))
-  (setf (layout-inherits layout) inherits)
-  ;;; If structurep, and *only* if, store all the inherited layout IDs.
-  ;;; It looks enticing to try to always store "something", but that goes wrong,
-  ;;; because only structure-object layouts are growable, and only structure-object
-  ;;; can store the self-ID in the proper index.
-  ;;; If the depthoid is -1, the self-ID has to go in index 0.
-  ;;; Standard-object layouts are not growable. The inherited layouts are known
-  ;;; only at class finalization time, at which point we've already made the layout.
-  ;;; Hence, the required indirection to the simple-vector of inherits.
-  #-sb-xc-host
-  (cond (structurep
-         (with-pinned-objects (layout)
-           (loop with sap = (sap+ (int-sap (get-lisp-obj-address layout))
-                                  (- (ash (+ sb-vm:instance-slots-offset
-                                             (get-dsd-index layout id-word0))
-                                          sb-vm:word-shift)
-                                     sb-vm:instance-pointer-lowtag))
-                 for i from 0 by 4
-                 for j from 2 below (length inherits)
-                 do (setf (signed-sap-ref-32 sap i) (layout-id (svref inherits j)))
-                 finally (setf (signed-sap-ref-32 sap i) this-id))))
-        ((not (eql this-id 0))
-         (setf (layout-id-word0 layout) this-id))))
-
-(defmacro set-bitmap-from-layout (to-layout from-layout)
-  #+sb-xc-host (declare (ignore to-layout from-layout))
-  #-sb-xc-host
-  `(let ((to-index (+ (type-dd-length layout)
-                      (calculate-extra-id-words (layout-depthoid ,to-layout))))
-         (from-index (+ (type-dd-length layout)
-                      (calculate-extra-id-words (layout-depthoid ,from-layout)))))
-     (dotimes (i (layout-bitmap-words ,from-layout))
-       (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
-             (%raw-instance-ref/word ,from-layout (+ from-index i))))))
-
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
   #+compact-instance-header  6

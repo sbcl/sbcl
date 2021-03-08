@@ -230,7 +230,16 @@ between the ~A definition and the ~A definition"
 ;;;    and subclasses are invalidated, and the SUBCLASSES slot is cleared.
 ;;; -- If DESTRUCT-LAYOUT, then this is some old layout, and is to be
 ;;;    destructively modified to hold the same type information.
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+(macrolet ((set-bitmap-from-layout (to-layout from-layout)
+             `(let ((to-index
+                     (+ (type-dd-length layout)
+                        (calculate-extra-id-words (layout-depthoid ,to-layout))))
+                    (from-index
+                     (+ (type-dd-length layout)
+                        (calculate-extra-id-words (layout-depthoid ,from-layout)))))
+                (dotimes (i (layout-bitmap-words ,from-layout))
+                  (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
+                        (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
 (defun register-layout (layout &key (invalidate t) destruct-layout)
   (declare (type layout layout) (type (or layout null) destruct-layout))
   (with-world-lock ()
@@ -321,8 +330,7 @@ between the ~A definition and the ~A definition"
           (setf (gethash classoid subclasses)
                 (or destruct-layout layout))))))
 
-  (values))
-); EVAL-WHEN
+  (values)))
 
 ;;; Arrange the inherited layouts to appear at their expected depth,
 ;;; ensuring that hierarchical type tests succeed. Layouts with
