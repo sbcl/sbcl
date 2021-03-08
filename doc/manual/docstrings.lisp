@@ -414,10 +414,10 @@ there is no corresponding docstring."
                       (cond ((or key optional) (car x))
                             (t (clean (car x))))
                       (clean (cdr x) :key key :optional optional))))))
-         (multiple-value-bind (ll valid) (sb-introspect:function-lambda-list (get-name doc))
-           (if valid
-               (clean ll)
-               (values nil nil))))))))
+         (multiple-value-bind (ll unknown) (sb-introspect:function-lambda-list (get-name doc))
+           (if unknown
+               (values nil t)
+               (clean ll))))))))
 
 (defun get-string-name (x)
   (let ((name (get-name x)))
@@ -752,8 +752,8 @@ followed another tabulation label or a tabulation body."
                "deffn"))
             (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
             (title-name doc))
-    (multiple-value-bind (lambda-list valid) (lambda-list doc)
-      (cond ((not valid)
+    (multiple-value-bind (lambda-list unknown) (lambda-list doc)
+      (cond (unknown
              (format *texinfo-output* " @emph{lambda list not known}"))
             ((not lambda-list))
             (t
