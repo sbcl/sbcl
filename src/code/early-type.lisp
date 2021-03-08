@@ -1031,11 +1031,13 @@
 ;;; This takes no CONTEXT (which implies lack of recursion) because
 ;;; you can't reasonably place a VALUES type inside another type.
 (defun values-specifier-type (type-specifier)
-  (let ((parse (dx-let ((context (make-type-context type-specifier)))
-                 (basic-parse-typespec type-specifier context))))
-    (if (eq parse *wild-type*)
-        (error "* is not permitted as a type specifier")
-        parse)))
+  ;; This catches uses of literal '* where it shouldn't appear, but it
+  ;; accidentally lets other uses slip through. We'd have to catch '*
+  ;; post-type-expansion to be more strict, but it isn't very important.
+  (if (eq type-specifier '*)
+      (error "* is not permitted as a type specifier")
+      (dx-let ((context (make-type-context type-specifier)))
+        (basic-parse-typespec type-specifier context))))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.

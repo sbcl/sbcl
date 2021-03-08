@@ -295,7 +295,7 @@
               '(data-vector-set array index new-value)
               (truly-the-unwild declared-element-ctype
                  `(data-vector-set array index
-                   ,(the-unwild declared-element-ctype new-value))))))))
+                   ,(the-unwild declared-element-ctype 'new-value))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
