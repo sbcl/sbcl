@@ -730,39 +730,6 @@
     (inst shr :dword res (- instance-length-shift n-fixnum-tag-bits))
     (inst and :dword res (fixnumize instance-length-mask))))
 
-#+compact-instance-header
-(progn
- (define-vop (%instance-layout)
-   (:translate %instance-layout)
-   (:policy :fast-safe)
-   (:args (object :scs (descriptor-reg)))
-   (:results (res :scs (descriptor-reg)))
-   (:variant-vars lowtag)
-   (:variant instance-pointer-lowtag)
-   (:generator 1
-    (inst mov :dword res (ea (- 4 lowtag) object))))
- (define-vop (%set-instance-layout)
-   (:translate %set-instance-layout)
-   (:policy :fast-safe)
-   (:args (object :scs (descriptor-reg))
-          (value :scs (any-reg descriptor-reg) :target res))
-   (:results (res :scs (any-reg descriptor-reg)))
-   (:vop-var vop)
-   (:generator 1
-     (inst mov :dword (ea (- 4 instance-pointer-lowtag) object) value)
-     (move res value)))
- (define-vop (%fun-layout %instance-layout)
-   (:translate %fun-layout)
-   (:variant fun-pointer-lowtag))
- (define-vop (%set-fun-layout %set-instance-layout)
-   (:translate %set-fun-layout)
-   (:generator 50
-     (pseudo-atomic ()
-       (inst push object)
-       (invoke-asm-routine 'call 'touch-gc-card vop)
-       (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value))
-     (move res value))))
-
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)
 

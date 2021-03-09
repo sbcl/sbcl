@@ -837,15 +837,17 @@
       ((name (classoid-name classoid))
        (layout (let ((res (info :type :compiler-layout name)))
                  (when (and res (not (layout-invalid res))) res)))
-       ((primtype-predicate slot-reader)
+       ((lowtag lowtag-test slot-reader)
         (cond ((csubtypep classoid (specifier-type 'funcallable-instance))
-               (values '(function-with-layout-p object) '(%fun-layout object)))
+               (values sb-vm:fun-pointer-lowtag
+                       '(function-with-layout-p object) '(%fun-layout object)))
               ((csubtypep classoid (specifier-type 'instance))
-               (values '(%instancep object) '(%instance-layout object)))))
+               (values sb-vm:instance-pointer-lowtag
+                       '(%instancep object) '(%instance-layout object)))))
        (get-layout-or-return-false
-        (if primtype-predicate
+        (if lowtag-test
             ;; Test just one of %INSTANCEP or %FUNCALLABLE-INSTANCE-P
-            `(if ,primtype-predicate ,slot-reader (return-from typep nil))
+            `(if ,lowtag-test ,slot-reader (return-from typep nil))
             ;; But if we don't know which is will be, try both.
             ;; This is less general than LAYOUT-OF,and therefore
             ;; a little quicker to fail, because objects with
@@ -876,24 +878,16 @@
             ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
             ;; though probably extremely weird. Also the PRED should be set in
             ;; that event, but it isn't.
-            ;; The crummy dual expressions for the same result are because
-            ;; (BLOCK (RETURN ...)) seems to emit a forward branch in the
-            ;; passing case, but AND emits a forward branch in the failing
-            ;; case which I believe is the better choice.
-            (flet ((check-layout (layout-getter)
-                       (cond ((and (vop-existsp :named sb-vm::layout-eq)
-                                   (equal layout-getter '(%instance-layout object)))
-                              `(sb-vm::layout-eq object ',layout))
-                             (t
-                              `(eq ,layout-getter ',layout)))))
-                (if primtype-predicate
-                    `(and ,primtype-predicate ,(check-layout slot-reader))
-                    `(block typep ,(check-layout get-layout-or-return-false)))))
+           (if lowtag-test
+               `(and ,lowtag-test ,(if (vop-existsp :translate layout-eq)
+                                       `(layout-eq object ,layout ,lowtag)
+                                       `(eq ,slot-reader ,layout)))
+               `(block typep (eq ,get-layout-or-return-false ,layout))))
 
           ;; All other structure types
           ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
-            (aver (equal primtype-predicate '(%instancep object)))
+            (aver (eql lowtag sb-vm:instance-pointer-lowtag))
             ;; we used to check for invalid layouts here, but in fact that's both unnecessary and
             ;; wrong; it's unnecessary because structure classes can't be redefined, and it's wrong
             ;; because it is quite legitimate to pass an object with an invalid layout
@@ -902,10 +896,11 @@
                     ;; If we allowed structure classes to be mixed in to standard-object,
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
-                  (let ((,n-layout (%instance-layout object)))
-                    ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-                         `(%structure-is-a ,n-layout ,layout)
-                         `(and (layout-depthoid-ge ,n-layout ,depthoid)
+                  ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
+                       ;; no gensym, to keep the expansion more concise
+                       `(%structure-is-a (%instance-layout object) ,layout)
+                       `(let ((,n-layout (%instance-layout object)))
+                          (and (layout-depthoid-ge ,n-layout ,depthoid)
                                (%structure-is-a ,n-layout ,layout))))))
 
           ((> depthoid 0)
@@ -932,8 +927,8 @@
                             (sequence
                              `(eq (data-vector-ref (layout-inherits ,n-layout) 1)
                                   ,layout))))))
-              (if primtype-predicate
-                  `(and ,primtype-predicate (let ((,n-layout ,slot-reader)) ,@guts))
+              (if lowtag-test
+                  `(and ,lowtag-test (let ((,n-layout ,slot-reader)) ,@guts))
                   `(block typep
                      (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
 

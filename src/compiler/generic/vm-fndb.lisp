@@ -203,6 +203,7 @@
   ())
 (defknown %set-fun-layout (funcallable-instance layout) layout
   ())
+(defknown layout-eq ((or instance function) t (mod 16)) boolean (flushable))
 ;;; Caution: This is not exactly the same as instance_length() in C.
 ;;; The C one is the same as SB-VM::INSTANCE-LENGTH.
 (defknown %instance-length (instance) (unsigned-byte 14) (foldable flushable))

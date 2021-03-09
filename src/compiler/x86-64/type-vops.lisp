@@ -443,20 +443,48 @@
   (:generator 2
    (inst cmp :byte (ea (- other-pointer-lowtag) x) widetag)))
 
-;;; TRANSFORM-INSTANCE-TYPEP checks for this vop by name and will try to use it,
-;;; so don't define it if inapplicable.
 #+compact-instance-header
 (progn
-(defknown layout-eq (instance t) boolean (flushable))
-(define-vop (layout-eq)
-  (:translate layout-eq)
+ (define-vop ()
+   (:translate %instance-layout)
+   (:policy :fast-safe)
+   (:args (object :scs (descriptor-reg)))
+   (:results (res :scs (descriptor-reg)))
+   (:variant-vars lowtag)
+   (:variant instance-pointer-lowtag)
+   (:generator 1
+    (inst mov :dword res (ea (- 4 lowtag) object))))
+ (define-vop ()
+   (:translate %set-instance-layout)
+   (:policy :fast-safe)
+   (:args (object :scs (descriptor-reg))
+          (value :scs (any-reg descriptor-reg) :target res))
+   (:results (res :scs (any-reg descriptor-reg)))
+   (:vop-var vop)
+   (:generator 1
+     (inst mov :dword (ea (- 4 instance-pointer-lowtag) object) value)
+     (move res value)))
+ (define-vop (%fun-layout %instance-layout)
+   (:translate %fun-layout)
+   (:variant fun-pointer-lowtag))
+ (define-vop (%set-fun-layout %set-instance-layout)
+   (:translate %set-fun-layout)
+   (:generator 50
+     (pseudo-atomic ()
+       (inst push object)
+       (invoke-asm-routine 'call 'touch-gc-card vop)
+       (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value))
+     (move res value)))
+(define-vop ()
+  (:translate sb-c::layout-eq)
   (:policy :fast-safe)
   (:conditional :e)
-  (:args (instance :scs (descriptor-reg))
+  (:args (object :scs (descriptor-reg))
          (layout :scs (descriptor-reg immediate)))
+  (:arg-types * * (:constant t))
+  (:info lowtag)
   (:generator 1
-    (inst cmp :dword
-          (ea (- 4 instance-pointer-lowtag) instance)
+    (inst cmp :dword (ea (- 4 lowtag) object)
           (if (sc-is layout immediate)
               (make-fixup (tn-value layout) :layout)
               layout)))))
