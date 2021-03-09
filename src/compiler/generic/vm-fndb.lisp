@@ -201,7 +201,7 @@
   (foldable flushable))
 (defknown %set-instance-layout (instance layout) layout
   ())
-(defknown %set-funcallable-instance-layout (funcallable-instance layout) layout
+(defknown %set-fun-layout (funcallable-instance layout) layout
   ())
 ;;; Caution: This is not exactly the same as instance_length() in C.
 ;;; The C one is the same as SB-VM::INSTANCE-LENGTH.

@@ -754,8 +754,8 @@
  (define-vop (%fun-layout %instance-layout)
    (:translate %fun-layout)
    (:variant fun-pointer-lowtag))
- (define-vop (%set-funcallable-instance-layout %set-instance-layout)
-   (:translate %set-funcallable-instance-layout)
+ (define-vop (%set-fun-layout %set-instance-layout)
+   (:translate %set-fun-layout)
    (:generator 50
      (pseudo-atomic ()
        (inst push object)

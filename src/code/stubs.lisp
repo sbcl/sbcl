@@ -94,7 +94,7 @@
   ;; funcallable instances
   (def %make-funcallable-instance)
   (def %fun-layout)
-  (def %set-funcallable-instance-layout (fin new-value))
+  (def %set-fun-layout (fin new-value))
   (def %funcallable-instance-fun)
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
