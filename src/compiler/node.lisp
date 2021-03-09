@@ -115,13 +115,26 @@
     #+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env (sb-interpreter:lexenv-from-env x))))
 
-;;; The front-end data structure (IR1) is composed of nodes,
-;;; representing actual evaluations. Linear sequences of nodes in
-;;; control-flow order are combined into blocks (but see
-;;; JOIN-SUCCESSOR-IF-POSSIBLE for precise conditions); control
-;;; transfers inside a block are represented with CTRANs and between
-;;; blocks -- with BLOCK-SUCC/BLOCK-PRED lists; data transfers are
-;;; represented with LVARs.
+;;; The front-end data structure (IR1) is composed of nodes and
+;;; continuations. The general idea is that continuations contain
+;;; top-down information and nodes contain bottom-up, derived
+;;; information. A continuation represents a place in the code, while
+;;; a node represents code that does something.
+;;;
+;;; This representation is more of a flow-graph than an augmented
+;;; syntax tree. The evaluation order is explicitly represented in the
+;;; linkage by continuations, rather than being implicit in the nodes
+;;; which receive the the results of evaluation. This allows us to
+;;; decouple the flow of results from the flow of control. A
+;;; continuation represents both, but the continuation can represent
+;;; the case of a discarded result by having no DEST.
+
+;;; Note: Continuations have been split into CTRANs and LVARs. Control
+;;; transfers inside a block are represented with CTRANs; data
+;;; transfers are represented with LVARs. However, many of the
+;;; comments and names have not been updated to reflect this, and it
+;;; is easy to find references to the old way of doing things with
+;;; continuations throughout the compiler.
 
 ;;; "Lead-in" Control TRANsfer [to some node]
 (defstruct (ctran (:constructor make-ctran) (:copier nil))
