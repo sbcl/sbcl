@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(conditional-opcode
+  (import '(conditional-opcode negate-condition
             plausible-signed-imm32-operand-p
             ea-p ea-base ea-index size-nbyte alias-p
             ea ea-disp rip-relative-ea) "SB-VM")
@@ -337,7 +337,7 @@
     (:le . 14) (:ng . 14)
     (:nle . 15) (:g . 15))
   #'equal)
-(defconstant-eqx sb-vm::+condition-name-vec+
+(defconstant-eqx +condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -359,10 +359,12 @@
   (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
   (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
 
-(define-arg-type condition-code :printer sb-vm::+condition-name-vec+)
+(define-arg-type condition-code :printer +condition-name-vec+)
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
+(defun negate-condition (name)
+  (aref +condition-name-vec+ (logxor 1 (conditional-opcode name))))
 
 ;;;; disassembler instruction formats
 

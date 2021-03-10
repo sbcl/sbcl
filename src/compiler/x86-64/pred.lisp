@@ -40,25 +40,22 @@
      (when (eq (car flags) 'not)
        (pop flags)
        (setf not-p (not not-p)))
-     (flet ((negate-condition (name)
-              (let ((code (logxor 1 (conditional-opcode name))))
-                (aref +condition-name-vec+ code))))
-       (cond ((null (rest flags))
+     (cond ((null (rest flags))
               (inst jmp
                     (if not-p
                         (negate-condition (first flags))
                         (first flags))
                     dest))
-             (not-p
+           (not-p
               (let ((not-lab (gen-label))
                     (last    (car (last flags))))
                 (dolist (flag (butlast flags))
                   (inst jmp flag not-lab))
                 (inst jmp (negate-condition last) dest)
                 (emit-label not-lab)))
-             (t
+           (t
               (dolist (flag flags)
-                (inst jmp flag dest)))))))
+                (inst jmp flag dest))))))
 
 (define-vop (multiway-branch-if-eq)
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
@@ -187,10 +184,7 @@
   (:generator 0
      (let ((not-p (eq (first flags) 'not)))
        (when not-p (pop flags))
-       (flet ((negate-condition (name)
-                (let ((code (logxor 1 (conditional-opcode name))))
-                  (aref +condition-name-vec+ code)))
-              (load-immediate (dst constant-tn
+       (flet ((load-immediate (dst constant-tn
                                &optional (sc (sc-name (tn-sc dst))))
                 ;; Can't use ZEROIZE, since XOR will affect the flags.
                 (inst mov dst

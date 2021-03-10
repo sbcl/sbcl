@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(conditional-opcode
+  (import '(conditional-opcode negate-condition
             add-sub-immediate-p fixnum-add-sub-immediate-p
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
@@ -47,7 +47,7 @@
     (:al . 14))
   #'equal)
 
-(defconstant-eqx sb-vm::+condition-name-vec+
+(defconstant-eqx +condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -57,8 +57,8 @@
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
 
-(defun invert-condition (condition)
-  (aref sb-vm::+condition-name-vec+
+(defun negate-condition (condition)
+  (aref +condition-name-vec+
         (logxor 1 (conditional-opcode condition))))
 
 ;;;; disassembler field definitions
@@ -1029,10 +1029,10 @@
 (def-cond-select csneg 1 1)
 
 (define-instruction-macro cset (rd cond)
-  `(inst csinc ,rd zr-tn zr-tn (invert-condition ,cond)))
+  `(inst csinc ,rd zr-tn zr-tn (negate-condition ,cond)))
 
 (define-instruction-macro csetm (rd cond)
-  `(inst csinv ,rd zr-tn zr-tn (invert-condition ,cond)))
+  `(inst csinv ,rd zr-tn zr-tn (negate-condition ,cond)))
 ;;;
 
 (def-emitter cond-compare

@@ -37,15 +37,12 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
-     (flet ((negate-condition (name)
-              (let ((code (logxor 1 (conditional-opcode name))))
-                (aref +condition-name-vec+ code))))
        (aver (null (rest flags)))
        (inst jmp
              (if not-p
                  (negate-condition (first flags))
                  (first flags))
-             dest))))
+             dest)))
 
 (define-vop (multiway-branch-if-eq)
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg

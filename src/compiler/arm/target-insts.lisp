@@ -46,7 +46,7 @@
            (fixnum value)
            (ignore dstate))
   (unless (= value 14) ;; Don't print :al
-    (princ (aref sb-vm::+condition-name-vec+ value) stream)))
+    (princ (aref +condition-name-vec+ value) stream)))
 
 (defun print-reg (value stream dstate)
   (declare (type stream stream)

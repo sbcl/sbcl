@@ -14,7 +14,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(conditional-opcode emit-word
+  (import '(conditional-opcode negate-condition emit-word
             composite-immediate-instruction encodable-immediate
             lsl lsr asr ror cpsr @) "SB-VM")
   ;; Imports from SB-VM into this package
@@ -40,7 +40,7 @@
     (:le . 13)
     (:al . 14))
   #'equal)
-(defconstant-eqx sb-vm::+condition-name-vec+
+(defconstant-eqx +condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -49,6 +49,9 @@
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
+(defun negate-condition (name)
+  (let ((code (logxor 1 (conditional-opcode name))))
+    (aref +condition-name-vec+ code)))
 
 ;;;; disassembler field definitions
 
