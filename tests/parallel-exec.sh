@@ -120,7 +120,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    (let ((shell (or #+sunos (posix-getenv "SHELL") "/bin/sh")))
                      ;; exec the shell with the test and we'll pick up its exit code
                      (alien-funcall (extern-alien "execl" (function int c-string c-string
-                                                                    c-string unsigned))
+                                                                    &optional c-string unsigned))
                                     shell shell
                                     (concatenate 'string file ".sh") 0))
                    ;; if exec fails, just exit with a wrong (not 104) status
