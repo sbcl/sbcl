@@ -75,6 +75,13 @@
                     :value-tn-ref args)))))
 
 #-x86-64 ; defined in compiler/x86-64/type-vops for x86-64
+(progn
+(define-type-vop unbound-marker-p (unbound-marker-widetag))
+
+(define-type-vop characterp (character-widetag))
+
+(define-type-vop single-float-p (single-float-widetag))
+
 (define-type-vop fixnump
   #.fixnum-lowtags
   #+(or x86) simple-type-predicate) ;; save a register
@@ -83,11 +90,18 @@
 
 (define-type-vop listp (list-pointer-lowtag))
 
-(define-type-vop non-null-symbol-p (symbol-widetag))
-
 (define-type-vop %instancep (instance-pointer-lowtag))
 
 (define-type-vop %other-pointer-p (other-pointer-lowtag))
+
+(define-type-vop non-null-symbol-p (symbol-widetag))
+
+(define-type-vop closurep (closure-widetag))
+
+(define-type-vop simple-fun-p (simple-fun-widetag))
+
+(define-type-vop funcallable-instance-p (funcallable-instance-widetag))
+) ; end PROGN
 
 (define-type-vop bignump (bignum-widetag))
 
@@ -107,15 +121,13 @@
 
 (define-type-vop complex-double-float-p (complex-double-float-widetag))
 
-(define-type-vop single-float-p (single-float-widetag)
-   #+x86-64 simple-type-predicate)
-
 (define-type-vop double-float-p (double-float-widetag))
 
 (define-type-vop simple-string-p
   (#+sb-unicode simple-character-string-widetag
    simple-base-string-widetag))
 
+#-x86-64
 (macrolet
     ((define-simple-array-type-vops ()
          `(progn
@@ -135,9 +147,6 @@
                *specialized-array-element-type-properties*))))
   (def)) ; simple-rank-1-array-*-p
 
-(define-type-vop characterp (character-widetag)
-  #+x86-64 simple-type-predicate)
-
 (define-type-vop system-area-pointer-p (sap-widetag))
 
 (define-type-vop weak-pointer-p (weak-pointer-widetag))
@@ -147,12 +156,6 @@
 #-(or x86 x86-64) (define-type-vop lra-p (return-pc-widetag))
 
 (define-type-vop fdefn-p (fdefn-widetag))
-
-(define-type-vop closurep (closure-widetag))
-
-(define-type-vop simple-fun-p (simple-fun-widetag))
-
-(define-type-vop funcallable-instance-p (funcallable-instance-widetag))
 
 (define-type-vop array-header-p
   (simple-array-widetag
@@ -253,9 +256,6 @@
 (define-type-vop simd-pack-p (simd-pack-widetag))
 #+sb-simd-pack-256
 (define-type-vop simd-pack-256-p (simd-pack-256-widetag))
-
-(define-type-vop unbound-marker-p (unbound-marker-widetag)
-  #+x86-64 simple-type-predicate)
 
 ;;; Not type vops, but generic over all backends
 (macrolet ((def (name lowtag)

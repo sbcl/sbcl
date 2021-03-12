@@ -110,6 +110,11 @@
                (values (block-label (car succ-a))
                        target value-a value-b)))))))
 
+#-x86-64
+(defun sb-vm::computable-from-flags-p (res x y flags)
+  (declare (ignorable res x y flags))
+  nil)
+
 ;; To convert a branch to a conditional move:
 ;; 1. Convert both possible values to the chosen common representation
 ;; 2. Execute the conditional VOP
@@ -122,10 +127,20 @@
                          target res
                          flags info
                          label
-                         vop node 2block)
-  (let ((prev (vop-prev vop)))
-    (delete-vop vop)
-    (flet ((reuse-if-eq-arg (value-if vop)
+                         vop node 2block
+                         &aux (prev (vop-prev vop)))
+  (delete-vop vop)
+  (cond
+    ((and (constant-tn-p arg-if)
+          (constant-tn-p arg-else)
+          (sb-vm::computable-from-flags-p
+           res (tn-value arg-if) (tn-value arg-else) flags))
+     (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
+                    (reference-tn-list (list arg-if arg-else) nil)
+                    (reference-tn res t)
+                    (list* flags info)))
+    (t
+     (flet ((reuse-if-eq-arg (value-if vop)
              ;; Most of the time this means:
              ;; if X is already NIL, don't load it again.
              (when (and (eq (vop-name vop) 'if-eq)
@@ -139,26 +154,26 @@
                             (eq (tn-primitive-type x-tn)
                                 (tn-primitive-type res)))
                    x-tn))))
-           (load-and-coerce (dst src)
+            (load-and-coerce (dst src)
              (when (and dst (neq dst src))
                (emit-and-insert-vop node 2block
                                     (template-or-lose 'move)
                                     (reference-tn src nil)
                                     (reference-tn dst t)
                                     (ir2-block-last-vop 2block)))))
-      (let ((reuse (reuse-if-eq-arg value-if prev)))
-        (if reuse
-            (setf arg-if reuse)
-            (load-and-coerce arg-if   value-if)))
-      (load-and-coerce arg-else value-else))
-    (emit-template node 2block (template-or-lose cmove-vop)
-                   (reference-tn-list (remove nil (list arg-if arg-else))
-                                      nil)
-                   (reference-tn res t)
-                   (list* flags info))
+       (let ((reuse (reuse-if-eq-arg value-if prev)))
+         (if reuse
+             (setf arg-if reuse)
+             (load-and-coerce arg-if   value-if)))
+       (load-and-coerce arg-else value-else))
+     (emit-template node 2block (template-or-lose cmove-vop)
+                    (reference-tn-list (remove nil (list arg-if arg-else))
+                                       nil)
+                    (reference-tn res t)
+                    (list* flags info))))
     (emit-move node 2block res target)
     (vop branch node 2block label)
-    (update-block-succ 2block (list label))))
+    (update-block-succ 2block (list label)))
 
 ;; Since conditional branches are always at the end of blocks,
 ;; it suffices to look at the last VOP in each block.

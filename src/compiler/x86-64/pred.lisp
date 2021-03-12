@@ -248,6 +248,80 @@
   #+sb-unicode
   (def-move-if move-if/char character character-reg character-stack)
   (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))
+
+;;; Return a hint about how to calculate the answer from X,Y and flags.
+;;; Return NIL to give up.
+(defun computable-from-flags-p (res x y flags)
+  ;; TODO: handle unsigned-reg
+  (unless (and (singleton-p flags)
+               (sc-is res sb-vm::any-reg sb-vm::descriptor-reg))
+    (return-from computable-from-flags-p nil))
+  ;; There are plenty more algebraic transforms possible,
+  ;; but this picks off some very common cases.
+  (flet ((try-shift (x y)
+           (and (eql x 0)
+                (typep y '(and fixnum unsigned-byte))
+                (= (logcount y) 1)
+                'shl))
+         (try-add (x y) ; commutative
+           ;; (signed-byte 32) is gonna work for sure.
+           ;; Other things might too, but "perfect is the enemy of good".
+           ;; The constant in LEA is pre-fixnumized.
+           ;; Post-fixnumizing instead would open up a few more possibilities.
+           (and (fixnump x)
+                (fixnump y)
+                (typep (fixnumize x) '(signed-byte 32))
+                (typep (fixnumize y) '(signed-byte 32))
+                (member (abs (fixnumize (- x y))) '(2 4 8))
+                'add)))
+    (or #+sb-thread (or (and (eq x t) (eq y nil) 'boolean)
+                        (and (eq x nil) (eq y t) 'boolean))
+        (try-shift x y)
+        (try-shift y x)
+        (try-add x y))))
+
+(define-vop (compute-from-flags)
+  (:args (x-tn :scs (immediate constant))
+         (y-tn :scs (immediate constant)))
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:info flags)
+  (:generator 3
+    (let* ((x (tn-value x-tn))
+           (y (tn-value y-tn))
+           (hint (computable-from-flags-p res x y flags))
+           (flag (car flags)))
+      (ecase hint
+        (boolean
+         ;; FIXNUMP -> {T,NIL} could be special-cased, reducing the instruction count by
+         ;; 1 or 2 depending on whether the argument and result are in the same register.
+         ;; Best case would be "AND :dword res, arg, 1 ; MOV res, [ea]".
+         (when (eql x t)
+           ;; T is at the lower address, so to pick it out we need index=0
+           ;; which makes the condition in (IF BIT T NIL) often flipped.
+           (setq flag (negate-condition flag)))
+         (inst set res flag)
+         (inst movzx '(:byte :dword) res res)
+         (inst mov :dword res
+               (ea (ash thread-t-nil-constants-slot word-shift) thread-base-tn res 4)))
+        (shl
+         (when (eql x 0)
+           (setq flag (negate-condition flag)))
+         (let ((bit (1- (integer-length (fixnumize (logior x y))))))
+           (inst set res flag)
+           (inst movzx '(:byte :dword) res res)
+           (inst shl (if (> bit 31) :qword :dword) res bit)))
+        (add
+         (let* ((x (fixnumize x))
+                (y (fixnumize y))
+                (min (min x y))
+                (delta (abs (- x y)))
+                (ea (ea min nil res delta)))
+           (when (eql x min)
+             (setq flag (negate-condition flag)))
+           (inst set res flag)
+           (inst movzx '(:byte :dword) res res)
+           ;; Retain bit 63... if either is negative
+           (inst lea (if (or (minusp x) (minusp y)) :qword :dword) res ea)))))))
 
 ;;;; conditional VOPs
 

@@ -866,6 +866,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->lisp_thread = 0; // force it to be always-thread-local, of course
     th->tls_size = dynamic_values_bytes;
 #endif
+#ifdef THREAD_T_NIL_CONSTANTS_SLOT
+    tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | T;
+#endif
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_LINUX
     tls[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
 #endif

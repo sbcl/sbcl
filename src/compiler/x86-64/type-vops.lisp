@@ -397,31 +397,85 @@
        (inst jmp (if not-p :a :be) target)
        (emit-label skip))))
 
+;;; SINGLE-FLOAT-P, CHARACTERP, UNBOUND-MARKER-P produce a flag result
+;;; and never need a temporary.
+(macrolet ((define (name widetag)
+             `(define-vop (,name simple-type-predicate)
+                (:translate ,name)
+                (:info)
+                (:conditional :z)
+                (:generator 1 (inst cmp :byte value ,widetag)))))
+  (define single-float-p single-float-widetag)
+  (define characterp character-widetag)
+  (define unbound-marker-p unbound-marker-widetag))
+
 (define-vop (pointerp)
   (:args (value :scs (any-reg descriptor-reg) :target temp))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :z)
   (:policy :fast-safe)
   (:translate pointerp)
   (:generator 3
     (inst lea :dword temp (ea -3 value))
-    (inst test :byte temp #b11)
-    (inst jmp (if not-p :nz :z) target)))
+    (inst test :byte temp #b11)))
+
+;;; FUNCTIONP, LISTP, %INSTANCEP, %OTHER-POINTER-P produce a flag result
+(macrolet ((define (name lowtag)
+             `(define-vop (,name pointerp)
+                (:translate ,name)
+                (:generator 2
+                  (inst lea :dword temp (ea (- ,lowtag) value))
+                  (inst test :byte temp lowtag-mask)))))
+  (define functionp fun-pointer-lowtag)
+  (define listp list-pointer-lowtag)
+  (define %instancep instance-pointer-lowtag)
+  (define %other-pointer-p other-pointer-lowtag))
+
+(macrolet ((define (name widetag)
+             `(define-vop (,name type-predicate)
+                (:translate ,name)
+                (:info)
+                (:conditional :z)
+                (:generator 4
+                  (inst lea temp (ea (- fun-pointer-lowtag) value))
+                  (inst test :byte temp lowtag-mask)
+                  (inst jmp :ne out)
+                  (inst cmp :byte (ea temp) ,widetag)
+                  out))))
+  (define closurep closure-widetag)
+  (define simple-fun-p simple-fun-widetag)
+  (define funcallable-instance-p funcallable-instance-widetag))
 
 ;;;; list/symbol types
 ;;;
 ;;; symbolp (or symbol (eq nil))
 ;;; consp (and list (not (eq nil)))
 
+(defun test-other-ptr (arg arg-ref widetag temp label)
+  (inst cmp :byte
+        (cond ((other-pointer-tn-ref-p arg-ref)
+               (ea (- other-pointer-lowtag) arg))
+              (t
+               (%lea-for-lowtag-test temp arg other-pointer-lowtag :qword)
+               (inst test :byte temp lowtag-mask)
+               (inst jmp :ne label)
+               (ea temp)))
+        widetag))
+
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
-  (:generator 12
-    (let ((is-symbol-label (if not-p DROP-THRU target)))
-      (inst cmp value nil-value)
-      (inst jmp :e is-symbol-label)
-      (test-type value temp target not-p (symbol-widetag)))
-    DROP-THRU))
+  (:info)
+  (:conditional :z)
+  (:generator 5
+    ;; SYMBOLP would have been IR1-transformed to NON-NULL-SYMBOL-P when possible
+    (inst cmp value nil-value)
+    (inst jmp :e out)
+    (test-other-ptr value args symbol-widetag temp out)
+    out))
+
+(define-vop (non-null-symbol-p symbolp)
+  (:translate non-null-symbol-p)
+  (:generator 3 (test-other-ptr value args symbol-widetag temp out) out))
 
 (define-vop (consp type-predicate)
   (:translate consp)
@@ -514,12 +568,27 @@
   (:translate fixnump)
   (:args-var arg-ref)
   (:args (value :scs (any-reg descriptor-reg) :load-if (tn-ref-memory-access arg-ref)))
+  (:info)
+  (:conditional :z)
+  ;; the compiler is very sensitive to this cost here as regards boxing. DON'T TOUCH !!!
   (:generator 3
    (awhen (tn-ref-memory-access arg-ref)
      (setq value (ea (cdr it) value)))
-   (test-type value nil target not-p
-              (even-fixnum-lowtag odd-fixnum-lowtag pad0-lowtag pad1-lowtag
-               pad2-lowtag pad3-lowtag pad4-lowtag pad5-lowtag))))
+   (generate-fixnum-test value)))
+
+(macrolet
+    ((define-simple-array-type-vops ()
+         `(progn
+           ,@(map 'list
+                  (lambda (saetp &aux (primtype (saetp-primitive-type-name saetp))
+                                      (name (symbolicate primtype "-P")))
+                    `(define-vop (,name symbolp)
+                       (:translate ,name)
+                       (:generator 4
+                        (test-other-ptr value args ,(saetp-typecode saetp) temp out)
+                        out)))
+                  *specialized-array-element-type-properties*))))
+  (define-simple-array-type-vops))
 
 ;;; Try to absorb a memory load into FIXNUMP.
 (defoptimizer (sb-c::vop-optimize fixnump) (vop)

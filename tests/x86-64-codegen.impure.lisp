@@ -834,7 +834,7 @@ sb-vm::(define-vop (cl-user::test)
       (unless (eql actual expect)
         (format t "~{~&~a~}~%" lines)
         (error "typep: needed ~d test ops but expected ~d for ~a"
-               expect actual type)))))
+               actual expect type)))))
 
 (defun check-arrayp-cmp-opcodes (expect type)
   ;; Assume the lowtag test passed already.
