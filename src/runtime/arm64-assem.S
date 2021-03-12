@@ -33,6 +33,19 @@
 #define SIZE(name) .size name,.-name
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+.macro ENTER_PA
+        str reg_wNULL,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
+.endm
+
+.macro LEAVE_PA
+        str wzr,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
+        ldr reg_wTMP,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET+4]
+        cbz reg_wTMP,1f
+	brk trap_PendingInterrupt
+1:
+.endm
+#else
 #define LOAD_STATIC_SYMBOL_VALUE(value,sym) \
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         ldr value,[reg_NULL, reg_TMP]
@@ -40,16 +53,6 @@
 #define STORE_STATIC_SYMBOL_VALUE(value,sym) \
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         str value,[reg_NULL, reg_TMP]
-#ifdef LISP_FEATURE_SB_THREAD
-#define ENTER_PA \
-        str reg_wNULL,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
-#define LEAVE_PA \
-        str wzr,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]       ;\
-        ldr reg_wTMP,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET+4] ;\
-        cbz reg_wTMP,1f                                              ;\
-	brk trap_PendingInterrupt                                   ;\
-1:
-#else
 #define ENTER_PA \
         STORE_STATIC_SYMBOL_VALUE(reg_CFP,PSEUDO_ATOMIC_ATOMIC)
 
