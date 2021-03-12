@@ -452,6 +452,7 @@
                      (prevsym "")
                      (nsyms 0))
                  (loop for addr from start to end by 8
+                       repeat 100
                        do (let ((sym (sb-sys:sap-foreign-symbol (sb-sys:int-sap addr))))
                             (when (and sym (string/= sym prevsym))
                               (incf nsyms)
