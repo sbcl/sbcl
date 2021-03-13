@@ -493,7 +493,6 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                 (if (and (numericp x) (numericp y))
                     (loop for x-i fixnum from start-x below end-x
                           for y-i fixnum from start-y
-                          for x-el = (funcall getter-x x x-i)
                           always (= (funcall getter-x x x-i) (funcall getter-y y y-i)))
                     ;; Everything else
                     (loop for x-i fixnum from start-x below end-x
@@ -502,9 +501,9 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                           for y-el = (funcall getter-y y y-i)
                           always (or (eq x-el y-el)
                                      (equalp x-el y-el))))))))))
-    (if (and (vectorp (truly-the array a))
-             (vectorp (truly-the array b)))
-        (and (= (length a) (length b))
+    (if (vectorp (truly-the array a))
+        (and (vectorp (truly-the array b))
+             (= (length a) (length b))
              (with-array-data ((x a) (start-x) (end-x)
                                :force-inline t :check-fill-pointer t)
                (with-array-data ((y b) (start-y) (end-y)
@@ -545,11 +544,12 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                               (layout-flags layout))
                      (eq (%instance-layout y) layout)
                      (funcall (layout-equalp-impl layout) x y)))))
-        ((and (arrayp x) (arrayp y))
-         ;; string-equal is nearly 2x the speed of array-equalp for comparing strings
-         (cond ((and (stringp x) (stringp y)) (string-equal x y))
-               ((and (bit-vector-p x) (bit-vector-p y)) (bit-vector-= x y))
-               (t (array-equalp x y))))
+        ((arrayp x)
+         (and (arrayp y)
+              ;; string-equal is nearly 2x the speed of array-equalp for comparing strings
+              (cond ((and (stringp x) (stringp y)) (string-equal x y))
+                    ((and (bit-vector-p x) (bit-vector-p y)) (bit-vector-= x y))
+                    (t (array-equalp x y)))))
         (t nil)))
 
 (let ((test-cases `(($0.0 $-0.0 t)
