@@ -32,7 +32,7 @@ for d in tools-for-build; do
     $GNUMAKE -I ../src/runtime -s clean
     cd "$original_pwd" > /dev/null
 done
-( cd ./doc ; sh ./clean.sh )
+( cd ./doc && sh ./clean.sh )
 
 # Within all directories, remove things which don't look like source
 # files. Some explanations:
