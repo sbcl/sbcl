@@ -544,7 +544,8 @@
     (('(b a)) 1)
     ((#(1)) nil)))
 
-(with-test (:name (search :array-equalp-non-consing))
+(with-test (:name :array-equalp-non-consing
+                  :skipped-on :interpreter)
   (let ((a (make-array 1000 :element-type 'double-float))
         (b (make-array 1000 :element-type 'double-float)))
     (ctu:assert-no-consing (equalp a b))))
