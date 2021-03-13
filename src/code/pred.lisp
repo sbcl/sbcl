@@ -432,49 +432,97 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                      ((functionp test) (funcall test i x y))
                      (t)))))
 
-;;; Doesn't work on simple vectors
-(defun array-equalp (x y)
-  (declare (array x y))
-  (let ((rank (array-rank x)))
-    (and
-     (= rank (array-rank y))
-     (dotimes (axis rank t)
-       (unless (= (%array-dimension x axis)
-                  (%array-dimension y axis))
-         (return nil)))
-     (with-array-data ((x x) (start-x) (end-x) :force-inline t
-                                               :array-header-p t)
-       (with-array-data ((y y) (start-y) (end-y) :force-inline t
-                                                 :array-header-p t)
-         (declare (ignore end-y))
-         (let* ((reffers %%data-vector-reffers%%)
-                (getter-x (truly-the function (svref reffers (%other-pointer-widetag x))))
-                (getter-y (truly-the function (svref reffers (%other-pointer-widetag y)))))
-           (loop for x-i fixnum from start-x below end-x
-                 for y-i fixnum from start-y
-                 for x-el = (funcall getter-x x x-i)
-                 for y-el = (funcall getter-y y y-i)
-                 always (or (eq x-el y-el)
-                            (equalp x-el y-el)))))))))
-
-(defun vector-equalp (x y)
-  (declare (vector x y))
-  (let ((length (length x)))
-    (and (= length (length y))
-         (with-array-data ((x x) (start-x) (end-x) :force-inline t
-                                                   :check-fill-pointer t)
-           (with-array-data ((y y) (start-y) (end-y) :force-inline t
-                                                     :check-fill-pointer t)
-             (declare (ignore end-y))
-             (let* ((reffers %%data-vector-reffers%%)
-                    (getter-x (truly-the function (svref reffers (%other-pointer-widetag x))))
-                    (getter-y (truly-the function (svref reffers (%other-pointer-widetag y)))))
-               (loop for x-i fixnum from start-x below end-x
-                     for y-i fixnum from start-y
-                     for x-el = (funcall getter-x x x-i)
-                     for y-el = (funcall getter-y y y-i)
-                     always (or (eq x-el y-el)
-                                (equalp x-el y-el)))))))))
+(macrolet ((numericp (v)
+             (let ((widetags
+                    (map 'list #'sb-vm:saetp-typecode
+                         (remove-if (lambda (x)
+                                      (not (typep (sb-vm:saetp-ctype x) 'numeric-type)))
+                                    sb-vm:*specialized-array-element-type-properties*))))
+               `(%other-pointer-subtype-p ,v ',widetags)))
+           (compare-loop (typespec)
+             `(let ((x (truly-the (simple-array ,typespec 1) x))
+                    (y (truly-the (simple-array ,typespec 1) y)))
+                (loop for x-i fixnum from start-x below end-x
+                      for y-i fixnum from start-y
+                      always (= (aref x x-i) (aref y y-i))))))
+(defun array-equalp (a b)
+  (flet
+      ((data-vector-compare (x y start-x end-x start-y)
+         (declare (index start-x end-x start-y)
+                  (optimize (sb-c::insert-array-bounds-checks 0)))
+         (let ((xtag (%other-pointer-widetag (truly-the (simple-array * 1) x)))
+               (ytag (%other-pointer-widetag (truly-the (simple-array * 1) y))))
+           (case (if (= xtag ytag) xtag 0)
+             (#.sb-vm:simple-vector-widetag
+              (let ((x (truly-the simple-vector x))
+                    (y (truly-the simple-vector y)))
+                (loop for x-i fixnum from start-x below end-x
+                      for y-i fixnum from start-y
+                      always (let ((a (svref x x-i)) (b (svref y y-i)))
+                               (or (eq a b) (equalp a b))))))
+             ;; Special-case the important array types that would cause consing in aref.
+             ;; Though (UNSIGNED-BYTE 62) and (UNSIGNED-BYTE 63) arrays exist,
+             ;; I highly doubt that they occur anywhere except in contrived code
+             ;; that does nothing but test that those types exist. i.e. They are
+             ;; beyond worthless, and are frankly wasteful of space in array dispatch
+             ;; scenarios, or to put it mildy: I disagree with their existence per se.
+             #+64-bit (#.sb-vm:simple-array-unsigned-byte-64-widetag
+                       (compare-loop (unsigned-byte 64)))
+             #+64-bit (#.sb-vm:simple-array-signed-byte-64-widetag
+                       (compare-loop (signed-byte 64)))
+             #-64-bit (#.sb-vm:simple-array-unsigned-byte-32-widetag
+                       (compare-loop (unsigned-byte 32)))
+             #-64-bit (#.sb-vm:simple-array-signed-byte-32-widetag
+                       (compare-loop (signed-byte 32)))
+             ;; SINGLE-FLOAT wouldn't cons on 64-bit, but it should be treated
+             ;; no less efficiently than DOUBLE-FLOAT.
+             (#.sb-vm:simple-array-single-float-widetag
+              (compare-loop single-float))
+             (#.sb-vm:simple-array-double-float-widetag
+              (compare-loop double-float))
+             (#.sb-vm:simple-array-complex-single-float-widetag
+              (compare-loop (complex single-float)))
+             (#.sb-vm:simple-array-complex-double-float-widetag
+              (compare-loop (complex double-float)))
+             (t
+              (let* ((reffers %%data-vector-reffers%%)
+                     (getter-x (truly-the function (svref reffers xtag)))
+                     (getter-y (truly-the function (svref reffers ytag))))
+                ;; The arrays won't both be strings, because EQUALP has a case for that.
+                ;; If they're both numeric, use = as the test.
+                (if (and (numericp x) (numericp y))
+                    (loop for x-i fixnum from start-x below end-x
+                          for y-i fixnum from start-y
+                          for x-el = (funcall getter-x x x-i)
+                          always (= (funcall getter-x x x-i) (funcall getter-y y y-i)))
+                    ;; Everything else
+                    (loop for x-i fixnum from start-x below end-x
+                          for y-i fixnum from start-y
+                          for x-el = (funcall getter-x x x-i)
+                          for y-el = (funcall getter-y y y-i)
+                          always (or (eq x-el y-el)
+                                     (equalp x-el y-el))))))))))
+    (if (and (vectorp (truly-the array a))
+             (vectorp (truly-the array b)))
+        (and (= (length a) (length b))
+             (with-array-data ((x a) (start-x) (end-x)
+                               :force-inline t :check-fill-pointer t)
+               (with-array-data ((y b) (start-y) (end-y)
+                                 :force-inline t :check-fill-pointer t)
+                 (declare (ignore end-y))
+                 (data-vector-compare x y start-x end-x start-y))))
+        (let ((rank (array-rank (truly-the array a))))
+          (and (= rank (array-rank (truly-the array b)))
+               (dotimes (axis rank t)
+                 (unless (= (%array-dimension a axis)
+                            (%array-dimension b axis))
+                   (return nil)))
+               (with-array-data ((x a) (start-x) (end-x)
+                                 :force-inline t :array-header-p t)
+                 (with-array-data ((y b) (start-y) (end-y)
+                                   :force-inline t :array-header-p t)
+                   (declare (ignore end-y))
+                   (data-vector-compare x y start-x end-x start-y)))))))))
 
 (defun equalp (x y)
   "Just like EQUAL, but more liberal in several respects.
@@ -497,20 +545,11 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                               (layout-flags layout))
                      (eq (%instance-layout y) layout)
                      (funcall (layout-equalp-impl layout) x y)))))
-        ((and (simple-vector-p x) (simple-vector-p y))
-         (let ((len (length x)))
-           (and (= len (length y))
-                (loop for i below len ; somewhat faster than the generic loop
-                      always (let ((a (svref x i)) (b (svref y i)))
-                               (or (eq a b) (equalp a b)))))))
-        ((and (bit-vector-p x) (bit-vector-p y))
-         (bit-vector-= x y))
-        ((vectorp x)
-         (and (vectorp y)
-              (vector-equalp x y)))
-        ((arrayp x)
-         (and (arrayp y)
-              (array-equalp x y)))
+        ((and (arrayp x) (arrayp y))
+         ;; string-equal is nearly 2x the speed of array-equalp for comparing strings
+         (cond ((and (stringp x) (stringp y)) (string-equal x y))
+               ((and (bit-vector-p x) (bit-vector-p y)) (bit-vector-= x y))
+               (t (array-equalp x y))))
         (t nil)))
 
 (let ((test-cases `(($0.0 $-0.0 t)

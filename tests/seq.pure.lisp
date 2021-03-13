@@ -543,3 +543,43 @@
          (search '(a) s :end1 nil))
     (('(b a)) 1)
     ((#(1)) nil)))
+
+(with-test (:name (search :array-equalp-non-consing))
+  (let ((a (make-array 1000 :element-type 'double-float))
+        (b (make-array 1000 :element-type 'double-float)))
+    (ctu:assert-no-consing (equalp a b))))
+
+(with-test (:name (search :array-equalp-numerics))
+  ;; This tests something that wasn't broken, but given that the new algorithm
+  ;; is potentially more complicated, it makes sense to test that various
+  ;; combinations of numeric arrays compare as equalp when they should.
+  (let (arrays (testdata '(7 3 1 5)))
+    (sb-int:dovector
+        (saetp (remove-if (lambda (x)
+                            (not (typep (sb-vm:saetp-ctype x) 'sb-kernel:numeric-type)))
+                          sb-vm:*specialized-array-element-type-properties*))
+      (let ((et (sb-vm::saetp-specifier saetp)))
+        (unless (or (eq et 'bit) (equal et '(unsigned-byte 2)))
+          (let ((fancy-array
+                 (make-array 4 :element-type et
+                               :displaced-to (make-array 5 :element-type et)
+                               :displaced-index-offset 1)))
+            (replace fancy-array
+                     (mapcar (lambda (x) (coerce x et)) testdata))
+            (push fancy-array arrays)))))
+    ;; All pairs should be EQUALP and it should be commutative
+    ;; and they should be EQUALP to a simple-vector.
+    (let* ((sv1 (coerce testdata 'simple-vector))
+           (sv2 (map 'simple-vector (lambda (x) (coerce x 'single-float)) sv1))
+           (sv3 (map 'simple-vector (lambda (x) (coerce x 'double-float)) sv1))
+           (sv4 (map 'simple-vector (lambda (x) (coerce x '(complex single-float))) sv1))
+           (sv5 (map 'simple-vector (lambda (x) (coerce x '(complex double-float))) sv1))
+           (svs (list sv1 sv2 sv3 sv4 sv5)))
+      (dolist (x arrays)
+        ;; Try simple vectors containing types that are not EQL to the testdata
+        (dolist (sv svs)
+          (assert (equalp x sv))
+          (assert (equalp sv x)))
+        ;; Try all other numeric array types
+        (dolist (y arrays)
+          (assert (equalp x y)))))))
