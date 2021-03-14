@@ -639,7 +639,7 @@
   (let* ((guard (template-guard template))
          (lvar (node-lvar call))
          (dtype (node-derived-type call)))
-    (cond ((and guard (not (funcall guard)))
+    (cond ((and guard (not (funcall guard call)))
            (values nil :guard))
           ((not (template-args-ok template call safe-p))
            (values nil
@@ -804,9 +804,9 @@
                             (template-or-lose 'call-named)))
                        *efficiency-note-cost-threshold*)))
       (dolist (try (fun-info-templates (basic-combination-fun-info call)))
-        (when (> (template-cost try) max-cost) (return)) ; FIXME: UNLESS'd be cleaner.
+        (when (> (template-cost try) max-cost) (return))
         (let ((guard (template-guard try)))
-          (when (and (or (not guard) (funcall guard))
+          (when (and (or (not guard) (funcall guard call))
                      (or (not safe-p)
                          (ltn-policy-safe-p (template-ltn-policy try)))
                      (not (and (eq ltn-policy :safe)

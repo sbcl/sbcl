@@ -1395,8 +1395,10 @@
     `(make-vop-info
       :name ',(vop-parse-name parse)
       ,@(make-vop-info-types parse)
-      :guard ,(when (vop-parse-guard parse)
-                `(lambda () ,(vop-parse-guard parse)))
+      :guard ,(awhen (vop-parse-guard parse)
+                (if (typep it '(cons (eql lambda)))
+                    it
+                    `(lambda (node) (declare (ignore node)) ,it)))
       :note ',(vop-parse-note parse)
       :info-arg-count ,(length (vop-parse-info-args parse))
       :ltn-policy ',(vop-parse-ltn-policy parse)
@@ -1556,6 +1558,8 @@
 ;;;     Specifies a Form that is evaluated in the global environment.
 ;;;     If form returns NIL, then emission of this VOP is prohibited
 ;;;     even when all other restrictions are met.
+;;;     As an additional possibility, if Form is a lambda expression,
+;;;     then it is funcalled with the node under consideration.
 ;;;
 ;;; :VOP-VAR Name
 ;;; :NODE-VAR Name
