@@ -12,6 +12,7 @@
 (eval-when (:compile-toplevel)
   (defun optional+key-style-warning-p (condition)
     (and (typep condition '(and simple-condition style-warning))
+         (stringp (simple-condition-format-control condition))
          (search "&OPTIONAL and &KEY found"
                  (simple-condition-format-control condition))))
   (proclaim '(sb-ext:muffle-conditions (satisfies optional+key-style-warning-p))))
