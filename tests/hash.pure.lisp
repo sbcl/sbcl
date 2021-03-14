@@ -397,3 +397,7 @@
     ;; and it's extremely dubious that we're totally silent here.
     ;; Also the same issue exists with bit-vectors.
     (assert-error (sxhash displaced-string))))
+
+(with-test (:name :array-psxhash-non-consing :skipped-on :interpreter)
+   (let ((a (make-array 1000 :element-type 'double-float)))
+     (ctu:assert-no-consing (sb-int:psxhash a))))
