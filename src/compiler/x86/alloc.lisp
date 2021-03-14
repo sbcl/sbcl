@@ -253,6 +253,11 @@
   (:policy :fast-safe)
   (:node-var node)
   (:generator 100
+   (flet ((store-widetag (value ptr slot lowtag)
+             (inst mov (object-slot-ea
+                        ptr slot lowtag
+                        (if (typep value '(and integer (not (unsigned-byte 8)))) :word :byte))
+                   value)))
     (let ((size (sc-case words
                   (immediate
                    (logandc2 (+ (fixnumize (tn-value words))
@@ -285,7 +290,7 @@
                (storew fixnum-length result
                        vector-length-slot other-pointer-lowtag)))))
          (t
-          (storew length result vector-length-slot other-pointer-lowtag)))))))
+          (storew length result vector-length-slot other-pointer-lowtag))))))))
 
 (define-vop (allocate-vector-on-stack)
   (:args (type :scs (unsigned-reg immediate) :to :save)
@@ -316,7 +321,7 @@
     (sc-case type
       (immediate
        (aver (typep (tn-value type) '(unsigned-byte 8)))
-       (store-widetag (tn-value type) result 0 other-pointer-lowtag))
+       (storew (tn-value type) result 0 other-pointer-lowtag))
       (t
        (storew type result 0 other-pointer-lowtag)))
     (storew length result vector-length-slot other-pointer-lowtag)

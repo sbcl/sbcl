@@ -59,13 +59,6 @@
   (once-only ((value value))
     `(inst mov (object-slot-ea ,ptr ,slot ,lowtag) ,value)))
 
-;;; A handy utility for storing widetags.
-(defun store-widetag (value ptr &optional (slot 0) (lowtag 0))
-  (inst mov (object-slot-ea
-             ptr slot lowtag
-             (if (typep value '(and integer (not (unsigned-byte 8)))) :word :byte))
-        value))
-
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
   `(inst push (object-slot-ea ,ptr ,slot ,lowtag)))
 
