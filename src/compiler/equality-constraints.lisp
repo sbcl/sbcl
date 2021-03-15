@@ -207,8 +207,8 @@
 
 (defoptimizer (- equality-constraint) ((x y) node)
   (let ((integer (specifier-type 'integer)))
-    (when (and (types-equal-or-intersect (lvar-type x) integer)
-               (types-equal-or-intersect (lvar-type y) integer))
+    (when (and (csubtypep (lvar-type x) integer)
+               (csubtypep (lvar-type y) integer))
       (macrolet ((f (op x y pos)
                    `(let ((constr (find-ref-equality-constraint ',op ,x ,y nil)))
                       (when constr

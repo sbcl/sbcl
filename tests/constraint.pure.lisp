@@ -123,3 +123,13 @@
                          (- x y)
                          -10)))))
           '(values (integer * 0) &optional))))
+
+(with-test (:name :--type)
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (x y)
+                     (if (> x y)
+                         (- x y)
+                         1)))))
+          '(values real &optional))))
