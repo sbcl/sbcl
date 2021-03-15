@@ -459,6 +459,7 @@
 (define-walker-template the                  (nil quote eval))
 (define-walker-template throw                (nil eval eval))
 (define-walker-template unwind-protect       (nil return repeat (eval)))
+(define-walker-template defun                walk-defun)
 
 ;;; SBCL-only special forms
 (define-walker-template truly-the (nil quote eval))
@@ -895,6 +896,10 @@
                name
                walked-arglist
                walked-body))))
+
+;;; The DEFUN macro does some stuff with the environment, handle it here.
+(defun walk-defun (form context env)
+  (recons form (car form) (walk-lambda (cdr form) context env)))
 
 (defun walk-setq (form context env)
   (if (cdddr form)

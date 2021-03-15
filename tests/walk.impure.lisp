@@ -1079,4 +1079,8 @@ Form: C   Context: EVAL; lexically bound
 (defmethod zook (x) (let ((typep x 'vector)) typep))
 (test-util:with-test (:name :let-syntax-error)
   (assertoid:assert-error (zook 1)))
-
+
+(declaim (inline inlined-fun))
+
+(test-util:with-test (:name :inlined-defun)
+  (eval '(defmethod inlined-defun () (defun inlined-fun ()))))
