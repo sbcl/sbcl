@@ -88,6 +88,62 @@
     (inst cmp :byte (ea (- 2 other-pointer-lowtag) array) (encode-array-rank 1))))
 
 ;;;; bounds checking routine
+(defun emit-bounds-check (vop %test-fixnum array index limit)
+  (let*  ((use-length-p (null limit))
+          (error
+           (if use-length-p
+               (generate-error-code vop 'sb-kernel::invalid-vector-index-error
+                                    array index)
+               (generate-error-code vop 'invalid-array-index-error array limit
+                                    index)))
+          (bound (if (and (tn-p limit) (sc-is limit immediate))
+                     (let ((value (tn-value limit)))
+                       (cond ((and %test-fixnum
+                                   (power-of-two-limit-p (1- value)))
+                              (lognot (fixnumize (1- value))))
+                             ((sc-is index any-reg descriptor-reg)
+                              (fixnumize value))
+                             (t
+                              value)))
+                     limit))
+          (index (if (sc-is index immediate)
+                     (let ((value (tn-value index)))
+                       (if (or (null bound) ; from array header
+                               (sc-is bound any-reg descriptor-reg))
+                           (fixnumize value)
+                           value))
+                     index)))
+      (cond ((typep bound '(integer * -1))
+             ;; Power of two bound, can be checked for fixnumness at
+             ;; the same time as it always occupies a consecutive bit
+             ;; range, everything else, including the tag, has to be
+             ;; zero.
+             (inst test index (if (eql bound -1)
+                                  index ;; zero?
+                                  bound))
+             (inst jmp :ne error))
+            (t
+             (when (and %test-fixnum (not (integerp index)))
+               (%test-fixnum index nil error t))
+             (cond (use-length-p
+                    (let ((len (ea (- (ash vector-length-slot word-shift)
+                                      other-pointer-lowtag)
+                                   array)))
+                      (cond ((integerp index)
+                             (inst cmp :qword len index)
+                             (inst jmp :be error))
+                            (t
+                             (inst cmp index len)
+                             (inst jmp :nb error)))))
+                   ((integerp bound)
+                    (inst cmp index bound)
+                    (inst jmp :nb error))
+                   (t
+                    (if (eql index 0)
+                        (inst test bound bound)
+                        (inst cmp bound index))
+                    (inst jmp :be error)))))))
+
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
@@ -105,45 +161,8 @@
   (:variant t)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 6
-    (let ((error (generate-error-code vop 'invalid-array-index-error
-                                      array bound index))
-          (bound (if (sc-is bound immediate)
-                     (let ((value (tn-value bound)))
-                       (cond ((and %test-fixnum
-                                   (power-of-two-limit-p (1- value)))
-                              (lognot (fixnumize (1- value))))
-                             ((sc-is index any-reg descriptor-reg)
-                              (fixnumize value))
-                             (t
-                              value)))
-                     bound))
-          (index (if (sc-is index immediate)
-                     (let ((value (tn-value index)))
-                       (if (sc-is bound any-reg descriptor-reg)
-                           (fixnumize value)
-                           value))
-                     index)))
-      (cond ((typep bound '(integer * -1))
-             ;; Power of two bound, can be checked for fixnumness at
-             ;; the same time as it always occupies a consecutive bit
-             ;; range, everything else, including the tag, has to be
-             ;; zero.
-             (inst test index (if (eql bound -1)
-                                  index ;; zero?
-                                  bound))
-             (inst jmp :ne error))
-            (t
-             (when (and %test-fixnum (not (integerp index)))
-               (%test-fixnum index nil error t))
-             (cond ((integerp bound)
-                    (inst cmp index bound)
-                    (inst jmp :nb error))
-                   (t
-                    (if (eql index 0)
-                        (inst test bound bound)
-                        (inst cmp bound index))
-                    (inst jmp :be error))))))))
+  (:generator 6 (emit-bounds-check vop %test-fixnum array index bound)))
+
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
   (:variant nil)
@@ -165,6 +184,57 @@
                 (:or unsigned-num signed-num))
   (:variant nil)
   (:variant-cost 5))
+
+(define-vop (check-vector-bound)
+  (:args (array :scs (descriptor-reg)) ; no constant sc allowed
+         (index :scs (any-reg descriptor-reg)
+                :load-if (not (and (sc-is index immediate)
+                                   (typep (tn-value index)
+                                          'sc-offset)))))
+  (:variant-vars %test-fixnum)
+  (:variant t)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 5 (emit-bounds-check vop %test-fixnum array index nil)))
+
+(define-vop (check-vector-bound/fast check-vector-bound)
+  (:policy :fast)
+  (:variant nil)
+  (:variant-cost 3))
+
+(define-vop (check-vector-bound/fixnum check-vector-bound)
+  (:args (array)
+         (index :scs (any-reg)))
+  (:arg-types * tagged-num)
+  (:variant nil)
+  (:variant-cost 3))
+
+(flet ((try-absorb-load (vop replacement)
+         (let ((prev (sb-c::vop-prev vop)))
+           ;; If the 2nd arg is the result of VECTOR-LENGTH of the 1st arg, then
+           ;; don't load the length; instead absorb it into a CMP instruction.
+           (when (and prev
+                      (eq (vop-name prev) 'slot)
+                      (eq (car (vop-codegen-info prev)) 'sb-c::vector-length)
+                      (eq (tn-ref-tn (sb-c::vop-args prev))
+                          (tn-ref-tn (sb-c::vop-args vop))))
+             (let* ((args (sb-c::vop-args vop))
+                    (first (tn-ref-tn args))
+                    (third (tn-ref-tn (tn-ref-across (tn-ref-across args))))
+                    (new (sb-c::emit-and-insert-vop
+                          (sb-c::vop-node vop) (vop-block vop)
+                          (template-or-lose replacement)
+                          (sb-c::reference-tn-list (list first third) nil)
+                          nil vop)))
+               (sb-c::delete-vop prev)
+               (sb-c::delete-vop vop)
+               new)))))
+  (setf (sb-c::vop-info-optimizer (template-or-lose 'check-bound))
+        (lambda (vop) (try-absorb-load vop 'check-vector-bound))
+        (sb-c::vop-info-optimizer (template-or-lose 'check-bound/fast))
+        (lambda (vop) (try-absorb-load vop 'check-vector-bound/fast))
+        (sb-c::vop-info-optimizer (template-or-lose 'check-bound/fixnum))
+        (lambda (vop) (try-absorb-load vop 'check-vector-bound/fixnum))))
 
 ;;;; accessors/setters
 

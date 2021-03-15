@@ -109,6 +109,7 @@
    ("odd number of &KEY arguments" odd-key-args 0)
    ("unknown &KEY argument" unknown-key-arg 1)
    ("invalid array index" invalid-array-index 3)
+   ("invalid vector index" invalid-vector-index 2)
    ("A function with declared result type NIL returned." nil-fun-returned 1)
    ("An array with element-type NIL was accessed." nil-array-accessed 1)
    ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)

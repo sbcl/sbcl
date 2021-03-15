@@ -356,10 +356,10 @@
                                     context)))
         (error 'unknown-keyword-argument :name key-name))))
 
-;; TODO: make the arguments (ARRAY INDEX &optional BOUND)
-;; and don't need the bound for vectors. Just read it.
 (deferr invalid-array-index-error (array bound index)
   (invalid-array-index-error array index bound))
+(deferr invalid-vector-index-error (vector index)
+  (invalid-array-index-error vector index (length vector)))
 
 (deferr tls-exhausted-error ()
   ;; There is nothing we can do about it. A number of entries in the
