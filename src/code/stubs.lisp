@@ -99,7 +99,8 @@
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
-  #+(and compact-instance-header x86-64) (def layout-of)
+  #+compact-instance-header (progn (def layout-of)
+                                   (def %instanceoid-layout))
   #+64-bit (def layout-depthoid)
   ;; lists
   (def %rplaca (x val))

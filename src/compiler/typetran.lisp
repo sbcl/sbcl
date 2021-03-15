@@ -929,6 +929,9 @@
                                   ,layout))))))
               (if lowtag-test
                   `(and ,lowtag-test (let ((,n-layout ,slot-reader)) ,@guts))
+                  #+compact-instance-header
+                  `(let ((,n-layout (%instanceoid-layout object))) ,@guts)
+                  #-compact-instance-header
                   `(block typep
                      (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
 
