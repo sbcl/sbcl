@@ -441,6 +441,15 @@
          ;; Strings are null-terminated for C interoperability
          (char #.(coerce "abcd" 'simple-base-string) x))
     ((4) #\Nul)))
+(defun check-bound-multiple-reads (x i)
+  (let* ((x (truly-the simple-vector x))
+         (l (sb-c::vector-length x)))
+    (sb-kernel:%check-bound x l i)
+    l))
+(compile 'check-bound-multiple-reads)
+(with-test (:name :check-bound-vop-optimize)
+  ;; could have crashed with the bad optimizer
+  (check-bound-multiple-reads #(a b c) 2))
 
 (with-test (:name (adjust-array :transform))
   (checked-compile-and-assert ()
