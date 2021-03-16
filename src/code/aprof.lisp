@@ -155,7 +155,7 @@
 (defun header-word-store-p (inst bindings)
   ;; a byte-sized or word-sized store at displacement 8 through 10 is OK
   (let ((ea (caddr inst))
-        (freeptr (cdr (assoc '$free bindings))))
+        (freeptr (cdr (assoc '?free bindings))))
     (and (eq (car inst) 'mov)
          (typep ea 'machine-ea)
          (typep freeptr 'reg)
@@ -175,46 +175,46 @@
 #-sb-show
 (setq *allocation-templates*
       `((array ;; also array-header
-               (xadd $free $size)
-               (cmp :qword $free ,region-end)
-               (jmp :nbe $_)
-               (mov :qword ,region-ptr $free)
-               (mov $_ (ea 0 $size) $header); after XADD, size is the old free ptr
-               (:optional (mov $_ (ea 8 $size) $vector-len))
-               (:or (or $size ,sb-vm:other-pointer-lowtag)
-                    (lea :qword $result (ea ,sb-vm:other-pointer-lowtag $size))))
+               (xadd ?free ?size)
+               (cmp :qword ?free ,region-end)
+               (jmp :nbe ?_)
+               (mov :qword ,region-ptr ?free)
+               (mov ?_ (ea 0 ?size) ?header); after XADD, size is the old free ptr
+               (:optional (mov ?_ (ea 8 ?size) ?vector-len))
+               (:or (or ?size ,sb-vm:other-pointer-lowtag)
+                    (lea :qword ?result (ea ,sb-vm:other-pointer-lowtag ?size))))
 
-        (any (:or (lea :qword $end (ea $nbytes $free $nbytes-var))
+        (any (:or (lea :qword ?end (ea ?nbytes ?free ?nbytes-var))
                   ;; LEA with scale=1 can have base and index swapped
-                  (lea :qword $end (ea 0 $nbytes-var $free))
-                  (add $end $free)) ; $end originally holds the size in bytes
-             (cmp :qword $end ,region-end)
-             (jmp :nbe $_)
-             (mov :qword ,region-ptr $end)
-             (mov $_ (ea 0 $free) $header)
-             (:optional (:if header-word-store-p (mov $_ (ea $_ $free) $vector-len)))
-             (:or (or $free $lowtag)
-                  (lea :qword $result (ea $lowtag $free))))
+                  (lea :qword ?end (ea 0 ?nbytes-var ?free))
+                  (add ?end ?free)) ; ?end originally holds the size in bytes
+             (cmp :qword ?end ,region-end)
+             (jmp :nbe ?_)
+             (mov :qword ,region-ptr ?end)
+             (mov ?_ (ea 0 ?free) ?header)
+             (:optional (:if header-word-store-p (mov ?_ (ea ?_ ?free) ?vector-len)))
+             (:or (or ?free ?lowtag)
+                  (lea :qword ?result (ea ?lowtag ?free))))
 
         ;; either non-headered object (cons) or unknown header or unknown nbytes
-        (unknown-header (:or (lea :qword $end (ea $nbytes $free $nbytes-var))
-                             (lea :qword $end (ea 0 $nbytes-var $free))
-                             (add $end $free))
-                        (cmp :qword $end ,region-end)
-                        (jmp :nbe $_)
-                        (mov :qword ,region-ptr $end)
+        (unknown-header (:or (lea :qword ?end (ea ?nbytes ?free ?nbytes-var))
+                             (lea :qword ?end (ea 0 ?nbytes-var ?free))
+                             (add ?end ?free))
+                        (cmp :qword ?end ,region-end)
+                        (jmp :nbe ?_)
+                        (mov :qword ,region-ptr ?end)
                         (:repeat (:or (mov . ignore) (lea . ignore)))
-                        (:or (or $free $lowtag)
-                             (lea :qword $result (ea $lowtag $free))))))
+                        (:or (or ?free ?lowtag)
+                             (lea :qword ?result (ea ?lowtag ?free))))))
 
 (defglobal *allocation-templates-large* nil)
 (setq *allocation-templates-large*
-      `((array (push $nbytes)
+      `((array (push ?nbytes)
                (call . ignore)
-               (pop $result)
-               (mov $_ (ea 0 $result) $header)
-               (mov $_ (ea $_ $result) $vector-len)
-               (or $result $lowtag))))
+               (pop ?result)
+               (mov ?_ (ea 0 ?result) ?header)
+               (mov ?_ (ea ?_ ?result) ?vector-len)
+               (or ?result ?lowtag))))
 
 (defun iterator-begin (iterator pc code)
   (let ((segment (sb-disassem:make-code-segment
@@ -273,8 +273,8 @@
                (note "   match-atom ~s ~s ~s ~s~%" pattern input ea-reg-p bindings)
                (when (and (integerp input) ea-reg-p)
                  (setq input (get-gpr :qword input)))
-               (cond ((eq pattern '$_) t) ; match and ignore anything
-                     ((and (symbolp pattern) (char= (char (string pattern) 0) #\$))
+               (cond ((eq pattern '?_) t) ; match and ignore anything
+                     ((and (symbolp pattern) (char= (char (string pattern) 0) #\?))
                       ;; free variable binds to input, otherwise binding must match
                       (let* ((cell (assq pattern bindings))
                              (binding (cdr cell)))
@@ -289,7 +289,7 @@
                      (t (eql pattern input))))
              (ok-binding (pattern input)
                (case pattern
-                ($lowtag
+                (?lowtag
                  (memq input `(,sb-vm:instance-pointer-lowtag ,sb-vm:list-pointer-lowtag
                                ,sb-vm:fun-pointer-lowtag ,sb-vm:other-pointer-lowtag)))
                 (t t))))
@@ -341,8 +341,8 @@
                 (fail))))))))
 
 (defun deduce-layout (iterator bindings)
-  (unless (assq '$result bindings)
-    (push `($result . ,(cdr (assq '$free bindings))) bindings))
+  (unless (assq '?result bindings)
+    (push `(?result . ,(cdr (assq '?free bindings))) bindings))
   (let ((bindings
          (matchp iterator
                  ;; instance allocation completes the pseudoatomic part after storing widetag
@@ -352,17 +352,17 @@
                   #+sb-safepoint
                   `((test :byte ,(get-gpr :byte sb-vm::rax-offset)
                           (ea ,(- sb-vm:static-space-start sb-vm:gc-safepoint-trap-offset) nil))
-                    (mov :dword (ea 1 $result) $layout))
+                    (mov :dword (ea 1 ?result) ?layout))
                   #-sb-safepoint
                   `((xor :qword ,p-a-flag ,(get-gpr :qword rbp-offset))
-                    (jmp :eq $_)
+                    (jmp :eq ?_)
                     (break . ignore)
-                    (mov :dword (ea 1 $result) $layout))
+                    (mov :dword (ea 1 ?result) ?layout))
                   t)
                  bindings)))
     (if (eq bindings :fail)
         'instance
-        (layout-name (cdr (assq '$layout bindings))))))
+        (layout-name (cdr (assq '?layout bindings))))))
 
 (defun deduce-fun-subtype (iterator bindings)
   (declare (ignorable iterator bindings))
@@ -371,14 +371,14 @@
   (let* ((bindings
           (matchp iterator
                   (load-time-value
-                   `((mov $scratch $header)
-                     (or :qword $scratch
+                   `((mov ?scratch ?header)
+                     (or :qword ?scratch
                          (ea ,(ash sb-vm::thread-function-layout-slot sb-vm:word-shift)
                              ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn))))
-                     (mov :qword (ea ,(- sb-vm:fun-pointer-lowtag) $result) $scratch))
+                     (mov :qword (ea ,(- sb-vm:fun-pointer-lowtag) ?result) ?scratch))
                    t)
                   bindings))
-         (header (and (listp bindings) (cdr (assoc '$header bindings)))))
+         (header (and (listp bindings) (cdr (assoc '?header bindings)))))
     (if (and (integerp header) (eq (logand header #xFF) sb-vm:closure-widetag))
         'closure
         'function)))
@@ -420,7 +420,7 @@
                     ;; refer to the undumpable constant REGION-PTR by its value, not by its
                     ;; name, then complaining that it can't be dumped.
                     ;; Why is ",P-A-FLAG" acceptable but this not?
-                    (load-time-value (list (list 'mov :qword '$free region-ptr)) t)
+                    (load-time-value (list (list 'mov :qword '?free region-ptr)) t)
                     nil))
            (templates
             (cond (template-name
@@ -439,9 +439,9 @@
             (return))))
       (if (eq bindings :fail)
           (values nil nil)
-          (let ((nbytes (cdr (assoc '$nbytes bindings)))
-                (header (cdr (assoc '$header bindings)))
-                (lowtag (cdr (assoc '$lowtag bindings))))
+          (let ((nbytes (cdr (assoc '?nbytes bindings)))
+                (header (cdr (assoc '?header bindings)))
+                (lowtag (cdr (assoc '?lowtag bindings))))
             ;; The low bit might signify something to the allocator. Clear it.
             (when (integerp nbytes)
               (setq nbytes (logandc2 nbytes 1)))
