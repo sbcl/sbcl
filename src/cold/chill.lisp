@@ -65,8 +65,4 @@
         (macro-function 'sb-int:/show0) (macro-function 'sb-int:/show)
         (macro-function 'sb-int:/noshow0) (macro-function 'sb-int:/show)))
 
-sb-c::(defun %vop-existsp (name query &optional optimistic)
-  (declare (ignore optimistic))
-  (not (null (ecase query
-               (:translate (awhen (info :function :info name) (fun-info-templates it)))
-               (:named (gethash name *backend-template-names*))))))
+(load "SYS:src;compiler;vop-existsp.lisp")

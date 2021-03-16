@@ -21,8 +21,8 @@
 ;;; sensitive to the order of vop definitions.  Such uses will often occur inside
 ;;; a "#." so that the defining form remains toplevel.
 ;;; If called with OPTIMISTIC = T then we're trying to return NIL or T
-;;; or the EXISTSP macroexpander.
-#+sb-xc-host
+;;; from the VOP-EXISTSP macroexpander, and if NIL then we decide later.
+#-sb-xc
 (progn
   (defvar *vop-not-existsp* nil)
   ;;; This function is invoked after compiling the cross-compiler
