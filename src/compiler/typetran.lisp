@@ -844,21 +844,6 @@
               ((csubtypep classoid (specifier-type 'instance))
                (values sb-vm:instance-pointer-lowtag
                        '(%instancep object) '(%instance-layout object)))))
-       (get-layout-or-return-false
-        (if lowtag-test
-            ;; Test just one of %INSTANCEP or %FUNCALLABLE-INSTANCE-P
-            `(if ,lowtag-test ,slot-reader (return-from typep nil))
-            ;; But if we don't know which is will be, try both.
-            ;; This is less general than LAYOUT-OF,and therefore
-            ;; a little quicker to fail, because objects with
-            ;; {LIST|OTHER}-POINTER-LOWTAG can't possibly pass.
-            ;; It's a bit disappointing that STREAM uses this slower path,
-            ;; but some people think it should be possible to create
-            ;; funcallable streams. As a countermeasure, it would be possible to emit
-            ;; slightly better code in a vop.
-            `(cond ((%instancep object) (%instance-layout object))
-                   ((function-with-layout-p object) (%fun-layout object))
-                   (t (return-from typep nil)))))
        (depthoid (if layout (layout-depthoid layout) -1))
        (n-layout (make-symbol "LAYOUT")))
 
@@ -871,19 +856,27 @@
                              (pathname  +pathname-layout-flag+)
                              (t         +structure-layout-flag+)))))
 
-          ;; Next easiest: Sealed and no subtypes.
+          ;; Next easiest: Sealed and no subtypes. Typically for DEFSTRUCT only.
+          ;; Even if you don't seal a DEFCLASS, we're allowed to assume that things
+          ;; won't change, as per CLHS 3.2.2.3 on Semantic Constraints:
+          ;;  "Classes defined by defclass in the compilation environment must be defined
+          ;;  at run time to have the same superclasses and same metaclass."
+          ;; I think that means we should know the lowtag always. Nonetheless, this isn't
+          ;; an important scenario, and only if you _do_ seal a class could this case be
+          ;; reached; users rarely seal their classes since the standard doesn't say how.
           ((and layout
                 (eq (classoid-state classoid) :sealed)
                 (not (classoid-subclasses classoid)))
-            ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
-            ;; though probably extremely weird. Also the PRED should be set in
-            ;; that event, but it isn't.
            (if lowtag-test
                `(and ,lowtag-test ,(if (vop-existsp :translate layout-eq)
                                        `(layout-eq object ,layout ,lowtag)
                                        `(eq ,slot-reader ,layout)))
-               `(block typep (eq ,get-layout-or-return-false ,layout))))
-
+               `(eq ,layout #+compact-instance-header (%instanceoid-layout object)
+                            ;; Slightly quicker than LAYOUT-OF. See also %PCL-INSTANCE-P
+                            #-compact-instance-header
+                            (cond ((%instancep object) (%instance-layout object))
+                                  ((funcallable-instance-p object) (%fun-layout object))
+                                  (t ,(find-layout 't))))))
           ;; All other structure types
           ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
@@ -933,8 +926,10 @@
                   `(let ((,n-layout (%instanceoid-layout object))) ,@guts)
                   #-compact-instance-header
                   `(block typep
-                     (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
-
+                     (let ((,n-layout (cond ((%instancep object) (%instance-layout object))
+                                            ((funcallable-instance-p object) (%fun-layout object))
+                                            (t (return-from typep nil)))))
+                       ,@guts)))))
           (t
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
                                   object)))))
