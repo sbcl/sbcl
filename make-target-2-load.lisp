@@ -412,15 +412,13 @@ Please check that all strings which were not recognizable to the compiler
            ;; overapproximate what we need for contribs and tests
            (member symbol '(sb-vm::map-referencing-objects
                             sb-vm::map-stack-references
-                            sb-vm::thread-profile-data-slot
-                            sb-vm::thread-alloc-region-slot
                             sb-vm::reconstitute-object
                             ;; need this for defining a vop which
                             ;; tests the x86-64 allocation profiler
                             sb-vm::pseudo-atomic
                             ;; Naughty outside-world code uses these.
-                            #+x86-64 sb-vm::reg-in-size
-                            sb-vm::thread-control-stack-start-slot))
+                            #+x86-64 sb-vm::reg-in-size))
+           (let ((s (string symbol))) (and (search "THREAD-" s) (search "-SLOT" s)))
            (search "-OFFSET" (string symbol))
            (search "-TN" (string symbol))))
       ((#.(find-package "SB-C")
