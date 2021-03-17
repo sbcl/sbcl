@@ -157,6 +157,7 @@
  ("src/code/type-class" :c-headers)
 
  ("src/code/cas" :not-host)
+ ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
  ("src/compiler/early-c" :c-headers)
  ("src/compiler/fun-info" :c-headers)
  ("src/pcl/slot-name") ; for calls from 'info-vector'
@@ -197,7 +198,6 @@
 
  ("src/code/early-time" :c-headers)
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
- ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
 
  ("src/code/bignum"     :not-host)
  ("src/code/number-dispatch" :not-host)

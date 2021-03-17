@@ -83,7 +83,6 @@
          id
          (sb-fasl::write-slots
           (sb-fasl::allocate-struct-of-type 'meta-info)
-          'meta-info ; pass the type name in lieu of layout
           :category category :kind kind :type-spec type-spec
           :type-checker checker :validate-function validator
           :default default :number id))))
