@@ -142,13 +142,12 @@
 ;;; Return the most restrictive primitive type that contains OBJECT.
 (/show0 "primtype.lisp 147")
 (defun primitive-type-of (object)
-  (let ((type (ctype-of object)))
-    (cond ((not (member-type-p type)) (primitive-type type))
-          ((and (eql 1 (member-type-size type))
-                (equal (member-type-members type) '(nil)))
-           (primitive-type-or-lose 'list))
-          (t
-           *backend-t-primitive-type*))))
+  (if (null object)
+      (load-time-value (primitive-type-or-lose 'list) t)
+      (let ((type (ctype-of object)))
+        (if (member-type-p type)
+            *backend-t-primitive-type*
+            (primitive-type type)))))
 
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
