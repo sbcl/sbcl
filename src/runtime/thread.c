@@ -258,6 +258,33 @@ void* read_current_thread() {
 extern pthread_key_t foreign_thread_ever_lispified;
 #endif
 
+#if defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
+#define COLLECT_GC_STATS
+#endif
+#ifdef COLLECT_GC_STATS
+static struct timespec gc_start_time;
+static long stw_elapsed,
+    stw_min_duration = LONG_MAX, stw_max_duration, stw_sum_duration,
+    gc_min_duration = LONG_MAX, gc_max_duration, gc_sum_duration;
+int show_gc_stats, n_gcs_done;
+static void summarize_gc_stats(void) {
+    // TODO: also collect things like number of root pages,bytes scanned
+    // and number of pages,bytes copied on average per GC cycle.
+    if (show_gc_stats && n_gcs_done)
+        fprintf(stderr,
+                "\nGC: time-to-stw=%ld,%ld,%ld \u00B5s (min,avg,max) pause=%ld,%ld,%ld \u00B5s over %d GCs\n",
+                stw_min_duration/1000, stw_sum_duration/n_gcs_done/1000, stw_max_duration/1000,
+                gc_min_duration/1000, gc_sum_duration/n_gcs_done/1000, gc_max_duration/1000,
+                n_gcs_done);
+}
+void reset_gc_stats() { // after sb-posix:fork
+    stw_min_duration = LONG_MAX; stw_max_duration = stw_sum_duration = 0;
+    gc_min_duration = LONG_MAX; gc_max_duration = gc_sum_duration = 0;
+    n_gcs_done = 0;
+    show_gc_stats = 1; // won't show if never called reset
+}
+#endif
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -302,6 +329,9 @@ void create_main_lisp_thread(lispobj function) {
     set_thread_stack(th->control_stack_end);
 #endif
 
+#ifdef COLLECT_GC_STATS
+    atexit(summarize_gc_stats);
+#endif
     /* WIN32 has a special stack arrangement, calling
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
@@ -1123,6 +1153,12 @@ void release_gc_lock() { pthread_mutex_unlock(&in_gc_lock); }
  * the memory shouldn't be there) */
 void gc_stop_the_world()
 {
+#ifdef COLLECT_GC_STATS
+    struct timespec stw_begin_time, stw_end_time;
+    // Measuring the wait time has to use a realtime clock, not a thread clock
+    // because sleeping below in a sem_wait needs to accrue time.
+    clock_gettime(CLOCK_MONOTONIC, &stw_begin_time);
+#endif
     struct thread *th, *me = get_sb_vm_thread();
     int rc;
 
@@ -1156,10 +1192,34 @@ void gc_stop_the_world()
         }
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:end\n"));
+#ifdef COLLECT_GC_STATS
+    clock_gettime(CLOCK_MONOTONIC, &stw_end_time);
+    stw_elapsed = (stw_end_time.tv_sec - stw_begin_time.tv_sec)*1000000000L
+                + (stw_end_time.tv_nsec - stw_begin_time.tv_nsec);
+    gc_start_time = stw_end_time;
+#endif
 }
 
 void gc_start_the_world()
 {
+#ifdef COLLECT_GC_STATS
+    struct timespec gc_end_time;
+    clock_gettime(CLOCK_MONOTONIC, &gc_end_time);
+    long gc_elapsed = (gc_end_time.tv_sec - gc_start_time.tv_sec)*1000000000L
+                      + (gc_end_time.tv_nsec - gc_start_time.tv_nsec);
+    if (stw_elapsed < 0 || gc_elapsed < 0) {
+        char errmsg[] = "GC: Negative times?\n";
+        write(2, errmsg, sizeof errmsg-1);
+    } else {
+        stw_sum_duration += stw_elapsed;
+        if (stw_elapsed < stw_min_duration) stw_min_duration = stw_elapsed;
+        if (stw_elapsed > stw_max_duration) stw_max_duration = stw_elapsed;
+        gc_sum_duration += gc_elapsed;
+        if (gc_elapsed < gc_min_duration) gc_min_duration = gc_elapsed;
+        if (gc_elapsed > gc_max_duration) gc_max_duration = gc_elapsed;
+        ++n_gcs_done;
+    }
+#endif
     struct thread *th, *me = get_sb_vm_thread();
     int lock_ret;
     /* if a resumed thread creates a new thread before we're done with
