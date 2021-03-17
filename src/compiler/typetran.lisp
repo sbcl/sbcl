@@ -845,7 +845,7 @@
                (values sb-vm:instance-pointer-lowtag
                        '(%instancep object) '(%instance-layout object)))))
        (depthoid (if layout (layout-depthoid layout) -1))
-       (n-layout (make-symbol "LAYOUT")))
+       (wrapper (make-symbol "LAYOUT")))
 
     ;; Easiest case first: single bit test.
     (cond ((member name '(condition pathname structure-object))
@@ -871,12 +871,15 @@
                `(and ,lowtag-test ,(if (vop-existsp :translate layout-eq)
                                        `(layout-eq object ,layout ,lowtag)
                                        `(eq ,slot-reader ,layout)))
-               `(eq ,layout #+compact-instance-header (%instanceoid-layout object)
-                            ;; Slightly quicker than LAYOUT-OF. See also %PCL-INSTANCE-P
-                            #-compact-instance-header
-                            (cond ((%instancep object) (%instance-layout object))
-                                  ((funcallable-instance-p object) (%fun-layout object))
-                                  (t ,(find-layout 't))))))
+               ;; `(eq ,layout
+               ;;      (if-vop-existsp (:translate %instanceoid-layout)
+               ;;        (%instanceoid-layout object)
+               ;;        ;; Slightly quicker than LAYOUT-OF. See also %PCL-INSTANCE-P
+               ;;        (cond ((%instancep object) (%instance-layout object))
+               ;;              ((funcallable-instance-p object) (%fun-layout object))
+               ;;              (t ,(find-layout 't)))))
+               (bug "Unexpected metatype for ~S" layout)))
+
           ;; All other structure types
           ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
@@ -890,11 +893,10 @@
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
                   ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-                       ;; no gensym, to keep the expansion more concise
                        `(%structure-is-a (%instance-layout object) ,layout)
-                       `(let ((,n-layout (%instance-layout object)))
-                          (and (layout-depthoid-ge ,n-layout ,depthoid)
-                               (%structure-is-a ,n-layout ,layout))))))
+                       `(let ((,wrapper (%instance-layout object)))
+                          (and (layout-depthoid-ge ,wrapper ,depthoid)
+                               (%structure-is-a ,wrapper ,layout))))))
 
           ((> depthoid 0)
            ;; fixed-depth ancestors of non-structure types:
@@ -902,34 +904,32 @@
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
                            (bug "Non-frozen static classoids?"))
-            (let ((guts `((when (zerop (layout-clos-hash ,n-layout))
-                            (setq ,n-layout
-                                  (truly-the layout
-                                             (update-object-layout object))))
+            (let ((guts `((when (zerop (layout-clos-hash ,wrapper))
+                            (setq ,wrapper (update-object-layout object)))
                           ,(ecase name
                             (stream
-                             `(logtest (layout-flags ,n-layout) ,+stream-layout-flag+))
+                             `(logtest (layout-flags ,wrapper) ,+stream-layout-flag+))
                             (file-stream
-                             `(logtest (layout-flags ,n-layout) ,+file-stream-layout-flag+))
+                             `(logtest (layout-flags ,wrapper) ,+file-stream-layout-flag+))
                             (string-stream
-                             `(logtest (layout-flags ,n-layout) ,+string-stream-layout-flag+))
+                             `(logtest (layout-flags ,wrapper) ,+string-stream-layout-flag+))
                             ;; Testing the type EXTENDED-SEQUENCE tests for #<LAYOUT of SEQUENCE>.
                             ;; It can only arise from a direct invocation of TRANSFORM-INSTANCE-TYPEP,
                             ;; because the lisp type is not a classoid. It's done this way to define
                             ;; the logic once only, instead of both here and src/code/pred.lisp.
                             (sequence
-                             `(eq (data-vector-ref (layout-inherits ,n-layout) 1)
+                             `(eq (data-vector-ref (layout-inherits ,wrapper) 1)
                                   ,layout))))))
               (if lowtag-test
-                  `(and ,lowtag-test (let ((,n-layout ,slot-reader)) ,@guts))
-                  #+compact-instance-header
-                  `(let ((,n-layout (%instanceoid-layout object))) ,@guts)
-                  #-compact-instance-header
-                  `(block typep
-                     (let ((,n-layout (cond ((%instancep object) (%instance-layout object))
-                                            ((funcallable-instance-p object) (%fun-layout object))
-                                            (t (return-from typep nil)))))
-                       ,@guts)))))
+                  `(and ,lowtag-test (let ((,wrapper ,slot-reader)) ,@guts))
+                  (if-vop-existsp (:translate %instanceoid-layout)
+                    `(let ((,wrapper (%instanceoid-layout object))) ,@guts)
+                    `(block typep
+                       (let ((,wrapper (cond ((%instancep object) (%instance-layout object))
+                                             ((funcallable-instance-p object) (%fun-layout object))
+                                             (t (return-from typep nil)))))
+                         ,@guts))))))
+
           (t
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
                                   object)))))
