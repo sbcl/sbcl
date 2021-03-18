@@ -1799,7 +1799,7 @@ static inline int layout_size_class_nwords(int index) {
     return 8 + 2*index ;
 }
 static inline int nwords_to_layout_size_class(unsigned int nwords) {
-    // the smallest layout size class is 14 words
+    // the smallest layout size class is 8 words
     int index = nwords <= 8 ? 0 : (nwords - 8)/2;
     if (index >= MAX_LAYOUT_DEFRAG_SIZE_CLASSES)
         lose("Oversized layout: can't defragment");
