@@ -1070,9 +1070,6 @@ core and return a descriptor to it."
 ;;; to the host's COLD-LAYOUT proxy for that layout.
 (defvar *cold-layout-by-addr*)
 
-;;; the descriptor for layout's layout (needed when making layouts)
-(defvar *layout-layout*)
-
 (defvar *known-structure-classoids*)
 
 ;;; Trivial methods [sic] require that we sort possible methods by the depthoid.
@@ -1170,9 +1167,12 @@ core and return a descriptor to it."
 (defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
 
 (defun choose-layout-id (name conditionp)
+  ;; If you change these, then also change src/runtime/gc-private.h
+  ;; The ID of T is irrelevant since we'll never try to compare to it.
   (case name
-    ((t) 1)
-    (structure-object 2)
+    ((t) 0)
+    (structure-object 1)
+    (sb-kernel::wrapper 2)
     (layout 3)
     (sb-lockless::list-node 4)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
@@ -1196,9 +1196,18 @@ core and return a descriptor to it."
   (let* ((fixed-words (sb-kernel::type-dd-length layout))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (result (allocate-struct (+ fixed-words bitmap-words)
-                                  *layout-layout*
+                                  (or (awhen (gethash 'layout *cold-layouts*)
+                                        (cold-layout-descriptor it))
+                                      (make-fixnum-descriptor 0))
                                   (symbol-value *cold-layout-gspace*)))
-         (this-id (choose-layout-id name (logtest flags +condition-layout-flag+))))
+         (wrapper
+          #-metaspace result ; WRAPPER and LAYOUT are synonymous in this case
+          #+metaspace (allocate-struct (sb-kernel::type-dd-length sb-kernel::wrapper)
+                                       (or (awhen (gethash 'sb-kernel::wrapper *cold-layouts*)
+                                             (cold-layout-descriptor it))
+                                           (make-fixnum-descriptor 0))))
+         (this-id (choose-layout-id name (logtest flags +condition-layout-flag+)))
+         (hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))))
 
     (let ((proxy (%make-cold-layout :id this-id
                                     :name name
@@ -1215,38 +1224,40 @@ core and return a descriptor to it."
     (unless core-file-name (return-from make-cold-layout result))
 
     ;; Can't use the easier WRITE-SLOTS unfortunately because bootstrapping is hard
-    (let ((metadata (type-dd-slots-or-lose 'layout)))
+    (let* ((layout-metadata (type-dd-slots-or-lose 'layout))
+           (wrapper-metadata #-metaspace layout-metadata
+                             #+metaspace (type-dd-slots-or-lose 'sb-kernel::wrapper)))
       #+64-bit
-      (%write-slots
-       metadata result
-       :flags (sb-kernel::pack-layout-flags depthoid length flags))
+      (%write-slots layout-metadata result
+                    :flags (sb-kernel::pack-layout-flags depthoid length flags))
       #-64-bit
-      (%write-slots
-       metadata result
-       :depthoid (make-fixnum-descriptor depthoid)
-       :length (make-fixnum-descriptor length)
-       :flags flags)
+      (%write-slots layout-metadata result
+                    :depthoid (make-fixnum-descriptor depthoid)
+                    :length (make-fixnum-descriptor length)
+                    :flags flags)
 
-      ;; Set other slot values.
-      ;; leave CLASSOID uninitialized for now
-      (%write-slots
-       metadata result
-       :clos-hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))
-       :invalid *nil-descriptor*
-       :inherits inherits
-       :%info *nil-descriptor*)
+      (%write-slots wrapper-metadata wrapper
+                    :clos-hash hash
+                    :invalid *nil-descriptor*
+                    :inherits inherits
+                    :%info *nil-descriptor*)
 
       (when (member name '(null list symbol pathname))
         ;; Assign an empty slot-table.  Why this is done only for four
         ;; classoids is ... too complicated to explain here in a few words,
         ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
         ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.
-      (%write-slots
-       metadata result
-       :slot-table (if (boundp '*vacuous-slot-table*)
-                       *vacuous-slot-table*
-                       (setq *vacuous-slot-table*
-                             (host-constant-to-core '#(1 nil))))))
+        (%write-slots wrapper-metadata wrapper
+                      :slot-table (if (boundp '*vacuous-slot-table*)
+                                      *vacuous-slot-table*
+                                      (setq *vacuous-slot-table*
+                                            (host-constant-to-core '#(1 nil))))))
+
+      ;; If wrappers are used, the wrapper has a copy of the hash,
+      ;; and also the two friends point to each other.
+      #+metaspace
+      (progn (%write-slots layout-metadata result :clos-hash hash :friend wrapper)
+             (%write-slots wrapper-metadata wrapper :friend result))
 
       (let ((byte-offset (ash (+ (descriptor-word-offset result)
                                  (get-dsd-index sb-kernel:layout sb-kernel::id-word0)
@@ -1349,7 +1360,6 @@ core and return a descriptor to it."
                                  (or (cdr override) host-val))))))))
 
 (defun initialize-layouts ()
-  (setq *layout-layout* (make-fixnum-descriptor 0))
   (let ((l (find-layout 'stream)))
     (setf (layout-flags l) (logior (logior (layout-flags l)) +stream-layout-flag+)))
   (flet ((chill-layout (name &rest inherits)
@@ -1365,10 +1375,17 @@ core and return a descriptor to it."
                                (layout-bitmap warm-layout)
                                (vector-in-core inherits)))))
     (let* ((t-layout   (chill-layout 't))
-           (s-o-layout (chill-layout 'structure-object t-layout)))
-      (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
-      (dolist (layout (list t-layout s-o-layout *layout-layout*))
-        (set-instance-layout layout *layout-layout*))
+           (s-o-layout (chill-layout 'structure-object t-layout))
+           #+metaspace (wrapper-layout (chill-layout 'sb-kernel::wrapper t-layout s-o-layout))
+           (layout-layout (chill-layout 'layout t-layout s-o-layout)))
+      (when core-file-name
+        #-metaspace
+        (dolist (instance (list t-layout s-o-layout layout-layout))
+          (set-instance-layout instance layout-layout))
+        #+metaspace
+        (progn (dolist (instance (list t-layout s-o-layout wrapper-layout layout-layout))
+                 (set-instance-layout (read-wordindexed instance 1) wrapper-layout)
+                 (set-instance-layout instance layout-layout))))
       (chill-layout 'function t-layout)
       (chill-layout 'sb-kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
@@ -3712,11 +3729,14 @@ III. initially undefined function references (alphabetically):
 
       (when *known-structure-classoids*
         (dolist (defstruct-args *known-structure-classoids*)
-            (let* ((dd (first defstruct-args))
-                   (name (warm-symbol (read-slot dd :name)))
-                   (layout (gethash name *cold-layouts*)))
-              (aver layout)
-              (write-slots (cold-layout-descriptor layout) :%info dd)))
+          (let* ((dd (first defstruct-args))
+                 (name (warm-symbol (read-slot dd :name)))
+                 (layout (gethash name *cold-layouts*)))
+            (aver layout)
+            (let* ((des (cold-layout-descriptor layout))
+                   (wrapper #+metaspace (read-wordindexed des 1)
+                            #-metaspace des))
+              (write-slots wrapper :%info dd))))
         (when verbose
           (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
                   (length *known-structure-classoids*)
@@ -3858,7 +3878,8 @@ III. initially undefined function references (alphabetically):
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
         (dolist (class '(defstruct-description defstruct-slot-description
-                         classoid layout hash-table package
+                         classoid layout #+metaspace sb-kernel::wrapper
+                         hash-table package
                          sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)

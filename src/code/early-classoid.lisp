@@ -147,6 +147,8 @@
 
 ;;; 32-bit is not done yet. Three slots are still used, instead of two.
 
+#-metaspace
+(progn
 (sb-xc:defstruct (layout (:copier nil)
                          ;; Parsing DEFSTRUCT uses a temporary layout
                          (:constructor make-temporary-layout
@@ -218,7 +220,63 @@
   #-64-bit (id-word3 0 :type word)
   #-64-bit (id-word4 0 :type word)
   #-64-bit (id-word5 0 :type word))
-(declaim (freeze-type layout))
+(declaim (freeze-type layout)))
+
+#+metaspace
+(progn
+;;; Separating the pointer and nonpointer slots of LAYOUT satisfies the
+;;; requirement of a certain garbage collector (WIP), but also opens up the
+;;; possibility of absorbing at least one of the vectorish slots into the
+;;; WRAPPER since it could be reallocated with variable size.
+;;; The SLOT-TABLE slot might be a good candidate for trailing tagged slots.
+(sb-xc:defstruct (wrapper (:copier nil) (:constructor %make-wrapper))
+  (clos-hash (missing-arg) :type (and fixnum unsigned-byte)) ; redundant
+  (classoid (missing-arg) :type classoid)
+  (inherits #() :type simple-vector)
+  (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
+  (slot-table #(1 nil) :type simple-vector)
+  (%info nil :type (or list defstruct-description))
+  (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
+  (friend nil :type layout))
+;;; See LAYOUT for the remarks about each slot.
+;;; LAYOUT points to WRAPPER and vice-versa.
+;;; The most common LAYOUT is 8 words.
+;;; Needing >64 words would be quite unusual - the layout would have
+;;; an enormous depthoid or bitmap or both.
+(sb-xc:defstruct (layout (:copier nil)
+                         ;; Parsing DEFSTRUCT uses a temporary layout
+                         (:constructor %make-temporary-layout (friend clos-hash)))
+  ;; !!! The FRIEND slot in LAYOUT *MUST* BE FIRST !!!
+  (friend nil :type wrapper)
+  (clos-hash (missing-arg) :type (and fixnum unsigned-byte))
+  (flags 0 :type (signed-byte #.sb-vm:n-word-bits))
+  (id-word0 0 :type word)
+  (id-word1 0 :type word)
+  (id-word2 0 :type word)
+  ;; There are zero or more raw words if a type needs to store additional layout-ids,
+  ;; and there are one or more raw words for the GC bitmap.
+  )
+(declaim (freeze-type wrapper layout))
+
+#-sb-xc-host
+(progn
+(defmacro layout-classoid (layout) `(wrapper-classoid (layout-friend ,layout)))
+(defmacro layout-slot-table (layout) `(wrapper-slot-table (layout-friend ,layout)))
+(defmacro layout-%info (layout) `(wrapper-%info (layout-friend ,layout)))
+(defmacro layout-equalp-impl (layout) `(wrapper-equalp-impl (layout-friend ,layout)))
+(defun layout-inherits (layout) (wrapper-inherits (layout-friend layout)))
+(declaim (inline layout-invalid))
+(defun layout-invalid (layout)
+  (wrapper-invalid (layout-friend layout)))
+(defun (setf layout-invalid) (newval layout)
+  (setf (wrapper-invalid (layout-friend layout)) newval))
+(defun make-temporary-layout (clos-hash classoid inherits)
+  (let* ((wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
+                                 :inherits inherits :invalid nil
+                                 :friend #.(find-layout t)))
+         (layout (%make-temporary-layout wrapper clos-hash)))
+    (setf (wrapper-friend wrapper) layout)
+    layout))))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
@@ -393,6 +451,11 @@
                           sb-vm:instance-widetag))
                  #-immobile-space (%make-instance nwords))))
     (setf (%instance-layout layout) #.(find-layout 'layout))
+    #+metaspace
+    (let ((wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid  :%info info
+                                  :inherits inherits :invalid invalid
+                                  :friend layout)))
+      (setf (layout-friend layout) wrapper))
     (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
                                 #-64-bit flags)
     (setf (layout-clos-hash layout) clos-hash
@@ -412,6 +475,7 @@
       (finalize layout (lambda () (atomic-push id (cdr *layout-id-generator*)))
                 :dont-save t))
     layout))
+
 (declaim (inline layout-bitmap-words))
 (defun layout-bitmap-words (layout)
   (declare (layout layout))

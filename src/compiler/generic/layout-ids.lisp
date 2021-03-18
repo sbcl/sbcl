@@ -216,8 +216,9 @@ SB-ALIEN::SHARED-OBJECT
   #-(or arm mips) 'signed-byte)
 
 ;;; There are a few wired IDs:
-;;;   1 = T
-;;;   2 = STRUCTURE-OBJECT
+;;;   0 = T
+;;;   1 = STRUCTURE-OBJECT
+;;;   2 = WRAPPER
 ;;;   3 = LAYOUT
 ;;;   4 = SB-LOCKLESS::LIST-NODE
 (ecase layout-id-type

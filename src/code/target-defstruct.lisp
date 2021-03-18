@@ -21,7 +21,8 @@
   (%instance-ref instance index))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
-  (setf (layout-inherits layout) inherits)
+  #-metaspace (setf (layout-inherits layout) inherits)
+  #+metaspace (setf (wrapper-inherits (layout-friend layout)) inherits)
   ;;; If structurep, and *only* if, store all the inherited layout IDs.
   ;;; It looks enticing to try to always store "something", but that goes wrong,
   ;;; because only structure-object layouts are growable, and only structure-object
@@ -84,9 +85,15 @@
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
+(defmacro set-layout-equalp-impl (layout newval)
+  `(setf #-metaspace (%instance-ref ,layout
+                                    (get-dsd-index layout equalp-impl))
+         #+metaspace (%instance-ref (layout-friend ,layout)
+                                    (get-dsd-index wrapper equalp-impl))
+        ,newval))
+
 (defun assign-equalp-impl (type-name function)
-  (setf (%instance-ref (find-layout type-name) (get-dsd-index layout equalp-impl))
-        function))
+  (set-layout-equalp-impl (find-layout type-name) function))
 
 (defun %target-defstruct (dd equalp)
   (declare (type defstruct-description dd))
@@ -95,9 +102,10 @@
     (setf (documentation (dd-name dd) 'structure)
           (dd-doc dd)))
 
-  (let* ((classoid (find-classoid (dd-name dd)))
-         (layout (classoid-layout classoid)))
-    (setf (%instance-ref layout (get-dsd-index sb-kernel:layout sb-kernel::equalp-impl))
+  (let ((classoid (find-classoid (dd-name dd))))
+    (let ((layout (classoid-layout classoid)))
+      (set-layout-equalp-impl
+          layout
           (cond ((compiled-function-p equalp) equalp)
                 ((eql (layout-bitmap layout) +layout-all-tagged+)
                  #'sb-impl::instance-equalp)
@@ -124,7 +132,7 @@
                                   0 ; means recurse using EQUALP
                                   (raw-slot-data-comparator rsd)))))
                     (lambda (a b)
-                      (sb-impl::instance-equalp* comparators a b))))))
+                      (sb-impl::instance-equalp* comparators a b)))))))
 
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))

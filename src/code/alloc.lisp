@@ -413,13 +413,14 @@
             (#.symbol-widetag 1)
             (#.fdefn-widetag  2)
             (#.instance-widetag
-             (cond ((<= aligned-nwords 16) (setq aligned-nwords 16) 3)
-                   ((<= aligned-nwords 24) (setq aligned-nwords 24) 4)
-                   ((<= aligned-nwords 32) (setq aligned-nwords 32) 5)
-                   ((<= aligned-nwords 48) (setq aligned-nwords 48) 6)
+             (cond ((<= aligned-nwords  8) (setq aligned-nwords  8) 3)
+                   ((<= aligned-nwords 16) (setq aligned-nwords 16) 4)
+                   ((<= aligned-nwords 24) (setq aligned-nwords 24) 5)
+                   ((<= aligned-nwords 32) (setq aligned-nwords 32) 6)
+                   ((<= aligned-nwords 48) (setq aligned-nwords 48) 7)
                    (t (error "Oversized layout"))))
             ;; TODO: allow different sizes of funcallable-instance
-            (#.funcallable-instance-widetag 7))))
+            (#.funcallable-instance-widetag 8))))
     (values (%primitive alloc-immobile-fixedobj
                         size-class
                         aligned-nwords
