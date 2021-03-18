@@ -1156,8 +1156,8 @@ interrupt_handle_pending(os_context_t *context)
          * an interrupt arrived during GC (POST-GC, really) it was
          * handled. */
         if (original_pending_handler != data->pending_handler)
-            lose("pending handler changed in gc: %p -> %p.",
-                 original_pending_handler, data->pending_handler);
+            lose("pending handler changed in gc: %p -> %p, signal = %d.",
+                 original_pending_handler, data->pending_handler, data->pending_signal);
     }
 
 #ifndef LISP_FEATURE_WIN32
