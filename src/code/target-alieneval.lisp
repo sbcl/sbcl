@@ -314,7 +314,7 @@ Examples:
 ;;; an invocation of INVOKE-WITH-SAVED-FP, which should be inlined.
 #+c-stack-is-control-stack
 (defun invoke-with-saved-fp (fn)
-  (declare #-sb-xc-host (muffle-conditions compiler-note)
+  (declare (muffle-conditions compiler-note)
            (optimize (speed 3)))
   ;; No need to link to the previous value, it can be fetched from the binding stack.
   (let ((*saved-fp* (sb-c::current-fp-fixnum)))

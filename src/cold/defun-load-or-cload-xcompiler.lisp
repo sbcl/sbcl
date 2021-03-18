@@ -135,6 +135,8 @@
       (with-math-journal
        (do-stems-and-flags (stem flags 1)
          (unless (find :not-host flags)
+           ;; Enforce naming convention: target-* files are not for make-host-1
+           (assert (not (search "code/target-" stem)))
            (funcall load-or-cload-stem stem flags)
            (when (member :sb-show sb-xc:*features*)
              (funcall 'warn-when-cl-snapshot-diff *cl-snapshot*))))))

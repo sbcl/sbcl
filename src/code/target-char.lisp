@@ -302,7 +302,6 @@
                                           ',(convert-to-double-vector u1-name->code t))))))))))))))
 
   (frob))
-#+sb-xc-host (!character-name-database-cold-init)
 
 (define-load-time-global *base-char-name-alist*
   ;; Note: The *** markers here indicate character names which are

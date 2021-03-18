@@ -2114,7 +2114,6 @@ subject to change."
 (defun destroy-thread (thread)
   (terminate-thread thread))
 
-#-sb-xc-host
 (declaim (sb-ext:deprecated
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
