@@ -279,17 +279,20 @@
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
-(defconstant structure-object-layout-id 2) ; KLUDGE
+
 #-sb-xc-host
 (defun layout-id (layout)
-  (let ((depthoid (layout-depthoid layout)))
+  ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
+  ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
+  ;; There are a few non-structure types at positive depthoid; those do not store
+  ;; their ancestors in the vector; they only store self-id at index 0.
+  ;; This isn't performance-critical. If it were, then we should store self-ID
+  ;; at a fixed index. Using it for type-based dispatch remains a possibility.
+  (let* ((depth (- (layout-depthoid layout) 2))
+         (index (if (or (< depth 0) (not (logtest (layout-flags layout)
+                                                  +structure-layout-flag+)))
+                    0 depth)))
     (truly-the layout-id
-     (cond ((not (logtest (layout-flags layout) +structure-layout-flag+))
-            ;; the 0th word of the ID vector stores the layout id
-            (layout-id-word0 layout))
-           ((>= depthoid 2)
-            ;; Depthoid 2 is in the 0th index and so on.
-            (let ((index (- depthoid 2)))
               #-64-bit
               (%raw-instance-ref/signed-word
                layout (+ (get-dsd-index layout id-word0) index))
@@ -300,9 +303,7 @@
                                             (get-dsd-index layout id-word0))
                                          sb-vm:word-shift)
                                     sb-vm:instance-pointer-lowtag))))
-                  (signed-sap-ref-32 sap (ash index 2))))))
-           (t ; KLUDGE: must be STRUCTURE-OBJECT
-            structure-object-layout-id)))))
+                  (signed-sap-ref-32 sap (ash index 2)))))))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-flags (depthoid length flags)
@@ -405,7 +406,6 @@
       (dotimes (i bitmap-words)
         (setf (%raw-instance-ref/word layout (+ bitmap-base i))
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
-    (setf (layout-invalid layout) invalid)
     ;; It's not terribly important that we recycle layout IDs, but I have some other
     ;; changes planned that warrant a finalizer per layout.
     (unless (built-in-classoid-p classoid)

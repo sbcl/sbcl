@@ -21,7 +21,6 @@
   (%instance-ref instance index))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
-  (declare (ignorable structurep this-id))
   (setf (layout-inherits layout) inherits)
   ;;; If structurep, and *only* if, store all the inherited layout IDs.
   ;;; It looks enticing to try to always store "something", but that goes wrong,
@@ -31,19 +30,22 @@
   ;;; Standard-object layouts are not growable. The inherited layouts are known
   ;;; only at class finalization time, at which point we've already made the layout.
   ;;; Hence, the required indirection to the simple-vector of inherits.
-  (cond (structurep
-         (with-pinned-objects (layout)
-           (loop with sap = (sap+ (int-sap (get-lisp-obj-address layout))
-                                  (- (ash (+ sb-vm:instance-slots-offset
-                                             (get-dsd-index layout id-word0))
-                                          sb-vm:word-shift)
-                                     sb-vm:instance-pointer-lowtag))
-                 for i from 0 by 4
-                 for j from 2 below (length inherits) ; skip T and STRUCTURE-OBJECT
-                 do (setf (signed-sap-ref-32 sap i) (layout-id (svref inherits j)))
-                 finally (setf (signed-sap-ref-32 sap i) this-id))))
-        ((not (eql this-id 0))
-         (setf (layout-id-word0 layout) this-id))))
+  (with-pinned-objects (layout)
+    ;; The layout-id vector is an array of int32_t starting at the ID-WORD0 slot.
+    ;; We could use (SETF %RAW-INSTANCE-REF/WORD) for 32-bit architectures,
+    ;; but on 64-bit we have to use SAP-REF, so may as well be consistent here
+    ;; and use a SAP either way.
+    (let ((sap (sap+ (int-sap (get-lisp-obj-address layout))
+                     (- (ash (+ sb-vm:instance-slots-offset (get-dsd-index layout id-word0))
+                             sb-vm:word-shift)
+                        sb-vm:instance-pointer-lowtag))))
+      (cond (structurep
+             (loop for i from 0 by 4
+                   for j from 2 below (length inherits) ; skip T and STRUCTURE-OBJECT
+                   do (setf (signed-sap-ref-32 sap i) (layout-id (svref inherits j)))
+                   finally (setf (signed-sap-ref-32 sap i) this-id)))
+            ((not (eql this-id 0))
+             (setf (signed-sap-ref-32 sap 0) this-id))))))
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.

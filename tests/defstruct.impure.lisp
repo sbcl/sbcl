@@ -53,7 +53,11 @@
                 (expect
                  (map 'list 'sb-kernel:layout-id
                       (sb-kernel:layout-inherits layout))))
-            (unless (equal (append '(1 2) ids)
+            (unless (equal (list* (sb-kernel:layout-id
+                                   (sb-kernel:find-layout 't))
+                                  (sb-kernel:layout-id
+                                   (sb-kernel:find-layout 'structure-object))
+                                  ids)
                            (append expect (list (sb-kernel:layout-id layout))))
               (error "Wrong IDs for ~A: expect ~D actual ~D~%"
                      layout expect ids))))))))
