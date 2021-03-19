@@ -174,7 +174,6 @@
  ("src/compiler/generic/pinned-objects" :not-host)
  ("src/compiler/generic/layout-ids" :c-headers)
  ("src/code/early-classoid" :c-headers)
- ("src/code/target-error" :not-host)
 
  ("src/code/cold-error"  :not-host)
  ;; Define at most one INTERPRETED-FUNCTION type based on target features
@@ -186,6 +185,7 @@
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/debug-var-io")
+ ("src/code/target-error" :not-host)
 
  ("src/code/early-float")
  ("src/code/pred" :not-host)

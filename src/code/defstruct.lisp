@@ -415,14 +415,11 @@
        (and ,@(group1) ,@(group2) ,@(group3)))))
 
 #+sb-xc-host
-(progn
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (fmakunbound 'sb-xc:defstruct))
 (defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             t nil nil name-and-options slot-descriptions :host))))
+             t nil nil name-and-options slot-descriptions :host)))
 
 (sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
@@ -1605,7 +1602,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (setf rest :untagged))
   #-compact-instance-header
   (when (eq (car (dd-alternate-metaclass dd)) 'function)
-    ;; There is only one bitmap, which excludes LAYOUT from tagged slots
+    ;; There is only one possible bitmap, which excludes LAYOUT from tagged slots
     (return-from calculate-dd-bitmap standard-gf-primitive-obj-layout-bitmap))
   ;; Compute two masks with a 1 bit for each dsd-index which contains a descriptor.
   ;; The "mininal" bitmap contains a 1 for each slot which *must* be scanned in GC,
@@ -1804,6 +1801,8 @@ or they must be declared locally notinline at each call site.~@:>"
    ;; Until someone does that, this means that instances with raw slots can be
    ;; DX allocated only on platforms with those additional VOPs.
   (aver (= (length dd-slots) (length values)))
+  ;; FIXME: why does SB-C::VOP-EXISTSP fail the defined-in-time post-check
+  ;; if employed here in lieu of the reader conditional?
   (if (or #+(or ppc ppc64 x86 x86-64) t)
     ;; Have raw-instance-init vops
     (collect ((slot-specs) (slot-values))
@@ -2270,50 +2269,18 @@ or they must be declared locally notinline at each call site.~@:>"
     (when (typep ctor '(cons t (eql :default)))
       (car ctor))))
 
-;;; These functions are required to emulate SBCL kernel functions
-;;; in a vanilla ANSI Common Lisp cross-compilation host.
-;;; The emulation doesn't need to be efficient, since it's needed
-;;; only for object dumping.
 #+sb-xc-host
-(progn
-  ;; The set of structure types that we access by slot position at cross-compile
-  ;; time is fairly small, including these and nothing but these:
-  ;;   - DEFINITION-SOURCE-LOCATION
-  ;;   - DEFSTRUCT-DESCRIPTION, DEFSTRUCT-SLOT-DESCRIPTION
-  ;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
-  ;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
-  ;;   - COMMA
-  (defun %instance-layout (instance)
-    (classoid-layout (find-classoid (type-of instance))))
-  (defun %instance-length (instance)
-    ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
-    ;; exceeed layout length, but in the cross-compiler they're the same.
-    (layout-length (%instance-layout instance)))
-  (defun %instance-ref (instance index)
-    (let* ((layout (%instance-layout instance))
-           (map (layout-index->accessor-map layout)))
-      (when (zerop (length map)) ; construct it on demand
-        (let ((slots (dd-slots (layout-info layout))))
-          (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
-                                :initial-element nil)
-                (layout-index->accessor-map layout) map)
-          (dolist (dsd slots)
-            (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
-      (funcall (aref map index) instance)))
-
-  (defun %raw-instance-ref/word (instance index)
-    (declare (ignore instance index))
-    (error "No such thing as raw structure access on the host"))
-
-  ;; Setting with (FUNCALL `(SETF ,accessor) ...) is unportable because
-  ;;  "The mechanism by which defstruct arranges for slot accessors to be
-  ;;   usable with setf is implementation-dependent; for example, it may
-  ;;   use setf functions, setf expanders, or some other
-  ;;   implementation-dependent mechanism ..."
-  ;; But such capability seems not to be needed.
-  (defun %instance-set (instance index new-value)
-    (declare (ignore instance index new-value))
-    (error "Can not use %INSTANCE-SET on cross-compilation host.")))
+(defun %instance-ref (instance index)
+  (let* ((layout (%instance-layout instance))
+         (map (layout-index->accessor-map layout)))
+    (when (zerop (length map)) ; construct it on demand
+      (let ((slots (dd-slots (layout-info layout))))
+        (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
+                              :initial-element nil)
+              (layout-index->accessor-map layout) map)
+        (dolist (dsd slots)
+          (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
+    (funcall (aref map index) instance)))
 
 ;;; It's easier for the compiler to recognize the output of M-L-F-S-S
 ;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.
@@ -2321,15 +2288,6 @@ or they must be declared locally notinline at each call site.~@:>"
 (defmacro new-struct (type) `(allocate-struct ',type))
 (defmacro sb-pcl::set-slots (instance name-list &rest values)
   `(sb-pcl::%set-slots ,instance ',name-list ,@values))
-
-#-sb-xc-host
-(defun allocate-struct (type)
-  (let* ((layout (classoid-layout (the structure-classoid (find-classoid type))))
-         (structure (%make-instance (layout-length layout))))
-    (setf (%instance-layout structure) layout)
-    (dolist (dsd (dd-slots (layout-dd layout)) structure)
-      (when (eq (dsd-raw-type dsd) 't)
-        (setf (%instance-ref structure (dsd-index dsd)) (make-unbound-marker))))))
 
 ;;; We require that MAKE-LOAD-FORM-SAVING-SLOTS produce deterministic output
 ;;; and that its output take a particular recognizable form so that it can

@@ -13,6 +13,16 @@
 
 ;;;; structure frobbing primitives
 
+;;; This allocator is used by the expansion of MAKE-LOAD-FORM-SAVING-SLOTS
+;;; when given a STRUCTURE-OBJECT.
+(defun allocate-struct (type)
+  (let* ((layout (classoid-layout (the structure-classoid (find-classoid type))))
+         (structure (%make-instance (layout-length layout))))
+    (setf (%instance-layout structure) layout)
+    (dolist (dsd (dd-slots (layout-dd layout)) structure)
+      (when (eq (dsd-raw-type dsd) 't)
+        (setf (%instance-ref structure (dsd-index dsd)) (make-unbound-marker))))))
+
 ;;; Return the value from the INDEXth slot of INSTANCE. This is SETFable.
 ;;; This is used right away in warm compile by MAKE-LOAD-FORM-SAVING-SLOTS,
 ;;; so without it already defined, you can't define it, because you can't dump

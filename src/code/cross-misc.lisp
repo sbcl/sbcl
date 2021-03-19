@@ -222,6 +222,31 @@
   (write structure :stream stream :circle t))
 
 (in-package "SB-KERNEL")
+
+;;; These functions are required to emulate SBCL kernel functions
+;;; in a vanilla ANSI Common Lisp cross-compilation host.
+;;; The emulation doesn't need to be efficient, since it's needed
+;;; only for object dumping.
+
+;; The set of structure types that we access by slot position at cross-compile
+;; time is fairly small:
+;;   - DEFINITION-SOURCE-LOCATION
+;;   - DEFSTRUCT-DESCRIPTION, DEFSTRUCT-SLOT-DESCRIPTION
+;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
+;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
+;;   - COMMA
+(defun %instance-layout (instance)
+  (declare (notinline classoid-layout)) ; forward ref
+  (classoid-layout (find-classoid (type-of instance))))
+(defun %instance-length (instance)
+  (declare (notinline layout-length))
+  ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
+  ;; exceeed layout length, but in the cross-compiler they're the same.
+  (layout-length (%instance-layout instance)))
+(defun %raw-instance-ref/word (instance index)
+  (declare (ignore instance index))
+  (error "No such thing as raw structure access on the host"))
+
 (defun %find-position (item seq from-end start end key test)
   (let ((position (position item seq :from-end from-end
                             :start start :end end :key key :test test)))
