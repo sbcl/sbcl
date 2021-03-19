@@ -539,13 +539,15 @@
   (let ((*print-circle* nil)
         (*print-level* 24)
         (*print-length* 100))
-    (format stream "~@:_Lambda-list: ~:S" lambda-list)))
+    (format stream "~@:_Lambda-list: ~/sb-impl:print-lambda-list/" lambda-list)))
 
 (defun describe-argument-precedence-order (argument-list stream)
   (let ((*print-circle* nil)
         (*print-level* 24)
         (*print-length* 100))
-    (format stream "~@:_Argument precedence order: ~:A" argument-list)))
+    (format stream "~@:_Argument precedence order: ~
+                    ~/sb-impl:print-lambda-list/"
+            argument-list)))
 
 (defun describe-function-source (function stream)
   (declare (function function))
@@ -683,7 +685,8 @@
                        (format stream "Methods:")
                        (dolist (method methods)
                          (pprint-indent :block 2 stream)
-                         (format stream "~@:_(~A ~{~S ~}~:S)"
+                         (format stream "~@:_(~A ~{~S ~}~
+                                         ~/sb-impl:print-lambda-list/)"
                                  name
                                  (method-qualifiers method)
                                  (sb-pcl::unparse-specializers

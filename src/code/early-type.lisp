@@ -154,7 +154,8 @@
                  (error "Keyword type description is not a two-list: ~S." key))
                (let ((kwd (first key)))
                  (when (find kwd (key-info) :key #'key-info-name)
-                   (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
+                   (error "~@<repeated keyword ~S in lambda list: ~2I~_~
+                           ~/sb-impl:print-lambda-list/~:>"
                           kwd lambda-listy-thing))
                  (key-info
                   (make-key-info

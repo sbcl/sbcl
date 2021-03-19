@@ -323,14 +323,17 @@
            (let*-like-bindings nil))
       (cond
         ((< arguments-present required-length)
-         (ip-error "~@<Too few arguments in ~S to satisfy lambda list ~S.~:@>"
+         (ip-error "~@<Too few arguments in ~S to satisfy lambda list ~
+                    ~/sb-impl:print-lambda-list/.~:@>"
                    arguments lambda-list))
         ((and (not (or rest-p keyword-p)) keywords-present-p)
-         (ip-error "~@<Too many arguments in ~S to satisfy lambda list ~S.~:@>"
+         (ip-error "~@<Too many arguments in ~S to satisfy lambda list ~
+                    ~/sb-impl:print-lambda-list/.~:@>"
                    arguments lambda-list))
         ((and keyword-p keywords-present-p
               (oddp (- arguments-present non-keyword-arguments)))
-         (ip-error "~@<Odd number of &KEY arguments in ~S for ~S.~:@>"
+         (ip-error "~@<Odd number of &KEY arguments in ~S for ~
+                    /sb-impl:print-lambda-list/.~:@>"
                    arguments lambda-list)))
       (dotimes (i required-length)
         (push (cons (pop required) (pop arguments)) let-like-bindings))
@@ -356,7 +359,8 @@
             (loop for (key value) on keyword-plist by #'cddr doing
                   (when (and (not (eq key :allow-other-keys))
                              (not (member key keyword :key #'keyword-key)))
-                    (ip-error "~@<Unknown &KEY argument ~S in ~S for ~S.~:@>"
+                    (ip-error "~@<Unknown &KEY argument ~S in ~S for ~
+                               ~/sb-impl:print-lambda-list/.~:@>"
                               key original-arguments lambda-list))))
           (dolist (keyword-spec keyword)
             (let ((supplied (getf keyword-plist (keyword-key keyword-spec)

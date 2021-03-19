@@ -1040,6 +1040,12 @@ NOTE: This interface is experimental and subject to change."
 (defun print-type (stream type &optional colon at)
   (print-type-specifier stream (type-specifier type) colon at)))
 
+(defun print-lambda-list (stream lambda-list &optional colon at)
+  (declare (ignore colon at))
+  (let ((sb-pretty:*pprint-quote-with-syntactic-sugar* nil)
+        (*package* *cl-package*))
+    (format stream "~:A" lambda-list)))
+
 
 ;;;; Deprecating stuff
 

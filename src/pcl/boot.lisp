@@ -401,7 +401,8 @@ bootstrapping.
     ;; incorrect use of defaults.
     (labels ((lose (kind arg)
                (generic-function-lambda-list-error
-                "~@<Invalid ~A argument specifier ~S ~_in ~A ~:S~:>"
+                "~@<Invalid ~A argument specifier ~S ~_in ~A ~
+                 ~/sb-impl:print-lambda-list/~:>"
                 kind arg context lambda-list))
              (verify-optional (spec)
                (when (nth-value 3 (parse-optional-arg-spec spec))
@@ -2086,9 +2087,9 @@ bootstrapping.
                          (= nopt gf-nopt)
                          (eq (ll-keyp-or-restp llks) gf-key/rest-p))
               (restart-case
-                  (error "New lambda-list ~S is incompatible with ~
-                          existing methods of ~S.~%~
-                          Old lambda-list ~s"
+                  (error "New lambda-list ~/sb-impl:print-lambda-list/ is ~
+                          incompatible with existing methods of ~S.~%~
+                          Old lambda-list ~/sb-impl:print-lambda-list/"
                          lambda-list gf (arg-info-lambda-list arg-info))
                 (continue ()
                   :report "Remove all methods."

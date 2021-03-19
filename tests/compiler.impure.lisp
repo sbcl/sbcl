@@ -2789,6 +2789,19 @@
        ((function (function *))       "(FUNCTION (FUNCTION *))")
        ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))
 
+(with-test (:name (:compiler-messages function :lambda-list))
+  ;; Previously, function lambda lists were sometimes printed
+  ;; confusingly, e.g.:
+  ;;
+  ;;   (function collection) => #'COLLECTION
+  ;;   ((function t))        => (#'T)
+  ;;
+  (handler-case
+      (sb-c::parse-lambda-list '((function t) . a) :context 'defmethod)
+    (error (condition)
+      (assert (search "illegal dotted lambda list: ((FUNCTION T) . A)"
+                      (princ-to-string condition))))))
+
 (with-test (:name :boxed-ref-setf-special
             :skipped-on :interpreter)
   (let* ((var (gensym))
