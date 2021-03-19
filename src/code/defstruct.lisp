@@ -415,11 +415,17 @@
        (and ,@(group1) ,@(group2) ,@(group3)))))
 
 #+sb-xc-host
+(progn
+;; When compiling and loading the cross-compiler, SB-XC:DEFSTRUCT gets
+;; a bootstrap definition from src/code/defbangstruct.
+;; The old definition has to be uninstalled to avoid a redefinition warning here.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (fmakunbound 'sb-xc:defstruct))
 (defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             t nil nil name-and-options slot-descriptions :host)))
+             t nil nil name-and-options slot-descriptions :host))))
 
 (sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
