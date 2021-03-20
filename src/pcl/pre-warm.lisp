@@ -130,7 +130,7 @@
                              :length (+ sb-vm:instance-data-start 1)
                              :flags +condition-layout-flag+
                              :invalid nil)))
-  (setf (classoid-layout classoid) layout
+  (setf (classoid-wrapper classoid) layout
         (info :type :classoid-cell name) cell
         (info :type :kind name) :instance))
 
@@ -146,7 +146,7 @@
                                               (cons t (if fun-p '(function))))
                                :length 0 ; don't care
                                :invalid nil)))
-           (setf (classoid-layout classoid) layout
+           (setf (classoid-wrapper classoid) layout
                  (info :type :classoid-cell name) cell
                  (info :type :kind name) :instance))))
   ;; Because we don't wire into %INSTANCE-TYPEP any assumptions about

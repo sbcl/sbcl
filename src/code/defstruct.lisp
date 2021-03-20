@@ -777,7 +777,7 @@ unless :NAMED is also specified.")))
               (let* ((classoid (make-structure-classoid :name (dd-name dd)))
                      (layout (make-temporary-layout (hash-layout-name (dd-name dd))
                                                     classoid inherits)))
-                (setf (classoid-layout classoid) layout)
+                (setf (classoid-wrapper classoid) (layout-friend layout))
                 classoid)))
          (ancestor-slot-comparator-list))
     #+sb-xc-host
@@ -1252,7 +1252,7 @@ unless :NAMED is also specified.")))
 ;;; the same for subclasses.  FIXME: maybe rename UNDEFINE-FUN-NAME to
 ;;; UNDECLARE-FUNCTION-NAME?
 (defun undeclare-structure (classoid subclasses-p)
-  (let ((info (layout-info (classoid-layout classoid))))
+  (let ((info (wrapper-%info (classoid-wrapper classoid))))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
         (clear-info :type :compiler-layout type)
@@ -2258,7 +2258,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun find-defstruct-description (name &optional (errorp t))
   (let* ((classoid (find-classoid name errorp))
          (info (and classoid
-                    (layout-info (classoid-layout classoid)))))
+                    (wrapper-%info (classoid-wrapper classoid)))))
     (cond ((defstruct-description-p info)
            info)
           (errorp

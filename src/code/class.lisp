@@ -309,9 +309,9 @@ between the ~A definition and the ~A definition"
             (set-layout-inherits destruct-layout inherits t id)
             (set-bitmap-from-layout destruct-layout layout)
             (setf (layout-invalid destruct-layout) nil
-                  (classoid-layout classoid) destruct-layout))
+                  (classoid-wrapper classoid) (layout-friend destruct-layout)))
           (setf (layout-invalid layout) nil
-                (classoid-layout classoid) layout))
+                (classoid-wrapper classoid) (layout-friend layout)))
 
       (dovector (super-layout (layout-inherits layout))
         (let* ((super (layout-classoid super-layout))

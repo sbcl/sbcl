@@ -280,7 +280,8 @@
 
 #+(and (not metaspace) (not sb-xc-host))
 (progn (defmacro layout-friend (x) x)
-       (defmacro wrapper-friend (x) x))
+       (defmacro wrapper-friend (x) x)
+       (defmacro wrapper-%info (x) `(layout-%info ,x)))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
@@ -579,12 +580,7 @@
   (declaim (inline classoid-layout))
   (defun classoid-layout (classoid)
     #-metaspace (classoid-wrapper classoid)
-    #+metaspace (awhen (classoid-wrapper classoid) (wrapper-friend it)))
-
-  (defun (setf classoid-layout) (layout classoid)
-    (setf (classoid-wrapper classoid) #-metaspace layout
-                                      #+metaspace (layout-friend layout))
-    layout))
+    #+metaspace (awhen (classoid-wrapper classoid) (wrapper-friend it))))
 
 (defun layout-classoid-name (x)
   (classoid-name (layout-classoid x)))

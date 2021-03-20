@@ -157,8 +157,9 @@
         (simple-reader-error stream
                              "~S is not a defined structure type."
                              (car body)))
-      (let ((default-constructor (dd-default-constructor
-                                  (layout-info (classoid-layout classoid)))))
+      (let ((default-constructor
+             (dd-default-constructor
+              (sb-kernel::wrapper-%info (classoid-wrapper classoid)))))
         (unless default-constructor
           (simple-reader-error
            stream
