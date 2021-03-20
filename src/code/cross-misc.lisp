@@ -235,8 +235,13 @@
 ;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
 ;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
 ;;   - COMMA
+(defun classoid-layout (x)
+  (declare (notinline classoid-wrapper))
+  (classoid-wrapper x))
+(defun (setf classoid-layout) (newval x)
+  (declare (notinline (setf classoid-wrapper)))
+  (setf (classoid-wrapper x) newval))
 (defun %instance-layout (instance)
-  (declare (notinline classoid-layout)) ; forward ref
   (classoid-layout (find-classoid (type-of instance))))
 (defun %instance-length (instance)
   (declare (notinline layout-length))

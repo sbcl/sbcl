@@ -290,6 +290,10 @@
 ;;; various type checks.
 #+sb-xc-host
 (progn
+  ;; As far as the host is concerned, LAYOUT and WRAPPER are always the same.
+  ;; We need this deftype because of the DEF!STRUCT for CLASSOID which states
+  ;; that the type of the slot named WRAPPER is WRAPPER.
+  #+metaspace (deftype wrapper () 'layout)
   (defstruct (layout (:include structure!object)
                      (:constructor host-make-layout
                                    (clos-hash classoid &key id info depthoid inherits
@@ -403,25 +407,17 @@
 ;;; The third one also gets thrown away.
 #-sb-xc-host
 (progn
-(declaim (inline layout-dd layout-info layout-slot-list))
+(declaim (inline layout-dd layout-info))
 ;; Use LAYOUT-DD to read LAYOUT-INFO if you want to assert that it is non-nil.
 (defun layout-dd (layout)
   (the defstruct-description (layout-%info layout)))
 (defun layout-info (layout)
   (let ((info (layout-%info layout)))
     (if (%instancep info) info)))
-(defun layout-slot-list (layout)
-  (let ((info (layout-%info layout)))
-    (if (listp info) info)))
 (defun (setf layout-info) (newval layout)
   ;; The current value must be nil or a defstruct-description,
   ;; otherwise we'd clobber a non-nil slot list.
   (aver (not (consp (layout-%info layout))))
-  (setf (layout-%info layout) newval))
-(defun (setf layout-slot-list) (newval layout)
-  ;; The current value must be a list, otherwise we'd clobber
-  ;; a defstruct-description.
-  (aver (listp (layout-%info layout)))
   (setf (layout-%info layout) newval))
 
 (define-load-time-global *layout-id-generator* (cons 0 nil))
@@ -546,8 +542,11 @@
              #-sb-xc-host (:pure nil))
   ;; the value to be returned by CLASSOID-NAME.
   (name nil :type symbol)
-  ;; the current layout for this class, or NIL if none assigned yet
-  (layout nil :type (or layout null))
+  ;; the current WRAPPER, or LAYOUT, for this classoid,
+  ;; or NIL if none assigned yet.
+  ;; The name of the slot is always WRAPPER even when WRAPPER = LAYOUT.
+  ;; See doc/internals-notes/metaspace for further details.
+  (wrapper nil :type (or null #+metaspace wrapper #-metaspace layout))
   ;; How sure are we that this class won't be redefined?
   ;;   :READ-ONLY = We are committed to not changing the effective
   ;;                slots or superclasses.
@@ -569,6 +568,19 @@
   ;; we don't just call it the CLASS slot) object for this class, or
   ;; NIL if none assigned yet
   (pcl-class nil))
+
+;; XC version is defined in cross-misc
+#-sb-xc-host
+(progn
+  (declaim (inline classoid-layout))
+  (defun classoid-layout (classoid)
+    #-metaspace (classoid-wrapper classoid)
+    #+metaspace (awhen (classoid-wrapper classoid) (wrapper-friend it)))
+
+  (defun (setf classoid-layout) (layout classoid)
+    (setf (classoid-wrapper classoid) #-metaspace layout
+                                      #+metaspace (layout-friend layout))
+    layout))
 
 (defun layout-classoid-name (x)
   (classoid-name (layout-classoid x)))

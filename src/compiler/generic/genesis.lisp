@@ -1333,11 +1333,11 @@ core and return a descriptor to it."
           ;; substructure it currently holds.
           (typecase obj
            (classoid
-            `((,(get-dsd-index built-in-classoid sb-kernel::subclasses) . nil)
+            `((,(get-dsd-index classoid sb-kernel::subclasses) . nil)
               ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
-              ;; we nonetheless must set LAYOUT to NIL or else warm build fails
+              ;; we nonetheless must set WRAPPER to NIL or else warm build fails
               ;; in the twisty maze of class initializations.
-              (,(get-dsd-index built-in-classoid layout) . nil)))))
+              (,(get-dsd-index classoid sb-kernel::wrapper) . nil)))))
          (dd-slots (type-dd-slots-or-lose host-type))
          ;; ASSUMPTION: all slots consume 1 storage word
          (dd-len (+ sb-vm:instance-data-start (length dd-slots)))

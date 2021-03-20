@@ -121,6 +121,17 @@
                           (find-class ',class) ,class)))
                classes)))
 
+(defmacro wrapper-info (x) `(sb-kernel::layout-%info ,x))
+(declaim (inline wrapper-slot-list))
+(defun wrapper-slot-list (wrapper)
+  (let ((info (wrapper-info wrapper)))
+    (if (listp info) info)))
+(defun (setf wrapper-slot-list) (newval wrapper)
+  ;; The current value must be a list, otherwise we'd clobber
+  ;; a defstruct-description.
+  (aver (listp (wrapper-info wrapper)))
+  (setf (wrapper-info wrapper) newval))
+
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
          standard-class-wrapper standard-class
@@ -208,7 +219,7 @@
                          (getf slot :allocation))))
 
               (when (layout-for-pcl-obj-p wrapper)
-                (setf (layout-slot-list wrapper) slots))
+                (setf (wrapper-slot-list wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
                               (allocate-standard-funcallable-instance wrapper name)
@@ -225,9 +236,9 @@
 
               (setf (layout-slot-table wrapper) (make-slot-table class slots t))
               (when (layout-for-pcl-obj-p wrapper)
-                (setf (layout-slot-list wrapper) slots))
+                (setf (wrapper-slot-list wrapper) slots))
 
-              (case meta
+              (ecase meta
                 ((standard-class funcallable-standard-class)
                  (!bootstrap-initialize-class
                   meta
@@ -358,7 +369,7 @@
                              (member metaclass-name
                                      '(standard-class funcallable-standard-class))))
       (when (layout-for-pcl-obj-p wrapper)
-        (setf (layout-slot-list wrapper) slots)))
+        (setf (wrapper-slot-list wrapper) slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't

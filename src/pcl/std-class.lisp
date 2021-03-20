@@ -1084,7 +1084,7 @@
            (owrapper (class-wrapper class))
            (nwrapper
              (cond ((and owrapper
-                         (slot-layouts-compatible-p (layout-slot-list owrapper)
+                         (slot-layouts-compatible-p (wrapper-slot-list owrapper)
                                                     instance-slots class-slots custom-slots))
                     owrapper)
                    ((or (not owrapper)
@@ -1100,7 +1100,7 @@
                     (class-wrapper class)))))
       (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
-            (layout-slot-list nwrapper) eslotds
+            (wrapper-slot-list nwrapper) eslotds
             (layout-slot-table nwrapper) (make-slot-table class eslotds)
             (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
@@ -1454,7 +1454,7 @@
                 (eq (layout-invalid owrapper) t))
         (let ((nwrapper (make-wrapper (layout-length owrapper)
                                       class)))
-          (setf (layout-slot-list nwrapper) (layout-slot-list owrapper))
+          (setf (wrapper-slot-list nwrapper) (wrapper-slot-list owrapper))
           (setf (layout-slot-table nwrapper) (layout-slot-table owrapper))
           (%update-lisp-class-layout class nwrapper)
           (setf (slot-value class 'wrapper) nwrapper)
@@ -1480,7 +1480,7 @@
         (if (class-has-a-forward-referenced-superclass-p class)
             (return-from make-instances-obsolete class)
             (%update-cpl class (compute-class-precedence-list class))))
-      (setf (layout-slot-list nwrapper) (layout-slot-list owrapper))
+      (setf (wrapper-slot-list nwrapper) (wrapper-slot-list owrapper))
       (setf (layout-slot-table nwrapper) (layout-slot-table owrapper))
       (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'wrapper) nwrapper)
@@ -1579,9 +1579,9 @@
                 (plist ())
                 (safe (safe-p class))
                 ((new-instance-slots nil new-custom-slots)
-                 (classify-slotds (layout-slot-list nwrapper)))
+                 (classify-slotds (wrapper-slot-list nwrapper)))
                 ((old-instance-slots old-class-slots old-custom-slots)
-                 (classify-slotds (layout-slot-list owrapper)))
+                 (classify-slotds (wrapper-slot-list owrapper)))
                 (layout (mapcar (lambda (slotd)
                                   ;; Get the names only once.
                                   (cons (slot-definition-name slotd) slotd))
@@ -1674,7 +1674,7 @@
              (old-class (wrapper-class old-wrapper))
              (old-slots (get-slots instance))
              (safe (safe-p new-class))
-             (new-wrapper-slots (layout-slot-list new-wrapper)))
+             (new-wrapper-slots (wrapper-slot-list new-wrapper)))
     (if (functionp copy)
         (setf (%fun-layout copy) new-wrapper
               (%fsc-instance-slots copy) new-slots)

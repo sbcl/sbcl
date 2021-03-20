@@ -245,17 +245,17 @@
                                                            (class-wrapper class)))))))
              (check-wrapper-validity instance))
             ((consp state)
-             (ecase (car state)
-               (:flush
-                (let ((new (cdr state)))
+             (let ((new (the layout (cdr state))))
+               (ecase (car state)
+                 (:flush
                   (cond ((std-instance-p instance)
                          (setf (%instance-layout instance) new))
                         ((fsc-instance-p instance)
                          (setf (%fun-layout instance) new))
                         (t
-                         (bug "unrecognized instance type")))))
-               (:obsolete
-                (%obsolete-instance-trap owrapper (cdr state) instance))))))))
+                         (bug "unrecognized instance type"))))
+                 (:obsolete
+                  (%obsolete-instance-trap owrapper new instance)))))))))
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)

@@ -46,7 +46,9 @@
 (defun defstruct-classoid-p (classoid)
   ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
   ;; work instead of this. -- NS 2008-03-14
-  (typep (layout-info (classoid-layout classoid)) 'defstruct-description))
+  (typep #-metaspace (layout-info (classoid-layout classoid))
+         #+metaspace (sb-kernel::wrapper-%info (sb-kernel::classoid-wrapper classoid))
+         'defstruct-description))
 
 ;;; This excludes structure types created with the :TYPE option to
 ;;; DEFSTRUCT. It also doesn't try to deal with types created by

@@ -413,7 +413,7 @@
        ;; in list. The only exceptions are when there are non-local slots
        ;; before the one we want.
        (slot-definition-name
-        (find position (layout-slot-list (layout-of instance))
+        (find position (wrapper-slot-list (layout-of instance))
               :key #'slot-definition-location)))
       (cons
        (car position))))))
