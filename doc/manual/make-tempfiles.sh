@@ -15,15 +15,13 @@
 # else an installed sbcl is used.
 
 if [ -z "$1" ] ; then
-    . ../../sbcl-pwd.sh
-    sbcl_pwd
-
-    sbclsystem=$SBCL_PWD/../../src/runtime/sbcl
-    sbclcore=$SBCL_PWD/../../output/sbcl.core
+    SBCL_TOP=../..
+    sbclsystem=$SBCL_TOP/src/runtime/sbcl
+    sbclcore=$SBCL_TOP/output/sbcl.core
     if [ -f $sbclsystem ] && [ -f $sbclcore ]
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
-        SBCL_HOME=$SBCL_PWD/../../obj/sbcl-home/; export SBCL_HOME
+        SBCL_HOME=$SBCL_TOP/obj/sbcl-home/; export SBCL_HOME
         SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
         SBCLRUNTIME="`command -v sbcl`"
