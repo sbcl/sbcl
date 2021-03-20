@@ -101,10 +101,15 @@ however, code blobs are not as frequently occurring as say cons cells,
 vectors, and general instances.
 
 In light of the above considerations, these are the LAYOUTs in heap object slots
-that will need to be changed to wrappers:
-- CLASSOID-LAYOUT
-- *FORWARD-REFERENCED-LAYOUTS*
-- elements of a LAYOUT-INHERITS vector
-- values in the CLASSOID-SUBCLASSES hash-table
-- everything in the CLOS implementation
+that will need to be changed to wrappers: ('x' indicates completed)
+[x] CLASSOID-LAYOUT
+[x] *FORWARD-REFERENCED-LAYOUTS*
+[ ] elements of a LAYOUT-INHERITS vector
+[ ] values in the CLASSOID-SUBCLASSES hash-table
+[ ] potentially the FASL loader table and stack, however, see exception (*)
+[ ] everything in the CLOS implementation
 
+(*) Exception: if it is certain that whenever you store a pointer to L
+    in a slot, you also hold a pointer to W, then GC can't free either one.
+    The FASL loader could enforce this by extending its structures to hold
+    a vector of wrappers corresponding to layouts loaded via FOP-LAYOUT.

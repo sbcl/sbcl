@@ -1061,7 +1061,7 @@ core and return a descriptor to it."
 ;;; Since we want to be able to dump structure constants and
 ;;; predicates with reference layouts, we need to create layouts at
 ;;; cold-load time. We use the name to intern layouts by, and dump a
-;;; list of all cold layouts in *!INITIAL-LAYOUTS* so that type system
+;;; list of all cold layouts in *!INITIAL-WRAPPERS* so that type system
 ;;; initialization can find them. The only thing that's tricky [sic --
 ;;; WHN 19990816] is initializing layout's layout, which must point to
 ;;; itself.
@@ -1187,6 +1187,11 @@ core and return a descriptor to it."
                   ;; genesis by giving them negative values which can't otherwise occur.
                   (decf *condition-layout-uniqueid-counter*)
                   (incf *general-layout-uniqueid-counter*))))))))
+
+(defconstant layout-friend-slot 1)
+(defun ->wrapper (x) ; cast layout to wrapper, if wrappers are in use
+  #+metaspace (read-wordindexed x layout-friend-slot)
+  #-metaspace x)
 
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   ;; Layouts created in genesis can't vary in length due to the number of ancestor
@@ -1779,11 +1784,11 @@ core and return a descriptor to it."
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
-  (cold-set '*!initial-layouts*
+  (cold-set 'sb-kernel::*!initial-wrappers*
             (vector-in-core
              (mapcar (lambda (pair)
                        (cold-cons (cold-intern (car pair))
-                                  (cold-layout-descriptor (cdr pair))))
+                                  (->wrapper (cold-layout-descriptor (cdr pair)))))
                      (sort-cold-layouts))))
   ;; MAKE-LAYOUT uses ATOMIC-INCF which returns the value in the cell prior to
   ;; increment, so we need to add 1 to get to the next value for it because
@@ -3733,10 +3738,7 @@ III. initially undefined function references (alphabetically):
                  (name (warm-symbol (read-slot dd :name)))
                  (layout (gethash name *cold-layouts*)))
             (aver layout)
-            (let* ((des (cold-layout-descriptor layout))
-                   (wrapper #+metaspace (read-wordindexed des 1)
-                            #-metaspace des))
-              (write-slots wrapper :%info dd))))
+            (write-slots (->wrapper (cold-layout-descriptor layout)) :%info dd)))
         (when verbose
           (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
                   (length *known-structure-classoids*)

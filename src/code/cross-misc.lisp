@@ -241,6 +241,8 @@
 (defun (setf classoid-layout) (newval x)
   (declare (notinline (setf classoid-wrapper)))
   (setf (classoid-wrapper x) newval))
+(defun layout-friend (x) x)
+(defun wrapper-friend (x) x)
 (defun %instance-layout (instance)
   (classoid-layout (find-classoid (type-of instance))))
 (defun %instance-length (instance)

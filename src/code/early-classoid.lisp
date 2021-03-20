@@ -278,6 +278,10 @@
     (setf (wrapper-friend wrapper) layout)
     layout))))
 
+#+(and (not metaspace) (not sb-xc-host))
+(progn (defmacro layout-friend (x) x)
+       (defmacro wrapper-friend (x) x))
+
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
 ;;;     GC wants it in the layout to avoid double indirection.
