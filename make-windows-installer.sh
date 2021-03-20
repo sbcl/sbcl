@@ -11,12 +11,10 @@
 
 WIX_PATH=$WIX/bin
 
-. ./sbcl-pwd.sh
-sbcl_pwd
-
+SBCL_TOP=../
 cd output
 
-"$SBCL_PWD/src/runtime/sbcl" --noinform --core "$SBCL_PWD/output/sbcl.core" \
+"$SBCL_TOP/src/runtime/sbcl" --noinform --core "$SBCL_TOP/output/sbcl.core" \
   --disable-debugger --no-sysinit --no-userinit \
   --load ../tools-for-build/rtf.lisp \
   --load ../tools-for-build/wxs.lisp \
