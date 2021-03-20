@@ -6,7 +6,7 @@
 # ones as dependencies.
 
 UNAME:=$(shell uname -s)
-DEST=$(SBCL_PWD)/obj/sbcl-home/contrib/
+DEST=$(SBCL_TOP)/obj/sbcl-home/contrib/
 FASL=$(DEST)/$(SYSTEM).fasl
 ASD=$(DEST)/$(SYSTEM).asd
 

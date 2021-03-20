@@ -120,12 +120,12 @@ done
 
 # installing contrib
 
-. ./sbcl-pwd.sh
-sbcl_pwd
+# See make-target-contrib.sh for this variable.
+SBCL_TOP="../../"
 
-SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
+SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
-export SBCL SBCL_BUILDING_CONTRIB SBCL_PWD
+export SBCL SBCL_BUILDING_CONTRIB SBCL_TOP
 
 . ./find-gnumake.sh
 find_gnumake

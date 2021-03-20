@@ -35,16 +35,17 @@ export CC LANG LC_ALL
 # Load our build configuration
 . output/build-config
 
-. ./sbcl-pwd.sh
-sbcl_pwd
+## All programs spawned by make-target-contrib.sh that use this
+## variable or anything derived from it are started with CWD
+## contrib/<contrib_name>/. Keeping this a relative pathname to the
+## toplevel source directory makes the shell and make portions of the
+## build system robust against funny stuff in PWD.
+SBCL_TOP="../../"
 
-SBCL_HOME="$SBCL_PWD/obj/sbcl-home"
-export SBCL_HOME SBCL_PWD
-if [ "$OSTYPE" = "cygwin" ] ; then
-    SBCL_PWD=`echo $SBCL_PWD | sed s/\ /\\\\\\\\\ /g`
-fi
+SBCL_HOME="$SBCL_TOP/obj/sbcl-home"
+export SBCL_HOME SBCL_TOP
 
-SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core \
+SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
