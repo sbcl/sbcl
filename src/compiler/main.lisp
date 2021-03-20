@@ -360,7 +360,7 @@ Examples:
          (file-compiling-p (file-info-p file-info)))
     (flet ((match-p (entry)
              (destructuring-bind (entry-thing entry-fmt &rest entry-args) entry
-               ;; THING is compared by EQ, FMT by STRING=.
+               ;; THING is compared by EQ, FMT mostly by STRING=.
                (and (eq entry-thing thing)
                     (cond ((typep entry-fmt 'condition)
                            (and (typep fmt-or-condition 'condition)
@@ -368,6 +368,12 @@ Examples:
                                          (princ-to-string fmt-or-condition))))
                           ((typep fmt-or-condition 'condition)
                            nil)
+                          ;; If at least one is a FMT-CONTROL-PROXY
+                          ;; the two should be either EQ or a
+                          ;; mismatch.
+                          ((not (stringp entry-fmt))
+                           (and (not (stringp fmt-or-condition))
+                                (eq entry-fmt fmt-or-condition)))
                           ((string= entry-fmt fmt-or-condition)))
                     ;; We don't want to walk into default values,
                     ;; e.g. (&optional (b #<insane-struct))
