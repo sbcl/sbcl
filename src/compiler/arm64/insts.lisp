@@ -1269,6 +1269,7 @@
   (op4 :field (byte 1 21) :value 1)
   (rm :field (byte 5 16) :type 'reg)
   (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
+  (op5 :field (byte 2 10) :value #b10)
   (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
 
 (def-emitter ldr-literal
@@ -1516,15 +1517,14 @@
   (o1 :field (byte 1 21))
   (rs :field (byte 5 16) :type 'w-reg)
   (o0 :field (byte 1 15))
-  (rt2 :field (byte 5 5) :type 'reg)
+  (rt2 :field (byte 5 10) :type 'reg)
   (rn :field (byte 5 5) :type 'x-reg-sp)
   (rt :field (byte 5 0) :type 'reg))
 
-(defmacro def-store-exclusive (name o0 o1 o2 rs &rest printers)
+(defmacro def-store-exclusive (name o0 o1 o2 rs)
   `(define-instruction ,name (segment ,@(and rs '(rs)) rt rn)
      (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 0))
                '(:name :tab ,@(and rs '(rs ", ")) rt ", [" rn "]"))
-     ,@printers
      (:emitter
       (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
                               ,o2 0 ,o1
@@ -1540,11 +1540,10 @@
 (def-store-exclusive stlxr 1 0 0 t)
 (def-store-exclusive stlr 1 0 1 nil)
 
-(defmacro def-load-exclusive (name o0 o1 o2 &rest printers)
+(defmacro def-load-exclusive (name o0 o1 o2)
   `(define-instruction ,name (segment rt rn)
      (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 1))
                '(:name :tab rt ", [" rn "]"))
-     ,@printers
      (:emitter
       (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
                               ,o2 1 ,o1
@@ -1558,10 +1557,163 @@
 (def-load-exclusive ldaxr 1 0 0)
 (def-load-exclusive ldar 1 0 1)
 
+(define-instruction-format (cas 32)
+  (size1 :field (byte 1 31) :value 1)
+  (size :field (byte 1 30))
+  (op2 :field (byte 6 24) :value #b001000)
+  (o2 :field (byte 1 23) :value 1)
+  (l :field (byte 1 22))
+  (o1 :field (byte 1 21) :value 1)
+  (rs :fields (list (byte 1 30) (byte 5 16)) :type 'sized-reg)
+  (o0 :field (byte 1 15))
+  (rt2 :field (byte 5 10) :value #b11111)
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :fields (list (byte 1 30) (byte 5 0)) :type 'sized-reg))
+
+(define-instruction-format (casb 32)
+  (size :field (byte 2 30))
+  (op2 :field (byte 6 24) :value #b001000)
+  (o2 :field (byte 1 23) :value 1)
+  (l :field (byte 1 22))
+  (o1 :field (byte 1 21) :value 1)
+  (rs :field (byte 5 16) :type 'w-reg)
+  (o0 :field (byte 1 15))
+  (rt2 :field (byte 5 10) :value #b11111)
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :field (byte 5 0) :type 'w-reg))
+
+(defmacro def-cas (name o0 l)
+  `(define-instruction ,name (segment rs rt rn)
+     (:printer cas ((o0 ,o0) (l ,l))
+               '(:name :tab rs ", " rt ", [" rn "]"))
+     (:emitter
+      (emit-ldr-str-exclusive segment
+                              (logior #b10 (reg-size rt))
+                              1
+                              ,l
+                              1
+                              (tn-offset rs)
+                              ,o0
+                              31
+                              (tn-offset rn)
+                              (tn-offset rt)))))
+
+(def-cas cas 0 0)
+(def-cas casa 0 1)
+(def-cas casal 1 1)
+(def-cas casl 1 0)
+
+(defmacro def-casb (name size o0 l)
+  `(define-instruction ,name (segment rs rt rn)
+     (:printer casb ((size ,size) (o0 ,o0) (l ,l))
+               '(:name :tab rs ", " rt ", [" rn "]"))
+     (:emitter
+      (emit-ldr-str-exclusive segment
+                              ,size
+                              1
+                              ,l
+                              1
+                              (tn-offset rs)
+                              ,o0
+                              31
+                              (tn-offset rn)
+                              (tn-offset rt)))))
+(def-casb casb 0 0 0)
+(def-casb casab 0 0 1)
+(def-casb casalb 0 1 1)
+(def-casb caslb 0 1 0)
+
+(def-casb cash 1 0 0)
+(def-casb casah 1 0 1)
+(def-casb casalh 1 1 1)
+(def-casb caslh 1 1 0)
+
+;;;
+
+(def-emitter ldatomic
+  (size 2 30)
+  (#b111000 6 24)
+  (a 1 23)
+  (r 1 22)
+  (#b1 1 21)
+  (rs 5 16)
+  (opc 6 10)
+  (rn 5 5)
+  (rt 5 0))
+
+(define-instruction-format (ldatomic 32)
+  (size1 :field (byte 1 31) :value #b1)
+  (size :field (byte 1 30))
+  (op2 :field (byte 6 24) :value #b111000)
+  (a :field (byte 1 23))
+  (r :field (byte 1 22))
+  (o1 :field (byte 1 21) :value #b1)
+  (rs :fields (list (byte 1 30) (byte 5 16)) :type 'sized-reg)
+  (opc :field (byte 6 10))
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :fields (list (byte 1 30) (byte 5 0)) :type 'sized-reg))
+
+(defmacro def-ldatomic (name opc a r)
+  `(define-instruction ,name (segment rs rt rn)
+     (:printer ldatomic ((a ,a) (r ,r) (opc ,opc))
+               '(:name :tab rs ", " rt ", [" rn "]"))
+     (:emitter
+      (emit-ldatomic segment
+                     (logior #b10 (reg-size rt))
+                     ,a
+                     ,r
+                     (tn-offset rs)
+                     ,opc
+                     (tn-offset rn)
+                     (tn-offset rt)))))
+
+(def-ldatomic ldadd 0 0 0)
+(def-ldatomic ldadda 0 1 0)
+(def-ldatomic ldaddal 0 1 1)
+
+(def-ldatomic ldeor #b001000 0 0)
+(def-ldatomic ldeora #b001000 1 0)
+(def-ldatomic ldeoral #b001000 1 1)
+
+(def-ldatomic ldset #b001100 0 0)
+(def-ldatomic ldseta #b001100 1 0)
+(def-ldatomic ldsetal #b001100 1 1)
+
+(define-instruction-format (ldaddb 32)
+  (size :field (byte 2 30))
+  (op2 :field (byte 6 24) :value #b111000)
+  (a :field (byte 1 23))
+  (r :field (byte 1 22))
+  (o1 :field (byte 1 21) :value #b1)
+  (rs :field (byte 5 16) :type 'w-reg)
+  (opc :field (byte 6 10) :value #b0)
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :field (byte 5 0) :type 'w-reg))
+
+(defmacro def-ldaddb (name size a r)
+  `(define-instruction ,name (segment rs rt rn)
+     (:printer ldaddb ((size ,size) (a ,a) (r ,r))
+               '(:name :tab rs ", " rt ", [" rn "]"))
+     (:emitter
+      (emit-ldadd  segment
+                   ,size
+                   ,a
+                   ,r
+                   (tn-offset rs)
+                   (tn-offset rn)
+                   (tn-offset rt)))))
+
+(def-ldaddb ldaddb 0 0 0)
+(def-ldaddb ldaddab 0 1 0)
+(def-ldaddb ldaddalb 0 1 1)
+(def-ldaddb ldaddh 1 0 0)
+(def-ldaddb ldaddah 1 1 0)
+(def-ldaddb ldaddalh 1 1 1)
+
 ;;;
 
 (def-emitter cond-branch
-  (#b01010100 8 24)
+    (#b01010100 8 24)
   (imm 19 5)
   (#b0 1 4)
   (cond 4 0))
