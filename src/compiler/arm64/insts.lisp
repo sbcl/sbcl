@@ -1695,13 +1695,14 @@
      (:printer ldaddb ((size ,size) (a ,a) (r ,r))
                '(:name :tab rs ", " rt ", [" rn "]"))
      (:emitter
-      (emit-ldadd  segment
-                   ,size
-                   ,a
-                   ,r
-                   (tn-offset rs)
-                   (tn-offset rn)
-                   (tn-offset rt)))))
+      (emit-ldatomic segment
+                     ,size
+                     ,a
+                     ,r
+                     0
+                     (tn-offset rs)
+                     (tn-offset rn)
+                     (tn-offset rt)))))
 
 (def-ldaddb ldaddb 0 0 0)
 (def-ldaddb ldaddab 0 1 0)
