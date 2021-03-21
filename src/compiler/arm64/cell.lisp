@@ -44,17 +44,22 @@
   (:temporary (:sc interior-reg) lip)
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   (:generator 5
-    (inst dsb)
     (inst add-sub lip object (- (* offset n-word-bytes) lowtag))
-    LOOP
-    (inst ldxr result lip)
-    (inst cmp result old)
-    (inst b :ne EXIT)
-    (inst stlxr tmp-tn new lip)
-    (inst cbnz tmp-tn LOOP)
-    EXIT
-    (inst clrex)
-    (inst dmb)))
+    (cond ((member :arm-v8.1 *backend-subfeatures*)
+           (move result old)
+           (inst casal result new lip))
+          (t
+           (assemble ()
+             (inst dsb)
+             LOOP
+             (inst ldxr result lip)
+             (inst cmp result old)
+             (inst b :ne EXIT)
+             (inst stlxr tmp-tn new lip)
+             (inst cbnz tmp-tn LOOP)
+             EXIT
+             (inst clrex)
+             (inst dmb))))))
 
 ;;;; Symbol hacking VOPs:
 
@@ -228,6 +233,40 @@
     (inst dmb)
     (inst cmp result unbound-marker-widetag)
     (inst b :eq (generate-error-code vop 'unbound-symbol-error symbol))))
+
+(define-vop (%compare-and-swap-symbol-value-v8.1)
+  (:translate %compare-and-swap-symbol-value)
+  (:args (symbol :scs (descriptor-reg))
+         (old :scs (descriptor-reg any-reg))
+         (new :scs (descriptor-reg any-reg)))
+  (:results (result :scs (descriptor-reg any-reg) :from :load))
+  #+sb-thread
+  (:temporary (:sc any-reg) tls-index)
+  (:temporary (:sc interior-reg) lip)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:guard (member :arm-v8.1 *backend-subfeatures*))
+  (:generator 14
+    #+sb-thread
+    (assemble ()
+      (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
+      ;; Thread-local area, no synchronization needed.
+      (inst ldr result (@ thread-tn tls-index))
+      (inst cmp result old)
+      (inst b :ne DONT-STORE-TLS)
+      (inst str new (@ thread-tn tls-index))
+      DONT-STORE-TLS
+
+      (inst cmp result no-tls-value-marker-widetag)
+      (inst b :ne CHECK-UNBOUND))
+    (inst add-sub lip symbol (- (* symbol-value-slot n-word-bytes)
+                                other-pointer-lowtag))
+    (move result old)
+    (inst casal result new lip)
+    CHECK-UNBOUND
+    (inst cmp result unbound-marker-widetag)
+    (inst b :eq (generate-error-code vop 'unbound-symbol-error symbol))))
+
 
 ;;;; Fdefinition (fdefn) objects.
 
@@ -567,3 +606,22 @@
     (inst stlxr tmp-tn sum lip)
     (inst cbnz tmp-tn LOOP)
     (inst dmb)))
+
+(define-vop (raw-instance-atomic-incf/word-v8.1)
+  (:translate %raw-instance-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (diff :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:temporary (:sc interior-reg) lip)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:guard (member :arm-v8.1 *backend-subfeatures*))
+  (:generator 3
+    (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+    (inst add lip lip (- (* instance-slots-offset
+                            n-word-bytes)
+                         instance-pointer-lowtag))
+
+    (inst ldaddal diff result lip)))

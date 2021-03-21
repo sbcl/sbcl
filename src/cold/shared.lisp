@@ -273,6 +273,10 @@
         (when (or (member :arm64 target-feature-list)
                   (member :sse4 *shebang-backend-subfeatures*))
           (push :round-float target-feature-list))
+        (when (and (member :arm64 target-feature-list)
+                  (member :darwin target-feature-list))
+          (push :arm-v8.1 *shebang-backend-subfeatures*))
+
         ;; Putting arch and gc choice first is visually convenient, versus
         ;; having to parse a random place in the line to figure out the value
         ;; of a binary choice {cheney vs gencgc} and architecture.
