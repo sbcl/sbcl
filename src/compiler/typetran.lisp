@@ -828,10 +828,6 @@
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
   `(>= (layout-depthoid ,layout) ,depthoid))
-;;; Assert that it is OK to look at element 1 of any INHERITS vector
-;;; without pre-checking its length.
-(eval-when (:compile-toplevel)
-  (aver (eql (layout-depthoid (find-layout 'sequence)) 1)))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))
@@ -918,8 +914,7 @@
                             ;; because the lisp type is not a classoid. It's done this way to define
                             ;; the logic once only, instead of both here and src/code/pred.lisp.
                             (sequence
-                             `(eq (data-vector-ref (layout-inherits ,wrapper) 1)
-                                  ,layout))))))
+                             `(logtest (layout-flags ,wrapper) ,+sequence-layout-flag+))))))
               (if lowtag-test
                   `(and ,lowtag-test (let ((,wrapper ,slot-reader)) ,@guts))
                   (if-vop-existsp (:translate %instanceoid-layout)

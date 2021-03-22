@@ -94,14 +94,15 @@
 
 ;;; Careful here: if you add more bits, then adjust the bit packing for
 ;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
-(defconstant +structure-layout-flag+         #b00000001)
-(defconstant +pathname-layout-flag+          #b00000010)
-(defconstant +pcl-object-layout-flag+        #b00000100)
-(defconstant +condition-layout-flag+         #b00001000)
-(defconstant +simple-stream-layout-flag+     #b00010000)
-(defconstant +file-stream-layout-flag+       #b00100000)
-(defconstant +string-stream-layout-flag+     #b01000000)
-(defconstant +stream-layout-flag+            #b10000000)
+(defconstant +structure-layout-flag+         #b000000001)
+(defconstant +pathname-layout-flag+          #b000000010)
+(defconstant +pcl-object-layout-flag+        #b000000100)
+(defconstant +condition-layout-flag+         #b000001000)
+(defconstant +simple-stream-layout-flag+     #b000010000)
+(defconstant +file-stream-layout-flag+       #b000100000)
+(defconstant +string-stream-layout-flag+     #b001000000)
+(defconstant +stream-layout-flag+            #b010000000)
+(defconstant +sequence-layout-flag+          #b100000000)
 
 ;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
 ;;; Each occupies two bytes of the %BITS slot when possible,
@@ -374,9 +375,7 @@
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-flags (depthoid length flags)
-  `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
-           (ash ,(or length 0) 16)
-           ,(or flags 0)))
+  `(logior (ash ,depthoid (+ 32 sb-vm:n-fixnum-tag-bits)) (ash ,length 16) ,flags))
 
 (defmacro type-dd-length (type-name)
   (dd-length (find-defstruct-description type-name)))
@@ -713,6 +712,19 @@
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 
+(defun summarize-layouts ()
+   (flet ((flag-bits (x) (logand (layout-flags x) #xffff)))
+     (let ((prev -1))
+       (dolist (layout (sort (loop for v being each hash-value
+                                of (classoid-subclasses (find-classoid 't))
+                                collect v)
+                             #'> :key #'flag-bits))
+         (let ((flags (flag-bits layout)))
+           (unless (= flags prev)
+             (format t "Layout flags = #b~10,'0b~%" flags)
+             (setq prev flags)))
+         (format t "  ~a~%" layout)))))
+
 (in-package "SB-C")
 
 ;;; layout for this type being used by the compiler
@@ -730,7 +742,7 @@
   #+sb-xc-host
   (specifier-type 'function)
   #-sb-xc-host
-  (let* ((fdefn (sb-kernel::find-fdefn name))
+  (let* ((fdefn (sb-int:find-fdefn name))
          (fun (and fdefn (fdefn-fun fdefn))))
     (if fun
         (handler-bind ((style-warning #'muffle-warning))
@@ -746,15 +758,3 @@
 (define-info-type (:function :type)
   :type-spec (or ctype (cons (eql function)) (member :generic-function))
   :default #'ftype-from-fdefn)
-
-(defun summarize-layouts ()
-  (let ((prev -1))
-    (dolist (layout (sort (loop for v being each hash-value
-                                of (classoid-subclasses (find-classoid 't))
-                                collect v)
-                          #'< :key #'sb-kernel:layout-flags))
-      (let ((flags (sb-kernel:layout-flags layout)))
-        (unless (= flags prev)
-          (format t "Layout flags = ~d~%" flags)
-          (setq prev flags)))
-      (format t "  ~a~%" layout))))

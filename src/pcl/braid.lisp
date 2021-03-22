@@ -685,6 +685,8 @@
              (setq flags +string-stream-layout-flag+))))
         (setf (layout-flags layout)
               (logior flags +stream-layout-flag+ (layout-flags layout)))))
+    (when (find #.(find-layout 'sequence) inherits)
+      (setf (layout-flags layout) (logior (layout-flags layout) +sequence-layout-flag+)))
     (when (find #.(find-layout 'function) inherits)
       (setf (%raw-instance-ref/signed-word layout (sb-kernel::type-dd-length layout))
              #+immobile-code ; there are two possible bitmaps
