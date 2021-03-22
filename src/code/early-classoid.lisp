@@ -706,9 +706,9 @@
 
 #-sb-xc-host
 (defun id-to-layout (id)
-  (maphash (lambda (k v)
-             (declare (ignore k))
-             (when (eql (layout-id v) id) (return-from id-to-layout v)))
+  (maphash (lambda (classoid wrapper &aux (layout (wrapper-friend wrapper)))
+             (declare (ignore classoid))
+             (when (eql (layout-id layout) id) (return-from id-to-layout layout)))
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 

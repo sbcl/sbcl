@@ -185,7 +185,7 @@
                                            (make-hash-table :hash-function #'type-hash-value
                                                             :test 'eq
                                                             :synchronized t)))))
-                (setf (gethash classoid subclasses) layout)))))))
+                (setf (gethash classoid subclasses) (sb-kernel::layout-friend layout))))))))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class

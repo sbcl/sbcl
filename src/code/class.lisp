@@ -64,6 +64,10 @@
             #-sb-xc-host (when *print-layout-id* (layout-id layout))
             (layout-proper-name layout)
             (layout-invalid layout))))
+#+(and metaspace (not sb-xc-host))
+(defmethod print-object ((wrapper wrapper) stream)
+  (print-unreadable-object (wrapper stream :type t :identity t)
+    (write (wrapper-friend wrapper) :stream stream)))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun layout-proper-name (layout)
@@ -265,10 +269,10 @@ between the ~A definition and the ~A definition"
       (when classoid-layout
         (%modify-classoid classoid)
         (when subclasses
-          (dohash ((subclass subclass-layout) subclasses :locked t)
+          (dohash ((subclass subclass-wrapper) subclasses :locked t)
             (%modify-classoid subclass)
             (when invalidate
-              (%invalidate-layout subclass-layout))))
+              (%invalidate-layout (wrapper-friend subclass-wrapper)))))
         (when invalidate
           (%invalidate-layout classoid-layout)
           (setf (classoid-subclasses classoid) nil)))
@@ -331,7 +335,7 @@ between the ~A definition and the ~A definition"
                   (classoid-name super))
             (setf (classoid-state super) :read-only))
           (setf (gethash classoid subclasses)
-                (or destruct-layout layout))))))
+                (layout-friend (or destruct-layout layout)))))))
 
   (values)))
 
@@ -724,8 +728,8 @@ between the ~A definition and the ~A definition"
         (o-sub (classoid-subclasses other)))
     (if (and s-sub o-sub)
         (collect ((res *empty-type* type-union))
-          (dohash ((subclass layout) s-sub :locked t)
-            (declare (ignore layout))
+          (dohash ((subclass wrapper) s-sub :locked t)
+            (declare (ignore wrapper))
             (when (gethash subclass o-sub)
               (res (specifier-type subclass))))
           (res))

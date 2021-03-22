@@ -195,8 +195,8 @@
                (let ((subs (classoid-subclasses class)))
                  (/noshow subs)
                  (when subs
-                   (dohash ((sub v) subs)
-                     (declare (ignore v))
+                   (dohash ((sub wrapper) subs)
+                     (declare (ignore wrapper))
                      (/noshow sub)
                      (when (member class (direct-supers sub) :test #'eq)
                        (res sub)))))

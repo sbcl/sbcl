@@ -16,10 +16,12 @@
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
 
 (with-test (:name :stream-layout-bits)
-  (loop for layout being each hash-value
+  (loop for wrapper being each hash-value
         of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't))
         do (flet ((check-bit (bit ancestor-type)
-                    (let ((ancestor (sb-kernel:find-layout ancestor-type)))
+                    (let* ((layout #+metaspace (sb-kernel::wrapper-friend wrapper)
+                                   #-metaspace wrapper)
+                           (ancestor (sb-kernel:find-layout ancestor-type)))
                       (when (or (eq layout ancestor)
                                 (find ancestor (sb-kernel:layout-inherits layout)))
                         (assert (logtest bit (sb-kernel:layout-flags layout)))))))

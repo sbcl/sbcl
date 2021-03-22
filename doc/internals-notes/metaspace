@@ -105,7 +105,7 @@ that will need to be changed to wrappers: ('x' indicates completed)
 [x] CLASSOID-LAYOUT
 [x] *FORWARD-REFERENCED-LAYOUTS*
 [ ] elements of a LAYOUT-INHERITS vector
-[ ] values in the CLASSOID-SUBCLASSES hash-table
+[x] values in the CLASSOID-SUBCLASSES hash-table
 [ ] the FASL loader table and stack
 [ ] everything in the CLOS implementation
 

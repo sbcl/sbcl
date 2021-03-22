@@ -1272,10 +1272,10 @@ unless :NAMED is also specified.")))
     (let ((subclasses (classoid-subclasses classoid)))
       (when subclasses
         (collect ((subs))
-          (dohash ((classoid layout)
+          (dohash ((classoid wrapper)
                    subclasses
                    :locked t)
-            (declare (ignore layout))
+            (declare (ignore wrapper))
             (undeclare-structure classoid nil)
             (subs (classoid-proper-name classoid)))
           ;; Is it really necessary to warn about

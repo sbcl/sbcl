@@ -423,10 +423,12 @@ is not of type
 
 ;;; Instances of LAYOUT for condition classoids created by genesis
 ;;; should resemble ones created normally. Due to a bug, they did not.
+;;; (The LENGTH slot had the wrong value)
 (with-test (:name :condition-layout-lengths)
-  (loop for layout being each hash-value of (sb-kernel:classoid-subclasses
-                                             (sb-kernel:find-classoid 'condition))
-        for len = (sb-kernel:layout-length layout)
+  (loop for wrapper being each hash-value of (sb-kernel:classoid-subclasses
+                                              (sb-kernel:find-classoid 'condition))
+        for len = (sb-kernel:layout-length
+                   (#+metaspace sb-kernel::wrapper-friend #-metaspace progn wrapper))
         minimize len into min
         maximize len into max
         finally (assert (= min max))))

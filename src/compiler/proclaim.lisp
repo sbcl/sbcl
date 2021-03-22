@@ -247,8 +247,8 @@
   (setf (classoid-state class) :sealed)
   (let ((subclasses (classoid-subclasses class)))
     (when subclasses
-      (dohash ((subclass layout) subclasses :locked t)
-        (declare (ignore layout))
+      (dohash ((subclass wrapper) subclasses :locked t)
+        (declare (ignore wrapper))
         (setf (classoid-state subclass) :sealed)))))
 
 (defun process-freeze-type-declaration (type-specifier)
