@@ -761,6 +761,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
     layout = instance_layout(obj);
+    if (!layout) return 0; // object can't have pointers in it yet
     if (younger_p(layout, gen, keep_gen, new_gen))
         return 1;
     struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));

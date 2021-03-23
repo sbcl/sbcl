@@ -1,6 +1,19 @@
 
 #-immobile-space (sb-ext:exit :code 104)
 
+;;; If an instance was allocated but its layout not stored yet
+;;; it could crash
+(defun alloc-layoutless-instances ()
+  (list (sb-vm::alloc-immobile-fixedobj
+         6 (logior (ash 5 sb-vm:instance-length-shift) sb-vm:instance-widetag))
+        (sb-vm::alloc-immobile-fixedobj
+         6 (logior (ash 5 sb-vm:n-widetag-bits) sb-vm:funcallable-instance-widetag))))
+(compile 'alloc-layoutless-instances)
+;;; the first GC should WP some pages but might not crash
+(dotimes (i 1000 (gc)) (alloc-layoutless-instances))
+;;; the second one was more likely to crash
+(dotimes (i 1000 (gc)) (alloc-layoutless-instances))
+
 (defstruct trythis a)
 
 ;;; Assign a bitmap that is not the special case for "all tagged"
