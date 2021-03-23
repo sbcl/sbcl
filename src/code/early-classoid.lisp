@@ -302,8 +302,8 @@
   #+metaspace (deftype wrapper () 'layout)
   (defstruct (layout (:include structure!object)
                      (:constructor host-make-layout
-                                   (clos-hash classoid &key id info depthoid inherits
-                                                       length flags invalid)))
+                                   (id clos-hash classoid &key info depthoid inherits
+                                                          length flags invalid)))
     (id nil :type (or null fixnum))
     ;; Cross-compiler-only translation from slot index to symbol naming
     ;; the accessor to call. (Since access by position is not a thing)
@@ -322,20 +322,8 @@
     (info nil :type (or null defstruct-description)))
   (defun layout-dd (layout)
     (the defstruct-description (layout-info layout)))
-  (defun make-layout (hash classoid &rest keys)
-    (declare (notinline classoid-name)) ; defined later
-    (let ((args (copy-list keys))
-          (name (classoid-name classoid)))
-      (remf args :bitmap)
-      (apply #'host-make-layout
-             hash classoid
-             :id (case name
-                   ((t) 1)
-                   (structure-object 2)
-                   (t (cdr (assq name *popular-structure-types*))))
-             args)))
   (defun make-temporary-layout (clos-hash classoid inherits)
-    (host-make-layout clos-hash classoid :inherits inherits :invalid nil))
+    (host-make-layout nil clos-hash classoid :inherits inherits :invalid nil))
   (defun layout-bitmap (layout)
     (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
 
@@ -724,6 +712,49 @@
              (format t "Layout flags = #b~10,'0b~%" flags)
              (setq prev flags)))
          (format t "  ~a~%" layout)))))
+
+#+sb-xc-host
+(progn
+(defun make-layout (hash classoid &rest keys)
+  (apply #'host-make-layout
+         (cdr (assq (classoid-name classoid) *popular-structure-types*))
+         hash classoid
+         (let ((copy (copy-list keys))) (remf copy :bitmap) copy)))
+;; The target reconstructs layouts using FOP-LAYOUT, but the host uses MAKE-LOAD-FORM.
+(defmethod make-load-form ((layout layout) &optional env)
+  (declare (ignore env))
+  (labels ((externalize (layout &aux (classoid (layout-classoid layout))
+                                     (name (classoid-name classoid)))
+             (when (or (layout-invalid layout) (not name))
+               (sb-c:compiler-error "can't dump ~S" layout))
+             (aver (= (layout-flags layout)
+                      (typecase classoid
+                        (structure-classoid +structure-layout-flag+)
+                        (condition-classoid +condition-layout-flag+)
+                        (undefined-classoid
+                         (bug "xc MAKE-LOAD-FORM on undefined layout"))
+                        (t 0))))
+             `(xc-load-layout ',name
+                              ,(layout-depthoid layout)
+                              (vector ,@(map 'list #'externalize (layout-inherits layout)))
+                              ,(layout-length layout)
+                              ,(layout-bitmap layout)
+                              ,(layout-flags layout))))
+    (externalize layout)))
+(defun xc-load-layout (name depthoid inherits length bitmap flags)
+  (let ((classoid (find-classoid name)))
+    (aver (and classoid (not (undefined-classoid-p classoid))))
+    (let ((layout (classoid-layout classoid)))
+      (unless (and (= (layout-depthoid layout) depthoid)
+                   (= (length (layout-inherits layout)) (length inherits))
+                   (every #'eq (layout-inherits layout) inherits)
+                   (= (layout-length layout) length)
+                   (= (layout-bitmap layout) bitmap)
+                   (= (layout-flags layout) flags))
+        (error "XC can't reload layout for ~S with ~S vs ~A"
+               name (list depthoid inherits length bitmap flags) layout))
+      layout)))
+) ; end PROGN
 
 (in-package "SB-C")
 
