@@ -3417,6 +3417,19 @@
       (t
        (give-up-ir1-transform)))))
 
+#+integer-eql-vop
+(deftransform %eql/integer ((x y) * * :node node)
+  (let* ((x-type (lvar-type x))
+         (y-type (lvar-type y)))
+    (cond
+      ((same-leaf-ref-p x y) t)
+      ((not (types-equal-or-intersect x-type y-type))
+       nil)
+      ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
+       '(eq y x))
+      (t
+       (give-up-ir1-transform)))))
+
 (defun array-type-dimensions-mismatch (x-type y-type)
   (let ((array-type (specifier-type 'array))
         (simple-array-type (specifier-type 'simple-array)))

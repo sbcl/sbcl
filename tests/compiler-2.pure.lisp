@@ -3112,9 +3112,10 @@
   (checked-compile
    '(lambda (x) (sb-kernel:hairy-data-vector-set
                  (the (simple-array symbol) x) 1 'hey))))
-(with-test (:name :deleting-unreachable-floats)
+
+(with-test (:name :ir2-convert-reffer-no-lvar)
   (checked-compile-and-assert
-   (:allow-notes nil)
+   (:allow-style-warnings t)
    `(lambda (a)
       (/ (unwind-protect (if a
                              (values nil (cdr a))
@@ -3122,4 +3123,14 @@
            a)
          1))
    ((nil) 1)))
+
+(with-test (:name :%eql-integer-fold)
+  (checked-compile-and-assert
+   ()
+   `(lambda (d)
+      (declare (type fixnum d))
+      (or (find d '(-98 27749116333474161060))
+          t))
+   ((-98) -98)
+   ((95) t)))
 
