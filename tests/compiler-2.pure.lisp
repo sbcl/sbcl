@@ -3112,3 +3112,14 @@
   (checked-compile
    '(lambda (x) (sb-kernel:hairy-data-vector-set
                  (the (simple-array symbol) x) 1 'hey))))
+(with-test (:name :deleting-unreachable-floats)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   `(lambda (a)
+      (/ (unwind-protect (if a
+                             (values nil (cdr a))
+                             (values 1 0))
+           a)
+         1))
+   ((nil) 1)))
+

@@ -39,7 +39,9 @@
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list (lvar-type lvar))))
+         (locs (lvar-result-tns lvar (list (if lvar
+                                               (lvar-type lvar)
+                                               *universal-type*))))
          (res (first locs)))
     (vop slot node block (lvar-tn node block object)
          name offset lowtag res)
