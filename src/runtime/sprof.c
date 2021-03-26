@@ -12,6 +12,10 @@
 #endif
 #include "genesis/compiled-debug-fun.h"
 
+#ifdef MEMORY_SANITIZER
+#include <sanitizer/msan_interface.h>
+#endif
+
 #include <fcntl.h>
 #include <unistd.h>
 /* Basic approach:
@@ -222,7 +226,7 @@ static int unstable_program_counter_p(uword_t addr)
 /* Represent 'trace' using code_serialno + offset for some PC locations.
  * Locations in foreign and pseudo-static code may remain as-is.
  * Return 1 if the trace was affected by stabilizing it. */
-static int stabilize(struct trace* trace)
+static int NO_SANITIZE_MEMORY stabilize(struct trace* trace)
 {
     int len = trace_len(trace);
     int changedp = 0;
@@ -248,8 +252,9 @@ static int stabilize(struct trace* trace)
     return changedp;
 }
 
-static int gather_trace_from_context(struct thread* thread, os_context_t* context,
-                                     struct trace* trace, int limit)
+static int NO_SANITIZE_MEMORY
+gather_trace_from_context(struct thread* thread, os_context_t* context,
+                          struct trace* trace, int limit)
 {
     uword_t pc = *os_context_pc_addr(context);
     int len = 1;
@@ -395,7 +400,11 @@ static struct sprof_data* enlarge_buffer(struct sprof_data* current,
 int sb_sprof_trace_ct;
 int sb_sprof_trace_ct_max;
 
-static int collect_backtrace(struct thread* th, int contextp, void* context_or_fp)
+/* this could get false msan positives because Lisp don't mark stack words as clean
+   so anything may appear as unwritten from C depending on whether any C code
+   ever marked them. So it was basically down to luck whether this worked or not */
+static int NO_SANITIZE_MEMORY
+collect_backtrace(struct thread* th, int contextp, void* context_or_fp)
 {
     int oldcount = __sync_fetch_and_add(&sb_sprof_trace_ct, 1);
     if (oldcount >= sb_sprof_trace_ct_max) {
@@ -547,7 +556,16 @@ uword_t acquire_sprof_data(struct thread* thread)
     // sync cas prevents reading before setting the lock
     uword_t retval = __sync_val_compare_and_swap(&thread->sprof_data, 0, 0);
     // if data were allocated, then set the field to 0
-    if (retval) __sync_val_compare_and_swap(&thread->sprof_data, retval, 0);
+    if (retval) {
+        __sync_val_compare_and_swap(&thread->sprof_data, retval, 0);
+#ifdef MEMORY_SANITIZER
+        // Traces were recorded with the sanitizer disabled, so we either need to
+        // read the memory from lisp in SAFETY 0 which disables UNINITIALIZED-LOAD-TRAP,
+        // or simply mark the memory as clean.
+        int freeptr = ((struct sprof_data*)retval)->free_pointer;
+        __msan_unpoison((void*)retval, freeptr * ELEMENT_SIZE);
+#endif
+    }
     __sync_fetch_and_and(&SPROF_LOCK(thread), 0);
     // This this thread owns that thread's data. ('This' and 'that' could be the same)
     return retval;
