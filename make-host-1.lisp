@@ -9,6 +9,11 @@
         (when val
           (format t "~&target ~S = ~S~%" sym  val))))))
 (in-package "SB-COLD")
+#+sbcl
+(declaim (sb-ext:muffle-conditions
+          (satisfies unable-to-optimize-note-p)
+          (satisfies optional+key-style-warning-p)
+          sb-ext:code-deletion-note))
 (progn
   (setf *host-obj-prefix* "obj/from-host/")
   (load "src/cold/set-up-cold-packages.lisp")
