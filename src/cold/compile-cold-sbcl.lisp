@@ -13,6 +13,15 @@
 
 (in-package "SB-COLD")
 
+;;; FIXME: I think it's a mistake that we load muffler twice in
+;;; make-host-2 (once for the host, once for XC), because the host
+;;; should produce no new warnings, and because it's really hard
+;;; to think straight when you figure that we're using the host's
+;;; SIGNAL and type system but mixing it with our types.
+;;; We can just bake in some behavior to the cross-compiler never to warn
+;;; about sh*t that we think isn't warning-worthy.
+;;; (i.e. do it in source code using #[-+]sb-xc-host).
+;;; The target compiler will still get everything as usual.
 (let ((*features* (cons :sb-xc *features*)))
   (load "src/cold/muffler.lisp"))
 

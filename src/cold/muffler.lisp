@@ -26,12 +26,12 @@
                     (and (typep (car args) '(cons string))
                          (search "forced to do" (caar args)))))))))
 
-(defparameter *optional-and-key-warning-condition* nil)
 #+sbcl
-(let ((s (find-symbol "&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST" "SB-KERNEL")))
-  (setq *optional-and-key-warning-condition* s))
+(defvar *optional-and-key-warning-condition*
+  (find-symbol "&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST" "SB-KERNEL"))
 
 (defun optional+key-style-warning-p (condition)
+  #+sbcl
   (when *optional-and-key-warning-condition*
     (return-from optional+key-style-warning-p
       (typep condition *optional-and-key-warning-condition*)))
