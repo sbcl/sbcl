@@ -1,8 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.2:
+  * minor incompatible change: support for the :SB-SAFEPOINT-STRICTLY,
+    :SB-THRUPTION, and :SB-WTIMER build features has been removed
+  * platform support:
+    ** support for :SB-CORE-COMPRESSION on Darwin/ARM64
+    ** support ARM v8.1 atomic and compare-and-swap instructions
+    ** x86, x86-64: microoptimizations in multiple type-checking routines
   * bug fix: structures and conditions are now TYPEP all classes in the class
     precedence list of their class.  (reported by Luis Oliveira)
+  * bug fix: derivation of the result type from subtraction sometimes
+    erroneously excluded zero.  (lp#1916895)
+  * bug fix: reduce the number of places where the system permissively accepts
+    * as a type specifier where it should not be accepted.  (lp#1860919)
+  * bug fix: the code-walker used by the system's implementation of CLOS can
+    handle defuns declared inline.  (reported by Don Cohen)
+  * optimization: EQUALP on specialized vectors and arrays is faster.
+  * optimization: support routines for EQUALP hash tables generate less garbage.
 
 changes in sbcl-2.1.2 relative to sbcl-2.1.1:
   * platform support:
