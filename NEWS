@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.2:
+changes in sbcl-2.1.3 relative to sbcl-2.1.2:
   * minor incompatible change: support for the :SB-SAFEPOINT-STRICTLY,
     :SB-THRUPTION, and :SB-WTIMER build features has been removed
   * platform support:
