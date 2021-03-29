@@ -3052,7 +3052,6 @@
         10))
    ((t t) (condition 'error))))
 
-
 (with-test (:name :fixnum-checking-boxing
                   :skipped-on (not :x86-64))
   (checked-compile
@@ -3101,8 +3100,11 @@
      (() 0f0))))
 
 (with-test (:name :no-*-as-type)
-  (multiple-value-bind (fun warn err) (compile nil '(lambda (x) (the * x)))
-    (assert (and warn err))
+  (multiple-value-bind (fun errorp warnings)
+      (checked-compile '(lambda (x) (the * x))
+                       :allow-failure t :allow-warnings t)
+    (assert errorp)
+    (assert (= (length warnings) 1))
     (assert-error (funcall fun 1)))
   ;; (values t) parses into *wild-type* and has to be allowed
   ;; even though * which parses into *wild-type* isn't.
@@ -3133,4 +3135,3 @@
           t))
    ((-98) -98)
    ((95) t)))
-
