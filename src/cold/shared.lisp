@@ -44,6 +44,7 @@
               value2)))))
 
 (defvar *make-host-parallelism* nil)
+(defvar *fail-on-warnings* t)
 (defun make-host-1-parallelism () (car *make-host-parallelism*))
 (defun make-host-2-parallelism () (cdr *make-host-parallelism*))
 

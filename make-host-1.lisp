@@ -22,7 +22,6 @@
   ;; Supress function/macro redefinition warnings under clisp.
   #+clisp (setf custom:*suppress-check-redefinition* t)
 
-  (defvar *fail-on-warnings* t)
   (defmacro maybe-with-compilation-unit (&body forms)
     ;; A compilation-unit seems to kill the compile. I'm not sure if it's
     ;; running out of memory or what. I don't care to find out,
