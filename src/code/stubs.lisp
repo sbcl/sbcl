@@ -59,7 +59,6 @@
   (def control-stack-pointer-sap ())
   (def sb-c:safe-fdefn-fun)
   (def fun-subtype)
-  (def simple-fun-p)
   (def closurep)
   (def %closure-fun)
   (def %closure-index-ref (closure index))
