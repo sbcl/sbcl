@@ -1037,6 +1037,7 @@
         (:synchronized t))
   hash-table
   (flushable))
+(defknown sb-impl::make-hash-table-using-defaults (integer) hash-table (flushable))
 (defknown hash-table-p (t) boolean (movable foldable flushable))
 (defknown gethash (t hash-table &optional t) (values t boolean)
   (flushable)) ; not FOLDABLE, since hash table contents can change
