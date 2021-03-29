@@ -614,3 +614,12 @@
          :test #'car-type-equal))
       (checked-compile-and-assert () '(lambda (x y) (ctu:compiler-derived-type (atan x y)))
         ((1 2) (values `(or ,long single-float (complex ,long) (complex single-float)) t) :test #'car-type-equal)))))
+
+(with-test (:name :comparison-transform-overflow)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (float a))
+      (= a 1854150818890592943838975159000134470424763027560))
+   ((1d0) nil)
+   ((1f0) nil)))

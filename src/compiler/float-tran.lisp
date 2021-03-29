@@ -479,10 +479,17 @@
                   (give-up-ir1-transform
                    "The RATIONAL value isn't known at compile time."))
                 (let ((val (lvar-value y)))
-                  (unless (eql (rational (float val)) val)
-                    (give-up-ir1-transform
-                     "~S doesn't have a precise float representation."
-                     val)))
+                  (multiple-value-bind (low high type)
+                      (if (csubtypep (lvar-type x) (specifier-type 'double-float))
+                          (values sb-xc:most-negative-double-float sb-xc:most-positive-double-float
+                                  'double-float)
+                          (values sb-xc:most-negative-single-float sb-xc:most-positive-single-float
+                                  'single-float))
+                      (unless (and (sb-xc:<= low val high)
+                                   (eql (rational (coerce val type)) val))
+                        (give-up-ir1-transform
+                         "~S doesn't have a precise float representation."
+                         val))))
                 `(,',op x (float y ,',(if complex
                                           '(realpart x)
                                           'x))))))
