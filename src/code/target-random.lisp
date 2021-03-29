@@ -325,13 +325,15 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (defun %random-single-float (arg state)
   (declare (type (single-float ($0f0)) arg)
            (type random-state state))
-  (* arg
-     (- (make-single-float
-         (dpb (ash (random-chunk state)
-                   (- sb-vm:single-float-digits n-random-chunk-bits))
-              sb-vm:single-float-significand-byte
-              (single-float-bits $1.0)))
-        $1.0)))
+  (loop for candidate = (* arg
+                           (- (make-single-float
+                               (dpb (ash (random-chunk state)
+                                         (- sb-vm:single-float-digits n-random-chunk-bits))
+                                    sb-vm:single-float-significand-byte
+                                    (single-float-bits $1.0)))
+                              $1.0))
+        while (= candidate arg)
+        finally (return candidate)))
 (declaim (ftype (function ((double-float ($0d0)) random-state)
                           (double-float $0d0))
                 %random-double-float))
@@ -348,14 +350,16 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (defun %random-double-float (arg state)
   (declare (type (double-float ($0d0)) arg)
            (type random-state state))
-  (* arg
-     (- (sb-impl::make-double-float
-         (dpb (ash (random-chunk state)
-                   (- sb-vm:double-float-digits n-random-chunk-bits 32))
-              sb-vm:double-float-significand-byte
-              (sb-impl::double-float-high-bits $1d0))
-         (random-chunk state))
-        $1d0)))
+  (loop for candidate = (* arg
+                           (- (sb-impl::make-double-float
+                               (dpb (ash (random-chunk state)
+                                         (- sb-vm:double-float-digits n-random-chunk-bits 32))
+                                    sb-vm:double-float-significand-byte
+                                    (sb-impl::double-float-high-bits $1d0))
+                               (random-chunk state))
+                              $1d0))
+        while (= candidate arg)
+        finally (return candidate)))
 
 ;;; using a faster inline VOP
 #+x86
@@ -363,15 +367,17 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type (double-float ($0d0)) arg)
            (type random-state state))
   (let ((state-vector (random-state-state state)))
-    (* arg
-       (- (sb-impl::make-double-float
-           (dpb (ash (sb-vm::random-mt19937 state-vector)
-                     (- sb-vm:double-float-digits n-random-chunk-bits
-                        sb-vm:n-word-bits))
-                sb-vm:double-float-significand-byte
-                (sb-impl::double-float-high-bits $1d0))
-           (sb-vm::random-mt19937 state-vector))
-          $1d0))))
+    (loop for candidate = (* arg
+                             (- (sb-impl::make-double-float
+                                 (dpb (ash (sb-vm::random-mt19937 state-vector)
+                                           (- sb-vm:double-float-digits n-random-chunk-bits
+                                              sb-vm:n-word-bits))
+                                      sb-vm:double-float-significand-byte
+                                      (sb-impl::double-float-high-bits $1d0))
+                                 (sb-vm::random-mt19937 state-vector))
+                                $1d0))
+          while (= candidate arg)
+          finally (return candidate))))
 
 
 ;;;; random fixnums
