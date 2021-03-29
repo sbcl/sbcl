@@ -12,7 +12,8 @@ changes in sbcl-2.1.3 relative to sbcl-2.1.2:
   * bug fix: derivation of the result type from subtraction sometimes
     erroneously excluded zero.  (lp#1916895)
   * bug fix: reduce the number of places where the system permissively accepts
-    * as a type specifier where it should not be accepted.  (lp#1860919)
+    the symbol * as a type specifier where it should not be accepted.
+    (lp#1860919)
   * bug fix: the code-walker used by the system's implementation of CLOS can
     handle defuns declared inline.  (reported by Don Cohen)
   * optimization: EQUALP on specialized vectors and arrays is faster.
