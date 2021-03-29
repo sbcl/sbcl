@@ -113,6 +113,8 @@
   (if (and (make-host-1-parallelism)
            (eq load-or-cload-stem #'host-cload-stem))
       (progn
+        ;; FIXME: muffler not working in forked children?
+        (setq *fail-on-warnings* nil)
         ;; Multiprocess build uses the in-memory math ops cache but not
         ;; the persistent cache file because we don't need each child
         ;; to be forced to read the file. Moreover, newly inserted values

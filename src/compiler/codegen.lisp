@@ -125,7 +125,7 @@
 ;;; to get handles (as returned by sb-vm:inline-constant-value) from constant
 ;;; descriptors.
 ;;;
-#+(or arm arm64 mips ppc ppc64 x86 x86-64)
+#+(or arm64 mips ppc ppc64 x86 x86-64)
 (defun register-inline-constant (&rest constant-descriptor)
   ;; N.B.: Please do not think yourself so clever as to declare DYNAMIC-EXTENT on
   ;; CONSTANT-DESCRIPTOR. Giving the list indefinite extent allows backends to simply
@@ -141,7 +141,7 @@
         (vector-push-extend (cons constant label)
                             (asmstream-constant-vector asmstream))
         value)))))
-#-(or arm arm64 mips ppc ppc64 x86 x86-64)
+#-(or arm64 mips ppc ppc64 x86 x86-64)
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))

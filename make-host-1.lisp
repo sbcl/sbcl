@@ -22,6 +22,7 @@
   ;; Supress function/macro redefinition warnings under clisp.
   #+clisp (setf custom:*suppress-check-redefinition* t)
 
+  (defvar *fail-on-warnings* t)
   (defmacro maybe-with-compilation-unit (&body forms)
     ;; A compilation-unit seems to kill the compile. I'm not sure if it's
     ;; running out of memory or what. I don't care to find out,
@@ -33,30 +34,26 @@
     ;; UNDEFINED-VARIABLE does not cause COMPILE-FILE to return warnings-p
     ;; unless outside a compilation unit. You find out about it only upon
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
-    `(let (in-summary fail)
-       (handler-bind (((and simple-warning (not style-warning))
+    `(let (warnp style-warnp)
+       (handler-bind ((style-warning
+                       ;; Any unmuffled STYLE-WARNING should fail
+                       ;; These would typically be from undefined functions,
+                       ;; or optional-and-key when that was visible.
+                       (lambda (c)
+                         (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
+                         (setq style-warnp 'style-warning)))
+                      (simple-warning
                        (lambda (c &aux (fc (simple-condition-format-control c)))
                          ;; hack for PPC. See 'build-order.lisp-expr'
                          ;; Ignore the warning, and the warning about the warning.
                          (unless (and (stringp fc)
                                       (or (search "not allowed by the operand type" fc)
                                           (search "ignoring FAILURE-P return" fc)))
-                           (setq fail 'warning))))
-                      ;; Prevent regressions on a few platforms
-                      ;; that are known to build cleanly.
-                      (sb-int:simple-style-warning
-                       (lambda (c &aux (fc (simple-condition-format-control c)))
-                         (when (and (featurep '(:or :x86 :x86-64 :arm64))
-                                    in-summary
-                                    (stringp fc)
-                                    (search "undefined" fc))
-                           (unless (eq fail 'warning)
-                             (setq fail 'style-warning))))))
-         (with-compilation-unit ()
-           (multiple-value-prog1 (progn ,@forms) (setq in-summary t))))
-       (when fail
+                           (setq warnp 'warning)))))
+         (with-compilation-unit () ,@forms))
+       (when (and (or warnp style-warnp) *fail-on-warnings*)
          (cerror "Proceed anyway"
-                 "make-host-1 stopped due to unexpected ~A." fail)))
+                 "make-host-1 stopped due to unexpected ~A." (or warnp style-warnp))))
 
     #-(or clisp sbcl) `(with-compilation-unit () ,@forms)))
 
