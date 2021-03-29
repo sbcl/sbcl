@@ -1592,7 +1592,7 @@
                 (values (funcall f x) (> x 1d0)))))))
     (ctu:assert-no-consing (funcall f #'identity 1d0))))
 
-(with-test (:name :infer-iteration-var-type)
+(with-test (:name (:infer-iteration-var-type :step-is-range))
   (let ((f (checked-compile
             '(lambda (s)
               (declare ((integer 1 2) s))
@@ -1602,6 +1602,41 @@
                 r)))))
     (assert (equal (sb-impl::%simple-fun-type f)
                    '(function ((integer 1 2)) (values (integer 16 31) &optional))))))
+
+(with-test (:name (:infer-iteration-var-type :multiple-sets))
+  (let ((f (checked-compile
+            '(lambda (x)
+               (declare (optimize speed)
+                        (type (integer 3 10) x))
+               (let ((y x))
+                 (tagbody
+                  :start
+                    (when (plusp y)
+                      (decf y)
+                      (when (plusp y)
+                        (decf y)
+                        (go :start))))
+                 y))
+            :allow-notes nil)))
+    (assert (equal (sb-impl::%simple-fun-type f)
+                   '(function ((integer 3 10)) (values (integer 0 0) &optional))))))
+
+(with-test (:name (:infer-iteration-var-type :incompatible-sets))
+  (checked-compile-and-assert ()
+      '(lambda (input-total missing-amount)
+         (declare (fixnum input-total) (fixnum missing-amount))
+         (loop with tot = 0
+               repeat 1
+               do (let ((difference input-total))
+                    (setq difference (max difference 0))
+                    (setq tot (+ tot difference)))
+               finally (when (plusp missing-amount)
+                         (decf tot missing-amount))
+                       (return (if (plusp tot) :good :bad))))
+    ((0 0) :bad)
+    ((1 0) :good)
+    ((0 1) :bad)
+    ((1 1) :bad)))
 
 (with-test (:name :delay-transform-until-constraint-loop)
   (checked-compile-and-assert
