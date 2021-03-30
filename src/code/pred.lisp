@@ -96,6 +96,7 @@
   ;; SIMPLE-FUN-P is needed for constant folding in early warm load,
   ;; and its absence would be obscured by the fact that
   ;; CONSTANT-FUNCTION-CALL-P allows the call to fail.
+  (def-type-predicate-wrapper closurep)
   (def-type-predicate-wrapper simple-fun-p)
   (def-type-predicate-wrapper integerp)
   (def-type-predicate-wrapper listp)

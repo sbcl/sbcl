@@ -205,7 +205,12 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
 
   (let ((cl:*compile-print* nil))
     (dolist (group sources)
-      (handler-bind ((#+x86-64 warning #-x86-64 simple-warning
+      ;; For the love of god, what are we trying to do here???
+      ;; It's gone through so many machinations that I can't figure it out.
+      ;; The goal should be to build warning-free, not layer one
+      ;; kludge upon another so that it can be allowed not to.
+      (handler-bind (((and #+x86-64 warning #-x86-64 simple-warning
+                           (not sb-kernel:redefinition-warning))
                       (lambda (c)
                         ;; escalate "undefined variable" warnings to errors.
                         ;; There's no reason to allow them in our code.

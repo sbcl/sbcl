@@ -11,8 +11,10 @@
 
 (in-package "SB-GRAY")
 
+;;; See minor rant in call-next-method about this EVAL-WHEN.
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defclass stream-function (standard-generic-function) ()
-  (:metaclass sb-mop:funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class)))
 (defmacro !def-stream-generic (name ll &rest rest)
   `(progn (fmakunbound ',name)
           (defgeneric ,name ,ll (:generic-function-class stream-function) ,@rest)
