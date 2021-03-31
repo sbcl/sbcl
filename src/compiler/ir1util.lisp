@@ -1428,7 +1428,10 @@
                     (unless (eq type1 type2)
                       (derive-node-type ref1
                                         (values-type-union type1 type2)
-                                        :from-scratch t)))
+                                        :from-scratch t))
+                    (setf (ref-constraints ref1)
+                          (intersection (ref-constraints ref1)
+                                        (ref-constraints ref2))))
                   (loop for pred in (block-pred block2)
                         do
                         (change-block-successor pred block2 block1))

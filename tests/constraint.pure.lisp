@@ -133,3 +133,16 @@
                          (- x y)
                          1)))))
           '(values real &optional))))
+
+(with-test (:name :remove-equivalent-blocks-clear-constraints)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a c)
+         (declare ((and fixnum unsigned-byte) a)
+                  (fixnum c))
+         (eql c
+              (if (eql a c)
+                  c
+                  a)))
+    ((3 1) nil)
+    ((3 3) t)))
