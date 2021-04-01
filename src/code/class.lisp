@@ -818,6 +818,7 @@ between the ~A definition and the ~A definition"
                      :predicate code-component-p
                      :prototype-form (fun-code-header #'identity))
      #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag)
+                            :predicate lra-p
                             ;; Make the PROTOTYPE slot unbound.
                             :prototype-form sb-pcl:+slot-unbound+)
      (fdefn :codes (,sb-vm:fdefn-widetag)
