@@ -364,16 +364,30 @@
 
 (defmacro define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
-  (let ((name (symbolicate class "-" method "-TYPE-METHOD"))
-        (arg-restriction
+  (let* ((name (symbolicate class "-" method "-TYPE-METHOD"))
+         (arg-type
           (case class
-           (classoid 'classoid)
-           (number 'numeric-type)
-           (function 'fun-type)
-           (alien 'alien-type-type)
-           ;; hairy could reparse the specifier into anything
-           (hairy (if (eq method :simple-subtypep) t 'hairy-type))
-           (t (symbolicate class "-TYPE")))))
+            (classoid 'classoid)
+            (number 'numeric-type)
+            (function 'fun-type)
+            (alien 'alien-type-type)
+            (t (symbolicate class "-TYPE"))))
+         (first (car lambda-list))
+         (second (cadr lambda-list))
+         ;; make-host-1 verifies that type methods are invoked correctly,
+         ;; but afterwards we assume that they are
+         (operator #+sb-xc-host 'the #-sb-xc-host 'truly-the)
+         (rebind
+          (unless more-methods
+            (case method
+              ((:complex-subtypep-arg1 :unparse :negate :singleton-p)
+               `((,first (,operator ,arg-type ,first))))
+              ((:complex-subtypep-arg2)
+               `((,first ,first) ; because there might be a DECLARE IGNORE on it
+                 (,second (,operator ,arg-type ,second))))
+              ((:simple-intersection2 :simple-union2 :simple-subtypep :simple-=)
+               `((,first (,operator ,arg-type ,first))
+                 (,second (,operator ,arg-type ,second))))))))
     `(progn
        #+sb-xc-host
        (when (plusp (bit *type-class-was-inherited* (type-class-name->id ',class)))
@@ -381,14 +395,7 @@
          ;; both an ancestor and its descendants on some method.
          ;; Too bad for you- this throws the baby out with the bathwater.
          (error "Can't define-type-method for class ~s: already inherited" ',class))
-       (defun ,name ,lambda-list
-         ,@(cond ((member method '(:unparse :negate :singleton-p))
-                  `((declare (type ,arg-restriction ,(car lambda-list)))))
-                 ((and (member method '(:simple-intersection2 :simple-union2
-                                        :simple-subtypep :simple-=))
-                       (not more-methods))
-                  `((declare (type ,arg-restriction ,(car lambda-list) ,(cadr lambda-list))))))
-         ,@body)
+       (defun ,name ,lambda-list ,@(if rebind `((let ,rebind ,@body)) body))
        (!cold-init-forms
         ,@(mapcar (lambda (method)
                     `(setf (,(type-class-fun-slot method)
