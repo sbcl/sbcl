@@ -1288,20 +1288,7 @@ unless :NAMED is also specified.")))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
-(defun %compiler-set-up-layout (dd
-                                &optional
-                                ;; Several special cases
-                                ;; (STRUCTURE-OBJECT itself, and
-                                ;; structures with alternate
-                                ;; metaclasses) call this function
-                                ;; directly, and they're all at the
-                                ;; base of the instance class
-                                ;; structure, so this is a handy
-                                ;; default.  (But note
-                                ;; FUNCALLABLE-STRUCTUREs need
-                                ;; assistance here)
-                                (inherits (vector (find-layout t))))
-
+(defun %compiler-set-up-layout (dd inherits)
   (multiple-value-bind (classoid layout old-layout)
       (multiple-value-bind (clayout clayout-p)
           (info :type :compiler-layout (dd-name dd))
@@ -2248,11 +2235,8 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; instead of trying to generalize the ordinary DEFSTRUCT code.
 (defun !set-up-structure-object-class ()
   (let ((dd (make-defstruct-description t 'structure-object)))
-    (setf
-     (dd-slots dd) nil
-     (dd-length dd) sb-vm:instance-data-start
-     (dd-type dd) 'structure)
-    (%compiler-set-up-layout dd)))
+    (setf (dd-length dd) sb-vm:instance-data-start)
+    (%compiler-set-up-layout dd (vector (find-layout 't)))))
 #+sb-xc-host(!set-up-structure-object-class)
 
 (defun find-defstruct-description (name &optional (errorp t))
