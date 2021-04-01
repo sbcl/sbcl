@@ -600,8 +600,8 @@
   ;; during make-host-1.
   (translation nil :type (or null ctype #+sb-xc-host (member :initializing))
                :read-only #+sb-xc-host nil #-sb-xc-host t)
-  (predicate nil :type #+sb-xc-host function
-                       #-sb-xc-host (sfunction (t) boolean)
+  (predicate (bug "must supply :PREDICATE for BUILT-IN-CLASSOID")
+             :type #+sb-xc-host function #-sb-xc-host (sfunction (t) boolean)
              :read-only t))
 
 (def!struct (condition-classoid (:include classoid)
