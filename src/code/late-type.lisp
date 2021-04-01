@@ -3191,10 +3191,16 @@ used for a COMPLEX component.~:@>"
 ;;; mechanically unparsed.
 (define-type-method (intersection :unparse) (type)
   (declare (type ctype type))
-  ;; If perhaps the magic intersection types were interned, then
-  ;; we could compare by EQ here instead of parsing in order to unparse.
-  (or (find type '(ratio keyword compiled-function) :key #'specifier-type :test #'type=)
-      `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
+  ;; If magic intersection types were interned, then
+  ;; we could compare by EQ here instead of calling TYPE=
+  (cond ((type= type (literal-ctype (specifier-type 'keyword) keyword))
+         'keyword)
+        ((type= type (literal-ctype (specifier-type 'ratio) ratio))
+         'ratio)
+        ((type= type (literal-ctype (specifier-type 'compiled-function) compiled-function))
+         'compiled-function)
+        (t
+         `(and ,@(mapcar #'type-specifier (intersection-type-types type))))))
 
 (define-type-method (intersection :singleton-p) (type)
   (loop for constituent in (intersection-type-types type)

@@ -26,6 +26,16 @@
  (dovector (pair *!initial-parsed-types*)
    (destructuring-bind (spec . parse) pair
      (drop-all-hash-caches) ; start from a relative vacuum
-     (aver (equal (type-specifier parse) spec)))))
+     (unless (equal (type-specifier parse) spec)
+       (unless (member (type-specifier parse)
+                       '(compiled-function keyword))
+         (write-string "parse/unparse: ")
+         (write spec)
+         (write-char #\space)
+         (write parse)
+         (write-char #\space)
+         (write (type-specifier parse))
+         (terpri)
+         (bug "type parsed->unparse round-trip fail"))))))
 
 (!defun-from-collected-cold-init-forms !fixup-type-cold-init)
