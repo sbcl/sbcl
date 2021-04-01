@@ -1112,24 +1112,27 @@ between the ~A definition and the ~A definition"
       ;; instance metatypes and T don't need a prototype, everything else does
       (unless (or prototype-form depth (eq name 't))
         (error "Missing prototype in ~S" x))
-      (let ((inherits-list (if (eq name t)
-                               ()
-                               (cons t (reverse inherits))))
-            (classoid
-             (acond #+sb-xc ; genesis dumps some classoid literals
-                    ((find-classoid name nil)
-                     ;; Unseal it so that REGISTER-LAYOUT doesn't warn
-                     (setf (classoid-state it) nil)
-                     it)
-                    (t
-                     (setf (classoid-cell-classoid
-                            (find-classoid-cell name :create t))
-                           (!make-built-in-classoid
+      (let* ((pred-fn (if (fboundp predicate) (symbol-function predicate) #'error))
+             (inherits-list (if (eq name t)
+                                ()
+                                (cons t (reverse inherits))))
+             (classoid
+              (acond #-sb-xc-host ; genesis dumps some classoid literals
+                     ((find-classoid name nil)
+                      (setf (%instance-ref it (get-dsd-index built-in-classoid predicate))
+                            pred-fn)
+                      ;; Unseal it so that REGISTER-LAYOUT doesn't warn
+                      (setf (classoid-state it) nil)
+                      it)
+                     (t
+                      (setf (classoid-cell-classoid
+                             (find-classoid-cell name :create t))
+                            (!make-built-in-classoid
                              :%bits (pack-ctype-bits classoid name)
                              :name name
                              :translation #+sb-xc-host (if trans-p :initializing nil)
                                           #-sb-xc-host translation
-                             :predicate #'error
+                             :allow-other-keys t :predicate pred-fn
                              :direct-superclasses
                              (if (eq name t)
                                  nil
@@ -1139,12 +1142,7 @@ between the ~A definition and the ~A definition"
         #+sb-xc-host
         (unless trans-p
           (setf (info :type :builtin name) classoid))
-        #-sb-xc-host
-        (setf (info :type :builtin name) (or translation classoid)
-              (%instance-ref classoid (get-dsd-index built-in-classoid predicate))
-              (if (and predicate (fboundp predicate))
-                  (symbol-function predicate)
-                  0))
+        #-sb-xc-host (setf (info :type :builtin name) (or translation classoid))
         (let* ((inherits-vector
                 (map 'simple-vector
                      (lambda (x)

@@ -1360,18 +1360,19 @@ core and return a descriptor to it."
     (do ((index sb-vm:instance-data-start (1+ index)))
         ((= index dd-len) result)
       (let* ((dsd (find index dd-slots :key #'dsd-index))
-             (host-val (funcall (dsd-accessor-name dsd) obj))
-             (override (assq index simple-slots)))
+             (override (assq index simple-slots))
+             (reader (dsd-accessor-name dsd)))
         (ecase (dsd-raw-type dsd)
          ((t)
           (write-wordindexed result
                              (+ sb-vm:instance-slots-offset index)
                              (if override
                                  (or (cdr override) *nil-descriptor*)
-                                 (host-constant-to-core host-val obj-to-core-helper))))
+                                 (host-constant-to-core (funcall reader obj)
+                                                        obj-to-core-helper))))
          ((word sb-vm:signed-word)
           (write-wordindexed/raw result (+ sb-vm:instance-slots-offset index)
-                                 (or (cdr override) host-val))))))))
+                                 (or (cdr override) (funcall reader obj)))))))))
 
 (defun initialize-layouts ()
   (let ((l (find-layout 'stream)))

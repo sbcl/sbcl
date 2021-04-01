@@ -592,17 +592,17 @@
 ;;; This translation is done when type specifiers are parsed. Type
 ;;; system operations (union, subtypep, etc.) should never encounter
 ;;; translated classes, only their translation.
-(def!struct (built-in-classoid (:include classoid)
-                               (:copier nil)
-                               (:constructor !make-built-in-classoid))
+(sb-xc:defstruct (built-in-classoid (:include classoid) (:copier nil)
+                                    (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
-  ;; stands on its own; or it can be set to :INITIALIZING for a period
-  ;; during make-host-1.
-  (translation nil :type (or null ctype #+sb-xc-host (member :initializing))
-               :read-only #+sb-xc-host nil #-sb-xc-host t)
-  (predicate (bug "must supply :PREDICATE for BUILT-IN-CLASSOID")
-             :type #+sb-xc-host function #-sb-xc-host (sfunction (t) boolean)
-             :read-only t))
+  ;; stands on its own
+  (translation nil :type (or null ctype) :read-only t)
+  (predicate nil :type (sfunction (t) boolean) :read-only t))
+#+sb-xc-host
+(defstruct (built-in-classoid (:include classoid) (:copier nil)
+                              (:constructor !make-built-in-classoid))
+  ;; until bootstrap of all CTYPEs, store a dummy value distinct from NIL
+  (translation nil :type (or null ctype (member :initializing))))
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)
