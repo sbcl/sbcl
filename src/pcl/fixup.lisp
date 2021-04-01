@@ -117,3 +117,14 @@
                   standard-writer-method update-dependent validate-superclass
                   writer-method-class))
   (sb-impl::deprecate-export *package* symbol :late "2.0.7"))
+
+(in-package "SB-KERNEL")
+(defun slot-object-p (x) (typep x '(or structure-object standard-object condition)))
+
+(flet ((set-predicate (classoid-name pred)
+         (let ((c (find-classoid classoid-name)))
+           (setf (%instance-ref c (get-dsd-index built-in-classoid predicate))
+                 pred))))
+  (set-predicate 't #'constantly-t)
+  (set-predicate 'random-class #'constantly-nil)
+  (set-predicate 'sb-pcl::slot-object #'slot-object-p))

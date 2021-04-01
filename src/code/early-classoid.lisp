@@ -597,8 +597,12 @@
                                (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
   ;; stands on its own; or it can be set to :INITIALIZING for a period
-  ;; during cold-load.
-  (translation nil :type (or ctype (member nil :initializing))))
+  ;; during make-host-1.
+  (translation nil :type (or null ctype #+sb-xc-host (member :initializing))
+               :read-only #+sb-xc-host nil #-sb-xc-host t)
+  (predicate nil :type #+sb-xc-host function
+                       #-sb-xc-host (sfunction (t) boolean)
+             :read-only t))
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)

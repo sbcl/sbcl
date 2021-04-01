@@ -1337,12 +1337,21 @@ core and return a descriptor to it."
           ;; trivially dumpable constant in lieu of whatever complicated
           ;; substructure it currently holds.
           (typecase obj
-           (classoid
-            `((,(get-dsd-index classoid sb-kernel::subclasses) . nil)
-              ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
-              ;; we nonetheless must set WRAPPER to NIL or else warm build fails
-              ;; in the twisty maze of class initializations.
-              (,(get-dsd-index classoid sb-kernel::wrapper) . nil)))))
+            (classoid
+             (let ((slots-to-omit
+                    `(;; :predicate will be patched in during cold init.
+                      (,(get-dsd-index built-in-classoid sb-kernel::predicate) .
+                        ,(make-random-descriptor sb-vm:unbound-marker-widetag))
+                      (,(get-dsd-index classoid sb-kernel::subclasses) . nil)
+                      ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
+                      ;; we nonetheless must set WRAPPER to NIL or else warm build fails
+                      ;; in the twisty maze of class initializations.
+                      (,(get-dsd-index classoid sb-kernel::wrapper) . nil))))
+               (if (typep obj 'built-in-classoid)
+                   slots-to-omit
+                   ;; :predicate is not a slot. Don't mess up the object
+                   ;; by omitting a slot at the same index as it.
+                   (cdr slots-to-omit))))))
          (dd-slots (type-dd-slots-or-lose host-type))
          ;; ASSUMPTION: all slots consume 1 storage word
          (dd-len (+ sb-vm:instance-data-start (length dd-slots)))
@@ -3360,13 +3369,26 @@ III. initially undefined function references (alphabetically):
       CELL   CLASSOID  NAME
 ========== ==========  ====~%")
 
-    (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
-      (destructuring-bind (name . cell) x
-        (format t "~10,'0x ~:[          ~;~:*~10,'0X~]  ~S~%"
-                (descriptor-bits cell)
-                (let ((classoid (read-slot cell :classoid)))
-                  (unless (cold-null classoid) (descriptor-bits classoid)))
-                name)))
+    (let ((dumped-classoids))
+      (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
+        (destructuring-bind (name . cell) x
+          (format t "~10,'0x ~:[          ~;~:*~10,'0X~]  ~S~%"
+                  (descriptor-bits cell)
+                  (let ((classoid (read-slot cell :classoid)))
+                    (unless (cold-null classoid)
+                      (push classoid dumped-classoids)
+                      (descriptor-bits classoid)))
+                  name)))
+      ;; Something goes wrong when dumping classoids, so show the memory
+      (terpri)
+      (dolist (classoid dumped-classoids)
+        (let ((nwords (logand (ash (read-bits-wordindexed classoid 0)
+                                   (- sb-vm:instance-length-shift))
+                              sb-vm::instance-length-mask)))
+          (format t "Classoid @ ~x, ~d words:~%" (descriptor-bits classoid) (1+ nwords))
+          (dotimes (i (1+ nwords)) ; include the header word in output
+            (format t "~2d: ~10x~%" i (read-bits-wordindexed classoid i)))
+          (terpri))))
 
     (format t "~%~|~%V. layout names:~2%")
     (format t "              Bitmap  Depth  ID  Name [Length]~%")

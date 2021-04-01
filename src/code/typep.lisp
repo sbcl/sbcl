@@ -82,13 +82,11 @@
      (when (member-type-member-p object type)
        t))
     (classoid
-     ;; It might be more efficient to check that OBJECT is either INSTANCEP
-     ;; or FUNCALLABLE-INSTANCE-P before making this call.
-     ;; But doing that would change the behavior if %%TYPEP were ever called
-     ;; with a built-in classoid whose members are not instances.
-     ;; e.g. (%%typep (find-fdefn 'car) (specifier-type 'fdefn))
-     ;; I'm not sure if that can happen.
-     (classoid-typep (layout-of object) type object))
+     (if (built-in-classoid-p type)
+         (funcall (built-in-classoid-predicate type) object)
+         (and (or (%instancep object)
+                  (functionp object))
+              (classoid-typep (layout-of object) type object))))
     (union-type
      (some (lambda (union-type-type) (recurse object union-type-type))
            (union-type-types type)))
@@ -292,7 +290,10 @@
          (values (%%typep obj type) t)))
     (classoid
      (if (built-in-classoid-p type)
-         (values (%%typep obj type) t)
+         (values (funcall (built-in-classoid-predicate type) obj) t)
+         ;; Hmm, if the classoid is a subtype of STRUCTURE-OBJECT,
+         ;; can we not decide this _now_ ? In fact, even for STANDARD-OBJECT, the spec
+         ;; says the compiler may assume inheritance not to change at runtime.
          (if (if (csubtypep type (specifier-type 'function))
                  (funcallable-instance-p obj)
                  (%instancep obj))

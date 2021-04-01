@@ -318,7 +318,7 @@
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
  ("src/code/late-type" :c-headers)
 
- ("src/code/class-init" :c-headers)
+ ("src/code/class-init" :c-headers :not-target)
 
  ;; The DEFSTRUCT machinery needs SUBTYPEP, defined in
  ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",

@@ -17,6 +17,11 @@
 (defun streamp (stream)
   (typep stream 'stream))
 
+;;; These would only be called from %%TYPEP given a built-in-classoid.
+;;; Ordinarily TYPEP on either one would be transformed.
+(defun sb-kernel::file-stream-p (x) (typep x 'file-stream))
+(defun sb-kernel::string-stream-p (x) (typep x 'string-stream))
+
 ;;; various (VECTOR FOO) type predicates, not implemented as simple
 ;;; widetag tests
 (macrolet
@@ -161,7 +166,7 @@
   (map-into **primitive-object-layouts**
             (lambda (name) (classoid-layout (find-classoid name)))
             #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))
-                (dolist (x sb-kernel::+!built-in-classes+)
+                (dolist (x sb-kernel::*builtin-classoids*)
                   (destructuring-bind (name &key codes &allow-other-keys) x
                     (dolist (code codes)
                       (setf (svref table code) name))))

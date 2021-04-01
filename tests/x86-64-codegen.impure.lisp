@@ -727,6 +727,7 @@ sb-vm::(define-vop (cl-user::test)
                                     sb-kernel::classoid-cell
                                     sb-kernel:layout
                                     sb-kernel:classoid
+                                    sb-kernel:built-in-classoid
                                     #-immobile-space null))))))
 
 ;; lp#1857861

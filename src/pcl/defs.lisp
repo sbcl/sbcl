@@ -177,7 +177,7 @@
 
 ;;;; built-in classes
 
-;;; Grovel over SB-KERNEL::+!BUILT-IN-CLASSES+ in order to set
+;;; Grovel over SB-KERNEL::*BUILTIN-CLASSOIDS* in order to set
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (define-load-time-global *built-in-classes*
@@ -221,7 +221,7 @@
                                  '(t function stream sequence
                                    file-stream string-stream
                                    slot-object)))
-                       sb-kernel::+!built-in-classes+))))
+                       sb-kernel::*builtin-classoids*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid

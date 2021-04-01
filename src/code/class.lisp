@@ -797,32 +797,38 @@ between the ~A definition and the ~A definition"
 ;;;     List of the direct superclasses of this class.
 ;;;
 ;;; NB: not to be confused with SB-PCL::*BUILT-IN-CLASSES*
-(defconstant-eqx +!built-in-classes+
-  ;; constant-quasiquote-form-p is not smart enough to notice
-  ;; that this entire thing is constant, so we kind of have to force it.
-'#.`((t :state :read-only :translation t)
+;;; (note the difference in spelling, to help keep things unconfusing)
+#+sb-xc-host
+(defvar *builtin-classoids*
+   `((t :state :read-only :translation t)
      (character :codes (,sb-vm:character-widetag)
                 :translation (character-set)
                 :prototype-form (code-char 42))
      (symbol :codes (,sb-vm:symbol-widetag)
+             :predicate symbolp
              :prototype-form '*)
 
      (system-area-pointer :codes (,sb-vm:sap-widetag)
+                          :predicate system-area-pointer-p
                           :prototype-form (int-sap 0))
      (weak-pointer :codes (,sb-vm:weak-pointer-widetag)
-      :prototype-form (make-weak-pointer 0))
+                   :predicate weak-pointer-p
+                   :prototype-form (make-weak-pointer 0))
      (code-component :codes (,sb-vm:code-header-widetag)
+                     :predicate code-component-p
                      :prototype-form (fun-code-header #'identity))
      #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag)
                             ;; Make the PROTOTYPE slot unbound.
                             :prototype-form sb-pcl:+slot-unbound+)
      (fdefn :codes (,sb-vm:fdefn-widetag)
+            :predicate fdefn-p
             :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
      (random-class ; used for unknown type codes
             ;; Make the PROTOTYPE slot unbound.
             :prototype-form sb-pcl:+slot-unbound+)
      (function
       :codes (,sb-vm:closure-widetag ,sb-vm:simple-fun-widetag)
+      :predicate functionp
       :state :read-only
       :prototype-form #'identity)
 
@@ -997,15 +1003,18 @@ between the ~A definition and the ~A definition"
 
      (sb-pcl::slot-object
       :translation (or structure-object standard-object condition)
+      :predicate slot-object-p
       :hierarchical-p nil
       :state :read-only
       :prototype-form (make-defstruct-description t 'arbitrary))
 
      ;; KLUDGE: the length must match the subsequent defstruct.
      (pathname :depth 1
+               :predicate pathnamep
                :length ,(+ 7 sb-vm:instance-data-start)
                :prototype-form (make-pathname))
      (logical-pathname :depth 2
+                       :predicate logical-pathname-p
                        :length ,(+ 7 sb-vm:instance-data-start)
                        :prototype-form (make-pathname :host "SYS")
                        :inherits (pathname))
@@ -1026,13 +1035,16 @@ between the ~A definition and the ~A definition"
      ;;    #<LAYOUT for FILE-STREAM {50303303}>)
 
      (stream
+      :predicate streamp
       :state :read-only
       :depth 2)
      (file-stream
+      :predicate file-stream-p
       :state :read-only
       :depth 4
       :inherits (stream))
      (string-stream
+      :predicate string-stream-p
       :state :read-only
       :depth 4
       :inherits (stream))
@@ -1050,17 +1062,40 @@ between the ~A definition and the ~A definition"
                :inherits (vector simple-array array sequence)
                :prototype-form
                (logically-readonlyize
-                (make-array 0 :element-type ',(sb-vm:saetp-specifier x))))))
-  #'equal)
+                (make-array 0 :element-type ',(sb-vm:saetp-specifier x)))))))
+
+(eval-when (#-sb-xc-host :compile-toplevel)
+  (defun compute-builtin-classoids ()
+    (mapcar (lambda (x)
+              (let* ((name (car x))
+                     (classoid (find-classoid name))
+                     (translation (built-in-classoid-translation classoid))
+                     (predicate
+                      (if (member name '(t random-class))
+                          'error
+                          (or (getf (cdr x) :predicate)
+                              (sb-c::backend-type-predicate translation)))))
+                (assert predicate)
+                ;; destructuring-bind will see the first :translation
+                ;; keyword; we don't need to delete the other one.
+                (list* name :predicate predicate :translation translation (cdr x))))
+            *builtin-classoids*)))
+
+;;; The read interceptor has to be disabled to avoid infinite recursion on CTYPEs
+(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* nil))
+#-sb-xc-host
+(!define-load-time-global *builtin-classoids* '#.(compute-builtin-classoids))
+(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* t))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
 (!cold-init-forms
-  (dolist (x +!built-in-classes+)
-    #-sb-xc-host (/show0 "at head of loop over +!BUILT-IN-CLASSES+")
+  (dolist (x *builtin-classoids*)
+    #-sb-xc-host (/show0 "at head of loop over *BUILTIN-CLASSOIDS*")
     (destructuring-bind
         (name &key
               (translation nil trans-p)
+              predicate
               inherits
               codes
               state
@@ -1072,7 +1107,7 @@ between the ~A definition and the ~A definition"
                                      (list (car inherits))
                                      '(t))))
         x
-      (declare (ignore codes state translation))
+      (declare (ignorable codes state translation trans-p predicate))
       ;; instance metatypes and T don't need a prototype, everything else does
       (unless (or prototype-form depth (eq name 't))
         (error "Missing prototype in ~S" x))
@@ -1091,15 +1126,24 @@ between the ~A definition and the ~A definition"
                            (!make-built-in-classoid
                              :%bits (pack-ctype-bits classoid name)
                              :name name
-                             :translation (if trans-p :initializing nil)
+                             :translation #+sb-xc-host (if trans-p :initializing nil)
+                                          #-sb-xc-host translation
+                             :predicate #'error
                              :direct-superclasses
                              (if (eq name t)
                                  nil
                                  (mapcar #'find-classoid
                                          direct-superclasses))))))))
         (setf (info :type :kind name) :primitive)
+        #+sb-xc-host
         (unless trans-p
           (setf (info :type :builtin name) classoid))
+        #-sb-xc-host
+        (setf (info :type :builtin name) (or translation classoid)
+              (%instance-ref classoid (get-dsd-index built-in-classoid predicate))
+              (if (and predicate (fboundp predicate))
+                  (symbol-function predicate)
+                  0))
         (let* ((inherits-vector
                 (map 'simple-vector
                      (lambda (x)
@@ -1119,12 +1163,12 @@ between the ~A definition and the ~A definition"
                                         +layout-all-tagged+
                                         0) ; flags
                            :invalidate nil)))))
-  (/show0 "done with loop over +!BUILT-IN-CLASSES+"))
+  (/show0 "done with loop over *!BUILTIN-CLASSOIDS*"))
 
 ;;; Now that we have set up the class heterarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.
 (!cold-init-forms
-  (dolist (x +!built-in-classes+)
+  (dolist (x *builtin-classoids*)
     (destructuring-bind (name &key (state :sealed) &allow-other-keys) x
       (setf (classoid-state (find-classoid name)) state))))
 
