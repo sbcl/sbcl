@@ -75,10 +75,11 @@
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
 
+(eval-when (:compile-toplevel)
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
-     ,@body))
+     ,@body)))
 
 (define-load-time-global *pcl-misc-random-state* (make-random-state))
 
@@ -92,6 +93,7 @@
 ;;; This formerly punted with slightly greater than 50% probability,
 ;;; and there was a periodicity to the nonrandomess.
 ;;; If that was intentional, it should have been commented to that effect.
+(eval-when (:compile-toplevel)
 (defmacro randomly-punting-lambda (lambda-list &body body)
   (with-unique-names (drops drop-pos)
     `(let ((,drops (random-fixnum)) ; means a POSITIVE fixnum
@@ -103,7 +105,7 @@
            (locally ,@body))
          (when (zerop ,drop-pos)
            (setf ,drops (random-fixnum)
-                 ,drop-pos sb-vm:n-positive-fixnum-bits))))))
+                 ,drop-pos sb-vm:n-positive-fixnum-bits)))))))
 
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
@@ -190,15 +192,6 @@
                       (every #'symbolp (car (last new-name))))))
     (setf (fdefinition new-name) fun))
   fun)
-
-;;; FIXME: probably no longer needed after init
-(defmacro precompile-random-code-segments (&optional system)
-  `(progn
-     (eval-when (:compile-toplevel)
-       (update-dispatch-dfuns))
-     (precompile-function-generators ,system)
-     (precompile-dfun-constructors ,system)
-     (precompile-ctors)))
 
 ;;; This definition is for interpreted code.
 ;;; FIXME: (1) is EXPLICIT-CHECK really doing anything here?

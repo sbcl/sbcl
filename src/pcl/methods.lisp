@@ -95,6 +95,16 @@
     (invalid-method-initarg method "~@<~S of ~S is not a ~S.~@:>"
                             :function fun 'function)))
 
+(macrolet ((dolist-carefully ((var list improper-list-handler) &body body)
+             `(let ((,var nil)
+                    (.dolist-carefully. ,list))
+                (loop (when (null .dolist-carefully.) (return nil))
+                   (if (consp .dolist-carefully.)
+                       (progn
+                         (setq ,var (pop .dolist-carefully.))
+                         ,@body)
+                       (,improper-list-handler))))))
+
 (defun check-qualifiers (method qualifiers)
   (flet ((improper-list ()
            (invalid-method-initarg method
@@ -135,6 +145,7 @@
                      ~V[~;~1{~S~}~;~1{~S and ~S~}~:;~{~#[~;and ~]~S~^, ~}~] ~
                      as ~2:*~V[~;a specializer~:;specializers~].~@:>"
                     (length frcs) frcs)))))
+) ; end MACROLET
 
 (defmethod shared-initialize :before
     ((method standard-method) slot-names &key

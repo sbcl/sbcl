@@ -23,7 +23,14 @@
 
 (in-package "SB-PCL")
 
-(precompile-random-code-segments pcl)
+(macrolet ((precompile-random-code-segments (&optional system)
+             `(progn
+                (eval-when (:compile-toplevel)
+                  (update-dispatch-dfuns))
+                (precompile-function-generators ,system)
+                (precompile-dfun-constructors ,system)
+                (precompile-ctors))))
+  (precompile-random-code-segments pcl))
 
 (push '("SB-PCL" *pcl-package* *built-in-classes*) *!removable-symbols*)
 
