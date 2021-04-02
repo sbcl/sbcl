@@ -59,53 +59,11 @@
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
   (when slot-specs
     (bug "funcallable-structure-instance allocation with slots unimplemented"))
-  (let ((name (dd-name dd))
-        (length (dd-length dd))
-        (nobject (gensym "OBJECT")))
-    (values
+  (values
      (compile nil `(lambda ()
-                     (let ((,nobject (%make-funcallable-instance ,length)))
-                       (setf (%fun-layout ,nobject)
-                             (%delayed-get-compiler-layout ,name))
-                       ,nobject))))))
-
-;;; Delay looking for compiler-layout until the constructor is being
-;;; compiled, since it doesn't exist until after the EVAL-WHEN
-;;; (COMPILE) stuff is compiled. (Or, in the oddball case when
-;;; DEFSTRUCT is executing in a non-toplevel context, the
-;;; compiler-layout still doesn't exist at compilation time, and we
-;;; delay still further.)
-(sb-xc:defmacro %delayed-get-compiler-layout (name)
-  (let ((layout (info :type :compiler-layout name)))
-    (cond (layout
-           ;; ordinary case: When the DEFSTRUCT is at top level,
-           ;; then EVAL-WHEN (COMPILE) stuff will have set up the
-           ;; layout for us to use.
-           (unless (typep (layout-info layout) 'defstruct-description)
-             (error "Class is not a structure class: ~S" name))
-           `,layout)
-          (t
-           ;; KLUDGE: In the case that DEFSTRUCT is not at top-level
-           ;; the layout doesn't exist at compile time. In that case
-           ;; we laboriously look it up at run time. This code will
-           ;; run on every constructor call and will likely be quite
-           ;; slow, so if anyone cares about performance of
-           ;; non-toplevel DEFSTRUCTs, it should be rewritten to be
-           ;; cleverer. -- WHN 2002-10-23
-           (sb-c:compiler-notify
-            "implementation limitation: ~
-             Non-toplevel DEFSTRUCT constructors are slow.")
-           (with-unique-names (layout)
-             `(let ((,layout (info :type :compiler-layout ',name)))
-                (unless (typep (layout-info ,layout) 'defstruct-description)
-                  (error "Class is not a structure class: ~S" ',name))
-                ,layout))))))
-
-;;; re. %DELAYED-GET-COMPILER-LAYOUT and COMPILE-TIME-FIND-LAYOUT, above..
-;;;
-;;; FIXME: Perhaps both should be defined with SB-XC:DEFMACRO?
-;;; FIXME: Do we really need both? If so, their names and implementations
-;;; should probably be tweaked to be more parallel.
+                     (let ((object (%make-funcallable-instance ,(dd-length dd))))
+                       (setf (%fun-layout object) ,(find-layout (dd-name dd)))
+                       object)))))
 
 ;;;; DEFSTRUCT-DESCRIPTION
 
@@ -2185,44 +2143,39 @@ or they must be declared locally notinline at each call site.~@:>"
   (declare (symbol constructor)) ; NIL for none
   (declare (type (member structure funcallable-structure) dd-type))
 
-  (let* ((dd (make-dd-with-alternate-metaclass
+  (let ((dd (make-dd-with-alternate-metaclass
               :class-name class-name
               :slot-names slot-names
               :superclass-name superclass-name
               :metaclass-name metaclass-name
               :metaclass-constructor metaclass-constructor
-              :dd-type dd-type))
-         (delayed-layout-form `(%delayed-get-compiler-layout ,class-name))
-         (raw-maker-form
-          (ecase dd-type
-           (structure `(%make-structure-instance-macro ,dd nil))
-          (funcallable-structure
-           `(let ((object
-                           ;; TRULY-THE should not be needed. But it is, to avoid
-                           ;; a type check on the next SETF. Why???
-                           (truly-the funcallable-instance
-                            (%make-funcallable-instance ,(dd-length dd)))))
-                      (setf (%fun-layout object) ,delayed-layout-form)
-                      object)))))
+              :dd-type dd-type)))
     `(progn
-         (eval-when (:compile-toplevel :load-toplevel :execute)
+       (assert (null (symbol-value '*defstruct-hooks*)))
+       (eval-when (:compile-toplevel :load-toplevel :execute)
            (%compiler-defstruct ',dd ',(!inherits-for-structure dd))
            (when (eq (info :type :kind ',class-name) :defined)
              (setf (info :type :kind ',class-name) :instance))
            ,@(when (eq metaclass-name 'static-classoid)
                `((declaim (freeze-type ,class-name)))))
-         ,@(accessor-definitions dd)
-         ,@(when constructor
-             `((defun ,constructor (,@slot-names &aux (object ,raw-maker-form))
+       ,@(accessor-definitions dd)
+       ,@(when constructor
+           (multiple-value-bind (allocate set-layout)
+               (ecase dd-type
+                 (structure
+                  (values `(%make-structure-instance-macro ,dd nil) nil))
+                 (funcallable-structure
+                  (values `(truly-the ,class-name
+                                      (%make-funcallable-instance ,(dd-length dd)))
+                          `((macrolet ((the-layout ()
+                                         (info :type :compiler-layout ',class-name)))
+                              (setf (%fun-layout object) (the-layout)))))))
+             `((defun ,constructor (,@slot-names &aux (object ,allocate))
+                 ,@set-layout
                  ,@(mapcar (lambda (dsd)
                              `(setf (,(dsd-accessor-name dsd) object) ,(dsd-name dsd)))
                            (dd-slots dd))
-                 object)))
-
-         ;; Usually we AVER instead of ASSERT, but AVER isn't defined yet.
-         ;; A naive reading of 'build-order' suggests it is,
-         ;; but due to def!struct delay voodoo, it isn't.
-         (assert (null (symbol-value '*defstruct-hooks*))))))
+                 object)))))))
 
 ;;;; finalizing bootstrapping
 
