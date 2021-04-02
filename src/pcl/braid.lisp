@@ -104,23 +104,6 @@
 ;;;;
 ;;;; This function builds the base metabraid from the early class definitions.
 
-(defmacro !initial-classes-and-wrappers (&rest classes)
-  `(progn
-     ,@(mapcar (lambda (class)
-                 (let ((wr (format-symbol *pcl-package* "~A-WRAPPER" class)))
-                   `(setf ,wr ,(if (eq class 'standard-generic-function)
-                                   '*sgf-wrapper*
-                                   `(!boot-make-wrapper
-                                     (!early-class-size ',class)
-                                     ',class))
-                          ,class (allocate-standard-instance
-                                  ,(if (eq class 'standard-generic-function)
-                                       'funcallable-standard-class-wrapper
-                                       'standard-class-wrapper))
-                          (wrapper-class ,wr) ,class
-                          (find-class ',class) ,class)))
-               classes)))
-
 (defmacro wrapper-info (x) `(sb-kernel::layout-%info ,x))
 (declaim (inline wrapper-slot-list))
 (defun wrapper-slot-list (wrapper)
@@ -132,23 +115,30 @@
   (aver (listp (wrapper-info wrapper)))
   (setf (wrapper-info wrapper) newval))
 
+(macrolet
+    ((with-initial-classes-and-wrappers ((&rest classes) &body body)
+       `(let* ((*create-classes-from-internal-structure-definitions-p* nil)
+               ,@(mapcar (lambda (class)
+                           `(,(symbolicate class "-WRAPPER")
+                              ,(if (eq class 'standard-generic-function)
+                                   '*sgf-wrapper*
+                                   `(!boot-make-wrapper (!early-class-size ',class)
+                                                        ',class))))
+                         classes)
+               ,@(mapcar (lambda (class)
+                           `(,class (allocate-standard-instance
+                                     ,(if (eq class 'standard-generic-function)
+                                          'funcallable-standard-class-wrapper
+                                          'standard-class-wrapper))))
+                         classes))
+          ,@(mapcan (lambda (class &aux (wr (symbolicate class "-WRAPPER")))
+                      `((setf (wrapper-class ,wr) ,class
+                              (find-class ',class) ,class)))
+                    classes)
+          ,@body)))
 (defun !bootstrap-meta-braid ()
-  (let* ((*create-classes-from-internal-structure-definitions-p* nil)
-         standard-class-wrapper standard-class
-         funcallable-standard-class-wrapper funcallable-standard-class
-         slot-class-wrapper slot-class
-         system-class-wrapper system-class
-         built-in-class-wrapper built-in-class
-         structure-class-wrapper structure-class
-         condition-class-wrapper condition-class
-         standard-direct-slot-definition-wrapper
-         standard-direct-slot-definition
-         standard-effective-slot-definition-wrapper
-         standard-effective-slot-definition
-         class-eq-specializer-wrapper class-eq-specializer
-         standard-generic-function-wrapper standard-generic-function)
-    (!initial-classes-and-wrappers
-     standard-class funcallable-standard-class
+  (with-initial-classes-and-wrappers
+    (standard-class funcallable-standard-class
      slot-class system-class built-in-class structure-class condition-class
      standard-direct-slot-definition standard-effective-slot-definition
      class-eq-specializer standard-generic-function)
@@ -303,7 +293,7 @@
         (funcall set-slot '%generic-functions (make-gf-hash-table))
         (funcall set-slot '%documentation nil)
         (funcall set-slot 'options '(:most-specific-first))
-        (setq *or-method-combination* method-combination)))))
+        (setq *or-method-combination* method-combination))))))
 
 ;;; I have no idea why we care so much about being able to create an instance
 ;;; of STRUCTURE-OBJECT, when (almost) no other structure class in the system
