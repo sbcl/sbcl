@@ -67,6 +67,7 @@
                              "sb_select" ; int-syscall
                              "sb_getitimer" ; syscall*
                              "sb_setitimer" ; syscall*
+                             "sb_clock_gettime" ; syscall*
                              "sb_utimes") ; posix
                          :test #'string=)
                  (subseq x 3)
@@ -1051,13 +1052,14 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (defun clock-gettime (clockid)
     (declare (type (signed-byte 32) clockid))
     (with-alien ((ts (struct timespec)))
-      (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
-                     clockid (addr ts))
-      ;; 'seconds' is definitely a fixnum for 64-bit, because most-positive-fixnum
-      ;; can express 1E11 years in seconds.
-      (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
-              #-64-bit (slot ts 'tv-sec)
-              (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec)))))
+      (syscall* ("sb_clock_gettime" int (* (struct timespec)))
+                ;; 'seconds' is definitely a fixnum for 64-bit, because
+                ;; most-positive-fixnum can express 1E11 years in seconds.
+                (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
+                        #-64-bit (slot ts 'tv-sec)
+                        (truly-the (integer 0 #.(expt 10 9))
+                                   (slot ts 'tv-nsec)))
+                clockid (addr ts))))
 
   (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
