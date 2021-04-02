@@ -66,8 +66,7 @@
   (/show0 "entering !COLD-INIT")
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
   (!readtable-cold-init)
-  (setq *readtable* (make-readtable)
-        *print-length* 6 *print-level* 3)
+  (setq *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
                       *trace-output* *error-output*)

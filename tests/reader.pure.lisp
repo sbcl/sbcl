@@ -11,6 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(with-test (:name :random-describe)
+  (describe sb-impl::*empty-extended-char-table* (make-broadcast-stream)))
+
 (with-test (:name (:reader symbol :escape))
   (assert (equal (symbol-name '#:|fd\sA|) "fdsA")))
 
