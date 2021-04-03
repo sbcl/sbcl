@@ -389,6 +389,12 @@ variable: an unreadable object representing the error is printed instead.")
           (return-from output-ugly-object
             (print-unreadable-object (object stream :identity t)
               (format stream "UNPRINTABLE instance of ~W" classoid)))))))
+  (when (funcallable-instance-p object)
+    (let ((layout (%fun-layout object)))
+      (unless (logtest (get-lisp-obj-address layout) sb-vm:widetag-mask)
+        (return-from output-ugly-object
+          (print-unreadable-object (object stream :identity t)
+            (prin1 'funcallable-instance stream))))))
   (print-object object stream))
 
 ;;;; symbols
