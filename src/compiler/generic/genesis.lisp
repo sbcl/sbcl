@@ -1389,6 +1389,8 @@ core and return a descriptor to it."
                                (layout-length warm-layout)
                                (layout-bitmap warm-layout)
                                (vector-in-core inherits)))))
+    (setf (layout-flags (find-layout 'sequence))
+          (logior (layout-flags (find-layout 'sequence)) +sequence-layout-flag+))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
            #+metaspace (wrapper-layout (chill-layout 'sb-kernel::wrapper t-layout s-o-layout))
@@ -2321,20 +2323,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (existing-layout (gethash name *cold-layouts*)))
     (declare (type descriptor bitmap-descriptor inherits))
     (declare (type symbol name))
-    (setq flags
-          ;; Nothing tests layout-flags at cross-compile time,
-          ;; so we can set them just-in-time for the cold core.
-          (logior flags
-                  (cond ((member name '(pathname logical-pathname))
-                         sb-kernel:+pathname-layout-flag+)
-                        ;; This layout flag would have to plumbed all the way through
-                        ;; DEFSTRUCT-WITH-ALTERNATE-METACLASS and ENSURE-STRUCTURE-CLASS
-                        ;; in order to set it for the root CONDITION type.
-                        ((eq name 'condition) +condition-layout-flag+)
-                        (t 0))))
     (flet ((maybe-set-flag (flag type)
              (when (or (find-in-inherits type inherits) (eq name type))
                (setq flags (logior flags flag)))))
+      (maybe-set-flag +pathname-layout-flag+ 'pathname)
+      (maybe-set-flag +condition-layout-flag+ 'condition)
+      (maybe-set-flag +sequence-layout-flag+ 'sequence)
       (maybe-set-flag +stream-layout-flag+ 'stream)
       (maybe-set-flag +file-stream-layout-flag+ 'file-stream)
       (maybe-set-flag +string-stream-layout-flag+ 'string-stream))

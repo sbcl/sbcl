@@ -561,7 +561,7 @@
                                       (map 'simple-vector #'class-wrapper
                                            (reverse (rest cpl))))
                                      nil 0))
-              (assign-layout-bitmap layout)
+              (set-bitmap-and-flags layout)
               (register-layout layout :invalidate t))))
         (mapc #'make-preliminary-layout (class-direct-subclasses class))))))
 
