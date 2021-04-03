@@ -1376,7 +1376,15 @@ core and return a descriptor to it."
 
 (defun initialize-layouts ()
   (let ((l (find-layout 'stream)))
-    (setf (layout-flags l) (logior (logior (layout-flags l)) +stream-layout-flag+)))
+    (setf (layout-flags l) (logior (layout-flags l) +stream-layout-flag+)))
+  ;; Adjust the XC host's view of some target layout flags.
+  ;; I don't know why failures only occur on some architectures.
+  ;; Note that we will actually only test the bit for instance types,
+  ;; and not vectors or lists, so the runtime is indifferent to whether
+  ;; it is set or not for lists.
+  (dolist (name '(sequence list null))
+    (let ((l (find-layout name)))
+      (setf (layout-flags l) (logior (layout-flags l) +sequence-layout-flag+))))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
@@ -1389,8 +1397,6 @@ core and return a descriptor to it."
                                (layout-length warm-layout)
                                (layout-bitmap warm-layout)
                                (vector-in-core inherits)))))
-    (setf (layout-flags (find-layout 'sequence))
-          (logior (layout-flags (find-layout 'sequence)) +sequence-layout-flag+))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
            #+metaspace (wrapper-layout (chill-layout 'sb-kernel::wrapper t-layout s-o-layout))
