@@ -1564,6 +1564,14 @@
              "~@<obsolete structure error for a structure of type ~2I~_~S~:>"
              (type-of (obsolete-structure-datum condition))))))
 
+(macrolet ((replace-wrapper-and-slots (thing layout slot-vector)
+             `(if (functionp ,thing)
+                  (setf (%fun-layout ,thing) ,layout
+                        (%fsc-instance-slots ,thing) ,slot-vector)
+                  ;; TODO: use a double-wide CAS here if CPU supports it
+                  (setf (%instance-layout ,thing) ,layout
+                        (std-instance-slots ,thing) ,slot-vector))))
+
 (defun %obsolete-instance-trap (owrapper nwrapper instance)
   (cond
     ((layout-for-pcl-obj-p owrapper)
@@ -1648,12 +1656,7 @@
          (dolist (cell layout)
            (push (car cell) added)))
 
-       (if (std-instance-p instance)
-           (setf (%instance-layout instance) nwrapper
-                 (std-instance-slots instance) nslots)
-           (setf (%fun-layout instance) nwrapper
-                 (%fsc-instance-slots instance) nslots))
-
+       (replace-wrapper-and-slots instance nwrapper nslots)
        (update-instance-for-redefined-class
         instance added discarded plist)
 
@@ -1663,7 +1666,6 @@
      (let ((*in-obsolete-instance-trap* t))
        (error 'obsolete-structure :datum instance)))))
 
-
 (defun %change-class (copy instance new-class initargs)
   (binding* ((new-wrapper (class-wrapper (ensure-class-finalized new-class)))
              (new-slots (make-array (layout-length new-wrapper)
@@ -1673,11 +1675,7 @@
              (old-slots (get-slots instance))
              (safe (safe-p new-class))
              (new-wrapper-slots (wrapper-slot-list new-wrapper)))
-    (if (functionp copy)
-        (setf (%fun-layout copy) new-wrapper
-              (%fsc-instance-slots copy) new-slots)
-        (setf (%instance-layout copy) new-wrapper
-              (%std-instance-slots copy) new-slots))
+    (replace-wrapper-and-slots copy new-wrapper new-slots)
     (flet ((initarg-for-slot-p (slot)
              (when initargs
                (dolist (slot-initarg (slot-definition-initargs slot))
@@ -1716,14 +1714,11 @@
     ;; All uses of %CHANGE-CLASS are under the world lock, but that doesn't
     ;; preclude user code operating on the old slots + new layout or v.v.
     ;; Users need to synchronize their own access when changing class.
-    (cond ((functionp instance)
-           (rotatef (%fun-layout instance) (%fun-layout copy))
-           (rotatef (%fsc-instance-slots instance) (%fsc-instance-slots copy)))
-          (t
-           (rotatef (%instance-layout instance) (%instance-layout copy))
-           (rotatef (%std-instance-slots instance) (%std-instance-slots copy))))
+    (replace-wrapper-and-slots copy old-wrapper old-slots)
+    (replace-wrapper-and-slots instance new-wrapper new-slots)
     (apply #'update-instance-for-different-class copy instance initargs)
     instance))
+) ; end MACROLET
 
 (defun check-new-class-not-metaobject (new-class)
   (dolist (class (class-precedence-list
