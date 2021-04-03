@@ -485,25 +485,6 @@
 
 (defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 
-;;; Abstract out the differences between {32-bit,64-bit} target and XC layouts.
-;;; FLAGS can't change once assigned.
-(defmacro assign-layout-slots (layout &key depthoid length
-                                           (flags `(layout-flags ,layout)) flagsp)
-  (let ((invalidate-p (and (eql depthoid -1) (not length) (not flagsp))))
-    #+(and 64-bit (not xc-host)) ; packed slot
-    `(setf (layout-flags ,layout)
-           ,(if invalidate-p
-                `(logior (ash -1 (+ 32 sb-vm:n-fixnum-tag-bits))
-                         (ldb (byte 32 0) (layout-flags ,layout)))
-                `(pack-layout-flags ,depthoid ,length
-                                    (logand ,flags layout-flags-mask))))
-    #+(or (not 64-bit) sb-xc-host) ; ordinary slot
-    (if invalidate-p
-        `(setf (layout-depthoid ,layout) -1)
-        `(setf (layout-depthoid ,layout) ,depthoid
-               (layout-length ,layout) ,length
-               (layout-flags ,layout) ,flags))))
-
 ;;; True of STANDARD-OBJECT, which include generic functions.
 ;;; This one includes any class that mixes in STANDARD-OBJECT.
 (declaim (inline layout-for-pcl-obj-p))
