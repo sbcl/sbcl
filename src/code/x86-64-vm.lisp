@@ -157,12 +157,11 @@
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.
 ;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
-  (let ((kind (fun-subtype fun)))
-    (or (and (eql kind sb-vm:funcallable-instance-widetag)
-             ;; if the FIN has no raw words then it has no internal trampoline
-             (eql (layout-bitmap (%fun-layout fun))
-                  +layout-all-tagged+))
-        (eql kind sb-vm:closure-widetag))))
+  (case (fun-subtype fun)
+    (#.sb-vm:closure-widetag t)
+    (#.sb-vm:funcallable-instance-widetag
+     ;; if the FIN has no raw words then it has no internal trampoline
+     (eql (layout-bitmap (%fun-layout fun)) +layout-all-tagged+))))
 
 ;; TODO: put a trampoline in all fins and allocate them anywhere.
 ;; Revision e7cd2bd40f5b9988 caused some FINs to go in dynamic space
