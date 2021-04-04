@@ -863,68 +863,55 @@ symbol-case giving up: case=((V U) (F))
                     (values score1 answer1) ; not improved
                     (values score2 answer2))))))))) ; 2 bytes = better
 
-;;; TODO: see if it's possible to not use SXHASH on layouts here.
-;;;  (etypecase x
-;;;    ((or named-type numeric-type member-type classoid ..) something)
-;;; -> (SB-IMPL::%SEALED-STRUCT-TYPECASE-INDEX
-;;;     ((named-type numeric-type member-type classoid ...)CHARACTER-SET-TYPE
-;;; -> (LET* ((ARRAY
-;;;            #(4048 NIL NIL NIL NIL NIL
-;;;              ((#<LAYOUT for ALIEN-TYPE-TYPE {50202A03}> . 1)) NIL
-;;;              ((#<LAYOUT for NAMED-TYPE {50202503}> . 1)) NIL NIL
-;;;
 (defun build-sealed-struct-typecase-map (type-unions)
   (let* ((layout-lists
           (mapcar (lambda (x) (mapcar #'find-layout x)) type-unions))
          (byte (nth-value 1
                 (pick-best-sxhash-bits (apply #'append layout-lists)
                                        #'layout-clos-hash 1)))
-         (bin-count (ash 1 (byte-size byte)))
-         (array (make-array (1+ bin-count) :initial-element nil))
-         (mask (1- bin-count))
+         (array (make-array (ash 1 (byte-size byte)) :initial-element nil))
+         (perfectp t)
          (seen))
-    (setf (aref array 0) (logior (ash mask 6) (byte-position byte)))
     (loop for layout-list in layout-lists
-          for i from 1
+          for selector from 1
           do (dolist (layout layout-list)
                (unless (member layout seen) ; in case of dups / overlaps
                  (push layout seen)
-                 (let ((bin (1+ (logand (ash (layout-clos-hash layout)
-                                             (- (the (mod #.sb-vm:n-word-bits)
-                                                     (byte-position byte))))
-                                        (the (and fixnum unsigned-byte) mask)))))
+                 (let ((bin (ldb byte (layout-clos-hash layout))))
+                   (when (aref array bin)
+                     (setq perfectp nil))
                    (setf (aref array bin)
-                         (nconc (aref array bin) (list (cons layout i))))))))
-    array))
+                         (nconc (aref array bin) (list (cons layout selector))))))))
+    (values `(byte ,(byte-size byte) ,(byte-position byte))
+            perfectp
+            (if perfectp
+                ;; at most one element is in each bin
+                (let ((result (make-array (* (length array) 2) :initial-element 0)))
+                  (dotimes (index (length array) result)
+                    (awhen (aref array index)
+                      (setf (aref result index) (caar it)
+                            (aref result (+ index (length array))) (cdar it)))))
+                array))))
 
-;;; FIXME: now that structure classoid hashes are computable at compile-time,
-;;; we can do ever better in this expander: if the hash is perfect,
-;;; then do not iterate over candidates, just flatten the array into
-;;;   #(<LAYOUT> case-index #<LAYOUT> case-index ...)
-;;; then test for a hit on the indexed layout, get the case-index, and jump.
 (sb-xc:defmacro %sealed-struct-typecase-index (cases object)
-  `(if (%instancep ,object)
-       (locally (declare (optimize (safety 0)))
-         ;; When the second argument to LOAD-TIME-VALUE is T in COMPILE (but not COMPILE-FILE)
-         ;; then element 0 of the vector is used as a compile-time constant and we'll wire in
-         ;; the shift and mask which produces an even better instruction sequence.
-         ;; This is pretty awesome and I did not know that we would do that.
-         (let* ((array ,(build-sealed-struct-typecase-map cases))
-                (layout (%instance-layout ,object))
-                (hash-spec (the fixnum (svref array 0)))
-                (shift (ldb (byte ,(integer-length (1- sb-vm:n-word-bits)) 0)
-                            hash-spec)))
+  (binding* (((byte perfectp cells) (build-sealed-struct-typecase-map cases))
+             (n-pairs (/ (length cells) 2)))
+    `(if (not (%instancep ,object))
+         0
+         (let* ((layout (%instance-layout ,object))
+                (index (ldb ,byte (layout-clos-hash layout)))
+                (cells ,cells))
+           (declare (optimize (safety 0)))
            (the (mod ,(1+ (length cases)))
-                ;; DOLIST performs a leading test, but we're OK with a cell
-                ;; that is NIL. It'll miss and then exit at the end of the loop.
-                ;; This potentially avoids one comparison vs NIL if we hit immediately.
-                (let ((list (svref array
-                                   (1+ (logand (ash (layout-clos-hash layout) (- shift))
-                                               (ash hash-spec -6))))))
-                  (loop (let ((cell (car list)))
-                          (cond ((eq layout (car cell)) (return (cdr cell)))
-                                ((null (setq list (cdr list))) (return 0)))))))))
-       0))
+                ,(if perfectp
+                     `(if (eq (aref cells index) layout) (aref cells (+ index ,n-pairs)) 0)
+                     ;; DOLIST performs a leading test, but we're OK with a cell
+                     ;; that is NIL. It'll miss and then exit at the end of the loop.
+                     ;; This potentially avoids one comparison vs NIL if we hit immediately.
+                     `(let ((list (svref cells index)))
+                        (loop (let ((cell (car list)))
+                                (cond ((eq layout (car cell)) (return (cdr cell)))
+                                      ((null (setq list (cdr list))) (return 0))))))))))))
 
 ;;; Given an arbitrary TYPECASE, see if it is a discriminator over
 ;;; an assortment of structure-object subtypes. If it is, potentially turn it
@@ -944,12 +931,18 @@ symbol-case giving up: case=((V U) (F))
 ;;; for a match on both the hash and the layout.
 (defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp
                                &aux (n-root-types 0) (exhaustive-list))
-  (flet ((discover-subtypes (specifier)
+  (labels
+      ((ok-classoid (classoid)
+         (or (structure-classoid-p classoid)
+             (and (sb-kernel::built-in-classoid-p classoid)
+                  (not (memq (classoid-name classoid)
+                             sb-kernel::**non-instance-classoid-types**)))))
+       (discover-subtypes (specifier)
            (let* ((parse (specifier-type specifier))
                   (worklist
-                   (cond ((structure-classoid-p parse) (list parse))
+                   (cond ((ok-classoid parse) (list parse))
                          ((and (union-type-p parse)
-                               (every #'structure-classoid-p (union-type-types parse)))
+                               (every #'ok-classoid (union-type-types parse)))
                           (copy-list (union-type-types parse)))
                          (t
                           (return-from discover-subtypes nil)))))
