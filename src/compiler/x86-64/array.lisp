@@ -265,6 +265,44 @@
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
     unsigned-reg))
 
+(defoptimizer (sb-c::vop-optimize data-vector-ref-with-offset/simple-vector) (vop)
+  (let ((next (vop-next vop)))
+    (when (and next (eq (vop-name next) 'if-eq))
+      (let* ((result-tn (tn-ref-tn (sb-c::vop-results vop)))
+             (next-args (sb-c::vop-args next))
+             (left (tn-ref-tn next-args))
+             (right (tn-ref-tn (tn-ref-across next-args))))
+        ;; Since we're only looking at the :Z flag it does not matter
+        ;; if the array ref is the left or right operand of CMP.
+        (when (and (sb-c::very-temporary-p result-tn)
+                   (or (eq result-tn left) (eq result-tn right)))
+          (let* ((new-args (sb-c::reference-tn-list
+                            (list (tn-ref-tn (sb-c::vop-args vop))
+                                  (tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))
+                                  (if (eq result-tn left) right left))
+                            nil))
+                 (new (sb-c::emit-and-insert-vop
+                       (sb-c::vop-node vop) (vop-block vop)
+                       (template-or-lose 'svref-with-offset+if-eq)
+                       new-args nil vop (vop-codegen-info vop))))
+            (sb-c::delete-vop vop)
+            (sb-c::delete-vop next)
+            new))))))
+
+(define-vop (svref-with-offset+if-eq)
+   (:args (object :scs (descriptor-reg))
+          (index :scs (any-reg))
+          (comparand :scs (any-reg descriptor-reg immediate)))
+   (:info offset)
+   (:arg-types simple-vector tagged-num * (:constant integer))
+   (:conditional :z)
+   (:generator 1
+    (inst cmp :qword
+          (ea (- (* (+ vector-data-offset offset) n-word-bytes) other-pointer-lowtag)
+              object index
+              (ash 1 (- word-shift n-fixnum-tag-bits)))
+          (encode-value-if-immediate comparand))))
+
 (define-vop (data-vector-ref-with-offset/constant-simple-vector)
   (:policy :fast-safe)
   (:args (object :scs (constant))
