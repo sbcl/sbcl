@@ -632,8 +632,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "LOAD-FORM-IS-DEFAULT-MLFSS-P"
                "*!LOAD-TIME-VALUES*"
                "OPEN-FASL-OUTPUT"
-               "*!COLD-DEFSYMBOLS*" "*!COLD-DEFUNS*"
                "*!COLD-SETF-MACROS*"  "*!COLD-TOPLEVELS*"
+               "*!COLD-DEFSYMBOLS*"
                "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"))
 
    ;; This package is a grab bag for things which used to be internal
@@ -1480,7 +1480,6 @@ possibly temporarily, because it might be used internally."
                ;; hackery to help set up for cold init
                "!BEGIN-COLLECTING-COLD-INIT-FORMS"
                "!COLD-INIT-FORMS"
-               "!COLD-FSET"
                "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
 
                ;; catch tags

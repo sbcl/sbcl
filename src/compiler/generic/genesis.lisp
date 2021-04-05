@@ -580,8 +580,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-defsymbols*
-                  *!cold-defuns* *cold-methods*))
+(declaim (special *!cold-toplevels* *!cold-defsymbols* *cold-methods*))
 
 
 ;;;; miscellaneous stuff to read and write the core memory
@@ -2002,34 +2001,27 @@ core and return a descriptor to it."
      (- sb-vm:fun-pointer-lowtag)
      (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
 
-;;; Handle a DEFUN in cold-load.
-(defun cold-fset (name function &optional inline-expansion dxable-args)
-  (binding* (((cold-name warm-name)
-              ;; (SETF f) was descriptorized when dumped, symbols were not.
-                     (if (symbolp name)
-                         (values (cold-intern name) name)
-                         (values name (warm-fun-name name))))
-             (fdefn (cold-fdefinition-object cold-name)))
-    (unless (cold-null (cold-fdefn-fun fdefn))
-      (error "Duplicate DEFUN for ~S" warm-name))
-    ;; There can't be any closures or funcallable instances.
-    (aver (= (logand (read-bits-wordindexed function 0) sb-vm:widetag-mask)
-             sb-vm:simple-fun-widetag))
-    (push (cold-list cold-name inline-expansion dxable-args) *!cold-defuns*)
-    (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)
-    (let ((fun-entry-addr
-            (+ (logandc2 (descriptor-bits function) sb-vm:lowtag-mask)
-               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
-      (declare (ignorable fun-entry-addr)) ; sparc and arm don't need
-      #+x86-64
-      (write-wordindexed/raw ; write a JMP instruction into the header
-       fdefn 0 (dpb #x1025FF (byte 24 16) (read-bits-wordindexed fdefn 0)))
-      (write-wordindexed/raw
-       fdefn sb-vm:fdefn-raw-addr-slot
-       (or #+(or sparc arm riscv) ; raw addr is the function descriptor
-           (descriptor-bits function)
-           ;; For all others raw addr is the starting address
-           fun-entry-addr)))
+(defun cold-fset (name defn)
+  (let ((fdefn (cold-fdefinition-object
+                ;; (SETF f) was descriptorized when dumped, symbols were not.
+                (if (symbolp name)
+                    (cold-intern name)
+                    name)))
+        (type (logand (read-bits-wordindexed defn 0) sb-vm:widetag-mask)))
+    (write-wordindexed fdefn sb-vm:fdefn-fun-slot defn)
+    ;; Closures and funcallable instances not supported yet.
+    (ecase type
+      (#.sb-vm:simple-fun-widetag
+       #+x86-64
+       (write-wordindexed/raw ; write a JMP instruction into the header
+        fdefn 0 (dpb #x1025FF (byte 24 16) (read-bits-wordindexed fdefn 0)))
+       (write-wordindexed/raw
+        fdefn sb-vm:fdefn-raw-addr-slot
+        (or #+(or sparc arm riscv) ; raw addr is the function descriptor
+            (descriptor-bits defn)
+            ;; For all others raw addr is the starting address
+            (+ (logandc2 (descriptor-bits defn) sb-vm:lowtag-mask)
+               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))))
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
@@ -2523,7 +2515,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (if (not args)
           (push fun *!cold-toplevels*)
           (case fun
-            (sb-impl::%defun (apply #'cold-fset args))
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb-kernel::%defstruct
              (push args *known-structure-classoids*)
@@ -3688,7 +3679,6 @@ III. initially undefined function references (alphabetically):
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
            (*cold-layout-by-addr* (make-hash-table :test 'eql)) ; addr -> cold-layout
            (*!cold-defsymbols* nil)
-           (*!cold-defuns* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
            ;; to adhere to the #\! convention for automatic uninterning.
            (*cold-methods* nil)
@@ -3763,14 +3753,13 @@ III. initially undefined function references (alphabetically):
             (aver layout)
             (write-slots (->wrapper (cold-layout-descriptor layout)) :%info dd)))
         (when verbose
-          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
+          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/methods/other~%"
                   (length *known-structure-classoids*)
                   (length *!cold-defsymbols*)
-                  (length *!cold-defuns*)
                   (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
                   (length *!cold-toplevels*))))
 
-      (dolist (symbol '(*!cold-defsymbols* *!cold-defuns* *!cold-toplevels*))
+      (dolist (symbol '(*!cold-defsymbols* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 

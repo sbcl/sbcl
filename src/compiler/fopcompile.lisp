@@ -188,11 +188,7 @@
             (let ((function (car form)))
               ;; Certain known functions have a special way of checking
               ;; their fopcompilability in the cross-compiler.
-              (or ;; allow %DEFUN, also ensuring that any inline lambda gets
-                  ;; its constant structures (possibly containing COMMAs) noted
-                  ;; as dumpable literals.
-                  (and (eq function 'sb-impl::%defun) (fopcompilable-p (fourth form)))
-                  (member function '(sb-pcl::!trivial-defmethod
+              (or (member function '(sb-pcl::!trivial-defmethod
                                      sb-kernel::%defstruct
                                      sb-thread:make-mutex))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok

@@ -161,7 +161,7 @@
                               ;; and it's in our object hierarchy
                               (cl:subtypep name 'structure!object))
                          (values (cl:typep obj name) t)
-                       (unimplemented)))))))
+                         (unimplemented)))))))
        (fun-type
         (if (fun-designator-type-p type)
              (values (typep obj '(or symbol function)) t)
@@ -172,7 +172,7 @@
              (if (and (functionp obj) (eq caller 'sb-xc:typep))
                  (error "TYPEP called with function type")
                  (values (functionp obj) t))))
-       (alien-type-type (if (null obj) (values nil t) (unimplemented)))
+       (alien-type-type (if (symbolp obj) (values nil t) (unimplemented)))
        ;; Test UNKNOWN before falling into the HAIRY case
        (unknown-type
         (let ((spec (unknown-type-specifier type)))
