@@ -632,8 +632,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "LOAD-FORM-IS-DEFAULT-MLFSS-P"
                "*!LOAD-TIME-VALUES*"
                "OPEN-FASL-OUTPUT"
-               "*!COLD-SETF-MACROS*"  "*!COLD-TOPLEVELS*"
                "*!COLD-DEFSYMBOLS*"
+               "*!COLD-TOPLEVELS*"
                "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"))
 
    ;; This package is a grab bag for things which used to be internal

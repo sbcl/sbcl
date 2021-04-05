@@ -41,7 +41,6 @@
 
 ;;; a list of toplevel things set by GENESIS
 (defvar *!cold-toplevels*)   ; except for DEFUNs and SETF macros
-(defvar *!cold-setf-macros*) ; just SETF macros
 (defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs and DEFPARAMETERs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
