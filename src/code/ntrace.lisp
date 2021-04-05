@@ -181,6 +181,7 @@
              (ecase (trace-info-report info)
                (trace
                 (fresh-line)
+                (format t "~&Here I am before~%")
                 (print-trace-indentation)
                 (if (trace-info-encapsulated info)
                     (prin1 `(,(trace-info-what info)
@@ -224,6 +225,7 @@
           (ecase (trace-info-report info)
             (trace
              (fresh-line)
+             (format t "~&Here I am after~%")
              (let ((*print-pretty* t))
                (pprint-logical-block (*standard-output* nil)
                  (print-trace-indentation)
