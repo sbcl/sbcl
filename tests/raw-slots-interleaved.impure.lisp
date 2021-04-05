@@ -26,6 +26,13 @@
                                   0 :type ,(if (= i 64) 'sb-ext:word t))))))
   (defbiggy))
 
+(macrolet ((def-100slots ()
+             `(defstruct 100slots
+               ,@(loop for i from 0 repeat 100
+                    collect `(,(sb-int:symbolicate "SLOT" (write-to-string i))
+                              ,(format nil "This is ~D" i))))))
+  (def-100slots))
+
 (assert (typep (sb-kernel:layout-bitmap
                 (sb-kernel::find-layout 'biggy)) 'bignum))
 
@@ -65,6 +72,16 @@
   (sb-ext:gc :gen 1))
 (princ 'did-pass-2) (terpri)
 (force-output)
+
+(defun collect-slot-values (struct &aux result)
+  (sb-kernel:do-instance-tagged-slot (i struct)
+    (push (sb-kernel:%instance-ref struct i) result))
+  (nreverse result))
+
+(with-test (:name :sign-extended-bitmap)
+  ;; could have 100 or 101 physical payload slots depending on
+  ;; presence of a padding word
+  (assert (>= (length (collect-slot-values (make-100slots))) 100)))
 
 ;; for testing the comparator
 (defstruct foo1

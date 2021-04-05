@@ -1528,7 +1528,7 @@
            (case widetag
              (#.instance-widetag
               (let ((layout (truly-the layout (translate (%instance-layout obj) spaces))))
-                (do-instance-tagged-slot (i obj :layout layout)
+                (do-instance-tagged-slot (i obj t layout)
                   (scanptr vaddr obj (1+ i))))
               (return-from scan-obj))
              (#.simple-vector-widetag

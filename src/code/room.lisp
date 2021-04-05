@@ -1049,12 +1049,9 @@ We could try a few things to mitigate this:
          ;; These two are in fact generally the most frequently occurring type.
          ,.(make-case 'cons `(car ,obj) `(cdr ,obj))
          ,.(make-case* 'instance
-            `(let ((.l. (%instance-layout ,obj)))
-               ;; Though we've bound %INSTANCE-LAYOUT to a variable,
-               ;; pass the form %INSTANCE-LAYOUT to functoid
-               ;; in case it wants to examine the form
+            `(progn
                (,functoid (%instance-layout ,obj) ,@more)
-               (do-instance-tagged-slot (.i. ,obj :layout .l. :pad nil)
+               (do-instance-tagged-slot (.i. ,obj nil)
                  (,functoid (%instance-ref ,obj .i.) ,@more))))
          (function
           (typecase ,obj
@@ -1066,7 +1063,7 @@ We could try a few things to mitigate this:
                   ;; if functoid is a macro that does nothing.
                   (,functoid .o. ,@more)))
             ,.(make-case* 'funcallable-instance
-               `(let ((.l. (%fun-layout ,obj)))
+               `(progn
                   ;; As for INSTANCE, allow the functoid to see the access form
                   (,functoid (%fun-layout ,obj) ,@more)
                   (,functoid (%funcallable-instance-fun ,obj) ,@more)
@@ -1076,7 +1073,7 @@ We could try a few things to mitigate this:
                   ;; both tricky and unnecessary to generalize iteration.
                   ;; So just hardcode the few cases that exist.
                   #+compact-instance-header
-                  (ecase (layout-bitmap .l.)
+                  (ecase (layout-bitmap (%fun-layout ,obj))
                     (-1 ; external trampoline, all slots are tagged
                      ;; In this case, the trampoline word is scanned, with no ill effect.
                      (loop for .i. from 0
@@ -1090,7 +1087,7 @@ We could try a few things to mitigate this:
                      (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
                   #-compact-instance-header
                   (progn
-                    (aver (eql (layout-bitmap .l.) -4))
+                    (aver (eql (layout-bitmap (%fun-layout ,obj)) -4))
                     ;;            v ----trampoline
                     ;; = #b1...1100
                     ;;           ^----- layout
