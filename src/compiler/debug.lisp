@@ -498,6 +498,7 @@
      (dolist (exit (entry-exits node))
        (unless (node-deleted exit)
          (check-node-reached node))))
+    (enclose)
     (exit
      (let ((entry (exit-entry node))
            (value (exit-value node)))
