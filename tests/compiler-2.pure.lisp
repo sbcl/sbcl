@@ -3175,6 +3175,6 @@
   (checked-compile-and-assert
    ()
    `(lambda (a d)
-      (eq (svref a d) -276932090860495638))
+      (eql (svref a d) -276932090860495638))
    ((#(1 0) 0) nil)
    ((#(-276932090860495638) 0) t)))
