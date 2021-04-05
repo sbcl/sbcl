@@ -415,6 +415,23 @@
                  '((0 (flet body :in (compiler-macro fn-with-cmac)) :enter)
                    (0 (flet body :in (compiler-macro fn-with-cmac)) :exit 42)))))
 
+(defun throw-foo ()
+  (throw 'foo 42))
+
+(defun catch-foo ()
+  (catch 'foo (throw-foo)))
+
+(with-test (:name (trace :non-local-exit))
+  (assert (equal (collecting-traces (throw-foo)
+                   (catch-foo))
+                 '((0 throw-foo :enter)
+                   (0 throw-foo :non-local-exit)))))
+
+(with-test (:name (trace :non-local-exit :standard-report))
+  (let ((output (with-traced-function (throw-foo)
+                  (catch-foo))))
+    (assert (search "exited non-locally" output))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")

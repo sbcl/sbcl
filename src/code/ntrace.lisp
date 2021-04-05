@@ -254,13 +254,13 @@
 ;;; succeeded before printing anything.
 (declaim (ftype (function (trace-info) function) trace-end-breakpoint-fun))
 (defun trace-end-breakpoint-fun (info)
-  (lambda (frame bpt values cookie)
-    (declare (ignore bpt))
+  (lambda (frame bpt-or-nle values cookie)
     (unless (eq cookie (caar *traced-entries*))
       (setf *traced-entries*
             (member cookie *traced-entries* :key #'car)))
 
-    (let ((entry (pop *traced-entries*)))
+    (let ((entry (pop *traced-entries*))
+          (non-local-exit (eq bpt-or-nle :nle)))
       (when (and (not (trace-info-untraced info))
                  (or (cdr entry)
                      (let ((cond (trace-info-condition-after info)))
@@ -275,19 +275,27 @@
                (pprint-logical-block (*standard-output* nil)
                  (print-trace-indentation)
                  (pprint-indent :current 2)
-                 (format t "~S returned" (trace-info-what info))
-                 (dolist (v values)
-                   (write-char #\space)
-                   (pprint-newline :linear)
-                   (prin1 (ensure-printable-object v))))
+                 (cond (non-local-exit
+                        (format t "~S exited non-locally" (trace-info-what info)))
+                       (t
+                        (format t "~S returned" (trace-info-what info))
+                        (dolist (v values)
+                          (write-char #\space)
+                          (pprint-newline :linear)
+                          (prin1 (ensure-printable-object v))))))
                (terpri))
-             (apply #'trace-print frame (trace-info-print-after info) values))
+             (unless non-local-exit
+               (apply #'trace-print frame (trace-info-print-after info) values)))
             ((nil)
-             (apply #'trace-print-unadorned frame (trace-info-print-after info) values))
+             (unless non-local-exit
+               (apply #'trace-print-unadorned frame (trace-info-print-after info) values)))
             (t
              (funcall (trace-info-report info)
                       (count-if #'cdr *traced-entries*)
-                      (trace-info-what info) :exit frame values)
+                      (trace-info-what info)
+                      (if non-local-exit :non-local-exit :exit)
+                      frame
+                      values)
              (apply #'trace-print-unadorned frame (trace-info-print-after info) values)))
           (write-sequence (get-output-stream-string *standard-output*)
                           *trace-output*)
@@ -305,8 +313,15 @@
       (apply #'funcall start frame nil args)
       (let ((*traced-entries* *traced-entries*))
         (funcall cookie frame nil)
-        (let ((vals (multiple-value-list (apply function args))))
-          (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
+        (let* ((non-local-exit '#:nle)
+               (vals non-local-exit))
+          (unwind-protect
+               (setq vals (multiple-value-list (apply function args)))
+            (funcall (trace-end-breakpoint-fun info)
+                     frame
+                     (if (eq vals non-local-exit) :nle nil)
+                     (if (eq vals non-local-exit) nil vals)
+                     nil))
           (values-list vals))))))
 
 ;;; This function is like TRACE-CALL above, but munges the method
@@ -321,8 +336,15 @@
         (apply #'funcall start frame nil (funcall transform args))
         (let ((*traced-entries* *traced-entries*))
           (funcall cookie frame nil)
-          (let ((vals (multiple-value-list (apply function args))))
-            (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
+          (let* ((non-local-exit '#:nle)
+                 (vals non-local-exit))
+            (unwind-protect
+                 (setq vals (multiple-value-list (apply function args)))
+              (funcall (trace-end-breakpoint-fun info)
+                       frame
+                       (if (eq vals non-local-exit) :nle nil)
+                       (if (eq vals non-local-exit) nil vals)
+                       nil))
             (values-list vals)))))))
 
 ;;; Trace one function according to the specified options. We copy the
@@ -582,9 +604,9 @@ The following options are defined:
        options (e.g. PRINT or BREAK). Otherwise, Report-Type is
        treated as a function designator and, for each trace event,
        funcalled with 5 arguments: trace depth (a non-negative
-       integer), a function name or a function object,
-       :ENTER or :EXIT, a stack frame, and a list of values (arguments
-       or return values).
+       integer), a function name or a function object, a
+       keyword (:ENTER, :EXIT or :NON-LOCAL-EXIT), a stack frame, and
+       a list of values (arguments or return values).
 
    :CONDITION Form
    :CONDITION-AFTER Form
