@@ -271,15 +271,18 @@
       (let* ((result-tn (tn-ref-tn (sb-c::vop-results vop)))
              (next-args (sb-c::vop-args next))
              (left (tn-ref-tn next-args))
-             (right (tn-ref-tn (tn-ref-across next-args))))
+             (right (tn-ref-tn (tn-ref-across next-args)))
+             (comparand (if (eq result-tn left) right left)))
         ;; Since we're only looking at the :Z flag it does not matter
         ;; if the array ref is the left or right operand of CMP.
         (when (and (sb-c::very-temporary-p result-tn)
-                   (or (eq result-tn left) (eq result-tn right)))
+                   (or (eq result-tn left) (eq result-tn right))
+                   (or (not (constant-tn-p comparand))
+                       (plausible-signed-imm32-operand-p (encode-value-if-immediate comparand))))
           (let* ((new-args (sb-c::reference-tn-list
                             (list (tn-ref-tn (sb-c::vop-args vop))
                                   (tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))
-                                  (if (eq result-tn left) right left))
+                                  comparand)
                             nil))
                  (new (sb-c::emit-and-insert-vop
                        (sb-c::vop-node vop) (vop-block vop)
