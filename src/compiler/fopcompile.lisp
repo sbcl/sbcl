@@ -193,7 +193,7 @@
                                      sb-kernel::%defstruct
                                      sb-thread:make-mutex))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
-                  (and (member function '(%defconstant sb-impl::%defparameter))
+                  (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))
                        (fopcompilable-p (third form)))
                   (and (symbolp function) ; no ((lambda ...) ...)
                        (get-properties (symbol-plist function)

@@ -145,9 +145,9 @@
     (destructuring-bind (fun name source-loc . docstring) x
       (aver (boundp name)) ; it's a bug if genesis didn't initialize
       (ecase fun
-        (sb-c::%defconstant
-         (apply #'sb-c::%defconstant name (symbol-value name) source-loc docstring))
-        (sb-impl::%defparameter ; use %DEFVAR which will not clobber
+        (%defconstant
+         (apply #'%defconstant name (symbol-value name) source-loc docstring))
+        (%defparameter ; use %DEFVAR which will not clobber
          (apply #'%defvar name source-loc nil docstring)))))
 
   (unless (!c-runtime-noinform-p)

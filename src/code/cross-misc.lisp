@@ -359,7 +359,7 @@
                 (matchp '((quote ?) (source-location) (:or (unless (%boundp :ignore) ?) ?))
                         (cdr form))
               `(defvar ,symbol ,value)))
-           (sb-c::%defconstant
+           (sb-impl::%defconstant
             ;; There is genuinely ambiguity here - does :COMPILE-TOPLEVEL situation for
             ;; DEFCONSTANT mean that we want the host compiler to know the constant?
             ;; It must, because the standard specifies that defconstant need not be within
@@ -374,13 +374,13 @@
             ;; that this is our normal :compile-toplevel handling.
             (destructuring-bind (symbol value) (matchp '((quote ?) ? . :ignore) (cdr form))
               `(progn (defconstant ,symbol ,value)
-                      (sb-c::%defconstant ',symbol ,symbol nil))))
+                      (sb-impl::%defconstant ',symbol ,symbol nil))))
            (defconstant ; we see this macro as well. The host expansion will not do,
             ;; because it calls our %defconstant which does not assign the symbol a value.
             ;; It might be possible to change that now that we don't use CL: symbols.
             (destructuring-bind (symbol value) (cdr form)
               `(progn (defconstant ,symbol ,value)
-                      (sb-c::%defconstant ',symbol ,symbol nil))))
+                      (sb-impl::%defconstant ',symbol ,symbol nil))))
            (t
             form))))))))
 

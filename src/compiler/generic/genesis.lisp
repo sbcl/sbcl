@@ -2512,7 +2512,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
-            ((sb-c::%defconstant sb-impl::%defparameter)
+            ((sb-impl::%defconstant sb-impl::%defparameter)
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
                (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)

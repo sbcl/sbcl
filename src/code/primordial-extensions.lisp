@@ -336,5 +336,5 @@
        (eval-when (:compile-toplevel)
          (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)))
        (eval-when (:load-toplevel)
-         (sb-c::%defconstant ',symbol ',(eval expr)
+         (%defconstant ',symbol ',(eval expr)
            (sb-c:source-location) ,@(when doc (list doc)))))))

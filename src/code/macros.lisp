@@ -172,15 +172,15 @@ tree structure resulting from the evaluation of EXPRESSION."
   third argument is an optional documentation string for the variable."
   (check-designator name defconstant)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (sb-c::%defconstant ',name ,value (sb-c:source-location)
-                         ,@(and docp `(',doc)))))
+     (%defconstant ',name ,value (sb-c:source-location)
+                   ,@(and docp `(',doc)))))
 
 
 (declaim (ftype (sfunction (symbol t &optional t t) null)
                 about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
 
-(defun sb-c::%defconstant (name value source-location &optional (doc nil docp))
+(defun %defconstant (name value source-location &optional (doc nil docp))
   #+sb-xc-host (declare (ignore doc docp))
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
@@ -218,7 +218,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                                   :new-value value))
                       (declare (ignore ignore))
                       (when aborted
-                        (return-from sb-c::%defconstant name))))))
+                        (return-from %defconstant name))))))
             (warn "redefining a MAKUNBOUND constant: ~S" name)))
        (:unknown
         ;; (This is OK -- undefined variables are of this kind. So we
