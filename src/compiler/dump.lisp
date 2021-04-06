@@ -464,7 +464,7 @@
                               (t (bug "Bogus debug name marker")))))
              (instance
               (let ((c (gethash x (sb-c::eql-constants sb-c::*ir1-namespace*))))
-                (cond ((and c (neq (sb-c::leaf-%source-name c) 'sb-c::.anonymous.))
+                (cond ((and c (sb-c::leaf-has-source-name-p c))
                        (dump-load-time-symbol-global-value c file))
                       (t
                        (dump-structure x file)
@@ -1111,10 +1111,9 @@
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
-             (let ((name (sb-c::leaf-%source-name entry)))
-               (if (eq name 'sb-c::.anonymous.)
-                   (dump-object (sb-c::constant-value entry) fasl-output)
-                   (dump-load-time-symbol-global-value entry fasl-output))))
+             (if (sb-c::leaf-has-source-name-p entry)
+                 (dump-load-time-symbol-global-value entry fasl-output)
+                 (dump-object (sb-c::constant-value entry) fasl-output)))
             (cons
              (ecase (car entry)
                (:constant ; anything that has not been wrapped in a #<CONSTANT>

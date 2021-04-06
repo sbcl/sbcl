@@ -2481,12 +2481,12 @@ is :ANY, the function name is not checked."
                 (setf (gethash name (named-constants namespace)) new)
                 ;; If there was no EQL constant, or an unnamed one, add NEW
                 (let ((old (gethash object (eql-constants namespace))))
-                  (when (or (not old) (eq (leaf-%source-name old) '.anonymous.))
+                  (when (or (not old) (not (leaf-has-source-name-p old)))
                     (setf (gethash object (eql-constants namespace)) new)))
                 ;; Same for SIMILAR table, if coalescible
                 (when coalescep
                   (let ((old (get-similar object (similar-constants namespace))))
-                    (when (or (not old) (eq (leaf-%source-name old) '.anonymous.))
+                    (when (or (not old) (not (leaf-has-source-name-p old)))
                       (setf (get-similar object (similar-constants namespace)) new))))
                 new))))
 
