@@ -30,6 +30,30 @@
 (defun %instance-ref (instance index)
   (%instance-ref instance index))
 
+(defun layout-id (layout)
+  ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
+  ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
+  ;; There are a few non-structure types at positive depthoid; those do not store
+  ;; their ancestors in the vector; they only store self-id at index 0.
+  ;; This isn't performance-critical. If it were, then we should store self-ID
+  ;; at a fixed index. Using it for type-based dispatch remains a possibility.
+  (let* ((depth (- (layout-depthoid layout) 2))
+         (index (if (or (< depth 0) (not (logtest (layout-flags layout)
+                                                  +structure-layout-flag+)))
+                    0 depth)))
+    (truly-the layout-id
+              #-64-bit
+              (%raw-instance-ref/signed-word
+               layout (+ (get-dsd-index layout id-word0) index))
+              #+64-bit ; use SAP-ref for lack of half-sized slots
+              (with-pinned-objects (layout)
+                (let ((sap (sap+ (int-sap (get-lisp-obj-address layout))
+                                 (- (ash (+ sb-vm:instance-slots-offset
+                                            (get-dsd-index layout id-word0))
+                                         sb-vm:word-shift)
+                                    sb-vm:instance-pointer-lowtag))))
+                  (signed-sap-ref-32 sap (ash index 2)))))))
+
 (defun set-layout-inherits (layout inherits structurep this-id)
   #-metaspace (setf (layout-inherits layout) inherits)
   #+metaspace (setf (wrapper-inherits (layout-friend layout)) inherits)
