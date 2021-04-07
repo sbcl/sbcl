@@ -616,6 +616,11 @@ int sb_utimes(char *path, struct timeval times[2])
 {
     return utimes(path, times);
 }
+
+int sb_clock_gettime(clockid_t id, struct timespec* tp)
+{
+    return clock_gettime(id, tp);
+}
 #ifndef LISP_FEATURE_SB_THREAD
 #include <signal.h>
 int sb_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)

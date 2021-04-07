@@ -67,6 +67,7 @@
                              "sb_select" ; int-syscall
                              "sb_getitimer" ; syscall*
                              "sb_setitimer" ; syscall*
+                             "sb_clock_gettime" ; alien-funcall
                              "sb_utimes") ; posix
                          :test #'string=)
                  (subseq x 3)
@@ -1051,7 +1052,8 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (defun clock-gettime (clockid)
     (declare (type (signed-byte 32) clockid))
     (with-alien ((ts (struct timespec)))
-      (alien-funcall (extern-alien "clock_gettime" (function int int (* (struct timespec))))
+      (alien-funcall (extern-alien #.(libc-name-for "sb_clock_gettime")
+                                   (function int int (* (struct timespec))))
                      clockid (addr ts))
       ;; 'seconds' is definitely a fixnum for 64-bit, because most-positive-fixnum
       ;; can express 1E11 years in seconds.
