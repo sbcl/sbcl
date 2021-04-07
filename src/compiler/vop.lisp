@@ -354,9 +354,6 @@
   (constants (make-array 10 :fill-pointer 1 :adjustable t
                          :initial-element :ignore)
              :type vector :read-only t)
-  ;; some kind of info about the component's run-time representation.
-  ;; This is filled in by the VM supplied SELECT-COMPONENT-FORMAT function.
-  format
   ;; a list of the ENTRY-INFO structures describing all of the entries
   ;; into this component. Filled in by entry analysis.
   (entries nil :type list)
