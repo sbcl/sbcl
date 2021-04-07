@@ -563,7 +563,7 @@ sb-c::
                                        result))
                           (pushnew (code-from-fun fun) result)))))))
              (code-from-fun (fun)
-               (ecase (fun-subtype fun)
+               (ecase (%fun-pointer-widetag fun)
                  (#.simple-fun-widetag
                   (fun-code-header fun))
                  (#.funcallable-instance-widetag

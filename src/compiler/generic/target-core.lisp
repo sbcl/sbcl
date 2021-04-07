@@ -37,7 +37,7 @@
   (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
     (cond ((not (immobile-space-obj-p fun))
            (error "Can't statically link to ~S: code is movable" name))
-          ((neq (fun-subtype fun) sb-vm:simple-fun-widetag)
+          ((neq (%fun-pointer-widetag fun) sb-vm:simple-fun-widetag)
            (error "Can't statically link to ~S: non-simple function" name))
           (t
            (let ((addr (get-lisp-obj-address fun)))

@@ -131,7 +131,7 @@
   ;; if we already know that FUNCTION is a function.
   ;; It will signal a type error if not, which is the right thing to do anyway.
   ;; (this isn't quite a true predicate)
-  (and (= (fun-subtype function) sb-vm:closure-widetag)
+  (and (= (%fun-pointer-widetag function) sb-vm:closure-widetag)
        ;; This test needs to reference the name of any macro, but in order for
        ;; cold-init to work, the macro has to be defined first.
        ;; So pick DX-LET, as it's in primordial-extensions.

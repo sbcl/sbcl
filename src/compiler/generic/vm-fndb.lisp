@@ -538,7 +538,7 @@
 (defknown code-trailer-ref (code-component fixnum) (unsigned-byte 32)
   (flushable #-(or sparc ppc64) always-translatable))
 
-(defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
+(defknown %fun-pointer-widetag (function) (member . #.sb-vm::+function-widetags+)
   (flushable))
 
 (defknown make-fdefn (t) fdefn (flushable movable))

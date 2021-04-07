@@ -218,7 +218,7 @@
            (cons 2)
            (instance (1+ (instance-length object)))
            (function
-            (when (= (fun-subtype object) simple-fun-widetag)
+            (when (= (%fun-pointer-widetag object) simple-fun-widetag)
               (return-from primitive-object-size
                 (code-object-size (fun-code-header (truly-the simple-fun object)))))
             (1+ (get-closure-length object)))

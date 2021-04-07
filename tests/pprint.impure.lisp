@@ -427,7 +427,7 @@
 (with-test (:name :closure-macro-arglist)
   ;; assert correct test setup - MACDADDY is a closure if compiling,
   ;; or a funcallable-instance if not
-  (assert (eq (sb-kernel:fun-subtype (macro-function 'macdaddy))
+  (assert (eq (sb-kernel:%fun-pointer-widetag (macro-function 'macdaddy))
               #-interpreter sb-vm:closure-widetag
               #+interpreter sb-vm:funcallable-instance-widetag))
   ;; MACRO-INDENTATION used %simple-fun-arglist instead of %fun-arglist.

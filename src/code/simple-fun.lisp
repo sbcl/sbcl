@@ -14,8 +14,7 @@
 ;;; Underlying SIMPLE-FUN
 (defun %fun-fun (function)
   (declare (function function))
-  ;; It's too bad that TYPECASE isn't able to generate equivalent code.
-  (case (fun-subtype function)
+  (case (%fun-pointer-widetag function)
     (#.sb-vm:closure-widetag
      (%closure-fun function))
     (#.sb-vm:funcallable-instance-widetag
@@ -206,7 +205,7 @@
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
 ;;; or NIL if there's none
 (defun %fun-name (function)
-  (case (fun-subtype function)
+  (case (%fun-pointer-widetag function)
     (#.sb-vm:closure-widetag
      (let ((val (nth-value +closure-name-index+ (closure-extra-values function))))
        (unless (unbound-marker-p val)
@@ -226,7 +225,7 @@
   (%simple-fun-name (%fun-fun function)))
 
 (defun (setf %fun-name) (new-value function)
-  (case (fun-subtype function)
+  (case (%fun-pointer-widetag function)
     (#.sb-vm:closure-widetag
      (set-closure-name (truly-the closure function) nil new-value))
     (#.sb-vm:simple-fun-widetag

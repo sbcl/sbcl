@@ -137,7 +137,7 @@
       ;; in arch_write_linkage_table_entry() and arch_do_displaced_inst().
       (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
             (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
-      (let ((i (if (/= (fun-subtype fun) funcallable-instance-widetag)
+      (let ((i (if (/= (%fun-pointer-widetag fun) funcallable-instance-widetag)
                    7
                    (let ((disp8 (- (ash funcallable-instance-function-slot
                                         word-shift)
@@ -157,7 +157,7 @@
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.
 ;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
-  (case (fun-subtype fun)
+  (case (%fun-pointer-widetag fun)
     (#.sb-vm:closure-widetag t)
     (#.sb-vm:funcallable-instance-widetag
      ;; if the FIN has no raw words then it has no internal trampoline
