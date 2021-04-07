@@ -559,7 +559,7 @@ or a method combination name."
            ;; because it contains more accurate information e.g. for
            ;; struct-accessors.
            (function-type name)
-           (sb-impl::%fun-type function-designator))))))
+           (sb-impl::%fun-ftype function-designator))))))
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 

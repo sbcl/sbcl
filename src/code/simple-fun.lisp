@@ -318,12 +318,12 @@
       ((cons t simple-vector) (cdr info))
       (simple-vector info))))
 
-(defun %fun-type (function)
+(defun %fun-ftype (function)
   (typecase function
     #+sb-fasteval
     ;; Obtain a list of the right shape, usually with T for each
     ;; arg type, but respecting local declarations if any.
-    (interpreted-function (sb-interpreter:%fun-type function))
+    (interpreted-function (sb-interpreter:%fun-ftype function))
     (t (%simple-fun-type (%fun-fun function)))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory

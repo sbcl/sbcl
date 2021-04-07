@@ -601,7 +601,7 @@
                   (t
                    (let* ((fun (or function (fdefinition name)))
                           (derived-type (and function
-                                             (%fun-type function)))
+                                             (%fun-ftype function)))
                           (legal-name-p (legal-fun-name-p name))
                           (ctype (and legal-name-p
                                       (global-ftype name)))
@@ -616,7 +616,7 @@
                                  (member from '(:defined-method :defined)))
                             (setf derived-type type)))
                      (unless derived-type
-                       (setf derived-type (%fun-type fun)))
+                       (setf derived-type (%fun-ftype fun)))
                      (if (typep fun 'standard-generic-function)
                          (values fun
                                  "a generic function"

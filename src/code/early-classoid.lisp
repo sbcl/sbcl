@@ -746,7 +746,7 @@
          (fun (and fdefn (fdefn-fun fdefn))))
     (if fun
         (handler-bind ((style-warning #'muffle-warning))
-          (specifier-type (sb-impl::%fun-type fun)))
+          (specifier-type (sb-impl::%fun-ftype fun)))
         (specifier-type 'function)))))
 
 ;;; The parsed or unparsed type for this function, or the symbol :GENERIC-FUNCTION.

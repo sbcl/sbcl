@@ -133,7 +133,7 @@
            ((functionp) (functionp object)) ; least strict
            ((nil) ; medium strict
             (and (functionp object)
-                 (csubtypep (specifier-type (sb-impl::%fun-type object)) type)))
+                 (csubtypep (specifier-type (sb-impl::%fun-ftype object)) type)))
            (t ; strict
             (error "Function types are not a legal argument to TYPEP:~%  ~S"
                    (type-specifier type))))))))
@@ -383,7 +383,7 @@
       (function
        (if (funcallable-instance-p x)
            (classoid-of x)
-           (let ((type (sb-impl::%fun-type x)))
+           (let ((type (sb-impl::%fun-ftype x)))
              (if (typep type '(cons (eql function))) ; sanity test
                  (try-cache type)
                  (classoid-of x)))))

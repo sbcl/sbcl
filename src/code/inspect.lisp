@@ -221,7 +221,7 @@ evaluated expressions.
           ;; to DESCRIBE from the inspector.
           (list*
            (cons "Lambda-list" (%fun-lambda-list object))
-           (cons "Ftype" (%fun-type object))
+           (cons "Ftype" (%fun-ftype object))
            (when (closurep object)
              (list
               (cons "Closed over values" (%closure-values object)))))))

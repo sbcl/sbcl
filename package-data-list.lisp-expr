@@ -3350,7 +3350,7 @@ structure representations"
                "FUN-LAMBDA-LIST"
                "FUN-PROTO-FN"
                "FUN-SOURCE-LOCATION"
-               "%FUN-TYPE" ; to avoid conflict with SB-KERNEL:FUN-TYPE
+               "%FUN-FTYPE"
                "LEXENV-FROM-ENV"
                "LIST-LOCALS"
                "PROTO-FN-DOCSTRING"
@@ -3514,7 +3514,7 @@ SBCL itself"
   sb-sequence:substitute-if-not)
  ;; Fast interpreter
  #+sb-fasteval
- (sb-interpreter:%fun-type
+ (sb-interpreter:%fun-ftype
   sb-interpreter:env-policy
   sb-interpreter:eval-in-environment
   sb-interpreter:find-lexical-fun

@@ -2433,7 +2433,7 @@
 
 (with-test (:name (compile lambda declare values))
   (let ((fun (checked-compile '(lambda (x) (declare (values list)) x))))
-    (assert (equal (sb-impl::%fun-type fun)
+    (assert (equal (sb-impl::%fun-ftype fun)
                    '(function (t) (values list &optional))))))
 
 ;;; test for some problems with too large immediates in x86-64 modular

@@ -145,7 +145,7 @@
     (assert (equal `(function (t) (values (sb-kernel:character-set
                                            ((1 . ,(1- char-code-limit))))
                                           &optional))
-                   (sb-impl::%fun-type f)))))
+                   (sb-impl::%fun-ftype f)))))
 
 (with-test (:name (:case-insensitive-char-comparisons :eacute))
   (assert (char-equal (code-char 201) (code-char 233))))

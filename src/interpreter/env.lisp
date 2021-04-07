@@ -547,7 +547,7 @@
       (values (proto-fn-%frame proto-fn) (proto-fn-cookie proto-fn))
       (digest-lambda env proto-fn)))
 
-(defun %fun-type (fun)
+(defun %fun-ftype (fun)
   (let ((proto-fn (fun-proto-fn fun)))
     (or (proto-fn-type proto-fn)
         (setf (proto-fn-type proto-fn)
