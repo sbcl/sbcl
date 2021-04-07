@@ -303,7 +303,7 @@
   (defstruct (layout (:include structure!object)
                      (:constructor host-make-layout
                                    (id clos-hash classoid &key info depthoid inherits
-                                                          length flags invalid)))
+                                                          length invalid)))
     (id nil :type (or null fixnum))
     ;; Cross-compiler-only translation from slot index to symbol naming
     ;; the accessor to call. (Since access by position is not a thing)
@@ -314,7 +314,7 @@
     ;; But there's no harm in storing it.
     (clos-hash nil :type (and sb-xc:fixnum unsigned-byte))
     (classoid nil :type classoid)
-    (flags 0 :type word)
+;    (flags 0 :type word)
     (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
     (inherits #() :type simple-vector)
     (depthoid -1 :type layout-depthoid)
@@ -517,6 +517,20 @@
   ;; NIL if none assigned yet
   (pcl-class nil))
 
+#+sb-xc-host
+(defun layout-flags (x)
+  (let ((mapping `((structure-object ,+structure-layout-flag+)
+                   (pathname-layout-flag ,+pathname-layout-flag+)
+                   (condition ,+condition-layout-flag+)
+                   (file-stream ,+file-stream-layout-flag+)
+                   (string-stream ,+string-stream-layout-flag+)
+                   (stream ,+stream-layout-flag+)
+                   (sequence ,+sequence-layout-flag+)))
+        (flags 0))
+    (dolist (layout (cons x (coerce (layout-inherits x) 'list)) flags)
+      (let ((cell (assoc (classoid-name (layout-classoid layout)) mapping)))
+        (when cell (setq flags (logior flags (second cell))))))))
+
 ;; XC version is defined in cross-misc
 #-sb-xc-host
 (progn
@@ -660,6 +674,7 @@
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 
+#-sb-xc-host
 (defun summarize-layouts ()
    (flet ((flag-bits (x) (logand (layout-flags x) #xffff)))
      (let ((prev -1))
@@ -679,29 +694,24 @@
   (apply #'host-make-layout
          (cdr (assq (classoid-name classoid) *popular-structure-types*))
          hash classoid
-         (let ((copy (copy-list keys))) (remf copy :bitmap) copy)))
+         :allow-other-keys t
+         keys))
 ;; The target reconstructs layouts using FOP-LAYOUT, but the host uses MAKE-LOAD-FORM.
 (defmethod make-load-form ((layout layout) &optional env)
   (declare (ignore env))
   (labels ((externalize (layout &aux (classoid (layout-classoid layout))
                                      (name (classoid-name classoid)))
-             (when (or (layout-invalid layout) (not name))
+             (when (or (layout-invalid layout)
+                       (not name)
+                       (typep classoid 'undefined-classoid))
                (sb-c:compiler-error "can't dump ~S" layout))
-             (aver (= (layout-flags layout)
-                      (typecase classoid
-                        (structure-classoid +structure-layout-flag+)
-                        (condition-classoid +condition-layout-flag+)
-                        (undefined-classoid
-                         (bug "xc MAKE-LOAD-FORM on undefined layout"))
-                        (t 0))))
              `(xc-load-layout ',name
                               ,(layout-depthoid layout)
                               (vector ,@(map 'list #'externalize (layout-inherits layout)))
                               ,(layout-length layout)
-                              ,(layout-bitmap layout)
-                              ,(layout-flags layout))))
+                              ,(layout-bitmap layout))))
     (externalize layout)))
-(defun xc-load-layout (name depthoid inherits length bitmap flags)
+(defun xc-load-layout (name depthoid inherits length bitmap)
   (let ((classoid (find-classoid name)))
     (aver (and classoid (not (undefined-classoid-p classoid))))
     (let ((layout (classoid-layout classoid)))
@@ -709,10 +719,9 @@
                    (= (length (layout-inherits layout)) (length inherits))
                    (every #'eq (layout-inherits layout) inherits)
                    (= (layout-length layout) length)
-                   (= (layout-bitmap layout) bitmap)
-                   (= (layout-flags layout) flags))
+                   (= (layout-bitmap layout) bitmap))
         (error "XC can't reload layout for ~S with ~S vs ~A"
-               name (list depthoid inherits length bitmap flags) layout))
+               name (list depthoid inherits length bitmap) layout))
       layout)))
 ) ; end PROGN
 

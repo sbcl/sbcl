@@ -1623,7 +1623,8 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; value is true if this is an incompatible redefinition, in which
 ;;; case it is the old layout.
 (defun ensure-structure-class (info inherits old-context new-context
-                                    &key compiler-layout)
+                                    &key compiler-layout
+                                    &aux (flags 0))
   (declare (type defstruct-description info))
   (multiple-value-bind (classoid old-layout)
       (multiple-value-bind (class constructor)
@@ -1655,15 +1656,16 @@ or they must be declared locally notinline at each call site.~@:>"
             (t
              (list (layout-classoid
                     (svref inherits (1- (length inherits))))))))
+    (unless (dd-alternate-metaclass info)
+      (setq flags +structure-layout-flag+))
+    #-sb-xc-host
+    (dovector (ancestor inherits)
+      (setq flags (logior (logand (logior +stream-layout-flag+
+                                          +file-stream-layout-flag+
+                                          +string-stream-layout-flag+)
+                                  (layout-flags ancestor))
+                          flags)))
     (let* ((old-layout (or compiler-layout old-layout))
-           (flags
-            (logior (if (dd-alternate-metaclass info) 0 +structure-layout-flag+)
-                    (if (find #.(find-layout 'stream) inherits)
-                        +stream-layout-flag+ 0)
-                    (if (find #.(find-layout 'file-stream) inherits)
-                        +file-stream-layout-flag+ 0)
-                    (if (find #.(find-layout 'string-stream) inherits)
-                        +string-stream-layout-flag+ 0)))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
                (make-layout (hash-layout-name (dd-name info))
