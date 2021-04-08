@@ -519,16 +519,16 @@
 
 #+sb-xc-host
 (defun layout-flags (x)
-  (let ((mapping `((structure-object ,+structure-layout-flag+)
-                   (pathname-layout-flag ,+pathname-layout-flag+)
-                   (condition ,+condition-layout-flag+)
-                   (file-stream ,+file-stream-layout-flag+)
-                   (string-stream ,+string-stream-layout-flag+)
-                   (stream ,+stream-layout-flag+)
-                   (sequence ,+sequence-layout-flag+)))
+  (let ((mapping `((structure-object  ,+structure-layout-flag+)
+                   (pathname          ,+pathname-layout-flag+)
+                   (condition         ,+condition-layout-flag+)
+                   (file-stream       ,+file-stream-layout-flag+)
+                   (string-stream     ,+string-stream-layout-flag+)
+                   (stream            ,+stream-layout-flag+)
+                   (sequence          ,+sequence-layout-flag+)))
         (flags 0))
     (dolist (layout (cons x (coerce (layout-inherits x) 'list)) flags)
-      (let ((cell (assoc (classoid-name (layout-classoid layout)) mapping)))
+      (let ((cell (assoc (layout-classoid-name layout) mapping)))
         (when cell (setq flags (logior flags (second cell))))))))
 
 ;; XC version is defined in cross-misc

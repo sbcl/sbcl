@@ -2311,15 +2311,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (existing-layout (gethash name *cold-layouts*)))
     (declare (type descriptor bitmap-descriptor inherits))
     (declare (type symbol name))
-    (flet ((maybe-set-flag (flag type)
-             (when (or (find-in-inherits type inherits) (eq name type))
-               (setq flags (logior flags flag)))))
-      (maybe-set-flag +pathname-layout-flag+ 'pathname)
-      (maybe-set-flag +condition-layout-flag+ 'condition)
-      (maybe-set-flag +sequence-layout-flag+ 'sequence)
-      (maybe-set-flag +stream-layout-flag+ 'stream)
-      (maybe-set-flag +file-stream-layout-flag+ 'file-stream)
-      (maybe-set-flag +string-stream-layout-flag+ 'string-stream))
     ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
     (when existing-layout
       (let ((old-flags (cold-layout-flags existing-layout))
