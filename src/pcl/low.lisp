@@ -109,11 +109,10 @@
 
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
-  ;; It's not worth bothering to teach the compiler to efficiently transform
-  ;; a type declaration involving FUNCALLABLE-STANDARD-OBJECT, not the least
+  ;; t's not worth bothering to teach the compiler to efficiently transform
+  ;; a type test involving FUNCALLABLE-STANDARD-OBJECT, not the least
   ;; of the problems being that the type isn't known during make-host-2.
-  (unless (and #+compact-instance-header (functionp fin)
-               #-compact-instance-header (funcallable-instance-p fin)
+  (unless (and (function-with-layout-p fin)
                (logtest (layout-flags (%fun-layout fin))
                         +pcl-object-layout-flag+))
     (error 'type-error :datum fin :expected-type 'funcallable-standard-object))

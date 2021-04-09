@@ -55,13 +55,11 @@
 
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
-(defvar *print-layout-id* t)
 (defmethod print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)
     (format stream
-            #+sb-xc-host "for ~S~@[, INVALID=~S~]"
-            #-sb-xc-host "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
-            #-sb-xc-host (when *print-layout-id* (layout-id layout))
+            "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
+            (layout-id layout)
             (layout-proper-name layout)
             (layout-invalid layout))))
 #+(and metaspace (not sb-xc-host))
@@ -104,7 +102,6 @@
                 warn-if-altered-layout))
 (defun warn-if-altered-layout (old-context old-layout context
                                length inherits depthoid bitmap)
-  (declare (type layout old-layout) (type simple-string old-context context))
   (let ((name (layout-proper-name old-layout))
         (old-inherits (layout-inherits old-layout)))
     (or (when (mismatch old-inherits inherits :key #'layout-proper-name)

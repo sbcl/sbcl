@@ -1507,17 +1507,16 @@ We could try a few things to mitigate this:
     (flet ((legend (newline str list)
              (when newline (terpri))
              (let ((s (format nil str (length list))))
-               (format t "~A~%~A~%" s (make-string (length s) :initial-element #\-))))
-           (name (x) (classoid-name (layout-classoid x))))
+               (format t "~A~%~A~%" s (make-string (length s) :initial-element #\-)))))
       (when zero
         (legend nil "Zero bitmap (~d):" zero)
-        (dolist (x zero) (format t "~a~%" (name x))))
+        (dolist (x zero) (format t "~a~%" (layout-classoid-name x))))
       (when trailing-raw
         (legend t "Trailing raw (~d):" trailing-raw)
         (dolist (x trailing-raw)
           (let ((m (sb-kernel::layout-bitmap x)))
             (format t "~30a 0...~v,'0b~%"
-                    (name x)
+                    (layout-classoid-name x)
                     (acond ((layout-info x) (1+ (dd-length it))) (t 32))
                     m))))
       (when trailing-tagged
@@ -1525,7 +1524,7 @@ We could try a few things to mitigate this:
         (dolist (x trailing-tagged)
           (let ((m (sb-kernel::layout-bitmap x)))
             (format t "~30a 1...~b~%"
-                    (name x)
+                    (layout-classoid-name x)
                     (acond ((layout-info x) (ldb (byte (dd-length it) 0) m))
                            (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))

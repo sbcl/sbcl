@@ -209,8 +209,7 @@
                 `(,name
                   ,(mapcar #'classoid-name (direct-supers class))
                   ,(mapcar #'classoid-name (direct-subs class))
-                  ,(map 'list
-                        (lambda (x) (classoid-name (layout-classoid x)))
+                  ,(map 'list #'layout-classoid-name
                         (reverse (layout-inherits (classoid-layout class))))
                   ,(eval (getf (cdr kernel-bic-entry) :prototype-form)))))
             (remove-if (lambda (kernel-bic-entry)

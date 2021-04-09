@@ -189,8 +189,6 @@
             (write-char #\= stream)
             t)))))
 
-(define-load-time-global *null-broadcast-stream* (make-broadcast-stream))
-(declaim (type stream *null-broadcast-stream*))
 (defmacro with-circularity-detection ((object stream) &body body)
   (with-unique-names (marker body-name)
     `(labels ((,body-name ()

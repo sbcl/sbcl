@@ -169,6 +169,22 @@
   (symbol nil :type symbol :read-only t))
 (declaim (freeze-type synonym-stream))
 
+(defstruct (broadcast-stream (:include ansi-stream
+                                       (out #'broadcast-out)
+                                       (bout #'broadcast-bout)
+                                       (sout #'broadcast-sout)
+                                       (misc #'broadcast-misc))
+                             (:constructor %make-broadcast-stream
+                                           (streams))
+                             (:copier nil)
+                             (:predicate nil))
+  ;; a list of all the streams we broadcast to
+  (streams () :type list :read-only t))
+(declaim (freeze-type broadcast-stream))
+
+(define-load-time-global *null-broadcast-stream* (make-broadcast-stream))
+(declaim (type stream *null-broadcast-stream*))
+
 (defmethod print-object ((x stream) stream)
   (print-unreadable-object (x stream :type t :identity t)))
 

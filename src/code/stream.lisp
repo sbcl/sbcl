@@ -90,19 +90,6 @@
 
 ;;; stream manipulation functions
 
-(defstruct (broadcast-stream (:include ansi-stream
-                                       (out #'broadcast-out)
-                                       (bout #'broadcast-bout)
-                                       (sout #'broadcast-sout)
-                                       (misc #'broadcast-misc))
-                             (:constructor %make-broadcast-stream
-                                           (streams))
-                             (:copier nil)
-                             (:predicate nil))
-  ;; a list of all the streams we broadcast to
-  (streams () :type list :read-only t))
-(declaim (freeze-type broadcast-stream))
-
 (defun maybe-resolve-synonym-stream (stream)
   (labels ((recur (stream)
              (if (synonym-stream-p stream)

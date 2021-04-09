@@ -148,14 +148,15 @@
   (let* ((lines
           (split-string
            (with-output-to-string (s)
-            (let ((sb-disassem:*disassem-location-column-width* 0)
-                  (sb-kernel::*print-layout-id* nil))
+            (let ((sb-disassem:*disassem-location-column-width* 0))
               (disassemble '(lambda (x) (the sb-assem:label x))
                            :stream s)))
            #\newline))
          (index
           (position "OBJECT-NOT-TYPE-ERROR" lines :test 'search)))
-    (assert (search "; #<SB-KERNEL:LAYOUT for SB-ASSEM:LABEL" (nth (+ index 2) lines)))))
+    (let ((line (nth (+ index 2) lines)))
+      (assert (search "; #<SB-KERNEL:LAYOUT " line))
+      (assert (search " SB-ASSEM:LABEL" line)))))
 
 #+immobile-code
 (with-test (:name :reference-assembly-tramp)

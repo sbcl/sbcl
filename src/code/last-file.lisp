@@ -55,8 +55,7 @@
                       classoid-name
                       (list* (the (unsigned-byte 16) (layout-flags layout))
                              (layout-depthoid layout)
-                             (map 'list
-                                  (lambda (x) (classoid-name (layout-classoid x)))
+                             (map 'list #'layout-classoid-name
                                   (layout-inherits layout))))
               (dolist (dsd (dd-slots dd) (format output ")~%"))
                 (format output "  (~d ~S ~S)~%"

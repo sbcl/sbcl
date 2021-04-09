@@ -159,7 +159,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
 ;;; disabled by default. Joe User can explicitly enable them if
 ;;; desired.
-(defvar *saved-floating-point-modes*
+(define-load-time-global *saved-floating-point-modes*
   '(:traps (:overflow #-(or netbsd ppc) :invalid :divide-by-zero)
     :rounding-mode :nearest :current-exceptions nil
     :accrued-exceptions nil :fast-mode nil
