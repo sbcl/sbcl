@@ -445,7 +445,9 @@
   (let ((primitive-types (list (primitive-type-or-lose 'character)
                                (primitive-type-or-lose 'fixnum)
                                (primitive-type-or-lose 'sb-vm::positive-fixnum)
+                               #-x86 ;; i387 is weird
                                (primitive-type-or-lose 'double-float)
+                               #-x86
                                (primitive-type-or-lose 'single-float)
                                .
                                #+(or 64-bit 64-bit-registers)

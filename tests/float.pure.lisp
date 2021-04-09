@@ -623,3 +623,15 @@
       (= a 1854150818890592943838975159000134470424763027560))
    ((1d0) nil)
    ((1f0) nil)))
+
+(with-test (:name :comparison-merging)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (double-float a b))
+      (cond ((= a b) 0)
+            ((< a b) 1)
+            (t 2)))
+   ((1d0 1d0) 0)
+   ((1d0 3d0) 1)
+   ((3d0 1d0) 2)))
