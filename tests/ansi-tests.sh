@@ -4,7 +4,9 @@ if [ ! -e ansi-test ]; then
    git clone --depth 1 https://github.com/sbcl/ansi-test.git
 fi
 
+
 cd ansi-test
+rm -fr sandbox/scratch
 ../../run-sbcl.sh --lose-on-corruption --disable-ldb \
                   --load gclload1.lsp --load gclload2.lsp \
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
@@ -54,14 +56,16 @@ cd ansi-test
  "WRITE-LINE.2" "MAKE-STRING-INPUT-STREAM.10" "MAKE-STRING-OUTPUT-STREAM.12"
  "WITH-INPUT-FROM-STRING.10" "PRINT.STRING.NIL.1" "PRINT.STRING.NIL.2"
  "PPRINT-LOGICAL-BLOCK.7"
- #+x86 (list "ACOSH.3" "SQRT.4")
-#+win32 (list "ASINH.1" "ASINH.2" "ASINH.3" "ASINH.7" "ACOSH.3" "EXP.ERROR.7"
-         "EXPT.ERROR.4" "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"
-                   "PROBE-FILE.4" "OPEN.OUTPUT.23" "OPEN.IO.22" "OPEN.IO.23")
- #-(or win32 x86) nil))
+ (append #+win32 (list "ASINH.1" "ASINH.2" "ASINH.3" "ASINH.7" "ACOSH.3" "EXP.ERROR.7"
+                       "EXPT.ERROR.4" "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"
+                       "PROBE-FILE.4" "OPEN.OUTPUT.23" "OPEN.IO.22" "OPEN.IO.23")
+         #+arm64 (list "EXP.ERROR.4" "EXP.ERROR.5" "EXP.ERROR.6" "EXP.ERROR.7" "EXPT.ERROR.4"
+                       "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"))))
                          (failing (remove "FORMAT.E.26"
                                           (mapcar (function string) regression-test:*failed-tests*)
                                           :test (function equal)))
+                         #+sb-devel
+                         (failing (remove "COMMON-LISP-PACKAGE-NICKNAMES" failing :test (function equal)))
                          (diff1 (set-difference failing  expected :test (function equal)))
                          (diff2 (set-difference expected failing :test (function equal))))
    (cond ((or diff1 diff2)
