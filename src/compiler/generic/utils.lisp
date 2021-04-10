@@ -237,3 +237,7 @@
                   (#.fdefn-widetag 0)
                   (t (ash (1- nwords) (length-field-shift widetag)))))
             widetag)))
+
+(defmacro bitmap-bits-offset ()
+  (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
+    (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))

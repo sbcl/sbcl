@@ -1427,8 +1427,7 @@ or they must be declared locally notinline at each call site.~@:>"
         ;; words, or else GC will croak when parsing the bitmap.
         (and (= (calculate-extra-id-words (layout-depthoid old-layout))
                 (calculate-extra-id-words (layout-depthoid new-layout)))
-             (= (layout-bitmap-words new-layout)
-                (layout-bitmap-words old-layout))
+             (= (bitmap-nwords new-layout) (bitmap-nwords old-layout))
              (dotimes (i (dd-length (layout-dd old-layout)) t)
                (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
                           (not (logbitp i old-bitmap))) ; that was opaque bits

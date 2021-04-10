@@ -194,7 +194,7 @@ between the ~A definition and the ~A definition"
                     (from-index
                      (+ (type-dd-length layout)
                         (calculate-extra-id-words (layout-depthoid ,from-layout)))))
-                (dotimes (i (layout-bitmap-words ,from-layout))
+                (dotimes (i (bitmap-nwords ,from-layout))
                   (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
                         (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
 (defun register-layout (layout &key (invalidate t) destruct-layout)

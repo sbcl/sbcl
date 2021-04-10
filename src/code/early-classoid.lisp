@@ -292,8 +292,7 @@
 ;;;   * ID-WORDn are optimizations for TYPEP.
 ;;; So none of those really make sense on the host.
 ;;; Also, we eschew the packed representation of length+depthoid+flags.
-;;; FLAGS are not even strictly necessary, since they are for optimizing
-;;; various type checks.
+;;; FLAGS are computed on demand, and not stored.
 #+sb-xc-host
 (progn
   ;; As far as the host is concerned, LAYOUT and WRAPPER are always the same.
@@ -314,7 +313,6 @@
     ;; But there's no harm in storing it.
     (clos-hash nil :type (and sb-xc:fixnum unsigned-byte))
     (classoid nil :type classoid)
-;    (flags 0 :type word)
     (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
     (inherits #() :type simple-vector)
     (depthoid -1 :type layout-depthoid)
@@ -439,10 +437,18 @@
                 :dont-save t))
     layout))
 
-(declaim (inline layout-bitmap-words))
-(defun layout-bitmap-words (layout)
+(declaim (inline bitmap-nwords bitmap-all-taggedp))
+(defun bitmap-nwords (layout)
   (declare (layout layout))
   (- (%instance-length layout) (type-dd-length layout)))
+
+(defun bitmap-all-taggedp (layout)
+  ;; All bitmaps have at least 1 word; read that first.
+  (and (= (%raw-instance-ref/signed-word layout (type-dd-length layout))
+          +layout-all-tagged+)
+       ;; Then check that there are no additional words.
+       (= (%instance-length layout) (1+ (type-dd-length layout)))))
+
 (defun layout-bitmap (layout)
   (acond ((layout-info layout) (dd-bitmap it))
          ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
@@ -451,12 +457,14 @@
          ;; on the platform, and the layout is tagged but a special case.
          ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
          ;; words preceding it.
-         (t (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
+         (t (the fixnum
+                 (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
 
-#+(and (not sb-xc-host) 64-bit)
+#+64-bit
 ;;; LAYOUT-DEPTHOID gets a vop and a stub
 (defmacro layout-length (layout) ; SETFable
   `(ldb (byte 16 16) (layout-flags ,layout)))
+) ; end PROGN
 
 (defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 

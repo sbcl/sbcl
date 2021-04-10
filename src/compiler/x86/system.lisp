@@ -67,9 +67,7 @@
   (:generator 1
     (inst cmp
           (make-ea :dword
-                   :disp (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
-                                    instance-slots-offset)
-                                 word-shift)
+                   :disp (+ (bitmap-bits-offset)
                             (ash (- (layout-depthoid test) 2) 2)
                             (- instance-pointer-lowtag))
                    :base x)

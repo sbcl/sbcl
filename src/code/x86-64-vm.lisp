@@ -161,7 +161,7 @@
     (#.sb-vm:closure-widetag t)
     (#.sb-vm:funcallable-instance-widetag
      ;; if the FIN has no raw words then it has no internal trampoline
-     (eql (layout-bitmap (%fun-layout fun)) +layout-all-tagged+))))
+     (sb-kernel::bitmap-all-taggedp (%fun-layout fun)))))
 
 ;; TODO: put a trampoline in all fins and allocate them anywhere.
 ;; Revision e7cd2bd40f5b9988 caused some FINs to go in dynamic space
@@ -195,7 +195,7 @@
                                       (logior (ash 5 n-widetag-bits)
                                               funcallable-instance-widetag)))))
     ;; Assert that raw bytes will not cause GC invariant lossage
-    (aver (/= (layout-bitmap layout) +layout-all-tagged+))
+    (aver (not (sb-kernel::bitmap-all-taggedp layout)))
     ;; Set layout prior to writing raw slots
     (setf (%fun-layout gf) layout)
     ;; just being pedantic - liveness is preserved by the stack reference.

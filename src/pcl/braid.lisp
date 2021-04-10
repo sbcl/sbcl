@@ -60,7 +60,7 @@
                     most-positive-fixnum)))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and immobile-code)
-                    ((/= (layout-bitmap wrapper) +layout-all-tagged+)
+                    ((not (sb-kernel::bitmap-all-taggedp wrapper))
                      (let ((f (truly-the funcallable-instance
                                          (sb-vm::make-immobile-funinstance wrapper slots))))
                        ;; set the upper 4 bytes of wordindex 5

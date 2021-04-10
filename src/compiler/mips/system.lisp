@@ -68,9 +68,7 @@
   (:temporary (:sc unsigned-reg) this-id test-id)
   (:generator 4
     (let ((label (register-inline-constant :layout-id test-layout))
-          (offset (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
-                             instance-slots-offset)
-                          word-shift)
+          (offset (+ (bitmap-bits-offset)
                      (ash (- (layout-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lw test-id sb-vm::code-tn label)

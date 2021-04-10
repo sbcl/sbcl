@@ -298,15 +298,15 @@
             (instance
              ;; Don't refer to the DD-SLOTS unless there is reason to,
              ;; that is, unless some slot might be raw.
-             (if (/= +layout-all-tagged+ (layout-bitmap (%instance-layout tree)))
-                 (let ((dd (layout-dd (%instance-layout tree))))
-                   (dolist (dsd (dd-slots dd))
-                     (when (eq (dsd-raw-type dsd) t)
-                       (process (%instance-ref tree (dsd-index dsd))))))
+             (if (sb-kernel::bitmap-all-taggedp (%instance-layout tree))
                  (do ((len (%instance-length tree))
                       (i sb-vm:instance-data-start (1+ i)))
                      ((>= i len))
-                   (process (%instance-ref tree i)))))
+                   (process (%instance-ref tree i)))
+                 (let ((dd (layout-dd (%instance-layout tree))))
+                   (dolist (dsd (dd-slots dd))
+                     (when (eq (dsd-raw-type dsd) t)
+                       (process (%instance-ref tree (dsd-index dsd))))))))
             ;; ASSUMPTION: all funcallable instances have at least 1 slot
             ;; accessible via FUNCALLABLE-INSTANCE-INFO.
             ;; The only such objects with reader syntax are CLOS objects,

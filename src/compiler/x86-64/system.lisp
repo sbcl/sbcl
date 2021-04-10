@@ -77,9 +77,7 @@
   (:conditional :e)
   (:generator 1
     (inst cmp :dword
-          (ea (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
-                         instance-slots-offset)
-                      word-shift)
+          (ea (+ (bitmap-bits-offset)
                  (ash (- (layout-depthoid test) 2) 2)
                  (- instance-pointer-lowtag))
               x)

@@ -45,6 +45,13 @@
 ;; these abstractions are provided as soon as the raw slots defs are.
 (def!type sb-vm:word () `(unsigned-byte ,sb-vm:n-word-bits))
 (def!type sb-vm:signed-word () `(signed-byte ,sb-vm:n-word-bits))
+
+;;; This constant has a 1 bit meaning "tagged" for every user data slot.
+;;; If LAYOUT is not in the header word, then (%INSTANCE-REF instance 0)
+;;; indicates as raw so that GC treats layouts consistently, not scanning
+;;; them en passant while visiting the payload. Consequently, 0 means either
+;;; no slots or all raw, no matter if the layout consumes a slot.
+;;; See remarks above CALCULATE-DD-BITMAP for further details.
 (defconstant +layout-all-tagged+ (ash -1 sb-vm:instance-data-start))
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed

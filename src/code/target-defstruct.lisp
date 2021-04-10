@@ -30,6 +30,9 @@
 (defun %instance-ref (instance index)
   (%instance-ref instance index))
 
+(macrolet ((bitmap-sap ()
+             `(sap+ (int-sap (get-lisp-obj-address layout))
+                    ,(- (sb-vm::bitmap-bits-offset) sb-vm:instance-pointer-lowtag))))
 (defun layout-id (layout)
   ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
   ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
@@ -47,12 +50,7 @@
                layout (+ (get-dsd-index layout id-word0) index))
               #+64-bit ; use SAP-ref for lack of half-sized slots
               (with-pinned-objects (layout)
-                (let ((sap (sap+ (int-sap (get-lisp-obj-address layout))
-                                 (- (ash (+ sb-vm:instance-slots-offset
-                                            (get-dsd-index layout id-word0))
-                                         sb-vm:word-shift)
-                                    sb-vm:instance-pointer-lowtag))))
-                  (signed-sap-ref-32 sap (ash index 2)))))))
+                (signed-sap-ref-32 (bitmap-sap) (ash index 2))))))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
   #-metaspace (setf (layout-inherits layout) inherits)
@@ -70,10 +68,7 @@
     ;; We could use (SETF %RAW-INSTANCE-REF/WORD) for 32-bit architectures,
     ;; but on 64-bit we have to use SAP-REF, so may as well be consistent here
     ;; and use a SAP either way.
-    (let ((sap (sap+ (int-sap (get-lisp-obj-address layout))
-                     (- (ash (+ sb-vm:instance-slots-offset (get-dsd-index layout id-word0))
-                             sb-vm:word-shift)
-                        sb-vm:instance-pointer-lowtag))))
+    (let ((sap (bitmap-sap)))
       (cond (structurep
              (loop for i from 0 by 4
                    for j from 2 below (length inherits) ; skip T and STRUCTURE-OBJECT
@@ -81,6 +76,7 @@
                    finally (setf (signed-sap-ref-32 sap i) this-id)))
             ((not (eql this-id 0))
              (setf (signed-sap-ref-32 sap 0) this-id))))))
+) ; end MACROLET
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
@@ -141,8 +137,7 @@
       (set-layout-equalp-impl
           layout
           (cond ((compiled-function-p equalp) equalp)
-                ((eql (layout-bitmap layout) +layout-all-tagged+)
-                 #'sb-impl::instance-equalp)
+                ((eql (dd-bitmap dd) +layout-all-tagged+) #'sb-impl::instance-equalp)
                 (t
                   ;; Make a vector of EQUALP slots comparators, indexed by
                   ;; (- word-index INSTANCE-DATA-START).
@@ -189,7 +184,7 @@
     (let* ((len (%instance-length structure))
            (res (%make-instance len)))
       (declare (type index len))
-      (let ((bitmap (layout-bitmap layout)))
+      (let ((bitmap (dd-bitmap (layout-dd layout))))
         ;; Don't assume that %INSTANCE-REF can access the layout.
         (setf (%instance-layout res) (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor

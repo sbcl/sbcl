@@ -1565,7 +1565,7 @@
                 (let* ((layout (truly-the layout (translate (%fun-layout obj) spaces)))
                        (bitmap (%raw-instance-ref/signed-word
                                 layout (sb-kernel::type-dd-length sb-kernel:layout))))
-                  (unless (= (sb-kernel:layout-bitmap-words layout) 1)
+                  (unless (= (sb-kernel:bitmap-nwords layout) 1)
                     (error "Strange funcallable-instance bitmap"))
                   (unless (eql bitmap sb-kernel:+layout-all-tagged+)
                       ;; tagged slots precede untagged slots,

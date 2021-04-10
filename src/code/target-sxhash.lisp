@@ -92,8 +92,11 @@
 (defun %instance-sxhash (instance)
   ;; to avoid consing in fmix
   (declare (inline #+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32))
-  ;; FIXME: this special case might be removable, but there are callers
-  ;; of sxhash on layouts due to the expansion of TYPECASE.
+  ;; LAYOUT must not acquire an extra slot for the stable hash,
+  ;; because the bitmap length is derived from the instance length.
+  ;; It would probably be simple to eliminate this as a special case
+  ;; by ensuring that instances of LAYOUT commence life with a trailing
+  ;; hash slot and the SB-VM:HASH-SLOT-PRESENT-FLAG set.
   (when (typep instance 'layout)
     ;; This might be wrong if the clos-hash was clobbered to 0
     (return-from %instance-sxhash (layout-clos-hash instance)))
@@ -446,10 +449,11 @@
            (declare (type fixnum result))
            (when (plusp depthoid)
              (let ((max-iterations depthoid)
-                   (depthoid (1- depthoid)))
+                   (depthoid (1- depthoid))
+                   (dd (layout-dd layout)))
                (declare (index max-iterations))
-               (if (/= (layout-bitmap layout) +layout-all-tagged+)
-                   (let ((slots (dd-slots (layout-dd layout))))
+               (if (/= (sb-kernel::dd-bitmap dd) +layout-all-tagged+)
+                   (let ((slots (dd-slots dd)))
                      (loop (unless slots (return))
                            (let* ((slot (pop slots))
                                   (rsd-index+1 (rsd-index+1 slot))

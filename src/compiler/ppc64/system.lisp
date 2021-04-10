@@ -74,9 +74,7 @@
   (:temporary (:scs (non-descriptor-reg)) this-id)
   (:generator 4
     (let ((test-id (layout-id test-layout))
-          (offset (+ (ash (+ (get-dsd-index layout sb-kernel::id-word0)
-                             instance-slots-offset)
-                          word-shift)
+          (offset (+ (bitmap-bits-offset)
                      (ash (- (layout-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lwa this-id x offset)
