@@ -184,10 +184,14 @@
 ;;; or an ordinary instance that is not a structure-object.
 (declaim (inline %pcl-instance-p))
 (defun %pcl-instance-p (x)
-  ;; The COND is more efficient than LAYOUT-OF.
-  (layout-for-pcl-obj-p (cond ((%instancep x) (%instance-layout x))
-                              ((function-with-layout-p x) (%fun-layout x))
-                              (t (return-from %pcl-instance-p nil)))))
+  ;; read-time eval so that vop-existsp isn't part of the inline expansion
+  #.(if (sb-c::vop-existsp :translate %instanceoid-layout)
+        '(logtest (layout-flags (%instanceoid-layout x)) +pcl-object-layout-flag+)
+        ;; The COND is slightly more efficient than LAYOUT-OF.
+        '(layout-for-pcl-obj-p
+          (cond ((%instancep x) (%instance-layout x))
+                ((function-with-layout-p x) (%fun-layout x))
+                (t (return-from %pcl-instance-p nil))))))
 
 ;;; Try to ensure that the object's layout is up-to-date only if it is an instance
 ;;; or funcallable-instance of other than a static or structure classoid type.
