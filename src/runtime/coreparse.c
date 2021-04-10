@@ -867,7 +867,7 @@ process_directory(int count, struct ndir_entry *entry,
                   DYNAMIC_0_SPACE_START = addr = semispace_0_start;
                   current_dynamic_space = (lispobj*)addr;
                   // Request that much again now
-                  uword_t addr1 = (uword_t)os_allocate(request);
+                  uword_t addr1 = (uword_t)os_validate(MOVABLE, 0, request, 1, 0);
                   uword_t semispace_1_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
                   uword_t semispace_1_end = ALIGN_DOWN(addr1 + request, BACKEND_PAGE_BYTES);
 

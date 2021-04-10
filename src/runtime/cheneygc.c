@@ -150,8 +150,7 @@ collect_garbage(generation_index_t ignore)
     scavenge_interrupt_contexts(th);
 
 #ifdef PRINTNOISE
-    printf("Scavenging interrupt handlers (%d bytes) ...\n",
-           (int)sizeof(interrupt_handlers));
+    printf("Scavenging interrupt handlers ...\n");
 #endif
     scavenge(lisp_sig_handlers, NSIG);
 
