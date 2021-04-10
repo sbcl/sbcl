@@ -203,7 +203,6 @@
                 (widetag-of x))))))
 
 (declaim (inline classoid-of))
-#-sb-xc-host
 (defun classoid-of (object)
   "Return the class of the supplied object, which may be any Lisp object, not
    just a CLOS STANDARD-OBJECT."
@@ -293,8 +292,8 @@
   ;; Anyway it suffices to disable type checking and pretend its the always
   ;; the first arg that's an integer, but that won't work on the host because
   ;; it might enforce the type since we can't portably unenforce after declaring.
-  #-sb-xc-host (declare (optimize (sb-c::type-check 0)))
-  (eql #+sb-xc-host obj1 #-sb-xc-host (the integer obj1) obj2))
+  (declare (optimize (sb-c::type-check 0)))
+  (eql (the integer obj1) obj2))
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)

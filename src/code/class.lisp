@@ -420,26 +420,11 @@ between the ~A definition and the ~A definition"
       (note-class class)
       (topological-sort classes constraints #'std-cpl-tie-breaker))))
 
-;;;; object types to represent classes
-
-;;; BUILT-IN-CLASS is used to represent the standard classes that
-;;; aren't defined with DEFSTRUCT and other specially implemented
-;;; primitive types whose only attribute is their name.
-;;; It is defined in 'early-classoid.lisp'
-
-;;; STRUCTURE-CLASS represents what we need to know about structure
-;;; classes. Non-structure "typed" defstructs are a special case, and
-;;; don't have a corresponding class.
-(def!struct (structure-classoid (:include classoid)
-                                (:copier nil)
-                                (:constructor make-structure-classoid
-                                    (&key name &aux (%bits (pack-ctype-bits classoid name))))))
-
 ;;;; classoid namespace
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun (setf find-classoid) (new-value name)
-    #-sb-xc (declare (type (or null classoid) new-value))
+    (declare (type (or null classoid) new-value))
     (aver new-value)
     (with-world-lock ()
         (let ((cell (find-classoid-cell name :create t)))
@@ -566,7 +551,7 @@ between the ~A definition and the ~A definition"
 ;;; If the classoid has a proper name, return the name, otherwise return
 ;;; the classoid.
 (defun classoid-proper-name (classoid)
-  #-sb-xc (declare (type classoid classoid))
+  (declare (type classoid classoid))
   (let ((name (classoid-name classoid)))
     (if (and name (eq (find-classoid name nil) classoid))
         name

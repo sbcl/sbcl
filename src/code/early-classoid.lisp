@@ -602,6 +602,15 @@
   ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
 
+;;; STRUCTURE-CLASSOID represents what we need to know about structure
+;;; classes. Non-structure "typed" defstructs are a special case, and
+;;; don't have a corresponding class.
+(def!struct (structure-classoid
+             (:include classoid)
+             (:copier nil)
+             (:constructor make-structure-classoid
+                           (&key name &aux (%bits (pack-ctype-bits classoid name))))))
+
 ;;;; classoid namespace
 
 ;;; We use an indirection to allow forward referencing of class
