@@ -720,6 +720,8 @@
                                           ,(sb-kernel:find-layout what))))))
 
 (with-test (:name :type-of-empty-instance)
+  (assert (eq (type-of (eval '(sb-kernel:%make-funcallable-instance 6)))
+              'sb-kernel:funcallable-instance))
   (assert (eq (type-of (eval '(sb-kernel:%make-instance 12)))
               'sb-kernel:instance)))
 

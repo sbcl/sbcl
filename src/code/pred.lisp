@@ -256,23 +256,26 @@
     (simple-fun 'compiled-function)
     (t
      (let ((layout (layout-of object)))
-       (if (eq (get-lisp-obj-address layout) 0)
-            ;; An empty instance, e.g. created by with-output-to-string
-            'instance
-            (let* ((classoid (layout-classoid layout))
-                   (name (classoid-name classoid)))
-              (if (%instancep object)
-                  (case name
-                    (sb-alien-internals:alien-value
-                     `(alien
-                       ,(sb-alien-internals:unparse-alien-type
-                         (sb-alien-internals:alien-value-type object))))
-                    (t
-                     (let ((pname (classoid-proper-name classoid)))
-                       (if (classoid-p pname)
-                           (classoid-pcl-class pname)
-                           pname))))
-                  name)))))))
+       (when (= (get-lisp-obj-address layout) 0)
+         ;; [fun-]instances momentarily have no layout in any code interrupted
+         ;; just after allocating and before assigning slots.
+         ;; OUTPUT-UGLY-OBJECT has a similar precaution as this.
+         (return-from type-of
+           (if (functionp object) 'funcallable-instance 'instance)))
+       (let* ((classoid (layout-classoid layout))
+              (name (classoid-name classoid)))
+         ;; FIXME: should the first test be (not (or (%instancep) (%funcallable-instance-p)))?
+         ;; God forbid anyone makes anonymous classes of generic functions.
+         (cond ((not (%instancep object))
+                name)
+               ((eq name 'sb-alien-internals:alien-value)
+                `(alien ,(sb-alien-internals:unparse-alien-type
+                          (sb-alien-internals:alien-value-type object))))
+               (t
+                (let ((pname (classoid-proper-name classoid)))
+                  (if (classoid-p pname)
+                      (classoid-pcl-class pname)
+                      pname)))))))))
 
 ;;;; equality predicates
 
