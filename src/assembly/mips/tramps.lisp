@@ -14,6 +14,7 @@
                                    fun-pointer-lowtag))))
     ((:temp nl0 unsigned-reg nl0-offset)
      (:temp lra descriptor-reg lra-offset))
+  (progn nl0) ; "use" it. Don't know if it's needed, and don't care to know.
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'undefined-tramp-tagged
                           :assembly-routine))
