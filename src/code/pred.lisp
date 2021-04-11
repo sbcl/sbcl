@@ -243,7 +243,7 @@
            ((eq (sb-xc:symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
     (array
-     (let ((etype (specifier-type (array-element-type object))))
+     (let ((etype (sb-vm::array-element-ctype object)))
        ;; Obviously :COMPLEXP is known to be T or NIL, but it's not allowed to
        ;; return (NOT SIMPLE-ARRAY), so use :MAYBE in lieu of T.
        (type-specifier

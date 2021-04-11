@@ -385,23 +385,29 @@
                          (vector-length-in-words full-length n-bits-shift)
                          0))))
 
+(declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag))
 (defun array-underlying-widetag (array)
-  (macrolet ((make-case ()
-               `(case widetag
-                  ,@(loop for saetp across *specialized-array-element-type-properties*
-                          for complex = (saetp-complex-typecode saetp)
-                          when complex
-                          collect (list complex (saetp-typecode saetp)))
-                  ((,simple-array-widetag
-                    ,complex-vector-widetag
-                    ,complex-array-widetag)
-                   (with-array-data ((array array) (start) (end))
-                     (declare (ignore start end))
-                     (%other-pointer-widetag array)))
-                  (t
-                   widetag))))
-    (let ((widetag (%other-pointer-widetag array)))
-      (make-case))))
+  (macrolet ((generate-table ()
+               (macrolet ((to-index (x) `(ash ,x -2)))
+                 (let ((table (sb-xc:make-array 64 :initial-element 0
+                                                :element-type '(unsigned-byte 8))))
+                   (dovector (saetp *specialized-array-element-type-properties*)
+                     (let* ((typecode (saetp-typecode saetp))
+                            (complex-typecode (saetp-complex-typecode saetp)))
+                       (setf (aref table (to-index typecode)) typecode)
+                       (when complex-typecode
+                         (setf (aref table (to-index complex-typecode)) typecode))))
+                   (setf (aref table (to-index simple-array-widetag)) 0
+                         (aref table (to-index complex-vector-widetag)) 0
+                         (aref table (to-index complex-array-widetag)) 0)
+                   table)))
+             (to-index (x) `(ash ,x -2)))
+  (named-let recurse ((x array))
+    (let ((result (aref (generate-table)
+                        (to-index (%other-pointer-widetag x)))))
+      (if (= 0 result)
+          (recurse (%array-data x))
+          (truly-the (integer 128 255) result))))))
 
 (defun sb-impl::make-vector-like (vector length)
   (allocate-vector-with-widetag (array-underlying-widetag vector) length nil))
@@ -1023,33 +1029,24 @@ of specialized arrays is supported."
 
 ;;;; miscellaneous array properties
 
+(macrolet ((widetag->type (accessor)
+             (let ((table
+                    ;; Using unbound-marker for empty elements would be preferable,
+                    ;; but I'd either need a cross-compiler proxy for unbound-marker,
+                    ;; or else wrap a LOAD-TIME-VALUE on the table construction form
+                    ;; which might introduce more order-sensitivity to self-build.
+                    (sb-xc:make-array 32 ;:initial-element (make-unbound-marker)
+                                      :initial-element 0)))
+               (dovector (saetp *specialized-array-element-type-properties*)
+                 (setf (aref table (ash (- (saetp-typecode saetp) 128) -2))
+                       (funcall accessor saetp)))
+               `(aref ,table (- (ash (array-underlying-widetag array) -2) 32)))))
+(defun array-element-ctype (array)
+  ;; same as (SPECIFIER-TYPE (ARRAY-ELEMENT-TYPE ARRAY)) but more efficient
+  (widetag->type saetp-ctype))
 (defun array-element-type (array)
   "Return the type of the elements of the array"
-  (let ((widetag (%other-pointer-widetag array))
-        (table (load-time-value
-                (let ((table (make-array 256 :initial-element :invalid)))
-                  (dotimes (i (length *specialized-array-element-type-properties*) table)
-                    (let* ((saetp (aref *specialized-array-element-type-properties* i))
-                           (typecode (saetp-typecode saetp))
-                           (complex-typecode (saetp-complex-typecode saetp))
-                           (specifier (saetp-specifier saetp)))
-                      (aver (typep specifier '(or list symbol)))
-                      (setf (aref table typecode) specifier)
-                      (when complex-typecode
-                        (setf (aref table complex-typecode) specifier))))
-                  (setf (aref table simple-array-widetag) nil
-                        (aref table complex-vector-widetag) nil
-                        (aref table complex-array-widetag) nil)
-                  table)
-                t)))
-    (let ((result (aref table widetag)))
-      (if result
-          (truly-the (or list symbol) result)
-          ;; (MAKE-ARRAY :ELEMENT-TYPE NIL) goes to this branch, but
-          ;; gets the right answer in the end
-          (with-array-data ((array array) (start) (end))
-            (declare (ignore start end))
-            (truly-the (or list symbol) (aref table (%other-pointer-widetag array))))))))
+  (truly-the (or list symbol) (widetag->type saetp-specifier))))
 
 (defun array-rank (array)
   "Return the number of dimensions of ARRAY."

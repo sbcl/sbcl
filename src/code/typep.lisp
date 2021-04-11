@@ -74,10 +74,10 @@
                      (type-specifier type))
               t)
           (or (eq (array-type-specialized-element-type type) *wild-type*)
+              ;; FIXME: see whether this TYPE= can be reduced to EQ.
+              ;; (Each specialized element type should be an interned ctype)
               (values (type= (array-type-specialized-element-type type)
-                             ;; FIXME: not the most efficient.
-                             (specifier-type (array-element-type
-                                              object)))))))
+                             (sb-vm::array-element-ctype object))))))
     (member-type
      (when (member-type-member-p object type)
        t))
@@ -460,7 +460,7 @@
                                            sb-vm:n-widetag-bits)
                                       (array-underlying-widetag array)))))
   ;; The value computed on cache miss.
-  (let ((etype (specifier-type (array-element-type array))))
+  (let ((etype (sb-vm::array-element-ctype array)))
     (make-array-type (array-dimensions array)
                      :complexp (not (simple-array-p array))
                      :element-type etype

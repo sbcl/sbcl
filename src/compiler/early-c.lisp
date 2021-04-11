@@ -234,6 +234,8 @@ the stack without triggering overflow protection.")
                  ((or symbol number string)
                   x)
                  (t
+                  ;; wtf?? This looks like a source of sensitivity to the cross-compiler host
+                  ;; in addition to which it seems generally a stupid idea.
                   (type-of x)))))
       (let ((name (list* type (walk thing) (when context (name-context)))))
         (when (legal-fun-name-p name)
