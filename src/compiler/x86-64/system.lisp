@@ -77,7 +77,7 @@
   (:conditional :e)
   (:generator 1
     (inst cmp :dword
-          (ea (+ (bitmap-bits-offset)
+          (ea (+ (id-bits-offset)
                  (ash (- (wrapper-depthoid test) 2) 2)
                  (- instance-pointer-lowtag))
               x)

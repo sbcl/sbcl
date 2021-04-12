@@ -59,7 +59,7 @@
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg) this-id temp)
   (:generator 4
-    (let ((offset (+ (bitmap-bits-offset)
+    (let ((offset (+ (id-bits-offset)
                      (ash (- (wrapper-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst ld this-id x offset)

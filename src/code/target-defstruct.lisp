@@ -39,9 +39,9 @@
 (defun %instance-ref (instance index)
   (%instance-ref instance index))
 
-(macrolet ((bitmap-sap ()
+(macrolet ((id-bits-sap ()
              `(sap+ (int-sap (get-lisp-obj-address layout))
-                    ,(- (sb-vm::bitmap-bits-offset) sb-vm:instance-pointer-lowtag))))
+                    ,(- (sb-vm::id-bits-offset) sb-vm:instance-pointer-lowtag))))
 (defun layout-id (layout)
   ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
   ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
@@ -60,7 +60,7 @@
                         layout (+ (get-dsd-index sb-vm:layout id-word0) index))
               #+64-bit ; use SAP-ref for lack of half-sized slots
               (with-pinned-objects (layout)
-                (signed-sap-ref-32 (bitmap-sap) (ash index 2))))))
+                (signed-sap-ref-32 (id-bits-sap) (ash index 2))))))
 
 (defun set-layout-inherits (wrapper inherits structurep this-id
                             &aux (layout (wrapper-friend wrapper)))
@@ -78,7 +78,7 @@
     ;; We could use (SETF %RAW-INSTANCE-REF/WORD) for 32-bit architectures,
     ;; but on 64-bit we have to use SAP-REF, so may as well be consistent here
     ;; and use a SAP either way.
-    (let ((sap (bitmap-sap)))
+    (let ((sap (id-bits-sap)))
       (cond (structurep
              (loop for i from 0 by 4
                    for j from 2 below (length inherits) ; skip T and STRUCTURE-OBJECT

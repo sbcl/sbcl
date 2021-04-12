@@ -67,7 +67,7 @@
   (:generator 1
     (inst cmp
           (make-ea :dword
-                   :disp (+ (bitmap-bits-offset)
+                   :disp (+ (id-bits-offset)
                             (ash (- (wrapper-depthoid test) 2) 2)
                             (- instance-pointer-lowtag))
                    :base x)

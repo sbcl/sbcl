@@ -74,7 +74,7 @@
   (:temporary (:scs (non-descriptor-reg)) this-id)
   (:generator 4
     (let ((test-id (layout-id test-layout))
-          (offset (+ (bitmap-bits-offset)
+          (offset (+ (id-bits-offset)
                      (ash (- (wrapper-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lwa this-id x offset)
