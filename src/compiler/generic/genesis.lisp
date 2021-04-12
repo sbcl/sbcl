@@ -685,17 +685,15 @@
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb-vm:word-shift) lowtag))
-(defun allocate-header+object (gspace length widetag)
-  "Allocate LENGTH words plus a header word in GSPACE and
-  return an ``other-pointer'' descriptor to them. Initialize the header word
-  with the resultant length and WIDETAG."
-  (let ((des (allocate-cold-descriptor
-              gspace (ash (1+ length) sb-vm:word-shift)
-              sb-vm:other-pointer-lowtag)))
+(defun allocate-otherptr (gspace length widetag)
+  "Allocate LENGTH words in GSPACE and return an ``other-pointer'' descriptor.
+   LENGTH must count the header word itself as 1 word.  The header word is
+   initialized with the payload size as (1- LENGTH), and WIDETAG."
+  (let ((des (allocate-cold-descriptor gspace (ash length sb-vm:word-shift)
+                                       sb-vm:other-pointer-lowtag)))
     ;; FDEFNs don't store a length, freeing up a header byte for other use
-    (when (= widetag sb-vm:fdefn-widetag)
-      (setq length 0))
-    (write-header-data+tag des length widetag)
+    (write-header-data+tag des (if (= widetag sb-vm:fdefn-widetag) 0 (1- length))
+                           widetag)
     des))
 (defun allocate-vector (widetag length words &optional (gspace *dynamic*))
   ;; Allocate a vector with WORDS payload words (excluding the header+length).
@@ -809,8 +807,7 @@ core and return a descriptor to it."
 (defun bignum-to-core (n)
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb-vm:n-word-bits))
-         (handle
-          (allocate-header+object *dynamic* words sb-vm:bignum-widetag)))
+         (handle (allocate-otherptr *dynamic* (1+ words) sb-vm:bignum-widetag)))
     (integer-bits-to-core handle n words)
     handle))
 
@@ -827,7 +824,7 @@ core and return a descriptor to it."
 
 (defun number-pair-to-core (first second type)
   "Makes a number pair of TYPE (ratio or complex) and fills it in."
-  (let ((des (allocate-header+object *dynamic* 2 type)))
+  (let ((des (allocate-otherptr *dynamic* 3 type)))
     (write-wordindexed des 1 first)
     (write-wordindexed des 2 second)
     des))
@@ -853,15 +850,13 @@ core and return a descriptor to it."
        #+64-bit ; 64-bit platforms have immediate single-floats
        (make-random-descriptor (logior (ash bits 32) sb-vm:single-float-widetag))
        #-64-bit
-       (let ((des (allocate-header+object *dynamic*
-                                          (1- sb-vm:single-float-size)
-                                          sb-vm:single-float-widetag)))
+       (let ((des (allocate-otherptr *dynamic* sb-vm:single-float-size
+                                     sb-vm:single-float-widetag)))
          (write-wordindexed/raw des sb-vm:single-float-value-slot bits)
          des)))
     (double-float
-     (let ((des (allocate-header+object *dynamic*
-                                         (1- sb-vm:double-float-size)
-                                         sb-vm:double-float-widetag)))
+     (let ((des (allocate-otherptr *dynamic* sb-vm:double-float-size
+                                   sb-vm:double-float-widetag)))
        (write-double-float-bits des sb-vm:double-float-value-slot x)))))
 
 (defun unsigned-bits-to-single-float (bits)
@@ -882,9 +877,8 @@ core and return a descriptor to it."
       (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-widetag)
       (ecase (sb-impl::flonum-format r)
        (single-float
-        (let* ((des (allocate-header+object *dynamic*
-                                            (1- sb-vm:complex-single-float-size)
-                                            sb-vm:complex-single-float-widetag))
+        (let* ((des (allocate-otherptr *dynamic* sb-vm:complex-single-float-size
+                                       sb-vm:complex-single-float-widetag))
                (where (ash (+ #+64-bit sb-vm:complex-single-float-data-slot
                               #-64-bit sb-vm:complex-single-float-real-slot
                               (descriptor-word-offset des))
@@ -893,9 +887,8 @@ core and return a descriptor to it."
                 (bvref-s32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
           des))
        (double-float
-        (let ((des (allocate-header+object *dynamic*
-                                            (1- sb-vm:complex-double-float-size)
-                                            sb-vm:complex-double-float-widetag)))
+        (let ((des (allocate-otherptr *dynamic* sb-vm:complex-double-float-size
+                                      sb-vm:complex-double-float-widetag)))
           (write-double-float-bits des sb-vm:complex-double-float-real-slot r)
           (write-double-float-bits des sb-vm:complex-double-float-imag-slot i)
           des)))))
@@ -1006,7 +999,7 @@ core and return a descriptor to it."
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (let ((symbol (allocate-header+object gspace (1- size) sb-vm:symbol-widetag)))
+  (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
     (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
     (write-wordindexed symbol sb-vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
@@ -1645,14 +1638,13 @@ core and return a descriptor to it."
                    #+64-bit sb-vm:simple-array-signed-byte-64-widetag
                    6 6 *static*)
   #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
-  (let* ((des (allocate-header+object *static* sb-vm:symbol-size 0))
+  (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                       (* 2 sb-vm:n-word-bytes)
                                       (- sb-vm:list-pointer-lowtag
-                                         ;; ALLOCATE-HEADER+OBJECT always adds in
+                                         ;; ALLOCATE-OTHERPTR always adds in
                                          ;; OTHER-POINTER-LOWTAG, so subtract it.
                                          sb-vm:other-pointer-lowtag))))
-         (header (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
          (initial-info (cold-cons nil-val nil-val))
          ;; NIL's name is in dynamic space because any extra bytes allocated
          ;; in static space need to be accounted for by STATIC-SYMBOL-OFFSET.
@@ -1685,7 +1677,7 @@ core and return a descriptor to it."
     ;; the above sequence would not necessarily decrease the instruction count!
 
     (write-wordindexed des 0 (make-fixnum-descriptor 0))
-    (write-wordindexed des 1 header)
+    (write-wordindexed des 1 (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
     (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
     (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
     (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
@@ -1975,7 +1967,7 @@ core and return a descriptor to it."
   (declare (type (or symbol descriptor) cold-name))
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
-        (let ((fdefn (allocate-header+object gspace (1- sb-vm:fdefn-size) sb-vm:fdefn-widetag)))
+        (let ((fdefn (allocate-otherptr gspace sb-vm:fdefn-size sb-vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
           #+x86-64
           (write-wordindexed/raw ; write an INT instruction into the header
