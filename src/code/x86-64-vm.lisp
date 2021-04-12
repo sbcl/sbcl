@@ -197,7 +197,7 @@
     ;; Assert that raw bytes will not cause GC invariant lossage
     (aver (not (sb-kernel::bitmap-all-taggedp layout)))
     ;; Set layout prior to writing raw slots
-    (setf (%fun-layout gf) layout)
+    (setf (%fun-wrapper gf) layout)
     ;; just being pedantic - liveness is preserved by the stack reference.
     (with-pinned-objects (gf)
       (let* ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask))

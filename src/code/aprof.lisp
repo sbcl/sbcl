@@ -136,7 +136,7 @@
 (defun layout-name (ptr)
   (if (eql (valid-lisp-pointer-p (int-sap ptr)) 0)
       'structure
-      (layout-classoid-name (make-lisp-obj ptr))))
+      (wrapper-classoid-name (layout-friend (make-lisp-obj ptr)))))
 
 ;;; These EAs are s-expressions, not instances of EA or MACHINE-EA.
 #-sb-safepoint

@@ -252,7 +252,7 @@
                              #+immobile-space
                              (let ((val (constant-value constant)))
                                (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
-                                   (typep val 'layout)))))
+                                   (typep val 'wrapper)))))
                 (let ((constants (ir2-component-constants component)))
                   (setf (tn-offset res)
                         (vector-push-extend constant constants))))

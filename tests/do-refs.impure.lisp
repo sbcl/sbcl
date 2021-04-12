@@ -11,10 +11,12 @@
 
 (in-package sb-vm)
 
-(defun collect-slot-values (obj)
-  (collect ((slots))
+(defun collect-slot-values (obj &aux result)
+  (flet ((slots (x)
+           #+metaspace (if (typep x 'sb-vm:layout) (setq x (sb-kernel::layout-friend x)))
+           (push x result)))
     (do-referenced-object (obj slots))
-    (slots)))
+    (nreverse result)))
 
 (defun walk-slots-test (obj expect)
   (assert (equal (collect-slot-values obj) expect)))
@@ -89,27 +91,26 @@
     (walk-slots-test* o
                       (lambda (slots)
                         (destructuring-bind (layout clos-slots) slots
-                          (and (eq layout (%instance-layout o))
+                          (and (eq layout (%instance-wrapper o))
                                (eq clos-slots (sb-pcl::std-instance-slots o))))))))
 
 (define-condition cfoo (simple-condition) ((a :initarg :a) (b :initarg :b) (c :initform 'c)))
 (test-util:with-test (:name :walk-slots-condition-instance)
   (let ((instance (make-condition 'cfoo :a 'ay :b 'bee :format-arguments "wat")))
     (walk-slots-test instance
-                     `(,(find-layout 'cfoo)
-                       (c c format-control nil)
+                     `(,(find-layout 'cfoo) (c c format-control nil)
                        :a  ay :b bee :format-arguments "wat"))))
 
 (defun make-random-funinstance (&rest values)
   (let* ((ctor (apply #'sb-pcl::%make-ctor values))
-         (layout (sb-kernel:%fun-layout ctor)))
+         (wrapper (sb-kernel:%fun-wrapper ctor)))
     ;; If the number of payload words is even, then there's a padding word
     ;; because adding the header makes the unaligned total an odd number.
     ;; Fill that padding word with something - it should not be visible.
     ;; Whether GC should trace the word is a different question,
     ;; on whose correct answer I waver back and forth.
     (when (evenp (sb-kernel:get-closure-length ctor)) ; payload length
-      (let ((max (reduce #'max (sb-kernel:dd-slots (sb-kernel:layout-info layout))
+      (let ((max (reduce #'max (sb-kernel:dd-slots (sb-kernel:wrapper-dd wrapper))
                          :key 'sb-kernel:dsd-index)))
         (setf (sb-kernel:%funcallable-instance-info ctor (1+ max))
               (elt sb-vm:+static-symbols+ 0))))
@@ -130,9 +131,9 @@
     (funcall f 1 2 3) ; compute the digested slots
     (walk-slots-test* f
                       (lambda (slots)
-                        (destructuring-bind (layout fin-fun a b c d) slots
+                        (destructuring-bind (type fin-fun a b c d) slots
                           (declare (ignore a b c))
-                          (and (typep layout 'layout)
+                          (and (typep type 'wrapper)
                                (typep fin-fun 'closure)
                                (typep d '(and integer (not (eql 0))))))))))
 
@@ -146,7 +147,7 @@
 (defun deep-size (obj &optional (leafp (lambda (x)
                                          (typep x '(or package symbol fdefn
                                                        function code-component
-                                                       layout classoid)))))
+                                                       wrapper classoid)))))
   (let ((worklist (list obj))
         (seen (make-hash-table :test 'eq))
         (tot-bytes 0))

@@ -424,9 +424,8 @@
 
                (static-symbol-p value))
        immediate-sc-number))
-    #+immobile-space
-    (layout
-       immediate-sc-number)
+    #+metaspace (sb-vm:layout (bug "Can't reference layout as a constant"))
+    #+(and immobile-space (not metaspace)) (wrapper immediate-sc-number)
     (single-float
        (if (eql value $0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float
@@ -463,8 +462,8 @@
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-symbol)))
-          #+immobile-space
-          (layout
+          #+(and immobile-space (not metaspace))
+          (wrapper
            (make-fixup val :layout))
           (character (if tag
                          (logior (ash (char-code val) n-widetag-bits)

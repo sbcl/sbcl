@@ -155,7 +155,7 @@
          (index
           (position "OBJECT-NOT-TYPE-ERROR" lines :test 'search)))
     (let ((line (nth (+ index 2) lines)))
-      (assert (search "; #<SB-KERNEL:LAYOUT " line))
+      (assert (search "; #<SB-KERNEL:WRAPPER " line))
       (assert (search " SB-ASSEM:LABEL" line)))))
 
 #+immobile-code
@@ -718,15 +718,15 @@ sb-vm::(define-vop (cl-user::test)
   ;; component.
   (let ((names
           (mapcar (lambda (x)
-                    (sb-kernel:classoid-name (sb-kernel:layout-classoid x)))
-                  (ctu:find-code-constants #'sb-kernel:%%typep :type 'sb-kernel:layout))))
+                    (sb-kernel:classoid-name (sb-kernel:wrapper-classoid x)))
+                  (ctu:find-code-constants #'sb-kernel:%%typep :type 'sb-kernel:wrapper))))
     (assert (null (set-difference names
                                   '(sb-kernel:ctype
                                     sb-kernel:unknown-type
                                     sb-kernel:fun-designator-type
                                     sb-c::abstract-lexenv
                                     sb-kernel::classoid-cell
-                                    sb-kernel:layout
+                                    sb-kernel:wrapper
                                     sb-kernel:classoid
                                     sb-kernel:built-in-classoid
                                     #-immobile-space null))))))
@@ -745,7 +745,7 @@ sb-vm::(define-vop (cl-user::test)
      (loop for line in (split-string (with-output-to-string (string)
                                        (disassemble f :stream string))
                                      #\newline)
-             thereis (and (search "LAYOUT for" line)
+             thereis (and (search "WRAPPER for" line)
                           (search "CMP DWORD PTR" line)))))
 
 (with-test (:name :thread-local-unbound)
@@ -804,7 +804,7 @@ sb-vm::(define-vop (cl-user::test)
 #+compact-instance-header
 (with-test (:name :gf-self-contained-trampoline)
   (let ((l (sb-kernel:find-layout 'standard-generic-function)))
-    (assert (/= (sb-kernel:layout-bitmap l) sb-kernel:+layout-all-tagged+))))
+    (assert (/= (sb-kernel:wrapper-bitmap l) sb-kernel:+layout-all-tagged+))))
 
 (with-test (:name :known-array-rank)
   (flet ((try (type)

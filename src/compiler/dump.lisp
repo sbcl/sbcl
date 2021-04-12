@@ -448,8 +448,8 @@
                     ((not (similar-check-table x file))
                      (dump-list x file t)
                      (similar-save-object x file))))
-             (layout
-              (dump-layout x file)
+             (wrapper
+              (dump-wrapper x file)
               (eq-save-object x file))
              #+sb-xc-host
              (ctype
@@ -573,6 +573,7 @@
 ;;; We peek at the object type so that we only pay the circular
 ;;; detection overhead on types of objects that might be circular.
 (defun dump-object (x file)
+  #+(and metaspace sb-xc-host) (when (cl:typep x 'sb-vm:layout) (error "can't dump sb-vm:layout"))
   (if (compound-object-p x)
       (let ((*circularities-detected* ())
             (circ (fasl-output-circularity-table file)))
@@ -1054,8 +1055,14 @@
             (ecase flavor
               (:code-object (the null name))
               (:layout
-               (if (symbolp name) name (layout-classoid-name name)))
-              (:layout-id (the layout name))
+               (if (symbolp name)
+                   name
+                   (wrapper-classoid-name
+                    (cond #+metaspace
+                          ((sb-kernel::layout-p name) (layout-friend name))
+                          (t name)))))
+              (:layout-id
+               (the wrapper name))
               ((:assembly-routine :assembly-routine* :asm-routine-nil-offset
                :symbol-tls-index
                ;; Only #+immobile-space can use the following two flavors.
@@ -1315,12 +1322,12 @@
            struct))
   (note-potential-circularity struct file)
   (do* ((length (%instance-length struct))
-        (layout (%instance-layout struct))
-        (bitmap (layout-bitmap layout))
+        (wrapper (%instance-wrapper struct))
+        (bitmap (wrapper-bitmap wrapper))
         (circ (fasl-output-circularity-table file))
         (index sb-vm:instance-data-start (1+ index)))
       ((>= index length)
-       (dump-non-immediate-object layout file)
+       (dump-non-immediate-object wrapper file)
        (dump-fop 'fop-struct file length))
     (let* ((obj (if (logbitp index bitmap)
                     (%instance-ref struct index)
@@ -1337,14 +1344,14 @@
                              (t obj))
                        file))))
 
-(defun dump-layout (obj file)
-  (when (layout-invalid obj)
+(defun dump-wrapper (obj file &aux (flags (wrapper-flags obj)))
+  (when (wrapper-invalid obj)
     (compiler-error "attempt to dump reference to obsolete class: ~S"
-                    (layout-classoid obj)))
+                    (wrapper-classoid obj)))
   ;; STANDARD-OBJECT could in theory be dumpable, but nothing else,
   ;; because all its subclasses can evolve to have new layouts.
-  (aver (not (logtest (layout-flags obj) +pcl-object-layout-flag+)))
-  (let ((name (layout-classoid-name obj)))
+  (aver (not (logtest flags +pcl-object-layout-flag+)))
+  (let ((name (wrapper-classoid-name obj)))
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))
@@ -1354,11 +1361,11 @@
     #-sb-xc-host
     (let ((fop (known-layout-fop name)))
       (when fop
-        (return-from dump-layout (dump-byte fop file))))
+        (return-from dump-wrapper (dump-byte fop file))))
     (dump-object name file))
-  (sub-dump-object (layout-bitmap obj) file)
-  (sub-dump-object (layout-inherits obj) file)
+  (sub-dump-object (wrapper-bitmap obj) file)
+  (sub-dump-object (wrapper-inherits obj) file)
   (dump-fop 'fop-layout file
-            (1+ (layout-depthoid obj)) ; non-stack args can't be negative
-            (logand (layout-flags obj) sb-kernel::layout-flags-mask)
-            (layout-length obj)))
+            (1+ (wrapper-depthoid obj)) ; non-stack args can't be negative
+            (logand flags sb-kernel::layout-flags-mask)
+            (wrapper-length obj)))

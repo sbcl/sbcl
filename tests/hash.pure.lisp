@@ -354,8 +354,8 @@
 ;;; This affected the performance of TYPECASE.
 (with-test (:name :sxhash-on-layout)
   (dolist (x '(pathname cons array))
-    (let ((l (sb-kernel:find-layout x)))
-      (assert (= (sxhash l) (sb-kernel::layout-clos-hash l))))))
+    (let ((l (sb-kernel:wrapper-friend (sb-kernel:find-layout x))))
+      (assert (= (sxhash l) (sb-kernel:layout-clos-hash l))))))
 
 (with-test (:name :equalp-table-fixnum-equal-to-float)
   (let ((table (make-hash-table :test #'equalp)))

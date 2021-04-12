@@ -1330,7 +1330,7 @@
 ;;; dx allocation of structures, this'll have to do.
 (defun %init-string-input-stream (stream string &optional (start 0) end)
   (declare (string string))
-  (setf (%instance-layout (truly-the instance stream))
+  (setf (%instance-wrapper (truly-the instance stream))
         #.(find-layout 'string-input-stream))
   (macrolet ((initforms ()
                `(setf
@@ -1402,7 +1402,7 @@
   (declare (optimize speed (sb-c::verify-arg-count 0)))
   (declare (string buffer)
            (ignorable wild-result-type)) ; if #-sb-unicode
-  (setf (%instance-layout (truly-the instance stream)) #.(find-layout 'string-output-stream))
+  (setf (%instance-wrapper (truly-the instance stream)) #.(find-layout 'string-output-stream))
   (macrolet ((initforms ()
                `(setf ,@(mapcan (lambda (dsd)
                                   (list `(%instance-ref stream ,(dsd-index dsd))
@@ -1900,7 +1900,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (unless (and (stringp string)
                (array-has-fill-pointer-p string))
     (error "~S is not a string with a fill-pointer" string))
-  (setf (%instance-layout (truly-the instance stream))
+  (setf (%instance-wrapper (truly-the instance stream))
         #.(find-layout 'fill-pointer-output-stream))
   (macrolet ((initforms ()
                `(setf ,@(mapcan (lambda (dsd)

@@ -427,8 +427,7 @@ is not of type
 (with-test (:name :condition-layout-lengths)
   (loop for wrapper being each hash-value of (sb-kernel:classoid-subclasses
                                               (sb-kernel:find-classoid 'condition))
-        for len = (sb-kernel:layout-length
-                   (#+metaspace sb-kernel::wrapper-friend #-metaspace progn wrapper))
+        for len = (sb-kernel:wrapper-length wrapper)
         minimize len into min
         maximize len into max
         finally (assert (= min max))))

@@ -20,12 +20,12 @@
   (declare (explicit-check)
            (dynamic-extent arguments))
   (cond ((and (%instancep datum)
-              (let ((layout (%instance-layout datum)))
-                (and (logtest +condition-layout-flag+ (layout-flags layout))
+              (let ((wrapper (%instance-wrapper datum)))
+                (and (logtest (wrapper-flags wrapper) +condition-layout-flag+)
                      ;; An invalid layout will drop into the (MAKE-CONDITION) branch
                      ;; which rightly fails because ALLOCATE-CONDITION asserts that
                      ;; the first argument is a condition-designator, which it won't be.
-                     (not (layout-invalid layout)))))
+                     (not (wrapper-invalid wrapper)))))
          (when (and arguments (not (eq fun-name 'cerror)))
            (cerror "Ignore the additional arguments."
                    'simple-type-error

@@ -99,7 +99,7 @@
          (class-eq (and name
                         (eq (classoid-state classoid) :sealed)
                         (not (classoid-subclasses classoid))))
-         (dd (and class-eq (layout-info layout)))
+         (dd (and class-eq (wrapper-info layout)))
          (max-inlined-words 5))
     (unless (and result ; could be unused result (but entire call wasn't flushed?)
                  layout
@@ -137,8 +137,10 @@
 
 (defun varying-length-struct-p (classoid)
   ;; This is a nice feature to have in general, but at present it is only possible
-  ;; to make varying length instances of LAYOUT and nothing else.
-  (eq (classoid-name classoid) 'layout))
+  ;; to make varying length instances of SB-VM:LAYOUT (or WRAPPER if that is the same type),
+  ;; and nothing else.
+  (eq classoid (load-time-value (find-classoid #+metaspace 'sb-vm:layout
+                                               #-metaspace 'wrapper))))
 
 (deftransform %instance-length ((instance))
   (let ((classoid (lvar-type instance)))
@@ -148,8 +150,11 @@
              (not (varying-length-struct-p classoid))
              ;; TODO: if sealed with subclasses which add no slots, use the fixed length
              (not (classoid-subclasses classoid)))
-        (dd-length (layout-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
+        (dd-length (wrapper-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
         (give-up-ir1-transform))))
+
+(define-source-transform %instance-wrapper (x) `(layout-friend (%instance-layout ,x)))
+(define-source-transform %fun-wrapper (x) `(layout-friend (%fun-layout ,x)))
 
 ;;; *** These transforms should be the only code, aside from the C runtime
 ;;;     with knowledge of the layout index.
@@ -158,9 +163,9 @@
 #-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
-    `(truly-the layout (%instance-ref ,x 0)))
+    `(truly-the sb-vm:layout (%instance-ref ,x 0)))
   (define-source-transform %set-instance-layout (x val)
-    `(%instance-set ,x 0 (the layout ,val)))
+    `(%instance-set ,x 0 (the sb-vm:layout ,val)))
   (define-source-transform function-with-layout-p (x)
     `(funcallable-instance-p ,x)))
 

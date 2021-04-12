@@ -194,10 +194,10 @@
             (,bitmap ,(or bitmap-expr `(%instance-layout ,instance)))
             ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
             ;; because it's not user-visible data.
-            (,mask (ash (%raw-instance-ref/signed-word ,bitmap (type-dd-length layout))
+            (,mask (ash (%raw-instance-ref/signed-word ,bitmap (type-dd-length sb-vm:layout))
                         (- sb-vm:instance-data-start)))
             ;; Start counting from the next bitmap word as we've consumed one already
-            (,bitmap-index (1+ (type-dd-length layout)))
+            (,bitmap-index (1+ (type-dd-length sb-vm:layout)))
             (,bitmap-limit (%instance-length ,bitmap))
             ;; If this was the last word of the bitmap, then the high bit
             ;; is infinitely sign-extended, and we can keep right-shifting

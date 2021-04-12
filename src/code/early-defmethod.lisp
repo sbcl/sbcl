@@ -100,7 +100,7 @@
                      ;; which is potentially too early in cold init especially if trying
                      ;; to debug to figure out what has been patched in.
                      (let ((arg-layout (if (%instancep specialized-arg)
-                                           (%instance-layout specialized-arg)
+                                           (%instance-wrapper specialized-arg)
                                            ;; Non-instance types always call a predicate.
                                            #.(find-layout 't))))
                        (and (null (svref method 1)) ; only primary methods are candidates
@@ -108,10 +108,10 @@
                               (if (fboundp guard)
                                   (funcall guard specialized-arg)
                                   (let ((test-layout (svref method 2)))
-                                    (and (sb-kernel::layout-p test-layout)
+                                    (and (sb-kernel::wrapper-p test-layout)
                                          (or (eq test-layout arg-layout)
                                              (find test-layout
-                                                   (layout-inherits arg-layout))))))))))
+                                                   (wrapper-inherits arg-layout))))))))))
                    methods)))
     (if applicable-method
         ;; Call using no permutation-vector / no precomputed next method.

@@ -186,7 +186,7 @@
   sb-c::vop
   sb-c::basic-combination
   sb-sys:fd-stream
-  layout
+  wrapper
   (sb-assem:segment object-not-assem-segment)
   sb-c::cblock
   sb-disassem:disassem-state

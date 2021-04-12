@@ -1090,7 +1090,7 @@ core and return a descriptor to it."
      (acond ((gethash class-name *cold-layouts*)
              (cold-layout-depthoid it))
             ((info :type :compiler-layout class-name)
-             (layout-depthoid it))
+             (wrapper-depthoid it))
             (t
              (error "Unknown depthoid for ~S" class-name))))))
 
@@ -1171,8 +1171,8 @@ core and return a descriptor to it."
   (case name
     ((t) 0)
     (structure-object 1)
-    (sb-kernel::wrapper 2)
-    (layout 3)
+    #+metaspace (wrapper 2)
+    (#+metaspace sb-vm:layout #-metaspace wrapper 3)
     (sb-lockless::list-node 4)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
            (ecase sb-kernel::layout-id-type
@@ -1187,27 +1187,28 @@ core and return a descriptor to it."
                   (decf *condition-layout-uniqueid-counter*)
                   (incf *general-layout-uniqueid-counter*))))))))
 
-(defconstant layout-friend-slot 1)
-(defun ->wrapper (x) ; cast layout to wrapper, if wrappers are in use
-  #+metaspace (read-wordindexed x layout-friend-slot)
-  #-metaspace x)
+(defun cold-wrapper-id (wrapper-descriptor)
+  (let* ((layout-descriptor (->layout wrapper-descriptor))
+         (proxy (gethash (descriptor-bits layout-descriptor) *cold-layout-by-addr*)))
+    (cold-layout-id proxy)))
 
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   ;; Layouts created in genesis can't vary in length due to the number of ancestor
   ;; types in the IS-A vector. They may vary in length due to the bitmap word count.
   ;; But we can at least assert that there is one less thing to worry about.
   (aver (<= depthoid sb-kernel::layout-id-vector-fixed-capacity))
-  (let* ((fixed-words (sb-kernel::type-dd-length layout))
+  (let* ((fixed-words (sb-kernel::type-dd-length sb-vm:layout))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (result (allocate-struct (+ fixed-words bitmap-words)
-                                  (or (awhen (gethash 'layout *cold-layouts*)
+                                  (or (awhen (gethash #+metaspace 'sb-vm:layout
+                                                      #-metaspace 'wrapper *cold-layouts*)
                                         (cold-layout-descriptor it))
                                       (make-fixnum-descriptor 0))
                                   (symbol-value *cold-layout-gspace*)))
          (wrapper
           #-metaspace result ; WRAPPER and LAYOUT are synonymous in this case
-          #+metaspace (allocate-struct (sb-kernel::type-dd-length sb-kernel::wrapper)
-                                       (or (awhen (gethash 'sb-kernel::wrapper *cold-layouts*)
+          #+metaspace (allocate-struct (sb-kernel::type-dd-length wrapper)
+                                       (or (awhen (gethash 'wrapper *cold-layouts*)
                                              (cold-layout-descriptor it))
                                            (make-fixnum-descriptor 0))))
          (this-id (choose-layout-id name (logtest flags +condition-layout-flag+)))
@@ -1228,9 +1229,10 @@ core and return a descriptor to it."
     (unless core-file-name (return-from make-cold-layout result))
 
     ;; Can't use the easier WRITE-SLOTS unfortunately because bootstrapping is hard
-    (let* ((layout-metadata (type-dd-slots-or-lose 'layout))
-           (wrapper-metadata #-metaspace layout-metadata
-                             #+metaspace (type-dd-slots-or-lose 'sb-kernel::wrapper)))
+    (let* ((wrapper-metadata (type-dd-slots-or-lose 'wrapper))
+           (layout-metadata #-metaspace wrapper-metadata
+                            #+metaspace (type-dd-slots-or-lose 'sb-vm:layout)))
+
       #+64-bit
       (%write-slots layout-metadata result
                     :flags (sb-kernel::pack-layout-flags depthoid length flags))
@@ -1264,14 +1266,13 @@ core and return a descriptor to it."
              (%write-slots wrapper-metadata wrapper :friend result))
 
       (let ((byte-offset (ash (+ (descriptor-word-offset result)
-                                 (get-dsd-index sb-kernel:layout sb-kernel::id-word0)
+                                 (get-dsd-index sb-vm:layout sb-kernel::id-word0)
                                  sb-vm:instance-slots-offset)
                               sb-vm:word-shift)))
         (when (logtest flags +structure-layout-flag+)
           (loop for i from 2 below (cold-vector-len inherits)
                 do (setf (bvref-s32 (descriptor-mem result) byte-offset)
-                         (cold-layout-id (gethash (descriptor-bits (cold-svref inherits i))
-                                                  *cold-layout-by-addr*)))
+                         (cold-wrapper-id (cold-svref inherits i)))
                    (incf byte-offset 4)))
         (setf (bvref-s32 (descriptor-mem result) byte-offset) this-id)))
 
@@ -1283,7 +1284,7 @@ core and return a descriptor to it."
   (let ((classoid (find-classoid type-name nil)))
     (typecase classoid
       (structure-classoid
-       (dd-predicate-name (layout-info (classoid-layout classoid))))
+       (dd-predicate-name (sb-kernel::wrapper-%info (classoid-wrapper classoid))))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
@@ -1343,9 +1344,9 @@ core and return a descriptor to it."
                         ,(make-random-descriptor sb-vm:unbound-marker-widetag))
                       (,(get-dsd-index classoid sb-kernel::subclasses) . nil)
                       ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
-                      ;; we nonetheless must set WRAPPER to NIL or else warm build fails
+                      ;; we nonetheless must set LAYOUT to NIL or else warm build fails
                       ;; in the twisty maze of class initializations.
-                      (,(get-dsd-index classoid sb-kernel::wrapper) . nil))))
+                      (,(get-dsd-index classoid wrapper) . nil))))
                (if (typep obj 'built-in-classoid)
                    slots-to-omit
                    ;; :predicate is not a slot. Don't mess up the object
@@ -1373,31 +1374,38 @@ core and return a descriptor to it."
           (write-wordindexed/raw result (+ sb-vm:instance-slots-offset index)
                                  (or (cdr override) (funcall reader obj)))))))))
 
+;;; Convert a layout to a wrapper and back.
+;;; Each points to the other through its first data word.
+(defun ->wrapper (x) #+metaspace (read-wordindexed x 1) #-metaspace x)
+(defun ->layout (x) #+metaspace (read-wordindexed x 1) #-metaspace x)
+
 (defun initialize-layouts ()
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
-           (let ((warm-layout (info :type :compiler-layout name)))
-             (assert (eql (length (layout-inherits warm-layout))
+           (let ((wrapper (info :type :compiler-layout name)))
+             (assert (eql (length (wrapper-inherits wrapper))
                           (length inherits)))
-             (make-cold-layout name
-                               (layout-depthoid warm-layout)
-                               (layout-flags warm-layout)
-                               (layout-length warm-layout)
-                               (layout-bitmap warm-layout)
-                               (vector-in-core inherits)))))
+             (->wrapper
+              (make-cold-layout name
+                                (wrapper-depthoid wrapper)
+                                (wrapper-flags wrapper)
+                                (wrapper-length wrapper)
+                                (wrapper-bitmap wrapper)
+                                (vector-in-core inherits))))))
+    ;; The variables are named foo-LAYOUT but are actually foo-WRAPPER.
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
-           #+metaspace (wrapper-layout (chill-layout 'sb-kernel::wrapper t-layout s-o-layout))
-           (layout-layout (chill-layout 'layout t-layout s-o-layout)))
+           #+metaspace (layout-layout (chill-layout 'sb-vm:layout t-layout s-o-layout))
+           (wrapper-layout (chill-layout 'wrapper t-layout s-o-layout)))
       (when core-file-name
         #-metaspace
-        (dolist (instance (list t-layout s-o-layout layout-layout))
-          (set-instance-layout instance layout-layout))
+        (dolist (instance (list t-layout s-o-layout wrapper-layout))
+          (set-instance-layout instance wrapper-layout))
         #+metaspace
-        (progn (dolist (instance (list t-layout s-o-layout wrapper-layout layout-layout))
-                 (set-instance-layout (read-wordindexed instance 1) wrapper-layout)
-                 (set-instance-layout instance layout-layout))))
+        (progn (dolist (instance (list t-layout s-o-layout layout-layout wrapper-layout))
+                 (set-instance-layout instance (->layout wrapper-layout))
+                 (set-instance-layout (->layout instance) (->layout layout-layout)))))
       (chill-layout 'function t-layout)
       (chill-layout 'sb-kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
@@ -2025,8 +2033,7 @@ core and return a descriptor to it."
 
 (defun attach-classoid-cells-to-symbols (hashtable)
   (when (plusp (hash-table-count *classoid-cells*))
-    (aver (cold-layout-descriptor
-           (gethash 'sb-kernel::classoid-cell *cold-layouts*)))
+    (aver (gethash 'sb-kernel::classoid-cell *cold-layouts*))
     (let ((type-classoid-cell-info
             (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
           (type-kind-info
@@ -2280,9 +2287,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
-  (let* ((layout (pop-stack))
-         (proxy-layout ; our host-structure wrapper on the slots of the cold layout
-          (gethash (descriptor-bits layout) *cold-layout-by-addr*))
+  (let* ((wrapper (pop-stack))
+         (layout (->layout wrapper))
+         (proxy-layout (gethash (descriptor-bits layout) *cold-layout-by-addr*))
          (result (allocate-struct size layout))
          (bitmap (cold-layout-bitmap proxy-layout)))
     (loop for index downfrom (1- size) to sb-vm:instance-data-start
@@ -2296,12 +2303,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
     result))
 
 (defun find-in-inherits (typename inherits)
-  (dotimes (i (cold-vector-len inherits))
-    (let ((proxy (gethash (descriptor-bits (cold-svref inherits i))
-                          *cold-layout-by-addr*)))
-      (when (eq (cold-layout-name proxy) typename)
-        (return proxy)))))
+  (binding* ((proxy (gethash typename *cold-layouts*) :exit-if-null)
+             (layout (->wrapper (cold-layout-descriptor proxy))))
+    (dotimes (i (cold-vector-len inherits))
+      (when (descriptor= (cold-svref inherits i) layout)
+        (return t)))))
 
+;;; Always return a WRAPPER if #+metaspace
 (define-cold-fop (fop-layout (depthoid flags length))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
   (let* ((inherits (pop-stack))
@@ -2311,7 +2319,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (existing-layout (gethash name *cold-layouts*)))
     (declare (type descriptor bitmap-descriptor inherits))
     (declare (type symbol name))
-    ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
+    ;; parameters have to match an existing FOP-LAYOUT invocation if there was one
     (when existing-layout
       (let ((old-flags (cold-layout-flags existing-layout))
             (old-depthoid (cold-layout-depthoid existing-layout))
@@ -2329,13 +2337,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
                          (return nil))))
           ;; Users will never see this.
           (format t "old=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
-                  old-flags old-depthoid old-length old-bitmap old-inherits)
+                  old-flags old-depthoid old-length old-bitmap
+                  (vector-from-core old-inherits))
           (format t "new=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
-                  flags depthoid length bitmap-value inherits)
+                  flags depthoid length bitmap-value
+                  (vector-from-core inherits))
           (bug "Messed up fop-layout for ~s" name))))
-    (if existing-layout
-        (cold-layout-descriptor existing-layout)
-        (make-cold-layout name depthoid flags length bitmap-value inherits))))
+    (->wrapper
+     (if existing-layout
+         (cold-layout-descriptor existing-layout)
+         (make-cold-layout name depthoid flags length bitmap-value inherits)))))
 
 ;;;; cold fops for loading symbols
 
@@ -2731,8 +2742,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index sym))
              (:layout (cold-layout-descriptor-bits sym))
-             (:layout-id (cold-layout-id (gethash (descriptor-bits sym)
-                                                  *cold-layout-by-addr*)))
+             (:layout-id ; SYM is a #<WRAPPER>
+              (cold-layout-id (gethash (descriptor-bits (->layout sym))
+                                       *cold-layout-by-addr*)))
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3182,9 +3194,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (if (string= (car slot) "default") "_default" (car slot))
                        (cdr slot))))
     (format t "};~%")
-    (when (member (dd-name dd) '(layout))
-      (write-cast-operator (dd-name dd) (cstring (dd-name dd))
-                           sb-vm:instance-pointer-lowtag))
     (format t "~%#endif /* __ASSEMBLER__ */~2%")))
 
 (defun write-thread-init (stream)
@@ -3364,13 +3373,15 @@ III. initially undefined function references (alphabetically):
           (terpri))))
 
     (format t "~%~|~%V. layout names:~2%")
-    (format t "              Bitmap  Depth  ID  Name [Length]~%")
+    (format t "~28tBitmap  Depth  ID  Name [Length]~%")
     (dolist (pair (sort-cold-layouts))
       (let* ((proxy (cdr pair))
              (descriptor (cold-layout-descriptor proxy))
              (addr (descriptor-bits descriptor)))
-        (format t "~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
+        (format t "~10,'0X -> ~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
                 addr
+                #+metaspace (descriptor-bits (->wrapper descriptor))
+                #-metaspace "          "
                 (cold-layout-bitmap proxy)
                 (cold-layout-depthoid proxy)
                 (cold-layout-id proxy)
@@ -3727,11 +3738,11 @@ III. initially undefined function references (alphabetically):
       (sb-cold::check-no-new-cl-symbols)
 
       (when *known-structure-classoids*
+        ;; Fill in LAYOUT-%INFO with each corresponding DEFSTRUCT-DESCRIPTION
+        ;; (Couldn't this be done sooner?)
         (dolist (defstruct-args *known-structure-classoids*)
           (let* ((dd (first defstruct-args))
-                 (name (warm-symbol (read-slot dd :name)))
-                 (layout (gethash name *cold-layouts*)))
-            (aver layout)
+                 (layout (gethash (warm-symbol (read-slot dd :name)) *cold-layouts*)))
             (write-slots (->wrapper (cold-layout-descriptor layout)) :%info dd)))
         (when verbose
           (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/methods/other~%"
@@ -3768,7 +3779,7 @@ III. initially undefined function references (alphabetically):
                               (and (null qual) (predicate-for-specializer class)))
                              (cold-intern qual)
                              (acond ((gethash class *cold-layouts*)
-                                     (cold-layout-descriptor it))
+                                     (->wrapper (cold-layout-descriptor it)))
                                     (t
                                      (aver (predicate-for-specializer class))
                                      (cold-intern class)))
@@ -3872,15 +3883,26 @@ III. initially undefined function references (alphabetically):
             (dolist (obj structs)
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
+        (out-to "layout"
+          #-metaspace
+          (write-structure-object (wrapper-info (find-layout 'wrapper)) stream
+                                  "layout")
+          #+metaspace
+          (progn
+            (write-structure-object (wrapper-info (find-layout 'sb-vm:layout)) stream)
+            (write-structure-object (wrapper-info (find-layout 'wrapper)) stream))
+          (let ((*standard-output* stream))
+            (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag)))
         (dolist (class '(defstruct-description defstruct-slot-description
-                         classoid layout #+metaspace sb-kernel::wrapper
+                         classoid
                          hash-table package
                          sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
-            (write-structure-object (layout-info (find-layout class)) stream)))
+            (write-structure-object (wrapper-info (find-layout class))
+                                    stream)))
         (out-to "thread-instance"
-          (write-structure-object (layout-info (find-layout 'sb-thread::thread))
+          (write-structure-object (wrapper-info (find-layout 'sb-thread::thread))
                                   stream "thread_instance"))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)

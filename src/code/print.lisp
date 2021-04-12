@@ -378,11 +378,12 @@ variable: an unreadable object representing the error is printed instead.")
         (return-from output-ugly-object
           (print-unreadable-object (object stream :identity t)
             (prin1 'instance stream))))
-      (let ((classoid (layout-classoid layout)))
+      (let* ((wrapper (layout-friend layout))
+             (classoid (wrapper-classoid wrapper)))
         ;; Additionally, don't crash if the object is an obsolete thing with
         ;; no update protocol.
         (when (or (sb-kernel::undefined-classoid-p classoid)
-                  (and (layout-invalid layout)
+                  (and (wrapper-invalid wrapper)
                        (logtest (layout-flags layout)
                                 (logior +structure-layout-flag+
                                         +condition-layout-flag+))))

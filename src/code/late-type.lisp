@@ -203,10 +203,10 @@
                                                         (specifier-type guard)))))
                      (return
                        (or (eq type2 (car x))
-                           (let ((inherits (layout-inherits
-                                            (classoid-layout (car x)))))
+                           (let ((inherits (wrapper-inherits
+                                            (classoid-wrapper (car x)))))
                              (dotimes (i (length inherits) nil)
-                               (when (eq type2 (layout-classoid (svref inherits i)))
+                               (when (eq type2 (wrapper-classoid (svref inherits i)))
                                  (return t))))))))))
           t))))
 

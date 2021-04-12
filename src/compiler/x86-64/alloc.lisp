@@ -606,7 +606,7 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-   (let* ((instancep (typep type 'layout)) ; is this an instance type?
+   (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
           (bytes (pad-data-block words)))
     (progn name) ; possibly not used
     (unless stack-allocate-p

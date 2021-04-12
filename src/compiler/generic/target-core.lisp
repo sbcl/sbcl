@@ -93,7 +93,7 @@
                    (:code-object (get-lisp-obj-address code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address
-                             (if (symbolp sym) (find-layout sym) sym)))
+                             (wrapper-friend (if (symbolp sym) (find-layout sym) sym))))
                    (:layout-id (layout-id sym))
                    (:immobile-symbol (get-lisp-obj-address sym))
                    (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
@@ -135,7 +135,7 @@
              (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
                                (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
-                     (get-lisp-obj-address #.(find-layout 'function))))))
+                     (get-lisp-obj-address (wrapper-friend #.(find-layout 'function)))))))
          ;; And finally, make the memory range executable
          #-(or x86 x86-64) (sb-vm:sanctify-for-execution code-obj)
          ;; Return fixups amenable to static linking

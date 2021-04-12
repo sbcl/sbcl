@@ -827,12 +827,15 @@
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
-  `(>= (layout-depthoid ,layout) ,depthoid))
+  `(>= (wrapper-depthoid ,layout) ,depthoid))
+(symbol-macrolet ((get-hash #+metaspace 'layout-clos-hash #-metaspace 'wrapper-clos-hash)
+                  (get-flags #+metaspace 'layout-flags #-metaspace 'wrapper-flags))
 (defun transform-instance-typep (classoid)
   (binding*
       ((name (classoid-name classoid))
-       (layout (let ((res (info :type :compiler-layout name)))
-                 (when (and res (not (layout-invalid res))) res)))
+       (wrapper (let ((res (info :type :compiler-layout name)))
+                 (when (and res (not (wrapper-invalid res))) res)))
+       (layout (and wrapper (wrapper-friend wrapper)))
        ((lowtag lowtag-test slot-reader)
         (cond ((csubtypep classoid (specifier-type 'funcallable-instance))
                (values sb-vm:fun-pointer-lowtag
@@ -840,13 +843,14 @@
               ((csubtypep classoid (specifier-type 'instance))
                (values sb-vm:instance-pointer-lowtag
                        '(%instancep object) '(%instance-layout object)))))
-       (depthoid (if layout (layout-depthoid layout) -1))
-       (wrapper (make-symbol "LAYOUT")))
+       (depthoid (if wrapper (wrapper-depthoid wrapper) -1))
+       (type (make-symbol "TYPE")))
+    (declare (ignorable layout))
 
     ;; Easiest case first: single bit test.
     (cond ((member name '(condition pathname structure-object))
            `(and (%instancep object)
-                 (logtest (layout-flags (%instance-layout object))
+                 (logtest (,get-flags (%instance-layout object))
                           ,(case name
                              (condition +condition-layout-flag+)
                              (pathname  +pathname-layout-flag+)
@@ -860,13 +864,14 @@
           ;; I think that means we should know the lowtag always. Nonetheless, this isn't
           ;; an important scenario, and only if you _do_ seal a class could this case be
           ;; reached; users rarely seal their classes since the standard doesn't say how.
-          ((and layout
+          ((and wrapper
                 (eq (classoid-state classoid) :sealed)
                 (not (classoid-subclasses classoid)))
            (if lowtag-test
-               `(and ,lowtag-test ,(if (vop-existsp :translate layout-eq)
-                                       `(layout-eq object ,layout ,lowtag)
-                                       `(eq ,slot-reader ,layout)))
+               `(and ,lowtag-test
+                     ,(if (vop-existsp :translate layout-eq)
+                          `(layout-eq object ,wrapper ,lowtag)
+                          `(eq ,slot-reader ,layout)))
                ;; `(eq ,layout
                ;;      (if-vop-existsp (:translate %instanceoid-layout)
                ;;        (%instanceoid-layout object)
@@ -874,10 +879,10 @@
                ;;        (cond ((%instancep object) (%instance-layout object))
                ;;              ((funcallable-instance-p object) (%fun-layout object))
                ;;              (t ,(find-layout 't)))))
-               (bug "Unexpected metatype for ~S" layout)))
+               (bug "Unexpected metatype for ~S" wrapper)))
 
           ;; All other structure types
-          ((and (typep classoid 'structure-classoid) layout)
+          ((and (typep classoid 'structure-classoid) wrapper)
             ;; structure type tests; hierarchical layout depths
             (aver (eql lowtag sb-vm:instance-pointer-lowtag))
             ;; we used to check for invalid layouts here, but in fact that's both unnecessary and
@@ -889,45 +894,45 @@
                     ;; this might have to change to consider object invalidation. Probably would
                     ;; want to track structure classoids that would render this code inadmissible.
                   ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-                       `(%structure-is-a (%instance-layout object) ,layout)
-                       `(let ((,wrapper (%instance-layout object)))
-                          (and (layout-depthoid-ge ,wrapper ,depthoid)
-                               (%structure-is-a ,wrapper ,layout))))))
+                       `(%structure-is-a (%instance-layout object) ,wrapper)
+                       `(let ((,type (%instance-layout object)))
+                          (and (layout-depthoid-ge ,type ,depthoid)
+                               (%structure-is-a ,type ,wrapper))))))
 
           ((> depthoid 0)
            ;; fixed-depth ancestors of non-structure types:
            ;; STREAM, FILE-STREAM, STRING-STREAM, and SEQUENCE.
             #+sb-xc-host (when (typep classoid 'static-classoid)
                            ;; should have use :SEALED code above
-                           (bug "Non-frozen static classoids?"))
-            (let ((guts `((when (zerop (layout-clos-hash ,wrapper))
-                            (setq ,wrapper (update-object-layout object)))
+                           (bug "Non-frozen static classoids ~S" name))
+            (let ((guts `((when (zerop (,get-hash ,type))
+                            (setq ,type (update-object-layout object)))
                           ,(ecase name
                             (stream
-                             `(logtest (layout-flags ,wrapper) ,+stream-layout-flag+))
+                             `(logtest (,get-flags ,type) ,+stream-layout-flag+))
                             (file-stream
-                             `(logtest (layout-flags ,wrapper) ,+file-stream-layout-flag+))
+                             `(logtest (,get-flags ,type) ,+file-stream-layout-flag+))
                             (string-stream
-                             `(logtest (layout-flags ,wrapper) ,+string-stream-layout-flag+))
+                             `(logtest (,get-flags ,type) ,+string-stream-layout-flag+))
                             ;; Testing the type EXTENDED-SEQUENCE tests for #<LAYOUT of SEQUENCE>.
                             ;; It can only arise from a direct invocation of TRANSFORM-INSTANCE-TYPEP,
                             ;; because the lisp type is not a classoid. It's done this way to define
                             ;; the logic once only, instead of both here and src/code/pred.lisp.
                             (sequence
-                             `(logtest (layout-flags ,wrapper) ,+sequence-layout-flag+))))))
+                             `(logtest (,get-flags ,type) ,+sequence-layout-flag+))))))
               (if lowtag-test
-                  `(and ,lowtag-test (let ((,wrapper ,slot-reader)) ,@guts))
+                  `(and ,lowtag-test (let ((,type ,slot-reader)) ,@guts))
                   (if-vop-existsp (:translate %instanceoid-layout)
-                    `(let ((,wrapper (%instanceoid-layout object))) ,@guts)
+                    `(let ((,type (%instanceoid-layout object))) ,@guts)
                     `(block typep
-                       (let ((,wrapper (cond ((%instancep object) (%instance-layout object))
-                                             ((funcallable-instance-p object) (%fun-layout object))
-                                             (t (return-from typep nil)))))
+                       (let ((,type (cond ((%instancep object) (%instance-layout object))
+                                          ((funcallable-instance-p object) (%fun-layout object))
+                                          (t (return-from typep nil)))))
                          ,@guts))))))
 
           (t
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
-                                  object)))))
+                                  object))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is

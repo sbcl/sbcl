@@ -437,9 +437,6 @@ static void brief_struct(lispobj obj)
 #include "genesis/layout.h"
 #include "genesis/defstruct-description.h"
 #include "genesis/defstruct-slot-description.h"
-#ifdef LISP_FEATURE_METASPACE
-#include "genesis/wrapper.h"
-#endif
 static boolean tagged_slot_p(struct layout *layout, int slot_index)
 {
     // Since we're doing this scan, we could return the name

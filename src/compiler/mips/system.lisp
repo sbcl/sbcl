@@ -69,7 +69,7 @@
   (:generator 4
     (let ((label (register-inline-constant :layout-id test-layout))
           (offset (+ (bitmap-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
+                     (ash (- (wrapper-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (inst lw test-id sb-vm::code-tn label)
       (inst lw this-id x offset)

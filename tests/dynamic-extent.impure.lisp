@@ -343,7 +343,7 @@
   (let ((thing sb-c::*backend-parsed-vops*))
     ;; check some preconditions
     (assert (typep thing 'hash-table))
-    (assert (/= (sb-kernel:layout-bitmap (sb-kernel:%instance-layout thing))
+    (assert (/= (sb-kernel:wrapper-bitmap (sb-kernel:%instance-wrapper thing))
                 sb-kernel:+layout-all-tagged+))
     (assert-no-consing
      (sb-int:dx-let ((x (copy-structure thing)))

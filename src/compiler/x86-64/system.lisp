@@ -78,7 +78,7 @@
   (:generator 1
     (inst cmp :dword
           (ea (+ (bitmap-bits-offset)
-                 (ash (- (layout-depthoid test) 2) 2)
+                 (ash (- (wrapper-depthoid test) 2) 2)
                  (- instance-pointer-lowtag))
               x)
           ;; Small layout-ids can only occur for layouts made in genesis.
@@ -97,7 +97,7 @@
 ;; ~17 instructions vs. 35
 (define-vop ()
     (:policy :fast-safe)
-    (:translate layout-of)
+    (:translate wrapper-of)
     (:args (object :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg :offset rax-offset) rax)
     (:results (result :scs (descriptor-reg)))
@@ -135,7 +135,8 @@
       (inst jmp  done)
       NULL
       (inst mov  result (make-fixup 'null :layout))
-      DONE))
+      DONE
+      #+metaspace (inst mov result (ea +5 result)))) ; layout->wrapper
 (define-vop ()
     (:policy :fast-safe)
     (:translate %instanceoid-layout)

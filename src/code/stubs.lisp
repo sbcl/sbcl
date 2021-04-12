@@ -86,20 +86,22 @@
   (def %make-instance) ; Allocate a new instance with X data slots.
   (def %instance-length) ; Given an instance, return its length.
   (def %instance-layout)
+  (def %instance-wrapper)
   (def %set-instance-layout (instance new-value))
   ; (def %instance-ref (instance index)) ; defined in 'target-defstruct'
   (def %instance-set (instance index new-value))
   ;; funcallable instances
   (def %make-funcallable-instance)
   (def %fun-layout)
+  (def %fun-wrapper)
   (def %set-fun-layout (fin new-value))
   (def %funcallable-instance-fun)
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
-  #+compact-instance-header (progn (def layout-of)
+  #+compact-instance-header (progn (def wrapper-of)
                                    (def %instanceoid-layout))
-  #+64-bit (def layout-depthoid)
+
   ;; lists
   (def %rplaca (x val))
   (def %rplacd (x val))
@@ -154,8 +156,8 @@
 ;;; I shouid add a vop for uint32 access to raw slots.
 (defun sb-c::%structure-is-a (object-layout test-layout)
   (or (eq object-layout test-layout)
-      (let ((depthoid (layout-depthoid test-layout))
-            (inherits (layout-inherits object-layout)))
+      (let ((depthoid (wrapper-depthoid test-layout))
+            (inherits (wrapper-inherits object-layout)))
         (and (> (length inherits) depthoid)
              (eq (svref inherits depthoid) test-layout)))))
 

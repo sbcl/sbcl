@@ -337,7 +337,7 @@
         (or (gethash key table)
             (let ((key (!allocate-pathname host device dir+hash name type version)))
               (when (typep host 'logical-host)
-                (setf (%instance-layout key) #.(find-layout 'logical-pathname)))
+                (setf (%instance-wrapper key) #.(find-layout 'logical-pathname)))
               (setf (gethash key table) key)))))))
 
 ;;; Vector of logical host objects, each of which contains its translations.

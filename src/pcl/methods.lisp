@@ -922,9 +922,9 @@
                                    'get-accessor-method-function)))
                     ,optimized-std-fun)))
                 (wrappers
-                 (let ((wrappers (list (layout-of class)
+                 (let ((wrappers (list (wrapper-of class)
                                        (class-wrapper class)
-                                       (layout-of slotd))))
+                                       (wrapper-of slotd))))
                    (if (eq type 'writer)
                        (cons (class-wrapper *the-class-t*) wrappers)
                        wrappers)))
@@ -1674,7 +1674,7 @@
    gf (generic-function-encapsulations gf) (call-next-method)))
 
 (defmethod (setf class-name) (new-value class)
-  (let ((classoid (layout-classoid (class-wrapper class))))
+  (let ((classoid (wrapper-classoid (class-wrapper class))))
     (if (and new-value (symbolp new-value))
         (setf (classoid-name classoid) new-value)
         (setf (classoid-name classoid) nil)))

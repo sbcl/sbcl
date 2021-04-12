@@ -13,13 +13,22 @@
 
 ;;;; structure frobbing primitives
 
+#+metaspace
+(defun make-temporary-wrapper (clos-hash classoid inherits)
+  (let* ((layout (%make-temporary-layout #.(find-layout t) clos-hash))
+         (wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
+                                 :inherits inherits :invalid nil
+                                 :friend layout)))
+    (setf (layout-friend layout) wrapper)
+    wrapper))
+
 ;;; This allocator is used by the expansion of MAKE-LOAD-FORM-SAVING-SLOTS
 ;;; when given a STRUCTURE-OBJECT.
 (defun allocate-struct (type)
-  (let* ((layout (classoid-layout (the structure-classoid (find-classoid type))))
-         (structure (%make-instance (layout-length layout))))
-    (setf (%instance-layout structure) layout)
-    (dolist (dsd (dd-slots (layout-dd layout)) structure)
+  (let* ((wrapper (classoid-wrapper (the structure-classoid (find-classoid type))))
+         (structure (%make-instance (wrapper-length wrapper))))
+    (setf (%instance-wrapper structure) wrapper)
+    (dolist (dsd (dd-slots (wrapper-dd wrapper)) structure)
       (when (eq (dsd-raw-type dsd) 't)
         (setf (%instance-ref structure (dsd-index dsd)) (make-unbound-marker))))))
 
@@ -40,21 +49,22 @@
   ;; their ancestors in the vector; they only store self-id at index 0.
   ;; This isn't performance-critical. If it were, then we should store self-ID
   ;; at a fixed index. Using it for type-based dispatch remains a possibility.
-  (let* ((depth (- (layout-depthoid layout) 2))
+  (let* ((layout (cond #+metaspace ((typep layout 'wrapper) (wrapper-friend layout))
+                       (t layout)))
+         (depth (- (sb-vm::layout-depthoid layout) 2))
          (index (if (or (< depth 0) (not (logtest (layout-flags layout)
                                                   +structure-layout-flag+)))
                     0 depth)))
     (truly-the layout-id
-              #-64-bit
-              (%raw-instance-ref/signed-word
-               layout (+ (get-dsd-index layout id-word0) index))
+              #-64-bit (%raw-instance-ref/signed-word
+                        layout (+ (get-dsd-index sb-vm:layout id-word0) index))
               #+64-bit ; use SAP-ref for lack of half-sized slots
               (with-pinned-objects (layout)
                 (signed-sap-ref-32 (bitmap-sap) (ash index 2))))))
 
-(defun set-layout-inherits (layout inherits structurep this-id)
-  #-metaspace (setf (layout-inherits layout) inherits)
-  #+metaspace (setf (wrapper-inherits (layout-friend layout)) inherits)
+(defun set-layout-inherits (wrapper inherits structurep this-id
+                            &aux (layout (wrapper-friend wrapper)))
+  (setf (wrapper-inherits wrapper) inherits)
   ;;; If structurep, and *only* if, store all the inherited layout IDs.
   ;;; It looks enticing to try to always store "something", but that goes wrong,
   ;;; because only structure-object layouts are growable, and only structure-object
@@ -85,7 +95,7 @@
   (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
         (value-index 0))
     (declare (index value-index))
-    (setf (%instance-layout instance) (dd-layout-or-lose dd))
+    (setf (%instance-wrapper instance) (dd-layout-or-lose dd))
     (dolist (spec slot-specs instance)
       (destructuring-bind (kind raw-type . index) spec
         (if (eq kind :unbound)
@@ -115,15 +125,11 @@
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
-(defmacro set-layout-equalp-impl (layout newval)
-  `(setf #-metaspace (%instance-ref ,layout
-                                    (get-dsd-index layout equalp-impl))
-         #+metaspace (%instance-ref (layout-friend ,layout)
-                                    (get-dsd-index wrapper equalp-impl))
-        ,newval))
+(defmacro set-wrapper-equalp-impl (wrapper newval)
+  `(setf (%instance-ref ,wrapper (get-dsd-index wrapper equalp-impl)) ,newval))
 
 (defun assign-equalp-impl (type-name function)
-  (set-layout-equalp-impl (find-layout type-name) function))
+  (set-wrapper-equalp-impl (find-layout type-name) function))
 
 (defun %target-defstruct (dd equalp)
   (declare (type defstruct-description dd))
@@ -133,8 +139,8 @@
           (dd-doc dd)))
 
   (let ((classoid (find-classoid (dd-name dd))))
-    (let ((layout (classoid-layout classoid)))
-      (set-layout-equalp-impl
+    (let ((layout (classoid-wrapper classoid)))
+      (set-wrapper-equalp-impl
           layout
           (cond ((compiled-function-p equalp) equalp)
                 ((eql (dd-bitmap dd) +layout-all-tagged+) #'sb-impl::instance-equalp)
@@ -172,8 +178,8 @@
 (defun copy-structure (structure)
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
-  (let ((layout (%instance-layout structure)))
-    (when (layout-invalid layout)
+  (let ((wrapper (%instance-wrapper structure)))
+    (when (wrapper-invalid wrapper)
       (error "attempt to copy an obsolete structure:~%  ~S" structure))
     ;; Previously this had to used LAYOUT-LENGTH in the allocation,
     ;; to avoid copying random bits from the stack to the heap if you had a
@@ -184,7 +190,7 @@
     (let* ((len (%instance-length structure))
            (res (%make-instance len)))
       (declare (type index len))
-      (let ((bitmap (dd-bitmap (layout-dd layout))))
+      (let ((bitmap (dd-bitmap (wrapper-dd wrapper))))
         ;; Don't assume that %INSTANCE-REF can access the layout.
         (setf (%instance-layout res) (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor
@@ -222,6 +228,12 @@
   (loop for i from sb-vm:instance-data-start below (%instance-length to)
         do (setf (%instance-ref to i) (%instance-ref from i)))
   to)
+(defun (setf %instance-wrapper) (newval x)
+  (setf (%instance-layout x) (wrapper-friend newval))
+  newval)
+(defun (setf %fun-wrapper) (newval x)
+  (setf (%fun-layout x) (wrapper-friend newval))
+  newval)
 
 ;;; default PRINT-OBJECT method
 
@@ -279,9 +291,9 @@
   (declare (ignore depth))
   (if (funcallable-instance-p structure)
       (print-unreadable-object (structure stream :identity t :type t))
-      (let* ((layout (%instance-layout structure))
-             (dd (layout-info layout))
-             (name (layout-classoid-name layout)))
+      (let* ((wrapper (%instance-wrapper structure))
+             (dd (wrapper-info wrapper))
+             (name (wrapper-classoid-name wrapper)))
         (cond ((not dd)
                ;; FIXME? this branch may be unnecessary as a consequence
                ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
@@ -331,5 +343,10 @@
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
+
+#+metaspace
+(defmethod print-object ((self sb-vm:layout) stream)
+  (print-unreadable-object (self stream :type t :identity t)
+    (write (layout-id self) :stream stream)))
 
 (/show0 "target-defstruct.lisp end of file")

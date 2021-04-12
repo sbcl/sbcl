@@ -549,7 +549,7 @@
 (defun find-slot-cell (wrapper slot-name)
   (declare (symbol slot-name))
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-  (let* ((vector (layout-slot-table wrapper))
+  (let* ((vector (wrapper-slot-table wrapper))
          (modulus (truly-the index (svref vector 0)))
          ;; Can elide the 'else' branch of (OR symbol-hash ensure-symbol-hash)
          ;; because every symbol in the slot-table already got a nonzero hash.

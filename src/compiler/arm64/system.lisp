@@ -87,7 +87,7 @@
   (:generator 4
     (let ((test-id (layout-id test-layout))
           (offset (+ (bitmap-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
+                     (ash (- (wrapper-depthoid test-layout) 2) 2)
                      (- instance-pointer-lowtag))))
       (declare (ignorable test-id))
       (inst ldr (32-bit-reg this-id) (@ x offset))

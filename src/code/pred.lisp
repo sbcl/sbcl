@@ -163,8 +163,10 @@
   ;; This vector is allocated in immobile space when possible. There isn't
   ;; a way to do that from lisp, so it's special-cased in genesis.
   #-immobile-space (setq **primitive-object-layouts** (make-array 256))
+  ;; If #+metaspace, we can't generally store layouts in heap objects except in
+  ;; the instance header, but this vector can because it too will go in metaspace.
   (map-into **primitive-object-layouts**
-            (lambda (name) (classoid-layout (find-classoid name)))
+            (lambda (name) (wrapper-friend (classoid-wrapper (find-classoid name))))
             #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))
                 (dolist (x sb-kernel::*builtin-classoids*)
                   (destructuring-bind (name &key codes &allow-other-keys) x
@@ -188,25 +190,26 @@
 ;;; the vector of layouts in the constant pool of the containing code.
 #-(and compact-instance-header x86-64)
 (progn
-(declaim (inline layout-of))
-(defun layout-of (x)
+(declaim (inline wrapper-of))
+(defun wrapper-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  (cond ((%instancep x) (%instance-layout x))
-        ((funcallable-instance-p x) (%fun-layout x))
+  (cond ((%instancep x) (%instance-wrapper x))
+        ((funcallable-instance-p x) (%fun-wrapper x))
         ;; Compiler can dump literal layouts, which handily sidesteps
         ;; the question of when cold-init runs L-T-V forms.
         ((null x) #.(find-layout 'null))
         (t
          ;; Note that WIDETAG-OF is slightly suboptimal here and could be
          ;; improved - we've already ruled out some of the lowtags.
-         (svref (load-time-value **primitive-object-layouts** t)
-                (widetag-of x))))))
+         (layout-friend
+          (svref (load-time-value **primitive-object-layouts** t)
+                 (widetag-of x)))))))
 
 (declaim (inline classoid-of))
 (defun classoid-of (object)
   "Return the class of the supplied object, which may be any Lisp object, not
    just a CLOS STANDARD-OBJECT."
-  (layout-classoid (layout-of object)))
+  (wrapper-classoid (wrapper-of object)))
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different
@@ -255,14 +258,19 @@
      (type-specifier (ctype-of object)))
     (simple-fun 'compiled-function)
     (t
-     (let ((layout (layout-of object)))
-       (when (= (get-lisp-obj-address layout) 0)
-         ;; [fun-]instances momentarily have no layout in any code interrupted
-         ;; just after allocating and before assigning slots.
-         ;; OUTPUT-UGLY-OBJECT has a similar precaution as this.
+     #+metaspace ; WRAPPER-OF can't be called on layoutless objects.
+     (unless (logtest (get-lisp-obj-address (%instanceoid-layout object))
+                      sb-vm:widetag-mask)
+       ;; [fun-]instances momentarily have no layout in any code interrupted
+       ;; just after allocating and before assigning slots.
+       ;; OUTPUT-UGLY-OBJECT has a similar precaution as this.
+       (return-from type-of (if (functionp object) 'funcallable-instance 'instance)))
+     (let ((wrapper (wrapper-of object)))
+       #-metaspace ; already checked for a good layout if metaspace
+       (when (= (get-lisp-obj-address wrapper) 0)
          (return-from type-of
            (if (functionp object) 'funcallable-instance 'instance)))
-       (let* ((classoid (layout-classoid layout))
+       (let* ((classoid (wrapper-classoid wrapper))
               (name (classoid-name classoid)))
          ;; FIXME: should the first test be (not (or (%instancep) (%funcallable-instance-p)))?
          ;; God forbid anyone makes anonymous classes of generic functions.
@@ -555,7 +563,8 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                 (and (logtest (logior +structure-layout-flag+ +pathname-layout-flag+)
                               (layout-flags layout))
                      (eq (%instance-layout y) layout)
-                     (funcall (layout-equalp-impl layout) x y)))))
+                     (funcall (wrapper-equalp-impl (layout-friend layout))
+                              x y)))))
         ((arrayp x)
          (and (arrayp y)
               ;; string-equal is nearly 2x the speed of array-equalp for comparing strings

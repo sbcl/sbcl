@@ -1527,8 +1527,8 @@
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
-              (let ((layout (truly-the layout (translate (%instance-layout obj) spaces))))
-                (do-instance-tagged-slot (i obj t layout)
+              (let ((type (translate (%instance-layout obj) spaces)))
+                (do-instance-tagged-slot (i obj t type)
                   (scanptr vaddr obj (1+ i))))
               (return-from scan-obj))
              (#.simple-vector-widetag
@@ -1562,9 +1562,9 @@
                              (+ core-offs n-word-bytes)
                              word)))
               (when (eq widetag funcallable-instance-widetag)
-                (let* ((layout (truly-the layout (translate (%fun-layout obj) spaces)))
+                (let* ((layout (truly-the sb-vm:layout (translate (%fun-layout obj) spaces)))
                        (bitmap (%raw-instance-ref/signed-word
-                                layout (sb-kernel::type-dd-length sb-kernel:layout))))
+                                layout (sb-kernel::type-dd-length sb-vm:layout))))
                   (unless (= (sb-kernel:bitmap-nwords layout) 1)
                     (error "Strange funcallable-instance bitmap"))
                   (unless (eql bitmap sb-kernel:+layout-all-tagged+)

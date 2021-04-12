@@ -235,22 +235,21 @@
 ;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
 ;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
 ;;   - COMMA
-(defun classoid-layout (x)
+#-metaspace (defmacro wrapper-friend (x) x)
+(defun %instance-wrapper (instance)
   (declare (notinline classoid-wrapper))
-  (classoid-wrapper x))
-(defun layout-friend (x) x)
-(defun wrapper-friend (x) x)
-(defmacro wrapper-%info (x) `(layout-info ,x))
-(defun %instance-layout (instance)
-  (classoid-layout (find-classoid (type-of instance))))
+  (classoid-wrapper (find-classoid (type-of instance))))
 (defun %instance-length (instance)
-  (declare (notinline layout-length))
+  (declare (notinline wrapper-length))
   ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
   ;; exceeed layout length, but in the cross-compiler they're the same.
-  (layout-length (%instance-layout instance)))
+  (wrapper-length (%instance-wrapper instance)))
 (defun %raw-instance-ref/word (instance index)
   (declare (ignore instance index))
   (error "No such thing as raw structure access on the host"))
+(defun layout-id (x)
+  (declare (notinline sb-kernel::wrapper-id))
+  (sb-kernel::wrapper-id x))
 
 (defun %find-position (item seq from-end start end key test)
   (let ((position (position item seq :from-end from-end

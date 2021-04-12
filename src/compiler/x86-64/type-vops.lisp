@@ -534,12 +534,15 @@
   (:policy :fast-safe)
   (:conditional :e)
   (:args (object :scs (descriptor-reg))
-         (layout :scs (descriptor-reg immediate)))
+         (layout :scs (descriptor-reg immediate #+metaspace constant)))
   (:arg-types * * (:constant t))
   (:info lowtag)
   (:generator 1
+    ;; With metaspace, the layout argument is actually a #<WRAPPER>
+    ;; which does not have IMMEDIATE sc, but rather CONSTANT sc.
+    ;; But we use a layout fixup which stuffs in the pointer to the layout.
     (inst cmp :dword (ea (- 4 lowtag) object)
-          (if (sc-is layout immediate)
+          (if (sc-is layout immediate constant)
               (make-fixup (tn-value layout) :layout)
               layout)))))
 

@@ -43,8 +43,8 @@
                           #'string<
                           ;; pair = (#<classoid> . #<layout>)
                           :key (lambda (pair) (classoid-name (car pair)))))
-        (let* ((layout (cdr pair))
-               (dd (layout-info layout)))
+        (let* ((wrapper (cdr pair))
+               (dd (wrapper-info wrapper)))
           (cond
            (dd
             (let* ((*print-pretty* nil) ; output should be insensitive to host pprint
@@ -53,10 +53,10 @@
                    (*package* (cl:symbol-package classoid-name)))
               (format output "~/sb-ext:print-symbol-with-prefix/ ~S (~%"
                       classoid-name
-                      (list* (the (unsigned-byte 16) (layout-flags layout))
-                             (layout-depthoid layout)
-                             (map 'list #'layout-classoid-name
-                                  (layout-inherits layout))))
+                      (list* (the (unsigned-byte 16) (wrapper-flags wrapper))
+                             (wrapper-depthoid wrapper)
+                             (map 'list #'sb-kernel::wrapper-classoid-name
+                                  (wrapper-inherits wrapper))))
               (dolist (dsd (dd-slots dd) (format output ")~%"))
                 (format output "  (~d ~S ~S)~%"
                         (sb-kernel::dsd-bits dsd)

@@ -16,51 +16,48 @@
 (defun layout-id-vector-sap (layout)
   (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address layout))
                (- (ash (+ sb-vm:instance-slots-offset
-                          (sb-kernel:get-dsd-index
-                           sb-kernel:layout sb-kernel::id-word0))
+                          (sb-kernel:get-dsd-index sb-vm:layout sb-kernel::id-word0))
                        sb-vm:word-shift)
                   sb-vm:instance-pointer-lowtag)))
 
 (let ((hash (make-hash-table)))
   ;; assert that all layout IDs are unique
-  (let ((all-layouts
+  (let ((all-wrappers
          (delete-if
           ;; temporary layouts (created for parsing DEFSTRUCT)
           ;; must be be culled out.
           (lambda (x)
-            (and (typep (sb-kernel:layout-classoid x)
+            (and (typep (sb-kernel:wrapper-classoid x)
                         'sb-kernel:structure-classoid)
-                 (eq (sb-kernel::layout-equalp-impl x)
+                 (eq (sb-kernel:wrapper-equalp-impl x)
                      #'sb-kernel::equalp-err)))
           (sb-vm::list-allocated-objects :all
                                          :type sb-vm:instance-widetag
-                                         :test #'sb-kernel::layout-p))))
-    (dolist (layout all-layouts)
-      (let ((id (sb-kernel:layout-id layout)))
+                                         :test #'sb-kernel::wrapper-p))))
+    (dolist (wrapper all-wrappers)
+      (let ((id (sb-kernel:layout-id wrapper)))
         (sb-int:awhen (gethash id hash)
-          (error "ID ~D is ~A and ~A" id sb-int:it layout))
-        (setf (gethash id hash) layout)))
+          (error "ID ~D is ~A and ~A" id sb-int:it wrapper))
+        (setf (gethash id hash) wrapper)))
     ;; assert that all inherited ID vectors match the layout-inherits vector
     (let ((structure-object
            (sb-kernel:find-layout 'structure-object)))
-      (dolist (layout all-layouts)
-        (when (find structure-object (sb-kernel:layout-inherits layout))
-          (let ((ids
-                 (sb-sys:with-pinned-objects (layout)
+      (dolist (wrapper all-wrappers)
+        (when (find structure-object (sb-kernel:wrapper-inherits wrapper))
+          (let* ((layout (sb-kernel:wrapper-friend wrapper))
+                 (ids
+                  (sb-sys:with-pinned-objects (layout)
                    (let ((sap (layout-id-vector-sap layout)))
-                     (loop for depthoid from 2 to (sb-kernel:layout-depthoid layout)
+                     (loop for depthoid from 2 to (sb-kernel:wrapper-depthoid wrapper)
                            collect (sb-sys:signed-sap-ref-32 sap (ash (- depthoid 2) 2))))))
-                (expect
-                 (map 'list 'sb-kernel:layout-id
-                      (sb-kernel:layout-inherits layout))))
-            (unless (equal (list* (sb-kernel:layout-id
-                                   (sb-kernel:find-layout 't))
-                                  (sb-kernel:layout-id
-                                   (sb-kernel:find-layout 'structure-object))
+                (expected
+                 (map 'list 'sb-kernel:layout-id (sb-kernel:wrapper-inherits wrapper))))
+            (unless (equal (list* (sb-kernel:layout-id (sb-kernel:find-layout 't))
+                                  (sb-kernel:layout-id (sb-kernel:find-layout 'structure-object))
                                   ids)
-                           (append expect (list (sb-kernel:layout-id layout))))
+                           (append expected (list (sb-kernel:layout-id wrapper))))
               (error "Wrong IDs for ~A: expect ~D actual ~D~%"
-                     layout expect ids))))))))
+                     wrapper expected ids))))))))
 
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
 
@@ -589,7 +586,7 @@
                (eql (huge-manyraw-w1 s) #xffee)
                (eql (huge-manyraw-w2 s) #xeeee)))
   (dolist (slot (sb-kernel:dd-slots
-                 (sb-kernel:layout-info (sb-kernel:layout-of s))))
+                 (sb-kernel:wrapper-info (sb-kernel:wrapper-of s))))
     (let ((name (string (sb-kernel:dsd-name slot))))
       (cond ((eql (mismatch name "SLOT-") 5)
              (let ((n (parse-integer name :start 5)))
@@ -946,7 +943,7 @@ redefinition."
   (assert (funcall predicate instance)))
 
 (defun assert-invalid (instance)
-  (assert (sb-kernel:layout-invalid (sb-kernel:%instance-layout instance))))
+  (assert (sb-kernel:wrapper-invalid (sb-kernel:%instance-wrapper instance))))
 
 ;; Don't try to understand this macro; just look at its expansion.
 (defmacro with-defstruct-redefinition-test (name
@@ -1480,7 +1477,7 @@ redefinition."
 
 (test-util:with-test (:name :specialized-equalp)
   ;; make sure we didn't mess up PATHNAME and HASH-TABLE
-  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'pathname))))
+  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'pathname))))
     (assert (eq f #'sb-int:pathname=)))
-  (let ((f (sb-kernel:layout-equalp-impl (sb-kernel:find-layout 'hash-table))))
+  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'hash-table))))
     (assert (eq f #'sb-int:hash-table-equalp))))

@@ -2402,6 +2402,8 @@ is :ANY, the function name is not checked."
 (defun find-constant (object &optional name
                              &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*))
                                   (output *compile-object*))
+  (when (or #+metaspace (typep object 'sb-vm:layout))
+    (error "Cowardly refusing to FIND-CONSTANT on a LAYOUT"))
 
   ;; Pick off some objects that aren't actually constants in user code.
   ;; These things appear as literals in forms such as `(%POP-VALUES ,x)

@@ -90,7 +90,7 @@
   (cond ((sc-is thing immediate)
          (let ((obj (tn-value thing)))
            (typecase obj
-             (layout nil)
+             (wrapper nil)
              ;; non-static symbols can be referenced as error-break args
              ;; because they appear in the code constants.
              ;; static symbols can't be referenced as error-break args
@@ -161,7 +161,7 @@
               (make-sc+offset immediate-sc-number (tn-value where)))
              (t
               (make-sc+offset (if (and (sc-is where immediate)
-                                       (typep (tn-value where) '(or symbol layout)))
+                                       (typep (tn-value where) '(or symbol wrapper)))
                                   constant-sc-number
                                   (sc-number (tn-sc where)))
                               (or (tn-offset where) 0))))

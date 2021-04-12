@@ -218,8 +218,8 @@ SB-ALIEN::SHARED-OBJECT
 ;;; There are a few wired IDs:
 ;;;   0 = T
 ;;;   1 = STRUCTURE-OBJECT
-;;;   2 = WRAPPER
-;;;   3 = LAYOUT
+;;;   2 = WRAPPER if #+metaspace, unused if #-metaspace
+;;;   3 = SB-VM:LAYOUT if #+metaspace, WRAPPER if #-metaspace
 ;;;   4 = SB-LOCKLESS::LIST-NODE
 (ecase layout-id-type
   (unsigned-byte

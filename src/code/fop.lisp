@@ -159,10 +159,10 @@
   (let ((res (%make-instance size)) ; number of words excluding header
         ;; Discount the layout from number of user-visible words.
         (n-data-words (- size sb-vm:instance-data-start)))
-    (setf (%instance-layout res) layout)
+    (setf (%instance-wrapper res) layout)
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
-      (let ((bitmap (layout-bitmap layout)))
+      (let ((bitmap (wrapper-bitmap layout)))
         ;; Values on the stack are in the same order as in the structure itself.
         (do ((i sb-vm:instance-data-start (1+ i)))
             ((>= i size))

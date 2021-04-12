@@ -97,7 +97,7 @@
   ;; It would probably be simple to eliminate this as a special case
   ;; by ensuring that instances of LAYOUT commence life with a trailing
   ;; hash slot and the SB-VM:HASH-SLOT-PRESENT-FLAG set.
-  (when (typep instance 'layout)
+  (when (typep instance 'sb-vm:layout)
     ;; This might be wrong if the clos-hash was clobbered to 0
     (return-from %instance-sxhash (layout-clos-hash instance)))
   ;; Non-simple cases: no hash slot, and either unhashed or hashed-not-moved.
@@ -348,7 +348,7 @@
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                (funcallable-instance
-                (if (layout-for-pcl-obj-p (%fun-layout x))
+                (if (logtest (layout-flags (%fun-layout x)) +pcl-object-layout-flag+)
                     ;; We have a hash code, so might as well use it.
                     (fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
@@ -444,13 +444,13 @@
                          (let ((cplx (%raw-instance-ref/complex-double key i)))
                            ,(mix-float '(realpart cplx) $0d0)
                            ,(mix-float '(imagpart cplx) $0d0)))))))
-         (let* ((layout (%instance-layout key))
-                (result (layout-clos-hash layout)))
+         (let* ((wrapper (%instance-wrapper key))
+                (result (wrapper-clos-hash wrapper)))
            (declare (type fixnum result))
            (when (plusp depthoid)
              (let ((max-iterations depthoid)
                    (depthoid (1- depthoid))
-                   (dd (layout-dd layout)))
+                   (dd (wrapper-dd wrapper)))
                (declare (index max-iterations))
                (if (/= (sb-kernel::dd-bitmap dd) +layout-all-tagged+)
                    (let ((slots (dd-slots dd)))

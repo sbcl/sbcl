@@ -2680,7 +2680,7 @@
                 (t :none))))))
     ;; There should be no #<layout> referenced directly from the code header.
     ;; There is of course a vector of layouts in there to compare against.
-    (assert (not (ctu:find-code-constants f :type 'sb-kernel:layout)))
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:wrapper)))
     ;; The function had better work.
     (assert (eq (funcall f 'wat) :none))
     (assert (equal (funcall f (make-broadcast-stream *error-output*))

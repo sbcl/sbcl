@@ -303,7 +303,7 @@
                       (i sb-vm:instance-data-start (1+ i)))
                      ((>= i len))
                    (process (%instance-ref tree i)))
-                 (let ((dd (layout-dd (%instance-layout tree))))
+                 (let ((dd (wrapper-dd (%instance-wrapper tree))))
                    (dolist (dsd (dd-slots dd))
                      (when (eq (dsd-raw-type dsd) t)
                        (process (%instance-ref tree (dsd-index dsd))))))))

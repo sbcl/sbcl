@@ -171,8 +171,8 @@
           (fmf         (svref method 3))
           (lambda-list (svref method 4))
           (source-loc  (svref method 5)))
-      (when (sb-kernel::layout-p specializer)
-        (setq specializer (layout-classoid-name specializer)))
+      (when (sb-kernel::wrapper-p specializer)
+        (setq specializer (wrapper-classoid-name specializer)))
       (unless (member specializer except)
         (multiple-value-bind (specializers arg-info)
                (case gf-name
@@ -194,7 +194,7 @@
                    mf)
                 plist ,arg-info simple-next-method-call t)
               source-loc))))))
-(!install-cross-compiled-methods 'make-load-form :except '(layout))
+(!install-cross-compiled-methods 'make-load-form :except '(wrapper))
 
 (defmethod make-load-form ((class class) &optional env)
   ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
@@ -206,13 +206,13 @@
         (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
                class))))
 
-(defmethod make-load-form ((object layout) &optional env)
+(defmethod make-load-form ((object wrapper) &optional env)
   (declare (ignore env))
-  (let ((pname (classoid-proper-name (layout-classoid object))))
+  (let ((pname (classoid-proper-name (wrapper-classoid object))))
     (unless pname
       (error "can't dump wrapper for anonymous class:~%  ~S"
-             (layout-classoid object)))
-    `(classoid-layout (find-classoid ',pname))))
+             (wrapper-classoid object)))
+    `(classoid-wrapper (find-classoid ',pname))))
 
 ;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.
 (defun dont-know-how-to-dump (object)

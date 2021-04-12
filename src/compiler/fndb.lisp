@@ -98,10 +98,10 @@
 (defknown find-classoid (name-for-class &optional t)
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
-(defknown layout-of (t) layout (flushable))
-#+64-bit (defknown layout-depthoid (layout) layout-depthoid (flushable always-translatable))
-#+(or x86 x86-64) (defknown (layout-depthoid-ge)
-                      (layout integer) boolean (flushable))
+(defknown wrapper-of (t) wrapper (flushable))
+(defknown wrapper-depthoid (wrapper) layout-depthoid (flushable))
+#+64-bit (defknown layout-depthoid (sb-vm:layout) layout-depthoid (flushable always-translatable))
+#+(or x86 x86-64) (defknown (layout-depthoid-ge) (sb-vm:layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
@@ -1769,7 +1769,7 @@
 ;;; We can't fold this in general because of SATISFIES. There is a
 ;;; special optimizer anyway.
 (defknown %typep (t (or type-specifier ctype)) boolean (movable flushable))
-(defknown %instance-typep (t (or type-specifier ctype layout)) boolean
+(defknown %instance-typep (t (or type-specifier ctype wrapper)) boolean
   (movable flushable always-translatable))
 ;;; We should never emit a call to %typep-wrapper
 (defknown %typep-wrapper (t t (or type-specifier ctype)) t

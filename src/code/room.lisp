@@ -777,9 +777,9 @@ We could try a few things to mitigate this:
                  (eql type funcallable-instance-widetag))
          (incf total-objects)
          (let* ((layout (if (eql type funcallable-instance-widetag)
-                            (%fun-layout obj)
-                            (%instance-layout obj)))
-                (classoid (layout-classoid layout))
+                            (%fun-wrapper obj)
+                            (%instance-wrapper obj)))
+                (classoid (wrapper-classoid layout))
                 (found (ensure-gethash classoid totals (cons 0 0)))
                 (size size))
            (declare (fixnum size))
@@ -1073,7 +1073,7 @@ We could try a few things to mitigate this:
                   ;; both tricky and unnecessary to generalize iteration.
                   ;; So just hardcode the few cases that exist.
                   #+compact-instance-header
-                  (ecase (layout-bitmap (%fun-layout ,obj))
+                  (ecase (wrapper-bitmap (%fun-wrapper ,obj))
                     (-1 ; external trampoline, all slots are tagged
                      ;; In this case, the trampoline word is scanned, with no ill effect.
                      (loop for .i. from 0
@@ -1087,7 +1087,7 @@ We could try a few things to mitigate this:
                      (,functoid (%funcallable-instance-info ,obj 0) ,@more)))
                   #-compact-instance-header
                   (progn
-                    (aver (eql (layout-bitmap (%fun-layout ,obj)) -4))
+                    (aver (eql (wrapper-bitmap (%fun-wrapper ,obj)) -4))
                     ;;            v ----trampoline
                     ;; = #b1...1100
                     ;;           ^----- layout
@@ -1496,10 +1496,10 @@ We could try a few things to mitigate this:
     (map-code-objects #'visit)))
 
 (defun show-all-layouts ()
-  (let ((l (sb-vm::list-allocated-objects :all :test #'sb-kernel::layout-p))
+  (let ((l (sb-vm::list-allocated-objects :all :test #'sb-kernel::wrapper-p))
         zero trailing-raw trailing-tagged vanilla)
     (dolist (x l)
-      (let ((m (sb-kernel::layout-bitmap x)))
+      (let ((m (wrapper-bitmap x)))
         (cond ((eql m +layout-all-tagged+) (push x vanilla))
               ((eql m 0) (push x zero))
               ((minusp m) (push x trailing-tagged))
@@ -1510,22 +1510,22 @@ We could try a few things to mitigate this:
                (format t "~A~%~A~%" s (make-string (length s) :initial-element #\-)))))
       (when zero
         (legend nil "Zero bitmap (~d):" zero)
-        (dolist (x zero) (format t "~a~%" (layout-classoid-name x))))
+        (dolist (x zero) (format t "~a~%" (wrapper-classoid-name x))))
       (when trailing-raw
         (legend t "Trailing raw (~d):" trailing-raw)
         (dolist (x trailing-raw)
-          (let ((m (sb-kernel::layout-bitmap x)))
+          (let ((m (wrapper-bitmap x)))
             (format t "~30a 0...~v,'0b~%"
-                    (layout-classoid-name x)
-                    (acond ((layout-info x) (1+ (dd-length it))) (t 32))
+                    (wrapper-classoid-name x)
+                    (acond ((wrapper-info x) (1+ (dd-length it))) (t 32))
                     m))))
       (when trailing-tagged
         (legend t "Trailing tagged (~d):" trailing-tagged)
         (dolist (x trailing-tagged)
-          (let ((m (sb-kernel::layout-bitmap x)))
+          (let ((m (wrapper-bitmap x)))
             (format t "~30a 1...~b~%"
-                    (layout-classoid-name x)
-                    (acond ((layout-info x) (ldb (byte (dd-length it) 0) m))
+                    (wrapper-classoid-name x)
+                    (acond ((wrapper-info x) (ldb (byte (dd-length it) 0) m))
                            (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))
 

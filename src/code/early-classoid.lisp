@@ -17,7 +17,7 @@
 
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
 ;;; about a structure type.
-;;; It is defined prior to LAYOUT because a LAYOUT-INFO slot
+;;; It is defined prior to WRAPPER because WRAPPER-INFO
 ;;; is declared to hold a DEFSTRUCT-DESCRIPTION.
 (def!struct (defstruct-description
              (:conc-name dd-)
@@ -150,9 +150,9 @@
 
 #-metaspace
 (progn
-(sb-xc:defstruct (layout (:copier nil)
+(sb-xc:defstruct (wrapper (:copier nil)
                          ;; Parsing DEFSTRUCT uses a temporary layout
-                         (:constructor make-temporary-layout
+                         (:constructor make-temporary-wrapper
                              (clos-hash classoid inherits &aux (invalid nil))))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
@@ -221,7 +221,7 @@
   #-64-bit (id-word3 0 :type word)
   #-64-bit (id-word4 0 :type word)
   #-64-bit (id-word5 0 :type word))
-(declaim (freeze-type layout)))
+(declaim (freeze-type wrapper)))
 
 #+metaspace
 (progn
@@ -231,20 +231,21 @@
 ;;; WRAPPER since it could be reallocated with variable size.
 ;;; The SLOT-TABLE slot might be a good candidate for trailing tagged slots.
 (sb-xc:defstruct (wrapper (:copier nil) (:constructor %make-wrapper))
+  ;; !!! The FRIEND slot in WRAPPER *MUST* BE FIRST !!! (Wired-in assumption in genesis)
+  (friend nil :type sb-vm:layout)
   (clos-hash (missing-arg) :type (and fixnum unsigned-byte)) ; redundant
   (classoid (missing-arg) :type classoid)
   (inherits #() :type simple-vector)
   (equalp-impl #'equalp-err :type (sfunction (t t) boolean) :read-only t)
   (slot-table #(1 nil) :type simple-vector)
   (%info nil :type (or list defstruct-description))
-  (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
-  (friend nil :type layout))
-;;; See LAYOUT for the remarks about each slot.
+  (invalid :uninitialized :type (or cons (member nil t :uninitialized))))
+;;; See #-metaspace structure definition for remarks about each slot.
 ;;; LAYOUT points to WRAPPER and vice-versa.
 ;;; The most common LAYOUT is 8 words.
 ;;; Needing >64 words would be quite unusual - the layout would have
 ;;; an enormous depthoid or bitmap or both.
-(sb-xc:defstruct (layout (:copier nil)
+(sb-xc:defstruct (sb-vm:layout (:copier nil)
                          ;; Parsing DEFSTRUCT uses a temporary layout
                          (:constructor %make-temporary-layout (friend clos-hash)))
   ;; !!! The FRIEND slot in LAYOUT *MUST* BE FIRST !!!
@@ -257,32 +258,7 @@
   ;; There are zero or more raw words if a type needs to store additional layout-ids,
   ;; and there are one or more raw words for the GC bitmap.
   )
-(declaim (freeze-type wrapper layout))
-
-#-sb-xc-host
-(progn
-(defmacro layout-classoid (layout) `(wrapper-classoid (layout-friend ,layout)))
-(defmacro layout-slot-table (layout) `(wrapper-slot-table (layout-friend ,layout)))
-(defmacro layout-%info (layout) `(wrapper-%info (layout-friend ,layout)))
-(defmacro layout-equalp-impl (layout) `(wrapper-equalp-impl (layout-friend ,layout)))
-(defun layout-inherits (layout) (wrapper-inherits (layout-friend layout)))
-(declaim (inline layout-invalid))
-(defun layout-invalid (layout)
-  (wrapper-invalid (layout-friend layout)))
-(defun (setf layout-invalid) (newval layout)
-  (setf (wrapper-invalid (layout-friend layout)) newval))
-(defun make-temporary-layout (clos-hash classoid inherits)
-  (let* ((wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
-                                 :inherits inherits :invalid nil
-                                 :friend #.(find-layout t)))
-         (layout (%make-temporary-layout wrapper clos-hash)))
-    (setf (wrapper-friend wrapper) layout)
-    layout))))
-
-#+(and (not metaspace) (not sb-xc-host))
-(progn (defmacro layout-friend (x) x)
-       (defmacro wrapper-friend (x) x)
-       (defmacro wrapper-%info (x) `(layout-%info ,x)))
+(declaim (freeze-type wrapper sb-vm:layout)))
 
 ;;; The cross-compiler representation of a LAYOUT omits several things:
 ;;;   * BITMAP - obtainable via (DD-BITMAP (LAYOUT-INFO layout)).
@@ -295,14 +271,12 @@
 ;;; FLAGS are computed on demand, and not stored.
 #+sb-xc-host
 (progn
-  ;; As far as the host is concerned, LAYOUT and WRAPPER are always the same.
-  ;; We need this deftype because of the DEF!STRUCT for CLASSOID which states
-  ;; that the type of the slot named WRAPPER is WRAPPER.
-  #+metaspace (deftype wrapper () 'layout)
-  (defstruct (layout (:include structure!object)
-                     (:constructor host-make-layout
-                                   (id clos-hash classoid &key info depthoid inherits
-                                                          length invalid)))
+  (defstruct (wrapper (:include structure!object)
+                      (:constructor host-make-wrapper
+                         (id clos-hash classoid
+                          &key ((:info %info)) depthoid inherits length invalid
+                          #+metaspace friend)))
+    #+metaspace (friend)
     (id nil :type (or null fixnum))
     ;; Cross-compiler-only translation from slot index to symbol naming
     ;; the accessor to call. (Since access by position is not a thing)
@@ -317,29 +291,39 @@
     (inherits #() :type simple-vector)
     (depthoid -1 :type layout-depthoid)
     (length 0 :type layout-length)
-    (info nil :type (or null defstruct-description)))
-  (defun layout-dd (layout)
-    (the defstruct-description (layout-info layout)))
-  (defun make-temporary-layout (clos-hash classoid inherits)
-    (host-make-layout nil clos-hash classoid :inherits inherits :invalid nil))
-  (defun layout-bitmap (layout)
-    (if (layout-info layout) (dd-bitmap (layout-info layout)) +layout-all-tagged+)))
+    (%info nil :type (or null defstruct-description)))
+  #+metaspace (defstruct (sb-vm:layout (:include structure!object)
+                                       (:constructor %make-layout))
+                friend)
+  (defun make-temporary-wrapper (clos-hash classoid inherits)
+    (host-make-wrapper nil clos-hash classoid :inherits inherits :invalid nil))
+  (defun wrapper-bitmap (wrapper)
+    (acond ((wrapper-%info wrapper) (dd-bitmap it)) (t +layout-all-tagged+))))
+
+#+(and metaspace (not sb-xc-host))
+(defmacro wrapper-flags (x) `(layout-flags (wrapper-friend ,x)))
+
+#+(and 64-bit (not sb-xc-host))
+(defun wrapper-depthoid (wrapper) (layout-depthoid (wrapper-friend wrapper)))
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))
 
+(defmacro name->dd (name)
+  ;; This wants to be a toplevel macrolet but can't be, because the body of
+  ;; the macro (which is run in the host) wouldn't see NAME->DD as a macro
+  ;; when expanding for the target. And it can't be a toplevel FLET because
+  ;; that would demote the two using macros from toplevel.
+  `(find-defstruct-description (cond #-metaspace ((eq ,name 'sb-vm:layout) 'wrapper)
+                                     (t ,name))))
+(defmacro type-dd-length (type-name) (dd-length (name->dd type-name)))
 (defmacro get-dsd-index (type-name slot-name)
   (declare (notinline dsd-index)) ; avoid later inlining failure style-warning
-  (dsd-index (find slot-name
-                   (dd-slots (find-defstruct-description type-name))
-                   :key #'dsd-name)))
+  (dsd-index (find slot-name (dd-slots (name->dd type-name)) :key #'dsd-name)))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-flags (depthoid length flags)
   `(logior (ash ,depthoid (+ 32 sb-vm:n-fixnum-tag-bits)) (ash ,length 16) ,flags))
-
-(defmacro type-dd-length (type-name)
-  (dd-length (find-defstruct-description type-name)))
 
 (defconstant layout-id-vector-fixed-capacity 7)
 (defmacro calculate-extra-id-words (depthoid)
@@ -349,6 +333,18 @@
   ;; 0 and 1 for T and STRUCTURE-OBJECT respectively are not stored.
   `(ceiling (max 0 (- ,depthoid ,layout-id-vector-fixed-capacity))
             ,(/ sb-vm:n-word-bytes 4)))
+
+(declaim (inline wrapper-info wrapper-dd))
+(defun wrapper-info (wrapper)
+  (let ((info (wrapper-%info wrapper))) (unless (listp info) info)))
+(defun (setf wrapper-info) (newval wrapper)
+  ;; The current value must be nil or a defstruct-description,
+  ;; otherwise we'd clobber a non-nil slot list.
+  (aver (not (consp (wrapper-%info wrapper))))
+  (setf (wrapper-%info wrapper) newval))
+;; Use WRAPPER-DD to read WRAPPER-INFO and assert that it is non-nil.
+(defun wrapper-dd (wrapper)
+  (the defstruct-description (wrapper-%info wrapper)))
 
 ;;; See the pictures above DD-BITMAP in src/code/defstruct for the details.
 (defconstant standard-gf-primitive-obj-layout-bitmap
@@ -372,21 +368,9 @@
 ;;; The third one also gets thrown away.
 #-sb-xc-host
 (progn
-(declaim (inline layout-dd layout-info))
-;; Use LAYOUT-DD to read LAYOUT-INFO if you want to assert that it is non-nil.
-(defun layout-dd (layout)
-  (the defstruct-description (layout-%info layout)))
-(defun layout-info (layout)
-  (let ((info (layout-%info layout)))
-    (if (%instancep info) info)))
-(defun (setf layout-info) (newval layout)
-  ;; The current value must be nil or a defstruct-description,
-  ;; otherwise we'd clobber a non-nil slot list.
-  (aver (not (consp (layout-%info layout))))
-  (setf (layout-%info layout) newval))
-
 (define-load-time-global *layout-id-generator* (cons 0 nil))
 (declaim (type (cons fixnum) *layout-id-generator*))
+;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
 (defun make-layout (clos-hash classoid
                     &key (depthoid -1) (length 0) (flags 0)
                          (inherits #())
@@ -397,60 +381,69 @@
                                  (atomic-incf (car *layout-id-generator*)))))
   (unless (typep id '(and layout-id (not (eql 0))))
     (error "Layout ID limit reached"))
-  (let* ((fixed-words (type-dd-length layout))
+  (let* ((fixed-words (type-dd-length sb-vm:layout))
          (extra-id-words ; count of additional words needed to store ancestors
           (if (logtest flags +structure-layout-flag+)
               (calculate-extra-id-words depthoid)
               0))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (nwords (+ fixed-words extra-id-words bitmap-words))
-         (layout (truly-the layout
-                 #+immobile-space
-                 (sb-vm::alloc-immobile-fixedobj
-                  (1+ nwords)
-                  (logior (ash nwords sb-vm:instance-length-shift)
-                          sb-vm:instance-widetag))
-                 #-immobile-space (%make-instance nwords))))
-    (setf (%instance-layout layout) #.(find-layout 'layout))
-    #+metaspace
-    (let ((wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid  :%info info
-                                  :inherits inherits :invalid invalid
-                                  :friend layout)))
-      (setf (layout-friend layout) wrapper))
+         (layout
+          (let ((new (truly-the sb-vm:layout
+                       #+immobile-space
+                       (sb-vm::alloc-immobile-fixedobj
+                        (1+ nwords)
+                        (logior (ash nwords sb-vm:instance-length-shift)
+                                sb-vm:instance-widetag))
+                       #-immobile-space (%make-instance nwords))))
+            (setf (%instance-layout new)
+                  (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
+                                                 #-metaspace 'wrapper)))
+            new))
+         (wrapper #+metaspace
+                  (%make-wrapper :clos-hash clos-hash :classoid classoid
+                                 :%info info :invalid invalid :friend layout)
+                  #-metaspace layout))
+    #+metaspace (setf (layout-friend layout) wrapper)
     (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
                                 #-64-bit flags)
     (setf (layout-clos-hash layout) clos-hash
-          (layout-classoid layout) classoid
-          (layout-invalid layout) invalid)
-    #-64-bit (setf (layout-depthoid layout) depthoid (layout-length layout) length)
-    (setf (layout-info layout) info)
-    (setf (layout-slot-table layout) #(1 nil))
-    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) id)
+          (wrapper-classoid wrapper) classoid
+          (wrapper-invalid wrapper) invalid)
+    #-64-bit (setf (wrapper-depthoid wrapper) depthoid
+                   (wrapper-length wrapper) length)
+    #-metaspace (setf (wrapper-%info wrapper) info ; already set if #+metaspace
+                      (wrapper-slot-table wrapper) #(1 nil))
+    (set-layout-inherits wrapper inherits (logtest flags +structure-layout-flag+) id)
     (let ((bitmap-base (+ fixed-words extra-id-words)))
       (dotimes (i bitmap-words)
         (setf (%raw-instance-ref/word layout (+ bitmap-base i))
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
     ;; It's not terribly important that we recycle layout IDs, but I have some other
     ;; changes planned that warrant a finalizer per layout.
+    ;; FIXME: structure IDs should never be recycled because code blobs referencing
+    ;; th ID do not reference the layout, and so the layout could be GCd allowing
+    ;; reuse of an old ID for a new type.
     (unless (built-in-classoid-p classoid)
-      (finalize layout (lambda () (atomic-push id (cdr *layout-id-generator*)))
+      (finalize wrapper (lambda () (atomic-push id (cdr *layout-id-generator*)))
                 :dont-save t))
-    layout))
+    wrapper))
 
 (declaim (inline bitmap-nwords bitmap-all-taggedp))
 (defun bitmap-nwords (layout)
-  (declare (layout layout))
-  (- (%instance-length layout) (type-dd-length layout)))
+  (declare (sb-vm:layout layout))
+  (- (%instance-length layout) (type-dd-length sb-vm:layout)))
 
 (defun bitmap-all-taggedp (layout)
   ;; All bitmaps have at least 1 word; read that first.
-  (and (= (%raw-instance-ref/signed-word layout (type-dd-length layout))
+  (and (= (%raw-instance-ref/signed-word layout (type-dd-length sb-vm:layout))
           +layout-all-tagged+)
        ;; Then check that there are no additional words.
-       (= (%instance-length layout) (1+ (type-dd-length layout)))))
+       (= (%instance-length layout) (1+ (type-dd-length sb-vm:layout)))))
 
-(defun layout-bitmap (layout)
-  (acond ((layout-info layout) (dd-bitmap it))
+(defun wrapper-bitmap (wrapper)
+  (declare (type wrapper wrapper))
+  (acond ((wrapper-info wrapper) (dd-bitmap it))
          ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
          ;; raw slots, except that funcallable-instances may have 2 raw slots -
          ;; the trampoline and the layout. The trampoline can have a tag, depending
@@ -458,12 +451,11 @@
          ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
          ;; words preceding it.
          (t (the fixnum
-                 (%raw-instance-ref/signed-word layout (type-dd-length layout))))))
-
+                 (%raw-instance-ref/signed-word (wrapper-friend wrapper)
+                                                (type-dd-length sb-vm:layout))))))
 #+64-bit
-;;; LAYOUT-DEPTHOID gets a vop and a stub
-(defmacro layout-length (layout) ; SETFable
-  `(ldb (byte 16 16) (layout-flags ,layout)))
+(defmacro wrapper-length (wrapper) ; SETFable
+  `(ldb (byte 16 16) (layout-flags (wrapper-friend ,wrapper))))
 ) ; end PROGN
 
 (defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
@@ -471,8 +463,10 @@
 ;;; True of STANDARD-OBJECT, which include generic functions.
 ;;; This one includes any class that mixes in STANDARD-OBJECT.
 (declaim (inline layout-for-pcl-obj-p))
-(defun layout-for-pcl-obj-p (x)
-  (logtest (layout-flags x) +pcl-object-layout-flag+))
+(defun layout-for-pcl-obj-p (wrapper)
+  (declare (type wrapper wrapper))
+  #-sb-xc-host (logtest (layout-flags (wrapper-friend wrapper)) +pcl-object-layout-flag+)
+  #+sb-xc-host (declare (ignore wrapper)))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type
@@ -498,11 +492,8 @@
              #-sb-xc-host (:pure nil))
   ;; the value to be returned by CLASSOID-NAME.
   (name nil :type symbol)
-  ;; the current WRAPPER, or LAYOUT, for this classoid,
-  ;; or NIL if none assigned yet.
-  ;; The name of the slot is always WRAPPER even when WRAPPER = LAYOUT.
-  ;; See doc/internals-notes/metaspace for further details.
-  (wrapper nil :type (or null #+metaspace wrapper #-metaspace layout))
+  ;; the current WRAPPER for this class, or NIL if none assigned yet
+  (wrapper nil :type (or null wrapper))
   ;; How sure are we that this class won't be redefined?
   ;;   :READ-ONLY = We are committed to not changing the effective
   ;;                slots or superclasses.
@@ -525,8 +516,12 @@
   ;; NIL if none assigned yet
   (pcl-class nil))
 
+(defun wrapper-classoid-name (x)
+  (classoid-name (wrapper-classoid x)))
+
 #+sb-xc-host
-(defun layout-flags (x)
+(defun wrapper-flags (wrapper)
+  (declare (type wrapper wrapper))
   (let ((mapping `((structure-object  ,+structure-layout-flag+)
                    (pathname          ,+pathname-layout-flag+)
                    (condition         ,+condition-layout-flag+)
@@ -535,20 +530,9 @@
                    (stream            ,+stream-layout-flag+)
                    (sequence          ,+sequence-layout-flag+)))
         (flags 0))
-    (dolist (layout (cons x (coerce (layout-inherits x) 'list)) flags)
-      (let ((cell (assoc (layout-classoid-name layout) mapping)))
+    (dolist (x (cons wrapper (coerce (wrapper-inherits wrapper) 'list)) flags)
+      (let ((cell (assoc (wrapper-classoid-name x) mapping)))
         (when cell (setq flags (logior flags (second cell))))))))
-
-;; XC version is defined in cross-misc
-#-sb-xc-host
-(progn
-  (declaim (inline classoid-layout))
-  (defun classoid-layout (classoid)
-    #-metaspace (classoid-wrapper classoid)
-    #+metaspace (awhen (classoid-wrapper classoid) (wrapper-friend it))))
-
-(defun layout-classoid-name (x)
-  (classoid-name (layout-classoid x)))
 
 ;;;; object types to represent classes
 
@@ -685,15 +669,17 @@
 
 #-sb-xc-host
 (defun id-to-layout (id)
-  (maphash (lambda (classoid wrapper &aux (layout (wrapper-friend wrapper)))
-             (declare (ignore classoid))
-             (when (eql (layout-id layout) id) (return-from id-to-layout layout)))
+  (maphash (lambda (k v)
+             (declare (ignore k))
+             (when (eql (layout-id v) id)
+               (return-from id-to-layout v)))
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 
 #-sb-xc-host
 (defun summarize-layouts ()
-   (flet ((flag-bits (x) (logand (layout-flags x) #xffff)))
+  (flet ((flag-bits (x) (logand (layout-flags (wrapper-friend x))
+                                layout-flags-mask)))
      (let ((prev -1))
        (dolist (layout (sort (loop for v being each hash-value
                                 of (classoid-subclasses (find-classoid 't))
@@ -708,47 +694,51 @@
 #+sb-xc-host
 (progn
 (defun make-layout (hash classoid &rest keys)
-  (apply #'host-make-layout
-         (cdr (assq (classoid-name classoid) *popular-structure-types*))
-         hash classoid
-         :allow-other-keys t
-         keys))
-;; The target reconstructs layouts using FOP-LAYOUT, but the host uses MAKE-LOAD-FORM.
-(defmethod make-load-form ((layout layout) &optional env)
+  (macrolet ((make (&rest extra)
+               `(apply #'host-make-wrapper
+                       (cdr (assq (classoid-name classoid) *popular-structure-types*))
+                       hash classoid ,@extra :allow-other-keys t keys)))
+    #-metaspace (make)
+    #+metaspace (let* ((layout (%make-layout))
+                       (wrapper (make :friend layout)))
+                  (setf (layout-friend layout) wrapper)
+                  wrapper)))
+;; The target reconstructs wrappers using FOP-LAYOUT but the host uses MAKE-LOAD-FORM.
+(defmethod make-load-form ((wrapper wrapper) &optional env)
   (declare (ignore env))
-  (labels ((externalize (layout &aux (classoid (layout-classoid layout))
-                                     (name (classoid-name classoid)))
-             (when (or (layout-invalid layout)
+  (labels ((externalize (wrapper &aux (classoid (wrapper-classoid wrapper))
+                                      (name (classoid-name classoid)))
+             (when (or (wrapper-invalid wrapper)
                        (not name)
                        (typep classoid 'undefined-classoid))
-               (sb-c:compiler-error "can't dump ~S" layout))
-             `(xc-load-layout ',name
-                              ,(layout-depthoid layout)
-                              (vector ,@(map 'list #'externalize (layout-inherits layout)))
-                              ,(layout-length layout)
-                              ,(layout-bitmap layout))))
-    (externalize layout)))
-(defun xc-load-layout (name depthoid inherits length bitmap)
+               (sb-c:compiler-error "can't dump ~S" wrapper))
+             `(xc-load-wrapper ',name
+                               ,(wrapper-depthoid wrapper)
+                               (vector ,@(map 'list #'externalize (wrapper-inherits wrapper)))
+                               ,(wrapper-length wrapper)
+                               ,(wrapper-bitmap wrapper))))
+    (externalize wrapper)))
+(defun xc-load-wrapper (name depthoid inherits length bitmap)
   (let ((classoid (find-classoid name)))
     (aver (and classoid (not (undefined-classoid-p classoid))))
-    (let ((layout (classoid-layout classoid)))
-      (unless (and (= (layout-depthoid layout) depthoid)
-                   (= (length (layout-inherits layout)) (length inherits))
-                   (every #'eq (layout-inherits layout) inherits)
-                   (= (layout-length layout) length)
-                   (= (layout-bitmap layout) bitmap))
+    (let ((wrapper (classoid-wrapper classoid)))
+      (unless (and (= (wrapper-depthoid wrapper) depthoid)
+                   (= (length (wrapper-inherits wrapper)) (length inherits))
+                   (every #'eq (wrapper-inherits wrapper) inherits)
+                   (= (wrapper-length wrapper) length)
+                   (= (wrapper-bitmap wrapper) bitmap))
         (error "XC can't reload layout for ~S with ~S vs ~A"
-               name (list depthoid inherits length bitmap) layout))
-      layout)))
+               name (list depthoid inherits length bitmap) wrapper))
+      wrapper)))
 ) ; end PROGN
 
 (in-package "SB-C")
 
-;;; layout for this type being used by the compiler
+;;; wrapper for this type being used by the compiler
 (define-info-type (:type :compiler-layout)
-  :type-spec (or layout null)
+  :type-spec (or wrapper null)
   :default (lambda (name)
-             (awhen (find-classoid name nil) (classoid-layout it))))
+             (awhen (find-classoid name nil) (classoid-wrapper it))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun ftype-from-fdefn (name)

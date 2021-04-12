@@ -46,8 +46,7 @@
 (defun defstruct-classoid-p (classoid)
   ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
   ;; work instead of this. -- NS 2008-03-14
-  (typep #-metaspace (layout-info (classoid-layout classoid))
-         #+metaspace (sb-kernel::wrapper-%info (sb-kernel::classoid-wrapper classoid))
+  (typep (sb-kernel::wrapper-%info (classoid-wrapper classoid))
          'defstruct-description))
 
 ;;; This excludes structure types created with the :TYPE option to
@@ -109,7 +108,7 @@
 
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
-  ;; t's not worth bothering to teach the compiler to efficiently transform
+  ;; It's not worth bothering to teach the compiler to efficiently transform
   ;; a type test involving FUNCALLABLE-STANDARD-OBJECT, not the least
   ;; of the problems being that the type isn't known during make-host-2.
   (unless (and (function-with-layout-p fin)
@@ -300,7 +299,7 @@
       (let ((setter 0))
         (lambda (newval instance)
           (if (eql setter 0)
-              (let* ((dd (layout-info (%instance-layout instance)))
+              (let* ((dd (wrapper-info (%instance-wrapper instance)))
                      (f (compile nil (slot-setter-lambda-form dd slotd))))
                 (if (functionp f)
                     (funcall (setq setter f) newval instance)

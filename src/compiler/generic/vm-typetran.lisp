@@ -126,7 +126,7 @@
 (defglobal *backend-type-predicates-grouped*
     (let (plist)
       (loop for (type . pred) in *backend-type-predicates*
-            for class = (#-sb-xc-host %instance-layout
+            for class = (#-sb-xc-host %instance-wrapper
                          #+sb-xc-host type-of
                          type)
             do (push type (getf plist class))
@@ -155,7 +155,7 @@
     (declare (inline vector-getf))
     (let ((group (truly-the (or simple-vector null)
                             (vector-getf *backend-type-predicates-grouped*
-                                         (#-sb-xc-host %instance-layout
+                                         (#-sb-xc-host %instance-wrapper
                                           #+sb-xc-host type-of type)
                                          #'eq))))
       (when group

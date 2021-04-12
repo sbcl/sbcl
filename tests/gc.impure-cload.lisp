@@ -11,7 +11,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-gencgc
+#-(and gencgc (not metaspace))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (sb-ext:exit :code 104))
 
@@ -120,7 +120,7 @@
            ;; don't just COPY-STRUCTURE - that would place it in dynamic space
            (let ((new-layout
                   (sb-kernel:make-layout (sb-kernel::hash-layout-name nil)
-                                         (sb-kernel:layout-classoid layout))))
+                                         (sb-kernel:wrapper-classoid layout))))
              (sb-kernel:%byte-blt
               (sb-sys:int-sap
                (- (sb-kernel:get-lisp-obj-address layout)

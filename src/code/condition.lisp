@@ -68,21 +68,21 @@
          ;; right thing is..
          (new-inherits
           (order-layout-inherits (concatenate 'simple-vector
-                                              (layout-inherits cond-layout)
-                                              (mapcar #'classoid-layout cpl)))))
+                                              (wrapper-inherits cond-layout)
+                                              (mapcar #'classoid-wrapper cpl)))))
     (if (and olayout
-             (not (mismatch (layout-inherits olayout) new-inherits)))
+             (not (mismatch (wrapper-inherits olayout) new-inherits)))
         olayout
         ;; All condition classoid layouts carry the same LAYOUT-INFO - the defstruct
         ;; description for CONDITION - which is a representation of the primitive object
         ;; and not the lisp-level object.
         (make-layout (hash-layout-name name)
                      (make-undefined-classoid name)
-                     :info (layout-info cond-layout)
+                     :info (wrapper-info cond-layout)
                      :flags +condition-layout-flag+
                      :inherits new-inherits
                      :depthoid -1
-                     :length (layout-length cond-layout)))))
+                     :length (wrapper-length cond-layout)))))
 
 ) ; EVAL-WHEN
 
@@ -152,7 +152,7 @@
 
 (defun set-condition-slot-value (condition new-value name)
   (dolist (cslot (condition-classoid-class-slots
-                  (layout-classoid (%instance-layout condition)))
+                  (wrapper-classoid (%instance-wrapper condition)))
                  (setf (getf (condition-assigned-slots condition) name)
                        new-value))
     (when (eq (condition-slot-name cslot) name)
@@ -161,7 +161,7 @@
 (defun condition-slot-value (condition name)
   (let ((val (getf (condition-assigned-slots condition) name sb-pcl:+slot-unbound+)))
     (if (unbound-marker-p val)
-        (let ((class (layout-classoid (%instance-layout condition))))
+        (let ((class (wrapper-classoid (%instance-wrapper condition))))
           (dolist (cslot
                    (condition-classoid-class-slots class)
                    (let ((instance-length (%instance-length condition))
@@ -217,11 +217,11 @@
     (flet ((stream-err-p (layout)
              (let ((stream-err-layout (load-time-value (find-layout 'stream-error))))
                (or (eq layout stream-err-layout)
-                   (find stream-err-layout (layout-inherits layout)))))
+                   (find stream-err-layout (wrapper-inherits layout)))))
            (type-err-p (layout)
              (let ((type-err-layout (load-time-value (find-layout 'type-error))))
                (or (eq layout type-err-layout)
-                   (find type-err-layout (layout-inherits layout)))))
+                   (find type-err-layout (wrapper-inherits layout)))))
            ;; avoid full calls to STACK-ALLOCATED-P here
            (stackp (x)
              (let ((addr (get-lisp-obj-address x)))
@@ -231,7 +231,7 @@
       (let* ((any-dx
               (loop for arg-index from 1 below (length initargs) by 2
                     thereis (stackp (fast-&rest-nth arg-index initargs))))
-             (layout (classoid-layout classoid))
+             (layout (classoid-wrapper classoid))
              (extra (if (and any-dx (type-err-p layout)) 2 0)) ; space for secret initarg
              (instance (%make-instance (+ sb-vm:instance-data-start
                                           1 ; ASSIGNED-SLOTS
@@ -241,7 +241,7 @@
              (arg-index 0)
              (have-type-error-datum)
              (type-error-datum))
-        (setf (%instance-layout instance) layout
+        (setf (%instance-wrapper instance) layout
               (condition-assigned-slots instance) nil)
         (macrolet ((store-pair (key val)
                      `(setf (%instance-ref instance data-index) ,key

@@ -49,51 +49,46 @@
  (setq *forward-referenced-wrappers* (make-hash-table :test 'equal))
  (dovector (x *!initial-wrappers*)
    (let ((expected (hash-layout-name (car x)))
-         (actual (layout-clos-hash (wrapper-friend (cdr x)))))
+         (actual (wrapper-clos-hash (cdr x))))
      (unless (= actual expected) (bug "XC layout hash calculation failed")))
    (setf (gethash (car x) *forward-referenced-wrappers*) (cdr x))))
 
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
-(defmethod print-object ((layout layout) stream)
-  (print-unreadable-object (layout stream :type t :identity t)
-    (format stream
-            "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
-            (layout-id layout)
-            (layout-proper-name layout)
-            (layout-invalid layout))))
-#+(and metaspace (not sb-xc-host))
 (defmethod print-object ((wrapper wrapper) stream)
   (print-unreadable-object (wrapper stream :type t :identity t)
-    (write (wrapper-friend wrapper) :stream stream)))
+    (format stream
+            "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
+            (layout-id wrapper)
+            (wrapper-proper-name wrapper)
+            (wrapper-invalid wrapper))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun layout-proper-name (layout)
-    (classoid-proper-name (layout-classoid layout))))
+  (defun wrapper-proper-name (wrapper)
+    (classoid-proper-name (wrapper-classoid wrapper))))
 
 ;;; Return the layout currently installed in the classoid named NAME.
 ;;; If there is none, then make a layout referring for an undefined classoid.
-(declaim (ftype (sfunction (symbol) layout) find-layout))
+;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
+(declaim (ftype (sfunction (symbol) wrapper) find-layout))
 (defun find-layout (name)
   (binding* ((classoid (find-classoid name nil) :exit-if-null) ; threadsafe
-             (layout (classoid-layout classoid) :exit-if-null))
-    (return-from find-layout layout))
+             (wrapper (classoid-wrapper classoid) :exit-if-null))
+    (return-from find-layout wrapper))
   (let ((table *forward-referenced-wrappers*))
     (with-world-lock ()
       (let ((classoid (find-classoid name nil)))
-        (or (and classoid (classoid-layout classoid))
-            (acond ((gethash name table)
-                    (wrapper-friend it))
-                   (t
-                    (let ((new (make-layout (hash-layout-name name)
-                                            (or classoid (make-undefined-classoid name)))))
-                      (setf (gethash name table) (layout-friend new))
-                      new))))))))
+        (or (and classoid (classoid-wrapper classoid))
+            (values (ensure-gethash name table
+                                    (make-layout
+                                     (hash-layout-name name)
+                                     (or classoid
+                                         (make-undefined-classoid name))))))))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
 (declaim (ftype (function (simple-string
-                           layout
+                           wrapper
                            simple-string
                            index
                            simple-vector
@@ -102,17 +97,17 @@
                 warn-if-altered-layout))
 (defun warn-if-altered-layout (old-context old-layout context
                                length inherits depthoid bitmap)
-  (let ((name (layout-proper-name old-layout))
-        (old-inherits (layout-inherits old-layout)))
-    (or (when (mismatch old-inherits inherits :key #'layout-proper-name)
+  (let ((name (wrapper-proper-name old-layout))
+        (old-inherits (wrapper-inherits old-layout)))
+    (or (when (mismatch old-inherits inherits :key #'wrapper-proper-name)
           (warn "change in superclasses of class ~S:~%  ~
                        ~A superclasses: ~S~%  ~
                        ~A superclasses: ~S"
                       name
                       old-context
-                      (map 'list #'layout-proper-name old-inherits)
+                      (map 'list #'wrapper-proper-name old-inherits)
                       context
-                      (map 'list #'layout-proper-name inherits))
+                      (map 'list #'wrapper-proper-name inherits))
           t)
         (let ((diff (mismatch old-inherits inherits)))
           (when diff
@@ -121,10 +116,10 @@
                     ~A definition."
                    name
                    old-context
-                   (layout-proper-name (svref old-inherits diff))
+                   (wrapper-proper-name (svref old-inherits diff))
                    context)
             t))
-        (let ((old-length (layout-length old-layout)))
+        (let ((old-length (wrapper-length old-layout)))
           (unless (= old-length length)
             (warn "change in instance length of class ~S:~%  ~
                    ~A length: ~W~%  ~
@@ -133,13 +128,13 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-bitmap (layout-bitmap old-layout)))
+        (let ((old-bitmap (wrapper-bitmap old-layout)))
           (unless (= old-bitmap bitmap)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
                   name old-context context)
             t))
-        (unless (= (layout-depthoid old-layout) depthoid)
+        (unless (= (wrapper-depthoid old-layout) depthoid)
           (warn "change in the inheritance structure of class ~S~%  ~
                  between the ~A definition and the ~A definition"
                 name old-context context)
@@ -148,26 +143,23 @@ between the ~A definition and the ~A definition"
 (defun load-layout (name depthoid inherits length bitmap flags)
   (let* ((layout
           (or (binding* ((classoid (find-classoid name nil) :exit-if-null))
-                (classoid-layout classoid))
+                (classoid-wrapper classoid))
               (let ((table *forward-referenced-wrappers*))
                 (with-world-lock ()
                  (let ((classoid (find-classoid name nil)))
-                   (or (and classoid (classoid-layout classoid))
-                       (let ((wrapper (gethash name table)))
-                         (if wrapper
-                             (wrapper-friend wrapper)
-                             (let ((new (make-layout
-                                         (hash-layout-name name)
-                                         (or classoid (make-undefined-classoid name))
-                                         :depthoid depthoid :inherits inherits
-                                         :length length :bitmap bitmap :flags flags)))
-                               (setf (gethash name table) (layout-friend new))
-                               new)))))))))
+                   (or (and classoid (classoid-wrapper classoid))
+                       (ensure-gethash
+                        name table
+                        (make-layout
+                         (hash-layout-name name)
+                         (or classoid (make-undefined-classoid name))
+                         :depthoid depthoid :inherits inherits
+                         :length length :bitmap bitmap :flags flags))))))))
          (classoid
-          (or (find-classoid name nil) (layout-classoid layout))))
-    (if (or (eq (layout-invalid layout) :uninitialized)
+          (or (find-classoid name nil) (wrapper-classoid layout))))
+    (if (or (eq (wrapper-invalid layout) :uninitialized)
             (not *type-system-initialized*))
-        (setf (layout-classoid layout) classoid)
+        (setf (wrapper-classoid layout) classoid)
         ;; There was an old layout already initialized with old
         ;; information, and we'll now check that old information
         ;; which was known with certainty is consistent with current
@@ -175,7 +167,7 @@ between the ~A definition and the ~A definition"
         (when (warn-if-altered-layout "current" layout "compile time"
                                     length inherits depthoid bitmap)
           (error "The loaded code expects an incompatible layout for class ~S."
-                 (layout-proper-name layout))))
+                 (wrapper-proper-name layout))))
     layout))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
@@ -189,19 +181,19 @@ between the ~A definition and the ~A definition"
 ;;;    destructively modified to hold the same type information.
 (macrolet ((set-bitmap-from-layout (to-layout from-layout)
              `(let ((to-index
-                     (+ (type-dd-length layout)
+                     (+ (type-dd-length sb-vm:layout)
                         (calculate-extra-id-words (layout-depthoid ,to-layout))))
                     (from-index
-                     (+ (type-dd-length layout)
+                     (+ (type-dd-length sb-vm:layout)
                         (calculate-extra-id-words (layout-depthoid ,from-layout)))))
                 (dotimes (i (bitmap-nwords ,from-layout))
                   (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
                         (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
-(defun register-layout (layout &key (invalidate t) destruct-layout)
-  (declare (type layout layout) (type (or layout null) destruct-layout))
+(defun register-layout (wrapper &key (invalidate t) modify)
+  (declare (type wrapper wrapper) (type (or wrapper null) modify))
   (with-world-lock ()
-    (let* ((classoid (layout-classoid layout))
-           (classoid-layout (classoid-layout classoid))
+    (let* ((classoid (wrapper-classoid wrapper))
+           (classoid-wrapper (classoid-wrapper classoid))
            (subclasses (classoid-subclasses classoid)))
 
       ;; Attempting to register ourselves with a temporary undefined
@@ -212,32 +204,33 @@ between the ~A definition and the ~A definition"
       ;; This assertion dates from classic CMU CL. The rationale is
       ;; probably that calling REGISTER-LAYOUT more than once for the
       ;; same LAYOUT is almost certainly a programmer error.
-      (aver (not (eq classoid-layout layout)))
+      (aver (not (eq classoid-wrapper wrapper)))
 
       ;; Figure out what classes are affected by the change, and issue
       ;; appropriate warnings and invalidations.
-      (when classoid-layout
+      (when classoid-wrapper
         (%modify-classoid classoid)
         (when subclasses
           (dohash ((subclass subclass-wrapper) subclasses :locked t)
             (%modify-classoid subclass)
             (when invalidate
-              (%invalidate-layout (wrapper-friend subclass-wrapper)))))
+              (%invalidate-layout subclass-wrapper))))
         (when invalidate
-          (%invalidate-layout classoid-layout)
+          (%invalidate-layout classoid-wrapper)
           (setf (classoid-subclasses classoid) nil)))
 
-      (if destruct-layout
+      (if modify
           #+sb-xc-host (error "Why mutate a layout in XC host?")
           #-sb-xc-host
           ;; Destructively modifying a layout is not threadsafe at all.
           ;; Use at your own risk (interactive use only).
-          (let ((inherits (layout-inherits layout))
-                (depthoid (layout-depthoid layout)) ; "new" depthoid
+          (let ((inherits (wrapper-inherits wrapper))
+                (depthoid (wrapper-depthoid wrapper)) ; "new" depthoid
                 (extra-id-words ; "old" extra words
-                 (calculate-extra-id-words (layout-depthoid destruct-layout)))
+                 (calculate-extra-id-words (wrapper-depthoid modify)))
+                (layout (wrapper-friend wrapper))
                 (id ; read my ID before screwing with the depthoid
-                 (layout-id destruct-layout)))
+                 (layout-id modify)))
             (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
             ;; DEPTHOID implies the number of words of "extra" IDs preceding the bitmap.
@@ -246,10 +239,10 @@ between the ~A definition and the ~A definition"
             ;; again to be certain. Heap corruption is the greater evil versus a minor
             ;; inconvenience of not offering the RECKLESSLY-CONTINUE restart.
             (aver (= (calculate-extra-id-words depthoid) extra-id-words))
-            #-64-bit (setf (layout-depthoid destruct-layout) (layout-depthoid layout)
-                           (layout-length destruct-layout) (layout-length layout))
-            (setf (layout-flags destruct-layout) (layout-flags layout)
-                  (layout-info destruct-layout) (layout-info layout))
+            #-64-bit (setf (wrapper-depthoid modify) (wrapper-depthoid wrapper)
+                           (wrapper-length modify) (wrapper-length wrapper))
+            (setf (layout-flags (wrapper-friend modify)) (layout-flags layout)
+                  (wrapper-info modify) (wrapper-info wrapper))
             ;; Zero out the inherited ID values one word at a time.
             ;; This makes self-ID transiently disappear, but what else can we do?
             ;; It's may be in the wrong slot anyway, depending on whether depthoid changed.
@@ -257,18 +250,20 @@ between the ~A definition and the ~A definition"
             ;;   (/ (- (1+ layout-id-vector-fixed-capacity) 2) number-of-ids-per-word)
             ;; which is surely more confusing than spelling it as 3 or 6.
             (dotimes (i (+ extra-id-words #+64-bit 3 #-64-bit 6))
-              (setf (%raw-instance-ref/word destruct-layout
-                                            (+ (get-dsd-index layout id-word0) i))
+              (setf (%raw-instance-ref/word (wrapper-friend modify)
+                                            (+ (get-dsd-index sb-vm:layout id-word0) i))
                     0))
-            (set-layout-inherits destruct-layout inherits t id)
-            (set-bitmap-from-layout destruct-layout layout)
-            (setf (layout-invalid destruct-layout) nil
-                  (classoid-wrapper classoid) (layout-friend destruct-layout)))
-          (setf (layout-invalid layout) nil
-                (classoid-wrapper classoid) (layout-friend layout)))
+            (set-layout-inherits modify inherits t id)
+            (let ((dst (wrapper-friend modify))
+                  (src (wrapper-friend wrapper)))
+              (set-bitmap-from-layout dst src))
+            (setf (wrapper-invalid modify) nil
+                  (classoid-wrapper classoid) modify))
+          (setf (wrapper-invalid wrapper) nil
+                (classoid-wrapper classoid) wrapper))
 
-      (dovector (super-layout (layout-inherits layout))
-        (let* ((super (layout-classoid super-layout))
+      (dovector (super-wrapper (wrapper-inherits wrapper))
+        (let* ((super (wrapper-classoid super-wrapper))
                (subclasses
                  (or (classoid-subclasses super)
                      (setf (classoid-subclasses super)
@@ -284,8 +279,7 @@ between the ~A definition and the ~A definition"
             (warn "unsealing sealed class ~S in order to subclass it"
                   (classoid-name super))
             (setf (classoid-state super) :read-only))
-          (setf (gethash classoid subclasses)
-                (layout-friend (or destruct-layout layout)))))))
+          (setf (gethash classoid subclasses) (or modify wrapper))))))
 
   (values)))
 
@@ -316,7 +310,7 @@ between the ~A definition and the ~A definition"
   (let ((length (length layouts))
         (max-depth -1))
     (dotimes (i length)
-      (let ((depth (layout-depthoid (svref layouts i))))
+      (let ((depth (wrapper-depthoid (svref layouts i))))
         (when (> depth max-depth)
           (setf max-depth depth))))
     (let* ((new-length (max (1+ max-depth) length))
@@ -327,7 +321,7 @@ between the ~A definition and the ~A definition"
            (inherits (make-array new-length :initial-element 0)))
       (dotimes (i length)
         (let* ((layout (svref layouts i))
-               (depth (layout-depthoid layout)))
+               (depth (wrapper-depthoid layout)))
           (unless (eql depth -1)
             (let ((old-layout (svref inherits depth)))
               (unless (or (eql old-layout 0) (eq old-layout layout))
@@ -338,7 +332,7 @@ between the ~A definition and the ~A definition"
           ((>= i length))
         (declare (type index i j))
         (let* ((layout (svref layouts i))
-               (depth (layout-depthoid layout)))
+               (depth (wrapper-depthoid layout)))
           (when (eql depth -1)
             (loop (when (eql (svref inherits j) 0)
                     (return))
@@ -492,9 +486,9 @@ between the ~A definition and the ~A definition"
                  (setf (info :type :kind name) :instance)))
           (setf (classoid-cell-classoid cell) new-value)
           (unless (eq (info :type :compiler-layout name)
-                      (classoid-layout new-value))
+                      (classoid-wrapper new-value))
             (setf (info :type :compiler-layout name)
-                  (classoid-layout new-value)))))
+                  (classoid-wrapper new-value)))))
     new-value)
 
   (defun %clear-classoid (name cell)
@@ -541,11 +535,10 @@ between the ~A definition and the ~A definition"
              (res (if (and old (funcall predicate old))
                       old
                       (funcall constructor :name name)))
-             (old-wrapper (or (gethash name table)
-                              (when old (classoid-wrapper old))))
-             (found (when old-wrapper (wrapper-friend old-wrapper))))
+             (found (or (gethash name table)
+                        (when old (classoid-wrapper old)))))
         (when found
-          (setf (layout-classoid found) res))
+          (setf (wrapper-classoid found) res))
         (values res found)))))
 
 ;;; If the classoid has a proper name, return the name, otherwise return
@@ -582,16 +575,16 @@ between the ~A definition and the ~A definition"
   (let ((super (if (symbolp super-or-name)
                    (find-classoid super-or-name)
                    super-or-name)))
-    (find (classoid-layout super)
-          (layout-inherits (classoid-layout sub)))))
+    (find (classoid-wrapper super)
+          (wrapper-inherits (classoid-wrapper sub)))))
 
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
 (defun %ensure-classoid-valid (classoid layout error-context)
   (declare (ignorable error-context)) ; not used on host
-  (aver (eq classoid (layout-classoid layout)))
-  (or (not (layout-invalid layout))
+  (aver (eq classoid (wrapper-classoid layout)))
+  (or (not (wrapper-invalid layout))
       ;; Avoid accidentally reaching code that can't work.
       #+sb-xc-host (bug "(TYPEP x 'STANDARD-CLASSOID) can't be tested")
       #-sb-xc-host
@@ -617,10 +610,10 @@ between the ~A definition and the ~A definition"
                classoid (or error-context 'subtypep)))))
 
 (defun %ensure-both-classoids-valid (class1 class2 &optional errorp)
-  (do ((layout1 (classoid-layout class1) (classoid-layout class1))
-       (layout2 (classoid-layout class2) (classoid-layout class2))
+  (do ((layout1 (classoid-wrapper class1) (classoid-wrapper class1))
+       (layout2 (classoid-wrapper class2) (classoid-wrapper class2))
        (i 0 (+ i 1)))
-      ((and (not (layout-invalid layout1)) (not (layout-invalid layout2)))
+      ((and (not (wrapper-invalid layout1)) (not (wrapper-invalid layout2)))
        t)
     (aver (< i 2))
     (unless (and (%ensure-classoid-valid class1 layout1 errorp)
@@ -1010,7 +1003,7 @@ between the ~A definition and the ~A definition"
      ;;
      ;; Essentially the hardwiring corresponds to the indices of the
      ;; respective types in the inherits vector for FD-STREAM.
-     ;;  * (layout-inherits (find-layout 'fd-stream))
+     ;;  * (wrapper-inherits (find-layout 'fd-stream))
      ;;  #(#<LAYOUT for T {50300003}>
      ;;    #<LAYOUT for STRUCTURE-OBJECT {50300103}>
      ;;    #<LAYOUT for STREAM {50301003}>
@@ -1129,14 +1122,14 @@ between the ~A definition and the ~A definition"
                 (map 'simple-vector
                      (lambda (x)
                        (let ((super-layout
-                              (classoid-layout (find-classoid x))))
-                         (when (minusp (layout-depthoid super-layout))
+                              (classoid-wrapper (find-classoid x))))
+                         (when (minusp (wrapper-depthoid super-layout))
                            (setf hierarchical-p nil))
                          super-layout))
                      inherits-list))
                (depthoid (if hierarchical-p
-                           (or depth (length inherits-vector))
-                           -1)))
+                             (or depth (length inherits-vector))
+                             -1)))
           (register-layout (load-layout name
                                         depthoid
                                         inherits-vector
@@ -1173,21 +1166,24 @@ between the ~A definition and the ~A definition"
 ;;; nominal superclasses.)  We set the layout-clos-hash slots to 0 to
 ;;; invalidate the wrappers for specialized dispatch functions, which
 ;;; use those slots as indexes into tables.
-(defun %invalidate-layout (layout)
-  (declare (type layout layout))
-  #+sb-xc-host (warn "Why are we invalidating layout ~S?" layout)
-  (setf (layout-invalid layout) t)
+(defun %invalidate-layout (wrapper)
+  (declare (type wrapper wrapper))
+  #+sb-xc-host (error "Can't invalidate layout ~S" wrapper)
+  #-sb-xc-host
+  (progn
+  (setf (wrapper-invalid wrapper) t)
   ;; Ensure that the INVALID slot conveying ancillary data describing the
   ;; invalidity reason is published before causing the invalid layout trap.
   (sb-thread:barrier (:write))
-  (setf (layout-clos-hash layout) 0)
-  (let ((inherits (layout-inherits layout))
-        (classoid (layout-classoid layout)))
+  #+metaspace (setf (layout-clos-hash (wrapper-friend wrapper)) 0)
+  (setf (wrapper-clos-hash wrapper) 0)
+  (let ((inherits (wrapper-inherits wrapper))
+        (classoid (wrapper-classoid wrapper)))
     (%modify-classoid classoid)
     (dovector (super inherits)
-      (let ((subs (classoid-subclasses (layout-classoid super))))
+      (let ((subs (classoid-subclasses (wrapper-classoid super))))
         (when subs
-          (remhash classoid subs)))))
+          (remhash classoid subs))))))
   (values))
 
 ;;;; cold loading initializations
