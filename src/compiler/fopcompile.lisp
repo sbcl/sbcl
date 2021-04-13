@@ -62,11 +62,6 @@
   ;; Special forms which we don't currently handle, but might consider
   ;; supporting in the future are LOCALLY (with declarations),
   ;; MACROLET, SYMBOL-MACROLET and THE.
-  ;; Also, if (FLET ((F () ...)) (DEFUN A () ...) (DEFUN B () ...))
-  ;; were handled, then it would probably automatically work in the
-  ;; cold loader too, providing definitions for A and B before
-  ;; executing all other toplevel forms. FIXME: This might actually
-  ;; currently work in the cold loader now.
   (flet ((expand (form)
            (if expand
                (handler-case
