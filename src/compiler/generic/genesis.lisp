@@ -114,14 +114,6 @@
         (setf (bvref bigvec i)
               (read-byte stream))))
 
-(defun read-n-bytes (stream vector start end)
-  (aver (zerop start))
-  (let* ((start (+ (descriptor-byte-offset vector)
-                   (ash sb-vm:vector-data-offset sb-vm:word-shift)))
-         (end (+ start end)))
-    (read-bigvec-as-sequence-or-die (descriptor-mem vector)
-                                    stream :start start :end end)))
-
 ;;; Grow BIGVEC (exponentially, so that large increases in size have
 ;;; asymptotic logarithmic cost per byte).
 (defun expand-bigvec (bigvec required-length)
@@ -308,12 +300,13 @@
   (= (logand lowtag 3) sb-vm:other-immediate-0-lowtag))
 
 (defstruct (descriptor
-            (:constructor make-descriptor (bits &optional gspace word-offset))
+            (:constructor make-descriptor (bits &optional gspace byte-offset))
             (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
   (gspace nil :type (or gspace null))
-  ;; the offset in words from the start of GSPACE, or NIL if not set yet
-  (word-offset nil :type (or sb-vm:word null))
+  ;; the offset in bytes (discounting the lowtag) from the start of GSPACE,
+  ;; or NIL if not set yet
+  (byte-offset nil :type (or sb-vm:word null))
   (bits 0 :read-only t :type (unsigned-byte #.sb-vm:n-machine-word-bits)))
 
 (declaim (inline descriptor=))
@@ -353,11 +346,10 @@
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
 (defun allocate-cold-descriptor (gspace length lowtag &optional (page-type :mixed))
-  (let* ((word-index (gspace-claim-n-bytes gspace length page-type))
-         (ptr (+ (gspace-word-address gspace) word-index))
-         (des (make-descriptor (logior (ash ptr sb-vm:word-shift) lowtag)
-                               gspace
-                               word-index)))
+  (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
+                            sb-vm:word-shift))
+         (ptr (+ (gspace-byte-address gspace) relative-ptr))
+         (des (make-descriptor (logior ptr lowtag) gspace relative-ptr)))
     (awhen (gspace-objects gspace) (vector-push-extend des it))
     des))
 
@@ -508,21 +500,19 @@
 ;;; common idioms
 (defun descriptor-mem (des)
   (gspace-data (descriptor-intuit-gspace des)))
-(defun descriptor-byte-offset (des)
-  (ash (descriptor-word-offset des) sb-vm:word-shift))
 
 ;;; If DESCRIPTOR-GSPACE is already set, just return that. Otherwise,
 ;;; figure out a GSPACE which corresponds to DES, set it into
 ;;; (DESCRIPTOR-GSPACE DES), set a consistent value into
-;;; (DESCRIPTOR-WORD-OFFSET DES), and return the GSPACE.
+;;; (DESCRIPTOR-BYTE-OFFSET DES), and return the GSPACE.
 (declaim (ftype (function (descriptor) gspace) descriptor-intuit-gspace))
 (defun descriptor-intuit-gspace (des)
   (or (descriptor-gspace des)
 
       ;; gspace wasn't set, now we have to search for it.
       (let* ((lowtag (descriptor-lowtag des))
-             (abs-word-addr (ash (- (descriptor-bits des) lowtag)
-                                 (- sb-vm:word-shift))))
+             (abs-addr (- (descriptor-bits des) lowtag))
+             (abs-word-addr (ash abs-addr (- sb-vm:word-shift))))
 
         ;; Non-pointer objects don't have a gspace.
         (unless (or (eql lowtag sb-vm:fun-pointer-lowtag)
@@ -543,8 +533,8 @@
                             (gspace-free-word-index gspace))))
             ;; Update the descriptor with the correct gspace and the
             ;; offset within the gspace and return the gspace.
-            (setf (descriptor-word-offset des)
-                  (- abs-word-addr (gspace-word-address gspace)))
+            (setf (descriptor-byte-offset des)
+                  (- abs-addr (gspace-byte-address gspace)))
             (return (setf (descriptor-gspace des) gspace)))))))
 
 (defun descriptor-gspace-name (des)
@@ -593,8 +583,8 @@
 (declaim (ftype (function (descriptor sb-vm:word) descriptor) read-wordindexed))
 (macrolet ((read-bits ()
              `(bvref-word (descriptor-mem address)
-                          (ash (+ index (descriptor-word-offset address))
-                               sb-vm:word-shift))))
+                          (+ (descriptor-byte-offset address)
+                             (ash index sb-vm:word-shift)))))
   (defun read-bits-wordindexed (address index)
     (read-bits))
   (defun read-wordindexed (address index)
@@ -607,8 +597,8 @@
                 write-wordindexed))
 (macrolet ((write-bits (bits)
              `(setf (bvref-word (descriptor-mem address)
-                                (ash (+ index (descriptor-word-offset address))
-                                     sb-vm:word-shift))
+                                (+ (descriptor-byte-offset address)
+                                   (ash index sb-vm:word-shift)))
                     ,bits)))
   (defun write-wordindexed (address index value)
     "Write VALUE displaced INDEX words from ADDRESS."
@@ -879,10 +869,10 @@ core and return a descriptor to it."
        (single-float
         (let* ((des (allocate-otherptr *dynamic* sb-vm:complex-single-float-size
                                        sb-vm:complex-single-float-widetag))
-               (where (ash (+ #+64-bit sb-vm:complex-single-float-data-slot
+               (where (+ (descriptor-byte-offset des)
+                         (ash #+64-bit sb-vm:complex-single-float-data-slot
                               #-64-bit sb-vm:complex-single-float-real-slot
-                              (descriptor-word-offset des))
-                           sb-vm:word-shift)))
+                              sb-vm:word-shift))))
           (setf (bvref-s32 (descriptor-mem des) where) (single-float-bits r)
                 (bvref-s32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
           des))
@@ -1258,10 +1248,7 @@ core and return a descriptor to it."
       (progn (%write-slots layout-metadata result :clos-hash hash :friend wrapper)
              (%write-slots wrapper-metadata wrapper :friend result))
 
-      (let ((byte-offset (ash (+ (descriptor-word-offset result)
-                                 (get-dsd-index sb-vm:layout sb-kernel::id-word0)
-                                 sb-vm:instance-slots-offset)
-                              sb-vm:word-shift)))
+      (let ((byte-offset (+ (descriptor-byte-offset result) (sb-vm::id-bits-offset))))
         (when (logtest flags +structure-layout-flag+)
           (loop for i from 2 below (cold-vector-len inherits)
                 do (setf (bvref-s32 (descriptor-mem result) byte-offset)
@@ -3943,3 +3930,11 @@ III. initially undefined function references (alphabetically):
            (#.sb-vm:double-float-widetag
             (double-float-from-core x))
            (#.sb-vm:bignum-widetag (bignum-from-core x))))))))
+
+(defun read-n-bytes (stream vector start end)
+  (aver (zerop start))
+  (let* ((start (+ (descriptor-byte-offset vector)
+                   (ash sb-vm:vector-data-offset sb-vm:word-shift)))
+         (end (+ start end)))
+    (read-bigvec-as-sequence-or-die (descriptor-mem vector)
+                                    stream :start start :end end)))
