@@ -326,6 +326,15 @@
     (interpreted-function (sb-interpreter:%fun-ftype function))
     (t (%simple-fun-type (%fun-fun function)))))
 
+(defun ftype-from-fdefn (name)
+  (declare (ignorable name))
+  (let* ((fdefn (sb-int:find-fdefn name))
+         (fun (and fdefn (fdefn-fun fdefn))))
+    (if fun
+        (handler-bind ((style-warning #'muffle-warning))
+          (specifier-type (%fun-ftype fun)))
+        (specifier-type 'function))))
+
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
 ;;; (as is the default).

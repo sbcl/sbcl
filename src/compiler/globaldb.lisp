@@ -284,8 +284,24 @@
 (declaim (ftype (sfunction (t &optional t symbol) ctype) specifier-type)
          (ftype (sfunction (t) ctype) ctype-of sb-kernel::ctype-of-array))
 
+;;; The parsed or unparsed type for this function, or the symbol :GENERIC-FUNCTION.
+;;; Ordinarily a parsed type is stored. Only if the parsed type contains
+;;; an unknown type will the original specifier be stored; we attempt to reparse
+;;; on each lookup, in the hope that the type becomes known at some point.
+;;; If :GENERIC-FUNCTION, the info is recomputed from methods at the time of lookup
+;;; and stored back. Method redefinition resets the value to :GENERIC-FUNCTION.
+(define-info-type (:function :type)
+  :type-spec (or ctype (cons (eql function)) (member :generic-function))
+  :default (lambda (name)
+             (declare (ignorable name))
+             #+sb-xc-host (specifier-type 'function)
+             #-sb-xc-host (sb-impl::ftype-from-fdefn name)))
+
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition
+;;; FIXME: It may be better to have this and/or :TYPE stored in a single
+;;; property as either (:known . #<ctype>) or (:assumed . #<ctype>)
+;;; rather than using two different properties. Do we ever use *both* ?
 (define-info-type (:function :assumed-type)
   ;; FIXME: The type-spec really should be
   ;;   (or approximate-fun-type null)).

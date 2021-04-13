@@ -732,36 +732,8 @@
       wrapper)))
 ) ; end PROGN
 
-(in-package "SB-C")
-
 ;;; wrapper for this type being used by the compiler
-(define-info-type (:type :compiler-layout)
+(sb-impl::define-info-type (:type :compiler-layout)
   :type-spec (or wrapper null)
   :default (lambda (name)
              (awhen (find-classoid name nil) (classoid-wrapper it))))
-
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-(defun ftype-from-fdefn (name)
-  (declare (ignorable name))
-  ;; Again [as in (DEFINE-INFO-TYPE (:FUNCTION :TYPE) ...)] it's
-  ;; not clear how to generalize the FBOUNDP expression to the
-  ;; cross-compiler. -- WHN 19990330
-  #+sb-xc-host
-  (specifier-type 'function)
-  #-sb-xc-host
-  (let* ((fdefn (sb-int:find-fdefn name))
-         (fun (and fdefn (fdefn-fun fdefn))))
-    (if fun
-        (handler-bind ((style-warning #'muffle-warning))
-          (specifier-type (sb-impl::%fun-ftype fun)))
-        (specifier-type 'function)))))
-
-;;; The parsed or unparsed type for this function, or the symbol :GENERIC-FUNCTION.
-;;; Ordinarily a parsed type is stored. Only if the parsed type contains
-;;; an unknown type will the original specifier be stored; we attempt to reparse
-;;; on each lookup, in the hope that the type becomes known at some point.
-;;; If :GENERIC-FUNCTION, the info is recomputed from methods at the time of lookup
-;;; and stored back. Method redefinition resets the value to :GENERIC-FUNCTION.
-(define-info-type (:function :type)
-  :type-spec (or ctype (cons (eql function)) (member :generic-function))
-  :default #'ftype-from-fdefn)
