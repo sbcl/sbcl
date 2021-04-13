@@ -2496,6 +2496,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (cold-set (first args)
                        (let ((val (second args)))
                          (if (symbolp val) (cold-intern val) val))))
+            (%svset (apply 'cold-svset args))
             (t (call fun :sb-cold-funcall-handler/for-effect args)))))))
 
 ;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
