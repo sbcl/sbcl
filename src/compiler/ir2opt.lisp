@@ -19,8 +19,8 @@
 ;;; For blocks it's a cons with (pred . succ)
 ;;; For labels it maps to the label block
 (defvar *2block-info*)
-(defmacro vop-predecessors (vop) `(car (gethash ,vop *2block-info*)))
-(defmacro vop-successors (vop) `(cdr (gethash ,vop *2block-info*)))
+(defmacro ir2block-predecessors (x) `(car (gethash (the ir2-block ,x) *2block-info*)))
+(defmacro ir2block-successors (x) `(cdr (gethash (the ir2-block ,x) *2block-info*)))
 
 (defun initialize-ir2-blocks-flow-info (component)
   (labels ((block-last-2block (block)
@@ -67,7 +67,7 @@
                 (remove 2block (car info)))))
       (setf (cdr info) succ)
       (dolist (new succ)
-        (pushnew 2block (vop-predecessors new))))))
+        (pushnew 2block (ir2block-predecessors new))))))
 
 ;;;; Conditional move insertion support code
 (defun move-value-target (2block)
@@ -527,7 +527,7 @@
 (defun next-start-vop (block)
   (loop for 2block = block then (ir2-block-next 2block)
         while (and 2block
-                   (= (length (vop-predecessors 2block)) 1))
+                   (= (length (ir2block-predecessors 2block)) 1))
         when (ir2-block-start-vop 2block) return it))
 
 (defun branch-destination (branch &optional (true t))
@@ -664,7 +664,7 @@
                       (tn-value (tn-ref-tn (tn-ref-across (vop-args conditional))))
                       ;; "-eq-/C" vops take a codegen arg
                       (car (vop-codegen-info conditional))))
-             (else-block-predecessors (vop-predecessors else-block))
+             (else-block-predecessors (ir2block-predecessors else-block))
              (else-vop (ir2-block-start-vop else-block)))
          (push (cons val then-block) chain)
          ;; If ELSE block has more than one predecessor, that's OK,
