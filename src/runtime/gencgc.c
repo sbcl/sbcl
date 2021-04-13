@@ -3399,13 +3399,6 @@ move_pinned_pages_to_newspace()
     }
 }
 
-/* If sb_sprof_enabled was used and the data are not in the final form
- * (in the *SAMPLES* instance) then all code remains live.
- * This is a weaker constraint than 'pin_all_dynamic_space_code'
- * because the latter implies that all code is not potential garbage and not
- * movable, whereas this only implies not potential garbage */
-int sb_sprof_enabled;
-
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY

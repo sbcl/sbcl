@@ -35,6 +35,7 @@ extern void clear_auto_gc_trigger(void);
 extern boolean maybe_gc(os_context_t *context);
 
 extern boolean gc_active_p;
+extern int sb_sprof_enabled;
 
 extern os_vm_size_t bytes_consed_between_gcs;
 

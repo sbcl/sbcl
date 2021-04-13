@@ -63,6 +63,13 @@ os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*const scavtab[256])(lispobj *where, lispobj object);
 
+/* If sb_sprof_enabled was used and the data are not in the final form
+ * (in the *SAMPLES* instance) then all code remains live.
+ * This is a weaker constraint than 'pin_all_dynamic_space_code'
+ * because the latter implies that all code is not potential garbage and not
+ * movable, whereas this only implies not potential garbage */
+int sb_sprof_enabled;
+
 // "Transport" functions are responsible for deciding where to copy an object
 // and how many bytes to copy (usually the sizing function is inlined into the
 // trans function, so we don't call a sizetab[] entry), allocating memory,
