@@ -198,8 +198,8 @@
   ;; name and identifier for this GSPACE
   (name (missing-arg) :type symbol :read-only t)
   (identifier (missing-arg) :type fixnum :read-only t)
-  ;; the word address where the data will be loaded
-  (word-address (missing-arg) :type unsigned-byte :read-only t)
+  ;; the address where the data will be loaded
+  (byte-address (missing-arg) :type unsigned-byte :read-only t)
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
   (page-table nil) ; for dynamic space
@@ -216,8 +216,9 @@
   ;; index into DATA, thus must be multiplied by SB-VM:N-WORD-BYTES.
   (free-word-index 0))
 
-(defun gspace-byte-address (gspace)
-  (ash (gspace-word-address gspace) sb-vm:word-shift))
+(defun gspace-upper-bound (gspace)
+  (+ (gspace-byte-address gspace)
+     (ash (gspace-free-word-index gspace) sb-vm:word-shift)))
 
 (cl:defmethod print-object ((gspace gspace) stream)
   (print-unreadable-object (gspace stream :type t)
@@ -241,7 +242,7 @@
                 ;; Track page usage
                 :page-table (if (= identifier dynamic-core-space-id)
                                 (make-array 100 :adjustable t :initial-element nil))
-                :word-address (ash byte-address (- sb-vm:word-shift))
+                :byte-address byte-address
                 :free-word-index (cond #+immobile-space
                                        ((= identifier immobile-fixedobj-core-space-id)
                                         (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
@@ -511,8 +512,7 @@
 
       ;; gspace wasn't set, now we have to search for it.
       (let* ((lowtag (descriptor-lowtag des))
-             (abs-addr (- (descriptor-bits des) lowtag))
-             (abs-word-addr (ash abs-addr (- sb-vm:word-shift))))
+             (abs-addr (- (descriptor-bits des) lowtag)))
 
         ;; Non-pointer objects don't have a gspace.
         (unless (or (eql lowtag sb-vm:fun-pointer-lowtag)
@@ -527,10 +527,7 @@
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
-          (when (and (<= (gspace-word-address gspace)
-                         abs-word-addr
-                         (+ (gspace-word-address gspace)
-                            (gspace-free-word-index gspace))))
+          (when (<= (gspace-byte-address gspace) abs-addr (gspace-upper-bound gspace))
             ;; Update the descriptor with the correct gspace and the
             ;; offset within the gspace and return the gspace.
             (setf (descriptor-byte-offset des)
