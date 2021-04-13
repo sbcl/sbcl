@@ -1992,26 +1992,24 @@ core and return a descriptor to it."
      (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
 
 (defun cold-fset (name defn)
+  (aver (= (logand (read-bits-wordindexed defn 0) sb-vm:widetag-mask)
+           sb-vm:simple-fun-widetag))
   (let ((fdefn (cold-fdefinition-object
                 ;; (SETF f) was descriptorized when dumped, symbols were not.
                 (if (symbolp name)
                     (cold-intern name)
-                    name)))
-        (type (logand (read-bits-wordindexed defn 0) sb-vm:widetag-mask)))
+                    name))))
     (write-wordindexed fdefn sb-vm:fdefn-fun-slot defn)
-    ;; Closures and funcallable instances not supported yet.
-    (ecase type
-      (#.sb-vm:simple-fun-widetag
-       #+x86-64
-       (write-wordindexed/raw ; write a JMP instruction into the header
-        fdefn 0 (dpb #x1025FF (byte 24 16) (read-bits-wordindexed fdefn 0)))
-       (write-wordindexed/raw
-        fdefn sb-vm:fdefn-raw-addr-slot
-        (or #+(or sparc arm riscv) ; raw addr is the function descriptor
-            (descriptor-bits defn)
-            ;; For all others raw addr is the starting address
-            (+ (logandc2 (descriptor-bits defn) sb-vm:lowtag-mask)
-               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))))
+    #+x86-64
+    (write-wordindexed/raw ; write a JMP instruction into the header
+     fdefn 0 (dpb #x1025FF (byte 24 16) (read-bits-wordindexed fdefn 0)))
+    (write-wordindexed/raw
+     fdefn sb-vm:fdefn-raw-addr-slot
+     (or #+(or sparc arm riscv) ; raw addr is the function descriptor
+         (descriptor-bits defn)
+         ;; For all others raw addr is the starting address
+         (+ (logandc2 (descriptor-bits defn) sb-vm:lowtag-mask)
+            (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
