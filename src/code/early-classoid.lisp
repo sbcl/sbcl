@@ -103,6 +103,7 @@
 (defconstant +string-stream-layout-flag+     #b001000000)
 (defconstant +stream-layout-flag+            #b010000000)
 (defconstant +sequence-layout-flag+          #b100000000)
+(defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 
 ;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
 ;;; Each occupies two bytes of the %BITS slot when possible,
@@ -297,14 +298,22 @@
                 friend)
   (defun make-temporary-wrapper (clos-hash classoid inherits)
     (host-make-wrapper nil clos-hash classoid :inherits inherits :invalid nil))
+  (defun wrapper-flags (wrapper)
+    (declare (type wrapper wrapper))
+    (let ((mapping `((structure-object  ,+structure-layout-flag+)
+                     (standard-object   ,+pcl-object-layout-flag+)
+                     (pathname          ,+pathname-layout-flag+)
+                     (condition         ,+condition-layout-flag+)
+                     (file-stream       ,+file-stream-layout-flag+)
+                     (string-stream     ,+string-stream-layout-flag+)
+                     (stream            ,+stream-layout-flag+)
+                     (sequence          ,+sequence-layout-flag+)))
+          (flags 0))
+      (dolist (x (cons wrapper (coerce (wrapper-inherits wrapper) 'list)) flags)
+        (let ((cell (assoc (wrapper-classoid-name x) mapping)))
+          (when cell (setq flags (logior flags (second cell))))))))
   (defun wrapper-bitmap (wrapper)
     (acond ((wrapper-%info wrapper) (dd-bitmap it)) (t +layout-all-tagged+))))
-
-#+(and metaspace (not sb-xc-host))
-(defmacro wrapper-flags (x) `(layout-flags (wrapper-friend ,x)))
-
-#+(and 64-bit (not sb-xc-host))
-(defun wrapper-depthoid (wrapper) (layout-depthoid (wrapper-friend wrapper)))
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))
@@ -351,84 +360,8 @@
   #+compact-instance-header  6
   #-compact-instance-header -4)
 
-;;; For lack of any better to place to write up some detail surrounding
-;;; layout creation for structure types, I'm putting here.
-;;; When you issue a DEFSTRUCT at the REPL, there are *three* instances
-;;; of LAYOUT makde for the new structure.
-;;; 1) The first is one associated with a temporary instance of
-;;; structure-classoid used in parsing the DEFSTRUCT form so that
-;;; we don't signal an UNKNOWN-TYPE condition for something like:
-;;;   (defstruct chain (next nil :type (or null chain)).
-;;; The temporary classoid is garbage immediately after parsing
-;;; and is never installed.
-;;; 2) The next is the actual LAYOUT that ends up being registered.
-;;; 3) The third is a layout created when setting the "compiler layout"
-;;; which contains copies of the length/depthoid/inherits etc
-;;; that we compare against the installed one to make sure they match.
-;;; The third one also gets thrown away.
 #-sb-xc-host
 (progn
-(define-load-time-global *layout-id-generator* (cons 0 nil))
-(declaim (type (cons fixnum) *layout-id-generator*))
-;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
-(defun make-layout (clos-hash classoid
-                    &key (depthoid -1) (length 0) (flags 0)
-                         (inherits #())
-                         (info nil)
-                         (bitmap (if info (dd-bitmap info) 0))
-                         (invalid :uninitialized)
-                    &aux (id (or (atomic-pop (cdr *layout-id-generator*))
-                                 (atomic-incf (car *layout-id-generator*)))))
-  (unless (typep id '(and layout-id (not (eql 0))))
-    (error "Layout ID limit reached"))
-  (let* ((fixed-words (type-dd-length sb-vm:layout))
-         (extra-id-words ; count of additional words needed to store ancestors
-          (if (logtest flags +structure-layout-flag+)
-              (calculate-extra-id-words depthoid)
-              0))
-         (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
-         (nwords (+ fixed-words extra-id-words bitmap-words))
-         (layout
-          (let ((new (truly-the sb-vm:layout
-                       #+immobile-space
-                       (sb-vm::alloc-immobile-fixedobj
-                        (1+ nwords)
-                        (logior (ash nwords sb-vm:instance-length-shift)
-                                sb-vm:instance-widetag))
-                       #-immobile-space (%make-instance nwords))))
-            (setf (%instance-layout new)
-                  (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
-                                                 #-metaspace 'wrapper)))
-            new))
-         (wrapper #+metaspace
-                  (%make-wrapper :clos-hash clos-hash :classoid classoid
-                                 :%info info :invalid invalid :friend layout)
-                  #-metaspace layout))
-    #+metaspace (setf (layout-friend layout) wrapper)
-    (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
-                                #-64-bit flags)
-    (setf (layout-clos-hash layout) clos-hash
-          (wrapper-classoid wrapper) classoid
-          (wrapper-invalid wrapper) invalid)
-    #-64-bit (setf (wrapper-depthoid wrapper) depthoid
-                   (wrapper-length wrapper) length)
-    #-metaspace (setf (wrapper-%info wrapper) info ; already set if #+metaspace
-                      (wrapper-slot-table wrapper) #(1 nil))
-    (set-layout-inherits wrapper inherits (logtest flags +structure-layout-flag+) id)
-    (let ((bitmap-base (+ fixed-words extra-id-words)))
-      (dotimes (i bitmap-words)
-        (setf (%raw-instance-ref/word layout (+ bitmap-base i))
-              (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
-    ;; It's not terribly important that we recycle layout IDs, but I have some other
-    ;; changes planned that warrant a finalizer per layout.
-    ;; FIXME: structure IDs should never be recycled because code blobs referencing
-    ;; th ID do not reference the layout, and so the layout could be GCd allowing
-    ;; reuse of an old ID for a new type.
-    (unless (built-in-classoid-p classoid)
-      (finalize wrapper (lambda () (atomic-push id (cdr *layout-id-generator*)))
-                :dont-save t))
-    wrapper))
-
 (declaim (inline bitmap-nwords bitmap-all-taggedp))
 (defun bitmap-nwords (layout)
   (declare (sb-vm:layout layout))
@@ -440,6 +373,14 @@
           +layout-all-tagged+)
        ;; Then check that there are no additional words.
        (= (%instance-length layout) (1+ (type-dd-length sb-vm:layout)))))
+
+#+metaspace ; If metaspace, then WRAPPER has no flags; they're in the LAYOUT.
+(defmacro wrapper-flags (x) `(layout-flags (wrapper-friend ,x)))
+
+;; 32-bit has the depthoid as a slot, 64-bit has it is part of FLAGS which are
+;; in the LAYOUT
+#+64-bit
+(defun wrapper-depthoid (wrapper) (layout-depthoid (wrapper-friend wrapper)))
 
 (defun wrapper-bitmap (wrapper)
   (declare (type wrapper wrapper))
@@ -456,17 +397,14 @@
 #+64-bit
 (defmacro wrapper-length (wrapper) ; SETFable
   `(ldb (byte 16 16) (layout-flags (wrapper-friend ,wrapper))))
+
 ) ; end PROGN
 
-(defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
-
 ;;; True of STANDARD-OBJECT, which include generic functions.
-;;; This one includes any class that mixes in STANDARD-OBJECT.
 (declaim (inline layout-for-pcl-obj-p))
 (defun layout-for-pcl-obj-p (wrapper)
   (declare (type wrapper wrapper))
-  #-sb-xc-host (logtest (layout-flags (wrapper-friend wrapper)) +pcl-object-layout-flag+)
-  #+sb-xc-host (declare (ignore wrapper)))
+  (logtest (wrapper-flags wrapper) +pcl-object-layout-flag+))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type
@@ -518,21 +456,6 @@
 
 (defun wrapper-classoid-name (x)
   (classoid-name (wrapper-classoid x)))
-
-#+sb-xc-host
-(defun wrapper-flags (wrapper)
-  (declare (type wrapper wrapper))
-  (let ((mapping `((structure-object  ,+structure-layout-flag+)
-                   (pathname          ,+pathname-layout-flag+)
-                   (condition         ,+condition-layout-flag+)
-                   (file-stream       ,+file-stream-layout-flag+)
-                   (string-stream     ,+string-stream-layout-flag+)
-                   (stream            ,+stream-layout-flag+)
-                   (sequence          ,+sequence-layout-flag+)))
-        (flags 0))
-    (dolist (x (cons wrapper (coerce (wrapper-inherits wrapper) 'list)) flags)
-      (let ((cell (assoc (wrapper-classoid-name x) mapping)))
-        (when cell (setq flags (logior flags (second cell))))))))
 
 ;;;; object types to represent classes
 
@@ -666,30 +589,6 @@
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
-
-#-sb-xc-host
-(defun id-to-layout (id)
-  (maphash (lambda (k v)
-             (declare (ignore k))
-             (when (eql (layout-id v) id)
-               (return-from id-to-layout v)))
-           (classoid-subclasses (find-classoid 't))))
-(export 'id-to-layout)
-
-#-sb-xc-host
-(defun summarize-layouts ()
-  (flet ((flag-bits (x) (logand (layout-flags (wrapper-friend x))
-                                layout-flags-mask)))
-     (let ((prev -1))
-       (dolist (layout (sort (loop for v being each hash-value
-                                of (classoid-subclasses (find-classoid 't))
-                                collect v)
-                             #'> :key #'flag-bits))
-         (let ((flags (flag-bits layout)))
-           (unless (= flags prev)
-             (format t "Layout flags = #b~10,'0b~%" flags)
-             (setq prev flags)))
-         (format t "  ~a~%" layout)))))
 
 #+sb-xc-host
 (progn

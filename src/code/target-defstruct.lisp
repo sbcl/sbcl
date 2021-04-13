@@ -13,6 +13,81 @@
 
 ;;;; structure frobbing primitives
 
+;;; For lack of any better to place to write up some detail surrounding
+;;; layout creation for structure types, I'm putting here.
+;;; When you issue a DEFSTRUCT at the REPL, there are *three* instances
+;;; of LAYOUT makde for the new structure.
+;;; 1) The first is one associated with a temporary instance of
+;;; structure-classoid used in parsing the DEFSTRUCT form so that
+;;; we don't signal an UNKNOWN-TYPE condition for something like:
+;;;   (defstruct chain (next nil :type (or null chain)).
+;;; The temporary classoid is garbage immediately after parsing
+;;; and is never installed.
+;;; 2) The next is the actual LAYOUT that ends up being registered.
+;;; 3) The third is a layout created when setting the "compiler layout"
+;;; which contains copies of the length/depthoid/inherits etc
+;;; that we compare against the installed one to make sure they match.
+;;; The third one also gets thrown away.
+(define-load-time-global *layout-id-generator* (cons 0 nil))
+(declaim (type (cons fixnum) *layout-id-generator*))
+;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
+(defun make-layout (clos-hash classoid
+                    &key (depthoid -1) (length 0) (flags 0)
+                         (inherits #())
+                         (info nil)
+                         (bitmap (if info (dd-bitmap info) 0))
+                         (invalid :uninitialized)
+                    &aux (id (or (atomic-pop (cdr *layout-id-generator*))
+                                 (atomic-incf (car *layout-id-generator*)))))
+  (unless (typep id '(and layout-id (not (eql 0))))
+    (error "Layout ID limit reached"))
+  (let* ((fixed-words (type-dd-length sb-vm:layout))
+         (extra-id-words ; count of additional words needed to store ancestors
+          (if (logtest flags +structure-layout-flag+)
+              (calculate-extra-id-words depthoid)
+              0))
+         (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
+         (nwords (+ fixed-words extra-id-words bitmap-words))
+         (layout
+          (truly-the sb-vm:layout
+                     #+immobile-space
+                     (sb-vm::alloc-immobile-fixedobj
+                      (1+ nwords)
+                      (logior (ash nwords sb-vm:instance-length-shift)
+                              sb-vm:instance-widetag))
+                     #-immobile-space (%make-instance nwords)))
+         (wrapper #-metaspace layout))
+    (setf (%instance-layout layout)
+          (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
+                                         #-metaspace 'wrapper)))
+    #+metaspace
+    (setf wrapper (%make-wrapper :clos-hash clos-hash :classoid classoid
+                                 :%info info :invalid invalid :friend layout)
+          (layout-friend layout) wrapper)
+    (setf (layout-flags layout) #+64-bit (pack-layout-flags depthoid length flags)
+                                #-64-bit flags)
+    (setf (layout-clos-hash layout) clos-hash
+          (wrapper-classoid wrapper) classoid
+          (wrapper-invalid wrapper) invalid)
+    #-64-bit (setf (wrapper-depthoid wrapper) depthoid
+                   (wrapper-length wrapper) length)
+    #-metaspace (setf (wrapper-%info wrapper) info ; already set if #+metaspace
+                      (wrapper-slot-table wrapper) #(1 nil))
+    (set-layout-inherits wrapper inherits (logtest flags +structure-layout-flag+) id)
+    (let ((bitmap-base (+ fixed-words extra-id-words)))
+      (dotimes (i bitmap-words)
+        (setf (%raw-instance-ref/word layout (+ bitmap-base i))
+              (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
+    ;; It's not terribly important that we recycle layout IDs, but I have some other
+    ;; changes planned that warrant a finalizer per layout.
+    ;; FIXME: structure IDs should never be recycled because code blobs referencing
+    ;; th ID do not reference the layout, and so the layout could be GCd allowing
+    ;; reuse of an old ID for a new type.
+    (unless (built-in-classoid-p classoid)
+      (finalize wrapper (lambda () (atomic-push id (cdr *layout-id-generator*)))
+                :dont-save t))
+    wrapper))
+
 #+metaspace
 (defun make-temporary-wrapper (clos-hash classoid inherits)
   (let* ((layout (%make-temporary-layout #.(find-layout t) clos-hash))
@@ -348,5 +423,27 @@
 (defmethod print-object ((self sb-vm:layout) stream)
   (print-unreadable-object (self stream :type t :identity t)
     (write (layout-id self) :stream stream)))
+
+(defun id-to-layout (id)
+  (maphash (lambda (k v)
+             (declare (ignore k))
+             (when (eql (layout-id v) id)
+               (return-from id-to-layout v)))
+           (classoid-subclasses (find-classoid 't))))
+(export 'id-to-layout)
+
+(defun summarize-layouts ()
+  (flet ((flag-bits (x) (logand (layout-flags (wrapper-friend x))
+                                layout-flags-mask)))
+     (let ((prev -1))
+       (dolist (layout (sort (loop for v being each hash-value
+                                of (classoid-subclasses (find-classoid 't))
+                                collect v)
+                             #'> :key #'flag-bits))
+         (let ((flags (flag-bits layout)))
+           (unless (= flags prev)
+             (format t "Layout flags = #b~10,'0b~%" flags)
+             (setq prev flags)))
+         (format t "  ~a~%" layout)))))
 
 (/show0 "target-defstruct.lisp end of file")
