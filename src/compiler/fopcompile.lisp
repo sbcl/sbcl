@@ -487,6 +487,11 @@
                                for-value-p)
                           (fopcompile (first args) path t)
                           (dump-fop 'sb-fasl::fop-package fasl))
+                         ((eq operator '%svset)
+                          (fopcompile (first args) path t)
+                          (let ((handle (sb-fasl::dump-pop fasl)))
+                            (fopcompile (third args) path t)
+                            (dump-fop 'sb-fasl::fop-svset fasl handle (second args))))
                          (t
                           (when (eq (info :function :where-from operator) :assumed)
                             (note-undefined-reference operator :function))
