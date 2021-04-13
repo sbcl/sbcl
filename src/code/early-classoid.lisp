@@ -107,11 +107,11 @@
 ;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
 ;;; Each occupies two bytes of the %BITS slot when possible,
 ;;; otherwise a slot unto itself.
-(deftype layout-depthoid () '(integer -1 #x7FFF))
-(deftype layout-length () '(integer 0 #xFFFF))
-(deftype layout-bitmap () 'integer)
+(def!type layout-depthoid () '(integer -1 #x7FFF))
+(def!type layout-length () '(integer 0 #xFFFF))
+(def!type layout-bitmap () 'integer)
 ;;; ID must be an fixnum for either value of n-word-bits.
-(deftype layout-id () '(signed-byte 30))
+(def!type layout-id () '(signed-byte 30))
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
