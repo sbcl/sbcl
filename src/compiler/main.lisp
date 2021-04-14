@@ -1968,15 +1968,20 @@ returning its filename.
 ;;; detection). If this works, great. If not, we add the init forms to
 ;;; the init forms for the object that caused the problems and let it
 ;;; deal with it.
-(defvar *constants-being-created* nil)
-(defvar *constants-created-since-last-init* nil)
-;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
-(defun emit-make-load-form (constant &aux (fasl *compile-object*))
+(defvar *constants-being-created*)
+(defvar *constants-created-since-last-init*)
+(defun emit-make-load-form (constant &aux (constants-being-created
+                                           (if (boundp '*constants-being-created*)
+                                               *constants-being-created*))
+                                          (constants-created-since-last-init
+                                           (if (boundp '*constants-created-since-last-init*)
+                                               *constants-created-since-last-init*))
+                                          (fasl *compile-object*))
   (aver (fasl-output-p fasl))
   (unless (fasl-constant-already-dumped-p constant fasl)
-    (let ((circular-ref (assoc constant *constants-being-created* :test #'eq)))
+    (let ((circular-ref (assoc constant constants-being-created :test #'eq)))
       (when circular-ref
-        (when (find constant *constants-created-since-last-init* :test #'eq)
+        (when (find constant constants-created-since-last-init :test #'eq)
           (throw constant t))
         (throw 'pending-init circular-ref)))
     (multiple-value-bind (creation-form init-form) (%make-load-form constant)
@@ -1989,10 +1994,9 @@ returning its filename.
                 (info (if init-form
                           (list constant name init-form)
                           (list constant))))
-           (let ((*constants-being-created*
-                  (cons info *constants-being-created*))
+           (let ((*constants-being-created* (cons info constants-being-created))
                  (*constants-created-since-last-init*
-                  (cons constant *constants-created-since-last-init*)))
+                  (cons constant constants-created-since-last-init)))
              (when
                  (catch constant
                    (fasl-note-handle-for-constant
