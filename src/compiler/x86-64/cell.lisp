@@ -326,6 +326,11 @@
       (:variant nil)
       (:variant-cost 5))
 
+    ;; TODO: this vop doesn't see that when (INFO :VARIABLE :KIND) = :GLOBAL
+    ;; there is no need to check the TLS. Probably this is better handled in IR1
+    ;; rather than IR2. It would need a new GLOBAL-BOUNDP function.
+    ;; On the other hand, how many users know that you can declaim
+    ;; a variable GLOBAL without using DEFGLOBAL ?
     (define-vop (boundp)
       (:translate boundp)
       (:policy :fast-safe)

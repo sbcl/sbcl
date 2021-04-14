@@ -565,16 +565,22 @@
                    ((eq label-block (first successors)) (second successors))
                    (t (first successors))))))
       (when (and symeval-vop
-                 (eq (vop-name symeval-vop) 'symbol-value)
+                 (or (eq (vop-name symeval-vop) 'symbol-value)
+                     ;; Expect SYMBOL-GLOBAL-VALUE only for variables of kind :GLOBAL.
+                     (and (eq (vop-name symeval-vop) 'symbol-global-value)
+                          (eq (info :variable :kind (tn-value sym)) :global)))
                  (eq sym (tn-ref-tn (vop-args symeval-vop)))
                  ;; Elide the SYMBOL-VALUE only if there is exactly one way to get there.
                  ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,
                  ;; and if coming from the BRANCH-IF, jump to the block that contained
                  ;; everything else except the SYMBOL-VALUE vop.
                  (not (cdr (ir2block-predecessors (vop-block symeval-vop)))))
-        (let ((result-tn (tn-ref-tn (vop-results symeval-vop))))
+        (let ((replacement (if (eq (vop-name symeval-vop) 'symbol-global-value)
+                               'fast-symbol-global-value
+                               'fast-symbol-value))
+              (result-tn (tn-ref-tn (vop-results symeval-vop))))
           (emit-and-insert-vop (vop-node vop) (vop-block vop)
-                               (template-or-lose 'fast-symbol-value)
+                               (template-or-lose replacement)
                                (reference-tn sym nil) (reference-tn result-tn t) next)
           (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                (template-or-lose 'unbound-marker-p)

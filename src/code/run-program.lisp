@@ -1323,11 +1323,12 @@ Users Manual for details about the PROCESS structure.
   if not available."
   (or sb-sys::*software-version*
       (setf sb-sys::*software-version*
-            (string-trim '(#\newline)
-                         (%with-output-to-string (stream)
+            (possibly-base-stringize
+             (string-trim '(#\newline)
+                          (%with-output-to-string (stream)
                            (run-program "/bin/uname"
                                         ;; "-r" on haiku just prints "1"
                                         ;; but "-v" prints some detail.
                                         #+haiku '("-v")
                                         #-haiku '("-r")
-                                        :output stream))))))
+                                        :output stream)))))))

@@ -26,15 +26,16 @@
   #+win32 (sb-win32::get-computer-name)
   #-win32 (truly-the simple-string (sb-unix:unix-gethostname)))
 
-(declaim (type (or null string) *machine-version*))
-(defvar *machine-version*)
+(declaim (type (or null simple-string) *machine-version*))
+(declaim (global *machine-version*))
 
 (defun machine-version ()
   "Return a string describing the version of the computer hardware we
 are running on, or NIL if we can't find any useful information."
-  (unless (boundp '*machine-version*)
-    (setf *machine-version* (get-machine-version)))
-  *machine-version*)
+  (if (boundp '*machine-version*)
+      *machine-version*
+      (setf *machine-version*
+            (awhen (get-machine-version) (possibly-base-stringize it)))))
 
 ;;; FIXME: Don't forget to set these in a sample site-init file.
 ;;; FIXME: Perhaps the functions could be SETFable instead of having the
@@ -42,7 +43,7 @@ are running on, or NIL if we can't find any useful information."
 ;;; from ANSI 11.1.2.1.1 "Constraints on the COMMON-LISP Package
 ;;; for Conforming Implementations" it is kosher to add a SETF function for
 ;;; a symbol in COMMON-LISP..
-(declaim (type (or null string) *short-site-name* *long-site-name*))
+(declaim (type (or null simple-string) *short-site-name* *long-site-name*))
 (define-load-time-global *short-site-name* nil
   "The value of SHORT-SITE-NAME.")
 (define-load-time-global *long-site-name* nil
