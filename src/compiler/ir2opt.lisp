@@ -548,7 +548,7 @@
 (defoptimizer (vop-optimize boundp) (vop)
   (let ((sym (tn-ref-tn (vop-args vop)))
         (next (vop-next vop)))
-    (unless (and (boundp '*2block-info*) (constant-tn-p sym)
+    (unless (and (boundp '*2block-info*)
                  next (eq (vop-name next) 'branch-if))
       (return-from vop-optimize-boundp-optimizer nil))
     ;; Only replace if the BOUNDP=T consequent starts with SYMBOL-VALUE so that
@@ -568,8 +568,14 @@
                  (or (eq (vop-name symeval-vop) 'symbol-value)
                      ;; Expect SYMBOL-GLOBAL-VALUE only for variables of kind :GLOBAL.
                      (and (eq (vop-name symeval-vop) 'symbol-global-value)
+                          (constant-tn-p sym)
                           (eq (info :variable :kind (tn-value sym)) :global)))
                  (eq sym (tn-ref-tn (vop-args symeval-vop)))
+                 ;; If the symbol is either a compile-time known symbol,
+                 ;; or can only be the same thing for both vops,
+                 ;; then we're fine to combine.
+                 (or (constant-tn-p sym)
+                     (not (tn-ref-next (tn-writes sym))))
                  ;; Elide the SYMBOL-VALUE only if there is exactly one way to get there.
                  ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,
                  ;; and if coming from the BRANCH-IF, jump to the block that contained

@@ -961,4 +961,9 @@ sb-vm::(define-vop (cl-user::test)
       (assert (not (search "ERROR" line))))
     (assert (= (loop for line in lines
                      count (search "*COMPILATION*" line))
-               1))))
+               1)))
+  ;; Non-constant symbol works too now
+  (let ((lines (disassembly-lines
+                '(lambda (x) (if (boundp (truly-the symbol x)) x '(hi))))))
+    (dolist (line lines)
+      (assert (not (search "ERROR" line))))))
