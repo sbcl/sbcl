@@ -249,10 +249,10 @@
 ;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
 (defun dumpable-leaflike-p (obj)
   (or (sb-xc:typep obj '(or symbol number character unboxed-array
-                            debug-name-marker
                             system-area-pointer
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))
+      (cl:typep obj 'debug-name-marker)
       ;; STANDARD-OBJECT layouts use MAKE-LOAD-FORM, but all other layouts
       ;; have the same status as symbols - composite objects but leaflike.
       (and (typep obj 'wrapper) (not (layout-for-pcl-obj-p obj)))

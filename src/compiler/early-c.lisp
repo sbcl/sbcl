@@ -186,11 +186,9 @@ the stack without triggering overflow protection.")
   (warnings () :type list))
 (declaim (freeze-type undefined-warning))
 
-;;; This is DEF!STRUCT so that when SB-C:DUMPABLE-LEAFLIKE-P invokes
-;;; SB-XC:TYPEP in make-host-2, it does not need need to signal PARSE-UNKNOWN
-;;; for each and every constant seen up until this structure gets defined.
-(def!struct (debug-name-marker (:print-function print-debug-name-marker)
-                               (:copier nil)))
+(defstruct (debug-name-marker (:print-function print-debug-name-marker)
+                              (:copier nil)))
+(declaim (freeze-type debug-name-marker))
 
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)
