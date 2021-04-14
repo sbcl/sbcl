@@ -537,6 +537,52 @@
         (next-start-vop (ir2-block-next (vop-block branch)))
         (next-start-vop (gethash label *2block-info*)))))
 
+;;; Replace (BOUNDP X) + (BRANCH-IF) + {(SYMBOL-VALUE X) | anything}
+;;; by (FAST-SYMBOL-VALUE X) + (UNBOUND-MARKER-P) + BRANCH-IF
+;;; and delete SYMBOL-VALUE, with the result of FAST-SYMBOL-VALUE flowing
+;;; into the same TN as symbol-value's result.
+;;; This is a valid substitution on any of the architectures, but
+;;; it requires that UNBOUND-MARKER-P return its result in a flag,
+;;; so presently is enabled only for x86-64.
+#+x86-64
+(defoptimizer (vop-optimize boundp) (vop)
+  (let ((sym (tn-ref-tn (vop-args vop)))
+        (next (vop-next vop)))
+    (unless (and (boundp '*2block-info*) (constant-tn-p sym)
+                 next (eq (vop-name next) 'branch-if))
+      (return-from vop-optimize-boundp-optimizer nil))
+    ;; Only replace if the BOUNDP=T consequent starts with SYMBOL-VALUE so that
+    ;; a bad example such as (IF (BOUNDP '*FOO*) (PRINT 'HI) *FOO*)
+    ;; - which has SYMBOL-VALUE as the wrong consequent of the IF - is unaffected.
+    (let* ((successors (ir2block-successors (vop-block next)))
+           (info (vop-codegen-info next))
+           (label-block (gethash (car info) *2block-info*))
+           (symeval-vop
+            (ir2-block-start-vop
+             (cond ((eq (second info) nil) label-block) ; not negated test.
+                   ;; When negated, the BOUNDP case goes to the "other" successor
+                   ;; block, i.e. whichever is not started by the #<label>.
+                   ((eq label-block (first successors)) (second successors))
+                   (t (first successors))))))
+      (when (and symeval-vop
+                 (eq (vop-name symeval-vop) 'symbol-value)
+                 (eq sym (tn-ref-tn (vop-args symeval-vop))))
+        (let ((result-tn (tn-ref-tn (vop-results symeval-vop))))
+          (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                               (template-or-lose 'fast-symbol-value)
+                               (reference-tn sym nil) (reference-tn result-tn t) next)
+          (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                               (template-or-lose 'unbound-marker-p)
+                               (reference-tn result-tn nil) nil next)
+          ;; We need to invert the test since BOUNDP and UNBOUND-MARKER-P have
+          ;; the opposite meaning in the language. But by chance, they specify
+          ;; opposite flags in the vop, which means that the sense of the
+          ;; BRANCH-IF test is automagically correct after substitution.
+          ;; Of course, this is machine-dependent.
+          (delete-vop vop)
+          (delete-vop symeval-vop)
+          next)))))
+
 ;;; Optimize (if x ... nil) to reuse the NIL coming from X.
 (defoptimizer (vop-optimize if-eq) (if-eq)
   (when (boundp '*2block-info*)

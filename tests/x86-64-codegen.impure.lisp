@@ -950,3 +950,15 @@ sb-vm::(define-vop (cl-user::test)
                            (typecase x (fixnum 'a) (bignum 'b) (t 'c))))))
     (assert (= (length (disassembly-lines f1))
                (length (disassembly-lines f2))))))
+
+(with-test (:name :boundp+symbol-value)
+  ;; The vop combiner produces exactly one reference to SB-C::*COMPILATION*.
+  ;; Previously there would have been one from BOUNDP and one from SYMBOL-VALUE.
+  (let ((lines (disassembly-lines
+                '(lambda ()
+                  (if (boundp 'sb-c::*compilation*) sb-c::*compilation*) '(hi)))))
+    (dolist (line lines)
+      (assert (not (search "ERROR" line))))
+    (assert (= (loop for line in lines
+                     count (search "*COMPILATION*" line))
+               1))))
