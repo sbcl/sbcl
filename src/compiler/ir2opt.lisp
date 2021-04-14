@@ -566,7 +566,12 @@
                    (t (first successors))))))
       (when (and symeval-vop
                  (eq (vop-name symeval-vop) 'symbol-value)
-                 (eq sym (tn-ref-tn (vop-args symeval-vop))))
+                 (eq sym (tn-ref-tn (vop-args symeval-vop)))
+                 ;; Elide the SYMBOL-VALUE only if there is exactly one way to get there.
+                 ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,
+                 ;; and if coming from the BRANCH-IF, jump to the block that contained
+                 ;; everything else except the SYMBOL-VALUE vop.
+                 (not (cdr (ir2block-predecessors (vop-block symeval-vop)))))
         (let ((result-tn (tn-ref-tn (vop-results symeval-vop))))
           (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                (template-or-lose 'fast-symbol-value)
