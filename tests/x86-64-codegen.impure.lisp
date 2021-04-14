@@ -951,7 +951,8 @@ sb-vm::(define-vop (cl-user::test)
     (assert (= (length (disassembly-lines f1))
                (length (disassembly-lines f2))))))
 
-(with-test (:name :boundp+symbol-value)
+(with-test (:name :boundp+symbol-value
+            :skipped-on (not :sb-thread))
   ;; The vop combiner produces exactly one reference to SB-C::*COMPILATION*.
   ;; Previously there would have been one from BOUNDP and one from SYMBOL-VALUE.
   (let ((lines (disassembly-lines
