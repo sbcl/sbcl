@@ -81,7 +81,7 @@
 
   (ensure-roundtrip-ascii)
   (ensure-roundtrip-latin1)
-  #+sb-unicode
+  #+(and sb-unicode (not unicode-lite))
   (progn
     (ensure-roundtrip-latin9)
     ;; Latin-9 chars; the previous test checked roundtrip from
@@ -253,11 +253,11 @@
                                        :external-format :utf-8)))
 
 ;;; whoops: the iso-8859-2 format referred to an undefined symbol.
-#+sb-unicode
+#+(and sb-unicode (not unicode-lite))
 (assert (equalp #(251) (string-to-octets (string (code-char 369))
                                          :external-format :latin-2)))
 
-(with-test (:name (:euc-jp :decoding-errors) :skipped-on (not :sb-unicode))
+(with-test (:name (:euc-jp :decoding-errors) :skipped-on (or (not :sb-unicode) :unicode-lite))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value #\? c))))
     (assert (string= "?{?"

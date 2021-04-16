@@ -703,8 +703,12 @@
   "src/interpreter/eval"
   "src/interpreter/debug")
 
- ("src/code/external-formats/enc-ebcdic")
- #+sb-unicode
+ ;; For an easy core size decreases by 3.5% put :UNICODE-LITE in features to exclude
+ ;; a few external-formats that you'll probably never need.
+ ;; Even better would be if they were all demand-loadable.
+ #+sb-unicode ("src/code/external-formats/enc-utf")
+ #-unicode-lite ("src/code/external-formats/enc-ebcdic")
+ #+(and sb-unicode (not unicode-lite))
  ("src/code/external-formats/enc-cyr"
   "src/code/external-formats/enc-dos"
   "src/code/external-formats/enc-iso"
@@ -714,8 +718,7 @@
   "src/code/external-formats/enc-cn-tbl"
   "src/code/external-formats/enc-cn"
   "src/code/external-formats/enc-jpn-tbl"
-  "src/code/external-formats/enc-jpn"
-  "src/code/external-formats/enc-utf")
+  "src/code/external-formats/enc-jpn")
 
  ("src/code/stubs")
 

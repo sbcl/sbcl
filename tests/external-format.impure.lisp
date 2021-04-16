@@ -22,6 +22,15 @@
          (let ((,xf (first (sb-impl::ef-names (car (sb-int:ensure-list ,nxf))))))
              ,@body)))))
 
+(defmacro with-ef-test (options &rest rest)
+  (let* ((test-name (getf options :name))
+         (ef-name (car (last test-name))))
+    (if (sb-impl::get-external-format ef-name)
+        `(with-test ,options ,@rest)
+        `(format t "::: INFO: no external format named ~S~%" ',ef-name))))
+
+(defun try-delete-file (x) (when (probe-file x) (delete-file x)))
+
 (defvar *test-path* (scratch-file-name))
 
 (with-test (:name :end-of-file)
@@ -223,6 +232,8 @@
 
 
 ;;;; KOI8-R external format
+#-unicode-lite
+(progn
 (with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :external-format :koi8-r)
   (write-char (code-char #xB0) s)
@@ -242,7 +253,6 @@
                  :external-format :koi8-r)
   (let ((char (read-char s)))
     (assert (= (char-code (eval char)) #xB0))))
-(delete-file *test-path*)
 
 (let* ((koi8-r-codes (coerce '(240 210 201 215 197 212 33) '(vector (unsigned-byte 8))))
        (uni-codes #(1055 1088 1080 1074 1077 1090 33))
@@ -254,6 +264,9 @@
                   uni-codes))
   (assert (equalp (string-to-octets (map 'string #'code-char uni-codes) :external-format :koi8-r)
                   koi8-r-codes)))
+)
+(try-delete-file *test-path*)
+
 
 ;;; tests of FILE-STRING-LENGTH
 (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
@@ -363,19 +376,19 @@
                                       (list (code-char 195))
                                       (list (code-char 164)))))))
 
-(with-test (:name (:sb-alien :ebcdic :ebcdic))
+(with-ef-test (:name (:sb-alien :ebcdic :ebcdic-us))
   (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
       (c-string :external-format :ebcdic-us)
     (str (c-string :external-format :ebcdic-us)))
   (assert (equal "foo" (strdup "foo"))))
 
-(with-test (:name (:sb-alien :latin-1 :ebcdic))
+(with-ef-test (:name (:sb-alien :latin-1 :ebcdic-us))
   (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
       (c-string :external-format :latin-1)
     (str (c-string :external-format :ebcdic-us)))
   (assert (not (equal "foo" (strdup "foo")))))
 
-(with-test (:name (:sb-alien :simple-base-string))
+(with-ef-test (:name (:sb-alien :simple-base-string :ebcdic-us))
   (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
       (c-string :external-format :ebcdic-us
                 :element-type base-char)
@@ -396,7 +409,7 @@
            (assert (or (= i (char-code #\?)) (> i 127))))
           (t (assert (and (not (= i (char-code #\?))) (< i 128)))))))))
 
-(with-test (:name (:unibyte-invalid-codepoints :cp857))
+(with-ef-test (:name (:unibyte-invalid-codepoints :cp857))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -404,9 +417,9 @@
       (handler-case (read-char s)
         (error () (assert (member i '(#xd5 #xe7 #xf2))))
         (:no-error (char) char (assert (not (member i '(#xd5 #xe7 #xf2)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-input-replacement :cp857))
+(with-ef-test (:name (:unibyte-input-replacement :cp857))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -416,9 +429,9 @@
           ((eq char #\?)
            (assert (member i `(,(char-code #\?) #xd5 #xe7 #xf2))))
           (t (assert (not (member i `(,(char-code #\?) #xd5 #xe7 #xf2))))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :cp857))
+(with-ef-test (:name (:unibyte-output-replacement :cp857))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:cp857 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -428,7 +441,7 @@
       (dotimes (i 128)
         (assert (= (char-code (char string i)) i)))
       (assert (= 38 (count #\? string :start 128))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 (with-test (:name (:unibyte-input-replacement :ascii))
   (dotimes (i 256)
@@ -476,7 +489,7 @@
 (delete-file *test-path*)
 
 ;;; latin-2 tests
-(with-test (:name (:unibyte-input-replacement :latin-2))
+(with-ef-test (:name (:unibyte-input-replacement :latin-2))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -486,9 +499,9 @@
           ((< i #xa1) (assert (= (char-code char) i)))
           ;; FIXME: more tests
           )))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-2))
+(with-ef-test (:name (:unibyte-output-replacement :latin-2))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-2 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -498,10 +511,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 57 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-3 tests
-(with-test (:name (:unibyte-input-replacement :latin-3))
+(with-ef-test (:name (:unibyte-input-replacement :latin-3))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -512,9 +525,9 @@
            (assert #1=(or (= i (char-code #\?))
                           (member i '(#xa5 #xae #xbe #xc3 #xd0 #xe3 #xf0)))))
           (t (assert (not #1#))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-3))
+(with-ef-test (:name (:unibyte-output-replacement :latin-3))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-3 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -524,10 +537,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 35 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-4 tests
-(with-test (:name (:unibyte-input-replacement :latin-4))
+(with-ef-test (:name (:unibyte-input-replacement :latin-4))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -537,9 +550,9 @@
           ((< i #xa1) (assert (= (char-code char) i)))
           ;; FIXME: more tests
           )))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-4))
+(with-ef-test (:name (:unibyte-output-replacement :latin-4))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-4 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -549,10 +562,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 50 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; iso-8859-5 tests
-(with-test (:name (:unibyte-input-replacement :iso-8859-5))
+(with-ef-test (:name (:unibyte-input-replacement :iso-8859-5))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -562,9 +575,9 @@
           ((= (char-code char) i)
            (assert (or (< i #xa1) (= i #xad))))
           (t (assert (and (>= i #xa1) (/= i #xad)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :iso-8859-5))
+(with-ef-test (:name (:unibyte-output-replacement :iso-8859-5))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-5 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -574,10 +587,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 93 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; iso-8859-6 tests
-(with-test (:name (:unibyte-input-replacement :iso-8859-6))
+(with-ef-test (:name (:unibyte-input-replacement :iso-8859-6))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -590,9 +603,9 @@
                           (<= #xbc i #xbe) (= i #xc0) (<= #xdb i #xdf)
                           (<= #xf3 i))))
           (t (assert (not #1#))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :iso-8859-6))
+(with-ef-test (:name (:unibyte-output-replacement :iso-8859-6))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-6 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -602,10 +615,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 93 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; iso-8859-7 tests
-(with-test (:name (:unibyte-input-replacement :iso-8859-7))
+(with-ef-test (:name (:unibyte-input-replacement :iso-8859-7))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -616,9 +629,9 @@
            (assert #1=(or (= i (char-code #\?))
                           (member i '(#xa4 #xa5 #xaa #xae #xd2 #xff)))))
           (t (assert (not #1#))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :iso-8859-7))
+(with-ef-test (:name (:unibyte-output-replacement :iso-8859-7))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-7 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -628,10 +641,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 80 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; iso-8859-8 tests
-(with-test (:name (:unibyte-input-replacement :iso-8859-8))
+(with-ef-test (:name (:unibyte-input-replacement :iso-8859-8))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -642,9 +655,9 @@
            (assert #1=(or (= i (char-code #\?))
                           (= i #xa1) (<= #xbf i #xde) (>= i #xfb))))
           (t (assert (not  #1#))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :iso-8859-8))
+(with-ef-test (:name (:unibyte-output-replacement :iso-8859-8))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-8 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -654,10 +667,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 67 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-5 tests
-(with-test (:name (:unibyte-input-replacement :latin-5))
+(with-ef-test (:name (:unibyte-input-replacement :latin-5))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -667,9 +680,9 @@
                          (not (member i '(#xd0 #xdd #xde #xf0 #xfd #xfe))))
                     (and (member i '(#xd0 #xdd #xde #xf0 #xfd #xfe))
                          (not (char= char #\?)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-5))
+(with-ef-test (:name (:unibyte-output-replacement :latin-5))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-5 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -679,10 +692,10 @@
       (dotimes (i #xd0)
         (assert (= (char-code (char string i)) i)))
       (assert (= 6 (count #\? string :start #xd0))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-6 tests
-(with-test (:name (:unibyte-input-replacement :latin-6))
+(with-ef-test (:name (:unibyte-input-replacement :latin-6))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -691,9 +704,9 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xff)
                          (not (char= char #\?)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-6))
+(with-ef-test (:name (:unibyte-output-replacement :latin-6))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-6 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -703,10 +716,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 46 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; iso-8859-11 tests
-(with-test (:name (:unibyte-input-replacement :iso-8859-11))
+(with-ef-test (:name (:unibyte-input-replacement :iso-8859-11))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -716,9 +729,9 @@
           ((eq char #\?)
            (assert (member i #1=`(,(char-code #\?) #xdb #xdc #xdd #xde #xfc #xfd #xfe #xff))))
           (t (assert (not (member i #1#)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :iso-8859-11))
+(with-ef-test (:name (:unibyte-output-replacement :iso-8859-11))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:iso-8859-11 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -728,10 +741,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 95 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-7 tests
-(with-test (:name (:unibyte-input-replacement :latin-7))
+(with-ef-test (:name (:unibyte-input-replacement :latin-7))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -740,9 +753,9 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xff)
                          (not (char= char #\?)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-7))
+(with-ef-test (:name (:unibyte-output-replacement :latin-7))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-7 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -754,10 +767,10 @@
       (dolist (i '(#xd8 #xc6 #xf8 #xe6))
         (assert (char/= (char string i) #\?)))
       (assert (= 52 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-8 tests
-(with-test (:name (:unibyte-input-replacement :latin-8))
+(with-ef-test (:name (:unibyte-input-replacement :latin-8))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -766,9 +779,9 @@
         (assert (or (= (char-code char) i)
                     (and (<= #xa1 i #xfe)
                          (not (char= char #\?)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-8))
+(with-ef-test (:name (:unibyte-output-replacement :latin-8))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-8 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -778,10 +791,10 @@
       (dotimes (i #xa1)
         (assert (= (char-code (char string i)) i)))
       (assert (= 31 (count #\? string :start #xa1))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; latin-9 tests
-(with-test (:name (:unibyte-input-replacement :latin-9))
+(with-ef-test (:name (:unibyte-input-replacement :latin-9))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -791,9 +804,9 @@
                          (not (member i '(#xa4 #xa6 #xa8 #xb4 #xb8 #xbc #xbd #xbe))))
                     (and (member i '(#xa4 #xa6 #xa8 #xb4 #xb8 #xbc #xbd #xbe))
                          (not (char= char #\?)))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :latin-9))
+(with-ef-test (:name (:unibyte-output-replacement :latin-9))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:latin-9 :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -803,10 +816,11 @@
       (dotimes (i #xa4)
         (assert (= (char-code (char string i)) i)))
       (assert (= 8 (count #\? string :start #xa4))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; koi8-r tests
-(with-test (:name (:unibyte-input-replacement :koi8-r))
+(with-ef-test (:name (:unibyte-input-replacement :koi8-r)
+                  :skipped-on :unicode-lite)
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -815,9 +829,9 @@
         (cond ((= (char-code char) i)
                (assert (< i 128)))
               (t (assert (> i 127))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :koi8-r))
+(with-ef-test (:name (:unibyte-output-replacement :koi8-r))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:koi8-r :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -827,10 +841,10 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 122 (count #\? string :start #x80))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; koi8-u tests
-(with-test (:name (:unibyte-input-replacement :koi8-u))
+(with-ef-test (:name (:unibyte-input-replacement :koi8-u))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -839,9 +853,9 @@
         (cond ((= (char-code char) i)
                (assert (< i 128)))
               (t (assert (> i 127))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :koi8-u))
+(with-ef-test (:name (:unibyte-output-replacement :koi8-u))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:koi8-u :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -851,10 +865,10 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 122 (count #\? string :start #x80))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; x-mac-cyrillic tests
-(with-test (:name (:unibyte-input-replacement :x-mac-cyrillic))
+(with-ef-test (:name (:unibyte-input-replacement :x-mac-cyrillic))
   (dotimes (i 256)
     (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
       (write-byte i s))
@@ -864,9 +878,9 @@
                (assert (or (< i 128) (member i '(#xa2 #xa3 #xa9 #xb1 #xb5)))))
               (t (assert (and (> i 127)
                               (not (member i '(#xa2 #xa3 #xa9 #xb1 #xb5)))))))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
-(with-test (:name (:unibyte-output-replacement :x-mac-cyrillic))
+(with-ef-test (:name (:unibyte-output-replacement :x-mac-cyrillic))
   (with-open-file (s *test-path* :direction :output :if-exists :supersede :external-format '(:x-mac-cyrillic :replacement #\?))
     (dotimes (i 256)
       (write-char (code-char i) s)))
@@ -876,7 +890,7 @@
       (dotimes (i #x80)
         (assert (= (char-code (char string i)) i)))
       (assert (= 113 (count #\? string :start #x80))))))
-(delete-file *test-path*)
+(try-delete-file *test-path*)
 
 ;;; ucs-2 tests
 (with-test (:name (:multibyte :ucs2le))
@@ -1043,7 +1057,7 @@
            (octets-to-string octets :external-format :bad-format)
          (error (e) e))))))
 
-(with-test (:name :lp713063)
+(with-ef-test (:name (:lp713063 :euc-jp))
   (with-open-file (f *test-path*
                      :direction :output
                      :external-format '(:euc-jp :replacement #\?)
