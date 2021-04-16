@@ -85,8 +85,13 @@
     ;; th ID do not reference the layout, and so the layout could be GCd allowing
     ;; reuse of an old ID for a new type.
     (unless (built-in-classoid-p classoid)
-      (finalize wrapper (lambda () (atomic-push id (cdr *layout-id-generator*)))
-                :dont-save t))
+      (let ((layout-addr (- (get-lisp-obj-address layout) sb-vm:instance-pointer-lowtag)))
+        (declare (ignorable layout-addr))
+        (finalize wrapper
+                  (lambda ()
+                    #+metaspace (sb-vm::unallocate-metaspace-chunk layout-addr)
+                    (atomic-push id (cdr *layout-id-generator*)))
+                :dont-save t)))
     ;; Rather than add and delete this line of debugging which I've done so many times,
     ;; let's instead keep it but commented out.
     #+nil

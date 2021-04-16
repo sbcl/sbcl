@@ -230,10 +230,12 @@
   (declare (word address))
   #+debug (aver (metaspace-chunk-valid-p address))
   (let* ((slab (int-sap (logandc2 address (1- metaspace-slab-size))))
-         (sizeclass (ash (slab-sizeclass slab) (- sb-vm:n-fixnum-tag-bits))))
-    (aver (/= sizeclass 0))
-    ;; Smash the lispobj header so that METASPACE-POINTER-VALID-P returns NIL for it.
-    (setf (sap-ref-word (int-sap address) 0) 0)
+         (sizeclass (ash (slab-sizeclass slab) (- sb-vm:n-fixnum-tag-bits)))
+         (size (slab-chunk-size slab)))
+    (aver (= size (metaspace-sizeclass->nbytes sizeclass)))
+    ;; Clear the memory
+    (alien-funcall (extern-alien "memset" (function void unsigned int size-t))
+                   address 0 size)
     (with-system-mutex (*allocator-mutex*)
       (let* ((freelist (int-sap (aref *metaspace-freelists* sizeclass)))
              (slab-was-partly-available ; true if already in freelist

@@ -450,11 +450,36 @@ static inline int wrapper_id(lispobj wrapper)
     struct layout* layout = LAYOUT(WRAPPER(wrapper)->friend);
     return layout_depth2_id(layout);
 }
-#define METASPACE_START (READ_ONLY_SPACE_START+32768) /* KLUDGE */
 #endif
 /// Return true if 'thing' is the layout of any subtype of sb-lockless::list-node.
 static inline boolean lockfree_list_node_layout_p(struct layout* layout) {
     return layout_depth2_id(layout) == LFLIST_NODE_LAYOUT_ID;
 }
+
+#ifdef LISP_FEATURE_METASPACE
+#define METASPACE_START (READ_ONLY_SPACE_START+32768) /* KLUDGE */
+// Keep in sync with the macro definitions in src/compiler/generic/early-vm.lisp
+struct slab_header {
+    short sizeclass;
+    short capacity;
+    short chunksize;
+    short count;
+    void* freelist;
+    struct slab_header *next;
+    struct slab_header *prev;
+};
+#endif
+
+/* Check whether 'pointee' was forwarded. If it has been, update the contents
+ * of 'cell' to point to it. Otherwise, set 'cell' to 'broken'.
+ * Note that this macro has no braces around the body because one of the uses
+ * of it needs to stick on another 'else' or two */
+#define TEST_WEAK_CELL(cell, pointee, broken) \
+    lispobj *native = native_pointer(pointee); \
+    if (from_space_p(pointee)) \
+        cell = forwarding_pointer_p(native) ? forwarding_pointer_value(native) : broken; \
+    else if (immobile_space_p(pointee)) { \
+        if (immobile_obj_gen_bits(base_pointer(pointee)) == from_space) cell = broken; \
+    }
 
 #endif /* _GC_PRIVATE_H_ */

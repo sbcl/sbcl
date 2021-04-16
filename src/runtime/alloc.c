@@ -156,17 +156,7 @@ void allocation_profiler_stop()
 }
 
 #ifdef LISP_FEATURE_METASPACE
-// Keep in sync with the macro definitions in src/compiler/generic/early-vm.lisp
-struct slab_header {
-    short sizeclass;
-    short capacity;
-    short chunksize;
-    short count;
-    void* freelist;
-    struct slab_header *next;
-    struct slab_header *prev;
-};
-
+#include "gc-private.h"
 lispobj valid_metaspace_ptr_p(void* addr)
 {
     struct slab_header* slab = (void*)ALIGN_DOWN((lispobj)addr, METASPACE_SLAB_SIZE);

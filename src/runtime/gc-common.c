@@ -976,18 +976,6 @@ trans_weak_pointer(lispobj object)
     return copy;
 }
 
-/* Check whether 'pointee' was forwarded. If it has been, update the contents
- * of 'cell' to point to it. Otherwise, set 'cell' to 'broken'.
- * Note that this macro has no braces around the body because one of the uses
- * of it needs to stick on another 'else' or two */
-#define TEST_WEAK_CELL(cell, pointee, broken) \
-    lispobj *native = native_pointer(pointee); \
-    if (from_space_p(pointee)) \
-        cell = forwarding_pointer_p(native) ? forwarding_pointer_value(native) : broken; \
-    else if (immobile_space_p(pointee)) { \
-        if (immobile_obj_gen_bits(base_pointer(pointee)) == from_space) cell = broken; \
-    }
-
 void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;

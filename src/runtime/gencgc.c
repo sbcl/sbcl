@@ -3797,19 +3797,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
                "/scavenge static space: %d bytes\n",
                (uword_t)static_space_free_pointer - STATIC_SPACE_OBJECTS_START));
     }
-#ifdef LISP_FEATURE_METASPACE
-    // *PRIMITIVE-OBJECT-LAYOUTS* (in readonly space) is a root, but it only points
-    // to other objects in readonly space; however, those other objects (above
-    // the read_only_space_free_pointer) point to dynamic space.
-    // FIXME this has two problems:
-    // (1) layouts need to _weakly_ point to wrappers, because if layouts strongly point,
-    //     then wrappers can never die, since wrappers point to layouts.
-    //     So this needs to be a postprocessing step, like where we smash weak pointers.
-    // (2) it's inefficient. We need to:
-    //     - confine the scan to just the slabs that contain anything
-    //     - fix only the single word of each layout that is a pointer
-    heap_scavenge((lispobj*)METASPACE_START, (lispobj*)READ_ONLY_SPACE_END);
-#endif
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be
@@ -3871,6 +3858,29 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     scan_binding_stack();
     smash_weak_pointers();
+#ifdef LISP_FEATURE_METASPACE
+    // *PRIMITIVE-OBJECT-LAYOUTS* (in readonly space) is a root, but it only points
+    // to other objects in readonly space; however, those other objects (above
+    // the read_only_space_free_pointer) point weakly to dynamic space.
+    struct slab_header *slab = (void*)METASPACE_START;
+    // This is not maximally efficient, in that it visits all slabs instead of just the
+    // used ones, but it's not so bad, because there are only 1024 slabs.
+    while ((uword_t)slab < READ_ONLY_SPACE_END) {
+        if (slab->sizeclass) {
+            lispobj* chunk = (lispobj*)((char*)slab + METASPACE_SLAB_SIZE);
+            int i;
+            for (i=0; i<slab->capacity; ++i) {
+                chunk = (lispobj*)((char*)chunk - slab->chunksize);
+                if (chunk[1]) { // in-use chunk
+                    // Freeing this layout is more involved than merely zeroing some memory,
+                    // because freelists have to be maintained. A finalizer will do that.
+                    TEST_WEAK_CELL(chunk[1], chunk[1], 0);
+                }
+            }
+        }
+        slab = (void*)((char*)slab + METASPACE_SLAB_SIZE);
+    }
+#endif
     /* Return private-use pages to the general pool so that Lisp can have them */
     gc_dispose_private_pages();
     cull_weak_hash_tables(weak_ht_alivep_funs);
