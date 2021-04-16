@@ -589,6 +589,7 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/alloc"             :not-host) ; needs foo-SPACE-START
+ #+metaspace ("src/code/metaspace" :not-host)
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
  ("src/code/time"              :not-host)

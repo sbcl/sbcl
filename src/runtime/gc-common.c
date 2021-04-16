@@ -697,11 +697,17 @@ scav_instance(lispobj *where, lispobj header)
 
     // First things first: fix or enliven the layout pointer as necessary,
     // writing it back if and only if it changed.
-    lispobj layoutptr = instance_layout(where), old = layoutptr;
+    lispobj layoutptr = instance_layout(where);
     if (!layoutptr) return total_nwords; // instance can't point to any data yet
+    struct layout *layout = LAYOUT(layoutptr);
+#ifdef LISP_FEATURE_METASPACE
+    scav1(&layout->friend, layout->friend);
+#else
+    lispobj old = layoutptr;
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) instance_layout(where) = layoutptr;
-    struct layout *layout = (void*)(layoutptr - INSTANCE_POINTER_LOWTAG);
+#endif
+    layout = LAYOUT(layoutptr); // in case it was adjusted in !METASPACE
     struct bitmap bitmap = get_layout_bitmap(layout);
     sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
 
@@ -774,10 +780,16 @@ scav_funinstance(lispobj *where, lispobj header)
     int nslots = HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
     // First things first: fix or enliven the layout pointer as necessary,
     // writing it back if and only if it changed.
-    lispobj layoutptr = funinstance_layout(where), old = layoutptr;
+    lispobj layoutptr = funinstance_layout(where);
     if (!layoutptr) return 1 + (nslots | 1); // skip, instance can't point to data
+#ifdef LISP_FEATURE_METASPACE
+    struct layout * layout = LAYOUT(layoutptr);
+    scav1(&layout->friend, layout->friend);
+#else
+    lispobj old = layoutptr;
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
+#endif
     // Do a similar thing as scav_instance but without any special cases.
     struct bitmap bitmap = get_layout_bitmap(LAYOUT(layoutptr));
     gc_assert(bitmap.nwords == 1);

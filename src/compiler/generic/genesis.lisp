@@ -208,6 +208,8 @@
   ;; Each free-range is (START . LENGTH) in words.
   (code-free-ranges (list nil))
   (non-code-free-ranges (list nil))
+  ;; for metaspace
+  current-slab
   ;; Address of every object created in this space.
   (objects (or #+sb-devel (make-array 700000 :fill-pointer 0 :adjustable t)))
   ;; the index of the next unwritten word (i.e. chunk of
@@ -253,17 +255,23 @@
   (address 0 :type sb-vm:word)
   (gspace nil :type gspace))
 (defun sap-int (x) (model-sap-address x))
+(defun sap+ (sap x)
+  (make-model-sap (+ (model-sap-address sap) x)
+                  (model-sap-gspace sap)))
 (macrolet ((access (name)
              `(,name (gspace-data (model-sap-gspace sap))
                      (- (+ (model-sap-address sap) offset)
                         (gspace-byte-address (model-sap-gspace sap))))))
   (defun sap-ref-8 (sap offset) (access bvref-8))
+  (defun sap-ref-16 (sap offset) (access bvref-16))
   (defun sap-ref-32 (sap offset) (access bvref-32))
   (defun sap-ref-64 (sap offset) (access bvref-64))
   (defun signed-sap-ref-32 (sap offset)
     (sb-disassem:sign-extend (access bvref-32) 32))
   (defun signed-sap-ref-64 (sap offset)
     (sb-disassem:sign-extend (access bvref-64) 64))
+  (defun (setf sap-ref-16) (newval sap offset)
+    (setf (access bvref-16) newval))
   (defun (setf sap-ref-32) (newval sap offset)
     (setf (access bvref-32) newval))
   (defun (setf signed-sap-ref-32) (newval sap offset)
@@ -342,15 +350,52 @@
               (t
                (values "bits: #X~X" bits)))))))
 
+;;; Emulate the slab allocator.
+;;; If the current slab (at the head of METASPACE-SLABS)
+;;; has room, then use it. Otherwise allocate a new slab
+;;; at a lower address.
+(defun allocate-metaspace-layout (gspace nbytes)
+  (assert (= nbytes (* 8 sb-vm:n-word-bytes)))
+  (let ((slab (gspace-current-slab gspace)))
+    (flet ((init (slab)
+             (let ((bytes-avail (- sb-vm:metaspace-slab-size
+                                   (* sb-vm::slab-overhead-words sb-vm:n-word-bytes))))
+               (sb-vm::init-slab-header
+                slab
+                1 ; sizeclass
+                nbytes
+                ;; FIXME: Technically this should use the chunk size of the sizeclass,
+                ;; not the object size. But they happen to be the same in sizeclass 1.
+                (floor bytes-avail nbytes)))
+             (setf (gspace-current-slab gspace) slab)))
+      (unless slab
+        (let ((space-size (- sb-vm:read-only-space-end sb-vm:read-only-space-start))
+              (slab-base (- sb-vm:read-only-space-end sb-vm:metaspace-slab-size)))
+          (expand-bigvec (gspace-data gspace) space-size)
+          (setf slab (init (make-model-sap slab-base gspace)))))
+      (when (= (sb-vm::slab-usage slab) (sb-vm::slab-capacity slab))
+        (format t "~&Slab @ ~x is full~%" (sap-int slab))
+        (setf slab (init (sap+ slab (- sb-vm:metaspace-slab-size)))))
+      (let* ((count (incf (sb-vm::slab-usage slab)))
+             (ptr (+ (sap-int slab)
+                     (- sb-vm:metaspace-slab-size
+                        (* count (sb-vm::slab-chunk-size slab))))))
+        (make-descriptor (logior ptr sb-vm:instance-pointer-lowtag)
+                         gspace
+                         (- ptr (gspace-byte-address gspace)))))))
+
 ;;; Return a descriptor for a block of LENGTH bytes out of GSPACE. The
 ;;; free word index is boosted as necessary, and if additional memory
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
 (defun allocate-cold-descriptor (gspace length lowtag &optional (page-type :mixed))
-  (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
-                            sb-vm:word-shift))
-         (ptr (+ (gspace-byte-address gspace) relative-ptr))
-         (des (make-descriptor (logior ptr lowtag) gspace relative-ptr)))
+  (let ((des
+         (if (and (eq gspace *read-only*) (eq lowtag sb-vm:instance-pointer-lowtag))
+             (allocate-metaspace-layout gspace length)
+             (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
+                                       sb-vm:word-shift))
+                    (ptr (+ (gspace-byte-address gspace) relative-ptr)))
+               (make-descriptor (logior ptr lowtag) gspace relative-ptr)))))
     (awhen (gspace-objects gspace) (vector-push-extend des it))
     des))
 
@@ -527,7 +572,10 @@
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
-          (when (<= (gspace-byte-address gspace) abs-addr (gspace-upper-bound gspace))
+          (when (or (<= (gspace-byte-address gspace) abs-addr (gspace-upper-bound gspace))
+                    (and (eq gspace *read-only*) ; KLUDGE
+                         (<= sb-vm:read-only-space-start abs-addr
+                             sb-vm:read-only-space-end)))
             ;; Update the descriptor with the correct gspace and the
             ;; offset within the gspace and return the gspace.
             (setf (descriptor-byte-offset des)
@@ -931,6 +979,14 @@ core and return a descriptor to it."
       (write-wordindexed result (+ index sb-vm:vector-data-offset)
                          (pop objects)))))
 
+(defun word-vector (objects &optional (gspace *dynamic*))
+  (let* ((size (length objects))
+         (result (allocate-vector #+64-bit sb-vm:simple-array-unsigned-byte-64-widetag
+                                  #-64-bit sb-vm:simple-array-unsigned-byte-32-widetag
+                                  size size gspace)))
+    (dotimes (index size result)
+      (write-wordindexed/raw result (+ index sb-vm:vector-data-offset) (pop objects)))))
+
 (defun cold-svset (vector index value)
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb-vm:vector-data-offset) value)))
@@ -1132,7 +1188,9 @@ core and return a descriptor to it."
 (defvar core-file-name)
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
-(defvar *cold-layout-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defvar *cold-layout-gspace* (or #+metaspace '*read-only*
+                                 #+immobile-space '*immobile-fixedobj*
+                                 '*dynamic*))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1714,7 +1772,10 @@ core and return a descriptor to it."
                          sb-vm:symbol-value-slot
                          (ash (cold-layout-descriptor-bits 'function) 32))
 
-  #+immobile-space
+  #+metaspace
+  (cold-set '**primitive-object-layouts**
+            (allocate-vector sb-vm:simple-vector-widetag 256 256 *read-only*))
+  #+(and immobile-space (not metaspace))
   (cold-set '**primitive-object-layouts**
             (let ((filler
                    (make-random-descriptor
@@ -1793,6 +1854,16 @@ core and return a descriptor to it."
                                   (cdr x))) ; cold descriptor to ctype instance
                      (sort (%hash-table-alist *ctype-cache*) #'<
                            :key (lambda (x) (descriptor-bits (cdr x)))))))
+
+  ;; Consume the rest of read-only-space as metaspace
+  #+metaspace
+  (let* ((space *read-only*)
+         (slab (gspace-current-slab space)))
+    (cold-set 'sb-vm::*metaspace-tracts*
+              (word-vector (list (+ sb-vm::read-only-space-start 32768) ; KLUDGE
+                                 (sap-int slab)
+                                 sb-vm:read-only-space-end
+                                 0))))
 
   #+sb-thread
   (cold-set 'sb-vm::*free-tls-index*
@@ -2656,7 +2727,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
-         (space (or #+immobile-space *immobile-varyobj*
+         (space (or #+(and immobile-space (not metaspace)) *immobile-varyobj*
                     ;; If there is a read-only space, use it, else use static space.
                     (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
                         *read-only*
@@ -3093,9 +3164,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (format out "static void (*~a_fns[])(lispobj obj) = {~
 ~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
-(defun write-cast-operator (name c-name lowtag)
-  (format t "static inline struct ~A* ~A(lispobj obj) {
-  return (struct ~A*)(obj - ~D);~%}~%" c-name name c-name lowtag))
+(defun write-cast-operator (operator-name c-name lowtag stream)
+  (format stream "static inline struct ~A* ~A(lispobj obj) {
+  return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag))
 
 (defun write-primitive-object (obj *standard-output*)
   (let* ((name (sb-vm:primitive-object-name obj))
@@ -3121,8 +3192,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (and (primitive-object-variable-length-p obj)
                             (eq slot (aref slots (1- (length slots)))))))
              (format t "};~%")
-             (when (member name '(cons vector symbol fdefn))
-               (write-cast-operator name c-name lowtag)))
+             (when (member name '(cons vector symbol fdefn instance))
+               (write-cast-operator name c-name lowtag *standard-output*)))
            (output-asm ()
              (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
              (format t " * so they work directly on tagged addresses. */~2%")
@@ -3199,10 +3270,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (format stream "#define ~A_tlsindex 0x~X~%"
               c-symbol (ensure-symbol-tls-index symbol))))
   ;; This #define is relative to the start of the fixedobj space to allow heap relocation.
-  #+immobile-space
-  (format stream "~@{#define LAYOUT_OF_~A (lispobj)(FIXEDOBJ_SPACE_START+0x~x)~%~}"
-          "FUNCTION" (- (cold-layout-descriptor-bits 'function)
-                        (gspace-byte-address *immobile-fixedobj*)))
+  #+(or immobile-space metaspace)
+  (format stream "~@{#define LAYOUT_OF_~A (lispobj)(~A_SPACE_START+0x~x)~%~}"
+          "FUNCTION"
+          #+metaspace "READ_ONLY" #-metaspace "FIXEDOBJ"
+          (- (cold-layout-descriptor-bits 'function)
+                        (gspace-byte-address (symbol-value *cold-layout-gspace*))))
   ;; For immobile code, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
   #+immobile-code
@@ -3394,7 +3467,12 @@ III. initially undefined function references (alphabetically):
 (defun output-gspace (gspace data-page core-file write-word verbose)
   (force-output core-file)
   (let* ((posn (file-position core-file))
-         (bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
+         (bytes (cond
+                  #+metaspace
+                  ((eq (gspace-identifier gspace) read-only-core-space-id)
+                   (- sb-vm:read-only-space-end sb-vm:read-only-space-start))
+                  (t
+                   (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))))
          (pages (ceiling bytes sb-c:+backend-page-bytes+))
          (total-bytes (* pages sb-c:+backend-page-bytes+)))
 
@@ -3864,9 +3942,9 @@ III. initially undefined function references (alphabetically):
           #+metaspace
           (progn
             (write-structure-object (wrapper-info (find-layout 'sb-vm:layout)) stream)
-            (write-structure-object (wrapper-info (find-layout 'wrapper)) stream))
-          (let ((*standard-output* stream))
-            (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag)))
+            (write-structure-object (wrapper-info (find-layout 'wrapper)) stream)
+            (write-cast-operator 'wrapper "wrapper" sb-vm:instance-pointer-lowtag stream))
+          (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag stream))
         (dolist (class '(defstruct-description defstruct-slot-description
                          classoid
                          hash-table package

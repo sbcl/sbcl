@@ -193,6 +193,7 @@
         *current-unwind-protect-block*)
 
     #+immobile-space *immobile-freelist* ; not per-thread (yet...)
+    #+metaspace *metaspace-tracts*
 
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread

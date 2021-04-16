@@ -2223,6 +2223,9 @@ pin_object(lispobj object)
 static boolean NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
+#ifdef LISP_FEATURE_METASPACE
+    extern lispobj valid_metaspace_ptr_p(void* addr);
+#endif
     page_index_t page = find_page_index(addr);
     if (page < 0) {
         // Though immobile_space_preserve_pointer accepts any pointer,
@@ -2230,6 +2233,18 @@ preserve_pointer(void *addr)
         // because it's inlined. Either is a no-op if no immobile space.
         if (immobile_space_p((lispobj)addr))
             return immobile_space_preserve_pointer(addr);
+#ifdef LISP_FEATURE_METASPACE
+        // Treat layout pointers as transparent - it's possible that no pointer
+        // to a wrapper exists, other than a layout which is in a CPU register.
+        if ((uword_t)addr >= METASPACE_START
+            && (uword_t)addr < READ_ONLY_SPACE_END
+            && lowtag_of((uword_t)addr) == INSTANCE_POINTER_LOWTAG
+            && valid_metaspace_ptr_p(addr)) {
+            lispobj wrapper = LAYOUT((lispobj)addr)->friend;
+            // fprintf(stderr, "stack -> metaspace ptr %p -> %p\n", addr, (void*)wrapper);
+            preserve_pointer((void*)wrapper);
+        }
+#endif
         return 0;
     }
     lispobj *object_start = conservative_root_p((lispobj)addr, page);
@@ -3046,6 +3061,12 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     state->vaddr = 0;
                     gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
+#ifdef LISP_FEATURE_METASPACE
+                    lispobj wrapper = layout->friend;
+                    gc_assert(wrapperp(wrapper));
+                    // structure layouts must have a defstruct description
+                    if (layout->flags & 1) gc_assert(instancep(WRAPPER(wrapper)->_info));
+#endif
                     struct bitmap bitmap = get_layout_bitmap(layout);
                     if (widetag_of(where) == FUNCALLABLE_INSTANCE_WIDETAG) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
@@ -3196,6 +3217,9 @@ void verify_heap(uword_t flags)
     if (verbose)
         fprintf(stderr, " [RO]");
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
+#ifdef LISP_FEATURE_METASPACE
+    verify_space(METASPACE_START, (lispobj*)READ_ONLY_SPACE_END, flags);
+#endif
     if (verbose)
         fprintf(stderr, " [static]");
     verify_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, flags);
@@ -3773,6 +3797,19 @@ garbage_collect_generation(generation_index_t generation, int raise)
                "/scavenge static space: %d bytes\n",
                (uword_t)static_space_free_pointer - STATIC_SPACE_OBJECTS_START));
     }
+#ifdef LISP_FEATURE_METASPACE
+    // *PRIMITIVE-OBJECT-LAYOUTS* (in readonly space) is a root, but it only points
+    // to other objects in readonly space; however, those other objects (above
+    // the read_only_space_free_pointer) point to dynamic space.
+    // FIXME this has two problems:
+    // (1) layouts need to _weakly_ point to wrappers, because if layouts strongly point,
+    //     then wrappers can never die, since wrappers point to layouts.
+    //     So this needs to be a postprocessing step, like where we smash weak pointers.
+    // (2) it's inefficient. We need to:
+    //     - confine the scan to just the slabs that contain anything
+    //     - fix only the single word of each layout that is a pointer
+    heap_scavenge((lispobj*)METASPACE_START, (lispobj*)READ_ONLY_SPACE_END);
+#endif
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be

@@ -623,7 +623,12 @@ set_adjustment(struct heap_adjust* adj,
 /// Compute the bounds of the lisp assembly routine code object
 void calc_asm_routine_bounds()
 {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef LISP_FEATURE_METASPACE
+    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG)
+        asm_routines_start = READ_ONLY_SPACE_START;
+    else
+        asm_routines_start = READ_ONLY_SPACE_START + (256+2)*N_WORD_BYTES;
+#elif defined LISP_FEATURE_IMMOBILE_SPACE
     asm_routines_start = VARYOBJ_SPACE_START;
 #else
     if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {

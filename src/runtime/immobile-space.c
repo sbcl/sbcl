@@ -1543,6 +1543,9 @@ static struct layout* fix_object_layout(lispobj* obj)
 #endif
     lispobj layout = layout_of(obj);
     if (layout == 0) return 0;
+#ifdef LISP_FEATURE_METASPACE
+    return LAYOUT(layout);
+#else
     if (forwarding_pointer_p(native_pointer(layout))) { // usually
         layout = forwarding_pointer_value(native_pointer(layout));
         layout_of(obj) = layout;
@@ -1551,6 +1554,7 @@ static struct layout* fix_object_layout(lispobj* obj)
     gc_assert(header_widetag(native_layout->header) == INSTANCE_WIDETAG);
     gc_assert(layoutp(make_lispobj(native_layout, INSTANCE_POINTER_LOWTAG)));
     return native_layout;
+#endif
 }
 
 static void apply_absolute_fixups(lispobj, struct code*);
@@ -1918,7 +1922,9 @@ static void defrag_immobile_space(boolean verbose)
             } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         }
     }
+#ifndef LISP_FEATURE_METASPACE
     gc_assert(obj_type_histo[INSTANCE_WIDETAG/4]);
+#endif
 
     // Calculate space needed for fixedobj pages after defrag.
     // page order is: layouts, symbols, fdefns, trampolines, GFs
@@ -1964,7 +1970,14 @@ static void defrag_immobile_space(boolean verbose)
     int n_code_bytes = 0;
 
     if (components) {
+#ifdef LISP_FEATURE_METASPACE
+        /* Skip the 0th entry when assigning new addresses, because it is
+           SB-FASL::*ASSEMBLER-ROUTINES* which is in read-only space and not
+           itself relocatable, but does contain absolute fixups */
+        for (i=1 ; components[i*2] ; ++i) {
+#else
         for (i=0 ; components[i*2] ; ++i) {
+#endif
             addr = (lispobj*)(long)components[i*2];
             gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
             addr = native_pointer((lispobj)addr);
@@ -2243,6 +2256,10 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
             // This fixup is only for whole-heap relocation on startup.
             continue;
         }
+#ifdef LISP_FEATURE_METASPACE
+        // Pointers to metaspace will never move, at least not for the time being.
+        if (ptr >= READ_ONLY_SPACE_START && ptr < READ_ONLY_SPACE_END) continue;
+#endif
         if (find_fixedobj_page_index((void*)ptr) >= 0) {
             header_addr = search_immobile_space((void*)ptr);
             gc_assert(header_addr);

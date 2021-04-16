@@ -50,12 +50,13 @@
          (nwords (+ fixed-words extra-id-words bitmap-words))
          (layout
           (truly-the sb-vm:layout
-                     #+immobile-space
+                     #-(or metaspace immobile-space) (%make-instance nwords)
+                     #+metaspace (sb-vm::allocate-metaspace-chunk (1+ nwords))
+                     #+(and immobile-space (not metaspace))
                      (sb-vm::alloc-immobile-fixedobj
                       (1+ nwords)
                       (logior (ash nwords sb-vm:instance-length-shift)
-                              sb-vm:instance-widetag))
-                     #-immobile-space (%make-instance nwords)))
+                              sb-vm:instance-widetag))))
          (wrapper #-metaspace layout))
     (setf (%instance-layout layout)
           (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
@@ -86,6 +87,14 @@
     (unless (built-in-classoid-p classoid)
       (finalize wrapper (lambda () (atomic-push id (cdr *layout-id-generator*)))
                 :dont-save t))
+    ;; Rather than add and delete this line of debugging which I've done so many times,
+    ;; let's instead keep it but commented out.
+    #+nil
+    (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned
+                                                    unsigned system-area-pointer))
+                   (vector-sap #.(format nil "New wrapper ID=%d %p %p '%s'~%"))
+                   id (get-lisp-obj-address layout) (get-lisp-obj-address wrapper)
+                   (vector-sap (string (classoid-name classoid))))
     wrapper))
 
 #+metaspace
@@ -428,7 +437,7 @@
   (maphash (lambda (k v)
              (declare (ignore k))
              (when (eql (layout-id v) id)
-               (return-from id-to-layout v)))
+               (return-from id-to-layout (wrapper-friend v))))
            (classoid-subclasses (find-classoid 't))))
 (export 'id-to-layout)
 
