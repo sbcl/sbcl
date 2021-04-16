@@ -454,27 +454,28 @@
 ;;; for the common MV-BIND case.
 (defun make-type-check-form (types cast)
   (let ((temps (make-gensym-list (length types))))
-    `(multiple-value-bind ,temps 'dummy
-       ,@(mapcar
-          (lambda (temp %type)
-            (destructuring-bind (not type-to-check
-                                 type-to-report) %type
-              (let* ((spec
-                       (let ((*unparse-fun-type-simplify* t))
-                         (type-specifier type-to-check)))
-                     (test (if not `(not ,spec) spec)))
-                `(unless
-                     ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
-                        (%source-transform-typep temp test))
-                   ,(internal-type-error-call temp
-                                              (if (fun-designator-type-p type-to-report)
-                                                  ;; Simplify
-                                                  (specifier-type 'function-designator)
-                                                  type-to-report)
-                                              (cast-context cast))))))
-          temps
-          types)
-       (values ,@temps))))
+    (lambda (dummy)
+      `(multiple-value-bind ,temps ,dummy
+         ,@(mapcar
+            (lambda (temp %type)
+              (destructuring-bind (not type-to-check
+                                   type-to-report) %type
+                (let* ((spec
+                         (let ((*unparse-fun-type-simplify* t))
+                           (type-specifier type-to-check)))
+                       (test (if not `(not ,spec) spec)))
+                  `(unless
+                       ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
+                          (%source-transform-typep temp test))
+                     ,(internal-type-error-call temp
+                                                (if (fun-designator-type-p type-to-report)
+                                                    ;; Simplify
+                                                    (specifier-type 'function-designator)
+                                                    type-to-report)
+                                                (cast-context cast))))))
+            temps
+            types)
+         (values ,@temps)))))
 
 ;;; Splice in explicit type check code immediately before CAST. This
 ;;; code receives the value(s) that were being passed to CAST-VALUE,

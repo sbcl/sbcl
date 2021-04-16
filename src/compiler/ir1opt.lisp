@@ -2739,39 +2739,31 @@
                  (filter-lvar
                   value
                   (if (cast-single-value-p cast)
-                      `(list 'dummy)
-                      `(multiple-value-call #'list 'dummy))))
+                      (lambda (dummy) `(list ,dummy))
+                      (lambda (dummy) `(multiple-value-call #'list ,dummy)))))
                (filter-lvar
                 (cast-value cast)
                 ;; FIXME: Derived type.
                 (if (cast-silent-conflict cast)
-                    (let ((dummy-sym (gensym)))
-                      `(let ((,dummy-sym 'dummy))
-                         ,@(and (eq (cast-silent-conflict cast) :style-warning)
-                                `((%compile-time-type-style-warn ,dummy-sym
-                                                                 ',(type-specifier atype)
-                                                                 ',(type-specifier value-type)
-                                                                 ',detail
-                                                                 ',(compile-time-type-error-context source-form)
-                                                                 ',context)))
-                         ,(internal-type-error-call dummy-sym atype context)
-                         ,dummy-sym))
-                    `(%compile-time-type-error 'dummy
-                                               ',(type-specifier atype)
-                                               ',(type-specifier value-type)
-                                               ',detail
-                                               ',(compile-time-type-error-context source-form)
-                                               ',context))))
-             ;; KLUDGE: FILTER-LVAR does not work for non-returning
-             ;; functions, so we declare the return type of
-             ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
-             ;; here.
-             (setq value (cast-value cast))
-             (derive-node-type (lvar-uses value) *empty-type*)
-             (maybe-terminate-block (lvar-uses value) nil)
-             ;; FIXME: Is it necessary?
-             (aver (null (block-pred (node-block cast))))
-             (delete-block-lazily (node-block cast))
+                    (lambda (dummy)
+                      (let ((dummy-sym (gensym)))
+                        `(let ((,dummy-sym ,dummy))
+                           ,@(and (eq (cast-silent-conflict cast) :style-warning)
+                                  `((%compile-time-type-style-warn ,dummy-sym
+                                                                   ',(type-specifier atype)
+                                                                   ',(type-specifier value-type)
+                                                                   ',detail
+                                                                   ',(compile-time-type-error-context source-form)
+                                                                   ',context)))
+                           ,(internal-type-error-call dummy-sym atype context)
+                           ,dummy-sym)))
+                    (lambda (dummy)
+                      `(%compile-time-type-error ,dummy
+                                                 ',(type-specifier atype)
+                                                 ',(type-specifier value-type)
+                                                 ',detail
+                                                 ',(compile-time-type-error-context source-form)
+                                                 ',context)))))
              (return-from ir1-optimize-cast)))
       (when (eq (node-derived-type cast) *empty-type*)
         (maybe-terminate-block cast nil))

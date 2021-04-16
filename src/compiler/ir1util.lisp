@@ -474,16 +474,21 @@
 
 ;;;;
 
-;;; Filter values of LVAR through FORM, which must be an ordinary/mv
-;;; call. Exactly one argument must be 'DUMMY, which will be replaced
-;;; with LVAR. In case of an ordinary call the function should not
-;;; have return type NIL. We create a new "filtered" lvar.
-;;;
-;;; TODO: remove preconditions.
-(defun filter-lvar (lvar form)
-  (declare (type lvar lvar) (type list form))
+;;; Filter values of LVAR through the form produced by
+;;; FUNCTION. FUNCTION takes one argument and returns a form with the
+;;; argument spliced into the form exactly once. This argument is a
+;;; placeholder which will be replaced with LVAR once the form is
+;;; IR1-converted. The new lvar which represents the value of the
+;;; form is called the "filtered" lvar.
+(defun filter-lvar (lvar function)
+  (declare (type lvar lvar)
+           (type function function))
   (let* ((dest (lvar-dest lvar))
-         (ctran (node-prev dest)))
+         (ctran (node-prev dest))
+         ;; We pick an arbitrary unique leaf so that IR1-convert will
+         ;; reference it.
+         (placeholder (make-constant 0))
+         (form (funcall function placeholder)))
     (with-ir1-environment-from-node dest
 
       (ensure-block-start ctran)
@@ -508,29 +513,18 @@
         ;; Perhaps it was a stale comment? Or perhaps I just don't
         ;; understand.. -- WHN 19990521
 
-        ;; Replace 'DUMMY with the LVAR. (We can find 'DUMMY because
-        ;; no LET conversion has been done yet.) The [mv-]combination
-        ;; code from the call in the form will be the use of the new
-        ;; check lvar. We substitute exactly one argument.
-        (let* ((node (lvar-use filtered-lvar))
-               victim)
-          (dolist (arg (basic-combination-args node) (aver victim))
-            (let* ((arg (principal-lvar arg))
-                   (use (lvar-use arg))
-                   leaf)
-              (when (and (ref-p use)
-                         (constant-p (setf leaf (ref-leaf use)))
-                         (eql (constant-value leaf) 'dummy))
-                (aver (not victim))
-                (setf victim arg))))
-          (aver (eq (constant-value (ref-leaf (lvar-use victim)))
-                    'dummy))
-
+        ;; Replace PLACEHOLDER with the LVAR.
+        (let* ((refs (leaf-refs placeholder))
+               (node (first refs))
+               (victim (node-lvar node)))
+          ;; PLACEHOLDER must be referenced exactly once.
+          (aver (null (rest refs)))
           (substitute-lvar filtered-lvar lvar)
           (substitute-lvar lvar victim)
           (flush-dest victim))
 
-        ;; Invoking local call analysis converts this call to a LET.
+        ;; The form may have introduced new local calls, for example,
+        ;; from LET bindings, so invoke local call analysis.
         (locall-analyze-component *current-component*))))
   (values))
 
