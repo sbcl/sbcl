@@ -71,8 +71,7 @@
                                   (make-entry)))
                          (cleanup (make-cleanup :kind :dynamic-extent
                                                 :mess-up entry
-                                                :info dx-lvars
-                                                :lexenv (lambda-lexenv fun))))
+                                                :info dx-lvars)))
                     (setf (entry-cleanup entry) cleanup)
                     (insert-node-before call entry)
                     (ensure-block-start (node-prev entry))

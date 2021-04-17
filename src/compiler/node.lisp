@@ -691,10 +691,7 @@
   ;; analysis. (For closures this is a list of the enclose node during
   ;; IR1, and a list of the LVAR of the enclose after physical
   ;; environment analysis.)
-  (info nil :type list)
-  ;; Used by propagate-ref-dx to check that the new ref is inside the
-  ;; original let
-  (lexenv nil :type (or null lexenv)))
+  (info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up

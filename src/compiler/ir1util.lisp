@@ -402,7 +402,7 @@
                (lambda-var-p new-lambda-var)
                ;; Make sure the let is inside the dx let
                (lexenv-contains-lambda (lambda-var-home new-lambda-var)
-                                       (cleanup-lexenv dx)))
+                                       (node-lexenv (cleanup-mess-up dx))))
       (let ((new-lvar (lambda-var-ref-lvar new-ref)))
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar t)
