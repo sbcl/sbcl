@@ -478,8 +478,9 @@
 ;;; FUNCTION. FUNCTION takes one argument and returns a form with the
 ;;; argument spliced into the form exactly once. This argument is a
 ;;; placeholder which will be replaced with LVAR once the form is
-;;; IR1-converted. The new lvar which represents the value of the
-;;; form is called the "filtered" lvar.
+;;; IR1 converted and the resulting code is spliced in before LVAR's
+;;; DEST. The new lvar which represents the value of the form is
+;;; called the "filtered" lvar.
 (defun filter-lvar (lvar function)
   (declare (type lvar lvar)
            (type function function))
@@ -490,35 +491,22 @@
          (placeholder (make-constant 0))
          (form (funcall function placeholder)))
     (with-ir1-environment-from-node dest
-
       (ensure-block-start ctran)
       (let* ((old-block (ctran-block ctran))
              (new-start (make-ctran))
              (filtered-lvar (make-lvar))
              (new-block (ctran-starts-block new-start)))
-
         ;; Splice in the new block before DEST, giving the new block
         ;; all of DEST's predecessors.
         (dolist (block (block-pred old-block))
           (change-block-successor block old-block new-block))
-
         (ir1-convert new-start ctran filtered-lvar form)
-
-        ;; KLUDGE: Comments at the head of this function in CMU CL
-        ;; said that somewhere in here we
-        ;;   Set the new block's start and end cleanups to the *start*
-        ;;   cleanup of PREV's block. This overrides the incorrect
-        ;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
-        ;; Unfortunately I can't find any code which corresponds to this.
-        ;; Perhaps it was a stale comment? Or perhaps I just don't
-        ;; understand.. -- WHN 19990521
 
         ;; Replace PLACEHOLDER with the LVAR.
         (let* ((refs (leaf-refs placeholder))
                (node (first refs))
                (victim (node-lvar node)))
-          ;; PLACEHOLDER must be referenced exactly once.
-          (aver (null (rest refs)))
+          (aver (null (rest refs))) ; PLACEHOLDER must be referenced exactly once.
           (substitute-lvar filtered-lvar lvar)
           (substitute-lvar lvar victim)
           (flush-dest victim))
