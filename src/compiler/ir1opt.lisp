@@ -862,13 +862,13 @@
                       (node-reoptimize ref) nil)
                 (use-lvar ref lambda-lvar)
                 (setf (lvar-dest lambda-lvar) call)
-                (insert-node-before-no-split bind call)
+                (insert-node-before bind call)
                 (setf (combination-kind call) :local
                       (combination-args call) args)
                 (loop for arg in args
                       when arg
                       do (setf (lvar-dest arg) call))
-                (insert-node-before-no-split call ref))
+                (insert-node-before call ref))
               t))))))
 
 ;; Finally, duplicate EQ-nil tests
