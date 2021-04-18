@@ -31,7 +31,7 @@ endif
 # (You *are* encouraged to design and implement a coherent stable
 # interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
 # working on one and it would be a nice thing to have.)
-LINKFLAGS = -Wl,-export-all-symbols,--disable-dynamicbase
+LINKFLAGS = -Wl,-export-all-symbols
 LIBSBCL += mswin64.def mswin.def
 USE_LIBSBCL += -Wl,mswin64.def -Wl,mswin.def
 __LDFLAGS__ =
@@ -57,6 +57,10 @@ CFLAGS =  -g -W -Wall \
        -D__W32API_USE_DLLIMPORT__
 
 CC = gcc
+
+ifeq ($(shell $(LD) --disable-dynamicbase 2>&1 | grep disable-dynamicbase),)
+LINKFLAGS += -Wl,--disable-dynamicbase
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers
