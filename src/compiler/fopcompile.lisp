@@ -362,7 +362,7 @@
                        ;; Lexical
                        (let* ((var (cdr (assoc form (lexenv-vars *lexenv*))))
                               (handle (and (lambda-var-p var)
-                                           (lambda-var-fop-value var))))
+                                           (leaf-info var))))
                          (cond (handle
                                 (setf (lambda-var-ever-used var) t)
                                 (when for-value-p
@@ -452,7 +452,7 @@
                                (let* ((obj (sb-fasl::dump-pop fasl))
                                       (var (make-lambda-var
                                             :%source-name name
-                                            :fop-value obj)))
+                                            :info obj)))
                                  (push var vars)
                                  (setf *lexenv*
                                        (make-lexenv
