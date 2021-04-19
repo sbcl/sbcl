@@ -1543,8 +1543,8 @@
 (defstruct (basic-combination (:include valued-node)
                               (:constructor nil)
                               (:copier nil))
-    ;; LVAR for the function
-    (fun (missing-arg) :type lvar)
+  ;; LVAR for the function
+  (fun (missing-arg) :type lvar)
   ;; list of LVARs for the args. In a local call, an argument lvar may
   ;; be replaced with NIL to indicate that the corresponding variable
   ;; is unreferenced, and thus no argument value need be passed.
@@ -1733,6 +1733,8 @@
                     (:copier nil))
   ;; the list of functionals that this ENCLOSE node allocates.
   (funs nil :type list))
+(defprinter (enclose :identity t)
+  funs)
 
 
 ;;; a helper for the POLICY macro, defined late here so that the
