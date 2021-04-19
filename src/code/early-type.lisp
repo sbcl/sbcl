@@ -849,12 +849,16 @@
 (declaim (inline make-type-context))
 (defstruct (type-context
             (:constructor make-type-context
-                          (spec &optional proto-classoid (cacheable t)))
+                          (spec &optional proto-classoid (options 0)))
             (:copier nil)
             (:predicate nil))
   (spec nil :read-only t)
   (proto-classoid nil :read-only t)
-  (cacheable t))
+  (options 0 :type fixnum))
+(defconstant +type-parse-cache-inhibit+  1)
+(defconstant +type-parse-signal-inhibit+ 2)
+(defmacro type-context-cacheable (x)
+  `(not (logtest (type-context-options ,x) +type-parse-cache-inhibit+)))
 
 ;;; Maintain a table of symbols designating unknown types that have any references
 ;;; to them, making it easy to inquire whether such things exist. This is at a lower
@@ -901,7 +905,8 @@
                        (info :type :builtin head)
                        (return (fail spec)))))
     (when (deprecated-thing-p 'type head)
-      (setf (type-context-cacheable context) nil)
+      (setf (type-context-options context)
+            (logior (type-context-options context) +type-parse-cache-inhibit+))
       (signal 'parse-deprecated-type :specifier spec))
     (when (atom spec)
       ;; If spec is non-atomic, the :BUILTIN value is inapplicable.
@@ -931,9 +936,11 @@
     ;; DEFTYPE to reject spec only if not a singleton.
     (when builtin (return (fail spec)))
     ;; SPEC has a legal form, so return an unknown type.
-    (signal 'parse-unknown-type :specifier spec)
+    (unless (logtest (type-context-options context) +type-parse-signal-inhibit+)
+      (signal 'parse-unknown-type :specifier spec))
   UNKNOWN
-    (setf (type-context-cacheable context) nil)
+    (setf (type-context-options context)
+          (logior (type-context-options context) +type-parse-cache-inhibit+))
     (return (if (atom spec)
                 (let ((table **unknown-type-atoms**))
                   (with-system-mutex ((hash-table-lock table))

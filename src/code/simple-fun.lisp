@@ -328,12 +328,19 @@
 
 (defun ftype-from-fdefn (name)
   (declare (ignorable name))
-  (let* ((fdefn (sb-int:find-fdefn name))
-         (fun (and fdefn (fdefn-fun fdefn))))
-    (if fun
-        (handler-bind ((style-warning #'muffle-warning))
-          (specifier-type (%fun-ftype fun)))
-        (specifier-type 'function))))
+  (let ((function (awhen (find-fdefn name) (fdefn-fun it))))
+    (if (not function)
+        (specifier-type 'function)
+        ;; Never signal the PARSE-UNKNOWN-TYPE condition.
+        ;; This affects 2 regression tests, both very contrived:
+        ;;  - in defstruct.impure ASSERT-ERROR (BUG127--FOO (MAKE-BUG127-E :FOO 3))
+        ;;  - in compiler.impure at :IDENTIFY-SUSPECT-VOPS
+        (let* ((ftype (%fun-ftype function))
+               (context
+                (sb-kernel::make-type-context
+                 ftype nil sb-kernel::+type-parse-signal-inhibit+)))
+          (declare (truly-dynamic-extent context))
+          (values (sb-kernel::basic-parse-typespec ftype context))))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy

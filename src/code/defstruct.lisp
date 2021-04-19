@@ -880,7 +880,8 @@ unless :NAMED is also specified.")))
       (setq ctype *universal-type*)) ; a harmless lie
 
     (unless ctype
-      (let ((context (make-type-context type proto-classoid nil)))
+      (let ((context (make-type-context type proto-classoid
+                                        +type-parse-cache-inhibit+)))
         (setq ctype (specifier-type type context)))) ; Parse once only
 
     (cond (included-slot
