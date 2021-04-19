@@ -20,7 +20,7 @@
                   (:copier nil))
  (expr nil :read-only t)
  (kind nil :read-only t :type (member 0 1 2)))
-#+sb-xc (declaim (freeze-type comma))
+(declaim (freeze-type comma))
 
 (defconstant !+comma-dot+ 1)
 (defconstant !+comma-at+  2)
@@ -318,7 +318,7 @@
   (set-macro-character #\, 'comma-charmacro nil rt))
 ;;; This is a load-time effect, not compile-time, and *READTABLE* will have been
 ;;; reverted to the standard one, so be sure to assign into ours, not that.
-#-sb-xc (!backq-cold-init sb-cold:*xc-readtable*)
+#+sb-xc-host (!backq-cold-init sb-cold:*xc-readtable*)
 
 ;;; Since our backquote is installed on the host lisp, and since
 ;;; developers make mistakes with backquotes and commas too, let's

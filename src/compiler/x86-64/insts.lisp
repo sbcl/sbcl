@@ -1230,13 +1230,6 @@
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-encoding reg seg))))
 
-(defmethod print-object ((reg reg) stream)
-  (if *print-readably*
-      ;; cross-compiled DEFMETHOD can't use call-next-method
-      #+sb-xc (default-structure-print reg stream *current-level-in-print*)
-      #-sb-xc (call-next-method)
-      (write-string (reg-name reg) stream)))
-
 ;;; The GPR for any size and register number is a unique atom. Return it.
 (defun get-gpr (size number)
   (svref (load-time-value

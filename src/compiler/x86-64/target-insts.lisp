@@ -15,6 +15,12 @@
 
 (in-package "SB-X86-64-ASM")
 
+(defmethod print-object ((reg reg) stream)
+  (if *print-readably*
+      ;; cross-compiled DEFMETHOD can't use call-next-method
+      (default-structure-print reg stream *current-level-in-print*)
+      (write-string (reg-name reg) stream)))
+
 ;;; Return the operand size depending on the prefixes and width bit as
 ;;; stored in DSTATE.
 (defun inst-operand-size (dstate)
