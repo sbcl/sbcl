@@ -58,15 +58,15 @@
 ;;;; reader errors
 
 (defun reader-eof-error (stream context)
-  (declare (optimize allow-non-returning-tail-call))
+  ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
+  (declare (explicit-check) (optimize allow-non-returning-tail-call))
   (error 'reader-eof-error
          :stream stream
          :context context))
 
-;;; If The Gods didn't intend for us to use multiple namespaces, why
-;;; did They specify them?
 (defun simple-reader-error (stream control &rest args)
-  (declare (optimize allow-non-returning-tail-call))
+  ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
+  (declare (explicit-check) (optimize allow-non-returning-tail-call))
   (error 'simple-reader-error
          :stream stream
          :format-control control
