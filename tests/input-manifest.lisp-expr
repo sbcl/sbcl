@@ -43,6 +43,7 @@
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
+ ("filecompile.impure.lisp" "src/code/primordial-extensions.lisp")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
   "tests/custom-sysinit.lisp"

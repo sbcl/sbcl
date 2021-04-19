@@ -1649,7 +1649,6 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
-              (with-world-lock ()
                 (setf (sb-fasl::fasl-output-source-info *compile-object*)
                       (debug-source-for-info info))
                 (with-ir1-namespace
@@ -1677,7 +1676,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                       list))
                                 nil
                                 nil))))
-                nil))))
+                nil)))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.
