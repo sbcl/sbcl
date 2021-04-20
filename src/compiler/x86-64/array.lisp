@@ -278,7 +278,8 @@
         (when (and (sb-c::very-temporary-p result-tn)
                    (or (eq result-tn left) (eq result-tn right))
                    (or (not (constant-tn-p comparand))
-                       (plausible-signed-imm32-operand-p (encode-value-if-immediate comparand))))
+                       (and (tn-sc comparand)
+                            (plausible-signed-imm32-operand-p (encode-value-if-immediate comparand)))))
           (let* ((new-args (sb-c::reference-tn-list
                             (list (tn-ref-tn (sb-c::vop-args vop))
                                   (tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))
