@@ -167,7 +167,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
                    (sb-sprof:start-profiling :sample-interval .001)
-                   (setq sb-c::*static-vop-usage-counts* (make-hash-table))
+                   (setq sb-c::*static-vop-usage-counts* (make-hash-table :synchronized t))
                    (let ((*features* (cons :parallel-test-runner *features*)))
                      (pure-runner (list (concatenate 'string file ".lisp"))
                                   (if (search "-cload" file) 'cload-test 'load-test)
