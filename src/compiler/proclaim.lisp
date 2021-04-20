@@ -242,14 +242,12 @@
     (setf (info :function :type name) type-oid
           (info :function :where-from name) where-from)))
 
-(defun seal-class (class)
-  (declare (type classoid class))
-  (setf (classoid-state class) :sealed)
-  (let ((subclasses (classoid-subclasses class)))
-    (when subclasses
-      (dohash ((subclass layout) subclasses :locked t)
-        (declare (ignore layout))
-        (setf (classoid-state subclass) :sealed)))))
+(defun seal-class (classoid)
+  (declare (type classoid classoid))
+  (setf (classoid-state classoid) :sealed)
+  (sb-kernel::do-subclassoids ((subclassoid wrapper) classoid)
+    (declare (ignore wrapper))
+    (setf (classoid-state subclassoid) :sealed)))
 
 (defun process-freeze-type-declaration (type-specifier)
   (let ((class (specifier-type type-specifier)))

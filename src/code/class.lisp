@@ -170,6 +170,84 @@ between the ~A definition and the ~A definition"
                  (wrapper-proper-name layout))))
     layout))
 
+(defun classoid-lock (classoid)
+  #+sb-xc-host (declare (ignore classoid))
+  #-sb-xc-host
+  (or (classoid-%lock classoid)
+      (let* ((lock (sb-thread:make-mutex :name "classoid lock"))
+             (oldval (cas (classoid-%lock classoid) nil lock)))
+        (if (eq oldval nil) lock oldval))))
+
+(defun add-subclassoid (super sub wrapper)
+  (with-system-mutex ((classoid-lock super))
+    (let ((table (classoid-subclasses super)))
+      (block nil
+        (when (hash-table-p table)
+          (return (setf (gethash sub table) wrapper)))
+        (let ((count 0))
+          (dolist (cell table)
+            (when (eq (car cell) sub)
+              (return (setf (cdr cell) wrapper)))
+            (incf (truly-the fixnum count)))
+          (when (<= count 7)
+            (setf (classoid-subclasses super) (acons sub wrapper table))
+            (sb-thread:barrier (:write))
+            (return wrapper)))
+        ;; Upgrade to a hash-table
+        (let ((new #+sb-xc-host (make-hash-table :test 'eq)
+                   #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
+                                                 :test 'eq)))
+          (loop for (key . val) in table do (setf (gethash key new) val))
+          (setf (gethash sub new) wrapper)
+          (setf (classoid-subclasses super) new)
+          (sb-thread:barrier (:write))
+          wrapper)))))
+
+;;; Mnemonic device: the argument order is as GETHASH (1st = key, 2nd = table).
+;;; But the 2nd arg is the superclassoid, *not* its subclassoid table,
+;;; because the mutex is stored in the classoid, not the table.
+(defun get-subclassoid (sub super)
+  (sb-thread:barrier (:read))
+  (when (classoid-subclasses super)
+    (with-system-mutex ((classoid-lock super))
+      (let ((table (classoid-subclasses super)))
+        (cond ((listp table) (cdr (assq sub table)))
+              (t (values (gethash sub table))))))))
+
+;;; Mnemonic device: it's like REMHASH (1st = key, 2nd = table)
+(defun remove-subclassoid (sub super)
+  (sb-thread:barrier (:read))
+  (when (classoid-subclasses super)
+    (with-system-mutex ((classoid-lock super))
+      (let ((table (classoid-subclasses super)))
+        (cond ((listp table)
+               (setf (classoid-subclasses super)
+                     (delete sub table :key #'car :test #'eq)))
+              (t
+               ;; There's no reason to demote a table to a list ever.
+               (remhash sub table))))))
+  nil)
+
+(defmacro do-subclassoids (((classoid-var wrapper-var) super) &body body)
+  (let ((f (make-symbol "FUNCTION")))
+    `(dx-flet ((,f (,classoid-var ,wrapper-var) ,@body))
+       (call-with-subclassoids #',f (the classoid ,super)))))
+
+(defun call-with-subclassoids (function super &aux (table (classoid-subclasses super)))
+  ;; Uses of DO-SUBCLASSOIDS don't need to acquire the classoid lock on SUPER.
+  ;; Even if there are readers or writers, hash-table iteration is safe.
+  ;; This was not always so - iteration could overrun the k/v array because it always
+  ;; re-fetched the scan limit, which could see a higher limit than corresponded
+  ;; to the k/v vector that it had gotten initially.
+  ;; If you're doing concurrent modification of the class heterarchy, there are no
+  ;; real guarantees. We dont' always hold a lock at a wider scope than the table lock,
+  ;; but sometimes we do, such as in REGISTER-LAYOUT.
+  (if (listp table)
+      (loop for (key . value) in table do (funcall function key value))
+      (maphash (lambda (key value) (funcall function key value))
+               table))
+  nil)
+
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
 ;;; layout for a class in the type system, clobbering any old layout.
@@ -193,8 +271,7 @@ between the ~A definition and the ~A definition"
   (declare (type wrapper wrapper) (type (or wrapper null) modify))
   (with-world-lock ()
     (let* ((classoid (wrapper-classoid wrapper))
-           (classoid-wrapper (classoid-wrapper classoid))
-           (subclasses (classoid-subclasses classoid)))
+           (classoid-wrapper (classoid-wrapper classoid)))
 
       ;; Attempting to register ourselves with a temporary undefined
       ;; class placeholder is almost certainly a programmer error. (I
@@ -210,11 +287,10 @@ between the ~A definition and the ~A definition"
       ;; appropriate warnings and invalidations.
       (when classoid-wrapper
         (%modify-classoid classoid)
-        (when subclasses
-          (dohash ((subclass subclass-wrapper) subclasses :locked t)
+        (do-subclassoids ((subclass subclass-wrapper) classoid) ; under WORLD-LOCK
             (%modify-classoid subclass)
             (when invalidate
-              (%invalidate-layout subclass-wrapper))))
+              (%invalidate-layout subclass-wrapper)))
         (when invalidate
           (%invalidate-layout classoid-wrapper)
           (setf (classoid-subclasses classoid) nil)))
@@ -263,23 +339,13 @@ between the ~A definition and the ~A definition"
                 (classoid-wrapper classoid) wrapper))
 
       (dovector (super-wrapper (wrapper-inherits wrapper))
-        (let* ((super (wrapper-classoid super-wrapper))
-               (subclasses
-                 (or (classoid-subclasses super)
-                     (setf (classoid-subclasses super)
-                           #+sb-xc-host (make-hash-table :test 'eq)
-                           ;; Might as well use CTYPE-HASH-VALUE as a
-                           ;; stable hash since we have it.
-                           #-sb-xc-host
-                           (make-hash-table :hash-function #'type-hash-value
-                                            :test 'eq
-                                            :synchronized t)))))
+        (let ((super (wrapper-classoid super-wrapper)))
           (when (and (eq (classoid-state super) :sealed)
-                     (not (gethash classoid subclasses)))
+                     (not (get-subclassoid classoid super)))
             (warn "unsealing sealed class ~S in order to subclass it"
                   (classoid-name super))
             (setf (classoid-state super) :read-only))
-          (setf (gethash classoid subclasses) (or modify wrapper))))))
+          (add-subclassoid super classoid (or modify wrapper))))))
 
   (values)))
 
@@ -629,10 +695,10 @@ between the ~A definition and the ~A definition"
 
 (define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
-  (with-world-lock ()
+  (with-world-lock () ; FIXME: why such coarse lock granularity here?
     (if (%ensure-both-classoids-valid class1 class2)
-        (let ((subclasses2 (classoid-subclasses class2)))
-          (if (and subclasses2 (gethash class1 subclasses2))
+        (let ()
+          (if (get-subclassoid class1 class2)
               (values t t)
               (if (and (typep class1 'standard-classoid)
                        (typep class2 'standard-classoid)
@@ -655,10 +721,12 @@ between the ~A definition and the ~A definition"
   (let ((s-sub (classoid-subclasses sealed))
         (o-sub (classoid-subclasses other)))
     (if (and s-sub o-sub)
+        ;; FIXME: should we put more locking here?
+        ;; [contrast with define-type-method (classoid :simple-subtypep)]
         (collect ((res *empty-type* type-union))
-          (dohash ((subclass wrapper) s-sub :locked t)
+          (do-subclassoids ((subclass wrapper) sealed)
             (declare (ignore wrapper))
-            (when (gethash subclass o-sub)
+            (when (get-subclassoid subclass other)
               (res (specifier-type subclass))))
           (res))
         *empty-type*)))
@@ -671,12 +739,8 @@ between the ~A definition and the ~A definition"
            class1)
           ;; If one is a subclass of the other, then that is the
           ;; intersection.
-          ((let ((subclasses (classoid-subclasses class2)))
-             (and subclasses (gethash class1 subclasses)))
-           class1)
-          ((let ((subclasses (classoid-subclasses class1)))
-             (and subclasses (gethash class2 subclasses)))
-           class2)
+          ((get-subclassoid class1 class2) class1)
+          ((get-subclassoid class2 class1) class2)
           ;; Otherwise, we can't in general be sure that the
           ;; intersection is empty, since a subclass of both might be
           ;; defined. But we can eliminate it for some special cases.
@@ -1171,19 +1235,17 @@ between the ~A definition and the ~A definition"
   #+sb-xc-host (error "Can't invalidate layout ~S" wrapper)
   #-sb-xc-host
   (progn
-  (setf (wrapper-invalid wrapper) t)
-  ;; Ensure that the INVALID slot conveying ancillary data describing the
-  ;; invalidity reason is published before causing the invalid layout trap.
-  (sb-thread:barrier (:write))
-  #+metaspace (setf (layout-clos-hash (wrapper-friend wrapper)) 0)
-  (setf (wrapper-clos-hash wrapper) 0)
-  (let ((inherits (wrapper-inherits wrapper))
-        (classoid (wrapper-classoid wrapper)))
-    (%modify-classoid classoid)
-    (dovector (super inherits)
-      (let ((subs (classoid-subclasses (wrapper-classoid super))))
-        (when subs
-          (remhash classoid subs))))))
+    (setf (wrapper-invalid wrapper) t)
+    ;; Ensure that the INVALID slot conveying ancillary data describing the
+    ;; invalidity reason is published before causing the invalid layout trap.
+    (sb-thread:barrier (:write))
+    #+metaspace (setf (layout-clos-hash (wrapper-friend wrapper)) 0)
+    (setf (wrapper-clos-hash wrapper) 0)
+    (let ((inherits (wrapper-inherits wrapper))
+          (classoid (wrapper-classoid wrapper)))
+      (%modify-classoid classoid)
+      (dovector (super inherits)
+        (remove-subclassoid classoid (wrapper-classoid super)))))
   (values))
 
 ;;;; cold loading initializations

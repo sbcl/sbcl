@@ -194,7 +194,7 @@
                (let ((subs (classoid-subclasses class)))
                  (/noshow subs)
                  (when subs
-                   (dohash ((sub wrapper) subs)
+                   (sb-kernel::do-subclassoids ((sub wrapper) class)
                      (declare (ignore wrapper))
                      (/noshow sub)
                      (when (member class (direct-supers sub) :test #'eq)

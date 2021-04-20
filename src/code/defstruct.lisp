@@ -1228,22 +1228,16 @@ unless :NAMED is also specified.")))
       ;; references are unknown types.
       (values-specifier-type-cache-clear)))
   (when subclasses-p
-    (let ((subclasses (classoid-subclasses classoid)))
-      (when subclasses
-        (collect ((subs))
-          (dohash ((classoid wrapper)
-                   subclasses
-                   :locked t)
-            (declare (ignore wrapper))
-            (undeclare-structure classoid nil)
-            (subs (classoid-proper-name classoid)))
+    (collect ((subs))
+      (do-subclassoids ((classoid wrapper) classoid)
+        (declare (ignore wrapper))
+        (undeclare-structure classoid nil)
+        (subs (classoid-proper-name classoid)))
           ;; Is it really necessary to warn about
           ;; undeclaring functions for subclasses?
-          (when (subs)
-            (warn "undeclaring functions for old subclasses ~
-                               of ~S:~%  ~S"
-                  (classoid-name classoid)
-                  (subs))))))))
+      (when (subs)
+        (warn "undeclaring functions for old subclasses of ~S:~%  ~S"
+              (classoid-name classoid) (subs))))))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities

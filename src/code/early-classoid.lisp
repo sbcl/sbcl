@@ -448,7 +448,9 @@
   ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
   ;; subclass layout that was in effect at the time the subclass was
   ;; created.
-  (subclasses nil :type (or null hash-table))
+  ;; Initially an alist, and changed to a hash-table at some threshold.
+  (subclasses nil :type (or list hash-table))
+  (%lock nil) ; install it just-in-time, similar to hash-table-lock
   ;; the PCL class (= CL:CLASS, but with a view to future flexibility
   ;; we don't just call it the CLASS slot) object for this class, or
   ;; NIL if none assigned yet

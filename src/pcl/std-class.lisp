@@ -177,15 +177,10 @@
       (pushnew subclass direct-subclasses :test #'eq)
       (let ((wrapper (class-wrapper subclass)))
         (when wrapper
-          (let* ((classoid (wrapper-classoid wrapper)))
+          (let ((classoid (wrapper-classoid wrapper)))
             (dovector (super-wrapper (wrapper-inherits wrapper))
-              (let* ((super (wrapper-classoid super-wrapper))
-                     (subclasses (or (classoid-subclasses super)
-                                     (setf (classoid-subclasses super)
-                                           (make-hash-table :hash-function #'type-hash-value
-                                                            :test 'eq
-                                                            :synchronized t)))))
-                (setf (gethash classoid subclasses) wrapper)))))))
+              (sb-kernel::add-subclassoid (wrapper-classoid super-wrapper)
+                                          classoid wrapper))))))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
@@ -194,10 +189,8 @@
       ;; Remove from classoid subclasses as well.
       (let ((classoid (class-classoid subclass)))
         (dovector (super-wrapper (wrapper-inherits (classoid-wrapper classoid)))
-          (let* ((super (wrapper-classoid super-wrapper))
-                 (subclasses (classoid-subclasses super)))
-            (when subclasses
-              (remhash classoid subclasses))))))
+          (sb-kernel::remove-subclassoid classoid
+                                         (wrapper-classoid super-wrapper)))))
     subclass))
 
 ;;; Maintaining the direct-methods and direct-generic-functions backpointers.

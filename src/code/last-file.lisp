@@ -38,11 +38,13 @@
                                                     '(:extra-artifact) :target-compile)
                           :direction :output :if-exists :supersede)
     (dolist (root '(structure-object function))
-      (dolist (pair (sort (%hash-table-alist
-                           (classoid-subclasses (find-classoid root)))
-                          #'string<
-                          ;; pair = (#<classoid> . #<layout>)
-                          :key (lambda (pair) (classoid-name (car pair)))))
+      (dolist (pair (let ((subclassoids (classoid-subclasses (find-classoid root))))
+                      (if (listp subclassoids)
+                          subclassoids
+                          (sort (%hash-table-alist subclassoids)
+                                #'string<
+                                ;; pair = (#<classoid> . #<layout>)
+                                :key (lambda (pair) (classoid-name (car pair)))))))
         (let* ((wrapper (cdr pair))
                (dd (wrapper-info wrapper)))
           (cond
