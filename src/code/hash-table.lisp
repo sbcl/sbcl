@@ -180,14 +180,7 @@
   ;; List of values (i.e. the second half of the k/v pair) culled out during
   ;; GC, used only by the finalizer hash-table. This informs Lisp of the IDs
   ;; (small fixnums) of the finalizers that need to run.
-  (culled-values nil :type list)
-  ;; For detecting concurrent accesses.
-  #+sb-hash-table-debug
-  (signal-concurrent-access t :type (member nil t))
-  #+sb-hash-table-debug
-  (reading-thread nil)
-  #+sb-hash-table-debug
-  (writing-thread nil))
+  (culled-values nil :type list))
 
 (sb-xc:defmacro hash-table-lock (table)
   `(let ((ht ,table)) (or (hash-table-%lock ht) (install-hash-table-lock ht))))
