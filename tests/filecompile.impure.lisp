@@ -1,3 +1,14 @@
+(with-test (:name :compile-file-error-position-reporting
+            :serial t)
+  (dolist (input '("data/wonky1.lisp" "data/wonky2.lisp" "data/wonky3.lisp"))
+    (let ((expect (with-open-file (f input) (read f))))
+      (assert (stringp expect))
+      (let ((err-string (with-output-to-string (*error-output*)
+                          (compile-file input :print nil
+                                              :output-file
+                                              (scratch-file-name "fasl")))))
+        (assert (search expect err-string))))))
+
 #-sb-thread (sb-ext:exit :code 104)
 
 (unlock-package "SB-INT")

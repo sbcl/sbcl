@@ -16,10 +16,6 @@
   "tests/package-ctor-bug.lisp"
   "tests/bug-503095.lisp"
   "tests/bug-503095-2.lisp")
- ("compiler.pure.lisp"
-  "tests/data/wonky1.lisp"
-  "tests/data/wonky2.lisp"
-  "tests/data/wonky3.lisp")
  ("compiler.impure.lisp"
   "tests/bad-mlf-test.lisp"
   "tests/bug204-test.lisp"
@@ -43,7 +39,11 @@
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
- ("filecompile.impure.lisp" "src/code/primordial-extensions.lisp")
+ ("filecompile.impure.lisp"
+  "tests/data/wonky1.lisp"
+  "tests/data/wonky2.lisp"
+  "tests/data/wonky3.lisp"
+  "src/code/primordial-extensions.lisp")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
   "tests/custom-sysinit.lisp"
