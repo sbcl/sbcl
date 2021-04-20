@@ -32,7 +32,6 @@ do
   fi
   cat crossbuild-runner/backends/$arch/features >> $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf
-  echo ':linkage-table' >> $ltf
   echo ')))' >> $ltf
 
   cp -fv crossbuild-runner/backends/$arch/stuff-groveled-from-headers.lisp \

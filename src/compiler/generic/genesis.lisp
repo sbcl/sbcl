@@ -3667,11 +3667,6 @@ III. initially undefined function references (alphabetically):
     ;; Prefill some linkage table entries perhaps
     (loop for (name datap) in sb-vm::*linkage-space-predefined-entries*
           do (linkage-table-note-symbol name datap))
-    #-(or linkage-table crossbuild-test)
-    (when core-file-name
-      (if symbol-table-file-name
-          (load-cold-foreign-symbol-table symbol-table-file-name)
-          (error "can't output a core file without symbol table file input")))
 
     ;; Now that we've successfully read our only input file (by
     ;; loading the symbol table, if any), it's a good time to ensure

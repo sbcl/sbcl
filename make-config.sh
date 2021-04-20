@@ -695,8 +695,6 @@ case "$sbcl_arch" in
     ;;
 esac
 
-printf ' :linkage-table' >> $ltf
-
 # Use a little C program to try to guess the endianness.  Ware
 # cross-compilers!
 #
