@@ -1101,7 +1101,7 @@
 
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
-(defun ir1-optimize-combination (node)
+(defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
   (when (lvar-reoptimize (basic-combination-fun node))
     (propagate-fun-change node)
     (when (node-deleted node)
@@ -1199,14 +1199,14 @@
                     ;; Are type checks getting in the way?
                     (or (try-equality-constraint node)
                         (dolist (x (fun-info-transforms info))
-                          (when (eq *show-transforms-p* :all)
+                          (when (eq show :all)
                             (let* ((lvar (basic-combination-fun node))
                                    (fname (lvar-fun-name lvar t)))
                               (format *trace-output*
                                       "~&trying transform ~s for ~s"
                                       (transform-type x) fname)))
-                          (unless (ir1-transform node x)
-                            (when (eq *show-transforms-p* :all)
+                          (unless (ir1-transform node x show)
+                            (when (eq show :all)
                               (format *trace-output*
                                       "~&quitting because IR1-TRANSFORM result was NIL"))
                             (return))))))))))))))
@@ -1493,7 +1493,7 @@
 ;;; finalize to pick up. We return true if the transform failed, and
 ;;; thus further transformation should be attempted. We return false
 ;;; if either the transform succeeded or was aborted.
-(defun ir1-transform (node transform)
+(defun ir1-transform (node transform show)
   (declare (type combination node) (type transform transform))
   (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (let* ((type (transform-type transform))
@@ -1513,7 +1513,7 @@
                (catch 'give-up-ir1-transform
                  (transform-call node
                                  (let ((new-form (funcall fun node)))
-                                   (when *show-transforms-p*
+                                   (when show
                                      (show-transform "ir"
                                                      (combination-fun-source-name node)
                                                      new-form))
