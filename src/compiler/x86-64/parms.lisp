@@ -128,7 +128,7 @@
 (!gencgc-space-setup #x50000000
                      :read-only-space-size #+metaspace #.(* 2 1024 1024)
                                            #-metaspace 0
-                     :fixedobj-space-size #.(* 30 1024 1024)
+                     :fixedobj-space-size #.(* 40 1024 1024)
                      :varyobj-space-size #.(* 130 1024 1024)
                      :dynamic-space-start #x1000000000)
 
