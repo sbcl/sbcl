@@ -488,23 +488,34 @@ Examples:
            (scaled-size (truncate (/ (float size) rehash-threshold)))
            (bucket-count (power-of-two-ceiling
                           (max scaled-size +min-hash-table-size+)))
-           (index-vector (make-array bucket-count
-                                     :element-type 'hash-table-index
-                                     :initial-element 0))
            (weakp (logtest flags hash-table-weak-flag))
-           (kv-vector (%alloc-kv-pairs size))
+           ;; Non-weak tables created with no options other than :TEST
+           ;; are allocated at 0 size. Weak tables are complicated enough,
+           ;; so just do their usual thing.
+           (defaultp (and (not weakp) (= size +min-hash-table-size+)))
+           (index-vector
+            (if defaultp
+                #.(sb-xc:make-array 2 :element-type '(unsigned-byte 32)
+                                    :initial-element 0)
+                (make-array bucket-count :element-type 'hash-table-index
+                            :initial-element 0)))
+           (kv-vector (if defaultp #(0 0 nil) (%alloc-kv-pairs size)))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
            ;; together.
            ;; We don't need this to be initially 0-filled, so don't specify
            ;; an initial element (in case we ever meaningfully distinguish
            ;; between don't-care and 0-fill)
-           (next-vector (make-array (1+ size) :element-type 'hash-table-index))
+           (next-vector (if defaultp
+                            #.(sb-xc:make-array 0 :element-type '(unsigned-byte 32))
+                            (make-array (1+ size) :element-type 'hash-table-index)))
            (table-kind (ht-flags-kind flags))
            (userfunp (logtest flags hash-table-userfun-flag))
            ;; same here - don't care about initial contents
            (hash-vector (when (or userfunp (>= table-kind 2))
-                          (make-array (1+ size) :element-type 'hash-table-index)))
+                          (if defaultp
+                              #.(sb-xc:make-array 1 :element-type '(unsigned-byte 32))
+                              (make-array (1+ size) :element-type 'hash-table-index))))
            ((getter setter remover)
             (if weakp
                 (values #'gethash/weak #'puthash/weak #'remhash/weak)
@@ -521,13 +532,19 @@ Examples:
       ;; at the table. Weak hashing vectors need the table.
       ;; As a special-case, non-weak tables with EQL hashing put T in this slot.
       ;; GC can't get the table kind since it doesn't have access to the table.
-      (setf (kv-vector-supplement kv-vector)
-            (if weakp
-                table
-                (or hash-vector (= table-kind hash-table-kind-eql))))
-      (when weakp
-        (set-header-data kv-vector (logior sb-vm:vector-hashing-flag
-                                           sb-vm:vector-weak-flag)))
+      (cond (defaultp
+             ;; Stash the desired size for the first time the vectors are grown.
+             (setf (hash-table-cache table) size
+                   ;; Cause the overflow logic to be invoked on the first insert.
+                   (hash-table-next-free-kv table) 0))
+            (t
+             (setf (kv-vector-supplement kv-vector)
+                   (if weakp
+                       table
+                       (or hash-vector (= table-kind hash-table-kind-eql))))
+             (when weakp
+               (set-header-data kv-vector (logior sb-vm:vector-hashing-flag
+                                                  sb-vm:vector-weak-flag)))))
       (when (logtest flags hash-table-synchronized-flag)
         (install-hash-table-lock table))
       table))
@@ -571,7 +588,8 @@ Examples:
   "Return a size that can be used with MAKE-HASH-TABLE to create a hash
    table that can hold however many entries HASH-TABLE can hold without
    having to be grown."
-  (hash-table-pairs-capacity (hash-table-pairs hash-table)))
+  (let ((n (hash-table-pairs-capacity (hash-table-pairs hash-table))))
+    (if (= n 0) +min-hash-table-size+ n)))
 
 (setf (documentation 'hash-table-test 'function)
       "Return the test HASH-TABLE was created with.")
@@ -850,6 +868,23 @@ multiple threads accessing the same hash-table without locking."
 ;;; made non-weak so that we don't have to deal with GC-related shenanigans.
 (defun grow-hash-table (table)
   (declare (type hash-table table))
+  (when (= (hash-table-%count table) 0) ; special case for new table
+    (let* ((size (shiftf (hash-table-cache table) 0))
+           (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
+           (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
+           (index-vector (make-array bucket-count :element-type 'hash-table-index
+                                     :initial-element 0))
+           (kv-vector (%alloc-kv-pairs size))
+           (next-vector (make-array (1+ size) :element-type 'hash-table-index))
+           (hash-vector (when (hash-table-hash-vector table)
+                          (make-array (1+ size) :element-type 'hash-table-index))))
+      (setf (kv-vector-supplement kv-vector) (or hash-vector
+                                                 (eq (hash-table-test table) 'eql))
+            (hash-table-pairs table) kv-vector
+            (hash-table-index-vector table) index-vector
+            (hash-table-next-vector table) next-vector
+            (hash-table-hash-vector table) hash-vector)
+      (return-from grow-hash-table 1)))
   (binding* (((new-kv-vector new-next-vector new-hash-vector new-index-vector)
               (hash-table-new-vectors table))
              (old-kv-vector (hash-table-pairs table))
@@ -1959,6 +1994,12 @@ table itself."
 (sb-kernel::assign-equalp-impl 'hash-table #'hash-table-equalp)
 
 #|
+(defun memusage (x)
+  (+ (sb-vm::primitive-object-size (hash-table-pairs x))
+     (acond ((hash-table-hash-vector x) (sb-vm::primitive-object-size it)) (t 0))
+     (sb-vm::primitive-object-size (hash-table-index-vector x))
+     (sb-vm::primitive-object-size (hash-table-next-vector x))))
+
 (defun show-address-sensitivity (&optional tbl)
   (flet ((show1 (tbl)
            (let ((kv (hash-table-pairs tbl))
