@@ -12,7 +12,9 @@
 (in-package "SB-VM")
 
 (defun zeroize (tn)
-  (inst xor :dword tn tn))
+  (if (stack-tn-p tn)
+      (inst mov tn 0)
+      (inst xor :dword tn tn)))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)

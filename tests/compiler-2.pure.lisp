@@ -3183,3 +3183,17 @@
    `(lambda (n)
       (position #c(1.0 2.0) #(nil nil nil) :start n))
    ((0) nil)))
+
+(with-test (:name :zeroize-stack-tns)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b d e)
+      (declare (type fixnum a))
+      (dpb
+       (ash
+        (truncate 562949953421316  (max 97 d))
+        (min 81 (expt (boole boole-and e b) 2)))
+       (byte 7 5)
+       (dotimes (i 2 a)
+         (count i #(61) :test '>=))))
+   ((1 2 3 4) 1985)))
