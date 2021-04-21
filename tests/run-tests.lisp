@@ -201,14 +201,14 @@
                   (make-package
                    (format nil "TEST~36,5,'_R" (random (expt 36 5)))
                    :use (append packages-to-use standard-use-list))
-                  (find-package "CL-USER")))
-             (*allowed-inputs*
+                  (find-package "CL-USER"))))
+        (setq *allowed-inputs*
               (if (eq *input-manifest* :ignore)
                   :any
                   (append (cdr (assoc (namestring (make-pathname :name (pathname-name file)
                                                                  :type (pathname-type file)))
                                       *input-manifest* :test #'string=))
-                          (list file)))))
+                          (list file))))
         (sb-int:encapsulate
          'open 'open-guard
          (lambda (f filename &rest args &key direction &allow-other-keys)
@@ -264,6 +264,7 @@
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard))
           (delete-package test-package))))
+    (makunbound '*allowed-inputs*)
     ;; after all the files are done
     (append-failures)))
 
