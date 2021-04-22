@@ -134,8 +134,8 @@
   ;; next GC.
   (hash-fun nil :type function :read-only t)
 
-  ;; The type of hash table this is. Only used for printing and as
-  ;; part of the exported interface.
+  ;; The type of hash table this is. Part of the exported interface,
+  ;; as well as needed for the MAKE-LOAD-FORM and PRINT-OBJECT methods.
   (test nil :type symbol :read-only t)
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply

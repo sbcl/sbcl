@@ -1927,16 +1927,6 @@ table itself."
 
 ;;;; methods on HASH-TABLE
 
-;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
-;;; when reconstructing HASH-TABLE.
-;;; FIXME: synchronized? custom function?
-(defun %hash-table-ctor-args (hash-table)
-  `(:test             ',(hash-table-test             hash-table)
-    :size             ',(hash-table-size             hash-table)
-    :rehash-size      ',(hash-table-rehash-size      hash-table)
-    :rehash-threshold ',(hash-table-rehash-threshold hash-table)
-    :weakness         ',(hash-table-weakness         hash-table)))
-
 ;;; Return an association list representing the same data as HASH-TABLE.
 ;;; Iterate downward so that PUSH creates the result in insertion order.
 ;;; One the one hand, this should not to be construed as a guarantee about
@@ -1963,29 +1953,56 @@ table itself."
     (setf (gethash (car x) hash-table) (cdr x)))
   hash-table)
 
+;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
+;;; when reconstructing HASH-TABLE.
+(flet ((%hash-table-ctor (hash-table &aux (test (hash-table-test hash-table)))
+         (when (or (not (logtest (hash-table-flags hash-table) hash-table-userfun-flag))
+                   ;; If it has a named test function - it wasn't a lambda expression -
+                   ;; and the table's hash-function is identical to the hash function
+                   ;; dictated by *USER-HASH-TABLE-TESTS* for that test, we're OK.
+                   ;; And it's not worth the risk of trying to reverse-engineer the hash
+                   ;; function if all we have is a name.
+                   (and test (eq (third (assoc test *user-hash-table-tests*))
+                                 (hash-table-hash-fun hash-table))))
+           `(make-hash-table
+             :test             ',test
+             :size             ',(hash-table-size             hash-table)
+             :rehash-size      ',(hash-table-rehash-size      hash-table)
+             :rehash-threshold ',(hash-table-rehash-threshold hash-table)
+             :synchronized     ',(hash-table-synchronized-p   hash-table)
+             :weakness         ',(hash-table-weakness         hash-table)))))
+
 (defmethod print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
-  (cond ((or (not *print-readably*) (not *read-eval*))
+  (let ((ctor (and *print-readably* *read-eval* (%hash-table-ctor hash-table))))
+    (cond
+        ((not ctor)
+         ;; Perhaps we should add :SYNCHRONIZED to the string?
          (print-unreadable-object (hash-table stream :type t :identity t)
            (format stream
                    ":TEST ~S~@[ :HASH-FUNCTION ~S~] :COUNT ~S~@[ :WEAKNESS ~S~]"
-                   (hash-table-test hash-table)
-                   (when (and (eq (hash-table-test hash-table) 'eq)
-                              (neq (hash-table-hash-fun hash-table) #'eq-hash))
+                   (or (hash-table-test hash-table) (hash-table-test-fun hash-table))
+                   (when (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
                      (hash-table-hash-fun hash-table))
                    (hash-table-count hash-table)
                    (hash-table-weakness hash-table))))
         (t
          (write-string "#." stream)
-         (write `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
-                                                          hash-table))
-                                     ',(%hash-table-alist hash-table))
-                :stream stream))))
+         (write `(%stuff-hash-table ,ctor ',(%hash-table-alist hash-table))
+                :stream stream)))))
 
 (defmethod make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))
-  (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
-          `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
+  (let ((ctor (%hash-table-ctor hash-table)))
+    (if ctor
+        (values ctor
+                ;; This uses a separate initform in case the hash table contains itself
+                ;; as either a key or value.
+                ;; FIXME: k/v pairs would take less space as a vector, not an alist.
+                (unless (zerop (hash-table-count hash-table))
+                  `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
+        (error "~S is not externalizable" hash-table))))
+)
 
 ;;; This assignment has to occur some time after the defstruct.
 ;;; We don't call EQUALP on hash-table, so as late as possible is fine.

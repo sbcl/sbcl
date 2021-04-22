@@ -422,6 +422,17 @@
     (assert (eq (aref pairs 2) 'first))
     (assert (eq (aref pairs 4) 'second))))
 
+(defun int= (a b) (= (the integer x) (the integer b)))
+(define-hash-table-test int= sb-impl::number-sxhash)
+(defun get-sync-hash-table () #.(make-hash-table :synchronized t))
+(with-test (:name :dump-hash-tables)
+  ;; Don't lose the :synchronized option.
+  (assert (hash-table-synchronized-p (get-sync-hash-table)))
+  ;; Disallow nonstandard hash that disagrees with test.
+  (assert-error (make-load-form (make-hash-table :test 'int= :hash-function 'sxhash)))
+  ;; Allow nonstandard test as long as it was registered
+  (assert (make-load-form (make-hash-table :test 'int=))))
+
 (defun list-coalescing-test-fun-1 ()
   (declare (optimize (debug 1)))
   ;; base coalesces with base, non-base coalesces with non-base

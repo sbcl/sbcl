@@ -138,6 +138,9 @@ for."
 
 (defconstant hash-table-weak-flag         8)
 (defconstant hash-table-finalizer-flag    4)
+;;; USERFUN-FLAG implies a nonstandard hash function. Such tables may also have
+;;; a custom comparator. But you can't have a custom comparator without a custom
+;;; hash, because there's no way in general to produce a compatible hash.
 (defconstant hash-table-userfun-flag      2)
 (defconstant hash-table-synchronized-flag 1)
 
