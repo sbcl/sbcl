@@ -242,11 +242,11 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
                            sum (ash #b01 (* i 2))))
         *policy* (copy-policy **baseline-policy**))
   (when baseline-qualities
-    (sb-xc:proclaim `(optimize ,@baseline-qualities))
+    (proclaim `(optimize ,@baseline-qualities))
     ;; Copy altered policy back as the baseline policy
     (setq **baseline-policy** (copy-policy *policy*)))
   (let ((*policy* *policy*))
-    (sb-xc:proclaim '(optimize (type-check 0)))
+    (proclaim '(optimize (type-check 0)))
     (setq **zero-typecheck-policy** *policy*)))
 
 ;;; Look up a named optimization quality in POLICY. This is only

@@ -286,6 +286,7 @@
     "MACRO-FUNCTION"
     "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
     "MAKE-LOAD-FORM-SAVING-SLOTS"
+    "PROCLAIM"
     "SPECIAL-OPERATOR-P"
     "SUBTYPEP"
     "UPGRADED-ARRAY-ELEMENT-TYPE"
@@ -355,7 +356,6 @@
                   "GENSYM"
                   "MAKE-ARRAY"
                   "MAKE-LOAD-FORM"
-                  "PROCLAIM"
                   "SIMPLE-VECTOR"
                   "TYPEP"
                   ))

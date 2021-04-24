@@ -323,7 +323,7 @@
  ;; The DEFSTRUCT machinery needs SUBTYPEP, defined in
  ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
- ;; and SB-XC:PROCLAIM, defined in "src/compiler/proclaim"
+ ;; and PROCLAIM, defined in "src/compiler/proclaim"
  ("src/code/defstruct"  :c-headers)
  ("src/code/target-defstruct" :not-host)
 

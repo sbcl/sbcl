@@ -1253,7 +1253,7 @@
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
   (let* ((next (first (block-succ block)))
-        (start (block-start next)))
+         (start (block-start next)))
     (when start  ; NEXT is not an END-OF-COMPONENT marker
       (cond ( ;; We cannot combine with a successor block if:
              (or

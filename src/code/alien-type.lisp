@@ -18,7 +18,7 @@
 (sb-xc:defstruct (alien-value (:copier nil) (:constructor %sap-alien (sap type)))
   (sap nil :type sb-sys:system-area-pointer)
   (type nil :type sb-alien::alien-type))
-(sb-xc:proclaim '(freeze-type alien-value))
+(proclaim '(freeze-type alien-value))
 
 (!begin-collecting-cold-init-forms)
 

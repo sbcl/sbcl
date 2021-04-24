@@ -430,7 +430,7 @@
          (unless (info :declaration :known kind)
            (compiler-warn "unrecognized declaration ~S" raw-form)))))))
 
-(defun sb-xc:proclaim (raw-form)
+(defun proclaim (raw-form)
   (/noshow "PROCLAIM" raw-form)
   (%proclaim raw-form nil)
   (values))

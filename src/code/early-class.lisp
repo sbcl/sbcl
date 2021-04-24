@@ -36,7 +36,7 @@
   (flet ((proclaim-ftype-for-name (kind name type)
            (ecase kind
              (condition
-              (sb-xc:proclaim `(ftype ,(type-specifier type) ,name)))
+              (proclaim `(ftype ,(type-specifier type) ,name)))
              (class
               (when (eq (info :function :where-from name) :assumed)
                 (sb-c:proclaim-ftype name type nil :defined))))))
