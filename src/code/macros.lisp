@@ -237,6 +237,11 @@ tree structure resulting from the evaluation of EXPRESSION."
     (when docp
       (setf (documentation name 'variable) doc))
     (%set-symbol-value name value))
+  ;; Define the constant in the cross-compilation host, since the
+  ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
+  ;; which reference the constant.
+  #+sb-xc-host
+  (eval `(defconstant ,name ',value))
   (setf (info :variable :kind name) :constant)
   name)
 

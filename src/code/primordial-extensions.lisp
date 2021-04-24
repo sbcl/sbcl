@@ -332,9 +332,6 @@
   (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
     (unless (constantp expr)
       (error "DEFCONSTANT-EQX requires a literal constant"))
-    `(progn
-       (eval-when (:compile-toplevel)
-         (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)))
-       (eval-when (:load-toplevel)
-         (%defconstant ',symbol ',(eval expr)
-           (sb-c:source-location) ,@(when doc (list doc)))))))
+    `(eval-when (:compile-toplevel :load-toplevel)
+       (%defconstant ',symbol ',(%defconstant-eqx-value symbol (eval expr) (eval eqx))
+         (sb-c:source-location) ,@(when doc (list doc))))))
