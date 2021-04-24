@@ -305,7 +305,7 @@
 (defun sb-impl::%defun (name lambda &optional inline-expansion)
   (declare (ignore inline-expansion))
   (cl:proclaim `(ftype function ,name))
-  (setf (fdefinition name) (eval lambda)))
+  (setf (fdefinition name) lambda))
 
 (defun %svset (vector index val) ; stemming from toplevel (SETF SVREF)
   (setf (aref vector index) val))
