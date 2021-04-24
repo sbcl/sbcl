@@ -348,7 +348,7 @@
 ;; compilation of the target.
 ;;
 (let ((package-name "SB-XC"))
-  (dolist (name (append (append *undefineds* *dual-personality-math-symbols*)))
+  (dolist (name (append *undefineds* *dual-personality-math-symbols*))
     (export (intern name package-name) package-name))
   (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
                   "ARRAY-ELEMENT-TYPE"
@@ -359,7 +359,7 @@
                   "SIMPLE-VECTOR"
                   "TYPEP"
                   ))
-      (export (intern name package-name) package-name)))
+    (export (intern name package-name) package-name)))
 
 (defun count-symbols (pkg)
   (let ((n 0))

@@ -481,9 +481,9 @@
                 (let ((val (lvar-value y)))
                   (multiple-value-bind (low high type)
                       (if (csubtypep (lvar-type x) (specifier-type 'double-float))
-                          (values sb-xc:most-negative-double-float sb-xc:most-positive-double-float
+                          (values most-negative-double-float most-positive-double-float
                                   'double-float)
-                          (values sb-xc:most-negative-single-float sb-xc:most-positive-single-float
+                          (values most-negative-single-float most-positive-single-float
                                   'single-float))
                       (unless (and (sb-xc:<= low val high)
                                    (eql (rational (coerce val type)) val))
