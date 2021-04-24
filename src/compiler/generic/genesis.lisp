@@ -809,7 +809,7 @@ core and return a descriptor to it."
                     (descriptor-byte-offset des))))
     (dotimes (i length)
       (setf (bvref bytes (+ offset i))
-            (sb-xc:char-code (aref string i))))
+            (char-code (aref string i))))
     (setf (bvref bytes (+ offset length))
           0) ; null string-termination character for C
     des))
@@ -3593,7 +3593,7 @@ III. initially undefined function references (alphabetically):
         (write-word build-id-core-entry-type-code)
         (write-word (+ 3 nwords)) ; 3 = fixed overhead including this word
         (write-word (length build-id))
-        (dovector (char build-id) (write-byte (sb-xc:char-code char) core-file))
+        (dovector (char build-id) (write-byte (char-code char) core-file))
         (dotimes (j (- padding)) (write-byte #xff core-file)))
 
       ;; Write the Directory entry header.

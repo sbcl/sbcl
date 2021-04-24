@@ -290,9 +290,9 @@
   (let* ((n (length string))
          (a (make-array n :element-type '(unsigned-byte 8))))
     (dotimes (i n a)
-      (let ((code (sb-xc:char-code (char string i))))
+      (let ((code (char-code (char string i))))
         (unless (<= 0 code 127)
-          (setf code (sb-xc:char-code #\?)))
+          (setf code (char-code #\?)))
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host

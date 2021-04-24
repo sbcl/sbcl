@@ -62,21 +62,21 @@
          ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
          (nil #:mu 0 simple-array-nil)
          #-sb-unicode
-         (character ,(code-char 0) 8 simple-base-string
+         (character ,(cl:code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
          #+sb-unicode
-         (base-char ,(code-char 0) 8 simple-base-string
+         (base-char ,(cl:code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
          #+sb-unicode
-         (character ,(code-char 0) 32 simple-character-string
+         (character ,(cl:code-char 0) 32 simple-character-string
                     :complex-typecode #.complex-character-string-widetag)
          (single-float $0.0f0 32 simple-array-single-float)
          (double-float $0.0d0 64 simple-array-double-float)

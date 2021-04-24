@@ -932,7 +932,7 @@
                          (values nil nil)))) ; can't decide
                 (test-character-type (type)
                   (when (characterp ,thing)
-                    (let ((code (sb-xc:char-code ,thing)))
+                    (let ((code (char-code ,thing)))
                       (dolist (pair (character-set-type-pairs type) nil)
                         (destructuring-bind (low . high) pair
                           (when (<= low code high)

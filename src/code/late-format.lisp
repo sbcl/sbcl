@@ -503,7 +503,7 @@
                ,directives))))
 
 (defun %set-format-directive-expander (char fn)
-  (let ((code (sb-xc:char-code (char-upcase char))))
+  (let ((code (char-code (char-upcase char))))
     (setf (aref *format-directive-expanders* code) fn))
   char)
 
