@@ -208,8 +208,6 @@
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
-;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
-;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant-eqx +constituent-trait-table+
   #.(let ((a (sb-xc:make-array base-char-code-limit
                                :retain-specialization-for-after-xc-core t
