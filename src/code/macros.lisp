@@ -280,7 +280,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                            `(',doc)))))
 
 (defun %compiler-defglobal (name always-boundp assign-it-p value)
-  (proclaim `(global ,name))
+  (sb-xc:proclaim `(global ,name))
   (when assign-it-p
     (set-symbol-global-value name value))
   (sb-c::process-variable-declaration
@@ -291,7 +291,7 @@ tree structure resulting from the evaluation of EXPRESSION."
        always-boundp)))
 
 (defun %compiler-defvar (var)
-  (proclaim `(special ,var)))
+  (sb-xc:proclaim `(special ,var)))
 
 
 ;;;; various conditional constructs

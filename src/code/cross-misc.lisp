@@ -290,9 +290,9 @@
   (let* ((n (length string))
          (a (make-array n :element-type '(unsigned-byte 8))))
     (dotimes (i n a)
-      (let ((code (char-code (char string i))))
+      (let ((code (sb-xc:char-code (char string i))))
         (unless (<= 0 code 127)
-          (setf code (char-code #\?)))
+          (setf code (sb-xc:char-code #\?)))
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host
@@ -304,8 +304,8 @@
 
 (defun sb-impl::%defun (name lambda &optional inline-expansion)
   (declare (ignore inline-expansion))
-  (cl:proclaim `(ftype function ,name))
-  (setf (fdefinition name) lambda))
+  (proclaim `(ftype function ,name))
+  (setf (fdefinition name) (eval lambda)))
 
 (defun %svset (vector index val) ; stemming from toplevel (SETF SVREF)
   (setf (aref vector index) val))

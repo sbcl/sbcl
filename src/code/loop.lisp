@@ -769,9 +769,6 @@ code to be loaded.
                   "")))
            #+sb-unicode
            ((csubtypep ctype (specifier-type 'extended-char))
-            #+sb-xc-host
-            (error "Unimplemented on cross-compiler.")
-            #-sb-xc-host
             (code-char base-char-code-limit))
            ((csubtypep ctype (specifier-type 'character))
             #\x)
