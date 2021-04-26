@@ -599,7 +599,7 @@
                 `(characterp ,object))))
         (let ((n-code (sb-xc:gensym "CODE")))
           `(and (characterp ,object)
-                (let ((,n-code (sb-xc:char-code ,object)))
+                (let ((,n-code (char-code ,object)))
                   (or
                    ,@(loop for pair in pairs
                            collect

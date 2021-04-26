@@ -529,7 +529,7 @@
              (dump-non-immediate-object x file)))
         ((fixnump x) (dump-integer x file))
         ((characterp x)
-         (dump-fop 'fop-character file (sb-xc:char-code x)))
+         (dump-fop 'fop-character file (char-code x)))
         #-sb-xc-host
         ((system-area-pointer-p x)
          (dump-fop 'fop-word-pointer file)
@@ -941,9 +941,9 @@
   (declare (type simple-string s))
   (if (or base-string-p #-sb-unicode t) ; if non-unicode, every char is 1 byte
       (dovector (c s)
-        (dump-byte (sb-xc:char-code c) fasl-output))
+        (dump-byte (char-code c) fasl-output))
       (dovector (c s) ; varint (a/k/a LEB128) is better for this than UTF-8.
-        (dump-varint (sb-xc:char-code c) fasl-output))))
+        (dump-varint (char-code c) fasl-output))))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
 ;;; but we are responsible for putting it there when appropriate.

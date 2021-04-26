@@ -562,7 +562,7 @@
 ) ; EVAL-WHEN
 
 (eval-when (:compile-toplevel)
-  (sb-xc:proclaim '(muffle-conditions compiler-note)))
+  (proclaim '(muffle-conditions compiler-note)))
 ;;; We would normally do this with a MACROLET, but then we run into
 ;;; problems with the lexical environment being too hairy for the
 ;;; cross-compiler and it cannot inline the basic basher functions.

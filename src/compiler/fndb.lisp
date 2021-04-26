@@ -2005,7 +2005,7 @@
 ;;; Unfortunately it prints that noise at each call site.
 ;;; Using DEFKNOWN we can make the proclamation effective when
 ;;; running the cross-compiler but not when building it.
-;;; Alternatively we could use SB-XC:PROCLAIM, except that that
+;;; Alternatively we could use PROCLAIM, except that that
 ;;; doesn't exist soon enough, and would need conditionals guarding
 ;;; it, which is sort of the very thing this is trying to avoid.
 (defknown missing-arg () nil)

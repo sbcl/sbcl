@@ -171,7 +171,7 @@
   (:policy :fast-safe)
   (:note "inline constant comparison")
   (:generator 2
-    (inst cmp :dword x (sb-xc:char-code y))))
+    (inst cmp :dword x (char-code y))))
 
 (define-vop (fast-char=/character/c character-compare/c)
   (:translate char=)

@@ -182,7 +182,7 @@
        *format-directive-interpreters*
        ;; Using the host's char-upcase should be fine here.
        ;; (Do we even need to use it? Why not just spell the source code as desired?)
-       ,(sb-xc:char-code (char-upcase char))
+       ,(char-code (char-upcase char))
        (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
          ,@(if lambda-list

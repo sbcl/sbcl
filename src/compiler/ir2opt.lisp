@@ -777,7 +777,7 @@
     (let ((values (mapcar #'car choices)))
       (cond ((every #'fixnump values)) ; ok
             ((every #'characterp values)
-             (setq values (mapcar #'sb-xc:char-code values)))
+             (setq values (mapcar #'char-code values)))
             (t
              (return-from should-use-jump-table-p nil)))
       (let* ((min (reduce #'min values))
@@ -818,7 +818,7 @@
           (destructuring-bind (clauses else-block test-vop-name) culled-chain
             (let* ((key-type (if (characterp (caar clauses)) 'character 'fixnum))
                    (clause-keyfn (if (eq key-type 'character)
-                                     (lambda (x) (sb-xc:char-code (car x)))
+                                     (lambda (x) (char-code (car x)))
                                      #'car))
                    ;; Sort and unzip the alist
                    (ordered (sort (copy-list clauses) #'< :key clause-keyfn))

@@ -208,16 +208,15 @@
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
-;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
-;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant-eqx +constituent-trait-table+
   #.(let ((a (sb-xc:make-array base-char-code-limit
                                :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
-      (flet ((!set-constituent-trait (char trait)
-               (aver (typep char 'base-char))
-               (setf (elt a (char-code char)) trait)))
+      (labels ((!set-code-constituent-trait (code trait)
+                 (setf (elt a code) trait))
+               (!set-constituent-trait (char trait)
+                 (!set-code-constituent-trait (char-code char) trait)))
         (!set-constituent-trait #\: +char-attr-package-delimiter+)
         (!set-constituent-trait #\. +char-attr-constituent-dot+)
         (!set-constituent-trait #\+ +char-attr-constituent-sign+)
@@ -225,7 +224,7 @@
         (!set-constituent-trait #\/ +char-attr-constituent-slash+)
         (do ((i (char-code #\0) (1+ i)))
             ((> i (char-code #\9)))
-          (!set-constituent-trait (code-char i) +char-attr-constituent-digit+))
+          (!set-code-constituent-trait i +char-attr-constituent-digit+))
         (!set-constituent-trait #\E +char-attr-constituent-expt+)
         (!set-constituent-trait #\F +char-attr-constituent-expt+)
         (!set-constituent-trait #\D +char-attr-constituent-expt+)
@@ -242,7 +241,7 @@
         (!set-constituent-trait #\Newline +char-attr-invalid+)
         (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
                          return-char-code rubout-char-code))
-          (!set-constituent-trait (code-char c) +char-attr-invalid+)))
+          (!set-code-constituent-trait c +char-attr-invalid+)))
       a)
   #'equalp)
 

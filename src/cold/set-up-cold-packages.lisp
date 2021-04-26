@@ -272,6 +272,8 @@
 
     ;; The cross-compiler itself shouldn't really need to use the host
     ;; versions of these in target code except in exceptional cases.
+    "CHAR-CODE"
+    "CODE-CHAR"
     "COMPILE-FILE"
     "COMPILE-FILE-PATHNAME"
     "*COMPILE-FILE-PATHNAME*"
@@ -286,6 +288,7 @@
     "MACRO-FUNCTION"
     "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
     "MAKE-LOAD-FORM-SAVING-SLOTS"
+    "PROCLAIM"
     "SPECIAL-OPERATOR-P"
     "SUBTYPEP"
     "UPGRADED-ARRAY-ELEMENT-TYPE"
@@ -349,13 +352,10 @@
     (export (intern name package-name) package-name))
   (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
                   "ARRAY-ELEMENT-TYPE"
-                  "CHAR-CODE"
-                  "CODE-CHAR"
                   "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
                   "GENSYM"
                   "MAKE-ARRAY"
                   "MAKE-LOAD-FORM"
-                  "PROCLAIM"
                   "SIMPLE-VECTOR"
                   "TYPEP"
                   ))

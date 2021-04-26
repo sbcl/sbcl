@@ -67,7 +67,7 @@
 (declaim (freeze-type format-directive))
 
 (defun make-format-directive (string start end params colon atsign char symbol)
-  (let ((code (sb-xc:char-code char)))
+  (let ((code (char-code char)))
     (%make-directive string start end params
                      (logior (if colon  #x100 0)
                              (if atsign #x080 0)

@@ -137,7 +137,7 @@
             #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))
        (character-set-type
-        ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
+        ;; provided that CHAR-CODE doesn't fail, the answer is certain
         (values (test-character-type type) t))
        (classoid ; = {built-in,structure,condition,standard,static}-classoid
         (let ((name (classoid-name type)))
