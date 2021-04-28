@@ -38,11 +38,9 @@
   (documentation nil :type (or string null)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (/show0 "condition.lisp 103")
   (let ((condition-class (find-classoid 'condition)))
     (setf (condition-classoid-cpl condition-class)
-          (list condition-class)))
-  (/show0 "condition.lisp 103"))
+          (list condition-class))))
 
 (setf (condition-classoid-report (find-classoid 'condition))
       (lambda (cond stream)
