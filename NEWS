@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.3:
+changes in sbcl-2.1.4 relative to sbcl-2.1.3:
   * platform support:
     ** work around address-space randomization causing instability on new
        versions of MinGW.  (lp#1921141)
