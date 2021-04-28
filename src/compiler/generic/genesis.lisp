@@ -2158,13 +2158,10 @@ core and return a descriptor to it."
 (defun code-header-words (code-object) ; same, but expressed in words
   (ash (code-header-bytes code-object) (- sb-vm:word-shift)))
 
-(declaim (inline calculate-code-insts-address))
-(defun calc-code-insts-address (code)
-  (+ (descriptor-bits code)
-     (- sb-vm:other-pointer-lowtag)
-     (code-header-bytes code)))
 (defun code-instructions (code)
-  (make-model-sap (calc-code-insts-address code) (descriptor-gspace code)))
+  (make-model-sap (- (+ (descriptor-bits code) (code-header-bytes code))
+                     sb-vm:other-pointer-lowtag)
+                  (descriptor-gspace code)))
 
 ;;; These are fairly straightforward translations of the similarly named accessor
 ;;; from src/code/simple-fun.lisp
@@ -2184,14 +2181,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
     #+little-endian (ldb (byte 16  0) word)
     #+big-endian    (ldb (byte 16 16) word)))
 
-;;; These three are literally identical between cross-compiler and target.
+;;; These are literally identical between cross-compiler and target.
 ;;; TODO: Maybe put them somewhere that gets defined for both?
 ;;; (Minor problem of CODE-COMPONENT not being a primitive type though)
 (defun code-n-entries (code)
   (ash (code-fun-table-count code) -4))
-(defun code-fdefns-start-index (code)
-  (+ sb-vm:code-constants-offset
-     (* (code-n-entries code) sb-vm:code-slots-per-simple-fun)))
 (defun %code-fun-offset (code fun-index)
   ;; The 4-byte quantity at "END" - 4 is the trailer count, the word at -8 is
   ;; the offset to the 0th simple-fun, -12 is the next, etc...
@@ -2674,17 +2668,39 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (* 2 sb-vm:n-word-bytes)
                   (bvref-word (descriptor-mem des) i)))))
 
-    (let* ((fdefns-start (code-fdefns-start-index des))
-           (fdefns-end (1- (+ fdefns-start n-named-calls)))) ; inclusive bound
-      (do ((index (1- n-boxed-words) (1- index)))
-          ((< index sb-vm:code-constants-offset))
-        (let ((obj (pop-stack)))
-          (cond ((and (consp obj) (eq (car obj) :known-fun))
-                 (push (list* (cdr obj) des index) *deferred-known-fun-refs*))
-                ((<= fdefns-start index fdefns-end)
-                 (store-named-call-fdefn des index obj))
-                (t
-                 (write-wordindexed des index obj))))))
+    (let* ((header-index sb-vm:code-constants-offset)
+           (stack (%fasl-input-stack (fasl-input)))
+           (n-constants (- n-boxed-words sb-vm:code-constants-offset))
+           (stack-index (fop-stack-pop-n stack n-constants)))
+      (declare (type index header-index stack-index))
+      (dotimes (fun-index (code-n-entries des))
+        (let ((fn (%code-entry-point des fun-index)))
+          #+compact-instance-header
+          (write-wordindexed/raw fn 0 (logior (ash (cold-layout-descriptor-bits 'function) 32)
+                                              (read-bits-wordindexed fn 0)))
+          #+(or x86 x86-64) ; store a machine-native pointer to the function entry
+          ;; note that the bit pattern looks like fixnum due to alignment
+          (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
+                                 (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
+                                    (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
+          #-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
+          (write-wordindexed fn sb-vm:simple-fun-self-slot fn))
+        (dotimes (i sb-vm:code-slots-per-simple-fun)
+          (write-wordindexed des header-index (svref stack stack-index))
+          (incf header-index)
+          (incf stack-index)))
+      (dotimes (i n-named-calls)
+        (store-named-call-fdefn des header-index (svref stack stack-index))
+        (incf header-index)
+        (incf stack-index))
+      (do () ((>= header-index n-boxed-words))
+       (let ((constant (svref stack stack-index)))
+         (cond ((and (consp constant) (eq (car constant) :known-fun))
+                (push (list* (cdr constant) des header-index) *deferred-known-fun-refs*))
+               (t
+                (write-wordindexed des header-index constant))))
+        (incf header-index)
+        (incf stack-index)))
 
     (apply-fixups (%fasl-input-stack (fasl-input)) des n-fixups)))
 
@@ -2694,28 +2710,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (place (cdr item)))
       (write-wordindexed (car place) (cdr place) fun))))
 
-(defun compute-fun (code-object fun-index)
-  (let* ((code-instructions (calc-code-insts-address code-object))
-         (fun (+ code-instructions (%code-fun-offset code-object fun-index))))
+(defun %code-entry-point (code-object fun-index)
+  (let ((fun (sap-int (sap+ (code-instructions code-object)
+                            (%code-fun-offset code-object fun-index)))))
     (unless (zerop (logand fun sb-vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))
     (make-descriptor (logior fun sb-vm:fun-pointer-lowtag))))
-
-(define-cold-fop (fop-fun-entry (fun-index))
-  (let* ((code-object (pop-stack))
-         (fn (compute-fun code-object fun-index)))
-    #+compact-instance-header
-    (write-wordindexed/raw
-     fn 0 (logior (descriptor-bits (cold-symbol-value 'sb-vm:function-layout))
-                  (read-bits-wordindexed fn 0)))
-    #+(or x86 x86-64) ; store a machine-native pointer to the function entry
-    ;; note that the bit pattern looks like fixnum due to alignment
-    (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
-                           (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
-                              (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
-    #-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
-    (write-wordindexed fn sb-vm:simple-fun-self-slot fn)
-    fn))
 
 (define-cold-fop (fop-assembler-code)
   (aver (not *cold-assembler-obj*))

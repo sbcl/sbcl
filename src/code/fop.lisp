@@ -528,8 +528,7 @@
          (n-constants (- n-boxed-words sb-vm:code-constants-offset)))
     ;; stack has (at least) N-CONSTANTS words plus debug-info
     (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
-      (let* ((debug-info-index (+ ptr n-constants))
-             (n-boxed-words (+ sb-vm:code-constants-offset n-constants))
+      (let* ((n-boxed-words (+ sb-vm:code-constants-offset n-constants))
              (code (sb-c:allocate-code-object
                     (if (oddp header) :immobile :dynamic)
                     n-named-calls
@@ -552,18 +551,26 @@
           (sb-thread:barrier (:write))
           ;; Assign debug-info last. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().
-          (setf (%code-debug-info code) (svref stack debug-info-index))
+          (setf (%code-debug-info code) (svref stack (+ ptr n-constants)))
           ;; Boxed constants can be assigned only after figuring out where the range
           ;; of implicitly tagged words is, which requires knowing how many functions
           ;; are in the code component, which requires reading the code trailer.
-          (let* ((fdefns-start (sb-impl::code-fdefns-start-index code))
-                 (fdefns-end (1- (+ fdefns-start n-named-calls)))) ; inclusive bound
-            (loop for i of-type index from sb-vm:code-constants-offset
-                  for j of-type index from ptr below debug-info-index
-                  do (let ((constant (svref stack j)))
-                       (if (<= fdefns-start i fdefns-end)
-                           (sb-c::set-code-fdefn code i constant)
-                           (setf (code-header-ref code i) constant)))))
+          (let* ((header-index sb-vm:code-constants-offset)
+                 (stack-index ptr))
+            (declare (type index header-index stack-index))
+            (dotimes (n (code-n-entries code))
+              (dotimes (i sb-vm:code-slots-per-simple-fun)
+                (setf (code-header-ref code header-index) (svref stack stack-index))
+                (incf header-index)
+                (incf stack-index)))
+            (dotimes (i n-named-calls)
+              (sb-c::set-code-fdefn code header-index (svref stack stack-index))
+              (incf header-index)
+              (incf stack-index))
+            (do () ((>= header-index n-boxed-words))
+              (setf (code-header-ref code header-index) (svref stack stack-index))
+              (incf header-index)
+              (incf stack-index)))
           ;; Now apply fixups. The fixups to perform are popped from the fasl stack.
           (sb-c::apply-fasl-fixups stack code n-fixups))
         #-sb-xc-host
@@ -612,7 +619,7 @@ report it as a ~ bug.~:@>")
     (setf (code-header-ref code index) value)
     (values)))
 
-(define-fop 20 :not-host (fop-fun-entry ((:operands fun-index) code-object))
+(define-fop 20 (fop-fun-entry ((:operands fun-index) code-object))
   (%code-entry-point code-object fun-index))
 
 ;;;; assemblerish fops
