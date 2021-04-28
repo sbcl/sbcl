@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.4:
+  * bug fix: on x86-64, fix instruction encoding for TEST on RIP-relative
+    addresses.  (lp#1925808, reported by Shinmera on #sbcl, thanks also to 3b)
+
 changes in sbcl-2.1.4 relative to sbcl-2.1.3:
   * platform support:
     ** work around address-space randomization causing instability on new

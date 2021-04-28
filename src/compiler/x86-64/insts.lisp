@@ -1870,7 +1870,7 @@
             ((and (neq size :byte) (plausible-signed-imm8-operand-p src size))
              (emit-prefixes segment dst nil size :lock (lockp prefix))
              (emit-byte segment #x83)
-             (emit-ea segment dst opcode)
+             (emit-ea segment dst opcode :remaining-bytes 1)
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
@@ -1984,7 +1984,7 @@
               (if imm
                   (emit-byte segment (if (eq imm-size :byte) #x6B #x69))
                   (emit-bytes segment #x0F #xAF))
-              (emit-ea segment src dst)
+              (emit-ea segment src dst :remaining-bytes (if imm (size-nbyte imm-size) 0))
               (if imm
                   (emit-imm-operand segment imm imm-size))))))))
 
@@ -2076,7 +2076,7 @@
                  (t   (values #b11000000 t)))
              (emit-prefixes segment (sized-thing dst size) nil size)
              (emit-byte segment (opcode+size-bit opcode size))
-             (emit-ea segment dst subcode)
+             (emit-ea segment dst subcode :remaining-bytes (if immed 1 0))
              (when immed
                (emit-byte segment amount))))))
   (macrolet ((define (name subop)
@@ -2101,7 +2101,7 @@
            (emit-bytes segment #x0F
                        ;; SHLD = A4 or A5; SHRD = AC or AD
                        (dpb opcode (byte 1 3) (if (eq amt :cl) #xA5 #xA4)))
-           (emit-ea segment dst src)
+           (emit-ea segment dst src :remaining-bytes (if (eq amt :cl) 0 1))
            (unless (eq amt :cl)
              (emit-byte segment (the (mod 64) amt))))))
   (macrolet ((define (name direction-bit op)
@@ -2139,7 +2139,7 @@
                    (emit-byte segment (opcode+size-bit #xA8 size)))
                   (t
                    (emit-byte segment (opcode+size-bit #xF6 size))
-                   (emit-ea segment this #b000)))
+                   (emit-ea segment this #b000 :remaining-bytes 1)))
             (emit-imm-operand segment that size))
            (t
             (emit-byte segment (opcode+size-bit #x84 size))
@@ -2214,7 +2214,7 @@
            (emit-prefixes segment src index size :lock (lockp prefix))
            (cond ((integerp index)
                   (emit-bytes segment #x0F #xBA)
-                  (emit-ea segment src opcode)
+                  (emit-ea segment src opcode :remaining-bytes 1)
                   (emit-byte segment index))
                  (t
                   (emit-bytes segment #x0F (dpb opcode (byte 3 3) #b10000011))

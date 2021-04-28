@@ -541,5 +541,14 @@ cat > $tmpfilename <<EOF
 EOF
 expect_warned_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(defun foo () 128)
+(let ((a (load-time-value (foo))))
+  (declare (fixnum a))
+  (print a)
+  (terpri))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN
