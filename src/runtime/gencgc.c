@@ -2866,6 +2866,9 @@ is_in_stack_space(lispobj ptr)
     }
     return 0;
 }
+static int is_in_static_space(void* ptr) {
+    return (uword_t)ptr >= STATIC_SPACE_START && (lispobj*)ptr < static_space_free_pointer;
+}
 
 struct verify_state {
     lispobj *vaddr;
@@ -3000,6 +3003,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                         "dynamic space from RO space");
                 if (CODE_PAGES_USE_SOFT_PROTECTION
                     && state->widetag == CODE_HEADER_WIDETAG
+                    && ! is_in_static_space(state->object_start)
                     && to_gen < state->object_gen) {
                     // two things must be true:
                     // 1. the page containing object_start must not be write-protected
@@ -3128,7 +3132,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                  * pointer into that object). Non-compacting GC does not have the
                  * "only if" part of that, nor does pre-GC verification because we
                  * don't test the generation of the newval when storing into code. */
-                if (compacting_p() && (state->flags & VERIFY_POST_GC) ?
+                if (is_in_static_space(state->object_start)) { }
+                else if (compacting_p() && (state->flags & VERIFY_POST_GC) ?
                     (state->min_pointee_gen < my_gen) != rememberedp :
                     (state->min_pointee_gen < my_gen) && !rememberedp)
                     lose("object @ %p is gen%d min_pointee=gen%d %s",
@@ -5003,8 +5008,9 @@ sword_t scav_code_header(lispobj *object, lispobj header)
     // that got copied as written, which would allow dropping the second half
     // of the OR condition. As is, we scavenge "too much" of newspace which
     // is not an issue of correctness but rather efficiency.
-    if (!CODE_PAGES_USE_SOFT_PROTECTION || header_rememberedp(header)
-        || (my_gen == new_space)) {
+    if (!CODE_PAGES_USE_SOFT_PROTECTION ||
+        header_rememberedp(header) || (my_gen == new_space) ||
+        ((uword_t)object >= STATIC_SPACE_START && object < static_space_free_pointer)) {
         // FIXME: We sometimes scavenge protected pages.
         // This assertion fails, but things work nonetheless.
         // gc_assert(!card_protected_p(object));

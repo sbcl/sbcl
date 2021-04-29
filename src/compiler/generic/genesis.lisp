@@ -2727,7 +2727,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
-         (space (or #+(and immobile-space (not metaspace)) *immobile-varyobj*
+         (space (or #+(and immobile-code (not metaspace)) *immobile-varyobj*
                     ;; If there is a read-only space, use it, else use static space.
                     (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
                         *read-only*

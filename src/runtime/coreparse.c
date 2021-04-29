@@ -610,7 +610,7 @@ set_adjustment(struct heap_adjust* adj,
     gc_assert(j <= 2);
     adj->range[j].start = (lispobj)desired_addr;
     adj->range[j].end   = (lispobj)desired_addr + len;
-    adj->range[j].delta = actual_addr - desired_addr;
+    adj->range[j].delta = len ? actual_addr - desired_addr : 0;
     adj->n_ranges = j+1;
 }
 
@@ -628,7 +628,7 @@ void calc_asm_routine_bounds()
         asm_routines_start = READ_ONLY_SPACE_START;
     else
         asm_routines_start = READ_ONLY_SPACE_START + (256+2)*N_WORD_BYTES;
-#elif defined LISP_FEATURE_IMMOBILE_SPACE
+#elif defined LISP_FEATURE_IMMOBILE_CODE
     asm_routines_start = VARYOBJ_SPACE_START;
 #else
     if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {

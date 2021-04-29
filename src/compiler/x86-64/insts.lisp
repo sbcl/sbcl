@@ -3488,6 +3488,10 @@
       ;; These are used for jump tables and are not recorded in code fixups.
       ;; GC knows to adjust the values if code is moved.
       (setf (sap-ref-64 sap offset) value))))
+  #-immobile-code
+  ;; Change asm routine indirect calls to not store the fixup,
+  ;; because the indirect address is in static space.
+  (when (and (eq flavor :assembly-routine*) (eq kind :absolute)) (setq kind :static))
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; Note that:

@@ -1180,6 +1180,15 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
             }
         }
     }
+    if (!VARYOBJ_SPACE_START) {
+        // Don't use the space. Free pointer was initialized to the nominal
+        // base address. Set the start to that also so that map-objects-in-range
+        // sees no used space, and find_varyobj_page_index() returns -1;
+        VARYOBJ_SPACE_START = (uword_t)varyobj_free_pointer;
+        varyobj_space_size = 0;
+        page_attributes_valid = 1; // make search_immobile_space() work right
+        return;
+    }
     uword_t address = VARYOBJ_SPACE_START;
     n_pages = varyobj_len / IMMOBILE_CARD_BYTES;
     lispobj* obj = (lispobj*)address;

@@ -116,6 +116,18 @@
            (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))))
 
 
+#+immobile-space
+(defun alloc-immobile-fdefn ()
+  (or #+nil ; Avoid creating new objects in the text segment for now
+      (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
+           (alloc-immobile-code (* fdefn-size n-word-bytes)
+                                  (logior (ash undefined-fdefn-header 16)
+                                          fdefn-widetag) ; word 0
+                                  0 other-pointer-lowtag nil)) ; word 1, lowtag, errorp
+      (alloc-immobile-fixedobj fdefn-size
+                               (logior (ash undefined-fdefn-header 16)
+                                       fdefn-widetag)))) ; word 0
+
 #+immobile-code
 (progn
 (defconstant trampoline-entry-offset n-word-bytes)
@@ -209,18 +221,6 @@
               (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
     (%set-funcallable-instance-info gf 0 slot-vector)
     gf))
-
-#+immobile-space
-(defun alloc-immobile-fdefn ()
-  (or #+nil ; Avoid creating new objects in the text segment for now
-      (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
-           (alloc-immobile-code (* fdefn-size n-word-bytes)
-                                  (logior (ash undefined-fdefn-header 16)
-                                          fdefn-widetag) ; word 0
-                                  0 other-pointer-lowtag nil)) ; word 1, lowtag, errorp
-      (alloc-immobile-fixedobj fdefn-size
-                               (logior (ash undefined-fdefn-header 16)
-                                       fdefn-widetag)))) ; word 0
 
 (defun fdefn-has-static-callers (fdefn)
   (declare (type fdefn fdefn))

@@ -56,7 +56,7 @@
   (def-mystruct)) ; MAKE-MYSTRUCT captures a lexenv (rather pointlessly)
 
 ;;; Assert that throwaway code in compiled macrolets does not go in immobile space
-#+immobile-space
+#+immobile-code
 (with-test (:name :macrolet-not-immobile-space :serial t
             :skipped-on :interpreter)
   (labels ((count-code-objects ()
