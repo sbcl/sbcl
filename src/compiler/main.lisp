@@ -897,12 +897,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                            ;; SBCL stream classes aren't available in the host
                            #-sb-xc-host :class
                            #-sb-xc-host 'form-tracking-stream)))
-                #+(and sb-xc-host sb-show)
-                (setq stream (make-concatenated-stream
-                              stream
-                              (make-string-input-stream
-                               (format nil "(write-string \"Completed TLFs: ~A~%\")"
-                                       (file-info-untruename file-info)))))
                 (when (file-info-subforms file-info)
                   (setf (form-tracking-stream-observer stream)
                         (make-form-tracking-stream-observer file-info)))

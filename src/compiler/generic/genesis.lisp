@@ -3783,6 +3783,7 @@ III. initially undefined function references (alphabetically):
 
       ;; Cold load.
       (dolist (file-name object-file-names)
+        (push (cold-cons :begin-file (base-string-to-core file-name)) *!cold-toplevels*)
         (cold-load file-name verbose))
 
       (sb-cold::check-no-new-cl-symbols)
