@@ -18,13 +18,31 @@
 (declaim (maybe-inline float-denormalized-p float-infinity-p float-nan-p
                        float-trapping-nan-p))
 
+#+64-bit
+(defmacro dfloat-exponent-from-bits (bits)
+  `(ldb (byte ,(byte-size sb-vm:double-float-exponent-byte)
+              ,(+ 32 (byte-position sb-vm:double-float-exponent-byte)))
+        ,bits))
+
 (defun float-denormalized-p (x)
   "Return true if the float X is denormalized."
+  (declare (explicit-check))
   (number-dispatch ((x float))
     ((single-float)
+     #+64-bit
+     (let ((bits (single-float-bits x)))
+       (and (ldb-test (byte 31 0) bits) ; is nonzero (disregard the sign bit)
+            (zerop (ldb sb-vm:single-float-exponent-byte bits))))
+     #-64-bit
      (and (zerop (ldb sb-vm:single-float-exponent-byte (single-float-bits x)))
           (not (zerop x))))
     ((double-float)
+     #+64-bit
+     (let ((bits (double-float-bits x)))
+       ;; is nonzero after shifting out the sign bit
+       (and (not (zerop (logand (ash bits 1) most-positive-word)))
+            (zerop (dfloat-exponent-from-bits bits))))
+     #-64-bit
      (and (zerop (ldb sb-vm:double-float-exponent-byte
                       (double-float-high-bits x)))
           (not (zerop x))))

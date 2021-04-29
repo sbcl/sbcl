@@ -1380,6 +1380,12 @@ constant shift greater than word length")))
 (setf (sb-c::vop-info-optimizer (template-or-lose 'fast-logtest-c/unsigned))
       #'vop-optimize-fast-logtest-c/fixnum-optimizer)
 
+;;; TODO: The TEST instruction preceding this JEQ is entirely superfluous
+;;; and can be removed with a vop optimizer:
+;;; E1:       25FE0F0000       AND EAX, 4094
+;;; E6:       4885C0           TEST RAX, RAX
+;;; E9:       74C9             JEQ L2
+
 ;;; %LOGBITP has the same argument order as ordinary LOGBITP which is * backwards *
 ;;; relative to every other architecture.
 ;;; I suspect the others have a predilection for placing codegen info args last.
