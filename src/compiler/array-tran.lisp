@@ -383,9 +383,7 @@
   `(make-array ,(length elements) :initial-contents (list ,@elements)))
 
 ;;; Just convert it into a MAKE-ARRAY.
-(deftransform make-string ((length &key
-                                   element-type
-                                   (initial-element (code-char 0))))
+(deftransform make-string ((length &key element-type initial-element))
   ;; There's a minor edge case that is debatable: if you specify a type that is not
   ;; spelled 'NIL, but equates to the empty type, then we should still return a
   ;; string. MAKE-ARRAY won't do that. The safe thing to do would be to abort this
