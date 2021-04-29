@@ -35,7 +35,7 @@
         (let* ((2comp (component-info component))
                (constants (ir2-component-constants 2comp)))
           (ash (align-up (length constants) code-boxed-words-align) sb-vm:word-shift)))
-      (* sb-vm:n-word-bytes 4)))
+      (* sb-vm:n-word-bytes 4))) ; FIXME: what is 4 ?
 
 ;;; the size of the NAME'd SB in the currently compiled component.
 ;;; This is useful mainly for finding the size for allocating stack

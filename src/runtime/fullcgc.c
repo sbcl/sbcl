@@ -331,7 +331,8 @@ static void trace_object(lispobj* where)
         scan_to = code_header_words((struct code*)where);
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         struct code* code = (struct code*)where;
-        lispobj* fdefns_start = code->constants + code_n_funs(code) * 4;
+        lispobj* fdefns_start = code->constants
+                                + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
         lispobj* fdefns_end  = fdefns_start + code_n_named_calls(code);
         lispobj* limit = where + scan_to;
         where = where + scan_from;

@@ -1225,7 +1225,7 @@
             (dolist (entry entries)
               ;; Process in reverse order of ENTRIES.
               ;; See also MAKE-CORE-COMPONENT which does the same thing.
-              (decf wordindex 4)
+              (decf wordindex sb-vm:code-slots-per-simple-fun)
               (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
                     `(:constant ,(sb-c::entry-info-name entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))

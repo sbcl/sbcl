@@ -3102,7 +3102,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
                 state->implicit_tagged_subrange_start =
-                  code->constants + code_n_funs(code) * 4;
+                  code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
                 state->implicit_tagged_subrange_end =
                   state->implicit_tagged_subrange_start + code_n_named_calls(code);
 #endif
@@ -5018,7 +5018,8 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         // If CODE_PAGES_USE_SOFT_PROTECTION were enabled along with untagged fdefns,
         // then the generation check at the bottom of this function would have to be
         // modified to take into account untagged pointers.
-        lispobj* fdefns_start = code->constants + code_n_funs(code) * 4;
+        lispobj* fdefns_start = code->constants + code_n_funs(code)
+                                * CODE_SLOTS_PER_SIMPLE_FUN;
         int n_fdefns = code_n_named_calls(code);
         int i;
         for (i=0; i<n_fdefns; ++i) {

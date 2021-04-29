@@ -3182,6 +3182,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    (format t "#define ~a ~d~%"
                            (c-name (string s)) (symbol-value s))))
                (terpri))
+             (when (eq name 'sb-vm::code)
+               (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d~2%"
+                       sb-vm:code-slots-per-simple-fun))
              (format t "struct ~A {~%" c-name)
              (when (sb-vm:primitive-object-widetag obj)
                (format t "    lispobj header;~%"))
