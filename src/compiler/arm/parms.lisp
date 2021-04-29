@@ -41,34 +41,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 32)
 
-;;; Floating-point related constants, both format descriptions and FPU
-;;; control register descriptions.  These don't exactly match up with
-;;; what the machine manuals say because the Common Lisp standard
-;;; defines floating-point values somewhat differently than the IEEE
-;;; standard does.
-
-(defconstant float-sign-shift 31)
-
-(defconstant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
-
 #+arm-vfp
 (progn
   (defconstant float-invalid-trap-bit (ash 1 0))

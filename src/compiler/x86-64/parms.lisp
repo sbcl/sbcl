@@ -64,35 +64,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 64)
 
-(defconstant float-sign-shift 31)
-
-;;; comment from CMU CL:
-;;;   These values were taken from the alpha code. The values for
-;;;   bias and exponent min/max are not the same as shown in the 486 book.
-;;;   They may be correct for how Python uses them.
-(defconstant single-float-bias 126)    ; Intel says 127.
-(defconstant-eqx single-float-exponent-byte    (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-;;; comment from CMU CL:
-;;;   The 486 book shows the exponent range -126 to +127. The Lisp
-;;;   code that uses these values seems to want already biased numbers.
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte    (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0)  #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) 32 1))
-
 ;;; from AMD64 Architecture manual
 (defconstant float-invalid-trap-bit       (ash 1 0))
 (defconstant float-denormal-trap-bit       (ash 1 1))

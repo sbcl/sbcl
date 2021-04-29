@@ -180,6 +180,7 @@
         (t
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
   (/show0 "done with loop over cold toplevel forms and fixups")
+  (terpri)
 
   ;; Precise GC seems to think these symbols are live during the final GC
   ;; which in turn enlivens a bunch of other "*!foo*" symbols.

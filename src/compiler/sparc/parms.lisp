@@ -45,22 +45,6 @@
     ;; Must be (ash 1 (1- sb-vm:n-lowtag-bits)) for cheneygc ALLOCATION.
     4)
 
-(defconstant float-sign-shift 31)
-
-(defconstant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
 ;;; CMUCL COMMENT:
 ;;;   X These values are for the x86 80 bit format and are no doubt
 ;;;   incorrect for the sparc.
@@ -71,12 +55,6 @@
 (defconstant long-float-normal-exponent-min 1)
 (defconstant long-float-normal-exponent-max #x7FFE)
 (defconstant long-float-hidden-bit (ash 1 31))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 ;;; This looks wrong - CSR
 (defconstant long-float-digits
