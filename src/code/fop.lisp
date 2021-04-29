@@ -465,16 +465,6 @@
     (read-n-bytes (fasl-input-stream) vector 0 bytes)
     vector))
 
-(define-fop 53 (fop-eval (expr)) ; This seems to be unused
-  (if (skip-until)
-      expr
-      (eval expr)))
-
-(define-fop 54 (fop-eval-for-effect (expr) nil) ; This seems to be unused
-  (unless (skip-until)
-    (eval expr))
-  nil)
-
 (defun fop-funcall* (argc stack skipping)
   (with-fop-stack ((stack) ptr (1+ argc))
     (unless skipping

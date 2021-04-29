@@ -2500,9 +2500,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;;; cold fops for calling (or not calling)
 
-(not-cold-fop fop-eval)
-(not-cold-fop fop-eval-for-effect)
-
 (defvar *load-time-value-counter*)
 
 (flet ((pop-args (argc fasl-input)
