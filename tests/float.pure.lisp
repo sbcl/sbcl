@@ -635,3 +635,86 @@
    ((1d0 1d0) 0)
    ((1d0 3d0) 1)
    ((3d0 1d0) 2)))
+
+;; Based on example in lp#1926383
+(defun idf (x) (multiple-value-list (cl:integer-decode-float x)))
+(defun testfloat (k)
+  (let* ((kidf (idf k))
+         (kff (float (* (car kidf) (expt 2 (cadr kidf))) k))
+         (kss (scale-float (float (car kidf) k) (cadr kidf))))
+    (format t "Input k(~a): ~,15e, IDF ~{~b ~d ~d~}~%" (type-of k) k kidf)
+    (format t "float k(~a): ~,15e, IDF ~{~b ~d ~d~}, diff ~,5e~%" (type-of k) kff (idf kff) (- k kff))
+    (format t "scale k(~a): ~,15e, IDF ~{~b ~d ~d~}, diff ~,5e~%" (type-of k) kff (idf kss) (- k kss))))
+
+;;; (time (exhaustive-test-single-floats))
+;;; Evaluation took:
+;;;   12.873 seconds of real time
+;;;   12.666938 seconds of total run time (12.629706 user, 0.037232 system)
+;;;   [ Run times consist of 0.055 seconds GC time, and 12.612 seconds non-GC time. ]
+;;;   98.40% CPU
+;;;   36,149,296,946 processor cycles
+;;;   5,033,148,304 bytes consed
+;;;
+#+nil ; This is too slow to be a regression test. And why does it cons?
+(defun exhaustive-test-single-floats ()
+  (loop for i from 1 to (1- (ash 1 23))
+     do (let ((k (sb-kernel:make-lisp-obj (logior (ash i 32) sb-vm:single-float-widetag))))
+          (multiple-value-bind (mant exp sign) (integer-decode-float k)
+            (declare (ignore sign))
+            (let ((way1 (float (* mant (expt 2 exp)) k))
+                  (way2 (scale-float (float mant k) exp)))
+              ;; Do bitwise comparison
+              (assert (= (sb-kernel:single-float-bits k)
+                         (sb-kernel:single-float-bits way1)))
+              (assert (= (sb-kernel:single-float-bits k)
+                         (sb-kernel:single-float-bits way2))))))))
+
+;;; For #+64-bit we could eradicate the legacy interface
+;;; to MAKE-DOUBLE-FLOAT, and just take the bits.
+(defun mdf (x)
+  (let ((f (sb-sys:%primitive sb-vm::fixed-alloc
+                              'make-double-float 2 sb-vm:double-float-widetag
+                              sb-vm:other-pointer-lowtag nil)))
+    (setf (sb-sys:sap-ref-word (sb-sys:int-sap (sb-kernel:get-lisp-obj-address f))
+                               (- 8 sb-vm:other-pointer-lowtag))
+          (the sb-vm:word x))
+    f))
+(compile 'mdf)
+
+#+64-bit
+(progn
+(defun test-single-floats (n)
+  (dotimes (i n)
+    (let* ((bits (random (ash 1 23)))
+           ;; This isn't a valid call to MAKE-LISP-OBJ for 32 bit words
+           (k (sb-kernel:make-lisp-obj (logior (ash i 32) sb-vm:single-float-widetag))))
+      (when (zerop bits) (incf bits))
+      (multiple-value-bind (mant exp sign) (integer-decode-float k)
+        (declare (ignore sign))
+        (let ((way1 (float (* mant (expt 2 exp)) k))
+              (way2 (scale-float (float mant k) exp)))
+          ;; Do bitwise comparison
+          (assert (= (sb-kernel:single-float-bits k)
+                     (sb-kernel:single-float-bits way1)))
+          (assert (= (sb-kernel:single-float-bits k)
+                     (sb-kernel:single-float-bits way2))))))))
+
+(defun test-double-floats (n)
+  (dotimes (i n)
+    (let ((bits (random (ash 1 52))))
+      (when (zerop bits) (incf bits))
+      (let ((k (mdf bits)))
+        (multiple-value-bind (mant exp sign) (integer-decode-float k)
+          (declare (ignore sign))
+          (let ((way1 (float (* mant (expt 2 exp)) k))
+                (way2 (scale-float (float mant k) exp)))
+            ;; Do bitwise comparison
+            (assert (= (sb-kernel:double-float-bits k)
+                       (sb-kernel:double-float-bits way1)))
+            (assert (= (sb-kernel:double-float-bits k)
+                       (sb-kernel:double-float-bits way2)))))))))
+
+(with-test (:name :round-trip-decode-recompose)
+  (test-single-floats 10000)
+  (test-double-floats 10000))
+)

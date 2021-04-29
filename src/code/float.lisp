@@ -132,18 +132,21 @@
 (defun integer-decode-single-float (x)
   (declare (single-float x))
   (let* ((bits (single-float-bits x))
+         (sign (if (minusp bits) -1 1))
          (exp (ldb sb-vm:single-float-exponent-byte bits)))
     (cond ((zerop (ldb (byte 31 0) bits))
-           (values 0 0 (if (minusp bits) -1 1)))
+           (values 0 0 sign))
           ((< exp sb-vm:single-float-normal-exponent-min)
-           (integer-decode-single-denorm x))
+           ;; binary point is to the left of the 23 represented mantissa bits,
+           ;; and normal exponent min is -126, so -149 is the effective exponent.
+           (values (ldb (byte 23 0) bits) -149 sign))
           ((> exp sb-vm:single-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
            (values (logior (ldb sb-vm:single-float-significand-byte bits)
                            sb-vm:single-float-hidden-bit)
                    (- exp sb-vm:single-float-bias sb-vm:single-float-digits)
-                   (if (minusp bits) -1 1))))))
+                   sign)))))
 
 ;;; like INTEGER-DECODE-SINGLE-DENORM, only doubly so
 (defun integer-decode-double-denorm (x)
@@ -199,6 +202,7 @@
                    (if (minusp hi) -1 1)))))
   #+64-bit ; don't split the high and low bits
   (let* ((bits (double-float-bits x))
+         (sign (if (minusp bits) -1 1))
          ;; It's unfortunate that the implied meaning of EXPONENT-BYTE and
          ;; SIGNIFICAND-BYTE for double-floats assumes refererence to the high half
          ;; and not the entire word.  Because knowledge of the splitup is imparted here
@@ -208,9 +212,11 @@
                          (+ 32 (byte-position sb-vm:double-float-exponent-byte)))
                    bits)))
     (cond ((zerop (ldb (byte 63 0) bits))
-           (values 0 0 (if (minusp bits) -1 1)))
+           (values 0 0 sign))
           ((< exp sb-vm:double-float-normal-exponent-min)
-           (integer-decode-double-denorm x))
+           ;; binary point is to the left of the 52 represented mantissa bits,
+           ;; and normal exponent min is -1022, so -1074 is the effective exponent.
+           (values (ldb (byte 52 0) bits) -1074 sign))
           ((> exp sb-vm:double-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
@@ -218,7 +224,7 @@
            (values (logior (ldb (byte (1- sb-vm:double-float-digits) 0) bits)
                            (ash sb-vm:double-float-hidden-bit 32))
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
-                   (if (minusp bits) -1 1))))))
+                   sign)))))
 
 #+(and long-float x86)
 (defun integer-decode-long-denorm (x)
