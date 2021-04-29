@@ -25,6 +25,19 @@
   "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
   (declare (explicit-check))
+  #+64-bit
+  (number-dispatch ((f float))
+    ((single-float)
+     (let ((bits (single-float-bits f)))
+       (if (sfloat-bits-subnormalp bits)
+           (integer-length (ldb sb-vm:single-float-significand-byte bits))
+           sb-vm:single-float-digits)))
+    ((double-float)
+     (let ((bits (double-float-bits f)))
+       (if (dfloat-bits-subnormalp bits)
+           (integer-length (ldb (byte 52 0) bits))
+           sb-vm:double-float-digits))))
+  #-64-bit
   (macrolet ((frob (digits bias decode)
                `(cond ((zerop f) 0)
                       ((float-denormalized-p f)
