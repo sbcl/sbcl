@@ -1276,8 +1276,8 @@
       ;; check to see if we know anything about the function
       (let ((info (info :function :info fname)))
         ;; if we know something, check to see if the full call was valid
-        (when (and info (ir1-attributep (fun-info-attributes info)
-                                        always-translatable))
+        (when (and info
+                   (ir1-attributep (fun-info-attributes info) always-translatable))
           (/show (policy node speed) (policy node safety))
           (/show (policy node compilation-speed))
           (bug "full call to ~S" fname))))
