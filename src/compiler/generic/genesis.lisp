@@ -2326,20 +2326,20 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
-  (let* ((wrapper (pop-stack))
-         (layout (->layout wrapper))
-         (proxy-layout (gethash (descriptor-bits layout) *cold-layout-by-addr*))
+  (let* ((layout (->layout (pop-stack)))
          (result (allocate-struct size layout))
-         (bitmap (cold-layout-bitmap proxy-layout)))
-    (loop for index downfrom (1- size) to sb-vm:instance-data-start
-          for val = (pop-stack) then (pop-stack)
-          do (let ((dsd-index (+ sb-vm:instance-slots-offset index)))
-               (if (logbitp index bitmap)
-                   (write-wordindexed result dsd-index val)
-                   (write-wordindexed/raw
-                    result dsd-index
-                    (the sb-vm:word (descriptor-integer val))))))
-    result))
+         (bitmap (cold-layout-bitmap (gethash (descriptor-bits layout) *cold-layout-by-addr*)))
+         (stack (%fasl-input-stack (fasl-input)))
+         (n-data-words (- size sb-vm:instance-data-start)))
+    (do ((stack-index (fop-stack-pop-n stack n-data-words) (1+ stack-index))
+         (dsd-index sb-vm:instance-data-start (1+ dsd-index)))
+        ((>= dsd-index size))
+      (let ((val (svref stack stack-index)))
+        (if (logbitp dsd-index bitmap)
+            (write-wordindexed result (+ sb-vm:instance-slots-offset dsd-index) val)
+            (write-wordindexed/raw result (+ sb-vm:instance-slots-offset dsd-index)
+                                   (the sb-vm:word (descriptor-integer val))))))
+   result))
 
 (defun find-in-inherits (typename inherits)
   (binding* ((proxy (gethash typename *cold-layouts*) :exit-if-null)
@@ -3962,6 +3962,8 @@ III. initially undefined function references (alphabetically):
 ;;; then we can produce a host object even if it is not a faithful rendition.
 (defun host-object-from-core (descriptor &optional (strictp t))
   (named-let recurse ((x descriptor))
+    (when (symbolp x)
+      (return-from recurse x))
     (when (cold-null x)
       (return-from recurse nil))
     (when (is-fixnum-lowtag (descriptor-lowtag x))
