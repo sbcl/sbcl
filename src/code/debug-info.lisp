@@ -441,8 +441,9 @@
                               (print-unreadable-object (s stream :type t)
                                 (princ (file-info-name s) stream)))))
   ;; If a file, the truename of the corresponding source file. If from
-  ;; a Lisp form, :LISP. If from a stream, :STREAM.
-  (name (missing-arg) :type (or pathname (eql :lisp)) :read-only t)
+  ;; a Lisp form, :LISP. In COMPILE-FILE, this gets filled lazily
+  ;; after the file gets opened.
+  (name nil :type (or pathname null (eql :lisp)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior

@@ -74,8 +74,7 @@
          (locally (declare (optimize (sb-c::type-check 0)))
            (setf sb-c::*current-path* (make-unbound-marker)))
          (if pathname
-             (let* ((info (sb-c::make-file-source-info
-                           pathname (stream-external-format stream)))
+             (let* ((info (sb-c::make-file-stream-source-info stream))
                     (sb-c::*source-info* info))
                (locally (declare (optimize (sb-c::type-check 0)))
                  (setf sb-c::*current-path* (make-unbound-marker)))

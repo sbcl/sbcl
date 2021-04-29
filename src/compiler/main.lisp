@@ -839,14 +839,23 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :name (truename file) ; becomes *C-F-TRUENAME*
-                              :untruename #+sb-xc-host file ; becomes *C-F-PATHNAME*
+   :file-info (make-file-info :untruename #+sb-xc-host file ; becomes *C-F-PATHNAME*
                                           #-sb-xc-host (merge-pathnames file)
                               :external-format external-format
                               :subforms
                               (if form-tracking-p
                                   (make-array 100 :fill-pointer 0 :adjustable t))
                               :write-date (file-write-date file))))
+
+;; LOAD-AS-SOURCE uses this.
+(defun make-file-stream-source-info (file-stream)
+  (make-source-info
+   :file-info (make-file-info :name (truename file-stream)
+                              ;; This T-L-P has been around since at least 2011.
+                              ;; It's unclear why an LPN isn't good enough.
+                              :untruename (translate-logical-pathname file-stream)
+                              :external-format (stream-external-format file-stream)
+                              :write-date (file-write-date file-stream))))
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
 (defun make-lisp-source-info (form &key parent)
@@ -885,22 +894,30 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (or (source-info-stream info)
       (let* ((file-info (source-info-file-info info))
-             (name (file-info-name file-info))
+             (pathname (file-info-untruename file-info))
              (external-format (file-info-external-format file-info)))
-        (setf *compile-file-truename* name
-              *compile-file-pathname* (file-info-untruename file-info)
-              (source-info-stream info)
-              (let ((stream
-                     (open name
-                           :direction :input
-                           :external-format external-format
-                           ;; SBCL stream classes aren't available in the host
-                           #-sb-xc-host :class
-                           #-sb-xc-host 'form-tracking-stream)))
-                (when (file-info-subforms file-info)
-                  (setf (form-tracking-stream-observer stream)
-                        (make-form-tracking-stream-observer file-info)))
-                stream)))))
+        (let ((stream
+               (open pathname
+                     :direction :input
+                     :external-format external-format
+                     ;; SBCL stream classes aren't available in the host
+                     #-sb-xc-host :class
+                     #-sb-xc-host 'form-tracking-stream)))
+          (setf *compile-file-pathname* (pathname stream)
+                *compile-file-truename* (truename stream)
+                (file-info-name file-info) *compile-file-truename*)
+          (when (file-info-subforms file-info)
+            (setf (form-tracking-stream-observer stream)
+                  (make-form-tracking-stream-observer file-info)))
+          (setf (source-info-stream info) stream)
+          ;; This used to happen before opening the file, which
+          ;; inhibited lazy computation of the truename, and was a
+          ;; minor time-of-check-vs-time-of-use mistake. It doesn't
+          ;; seem worthwhile to pass the verbose bit down from C-F,
+          ;; however.
+          (when *compile-verbose*
+            (print-compile-start-note info))
+          stream))))
 
 ;;; Close the stream in INFO if it is open.
 (defun close-source-info (info)
@@ -1842,9 +1859,6 @@ returning its filename.
                              (make-pathname :type "trace" :defaults
                                             (fasl-output-stream fasl-output)))
                             :if-exists :supersede :direction :output))))
-
-          (when *compile-verbose*
-            (print-compile-start-note source-info))
 
           (let ((*compile-object* fasl-output))
             (setf (values abort-p warnings-p failure-p)
