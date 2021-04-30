@@ -321,7 +321,7 @@
        ,@(when doc (list doc)))))
 
 ;;; Special variant at cross-compile-time. Face it: the "croak-if-not-EQx" test
-;;; is irrelevant - there can be no pre-existing value to test against.
+;;; is irrelevant - there can be no pre-existing value to test against at target load time.
 ;;; The extra requirement is that the EXPR must satisfy CONSTANTP so that this
 ;;; macroexpander can EVAL it, and then the constant value can be dumped as a literal.
 ;;; This in turn allows a LOAD-TIME-VALUE form referencing the constant to work
