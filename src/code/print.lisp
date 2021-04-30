@@ -1365,8 +1365,14 @@ variable: an unreadable object representing the error is printed instead.")
             (double-float double-float-min-e)
             #+long-float
             (long-float long-float-min-e))))
-    (multiple-value-bind (f e)
-        (integer-decode-float float)
+    (multiple-value-bind (f e) (integer-decode-float float)
+      ;; An extra step became necessary here for subnormals because the
+      ;; algorithm assumes that the fraction is left-aligned in a field
+      ;; that is FLOAT-DIGITS wide.
+      (when (< (float-precision float) float-digits)
+        (let ((shift (- float-digits (integer-length f))))
+          (setq f (ash f shift)
+                e (- e shift))))
       (let ( ;; FIXME: these even tests assume normal IEEE rounding
             ;; mode.  I wonder if we should cater for non-normal?
             (high-ok (evenp f))
