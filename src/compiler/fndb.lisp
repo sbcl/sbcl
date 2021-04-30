@@ -582,6 +582,17 @@
     ()
   :derive-type #'result-type-first-arg
   :result-arg 0)
+;;; Like FILL but with no keyword argument parsing
+(defknown splat ((modifying (simple-array * 1)) t) (simple-array * 1) ()
+  :derive-type #'result-type-first-arg
+  :result-arg 0)
+;;; Special case of SPLAT using an assumed initial element.
+;;; This might be a no-op depending on whether memory is prezeroized.
+(defknown sb-vm::zero-fill ((modifying (simple-array * 1)) index boolean)
+    (simple-array * 1)
+  (always-translatable)
+  :derive-type #'result-type-first-arg
+  :result-arg 0)
 
 (defknown replace ((modifying sequence) proper-sequence &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))

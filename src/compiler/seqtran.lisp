@@ -764,10 +764,20 @@
                  '(char-code item)
                  'item)))))))
 
+(deftransform splat ((seq item) (vector t) * :node node)
+  ;; The SPLAT function has no START,END lexical vars, but if
+  ;; the transform hits the bashable non-simple or non-bashable case,
+  ;; it will invoke WITH-ARRAY-DATA using these variables.
+  `(let ((start 0) (end nil))
+     (declare (ignorable start end))
+     ,(splat-transform 'splat node seq item nil nil)))
 (deftransform fill ((seq item &key (start 0) (end nil))
                     (vector t &key (:start t) (:end t))
                     *
                     :node node)
+  (splat-transform 'fill node seq item start end))
+(defun splat-transform (fun-name node seq item start end)
+  (declare (ignorable end))
   (let* ((type (lvar-type seq))
          (element-ctype (array-type-upgraded-element-type type))
          (element-type (type-specifier element-ctype))
@@ -779,20 +789,32 @@
           #+x86-64
           ((and (type= element-ctype *universal-type*)
                 (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
+                ;; FIXME: why can't this work with arbitrary START and END?
+                ;; VECTOR-FILL/T certainly seems to take them.
                 (or (not start)
                     (and (constant-lvar-p start)
                          (eql (lvar-value start) 0)))
-                (not end))
-           '(vector-fill/t seq item 0 (length seq)))
+                (or (not end)
+                    ;; Splat always splats the whole vector, but I anticipate
+                    ;; supplying END to avoid a call to VECTOR-LENGTH
+                    (eq fun-name 'splat)))
+           ;; VECTOR-LENGTH entails one fewer transform than LENGTH
+           ;; and it too can derive a constant length if known.
+           '(vector-fill/t seq item 0 (vector-length seq)))
           ((and saetp (sb-vm:valid-bit-bash-saetp-p saetp))
            (multiple-value-bind (basher bash-value) (find-basher saetp item node)
              (values
               ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
               ;; dynamic-extent for MAKE-ARRAY :INITIAL-ELEMENT initialization.
-              (if (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
+              (cond
+                ((eq fun-name 'splat)
+                 ;; array is simple, and out-of-bounds can't happen
+                 `(,basher ,bash-value seq 0 (vector-length seq)))
+                ;; FIXME: isn't this (NOT (CONSERVATIVE-ARRAY-TYPE-COMPLEXP (lvar-type seq))) ?
+                ((csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
                   `(block nil
                      (tagbody
-                        (let* ((len (length seq))
+                        (let* ((len (vector-length seq))
                                (end (cond (end
                                            (when (> end len)
                                              (go bad-index))
@@ -808,7 +830,8 @@
                                                      start))
                                            (- end start))))
                       bad-index
-                        (sequence-bounding-indices-bad-error seq start end)))
+                        (sequence-bounding-indices-bad-error seq start end))))
+                (t
                   `(with-array-data ((data seq)
                                      (start start)
                                      (end end)
@@ -817,8 +840,9 @@
                      (declare (type index start end))
                      (declare (optimize (safety 0) (speed 3)))
                      (,basher ,bash-value data start (- end start))
-                     seq))
+                     seq)))
               `((declare (type ,element-type item))))))
+          ;; OK, it's not a "bashable" array type.
           ((policy node (> speed space))
            (values
             `(with-array-data ((data seq)

@@ -316,6 +316,8 @@
 
 (defconstant +array-fill-pointer-p+    #x80)
 
+(defconstant +vector-dynamic-extent+   #x40)
+
 ;; A vector tagged as +VECTOR-SHAREABLE+ is logically readonly,
 ;; and permitted to be shared with another vector per the CLHS standard
 ;; under the concept of similarity as constant. A vector so tagged is

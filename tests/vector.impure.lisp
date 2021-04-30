@@ -85,6 +85,7 @@
       ()
       `(lambda (n)
          (sb-int:dx-let ((v (make-array (the (mod 200) n)
+                                        :initial-element #\null
                                         :element-type 'base-char)))
            (find #\null v :test #'char/=)))
     ((40) nil)))

@@ -274,13 +274,6 @@
               (funcall setter (tnify i) tmp))))))
     (move-lvar-result node block locs lvar)))
 
-(defun vector-initialized-p (call)
-  (let ((lvar (node-lvar call)))
-    (when lvar
-      (let ((dest (principal-lvar-dest lvar)))
-        (and (basic-combination-p dest)
-             (lvar-fun-is (basic-combination-fun dest) '(initialize-vector)))))))
-
 ;;; An array header for simple non-unidimensional arrays is a fixed alloc,
 ;;; because the rank has to be known.
 ;;; (There are no compile-time optimizations for unknown rank arrays)
@@ -340,9 +333,11 @@
                                            sb-vm:vector-data-offset)))))))
 (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (declare (ignore type length words))
-    (vectorish-ltn-annotate-helper call ltn-policy
-                                   'sb-vm::allocate-vector-on-stack
-                                   'sb-vm::allocate-vector-on-heap))
+  (vectorish-ltn-annotate-helper call ltn-policy
+                                 (if (sb-c:msan-unpoison sb-c:*compilation*)
+                                     'sb-vm::allocate-vector-on-stack+msan-unpoison
+                                     'sb-vm::allocate-vector-on-stack)
+                                 'sb-vm::allocate-vector-on-heap))
 
 (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
     (let* ((args (basic-combination-args call))
@@ -403,6 +398,36 @@
                                    'sb-vm::allocate-list-on-stack
                                    'sb-vm::allocate-list-on-heap)))
 
+;;; Return the vop that wrote the TN referenced by TN-REF,
+;;; but look through MOVEs.
+(defun producer-vop (tn-ref)
+  (let ((vop (tn-ref-vop (tn-writes (tn-ref-tn tn-ref)))))
+    (if (neq (vop-name vop) 'move)
+        vop
+        (tn-ref-vop (tn-writes (tn-ref-tn (vop-args vop)))))))
+
+(defun elide-zero-fill (vop)
+  (let ((writer (producer-vop (vop-args vop))))
+    (when (ecase (vop-name writer)
+            ;; Zero-fill is always elidable on the heap, because it's prezeroed.
+            (sb-vm::allocate-vector-on-heap t)
+            ;; It is elidable on the stack if the codegen arg is T.
+            ;; But in practice we never pass T, we just elide the call as per
+            ;; lexical policy. But we might wish to wait until after vop
+            ;; selection whether to elide stack zeroing, because we could
+            ;; cause stack arrays to be filled with #<unbound-marker> instead,
+            ;; so we need to distinguish between "zero and I really mean it"
+            ;; versus the array having no :initial-element.
+            ((sb-vm::allocate-vector-on-stack
+              sb-vm::allocate-vector-on-stack+msan-unpoison)
+             (car (vop-codegen-info vop))))
+      (let ((new (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                      (template-or-lose 'move)
+                                      (reference-tn (tn-ref-tn (vop-args vop)) nil)
+                                      (reference-tn (tn-ref-tn (vop-results vop)) t)
+                                      vop)))
+        (delete-vop vop)
+        new))))
 
 (in-package "SB-VM")
 ;;; Return a list of parameters with which to call MAKE-ARRAY-HEADER*

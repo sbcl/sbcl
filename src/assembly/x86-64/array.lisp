@@ -16,7 +16,7 @@
 ;;; to deal with pre- and post-loop pieces for proper alignment.
 ;;; Alternatively, if the CPU has the enhanced MOVSB feature, use REP STOS
 ;;; depending on the number of elements to be written.
-(define-assembly-routine (vector-fill/t
+(define-assembly-routine (vector-fill/t ; <-- this could work on raw bits too
                           (:translate vector-fill/t)
                           (:policy :fast-safe))
                          ((:arg  vector (descriptor-reg) rdx-offset)

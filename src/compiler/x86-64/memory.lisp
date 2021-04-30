@@ -185,3 +185,71 @@
           ;; Bit index is 0-based. Subtract 8 since we're using the EA
           ;; to select byte 1 of the header word.
           (ash 1 (- stable-hash-required-flag 8)))))
+
+;;; This logic was formerly in ALLOCATE-VECTOR-ON-STACK.
+;;; Splitting it into 3 vops potentially gets better register allocation
+;;; by not wasting registers in the cases that don't use them.
+(define-vop (zero-fill-word)
+  (:guard (lambda (node)
+            (let ((words (second (sb-c::combination-args node))))
+              (and (sb-c::constant-lvar-p words) (eql (sb-c::lvar-value words) 1)))))
+  (:policy :fast-safe)
+  (:translate zero-fill)
+  (:args (vector :scs (descriptor-reg))
+         (words :scs (unsigned-reg immediate)))
+  (:info elidable)
+  (:arg-types * positive-fixnum (:constant boolean))
+  (:results (result :scs (descriptor-reg)))
+  (:ignore elidable)
+  (:generator 1
+   (progn words) ; don't put it in :ignore, which gets inherited
+   (inst mov :qword
+         (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
+         0)
+   (move result vector)))
+
+(define-vop (zero-fill-small zero-fill-word)
+  (:guard (lambda (node)
+            (let ((words (second (sb-c::combination-args node))))
+              (and (sb-c::constant-lvar-p words)
+                   (typep (sb-c::lvar-value words) '(integer 2 10))))))
+  (:temporary (:sc complex-double-reg) zero)
+  (:generator 5
+   (inst xorpd zero zero)
+   (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                        vector)))
+     (multiple-value-bind (double single) (truncate (tn-value words) 2)
+       (dotimes (i double)
+         (inst movapd data-addr zero)
+         (setf data-addr (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
+                             (ea-base data-addr))))
+       (unless (zerop single)
+         (inst movaps data-addr zero))))
+   (move result vector)))
+
+(define-vop (zero-fill-any zero-fill-word)
+  (:guard nil) ; removes the inherited guard
+  ;; vector has to conflict with everything so that a tagged pointer
+  ;; corresponding to RDI always exists
+  (:args (vector :scs (descriptor-reg) :to (:result 0))
+         (words :scs (unsigned-reg immediate) :target rcx))
+  (:temporary (:sc any-reg :offset rdi-offset :from (:argument 0)
+               :to (:result 0)) rdi)
+  (:temporary (:sc any-reg :offset rcx-offset :from (:argument 1)
+               :to (:result 0)) rcx)
+  (:temporary (:sc any-reg :offset rax-offset :from :eval
+               :to (:result 0)) rax)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 10
+   (inst lea rdi (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                        vector))
+   (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
+   (zeroize rax)
+   (inst rep)
+   (inst stos rax)
+   (move result vector)))
+
+(dolist (name '(zero-fill-word zero-fill-small zero-fill-any))
+  ;; It wants a function, not a symbol
+  (setf (sb-c::vop-info-optimizer (template-or-lose name))
+        (lambda (vop) (sb-c::elide-zero-fill vop))))

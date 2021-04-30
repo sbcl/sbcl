@@ -381,80 +381,63 @@
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
-    (:temporary (:sc any-reg :offset rcx-offset :from :eval) rcx)
-    (:temporary (:sc any-reg :offset rax-offset :from :eval) rax)
-    (:temporary (:sc any-reg :offset rdi-offset :from :eval) rdi)
-    (:temporary (:sc complex-double-reg) zero)
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:translate allocate-vector)
     (:policy :fast-safe)
-    (:node-var node)
-    (:generator 100
-      (let ((size (calc-size-in-bytes words result))
-            (rax-zeroed))
+    (:generator 10
+      (let ((size (calc-size-in-bytes words result)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag)
-        (put-header result other-pointer-lowtag type length nil)
         ;; FIXME: It would be good to check for stack overflow here.
-        ;; It would also be good to skip zero-fill of specialized vectors
-        ;; perhaps in a policy-dependent way. At worst you'd see random
-        ;; bits, and CLHS says consequences are undefined.
-        (when (sb-c:msan-unpoison sb-c:*compilation*)
-          ;; Unpoison all DX vectors regardless of widetag.
-          ;; Mark the header and length as valid, not just the payload.
-          #+linux ; unimplemented for others
-          (let ((words-savep
-                 ;; 'words' might be co-located with any of the temps
-                 (or (location= words rdi) (location= words rcx) (location= words rax))))
-            (setq rax-zeroed (not (location= words rax)))
-            (when words-savep ; use 'result' to save 'words'
-              (inst mov result words))
-            (cond ((sc-is words immediate)
-                   (inst mov rcx (+ (tn-value words) vector-data-offset)))
-                  (t
-                   (inst lea rcx
-                         (ea (ash vector-data-offset n-fixnum-tag-bits) words))
-                   (inst shr rcx n-fixnum-tag-bits)))
-            (inst mov rdi msan-mem-to-shadow-xor-const)
-            (inst xor rdi rsp-tn) ; compute shadow address
-            (zeroize rax)
-            (inst rep)
-            (inst stos rax)
-            (when words-savep
-              (inst mov words result) ; restore 'words'
-              (inst lea result ; recompute the tagged pointer
-                    (ea other-pointer-lowtag rsp-tn)))))
-        (unless (sb-c::vector-initialized-p node)
-          (let ((data-addr
-                  (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-                      result)))
-            (block zero-fill
-              (cond ((sc-is words immediate)
-                     (let ((n (tn-value words)))
-                       (cond ((> n 8)
-                              (inst mov rcx (tn-value words)))
-                             ((= n 1)
-                              (inst mov :qword data-addr 0)
-                              (return-from zero-fill))
-                             (t
-                              (multiple-value-bind (double single) (truncate n 2)
-                                (inst xorpd zero zero)
-                                (dotimes (i double)
-                                  (inst movapd data-addr zero)
-                                  (setf data-addr
-                                        (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
-                                            (ea-base data-addr))))
-                                (unless (zerop single)
-                                  (inst movaps data-addr zero))
-                                (return-from zero-fill))))))
-                    (t
-                     (move rcx words)
-                     (inst shr rcx n-fixnum-tag-bits)))
-              (inst lea rdi data-addr)
-              (unless rax-zeroed (zeroize rax))
-              (inst rep)
-              (inst stos rax))))))))
+        (put-header result other-pointer-lowtag type length nil)
+        ;; If the array was safely created then it can't contain junk.
+        ;; If the type is such that it may contain safely readable random bits,
+        ;; it is as if safe. Otherwise mark is as potentially unsafe,
+        ;; so that OUTPUT-UGLY-OBJECT will try to detect whether each
+        ;; element individually is a valid pointer.
+        ;; Unfortunately this is impossible - how can we detect whether
+        ;; an element which points to the stack is valid or garbage?
+        #+nil
+        (unless (or (policy node (= safety 3))
+                    (and (constant-tn-p type)
+                         (not (sb-c::should-zerofill-p
+                               (find (tn-value type)
+                                     *specialized-array-element-type-properties*
+                                     :key #'saetp-typecode)))))
+          (inst or :byte (ea (- 1 other-pointer-lowtag) result)
+                +vector-dynamic-extent+)))))
+
+  #+linux ; unimplemented for others
+  (define-vop (allocate-vector-on-stack+msan-unpoison)
+    (:args (type :scs (unsigned-reg immediate))
+           (length :scs (any-reg immediate))
+           (words :scs (any-reg immediate)))
+    (:results (result :scs (descriptor-reg) :from :load))
+    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    ;; This is a separate vop because it needs more temps.
+    (:temporary (:sc any-reg :offset rcx-offset) rcx)
+    (:temporary (:sc any-reg :offset rax-offset) rax)
+    (:temporary (:sc any-reg :offset rdi-offset) rdi)
+    (:translate allocate-vector)
+    (:policy :fast-safe)
+    (:generator 10
+      (let ((size (calc-size-in-bytes words result)))
+        ;; Compute tagged pointer sooner than later since access off RSP
+        ;; requires an extra byte in the encoding anyway.
+        (stack-allocation result size other-pointer-lowtag)
+        ;; FIXME: It would be good to check for stack overflow here.
+        (put-header result other-pointer-lowtag type length nil)
+        (cond ((sc-is words immediate)
+               (inst mov rcx (+ (tn-value words) vector-data-offset)))
+              (t
+               (inst lea rcx (ea (ash vector-data-offset n-fixnum-tag-bits) words))
+               (inst shr rcx n-fixnum-tag-bits)))
+        (inst mov rdi msan-mem-to-shadow-xor-const)
+        (inst xor rdi rsp-tn) ; compute shadow address
+        (zeroize rax)
+        (inst rep)
+        (inst stos rax)))))
 
 ;;; ALLOCATE-LIST
 (macrolet ((calc-size-in-bytes (length answer)
