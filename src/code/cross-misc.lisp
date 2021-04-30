@@ -72,8 +72,10 @@
 (defun %defvar (var source-location &optional (val nil valp) (doc nil docp))
   (declare (ignore source-location doc docp))
   (cl:proclaim `(special ,var))
-  (when valp
+  (when (and valp (not (boundp var)))
     (setf (symbol-value var) val)))
+
+(defun %boundp (symbol) (boundp symbol))
 
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
