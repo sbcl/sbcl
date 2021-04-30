@@ -367,7 +367,18 @@
 ;;; e.g. the behavior if the first arg is a NaN is well-defined as we have it,
 ;;; but what about the second arg? We need some test cases around this.
 (defknown float-sign (float &optional float) float
-  (movable foldable unsafely-flushable))
+  (movable foldable unsafely-flushable)
+  :derive-type (lambda (call &aux (args (combination-args call))
+                                  (type (unless (cdr args) (lvar-type (first args)))))
+                 (cond ((and type (csubtypep type (specifier-type 'single-float)))
+                        (specifier-type '(member $1f0 $-1f0)))
+                       ((and type (csubtypep type (specifier-type 'double-float)))
+                        (specifier-type '(member $1d0 $-1d0)))
+                       (type
+                        (specifier-type '(member $1f0 $-1f0 $1d0 $-1d0)))
+                       (t
+                        (specifier-type 'float)))))
+
 (defknown (float-digits float-precision) (float) float-digits
   (movable foldable unsafely-flushable))
 (defknown integer-decode-float (float)
