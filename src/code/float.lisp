@@ -186,21 +186,23 @@
   (declare (double-float x))
   #-64-bit ; treat high and low bits separately until the end
   (let* ((hi (double-float-high-bits x))
+         (sign (if (minusp hi) -1 1))
          (lo (double-float-low-bits x))
+         (mantissa (logior (ash (ldb sb-vm:double-float-significand-byte hi) 32) lo))
          (exp (ldb sb-vm:double-float-exponent-byte hi)))
     (cond ((zerop (logior (ldb (byte 31 0) hi) lo))
-           (values 0 0 (if (minusp hi) -1 1)))
+           (values 0 0 sign))
           ((< exp sb-vm:double-float-normal-exponent-min)
-           (integer-decode-double-denorm x))
+           (values mantissa -1074 sign))
           ((> exp sb-vm:double-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
-           (values (logior (ash (logior (ldb sb-vm:double-float-significand-byte hi)
-                                        sb-vm:double-float-hidden-bit)
-                                32)
-                           lo)
+           ;; DOUBLE-FLOAT-HIDDEN-BIT is nonsense. It's 20 because it's the index
+           ;; within the high half. It should be an index within the entire fraction.
+           ;; If you want to manipulate the fraction as two 4-byte parts, that's on you.
+           (values (logior (ash sb-vm:double-float-hidden-bit 32) mantissa)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
-                   (if (minusp hi) -1 1)))))
+                   sign))))
   #+64-bit ; don't split the high and low bits
   (let* ((bits (double-float-bits x))
          (sign (if (minusp bits) -1 1))
