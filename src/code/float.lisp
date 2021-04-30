@@ -109,25 +109,6 @@
 (declaim (maybe-inline integer-decode-single-float
                        integer-decode-double-float))
 
-;;; Handle the denormalized case of INTEGER-DECODE-FLOAT for SINGLE-FLOAT.
-(defun integer-decode-single-denorm (x)
-  (declare (type single-float x))
-  (let* ((bits (single-float-bits x))
-         (sig (ash (ldb sb-vm:single-float-significand-byte bits) 1))
-         (extra-bias 0))
-    (declare (type (unsigned-byte 24) sig)
-             (type (integer 0 23) extra-bias))
-    (loop
-      (unless (zerop (logand sig sb-vm:single-float-hidden-bit))
-        (return))
-      (setq sig (ash sig 1))
-      (incf extra-bias))
-    (values sig
-            (- (- sb-vm:single-float-bias)
-               sb-vm:single-float-digits
-               extra-bias)
-            (if (minusp bits) -1 1))))
-
 ;;; Handle the single-float case of INTEGER-DECODE-FLOAT. If an infinity or
 ;;; NaN, error. If a denorm, call i-d-s-DENORM to handle it.
 (defun integer-decode-single-float (x)
@@ -148,38 +129,6 @@
                            sb-vm:single-float-hidden-bit)
                    (- exp sb-vm:single-float-bias sb-vm:single-float-digits)
                    sign)))))
-
-;;; like INTEGER-DECODE-SINGLE-DENORM, only doubly so
-(defun integer-decode-double-denorm (x)
-  (declare (type double-float x))
-  (let* ((high-bits (double-float-high-bits x))
-         (sig-high (ldb sb-vm:double-float-significand-byte high-bits))
-         (low-bits (double-float-low-bits x))
-         (sign (if (minusp high-bits) -1 1))
-         (biased (- (- sb-vm:double-float-bias) sb-vm:double-float-digits)))
-    (if (zerop sig-high)
-        (let ((sig low-bits)
-              (extra-bias (- sb-vm:double-float-digits 33))
-              (bit (ash 1 31)))
-          (declare (type (unsigned-byte 32) sig) (fixnum extra-bias))
-          (loop
-            (unless (zerop (logand sig bit)) (return))
-            (setq sig (ash sig 1))
-            (incf extra-bias))
-          (values (ash sig (- sb-vm:double-float-digits 32))
-                  (truly-the fixnum (- biased extra-bias))
-                  sign))
-        (let ((sig (ash sig-high 1))
-              (extra-bias 0))
-          (declare (type (unsigned-byte 32) sig) (fixnum extra-bias))
-          (loop
-            (unless (zerop (logand sig sb-vm:double-float-hidden-bit))
-              (return))
-            (setq sig (ash sig 1))
-            (incf extra-bias))
-          (values (logior (ash sig 32) (ash low-bits (1- extra-bias)))
-                  (truly-the fixnum (- biased extra-bias))
-                  sign)))))
 
 ;;; like INTEGER-DECODE-SINGLE-FLOAT, only doubly so
 (defun integer-decode-double-float (x)
@@ -301,19 +250,6 @@
 
 (declaim (maybe-inline decode-single-float decode-double-float))
 
-;;; Handle the denormalized case of DECODE-SINGLE-FLOAT. We call
-;;; INTEGER-DECODE-SINGLE-DENORM and then make the result into a float.
-(defun decode-single-denorm (x)
-  (declare (type single-float x))
-  (multiple-value-bind (sig exp sign) (integer-decode-single-denorm x)
-    (values (make-single-float
-             (dpb sig sb-vm:single-float-significand-byte
-                  (dpb sb-vm:single-float-bias
-                       sb-vm:single-float-exponent-byte
-                       0)))
-            (truly-the fixnum (+ exp sb-vm:single-float-digits))
-            (float sign x))))
-
 ;;; Handle the single-float case of DECODE-FLOAT. If an infinity or NaN,
 ;;; error. If a denorm, call d-s-DENORM to handle it.
 (defun decode-single-float (x)
@@ -324,7 +260,16 @@
     (cond ((zerop bits)
            (values $0.0f0 0 sign))
           ((< exp sb-vm:single-float-normal-exponent-min)
-           (decode-single-denorm x))
+           (binding* (((mantissa exp) (integer-decode-single-float x))
+                      (prec (float-precision x))
+                      (fraction (ash mantissa (- sb-vm:single-float-digits prec))))
+             (values (make-single-float
+                      (dpb sb-vm:single-float-bias ; set the effective exponent to 0
+                           sb-vm:single-float-exponent-byte
+                           ;; unset the high bit (the implied 1 bit)
+                           (ldb (byte (1- sb-vm:single-float-digits) 0) fraction)))
+                     (+ exp prec)
+                     sign)))
           ((> exp sb-vm:single-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
@@ -335,19 +280,6 @@
                    (truly-the single-float-exponent (- exp sb-vm:single-float-bias))
                    sign)))))
 
-;;; like DECODE-SINGLE-DENORM, only doubly so
-(defun decode-double-denorm (x)
-  (declare (double-float x))
-  (multiple-value-bind (sig exp sign) (integer-decode-double-denorm x)
-    (values (make-double-float
-             (dpb (logand (ash sig -32) (lognot sb-vm:double-float-hidden-bit))
-                  sb-vm:double-float-significand-byte
-                  (dpb sb-vm:double-float-bias
-                       sb-vm:double-float-exponent-byte 0))
-             (ldb (byte 32 0) sig))
-            (truly-the fixnum (+ exp sb-vm:double-float-digits))
-            (float sign x))))
-
 ;;; like DECODE-SINGLE-FLOAT, only doubly so
 (defun decode-double-float (x)
   (declare (double-float x))
@@ -357,7 +289,16 @@
     (cond ((zerop x)
            (values $0.0d0 0 sign))
           ((< exp sb-vm:double-float-normal-exponent-min)
-           (decode-double-denorm x))
+           (binding* (((mantissa exp) (integer-decode-double-float x))
+                      (prec (float-precision x))
+                      (fraction (ash mantissa (- sb-vm:double-float-digits prec))))
+             (values (make-double-float
+                      (dpb sb-vm:double-float-bias ; set the effective exponent to 0
+                           sb-vm:double-float-exponent-byte
+                           (ldb (byte 20 32) fraction))
+                      (ldb (byte 32 0) fraction))
+                     (+ exp prec)
+                     sign)))
           ((> exp sb-vm:double-float-normal-exponent-max)
            (error float-decoding-error x))
           (t
