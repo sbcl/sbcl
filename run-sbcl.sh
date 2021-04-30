@@ -27,6 +27,14 @@ while [ -h "$this" ]; do
     fi
 done
 BASE=`dirname "$this"`
+# BASE can still be relative if $0 is a relative pathname naming a
+# non-symlink, or if the last symlink visited in that loop has a
+# relative target. We need BASE to be an absolute pathname in order to
+# make MODULE-PROVIDE-CONTRIB work throughout the Lisp session, even
+# after frobbing *DEFAULT-PATHNAME-DEFAULTS*.
+if ! expr "$BASE" : '^/.*' > /dev/null; then
+    BASE=`cd ./"$BASE" && pwd`
+fi
 
 CORE_DEFINED=no
 
