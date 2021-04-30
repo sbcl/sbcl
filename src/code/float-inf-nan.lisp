@@ -18,14 +18,17 @@
 (declaim (maybe-inline float-denormalized-p float-infinity-p float-nan-p
                        float-trapping-nan-p))
 
+(defmacro sfloat-bits-subnormalp (bits)
+  `(zerop (ldb sb-vm:single-float-exponent-byte ,bits)))
+#-64-bit
+(defmacro dfloat-high-bits-subnormalp (bits)
+  `(zerop (ldb sb-vm:double-float-exponent-byte ,bits)))
 #+64-bit
 (progn
 (defmacro dfloat-exponent-from-bits (bits)
   `(ldb (byte ,(byte-size sb-vm:double-float-exponent-byte)
               ,(+ 32 (byte-position sb-vm:double-float-exponent-byte)))
         ,bits))
-(defmacro sfloat-bits-subnormalp (bits)
-  `(zerop (ldb sb-vm:single-float-exponent-byte ,bits)))
 (defmacro dfloat-bits-subnormalp (bits)
   `(zerop (dfloat-exponent-from-bits ,bits))))
 

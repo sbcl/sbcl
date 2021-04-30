@@ -25,39 +25,27 @@
   "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
   (declare (explicit-check))
-  #+64-bit
-  (number-dispatch ((f float))
-    ((single-float)
-     (let ((bits (single-float-bits f)))
-       (if (sfloat-bits-subnormalp bits)
-           (integer-length (ldb sb-vm:single-float-significand-byte bits))
-           sb-vm:single-float-digits)))
-    ((double-float)
-     (let ((bits (double-float-bits f)))
-       (if (dfloat-bits-subnormalp bits)
-           (integer-length (ldb (byte 52 0) bits))
-           sb-vm:double-float-digits))))
-  #-64-bit
-  (macrolet ((frob (digits bias decode)
-               `(cond ((zerop f) 0)
-                      ((float-denormalized-p f)
-                       (multiple-value-bind (ignore exp) (,decode f)
-                         (declare (ignore ignore))
-                         (truly-the fixnum
-                                    (+ ,digits (1- ,digits) ,bias exp))))
-                      (t
-                       ,digits))))
-    (number-dispatch ((f float))
-      ((single-float)
-       (frob sb-vm:single-float-digits sb-vm:single-float-bias
-         integer-decode-single-denorm))
-      ((double-float)
-       (frob sb-vm:double-float-digits sb-vm:double-float-bias
-         integer-decode-double-denorm))
-      #+long-float
-      ((long-float)
-       (frob sb-vm:long-float-digits sb-vm:long-float-bias
-         integer-decode-long-denorm)))))
+  (integer-length
+   (number-dispatch ((f float))
+     ((single-float)
+      (let ((bits (single-float-bits f)))
+        (if (sfloat-bits-subnormalp bits)
+            (ldb sb-vm:single-float-significand-byte bits)
+            (return-from float-precision sb-vm:single-float-digits))))
+     ((double-float)
+      #+64-bit
+      (let ((bits (double-float-bits f)))
+        (if (dfloat-bits-subnormalp bits)
+            (ldb (byte 52 0) bits)
+            (return-from float-precision sb-vm:double-float-digits)))
+      #-64-bit
+      (let ((high (double-float-high-bits f)))
+        (if (not (dfloat-high-bits-subnormalp high))
+            (return-from float-precision sb-vm:double-float-digits)
+            (let ((n (integer-length (ldb sb-vm:double-float-significand-byte high))))
+              (if (/= 0 n)
+                  (return-from float-precision (+ n 32))
+                  (double-float-low-bits f)))))))))
 
 (defun float-sign (float1 &optional (float2 (float 1 float1)))
   "Return a floating-point number that has the same sign as
