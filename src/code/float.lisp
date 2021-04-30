@@ -178,57 +178,6 @@
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
                    sign)))))
 
-#+(and long-float x86)
-(defun integer-decode-long-denorm (x)
-  (declare (type long-float x))
-  (let* ((high-bits (long-float-high-bits (abs x)))
-         (sig-high (ldb sb-vm:long-float-significand-byte high-bits))
-         (low-bits (long-float-low-bits x))
-         (sign (if (minusp (float-sign x)) -1 1))
-         (biased (- (- sb-vm:long-float-bias) sb-vm:long-float-digits)))
-    (if (zerop sig-high)
-        (let ((sig low-bits)
-              (extra-bias (- sb-vm:long-float-digits 33))
-              (bit (ash 1 31)))
-          (declare (type (unsigned-byte 32) sig) (fixnum extra-bias))
-          (loop
-            (unless (zerop (logand sig bit)) (return))
-            (setq sig (ash sig 1))
-            (incf extra-bias))
-          (values (ash sig (- sb-vm:long-float-digits 32))
-                  (truly-the fixnum (- biased extra-bias))
-                  sign))
-        (let ((sig (ash sig-high 1))
-              (extra-bias 0))
-          (declare (type (unsigned-byte 32) sig) (fixnum extra-bias))
-          (loop
-            (unless (zerop (logand sig sb-vm:long-float-hidden-bit))
-              (return))
-            (setq sig (ash sig 1))
-            (incf extra-bias))
-          (values (logior (ash sig 32) (ash low-bits (1- extra-bias)))
-                  (truly-the fixnum (- biased extra-bias))
-                  sign)))))
-
-#+(and long-float x86)
-(defun integer-decode-long-float (x)
-  (declare (long-float x))
-  (let* ((hi (long-float-high-bits x))
-         (lo (long-float-low-bits x))
-         (exp-bits (long-float-exp-bits x))
-         (exp (ldb sb-vm:long-float-exponent-byte exp-bits))
-         (sign (if (minusp exp-bits) -1 1))
-         (biased (- exp sb-vm:long-float-bias sb-vm:long-float-digits)))
-    (declare (fixnum biased))
-    (cond ((and (zerop exp) (zerop hi) (zerop lo))
-           (values 0 biased sign))
-          ((< exp sb-vm:long-float-normal-exponent-min)
-           (integer-decode-long-denorm x))
-          ((> exp sb-vm:long-float-normal-exponent-max)
-           (error float-decoding-error x))
-          (t
-           (values (logior (ash hi 32) lo) biased sign)))))
-
 ;;; Dispatch to the correct type-specific i-d-f function.
 (defun integer-decode-float (x)
   "Return three values:
@@ -243,10 +192,7 @@
     ((single-float)
      (integer-decode-single-float x))
     ((double-float)
-     (integer-decode-double-float x))
-    #+long-float
-    ((long-float)
-     (integer-decode-long-float x))))
+     (integer-decode-double-float x))))
 
 (declaim (maybe-inline decode-single-float decode-double-float))
 
@@ -310,39 +256,6 @@
                    (truly-the double-float-exponent (- exp sb-vm:double-float-bias))
                    sign)))))
 
-#+(and long-float x86)
-(defun decode-long-denorm (x)
-  (declare (long-float x))
-  (multiple-value-bind (sig exp sign) (integer-decode-long-denorm x)
-    (values (make-long-float sb-vm:long-float-bias (ash sig -32)
-                             (ldb (byte 32 0) sig))
-            (truly-the fixnum (+ exp sb-vm:long-float-digits))
-            (float sign x))))
-
-#+(and long-float x86)
-(defun decode-long-float (x)
-  (declare (long-float x))
-  (let* ((hi (long-float-high-bits x))
-         (lo (long-float-low-bits x))
-         (exp-bits (long-float-exp-bits x))
-         (exp (ldb sb-vm:long-float-exponent-byte exp-bits))
-         (sign (if (minusp exp-bits) -1l0 1l0))
-         (biased (truly-the long-float-exponent
-                            (- exp sb-vm:long-float-bias))))
-    (cond ((zerop x)
-           (values 0.0l0 biased sign))
-          ((< exp sb-vm:long-float-normal-exponent-min)
-           (decode-long-denorm x))
-          ((> exp sb-vm:long-float-normal-exponent-max)
-           (error float-decoding-error x))
-          (t
-           (values (make-long-float
-                    (dpb sb-vm:long-float-bias sb-vm:long-float-exponent-byte
-                         exp-bits)
-                    hi
-                    lo)
-                   biased sign)))))
-
 ;;; Dispatch to the appropriate type-specific function.
 (defun decode-float (f)
   "Return three values:
@@ -355,10 +268,7 @@
     ((single-float)
      (decode-single-float f))
     ((double-float)
-     (decode-double-float f))
-    #+long-float
-    ((long-float)
-     (decode-long-float f))))
+     (decode-double-float f))))
 
 ;;;; SCALE-FLOAT
 
@@ -473,11 +383,6 @@
     (unsigned-byte (scale-float-maybe-overflow x exp))
     ((integer * 0) (scale-float-maybe-underflow x exp))))
 
-#+(and x86 long-float)
-(defun scale-long-float (x exp)
-  (declare (long-float x) (integer exp))
-  (scale-float x exp))
-
 ;;; Dispatch to the correct type-specific scale-float function.
 (defun scale-float (f ex)
   "Return the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
@@ -487,10 +392,7 @@
     ((single-float)
      (scale-single-float f ex))
     ((double-float)
-     (scale-double-float f ex))
-    #+long-float
-    ((long-float)
-     (scale-long-float f ex))))
+     (scale-double-float f ex))))
 
 ;;;; converting to/from floats
 
