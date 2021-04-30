@@ -45,7 +45,7 @@
             (setf *report-skipped-tests* t))
            ((string= arg "--no-color"))
            (t
-            (push (truename (parse-namestring arg)) *explicit-test-files*))))
+            (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (with-open-file (log "test.log" :direction :output
                        :if-exists :supersede
@@ -340,7 +340,12 @@
       (loop for file in *explicit-test-files*
             when (pathname-match-p file wild-mask)
             collect file)
-      (directory wild-mask)))
+      (directory wild-mask
+                 ;; If we're in a tree whose non-directories are
+                 ;; symlinks, the truenames of those symlinks might
+                 ;; not have the same relationships to each other as
+                 ;; we need.
+                 :resolve-symlinks nil)))
 
 (defun pure-load-files ()
   (filter-test-files "*.pure.lisp"))

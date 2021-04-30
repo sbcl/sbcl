@@ -66,9 +66,11 @@
       (cond
         (change-p
          (delete-file file)
-         (rename-file temporary file))
+         (rename-file temporary file)
+         t)
         ((probe-file temporary)
-         (delete-file temporary))))))
+         (delete-file temporary)
+         nil)))))
 
 ;;; Timestamp functions
 
@@ -80,11 +82,14 @@
       0))
 
 (defun write-stamp-file ()
-  (with-open-file (stream *stamp-file*
-                          :direction :output
-                          :if-exists :supersede)
-    (declare (ignorable stream))
-    (values)))
+  ;; We want the stamp file to have the current time for its write
+  ;; date. Conforming variation in OPEN's IF-EXISTS semantics across
+  ;; existing XC hosts means it's simplest to unconditionally ensure a
+  ;; new file.
+  (when (probe-file *stamp-file*)
+    (delete-file *stamp-file*))
+  (close (open *stamp-file* :direction :output :if-exists :error
+               :if-does-not-exist :create)))
 
 ;;; Repository-level functions
 
@@ -93,23 +98,51 @@
 (defvar *exceptions* '("compile-file-pos-utf16be"))
 
 (defun canonicalize-whitespace/directory
-    (&optional (directory *default-pathname-defaults*))
-  (let ((stamp-date (read-stamp-file)))
+    (&optional (directory *default-pathname-defaults*) (report t))
+  (let ((stamp-date (read-stamp-file)) (n-files 0) (n-newer 0) (n-changed 0))
     (labels ((older-than-stamp (file)
                (< (file-write-date file) stamp-date))
              (exception-p (file)
                (member (pathname-name file) *exceptions*
                        :test #'string=))
              (skip-p (file)
-               (or (older-than-stamp file) (exception-p file))))
+               (incf n-files)
+               (or (older-than-stamp file) (exception-p file)))
+             (directory* (pattern)
+               ;; We might be in a build tree made out of symlinks, so
+               ;; we should list our files without resolving
+               ;; symlinks. (This is implementation-dependent, but
+               ;; many implementations on Unix can do it. The list of
+               ;; implementations covered below might be larger than
+               ;; the set that can build SBCL.)
+               (apply #-clisp #'directory
+                      #+clisp #'(lambda (pathname &rest keys)
+                                  (mapcar #'first
+                                          (apply #'directory pathname keys)))
+                      pattern
+                      #+abcl '(:resolve-symlinks nil)
+                      #+allegro '(:follow-symbolic-links nil)
+                      #+ccl '(:follow-links nil)
+                      #+clisp '(:full t)
+                      #+cmu '(:truenamep nil)
+                      #+ecl '(:resolve-symlinks nil)
+                      #+lispworks '(:link-transparency nil)
+                      #+sbcl '(:resolve-symlinks nil)
+                      #-(or abcl allegro ccl clisp cmu ecl lispworks sbcl)
+                      #.(error "Don't know how to list files without ~
+                                resolving symlinks."))))
       (dolist (type *source-types*)
         (let* ((pattern (merge-pathnames
                          (make-pathname :type type
                                         :name :wild
                                         :directory '(:relative :wild-inferiors))
                          directory))
-               (files (remove-if #'skip-p (directory pattern))))
-          (mapc #'canonicalize-whitespace/file files))))
+               (files (remove-if #'skip-p (directory* pattern))))
+          (incf n-newer (length files))
+          (incf n-changed (count-if #'canonicalize-whitespace/file files)))))
+    (when report
+      (format t "~&// Rewrote ~D of ~D new files out of ~D total."
+              n-changed n-newer n-files))
     (write-stamp-file)))
 ) ; end PROGN
 

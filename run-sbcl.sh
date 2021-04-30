@@ -15,8 +15,18 @@ set -e
 
 this="$0"
 
+build_directory_p(){
+    [ -x "$1"/src/runtime/sbcl -a -f "$1"/output/sbcl.core ];
+}
+
 # OSX 10.8 readlink doesn't have -f
 while [ -h "$this" ]; do
+    # Stop resolving symlinks when $this lives in a build tree.
+    # (Build trees might consist of symlinks to something that doesn't
+    # follow our repo layout.)
+    if build_directory_p "$(dirname "$this")"; then
+	break
+    fi
     # [ -h should guarantee that readlink output will be non-null
     link=`readlink -n "$this"`
     # if absolute path
@@ -61,7 +71,7 @@ if [ "$CORE_DEFINED" = "no" ]; then
     ARGUMENTS="--core "$BASE"/output/sbcl.core"
 fi
 
-if [ -x "$BASE"/src/runtime/sbcl -a -f "$BASE"/output/sbcl.core ]; then
+if build_directory_p "$BASE"; then
     export SBCL_HOME
     SBCL_HOME="$BASE/obj/sbcl-home" exec "$BASE"/src/runtime/sbcl $ARGUMENTS "$@"
 else

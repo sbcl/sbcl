@@ -563,7 +563,8 @@
                                         (directory (make-pathname
                                                     :name :wild
                                                     :type :wild
-                                                    :defaults *current-directory*))))
+                                                    :defaults *current-directory*)
+                                                   :resolve-symlinks nil)))
                         #'string<))
         (sb-posix:closedir dir)))
   t)
