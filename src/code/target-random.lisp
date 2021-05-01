@@ -333,7 +333,9 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                       sb-vm:single-float-significand-byte
                       (single-float-bits $1.0)))
                 $1.0))
-        while (= candidate arg)
+        while (#+x86 eql ;; Can't use = due to 80-bit precision
+               #-x86 =
+               candidate arg)
         finally (return candidate)))
 (declaim (ftype (function ((double-float ($0d0)) random-state)
                           (double-float $0d0))
@@ -350,7 +352,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 #-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float ($0d0)) arg)
-           (optimize speed)
            (type random-state state))
   (loop for candidate of-type double-float
         = (* arg
@@ -380,7 +381,8 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                         (sb-impl::double-float-high-bits $1d0))
                    (sb-vm::random-mt19937 state-vector))
                   $1d0))
-          while (= candidate arg)
+          ;; Can't use = due to 80-bit precision
+          while (eql candidate arg)
           finally (return candidate))))
 
 
