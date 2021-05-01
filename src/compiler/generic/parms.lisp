@@ -275,6 +275,13 @@
 (progn
 (defconstant float-sign-shift 31)
 
+;;; The exponent bias is the amount up by which the true exponent is
+;;; incremented for storage purposes.
+;;; (Wikipedia entry for single-float: "an exponent value of 127 represents the actual zero")
+;;; 126 works for us because we actually want an exponent of -1 and not 0
+;;; when using DECODE-FLOAT. -1 is correct because the implied 1 bit in a normalized
+;;; float is the _left_ of of the binary point, so the powers of 2 for the first represented
+;;; bit is 2^-1. Similarly for double-float.
 (defconstant single-float-bias 126)
 (defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
 (defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
