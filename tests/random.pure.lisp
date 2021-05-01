@@ -179,3 +179,11 @@
     (let ((values (loop :repeat 10000
                         :collect (random least-positive-double-float))))
       (assert (not (find 0.0d0 values :test-not #'=))))))
+
+(with-test (:name :float-no-consing
+            :skipped-on :interpreter)
+  (let ((fun (checked-compile `(lambda ()
+                                 (declare (optimize speed))
+                                 (> (random 40d0) 1d0))
+                              :allow-notes nil)))
+    (ctu:assert-no-consing (funcall fun))))
