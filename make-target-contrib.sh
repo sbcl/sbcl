@@ -73,7 +73,7 @@ fi
 
 # Otherwise report expected failures:
 HEADER_HAS_BEEN_PRINTED=false
-for dir in `cd obj/asdf-cache/ ; echo *`; do
+for dir in `cd ./obj/asdf-cache/ ; echo *`; do
   f="obj/asdf-cache/$dir/test-passed.test-report"
   if test -f "$f" && grep -i fail "$f" >/dev/null; then
       if ! $HEADER_HAS_BEEN_PRINTED; then
@@ -90,7 +90,7 @@ EOF
 done
 
 if [ -z "$*" ]; then
-    contribs_to_build="`cd contrib ; echo *`"
+    contribs_to_build="`cd ./contrib ; echo *`"
 else
     contribs_to_build="$*"
 fi

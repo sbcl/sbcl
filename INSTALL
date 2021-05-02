@@ -139,11 +139,11 @@ INSTALLING SBCL
 
   To run the regression tests:
 
-    $ cd tests && sh run-tests.sh
+    $ cd ./tests && sh run-tests.sh
 
   To build documentation:
 
-    $ cd doc/manual && make
+    $ cd ./doc/manual && make
 
   This builds the Info, HTML and PDF documentation from the Texinfo
   sources. The manual includes documentation string from the build

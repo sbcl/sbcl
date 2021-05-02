@@ -12,7 +12,7 @@
 WIX_PATH=$WIX/bin
 
 SBCL_TOP=../
-cd output
+cd ./output
 
 "$SBCL_TOP/src/runtime/sbcl" --noinform --core "$SBCL_TOP/output/sbcl.core" \
   --disable-debugger --no-sysinit --no-userinit \

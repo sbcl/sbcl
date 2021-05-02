@@ -93,11 +93,11 @@ echo "The build seems to have finished successfully, including $NPASSED (out of 
 echo "contributed modules. If you would like to run more extensive tests on"
 echo "the new SBCL, you can try:"
 echo
-echo "  cd tests && sh ./run-tests.sh"
+echo "  cd ./tests && sh ./run-tests.sh"
 echo
 echo "To build documentation:"
 echo
-echo "  cd doc/manual && make"
+echo "  cd ./doc/manual && make"
 echo
 echo "To install SBCL (more information in INSTALL):"
 echo
