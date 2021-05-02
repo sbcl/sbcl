@@ -28,22 +28,22 @@ while [ -h "$this" ]; do
 	break
     fi
     # [ -h should guarantee that readlink output will be non-null
-    link=`readlink -n "$this"`
+    link="`readlink -n "$this"`"
     # if absolute path
     if expr "$link" : '^/.*' > /dev/null; then
         this="$link"
     else
-        this=`dirname "$this"`/"$link"
+        this="`dirname "$this"`"/"$link"
     fi
 done
-BASE=`dirname "$this"`
+BASE="`dirname "$this"`"
 # BASE can still be relative if $0 is a relative pathname naming a
 # non-symlink, or if the last symlink visited in that loop has a
 # relative target. We need BASE to be an absolute pathname in order to
 # make MODULE-PROVIDE-CONTRIB work throughout the Lisp session, even
 # after frobbing *DEFAULT-PATHNAME-DEFAULTS*.
 if ! expr "$BASE" : '^/.*' > /dev/null; then
-    BASE=`cd ./"$BASE" && pwd`
+    BASE="`cd ./"$BASE" && pwd`"
 fi
 
 CORE_DEFINED=no
@@ -68,12 +68,12 @@ done
 ARGUMENTS=""
 
 if [ "$CORE_DEFINED" = "no" ]; then
-    ARGUMENTS="--core "$BASE"/output/sbcl.core"
+    CORE="$BASE"/output/sbcl.core
 fi
 
 if build_directory_p "$BASE"; then
     export SBCL_HOME
-    SBCL_HOME="$BASE/obj/sbcl-home" exec "$BASE"/src/runtime/sbcl $ARGUMENTS "$@"
+    SBCL_HOME="$BASE/obj/sbcl-home" exec "$BASE"/src/runtime/sbcl ${CORE:+--core "$CORE"} "$@"
 else
     echo "No built SBCL here ($BASE): run 'sh make.sh' first!"
     exit 1
