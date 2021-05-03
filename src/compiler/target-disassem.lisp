@@ -378,33 +378,25 @@
                                       (+ (dstate-cur-offs dstate)
                                          (1- lra-size))))
                 sb-vm:return-pc-widetag))
-    (unless (null stream)
+    (when stream
       (note "possible LRA header" dstate)))
   nil))
 
 ;;; Print the fun-header (entry-point) pseudo-instruction at the
-;;; current location in DSTATE to STREAM.
+;;; current location in DSTATE to STREAM and skip 2 words.
 (defun fun-header-hook (fun-index stream dstate)
   (declare (type (or null stream) stream)
            (type disassem-state dstate))
-  (unless (null stream)
-    (let* ((seg (dstate-segment dstate))
-           (code (seg-code seg))
-           (woffs (+ sb-vm:code-constants-offset (* fun-index sb-vm:code-slots-per-simple-fun)))
-           (name (code-header-ref code (+ woffs sb-vm:simple-fun-name-slot)))
-           (args (code-header-ref code (+ woffs sb-vm:simple-fun-arglist-slot)))
-           (info (code-header-ref code (+ woffs sb-vm:simple-fun-info-slot)))
-           (type (typecase info
-                   ((cons t simple-vector) (car info))
-                   ((not simple-vector) info))))
+  (when stream
+    (let* ((fun (%code-entry-point (seg-code (dstate-segment dstate)) fun-index))
+           (name (%simple-fun-name fun))
+           (args (%simple-fun-arglist fun)))
       ;; if the function's name conveys its args, don't show ARGS too
-      (format stream ".~A ~S~:[~:A~;~]" 'entry name
+      (format stream ".~A ~S~:[~:A~;~]"
+              'entry name
               (and (typep name '(cons (eql lambda) (cons list)))
                    (equal args (second name)))
-              args)
-      (note (lambda (stream)
-              (format stream "~:S" type)) ; use format to print NIL as ()
-            dstate)))
+              args)))
   (incf (dstate-next-offs dstate)
         (words-to-bytes sb-vm:simple-fun-insts-offset)))
 
@@ -492,7 +484,7 @@
 
 (defun handle-bogus-instruction (stream dstate prefix-len)
   (let ((alignment (dstate-alignment dstate)))
-    (unless (null stream)
+    (when stream
       (multiple-value-bind (words bytes)
           (truncate alignment sb-vm:n-word-bytes)
         (when (> words 0)
@@ -1442,7 +1434,8 @@
   (dotimes (i (code-n-entries (seg-code segment)))
     (let* ((fun (%code-entry-point (seg-code segment) i))
            (length (seg-length segment))
-           (offset (code-offs-to-segment-offs (%fun-code-offset fun) segment)))
+           (code-offs (%fun-code-offset fun))
+           (offset (code-offs-to-segment-offs code-offs segment)))
       (when (<= 0 offset length)
         ;; Up to 2 words (less a byte) of padding might be present to align the
         ;; next simple-fun. Limit on OFFSET is to avoid incorrect triggering
@@ -1455,11 +1448,12 @@
                           (incf (dstate-next-offs dstate) offset))
                  :offset 0) ; at 0 bytes into this seg, skip OFFSET bytes
                 (seg-hooks segment)))
-        (push (make-offs-hook
-               :offset offset
-               :fun (let ((i i)) ; capture the _current_ I, not the final value
-                      (lambda (stream dstate) (fun-header-hook i stream dstate))))
-              (seg-hooks segment))))))
+        (unless (minusp offset)
+          (push (make-offs-hook
+                 :offset offset
+                 :fun (let ((i i)) ; capture the _current_ I, not the final value
+                        (lambda (stream dstate) (fun-header-hook i stream dstate))))
+                (seg-hooks segment)))))))
 
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.
 
@@ -1633,6 +1627,7 @@
 ;;; Assuming that CODE-OBJ is pinned, return true if ADDR is anywhere
 ;;; between the tagged pointer and the first occuring simple-fun.
 (defun points-to-code-constant-p (addr code-obj)
+  (declare (type word addr) (type code-component code-obj))
   (<= (get-lisp-obj-address code-obj)
       addr
       (get-lisp-obj-address (%code-entry-point code-obj 0))))
