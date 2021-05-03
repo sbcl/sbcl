@@ -561,6 +561,7 @@
        ;; (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (storew temp result closure-fun-slot fun-pointer-lowtag)
+       #+metaspace
        (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
          (inst lea temp (rip-relative-ea origin :code))
          (storew temp result closure-code-slot fun-pointer-lowtag))))))
