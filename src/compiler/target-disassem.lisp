@@ -2191,6 +2191,10 @@
                           ;; What could it do- disassemble the interpreter?
                           (error "Can't disassemble a special operator"))
                          (t (get-compiled-funs object))))
+      (when (code-component-p object)
+        (let* ((base (- (get-lisp-obj-address object) sb-vm:other-pointer-lowtag))
+               (insts (code-instructions object)))
+        (format t "~&; Base: ~x Data: ~x~%" base (sap-int insts))))
       (disassemble-code-component thing :stream stream)))))
 
 ;;;; code to disassemble assembler segments
