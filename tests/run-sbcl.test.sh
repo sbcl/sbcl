@@ -71,4 +71,16 @@ ln -s $(pwd | sed 's|^/||; s|[^/][^/]*|..|g')/"$run_sbcl_path" ./run-sbcl-relati
 test_run_sbcl ./run-sbcl-relative-symlink.sh
 rm ./run-sbcl-relative-symlink.sh
 
+# Test whether we can run-sbcl.sh named using a path to the build
+# directory that contains a space.
+echo "testing run-sbcl.sh named by a path containing spaces"
+ln -s `dirname $run_sbcl_path` ./'a b'
+# Prior to 4a30189fbc, run-sbcl.sh would start the runtime using the
+# core file path ./a b/output/sbcl.core, but unquoted.
+# After 4a30189fbc, the path to the core file will be
+# ${PWD}/a b/output/sbcl.core, still unquoted.
+# 546416b34d changed the core file path handling to ensure
+# it's always quoted.
+test_run_sbcl "./a b/run-sbcl.sh"
+
 exit $EXIT_TEST_WIN
