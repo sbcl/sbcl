@@ -408,7 +408,7 @@ scav_closure(lispobj *where, lispobj header)
     }
     int payload_words = SHORT_BOXED_NWORDS(header);
     // Payload includes 'fun' which was just looked at, so subtract it.
-    scavenge(closure->info, payload_words - 1);
+    scavenge(1 + &closure->fun, payload_words - 1);
     return 1 + payload_words;
 }
 #endif

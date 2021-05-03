@@ -38,51 +38,63 @@
   (logand (ash (function-header-word f) (- sb-vm:n-widetag-bits))
           sb-vm:short-header-max-words))
 
+(defmacro closure-len->nvalues (length)
+  `(- ,length (1- sb-vm:closure-info-offset)))
+
+;; Return T if and only if CLOSURE has extra values that are physically
+;; in a padding slot of the object and not in the external hash-table.
+(defun closure-has-extra-values-slot-p (closure)
+  (declare (closure closure))
+  (and (logtest (function-header-word closure) closure-extra-data-indicator)
+       (evenp (get-closure-length closure))))
+
 (macrolet ((%closure-index-set (closure index val)
              ;; Use the identical convention as %CLOSURE-INDEX-REF for the index.
              ;; There are no closure slot setters, and in fact SLOT-SET
              ;; does not exist in a variant that takes a non-constant index.
              `(setf (sap-ref-lispobj (int-sap (get-lisp-obj-address ,closure))
-                                     (+ (ash sb-vm:closure-info-offset sb-vm:word-shift)
-                                        (ash ,index sb-vm:word-shift)
-                                        (- sb-vm:fun-pointer-lowtag)))
+                                     (+ (ash ,index sb-vm:word-shift)
+                                        (- (ash sb-vm:closure-info-offset sb-vm:word-shift)
+                                           sb-vm:fun-pointer-lowtag)))
                     ,val))
-           (closure-header-word (closure)
-             `(sap-ref-word (int-sap (get-lisp-obj-address ,closure))
-                            (- sb-vm:fun-pointer-lowtag)))
-           (new-closure (len)
+           (new-closure (nvalues)
+             ;; argument is the number of INFO words
              #-(or x86 x86-64)
-             `(sb-vm::%alloc-closure ,len (%closure-fun closure))
+             `(sb-vm::%alloc-closure ,nvalues (%closure-fun closure))
              #+(or x86 x86-64)
              `(with-pinned-objects ((%closure-fun closure))
                 ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                 ;; valid across GC due to %CLOSURE-FUN being pinned
                 ;; until after the new closure is made.
-                (sb-vm::%alloc-closure ,len (sb-vm::%closure-callee closure))))
-           (copy-slots (extra-bit)
-             `(progn
-                (loop with sap = (int-sap (get-lisp-obj-address copy))
-                      for i from 0 below (1- payload-len)
-                      for ofs from (- (ash 2 sb-vm:word-shift) sb-vm:fun-pointer-lowtag)
-                      by sb-vm:n-word-bytes
-                      do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
-                (setf (closure-header-word copy) ; Update the header
-                      ;; Closure copy lost its high header bits, so OR them in again.
-                      (logior #+(and immobile-space 64-bit sb-thread)
-                              (sap-int (sb-vm::current-thread-offset-sap
-                                        sb-vm::thread-function-layout-slot))
-                              #+(and immobile-space 64-bit (not sb-thread))
-                              (get-lisp-obj-address sb-vm:function-layout)
-                              (function-header-word copy)
-                              ,extra-bit)))))
+                (sb-vm::%alloc-closure ,nvalues (sb-vm::%closure-callee closure))))
+           (copy-slots (has-extra-data)
+             `(do ((sap (sap+ (int-sap (get-lisp-obj-address copy))
+                              (- sb-vm:fun-pointer-lowtag)))
+                   (i (ash sb-vm:closure-info-offset sb-vm:word-shift)
+                      (+ i sb-vm:n-word-bytes))
+                   (j 0 (1+ j)))
+                  ((>= j nvalues)
+                   ,@(when has-extra-data
+                       `((setf (sap-ref-word sap 0)
+                               (logior (function-header-word copy)
+                                       closure-extra-data-indicator))))
+                   #+immobile-space ; copy the layout
+                   (setf (sap-ref-32 sap 4) ; ASSUMPTION: little-endian
+                         (logior (get-lisp-obj-address
+                                  (wrapper-friend ,(find-layout 'function)))))
+                   #+metaspace ; copy the CODE (not accessible by index-ref)
+                   (setf (sap-ref-lispobj sap (ash sb-vm::closure-code-slot sb-vm:word-shift))
+                         (sb-vm::%closure-code closure)))
+                (setf (sap-ref-lispobj sap i) (%closure-index-ref closure j)))))
 
   ;; This is factored out because of a cutting-edge implementation
   ;; of tracing wrappers that I'm trying to finish.
   (defun copy-closure (closure)
     (declare (closure closure))
-    (let* ((payload-len (get-closure-length (truly-the function closure)))
-           (copy (new-closure (1- payload-len))))
-      (with-pinned-objects (copy) (copy-slots 0))
+    (let* ((nvalues (closure-len->nvalues
+                     (get-closure-length (truly-the function closure))))
+           (copy (new-closure nvalues)))
+      (with-pinned-objects (copy) (copy-slots nil))
       copy))
 
   ;;; Assign CLOSURE a new name and/or docstring in VALUES, and return the
@@ -95,17 +107,15 @@
   ;;;     then a copy of the closure with extra slots reduces to case (1).
   (defun set-closure-extra-values (closure permit-copy data)
     (declare (closure closure))
-    (let ((payload-len (get-closure-length (truly-the function closure)))
-          (extendedp (logtest (function-header-word closure)
-                              closure-extra-data-indicator)))
-      (when (and (not extendedp) permit-copy (oddp payload-len))
-        ;; PAYLOAD-LEN includes the trampoline, so the number of slots we would
-        ;; pass to %ALLOC-CLOSURE is 1 less than that, were it not for
-        ;; the fact that we actually want to create 1 additional slot.
-        ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
-        (let ((copy (new-closure payload-len)))
+    (let* ((len (get-closure-length (truly-the function closure)))
+           (nvalues (closure-len->nvalues len))
+           (has-padding-slot (evenp len))
+           (extendedp (logtest (function-header-word closure)
+                               closure-extra-data-indicator)))
+      (when (and (not extendedp) (not has-padding-slot) permit-copy)
+        (let ((copy (new-closure (1+ nvalues))))
           (with-pinned-objects (copy)
-            (copy-slots closure-extra-data-indicator)
+            (copy-slots t)
             ;; We copy only if there was no padding, which means that adding 1 slot
             ;; physically adds 2 slots. You might think that the added data go in the
             ;; first new slot, followed by padding. Nope! Take an example of a
@@ -120,15 +130,16 @@
             ;; CLOSURE-EXTRA-VALUES always reads 1 word past the stated payload size
             ;; regardless of whether the closure really captured the implied
             ;; number of closure values.
-            (%closure-index-set copy payload-len data)
+            (%closure-index-set copy (1+ nvalues) data)
             (return-from set-closure-extra-values copy))))
       (unless (with-pinned-objects (closure)
                 (unless extendedp ; Set the header bit
-                  (setf (closure-header-word closure)
+                  (setf (sap-ref-word (int-sap (get-lisp-obj-address closure))
+                                      (- sb-vm:fun-pointer-lowtag))
                         (logior (function-header-word closure)
                                 closure-extra-data-indicator)))
-                (when (evenp payload-len)
-                  (%closure-index-set closure (1- payload-len) data)
+                (when has-padding-slot
+                  (%closure-index-set closure nvalues data)
                   t))
         (if (unbound-marker-p data)
             (remhash closure **closure-extra-values**)
@@ -159,37 +170,21 @@
     ;; an even-length payload takes the last slot for the name,
     ;; and an odd-length payload uses the global hashtable.
   (declare (closure closure))
-  (let ((header-word (function-header-word closure)))
-      (if (not (logtest header-word closure-extra-data-indicator))
-          (values unbound unbound)
-          (let* ((len (logand (ash header-word (- sb-vm:n-widetag-bits))
-                              sb-vm:short-header-max-words))
-                 (data
-                  (if (oddp len)
-                      ;; Boxed length odd implies total length even which implies
-                      ;; no extra slot in which to store ancillary data.
-                      (gethash closure **closure-extra-values** 0)
-                      ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
-                      ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
-                      (%closure-index-ref closure (1- len)))))
+  (if (logtest (function-header-word closure) closure-extra-data-indicator)
+      (let* ((len (get-closure-length closure))
+             ;; See examples in doc/internals-notes/closure
+             (data (if (evenp len) ; has padding slot
+                       (%closure-index-ref closure (closure-len->nvalues len))
+                       ; No padding slot
+                       (gethash closure **closure-extra-values** 0))))
             (typecase data
              ((eql 0) (values unbound unbound))
              ((cons t (or string null (satisfies unbound-marker-p)))
               (values (car data) (cdr data)))
              ;; NIL represents an explicit docstring of NIL, not the name.
              ((or string null) (values unbound data))
-             (t (values data unbound)))))))
-
-;; Return T if and only if CLOSURE has extra values that are physically
-;; in the padding slot of the object and not in the external hash-table.
-(defun closure-has-extra-values-slot-p (closure)
-  (declare (closure closure))
-  (let ((header-word (function-header-word closure)))
-    (and (logtest header-word closure-extra-data-indicator)
-         ;; If the boxed payload length is even, adding the header makes it odd,
-         ;; so there's a padding slot for alignment to an even total word count.
-         ;; i.e. if the least-significant bit of the size field is 0, there's padding.
-         (not (logbitp sb-vm:n-widetag-bits header-word)))))
+             (t (values data unbound))))
+      (values unbound unbound)))
 
 (defconstant +closure-name-index+ 0)
 (defconstant +closure-doc-index+ 1)

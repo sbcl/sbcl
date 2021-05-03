@@ -361,6 +361,8 @@
       #+x86-64
       (sb-assem::combine-instructions (asmstream-code-section asmstream)))
 
+    (emit (asmstream-data-section asmstream)
+          (sb-assem::asmstream-data-origin-label asmstream))
     ;; Jump tables precede the coverage mark bytes to simplify locating
     ;; them in trans_code().
     (emit-jump-tables)

@@ -556,10 +556,14 @@
                                      (thread-slot-ea thread-function-layout-slot))
                        temp)
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
-     ;; Done with pseudo-atomic
+     ;; Finished with the pseudo-atomic instructions
      (when label
+       ;; (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-       (storew temp result closure-fun-slot fun-pointer-lowtag)))))
+       (storew temp result closure-fun-slot fun-pointer-lowtag)
+       (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
+         (inst lea temp (rip-relative-ea origin :code))
+         (storew temp result closure-code-slot fun-pointer-lowtag))))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

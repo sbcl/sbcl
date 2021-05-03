@@ -321,6 +321,8 @@
   (data-section (make-section) :read-only t)
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)
+  (data-origin-label (gen-label "data start") :read-only t)
+  (text-origin-label (gen-label "text start") :read-only t)
   (elsewhere-label (gen-label "elsewhere start") :read-only t)
   (inter-function-padding :normal :type (member :normal :nop))
   ;; for collecting unique "unboxed constants" prior to placing them

@@ -1054,7 +1054,11 @@
                          (:predicate nil)
                          (:copier nil))
   (label nil :type label)
-  (addend 0 :type (signed-byte 32)))
+  ;; The addend of :CODE computes the tagged code object.
+  ;; It could be represented by just a label, except that the assembler can't
+  ;; directly reference labels in the boxed header. A label would need a negative
+  ;; POSN to represent such a location.
+  (addend 0 :type (or (signed-byte 32) (eql :code))))
 (declaim (freeze-type label+addend))
 
 ;;;; the effective-address (ea) structure
@@ -1322,6 +1326,8 @@
                  (if (typep disp 'label+addend)
                      (values (label+addend-label disp) (label+addend-addend disp))
                      (values disp 0))
+               (when (eq addend :code)
+                 (setq addend (- sb-vm:other-pointer-lowtag (component-header-length))))
                ;; To point at ADDEND bytes beyond the label, pretend that the PC
                ;; at which the EA occurs is _smaller_ by that amount.
                (emit-dword-displacement-backpatch
