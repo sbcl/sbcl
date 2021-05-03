@@ -130,7 +130,9 @@
                 (when (evenp payload-len)
                   (%closure-index-set closure (1- payload-len) data)
                   t))
-        (setf (gethash closure **closure-extra-values**) data)))
+        (if (unbound-marker-p data)
+            (remhash closure **closure-extra-values**)
+            (setf (gethash closure **closure-extra-values**) data))))
     closure))
 
 (defun pack-closure-extra-values (name docstring)
@@ -170,11 +172,8 @@
                       ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
                       ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
                       (%closure-index-ref closure (1- len)))))
-            ;; There can be a concurrency glitch, because the 'extended' flag is
-            ;; toggled to indicate that extra data are present before the data
-            ;; are written; so there's a window where NAME looks like 0. That could
-            ;; be fixed in the setter, or caught here, but it shouldn't matter.
             (typecase data
+             ((eql 0) (values unbound unbound))
              ((cons t (or string null (satisfies unbound-marker-p)))
               (values (car data) (cdr data)))
              ;; NIL represents an explicit docstring of NIL, not the name.
