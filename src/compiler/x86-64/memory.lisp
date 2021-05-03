@@ -190,15 +190,11 @@
 ;;; Splitting it into 3 vops potentially gets better register allocation
 ;;; by not wasting registers in the cases that don't use them.
 (define-vop (zero-fill-word)
-  (:guard (lambda (node)
-            (let ((words (second (sb-c::combination-args node))))
-              (and (sb-c::constant-lvar-p words) (eql (sb-c::lvar-value words) 1)))))
   (:policy :fast-safe)
   (:translate zero-fill)
-  (:args (vector :scs (descriptor-reg))
-         (words :scs (unsigned-reg immediate)))
-  (:info elidable)
-  (:arg-types * positive-fixnum (:constant boolean))
+  (:args (vector :scs (descriptor-reg)))
+  (:info words elidable)
+  (:arg-types * (:constant (eql 1)) (:constant boolean))
   (:results (result :scs (descriptor-reg)))
   (:ignore elidable)
   (:generator 1
@@ -209,16 +205,13 @@
    (move result vector)))
 
 (define-vop (zero-fill-small zero-fill-word)
-  (:guard (lambda (node)
-            (let ((words (second (sb-c::combination-args node))))
-              (and (sb-c::constant-lvar-p words)
-                   (typep (sb-c::lvar-value words) '(integer 2 10))))))
+  (:arg-types * (:constant (integer 2 10)) (:constant boolean))
   (:temporary (:sc complex-double-reg) zero)
   (:generator 5
    (inst xorpd zero zero)
    (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                         vector)))
-     (multiple-value-bind (double single) (truncate (tn-value words) 2)
+     (multiple-value-bind (double single) (truncate words 2)
        (dotimes (i double)
          (inst movapd data-addr zero)
          (setf data-addr (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
@@ -228,11 +221,12 @@
    (move result vector)))
 
 (define-vop (zero-fill-any zero-fill-word)
-  (:guard nil) ; removes the inherited guard
   ;; vector has to conflict with everything so that a tagged pointer
   ;; corresponding to RDI always exists
   (:args (vector :scs (descriptor-reg) :to (:result 0))
          (words :scs (unsigned-reg immediate) :target rcx))
+  (:info elidable)
+  (:arg-types * positive-fixnum (:constant boolean))
   (:temporary (:sc any-reg :offset rdi-offset :from (:argument 0)
                :to (:result 0)) rdi)
   (:temporary (:sc any-reg :offset rcx-offset :from (:argument 1)
@@ -243,8 +237,13 @@
   (:generator 10
    (inst lea rdi (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                         vector))
-   (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
-   (zeroize rax)
+   (cond ((and (constant-tn-p words) (typep (tn-value words) '(unsigned-byte 7)))
+          (zeroize rax)
+          (inst lea :dword rcx (ea (tn-value words) rax))) ; smaller encoding
+         (t
+          ;; words could be in RAX, so read it first, then zeroize
+          (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
+          (zeroize rax)))
    (inst rep)
    (inst stos rax)
    (move result vector)))
