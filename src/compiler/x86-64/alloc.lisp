@@ -558,7 +558,6 @@
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
      ;; Finished with the pseudo-atomic instructions
      (when label
-       ;; (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (storew temp result closure-fun-slot fun-pointer-lowtag)
        #+metaspace

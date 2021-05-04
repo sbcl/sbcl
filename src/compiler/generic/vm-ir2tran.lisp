@@ -420,7 +420,9 @@
             ;; versus the array having no :initial-element.
             ((sb-vm::allocate-vector-on-stack
               sb-vm::allocate-vector-on-stack+msan-unpoison)
-             (car (vop-codegen-info vop))))
+             ;; Take the last of the info arguments
+             ;; in case WORDS is also an info argument.
+             (the boolean (car (last (vop-codegen-info vop))))))
       (let ((new (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                       (template-or-lose 'move)
                                       (reference-tn (tn-ref-tn (vop-args vop)) nil)
