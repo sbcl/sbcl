@@ -36,8 +36,7 @@ and a secondary value, the number of characters consumed."
       (let ((length (length string)))
         (when (< length 256) ; arbitrary limit to keep stack usage minimal
           (string-dispatch ((simple-array character (*)) base-string) string
-            (sb-int:dx-let ((copy (make-array length :element-type 'base-char
-                                              :initial-element #\null)))
+            (sb-int:dx-let ((copy (make-array length :element-type 'base-char)))
               (loop for i below length do (setf (schar copy i) (char string i)))
               (return-from strtod (strtod/base-string copy 0)))))))
     (strtod/base-string (coerce string 'simple-base-string) 0))) ; Anything else

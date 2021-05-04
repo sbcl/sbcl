@@ -858,8 +858,7 @@
              (let ((lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
-                  ,(wrap (cond ((or (eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
-                                    (policy call (= safety 3))) ; mandatory zero-fill
+                  ,(wrap (cond ((eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
                                 `(sb-vm::zero-fill ,data-alloc-form nwords nil))
                                (t
                                 ;; otherwise, reading an element can't cause an invalid bit pattern

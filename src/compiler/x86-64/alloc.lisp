@@ -376,6 +376,41 @@
          (put-header result 0 type length t)
          (inst or :byte result other-pointer-lowtag)))))
 
+  (defun store-string-trailing-null (vector type length words)
+    ;; BASE-STRING needs to have a null terminator. The byte is inaccessible
+    ;; to lisp, so clear it now.
+    (cond ((and (sc-is type immediate)
+                (/= (tn-value type) sb-vm:simple-base-string-widetag))) ; do nothing
+          ((and (sc-is type immediate)
+                (= (tn-value type) sb-vm:simple-base-string-widetag)
+                (sc-is length immediate))
+           (inst mov :byte (ea (- (+ (ash vector-data-offset word-shift)
+                                     (tn-value length))
+                                  other-pointer-lowtag)
+                               vector)
+                 0))
+          ;; Zeroizing the entire final word is easier than using LENGTH now.
+          ((sc-is words immediate)
+           ;; I am not convinced that this case is reachable -
+           ;; we won't DXify a vector of unknown type.
+           (inst mov :qword
+                 ;; Given N data words, write to word N-1
+                 (ea (- (ash (+ (tn-value words) vector-data-offset -1)
+                             word-shift)
+                        other-pointer-lowtag)
+                     vector)
+                 0))
+          (t
+           ;; This final case is ok with 0 data words - it might clobber the LENGTH
+           ;; slot, but subsequently we rewrite that slot.
+           ;; But strings always have at least 1 word, so no worries either way.
+           (inst mov :qword
+                 (ea (- (ash (1- vector-data-offset) word-shift)
+                        other-pointer-lowtag)
+                     vector
+                     words (ash 1 (- word-shift n-fixnum-tag-bits)))
+                 0))))
+
   (define-vop (allocate-vector-on-stack)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
@@ -389,6 +424,10 @@
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag)
+        ;; NB: store the trailing null BEFORE storing the header,
+        ;; in case the length in words is 0, which stores into the LENGTH slot
+        ;; as if it were element -1 of data (which probably can't happen).
+        (store-string-trailing-null result type length words)
         ;; FIXME: It would be good to check for stack overflow here.
         (put-header result other-pointer-lowtag type length nil)
         ;; If the array was safely created then it can't contain junk.
@@ -426,6 +465,7 @@
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag)
+        (store-string-trailing-null result type length words)
         ;; FIXME: It would be good to check for stack overflow here.
         (put-header result other-pointer-lowtag type length nil)
         (cond ((sc-is words immediate)
