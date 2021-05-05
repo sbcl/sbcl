@@ -19,14 +19,6 @@
 ;;; for fopcompilation, as it could eliminate special cases below.
 (defun compile-load-time-value (form &optional no-skip)
   (acond ((typecase form
-            ;; This case is important for dumping packages as constants
-            ;; in cold-init, but works fine in the normal target too.
-            ((cons (eql find-package) (cons string null)) 'package)
-            ;; Another similar case - this allows the printer to work
-            ;; immediately in cold-init. (See SETUP-PRINTER-STATE.)
-            ((cons (eql function)
-                   (cons (satisfies legal-fun-name-p) null))
-             'function)
             ;; We want to construct cold classoid cells, but in general
             ;; FIND-CLASSOID-CELL could be called with :CREATE NIL
             ;; which can not be handled in cold-load.

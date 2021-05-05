@@ -1729,14 +1729,6 @@ expansion happened."
           nil
           result))))
 
-;;; Note that the type NAME has been (re)defined, updating the
-;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.
-(defun %note-type-defined (name)
-  (declare (symbol name))
-  (note-name-defined name :type)
-  (values-specifier-type-cache-clear)
-  (values))
-
 ;;; Don't try to define a print method until it's actually gonna work!
 ;;; (Otherwise this would be near the DEFSTRUCT)
 (defmethod print-object ((ctype ctype) stream)

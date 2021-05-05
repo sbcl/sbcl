@@ -435,6 +435,14 @@
   (%proclaim raw-form nil)
   (values))
 
+;;; Note that the type NAME has been (re)defined, updating the
+;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.
+(defun %note-type-defined (name)
+  (declare (symbol name))
+  (note-name-defined name :type)
+  (values-specifier-type-cache-clear)
+  (values))
+
 ;; Issue a style warning if there are any repeated OPTIMIZE declarations
 ;; given the SPECIFIED-QUALITIES, unless there is no ambiguity.
 (defun warn-repeated-optimize-qualities (new-policy specified-qualities)
