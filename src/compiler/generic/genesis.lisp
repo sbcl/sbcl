@@ -991,9 +991,6 @@ core and return a descriptor to it."
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb-vm:vector-data-offset) value)))
 
-(setf (get 'vector :sb-cold-funcall-handler/for-value)
-      (lambda (&rest args) (vector-in-core args)))
-
 (declaim (inline cold-vector-len cold-svref))
 (defun cold-vector-len (vector)
   (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
