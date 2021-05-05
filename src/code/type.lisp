@@ -4657,6 +4657,46 @@ used for a COMPLEX component.~:@>"
     (if (union-type-p type)
         (sb-kernel::simplify-array-unions type)
         type)))
+
+
+;;;; ALIEN-TYPE types
+
+(define-type-class alien :enumerable nil :might-contain-other-types nil)
+
+(define-type-method (alien :negate) (type) (make-negation-type type))
+
+(define-type-method (alien :unparse) (type)
+  `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))
+
+(define-type-method (alien :simple-subtypep) (type1 type2)
+  (values (alien-subtype-p (alien-type-type-alien-type type1)
+                           (alien-type-type-alien-type type2))
+          t))
+
+(define-type-method (alien :simple-=) (type1 type2)
+  (let ((alien-type-1 (alien-type-type-alien-type type1))
+        (alien-type-2 (alien-type-type-alien-type type2)))
+    (values (or (eq alien-type-1 alien-type-2)
+                (alien-type-= alien-type-1 alien-type-2))
+            t)))
+
+(def-type-translator alien (&optional (alien-type nil))
+  (typecase alien-type
+    (null
+     (make-alien-type-type))
+    (alien-type
+     (make-alien-type-type alien-type))
+    (t
+     (make-alien-type-type (parse-alien-type alien-type (make-null-lexenv))))))
+
+(defun make-alien-type-type (&optional alien-type)
+  (if alien-type
+      (let ((lisp-rep-type (compute-lisp-rep-type alien-type)))
+        (if lisp-rep-type
+            (single-value-specifier-type lisp-rep-type)
+            (%make-alien-type-type alien-type)))
+      *universal-type*))
+
 
 ;;;; CONS types
 

@@ -2369,7 +2369,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
                "!COLD-INIT"
                "!TYPE-CLASS-COLD-INIT"
-               "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
+               "!CLASSES-COLD-INIT"
                "!TYPE-COLD-INIT"
                "!FIXUP-TYPE-COLD-INIT"
                "!RANDOM-COLD-INIT"
