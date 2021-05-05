@@ -733,7 +733,7 @@
 
 (eval-when (:compile-toplevel :execute) (setq sb-cold::*choke-on-host-irrationals* t))
 
-;;; These two constants are used in 'late-type'
+;;; These two constants are used in 'type'
 (defconstant most-positive-long-float most-positive-double-float)
 (defconstant most-negative-long-float most-negative-double-float)
 

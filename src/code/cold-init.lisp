@@ -118,8 +118,7 @@
   (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !pred-cold-init)
-  (show-and-call !early-type-cold-init)
-  (show-and-call !late-type-cold-init)
+  (show-and-call !type-cold-init)
   (show-and-call !alien-type-cold-init)
   ;; FIXME: It would be tidy to make sure that that these cold init
   ;; functions are called in the same relative order as the toplevel

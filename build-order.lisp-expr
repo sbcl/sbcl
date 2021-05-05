@@ -229,7 +229,6 @@
  ("src/compiler/generic/vm-macs" :c-headers)
  ("src/compiler/generic/objdef" :c-headers)
 
- ("src/code/early-type" :c-headers)
  ;; sparc-vm and ppc-vm need sc+offset defined to get at internal
  ;; error args. This file contains stuff previously in
  ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
@@ -294,12 +293,11 @@
  ("src/code/condition" :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
-
+ ("src/code/type" :c-headers)
  ("src/compiler/generic/primtype" :c-headers)
 
- ;; SB-XC:DEFTYPE is needed in order to compile late-type
- ;; in the host Common Lisp, and in order to run, it needs
- ;; %COMPILER-DEFTYPE.
+ ;; SB-XC:DEFTYPE is needed in order to compile type.lisp in the host
+ ;; Common Lisp, and in order to run, it needs %COMPILER-DEFTYPE.
  ("src/compiler/compiler-deftype" :c-headers)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
@@ -313,15 +311,11 @@
  ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
  ;; and all type-classes are defined.
  ("src/code/deftypes-for-target" :c-headers)
- ;; These appear here in the build sequence because they require
- ;;   * the macro INFO, defined in globaldb.lisp
- ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
- ("src/code/late-type" :c-headers)
 
  ("src/code/class-init" :c-headers :not-target)
 
  ;; The DEFSTRUCT machinery needs SUBTYPEP, defined in
- ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
+ ;; "code/type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and PROCLAIM, defined in "src/compiler/proclaim"
  ("src/code/defstruct"  :c-headers)
@@ -331,9 +325,9 @@
  ;; machinery) before we can set its superclasses here.
  ("src/code/alien-type")
 
- ;; This needs not just the SB-XC:DEFSTRUCT machinery, but also
- ;; the TYPE= stuff defined in late-type.lisp, and the
- ;; CHECK-FUN-NAME defined in proclaim.lisp.
+ ;; This needs not just the SB-XC:DEFSTRUCT machinery, but also the
+ ;; TYPE= stuff defined in type.lisp, and the CHECK-FUN-NAME defined
+ ;; in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs" :c-headers :not-target)
 
  ("src/compiler/compiler-error")

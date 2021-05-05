@@ -548,6 +548,31 @@
           (funcall (the function method-fun) type2 type1))
         (values nil t))))
 
+;; The following macros expand into either constructor calls,
+;; if building the cross-compiler, or forms which reference
+;; previously constructed objects, if running the cross-compiler.
+#+sb-xc-host
+(progn
+  (defmacro literal-ctype (constructor &optional specifier)
+    (declare (ignore specifier))
+    `(load-time-value ,constructor))
+
+  (defmacro literal-ctype-vector (var)
+    `(load-time-value ,var nil)))
+
+;; Omitting the specifier works only if the unparser method has been
+;; defined in time to use it, and you're sure that constructor's result
+;; can be unparsed - some unparsers may be confused if called on a
+;; non-canonical object, such as an instance of (CONS T T) that is
+;; not EQ to the interned instance.
+#-sb-xc-host
+(progn
+  (defmacro literal-ctype (constructor &optional (specifier nil specifier-p))
+    (if specifier-p (specifier-type specifier) (symbol-value constructor)))
+
+  (defmacro literal-ctype-vector (var)
+    (symbol-value var)))
+
 ;;;; miscellany
 
 ;;; Hash two things (types) down to a target fixnum. In CMU CL this was an EQ
@@ -573,8 +598,7 @@
         do (setq res (logxor (ash res -1) (type-hash-value type)))
         finally (return res)))
 
-;;; A few type representations need to be defined slightly earlier than
-;;; 'early-type' is compiled, so they're defined here.
+;;;; representations of types
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -702,6 +726,23 @@
                                             (enumerable types))
                               (:copier nil)))
 
+(defstruct (alien-type-type
+            (:include ctype (%bits (pack-ctype-bits alien)))
+            (:constructor %make-alien-type-type (alien-type))
+            (:copier nil))
+  (alien-type nil :type alien-type :read-only t))
+
+(defstruct (negation-type (:include ctype (%bits (pack-ctype-bits negation)))
+                          (:copier nil)
+                          (:constructor make-negation-type (type)))
+  (type (missing-arg) :type ctype :read-only t))
+
+;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
+;;; defined). We make this distinction since we don't want to complain
+;;; about types that are hairy but defined.
+(defstruct (unknown-type (:include hairy-type (%bits (pack-ctype-bits hairy)))
+                         (:copier nil)))
+
 ;;; a list of all the float "formats" (i.e. internal representations;
 ;;; nothing to do with #'FORMAT), in order of decreasing precision
 (defglobal *float-formats*
@@ -759,34 +800,6 @@
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
 
-(in-package "SB-ALIEN")
-(def!struct (alien-type
-             (:copier nil)
-             (:constructor make-alien-type
-                           (&key class bits alignment
-                            &aux (alignment
-                                  (or alignment (guess-alignment bits))))))
-  (class 'root :type symbol :read-only t)
-  (bits nil :type (or null unsigned-byte))
-  (alignment nil :type (or null unsigned-byte)))
-(!set-load-form-method alien-type (:xc :target))
-
-(in-package "SB-KERNEL")
-(defstruct (alien-type-type
-            (:include ctype (%bits (pack-ctype-bits alien)))
-            (:constructor %make-alien-type-type (alien-type))
-            (:copier nil))
-  (alien-type nil :type alien-type :read-only t))
-
-;;; the description of a &KEY argument
-(defstruct (key-info #-sb-xc-host (:pure t)
-                     (:copier nil))
-  ;; the key (not necessarily a keyword in ANSI Common Lisp)
-  (name (missing-arg) :type symbol :read-only t)
-  ;; the type of the argument value
-  (type (missing-arg) :type ctype :read-only t))
-(declaim (freeze-type key-info))
-
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
 (defstruct (args-type (:include ctype)
@@ -803,6 +816,22 @@
   (keywords nil :type list :read-only t)
   ;; true if other &KEY arguments are allowed
   (allowp nil :type boolean :read-only t))
+
+;;; the description of a &KEY argument
+(defstruct (key-info #-sb-xc-host (:pure t)
+                     (:copier nil))
+  ;; the key (not necessarily a keyword in ANSI Common Lisp)
+  (name (missing-arg) :type symbol :read-only t)
+  ;; the type of the argument value
+  (type (missing-arg) :type ctype :read-only t))
+(declaim (freeze-type key-info))
+
+(defstruct (values-type
+            (:include args-type (%bits (pack-ctype-bits values)))
+            (:constructor %make-values-type)
+            (:copier nil)))
+
+(declaim (freeze-type values-type))
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type (%bits (pack-ctype-bits function)))
@@ -826,6 +855,38 @@
             (:constructor make-fun-designator-type
                 (required optional rest
                  keyp keywords allowp wild-args returns))))
+
+;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
+;;; "type specifier", which is only meaningful in function argument
+;;; type specifiers used within the compiler. (It represents something
+;;; that the compiler knows to be a constant.)
+(defstruct (constant-type
+            (:include ctype (%bits (pack-ctype-bits constant)))
+            (:copier nil))
+  ;; The type which the argument must be a constant instance of for this type
+  ;; specifier to win.
+  (type (missing-arg) :type ctype :read-only t))
+
+
+;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
+#+sb-simd-pack
+(defstruct (simd-pack-type
+            (:include ctype (%bits (pack-ctype-bits simd-pack)))
+            (:constructor %make-simd-pack-type (element-type))
+            (:copier nil))
+  (element-type (missing-arg)
+   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :read-only t))
+
+#+sb-simd-pack-256
+(defstruct (simd-pack-256-type
+            (:include ctype (%bits (pack-ctype-bits simd-pack-256)))
+            (:constructor %make-simd-pack-256-type (element-type))
+            (:copier nil))
+  (element-type (missing-arg)
+   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :read-only t))
+
 (declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
 ;;; Look for nice relationships for types that have nice relationships
 ;;; only when one is a hierarchical subtype of the other.
@@ -848,18 +909,6 @@
         ((csubtypep type2 type1) type1)
         (t nil)))
 
-;; KLUDGE: putting this here satisfies CMUCL for an inexplicable reason.
-;; It should suffice to put it anywhere before %MAKE-CHARACTER-SET-TYPE
-;; is actually called.
-;;
-;; all character-set types are enumerable, but it's not possible
-;; for one to be TYPE= to a MEMBER type because (MEMBER #\x)
-;; is not internally represented as a MEMBER type.
-;; So in case it wasn't clear already ENUMERABLE-P does not mean
-;;  "possibly a MEMBER type in the Lisp-theoretic sense",
-;; but means "could be implemented in SBCL as a MEMBER type".
-(define-type-class character-set :enumerable nil
-                    :might-contain-other-types nil)
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
 
 ;;; CAUTION: unhygienic macro specifically designed to expand into body code

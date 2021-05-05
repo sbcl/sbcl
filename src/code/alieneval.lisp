@@ -172,6 +172,17 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (create-alien-type-class-if-necessary 'root 'alien-type nil))
 
+(def!struct (alien-type
+             (:copier nil)
+             (:constructor make-alien-type
+                           (&key class bits alignment
+                            &aux (alignment
+                                  (or alignment (guess-alignment bits))))))
+  (class 'root :type symbol :read-only t)
+  (bits nil :type (or null unsigned-byte))
+  (alignment nil :type (or null unsigned-byte)))
+(!set-load-form-method alien-type (:xc :target))
+
 (defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
     (sb-impl:print-type-specifier stream (unparse-alien-type type))))

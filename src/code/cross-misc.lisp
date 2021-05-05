@@ -337,7 +337,6 @@
 
 (defmacro sb-format:tokens (string) string)
 
-;;; For a use in EARLY-TYPE
 (defmacro with-system-mutex ((lock) &body body)
   (declare (ignore lock))
   `(progn ,@body))
