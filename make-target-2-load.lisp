@@ -476,10 +476,6 @@ Please check that all strings which were not recognizable to the compiler
             sum-delta-ext sum-delta-int
             (+ sum-delta-ext sum-delta-int))))
 
-;;; Use historical (stupid) behavior for storing pathname namestrings
-;;; in fasls.
-(setq sb-c::*name-context-file-path-selector* 'truename)
-
 ;;; Lock internal packages
 #-(and sb-devel
        (not sb-devel-lock-packages))

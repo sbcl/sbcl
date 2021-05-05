@@ -836,11 +836,20 @@ necessary, since type inference may take arbitrarily long to converge.")
   (terpri)
   (values))
 
+;;; Leave this as NIL if you want modern, rational, correct, behavior,
+;;; or switch it to T for legacy (CLHS-specified) bullshit a la
+;;;  "During a call to compile-file, *compile-file-pathname* is bound to the pathname
+;;;   denoted by the first argument to compile-file, merged against the defaults"
+;;; The normal build sets it to T in make-target-2, despite that I think most people would
+;;; prefer the nonstandard behavior. The standard behavior makes stored pathnames all wrong
+;;; when files are physically moved. (Same problem as SBCL_HOME embedded into C pretty much)
+(defglobal *merge-pathnames* t)
+
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :untruename #+sb-xc-host file ; becomes *C-F-PATHNAME*
-                                          #-sb-xc-host (merge-pathnames file)
+   :file-info (make-file-info :untruename ; becomes *C-F-PATHNAME*
+                              (if *merge-pathnames* (merge-pathnames file) file)
                               :external-format external-format
                               :subforms
                               (if form-tracking-p
@@ -903,7 +912,11 @@ necessary, since type inference may take arbitrarily long to converge.")
                      ;; SBCL stream classes aren't available in the host
                      #-sb-xc-host :class
                      #-sb-xc-host 'form-tracking-stream)))
-          (setf *compile-file-pathname* (pathname stream)
+          ;; If you don't want merged pathnames embedded in your build artifacts,
+          ;; then you surely don't want them in *COMPILE-FILE-PATHNAME* either.
+          ;; [And can't we just bind this to PATHNAME is all cases? If anything,
+          ;; it seems to me that asking the stream for its name is expressly backwards]
+          (setf *compile-file-pathname* (if *merge-pathnames* (pathname stream) pathname)
                 *compile-file-truename* (truename stream)
                 (file-info-name file-info) *compile-file-truename*)
           (when (file-info-subforms file-info)

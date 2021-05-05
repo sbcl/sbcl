@@ -58,12 +58,17 @@ if [ "$warm_compile" = yes ]; then
 fi
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl --core output/cold-sbcl.core \
- --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
- --eval "(progn ${devel})" \
- --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
- --eval '(setf (extern-alien "gc_coalesce_string_literals" char) 2)' \
- --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
- (sb-ext:save-lisp-and-die "output/sbcl.core"))'
+ --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit <<EOF
+(progn ${devel})
+(sb-fasl::!warm-load "make-target-2-load.lisp")
+(setf (extern-alien "gc_coalesce_string_literals" char) 2)
+;;; Use the historical (bad) convention for *compile-file-pathname*
+(setf sb-c::*merge-pathnames* t)
+;;; and for storing pathname namestrings in fasls too.
+(setq sb-c::*name-context-file-path-selector* 'truename)
+(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
+ (sb-ext:save-lisp-and-die "output/sbcl.core"))
+EOF
 
 # Confirm that default evaluation strategy is :INTERPRET if sb-fasteval was built
 src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
