@@ -219,10 +219,6 @@
      (sb-thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
 
-(defmethod make-load-form ((p package) &optional environment)
-  (declare (ignore environment))
-  `(find-undeleted-package-or-lose ,(package-name p)))
-
 ;;;; iteration macros
 
 (defmacro with-package-iterator ((mname package-list &rest symbol-types) &body body)

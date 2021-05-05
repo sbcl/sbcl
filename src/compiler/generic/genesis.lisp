@@ -638,7 +638,7 @@
 
 (defstruct (ltv-patch (:copier nil) (:constructor make-ltv-patch (index)))
   (index 0 :read-only t))
-(declaim (ftype (function (descriptor sb-vm:word (or symbol descriptor ltv-patch)))
+(declaim (ftype (function (descriptor sb-vm:word (or symbol package descriptor ltv-patch)))
                 write-wordindexed))
 (macrolet ((write-bits (bits)
              `(setf (bvref-word (descriptor-mem address)
@@ -659,9 +659,11 @@
                 (bug "Can't patch load-time-value into ~S" address))
             sb-vm:unbound-marker-widetag)
           (t
-           ;; If we're passed a symbol as a value then it needs to be interned.
-           (descriptor-bits (cond ((symbolp value) (cold-intern value))
-                                  (t value)))))))
+           (descriptor-bits
+            ;; If we're passed a symbol as a value then it needs to be interned.
+            (cond ((symbolp value) (cold-intern value))
+                  ((packagep value) (cdr (cold-find-package-info (package-name value))))
+                  (t value)))))))
 
   (defun write-wordindexed/raw (address index bits)
     (declare (type descriptor address) (type sb-vm:word index)
@@ -1454,10 +1456,9 @@ core and return a descriptor to it."
 (defvar *cold-package-symbols*)
 (declaim (type hash-table *cold-package-symbols*))
 
-(setf (get 'find-package :sb-cold-funcall-handler/for-value)
-      (lambda (descriptor &aux (name (base-string-from-core descriptor)))
-        (or (cdr (gethash name *cold-package-symbols*))
-            (error "Genesis could not find a target package named ~S" name))))
+(defun cold-find-package-info (package-name)
+  (or (gethash package-name *cold-package-symbols*)
+      (error "Genesis could not find a target package named ~S" package-name)))
 
 (defvar *classoid-cells*)
 (defun cold-find-classoid-cell (name &key create)
@@ -1648,8 +1649,7 @@ core and return a descriptor to it."
           ;; All interned symbols need a hash
           (write-wordindexed handle sb-vm:symbol-hash-slot
                              (make-fixnum-descriptor (sb-xc:sxhash symbol)))
-          (let ((pkg-info (or (gethash (package-name package) *cold-package-symbols*)
-                              (error "No target package descriptor for ~S" package))))
+          (let ((pkg-info (cold-find-package-info (package-name package))))
             (write-wordindexed handle sb-vm:symbol-package-slot (cdr pkg-info))
             (record-accessibility
              (or access (nth-value 1 (find-symbol name package)))

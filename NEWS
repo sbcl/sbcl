@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.4:
+  * optimization: file compilation now produces smaller fasls for files which
+    reference package literals.
   * incompatible change: on certain platforms (currently just x86-64),
     dynamic-extent arrays specialized on character and numeric types and
     created without either :INITIAL-ELEMENT or :INITIAL-CONTENTS will reflect

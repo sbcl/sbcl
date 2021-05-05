@@ -94,11 +94,6 @@
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
 (proclaim '(freeze-type package-hashtable package))
-(!set-load-form-method package (:xc)
-  (lambda (obj env)
-    (declare (ignore env))
-    ;; the target code will use FIND-UNDELETED-PACKAGE-OR-LOSE
-    `(find-package ,(package-name obj))))
 
 (defconstant +initial-package-bits+ 2) ; for genesis
 

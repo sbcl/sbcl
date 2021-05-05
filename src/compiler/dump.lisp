@@ -530,6 +530,8 @@
         ((fixnump x) (dump-integer x file))
         ((characterp x)
          (dump-fop 'fop-character file (char-code x)))
+        ((packagep x)
+         (dump-push (dump-package x file) file))
         #-sb-xc-host
         ((system-area-pointer-p x)
          (dump-fop 'fop-word-pointer file)
