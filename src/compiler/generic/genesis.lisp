@@ -2519,7 +2519,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
             (cold-symbol-function (car args)))
-           (cons (cold-cons (first args) (second args)))
            (symbol-global-value (cold-symbol-value (first args)))
            (values-specifier-type
             (let* ((des (first args))
