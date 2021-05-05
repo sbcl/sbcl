@@ -146,8 +146,6 @@ the stack without triggering overflow protection.")
 
 ;;; This lock is seized in the compiler, and related areas -- like the
 ;;; classoid/layout/class system.
-;;; Assigning a literal object enables genesis to dump and load it
-;;; without need of a cold-init function.
 #-sb-xc-host
 (!define-load-time-global **world-lock** (sb-thread:make-mutex :name "World Lock"))
 
