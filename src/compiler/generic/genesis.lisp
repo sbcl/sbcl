@@ -1470,9 +1470,6 @@ core and return a descriptor to it."
                          :pcl-class *nil-descriptor*
                          :classoid *nil-descriptor*))))
 
-(setf (get 'find-classoid-cell :sb-cold-funcall-handler/for-value)
-      #'cold-find-classoid-cell)
-
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
 (defvar *cold-symbols*)

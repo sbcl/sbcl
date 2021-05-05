@@ -1425,6 +1425,20 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun producing-fasl-file ()
   (fasl-output-p *compile-object*))
 
+;;; Compile FORM and arrange for it to be called at load-time. Return
+;;; the dumper handle and our best guess at the type of the object.
+;;; Potential optimizations: We could test the form for constantness
+;;; (including FIND-PACKAGE forms) and dump it as a literal directly
+;;; instead. We could also fopcompile more complex non-constant forms.
+(defun compile-load-time-value (form &optional no-skip)
+  (let ((lambda (compile-load-time-stuff form t)))
+    (values (fasl-dump-load-time-value-lambda lambda *compile-object*
+                                              no-skip)
+            (let ((type (leaf-type lambda)))
+              (if (fun-type-p type)
+                  (single-value-type (fun-type-returns type))
+                  *wild-type*)))))
+
 ;;; Compile the FORMS and arrange for them to be called (for effect,
 ;;; not value) at load time.
 (defun compile-make-load-form-init-forms (forms fasl)

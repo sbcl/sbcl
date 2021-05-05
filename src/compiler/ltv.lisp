@@ -13,30 +13,6 @@
 
 (defknown %load-time-value (t) t (flushable movable))
 
-;;; Compile FORM and arrange for it to be called at load-time. Return
-;;; the dumper handle and our best guess at the type of the object.
-;;; It would be nice if L-T-V forms were generally eligible
-;;; for fopcompilation, as it could eliminate special cases below.
-(defun compile-load-time-value (form &optional no-skip)
-  (acond ((typecase form
-            ;; We want to construct cold classoid cells, but in general
-            ;; FIND-CLASSOID-CELL could be called with :CREATE NIL
-            ;; which can not be handled in cold-load.
-            #+sb-xc-host
-            ((cons (eql find-classoid-cell) (cons (cons (eql quote))))
-             (aver (eq (getf (cddr form) :create) t))
-             'sb-kernel::classoid-cell))
-          (fopcompile form nil t)
-          (values (sb-fasl::dump-pop *compile-object*) (specifier-type it)))
-         (t
-          (let ((lambda (compile-load-time-stuff form t)))
-            (values (fasl-dump-load-time-value-lambda lambda *compile-object*
-                                                      no-skip)
-                    (let ((type (leaf-type lambda)))
-                      (if (fun-type-p type)
-                          (single-value-type (fun-type-returns type))
-                          *wild-type*)))))))
-
 (def-ir1-translator load-time-value
     ((form &optional read-only-p) start next result)
   "Arrange for FORM to be evaluated at load-time and use the value produced as
