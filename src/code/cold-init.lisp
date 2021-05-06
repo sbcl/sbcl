@@ -20,7 +20,8 @@
   (%primitive print "too early in cold init to recover from errors")
   (%halt))
 
-(defun !cold-failed-aver (expr)
+;;; Real definition installed later in cold-init.
+(defun %failed-aver (expr)
   ;; output the message and invoke ldb monitor
   (terpri)
   (write-line "failed AVER:")
@@ -62,7 +63,6 @@
   "Give the world a shove and hope it spins."
 
   (/show0 "entering !COLD-INIT")
-  (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
   (!readtable-cold-init)
   (setq *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)
@@ -74,6 +74,16 @@
     ;; hence the conditional.
     #+(or x86 x86-64) (format t "COLD-INIT... ")
     #-(or x86 x86-64) (write-string "COLD-INIT... "))
+
+  ;; Anyone might call RANDOM to initialize a hash value or something;
+  ;; and there's nothing which needs to be initialized in order for
+  ;; this to be initialized, so we initialize it right away.
+  (show-and-call !random-cold-init)
+
+  ;; All sorts of things need INFO and/or (SETF INFO).
+  (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
+  (show-and-call !globaldb-cold-init)
+
   (!cold-init-hash-table-methods)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
   (sb-thread::init-main-thread)
@@ -82,11 +92,6 @@
   ;; It was fine if T because in that case the legality of the arg is certain.
   ;; And be extra paranoid - ensure that it really gets called.
   (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
-
-  ;; Anyone might call RANDOM to initialize a hash value or something;
-  ;; and there's nothing which needs to be initialized in order for
-  ;; this to be initialized, so we initialize it right away.
-  (show-and-call !random-cold-init)
 
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
@@ -106,10 +111,6 @@
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
   (show-and-call sb-unicode::!unicode-properties-cold-init)
-
-  ;; All sorts of things need INFO and/or (SETF INFO).
-  (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
-  (show-and-call !globaldb-cold-init)
 
   ;; Various toplevel forms call MAKE-ARRAY, which calls SUBTYPEP, so
   ;; the basic type machinery needs to be initialized before toplevel

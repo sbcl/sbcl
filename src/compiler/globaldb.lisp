@@ -72,20 +72,6 @@
            (!make-meta-info id category kind type-spec type-checker
                             validate-function default)))))
 
-#-sb-xc
-(setf (get '!%define-info-type :sb-cold-funcall-handler/for-effect)
-      (lambda (category kind type-spec checker validator default id)
-        ;; The SB-FASL: symbols are poor style, but the lesser evil.
-        ;; If exported, then they'll stick around in the target image.
-        ;; Perhaps SB-COLD should re-export some of these.
-        (sb-fasl::cold-svset
-         (sb-fasl::cold-symbol-value '*info-types*)
-         id
-         (sb-fasl::write-slots
-          (sb-fasl::allocate-struct-of-type 'meta-info)
-          :category category :kind kind :type-spec type-spec
-          :type-checker checker :validate-function validator
-          :default default :number id))))
 
 ;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
@@ -114,16 +100,17 @@
   ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
-  `(!%define-info-type
-    ,category ,kind ',type-spec
-    ,(if (eq type-spec 't)
-         '#'identity
-         `(named-lambda "check-type" (x) (the ,type-spec x)))
-    ,validate-function ,default
-    ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
-    ,(or (and (eq category :function) (eq kind :definition)
-              +fdefn-info-num+)
-         #+sb-xc (meta-info-number (meta-info category kind)))))
+  `(!cold-init-forms
+    (!%define-info-type
+     ,category ,kind ',type-spec
+     ,(if (eq type-spec 't)
+          '#'identity
+          `(named-lambda "check-type" (x) (the ,type-spec x)))
+     ,validate-function ,default
+     ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
+     ,(or (and (eq category :function) (eq kind :definition)
+               +fdefn-info-num+)
+          #+sb-xc (meta-info-number (meta-info category kind))))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
 (push '("SB-INT" define-info-type) *!removable-symbols*)
 
@@ -190,18 +177,6 @@
         (info-puthash *info-environment* name #'clear-hairy)))
     (not (null new))))
 
-;;;; *INFO-ENVIRONMENT*
-
-(defun !globaldb-cold-init ()
-  ;; Genesis writes the *INFO-TYPES* array, but setting up the mapping
-  ;; from keyword-pair to object is deferred until cold-init.
-  (dovector (x (the simple-vector *info-types*))
-    (when x (!register-meta-info x)))
-  #-sb-xc-host
-  (let ((h (make-info-hashtable)))
-    (setf (sb-thread:mutex-name (info-env-mutex h)) "globaldb")
-    (setq *info-environment* h)))
-
 ;;;; GET-INFO-VALUE
 
 ;;; If non-nil, *GLOBALDB-OBSERVER*'s CAR is a bitmask over info numbers
@@ -251,6 +226,7 @@
         (funcall (truly-the function (cdr hook)) name info-number answer nil))
       (values answer nil))))
 
+(!begin-collecting-cold-init-forms)
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 (define-info-type (:function :definition) :type-spec #-sb-xc-host (or fdefn null) #+sb-xc-host t)
 
@@ -577,6 +553,15 @@
 (define-info-type (:source-location :symbol-macro) :type-spec t)
 (define-info-type (:source-location :declaration) :type-spec t)
 (define-info-type (:source-location :alien-type) :type-spec t)
+
+(!defun-from-collected-cold-init-forms !info-type-cold-init)
+
+#-sb-xc-host
+(defun !globaldb-cold-init ()
+  (let ((h (make-info-hashtable)))
+    (setf (sb-thread:mutex-name (info-env-mutex h)) "globaldb")
+    (setq *info-environment* h))
+  (!info-type-cold-init))
 
 ;; This is for the SB-INTROSPECT contrib module, and debugging.
 (defun call-with-each-info (function symbol)
