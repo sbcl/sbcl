@@ -4935,7 +4935,7 @@ used for a COMPLEX component.~:@>"
             (chars (loop named outer
                          for (low . high) in pairs
                          nconc (loop for code from low upto high
-                                     collect (sb-xc:code-char code)
+                                     collect (code-char code)
                                      when (minusp (decf count))
                                      do (return-from outer t)))))
        (if (eq chars t)

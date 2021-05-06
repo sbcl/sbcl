@@ -79,7 +79,7 @@
 (defun directive-atsignp (x) (logbitp 7 (directive-bits x)))
 (declaim (inline directive-code directive-character))
 (defun directive-code (x) (logand (directive-bits x) #x7F))
-(defun directive-character (x) (sb-xc:code-char (directive-code x)))
+(defun directive-character (x) (code-char (directive-code x)))
 ;;; This works even if directive char is invalid, where -CHARACTER
 ;;; would return (code-char 0)
 (defun directive-char-name (x)
@@ -87,7 +87,7 @@
     (char-name (if (eql byte 0)
                    ;; extract the character from the string
                    (char (directive-string x) (1- (directive-end x)))
-                   (sb-xc:code-char byte)))))
+                   (code-char byte)))))
 
 (defun check-modifier (modifier-name value)
   (when value

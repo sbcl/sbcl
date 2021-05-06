@@ -264,7 +264,7 @@
                                        (if (and (not colon) (stringp (car input)))
                                            (string-left-trim
                                             ;; #\Tab is a nonstandard char
-                                            `(#-sb-xc-host ,(sb-xc:code-char tab-char-code)
+                                            `(#-sb-xc-host ,(code-char tab-char-code)
                                               #\space #\newline)
                                             (pop input))
                                            ""))))
@@ -284,7 +284,7 @@
                         (when (or (plusp n) (emit-placeholder-p))
                           (let ((char (case char
                                         (#\% #\Newline)
-                                        (#\| (sb-xc:code-char form-feed-char-code))
+                                        #-sb-xc-host (#\| (code-char form-feed-char-code))
                                         (t char))))
                             (emit-string (make-string n :initial-element char))))
                         (return)))))

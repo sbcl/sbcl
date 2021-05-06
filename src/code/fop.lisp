@@ -100,7 +100,7 @@
   (with-fast-read-byte ((unsigned-byte 8) stream)
     (dotimes (i length)
       (setf (aref string i)
-            (sb-xc:code-char (fast-read-byte)))))
+            (code-char (fast-read-byte)))))
   string)
 ;;; Variation 2: base-string, transfer elements of type (unsigned-byte 8)
 (defun read-base-string-as-bytes (stream string &optional (length (length string)))
@@ -110,7 +110,7 @@
   (with-fast-read-byte ((unsigned-byte 8) stream)
     (dotimes (i length)
       (setf (aref string i)
-            (sb-xc:code-char (fast-read-byte)))))
+            (code-char (fast-read-byte)))))
   string)
 ;;; Variation 3: character-string, transfer elements of type varint
 (defun read-char-string-as-varints
@@ -133,7 +133,7 @@
                    unless (logbitp 7 octet) return accum)))
       (dotimes (i length)
         (setf (aref string i)
-              (sb-xc:code-char (read-varint))))))
+              (code-char (read-varint))))))
   string)
 
 ;;;; miscellaneous fops

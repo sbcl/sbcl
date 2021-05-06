@@ -659,10 +659,7 @@
  ;; other target-code-building stuff which can't be processed until
  ;; machinery like SB-XC:DEFMACRO exists
 
- ("src/code/late-format" ; needs SB-XC:DEFMACRO
-  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
-                (cl:find :cmucl cl:*features*)) ; gets fatal warnings in CMUCL 20c
-        :ignore-failure-p))
+ ("src/code/late-format") ; needs SB-XC:DEFMACRO
 
  ("src/code/late-globaldb" :not-host)
  ("src/code/redblack" :not-host)
