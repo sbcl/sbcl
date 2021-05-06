@@ -265,6 +265,10 @@
   ;; But it's consistent for genesis to treat it always as a raw slot.
   (%bits (missing-arg) :type sb-vm:word :read-only t))
 
+(defmethod print-object ((ctype ctype) stream)
+  (print-unreadable-object (ctype stream :type t)
+    (prin1 (type-specifier ctype) stream)))
+
 ;;; take 27 low bits but exclude bits 20 and 21
 ;;; [Our MASK-FIELD can't be folded, and I didn't feel like fixing that.]
 (defconstant +type-hash-mask+

@@ -1625,7 +1625,6 @@
       *universal-type*
       (specifier-type x context)))
 
-
 ;;; When cross-compiling SPECIFIER-TYPE with a quoted argument,
 ;;; it can be rendered as a literal object unless it mentions
 ;;; certain classoids.
@@ -1728,12 +1727,6 @@ expansion happened."
                (contains-unknown-type-p result))
           nil
           result))))
-
-;;; Don't try to define a print method until it's actually gonna work!
-;;; (Otherwise this would be near the DEFSTRUCT)
-(defmethod print-object ((ctype ctype) stream)
-  (print-unreadable-object (ctype stream :type t)
-    (prin1 (type-specifier ctype) stream)))
 
 (defun-cached (type-negation :hash-function #'type-hash-value
                              :hash-bits 8
