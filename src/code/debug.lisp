@@ -1810,6 +1810,8 @@ forms that explicitly control this kind of evaluation.")
                            (funcall thunk))
                          #+unbind-in-unwind thunk
                          #+unbind-in-unwind unbind-to
+                         #+(and unbind-in-unwind (not c-stack-is-control-stack))
+                         (%primitive sb-c:current-nsp)
                          #+unbind-in-unwind catch-block)))
   #-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))

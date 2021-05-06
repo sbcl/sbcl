@@ -237,8 +237,9 @@
          (uwp :scs (descriptor-reg))
          (function :scs (descriptor-reg) :to :load :target saved-function)
          (bsp :scs (any-reg descriptor-reg))
+         (nsp :scs (any-reg descriptor-reg))
          (catch-block :scs (any-reg descriptor-reg)))
-  (:arg-types system-area-pointer system-area-pointer t t t)
+  (:arg-types system-area-pointer system-area-pointer t t t t)
   (:temporary (:sc unsigned-reg) temp)
   (:temporary (:sc descriptor-reg :offset r9-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
@@ -265,6 +266,8 @@
       (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
       (storew temp block unwind-block-cfp-slot)
       (storew bsp block unwind-block-bsp-slot)
+      (storew nsp block unwind-block-nsp-slot)
+      (storew zr-tn block unwind-block-nfp-slot)
       (storew catch-block block unwind-block-current-catch-slot)
       ;; Don't need to save code at unwind-block-code-slot since
       ;; it's not going to be used and will be overwritten after the
