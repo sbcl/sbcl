@@ -167,13 +167,13 @@
  ("src/code/sysmacs" :not-host)
  ("src/code/target-lfhash" :not-host)
  ("src/compiler/info-vector" :c-headers)
+ ("src/code/early-classoid" :c-headers)
  ("src/compiler/globaldb" :c-headers)
  ("src/compiler/generic/vm-array" :c-headers)
  ("src/code/string-hash" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/compiler/generic/pinned-objects" :not-host)
  ("src/compiler/generic/layout-ids" :c-headers)
- ("src/code/early-classoid" :c-headers)
 
  ("src/code/cold-error"  :not-host)
  ;; Define at most one INTERPRETED-FUNCTION type based on target features

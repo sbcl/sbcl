@@ -550,26 +550,6 @@
     (declare (ignore env))
     `(find-classoid-cell ',(classoid-cell-name self) :create t)))
 
-(defun find-classoid-cell (name &key create)
-  (let ((real-name (uncross name)))
-    (cond ((info :type :classoid-cell real-name))
-          (create
-           (get-info-value-initializing :type :classoid-cell real-name
-                                        (make-classoid-cell real-name))))))
-
-;;; Return the classoid with the specified NAME. If ERRORP is false,
-;;; then NIL is returned when no such class exists.
-(defun find-classoid (name &optional (errorp t))
-  (declare (type symbol name))
-  (let ((cell (find-classoid-cell name)))
-    (cond ((and cell (classoid-cell-classoid cell)))
-          (errorp
-           (error 'simple-type-error
-                  :datum nil
-                  :expected-type 'class
-                  :format-control "Class not yet defined: ~S"
-                  :format-arguments (list name))))))
-
 ;;;; PCL stuff
 
 ;;; the CLASSOID that we use to represent type information for
@@ -591,50 +571,3 @@
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
-
-#+sb-xc-host
-(progn
-(defun make-layout (hash classoid &rest keys)
-  (macrolet ((make (&rest extra)
-               `(apply #'host-make-wrapper
-                       (cdr (assq (classoid-name classoid) *popular-structure-types*))
-                       hash classoid ,@extra :allow-other-keys t keys)))
-    #-metaspace (make)
-    #+metaspace (let* ((layout (%make-layout))
-                       (wrapper (make :friend layout)))
-                  (setf (layout-friend layout) wrapper)
-                  wrapper)))
-;; The target reconstructs wrappers using FOP-LAYOUT but the host uses MAKE-LOAD-FORM.
-(defmethod make-load-form ((wrapper wrapper) &optional env)
-  (declare (ignore env))
-  (labels ((externalize (wrapper &aux (classoid (wrapper-classoid wrapper))
-                                      (name (classoid-name classoid)))
-             (when (or (wrapper-invalid wrapper)
-                       (not name)
-                       (typep classoid 'undefined-classoid))
-               (sb-c:compiler-error "can't dump ~S" wrapper))
-             `(xc-load-wrapper ',name
-                               ,(wrapper-depthoid wrapper)
-                               (vector ,@(map 'list #'externalize (wrapper-inherits wrapper)))
-                               ,(wrapper-length wrapper)
-                               ,(wrapper-bitmap wrapper))))
-    (externalize wrapper)))
-(defun xc-load-wrapper (name depthoid inherits length bitmap)
-  (let ((classoid (find-classoid name)))
-    (aver (and classoid (not (undefined-classoid-p classoid))))
-    (let ((wrapper (classoid-wrapper classoid)))
-      (unless (and (= (wrapper-depthoid wrapper) depthoid)
-                   (= (length (wrapper-inherits wrapper)) (length inherits))
-                   (every #'eq (wrapper-inherits wrapper) inherits)
-                   (= (wrapper-length wrapper) length)
-                   (= (wrapper-bitmap wrapper) bitmap))
-        (error "XC can't reload layout for ~S with ~S vs ~A"
-               name (list depthoid inherits length bitmap) wrapper))
-      wrapper)))
-) ; end PROGN
-
-;;; wrapper for this type being used by the compiler
-(sb-impl::define-info-type (:type :compiler-layout)
-  :type-spec (or wrapper null)
-  :default (lambda (name)
-             (awhen (find-classoid name nil) (classoid-wrapper it))))

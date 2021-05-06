@@ -115,15 +115,15 @@
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
   `(!%define-info-type
-           ,category ,kind ',type-spec
-           ,(if (eq type-spec 't)
-                '#'identity
-                `(named-lambda "check-type" (x) (the ,type-spec x)))
-           ,validate-function ,default
-           ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
-           ,(or (and (eq category :function) (eq kind :definition)
-                     +fdefn-info-num+)
-                #+sb-xc (meta-info-number (meta-info category kind)))))
+    ,category ,kind ',type-spec
+    ,(if (eq type-spec 't)
+         '#'identity
+         `(named-lambda "check-type" (x) (the ,type-spec x)))
+    ,validate-function ,default
+    ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
+    ,(or (and (eq category :function) (eq kind :definition)
+              +fdefn-info-num+)
+         #+sb-xc (meta-info-number (meta-info category kind)))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
 (push '("SB-INT" define-info-type) *!removable-symbols*)
 
@@ -492,6 +492,13 @@
 
 ;;; The classoid-cell for this type
 (define-info-type (:type :classoid-cell) :type-spec t)
+
+;;; wrapper for this type being used by the compiler
+(define-info-type (:type :compiler-layout)
+  :type-spec (or wrapper null)
+  :default (lambda (name)
+             (let ((class (find-classoid name nil)))
+               (and class (classoid-wrapper class)))))
 
 ;;; DEFTYPE lambda-list
 ;; FIXME: remove this after making swank-fancy-inspector not use it.
