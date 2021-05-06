@@ -190,10 +190,6 @@
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))
                        (fopcompilable-p (third form)))
-                  (and (symbolp function) ; no ((lambda ...) ...)
-                       (get-properties (symbol-plist function)
-                                       '(:sb-cold-funcall-handler/for-effect
-                                         :sb-cold-funcall-handler/for-value)))
                   (and (eq function 'setf)
                        (fopcompilable-p (%macroexpand form *lexenv*)))
                   (and (eq function 'sb-kernel:%svset)

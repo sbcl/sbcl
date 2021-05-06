@@ -83,6 +83,7 @@
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
+  (show-and-call !function-names-init)
 
   (!cold-init-hash-table-methods)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*

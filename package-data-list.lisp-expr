@@ -628,7 +628,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "OPEN-FASL-OUTPUT"
                "*!COLD-DEFSYMBOLS*"
                "*!COLD-TOPLEVELS*"
-               "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"))
+               "COLD-CONS" "COLD-INTERN" "COLD-PUSH"))
 
    ;; This package is a grab bag for things which used to be internal
    ;; symbols in package COMMON-LISP. Lots of these symbols are accessed

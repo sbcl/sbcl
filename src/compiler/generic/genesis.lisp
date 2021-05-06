@@ -619,12 +619,6 @@
 
 
 ;;;; miscellaneous stuff to read and write the core memory
-
-;; Like above, but the list is held in the target's image of the host symbol,
-;; not the host's value of the symbol.
-(defun cold-target-push (cold-thing host-symbol)
-  (cold-set host-symbol (cold-cons cold-thing (cold-symbol-value host-symbol))))
-
 (declaim (ftype (function (descriptor sb-vm:word) descriptor) read-wordindexed))
 (macrolet ((read-bits ()
              `(bvref-word (descriptor-mem address)
@@ -2500,11 +2494,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (let ((args)
                (stack (%fasl-input-stack fasl-input)))
            (dotimes (i argc (values (pop-fop-stack stack) args))
-             (push (pop-fop-stack stack) args))))
-       (call (fun-name handler-name args)
-         (acond ((get fun-name handler-name) (apply it args))
-                (t (error "Can't ~S ~S in cold load" handler-name fun-name)))))
-
+             (push (pop-fop-stack stack) args)))))
   (define-cold-fop (fop-funcall (n))
     (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if args
@@ -2523,8 +2513,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (write-slots (allocate-struct-of-type 'sb-thread:mutex)
                          :name (cadr args)
                          :%owner *nil-descriptor*))
-           (t
-            (call fun :sb-cold-funcall-handler/for-value args)))
+           (t (error "Can't FOP-FUNCALL with function ~S in cold load." fun)))
           (let ((counter *load-time-value-counter*))
             (push (cold-list (cold-intern :load-time-value) fun
                              (number-to-core counter)) *!cold-toplevels*)
@@ -2552,7 +2541,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (let ((val (second args)))
                          (if (symbolp val) (cold-intern val) val))))
             (%svset (apply 'cold-svset args))
-            (t (call fun :sb-cold-funcall-handler/for-effect args)))))))
+            (t
+             (error "Can't FOP-FUNCALL-FOR-EFFECT with function ~S in cold load" fun)))))))
 
 ;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
 #-c-headers-only
