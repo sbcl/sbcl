@@ -412,7 +412,7 @@
   (contexts nil :type t :read-only t)
   ;; Packed integers. Also can be a cons of that plus an alist which
   ;; maps SB-C::COMPILED-DEBUG-FUN to SB-DI::COMPILED-DEBUG-FUN instances.
-  (tlf-num+offset nil :type (or integer cons)))
+  (tlf-num+offset (missing-arg) :type (or integer cons)))
 
 ;;; The TLF-NUMBER and CHAR-OFFSET of a compiled-debug-info can each be NIL,
 ;;; but aren't often. However, to allow that, convert NIL to 0 and non-nil

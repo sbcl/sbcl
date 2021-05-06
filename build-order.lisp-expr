@@ -283,10 +283,7 @@
  ("src/pcl/pre-warm")
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
- ("src/code/debug-info" :c-headers
-  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
-                (cl:find :cmucl cl:*features*)) ; gets fatal warnings in CMUCL 20c
-        :ignore-failure-p))
+ ("src/code/debug-info" :c-headers)
 
  ("src/code/source-location")
  ("src/code/early-class")
