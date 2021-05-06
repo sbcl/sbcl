@@ -20,8 +20,7 @@
   (%primitive print "too early in cold init to recover from errors")
   (%halt))
 
-;;; Real definition installed later in cold-init.
-(defun %failed-aver (expr)
+(defun !cold-failed-aver (expr)
   ;; output the message and invoke ldb monitor
   (terpri)
   (write-line "failed AVER:")
@@ -84,6 +83,8 @@
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
   (show-and-call !function-names-init)
+
+  (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
 
   (!cold-init-hash-table-methods)
   ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
