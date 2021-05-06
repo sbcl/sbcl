@@ -508,6 +508,10 @@
 
 (def-add-sub add #b00
   (:printer add-sub-imm ((op #b00)))
+  (:printer add-sub-imm ((op #b00) (rd #.nsp-offset) (imm 0))
+            '('mov :tab rd ", " rn))
+  (:printer add-sub-imm ((op #b00) (rn #.nsp-offset) (imm 0))
+            '('mov :tab rd ", " rn))
   (:printer add-sub-ext-reg ((op #b00)))
   (:printer add-sub-shift-reg ((op #b00))))
 
