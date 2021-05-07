@@ -672,8 +672,8 @@
       (if (typep const-length 'index)
           (ceiling (* (+ const-length n-pad-elements) n-bits) sb-vm:n-word-bits))))
   (let ((padded-length-form (if (zerop n-pad-elements)
-                                'length
-                                `(+ length ,n-pad-elements))))
+                                '%length
+                                `(+ %length ,n-pad-elements))))
     (cond ((= n-bits 0) 0)
           ((= n-bits sb-vm:n-word-bits) padded-length-form)
           ((> n-bits sb-vm:n-word-bits) ; e.g. double-float on 32-bit
@@ -699,11 +699,23 @@
 ;;; to do a good job with all the different ways it can happen.
 (defun transform-make-array-vector (length element-type initial-element
                                     initial-contents call
-                                    &key adjustable fill-pointer)
-  (let* ((c-length (if (lvar-p length)
-                       (if (constant-lvar-p length) (lvar-value length))
-                       length))
-         (expressly-adjustable (cond ((not adjustable) nil)
+                                    &key adjustable fill-pointer
+                                    &aux c-length)
+  (when (and initial-contents initial-element)
+    (abort-ir1-transform "Both ~S and ~S specified."
+                         :initial-contents :initial-element))
+  (setq c-length (if (lvar-p length) ; some callers pass an integer per se
+                     (if (constant-lvar-p length) (lvar-value length))
+                     length))
+  (when (and (integerp c-length) ; 'bad-code.pure' tries to pass ((("foo"))) e.g.
+             fill-pointer
+             (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
+             (not (types-equal-or-intersect (lvar-type fill-pointer)
+                                            (specifier-type `(integer 0 ,c-length)))))
+    (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
+                         (type-specifier (lvar-type fill-pointer))
+                         c-length))
+  (let* ((expressly-adjustable (cond ((not adjustable) nil)
                                      ((not (constant-lvar-p adjustable)) :maybe)
                                      (t (and (lvar-value adjustable) t))))
          (has-fill-pointer (cond ((not fill-pointer) nil)
@@ -732,14 +744,6 @@
           `(truly-the (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
                       (allocate-vector ,(sb-vm:saetp-typecode saetp) %length nwords))))
 
-    (when (and c-length
-               fill-pointer
-               (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
-               (not (types-equal-or-intersect (lvar-type fill-pointer)
-                                              (specifier-type `(integer 0 ,c-length)))))
-      (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
-                           (type-specifier (lvar-type fill-pointer))
-                           c-length))
     (flet ((eliminate-keywords ()
              (eliminate-keyword-args
               call 1
@@ -749,8 +753,8 @@
                 (:adjustable adjustable)
                 (:fill-pointer fill-pointer))))
            (wrap (underlying)
-             `(let ((%length ,(or c-length '(the index length)))
-                    (nwords ,n-words-form))
+             `(let* ((%length ,(or c-length '(the index length)))
+                     (nwords ,n-words-form))
                ,(if (not array-header-p)
                     underlying ; was already cast using TRULY-THE
                     (let* ((constant-fill-pointer-p (and fill-pointer
@@ -796,9 +800,6 @@
                           array-header))))))
       (cond ;; Case (1) - :INITIAL-ELEMENT
             (initial-element
-             (when initial-contents
-               (abort-ir1-transform "Both ~S and ~S specified."
-                                    :initial-contents :initial-element))
              ;; If the specified initial element is equivalent to zero-filling,
              ;; then use ZERO-FILL, which is elidable for heap allocations.
              ;; But if that element induces a type error based on the specified
