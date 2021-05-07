@@ -581,6 +581,27 @@
   (def vpmovzxwq #x66 #x34 #x0f38)
   (def vpmovzxdq #x66 #x35 #x0f38))
 
+(macrolet ((def (name prefix opcode n-bits radix)
+             (let ((shuffle-pattern
+                     (find-symbol (format nil "SSE-SHUFFLE-PATTERN-~D-~D"
+                                          n-bits radix))))
+               `(define-instruction ,name (segment dst src pattern)
+                  ,@(avx2-inst-printer-list
+                     'ymm-ymm/mem prefix opcode
+                     :more-fields `((imm nil :type ',shuffle-pattern))
+                     :printer '(:name :tab reg ", " reg/mem ", " imm))
+
+                  (:emitter
+                   (aver (typep pattern '(unsigned-byte ,n-bits)))
+                   (emit-avx2-inst segment dst src ,prefix ,opcode
+                                   :remaining-bytes 1)
+                   (emit-byte segment pattern))))))
+  (def vpshufd  #x66 #x70 8 4)
+  (def vpshufhw #xf3 #x70 8 4)
+  (def vpshuflw #xf2 #x70 8 4)
+  (def vshufpd  #x66 #xc6 2 2)
+  (def vshufps  nil  #xc6 8 4))
+
 (macrolet
     ((def (name prefix opcode)
        `(define-instruction ,name (segment dst src src2 imm)
