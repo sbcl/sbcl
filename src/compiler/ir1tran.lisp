@@ -328,7 +328,7 @@
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
 ;;; CONSTANT might be circular. We also check that the constant (and
 ;;; any subparts) are dumpable at all.
-(defun ensure-externalizable (constant)
+(defun maybe-emit-make-load-forms (constant)
   (declare #-sb-xc-host (inline alloc-xset))
   (dx-let ((xset (alloc-xset)))
     (named-let grovel ((value constant))
@@ -350,27 +350,27 @@
            (dotimes (i (length value))
              (grovel (aref value i))))
           ((simple-array t)
-                    ;; Even though the (ARRAY T) branch does the exact
-                    ;; same thing as this branch we do this separately
-                    ;; so that the compiler can use faster versions of
-                    ;; array-total-size and row-major-aref.
+           ;; Even though the (ARRAY T) branch does the exact
+           ;; same thing as this branch we do this separately
+           ;; so that the compiler can use faster versions of
+           ;; array-total-size and row-major-aref.
            (dotimes (i (array-total-size value))
              (grovel (row-major-aref value i))))
           ((array t)
            (dotimes (i (array-total-size value))
              (grovel (row-major-aref value i))))
           (instance
-                    ;; In the target SBCL, we can dump any instance, but
-                    ;; in the cross-compilation host, %INSTANCE-FOO
-                    ;; functions don't work on general instances, only on
-                    ;; STRUCTURE!OBJECTs.
-                    ;;
-                    ;; Behold the wonderfully clear sense of this-
-                    ;;  WHEN (EMIT-MAKE-LOAD-FORM VALUE)
-                    ;; meaning "when you're _NOT_ using a custom load-form"
-                    ;;
-                    ;; FIXME: What about funcallable instances with
-                    ;; user-defined MAKE-LOAD-FORM methods?
+           ;; In the target SBCL, we can dump any instance, but
+           ;; in the cross-compilation host, %INSTANCE-FOO
+           ;; functions don't work on general instances, only on
+           ;; STRUCTURE!OBJECTs.
+           ;;
+           ;; Behold the wonderfully clear sense of this-
+           ;;  WHEN (EMIT-MAKE-LOAD-FORM VALUE)
+           ;; meaning "when you're _NOT_ using a custom load-form"
+           ;;
+           ;; FIXME: What about funcallable instances with
+           ;; user-defined MAKE-LOAD-FORM methods?
            (when (emit-make-load-form value)
              #+sb-xc-host
              (aver (eql (wrapper-bitmap (%instance-wrapper value))

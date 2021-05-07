@@ -2323,11 +2323,37 @@ is :ANY, the function name is not checked."
       (change-ref-leaf ref new-leaf)))
   (values))
 
+;;; FIXME: This logic is incomplete, lacking PACKAGE, RANDOM-STATE,
+;;; SIMPLE-VECTOR, HASH-TABLE, and PATHNAME, and all arrays of rank
+;;; other than 1.  SIMPLE-VECTOR, PATHNAME, and possibly RANDOM-STATE,
+;;; could be worthwhile to handle.
+(defun coalescible-object-p (object)
+  (labels ((cons-coalesce-p (x)
+             (when (coalesce-tree-p x)
+               (labels ((descend (x)
+                          (do ((y x (cdr y)))
+                              ((atom y) (atom-colesce-p y))
+                            ;; Don't just call file-coalesce-p, because
+                            ;; it'll invoke COALESCE-TREE-P repeatedly
+                            (let ((car (car y)))
+                              (unless (if (consp car)
+                                          (descend car)
+                                          (atom-colesce-p car))
+                                (return nil))))))
+                 (descend x))))
+           (atom-colesce-p (x)
+             (sb-xc:typep x '(or (unboxed-array (*)) number symbol instance character))))
+    (if (consp object)
+        (cons-coalesce-p object)
+        ;; Coalescing of SYMBOL, INSTANCE, CHARACTER is not useful -
+        ;; if OBJECT is one of those, it would only be findable in the
+        ;; EQL table.  However, a coalescible objects with subparts
+        ;; may contain those.
+        (sb-xc:typep object '(or (unboxed-array (*)) number)))))
+
 ;;; Return a LEAF which represents the specified constant object. If
-;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
-;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
-;;; MAKE-LOAD-FORM gets used on any parts of the constant that it
-;;; needs to be.
+;;; we are producing a fasl file, make sure that MAKE-LOAD-FORM gets
+;;; used on any parts of the constant that it needs to be.
 ;;;
 ;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
 ;;; when file-compiling, but not when using COMPILE.
@@ -2368,111 +2394,80 @@ is :ANY, the function name is not checked."
 ;;;   This would matter only if at load-time, the form which produced C assigns
 ;;;   some completely different (not EQ and maybe not even similar) to the symbol.
 ;;;   But some weird behavior was definitely observable in user code.
-
 (defun find-constant (object &optional name
-                             &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*))
-                                  (output *compile-object*))
+                             &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
   (when (or #+metaspace (typep object 'sb-vm:layout))
     (error "Cowardly refusing to FIND-CONSTANT on a LAYOUT"))
 
-  ;; Pick off some objects that aren't actually constants in user code.
-  ;; These things appear as literals in forms such as `(%POP-VALUES ,x)
-  ;; acting as a magic mechanism for passing data along.
-  (when (opaque-box-p object) ; quote an object without examining it
-    (return-from find-constant
-      (make-constant (opaque-box-value object) *universal-type*)))
-
-  (when (or (core-object-p output)
-            ;; Git rev eded4f76 added an assertion that a named non-fixnum is referenced
-            ;; via its name at (defconstant +share-me-4+ (* 2 most-positive-fixnum))
-            ;; I'm not sure that test makes any sense, but whatever...
-            (if name
-                (sb-xc:typep object '(or fixnum character symbol))
-                (sb-xc:typep object '(or number character symbol))))
-    ;;  "The consequences are undefined if literal objects are destructively modified
-    ;;   For this purpose, the following operations are considered destructive:
-    ;;   array - Storing a new value into some element of the array ..."
-    ;; so a string, once used as a literal in source, becomes logically immutable.
-    (when (and (core-object-p output) (sb-xc:typep object '(simple-array * (*))))
-      #-sb-xc-host (logically-readonlyize object nil))
-    ;;  "The functions eval and compile are required to ensure that literal objects
-    ;;   referenced within the resulting interpreted or compiled code objects are
-    ;;   the _same_ as the corresponding objects in the source code.
-    ;;   ...
-    ;;   The constraints on literal objects described in this section apply only to
-    ;;   compile-file; eval and compile do not copy or coalesce constants."
-    ;;   (http://www.lispworks.com/documentation/HyperSpec/Body/03_bd.htm)
-    ;; The preceding notwithstanding, numbers are always freely copyable and coaelescible.
-    (return-from find-constant
-      (if namespace
-          (values (ensure-gethash object (eql-constants namespace) (make-constant object)))
-          (make-constant object))))
-
-  ;; From here down, we're dealing only with COMPILE-FILE and a constant
-  ;; whose type is (not (or number character symbol)).
-  ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when file-compiling.
-  ;; But this logic is incomplete, lacking PACKAGE, RANDOM-STATE, SIMPLE-VECTOR,
-  ;; HASH-TABLE, and PATHNAME, and all arrays of rank other than 1.
-  ;; SIMPLE-VECTOR, PATHNAME, and possibly RANDOM-STATE, could be worthwhile to handle.
-  (labels ((cons-coalesce-p (x)
-             (when (coalesce-tree-p x)
-               (labels ((descend (x)
-                          (do ((y x (cdr y)))
-                              ((atom y) (atom-colesce-p y))
-                            ;; Don't just call file-coalesce-p, because it'll
-                            ;; invoke COALESCE-TREE-P repeatedly
-                            (let ((car (car y)))
-                              (unless (if (consp car)
-                                          (descend car)
-                                        (atom-colesce-p car))
-                                (return nil))))))
-                 (descend x))))
-           (atom-colesce-p (x)
-             (sb-xc:typep x '(or (unboxed-array (*)) number symbol instance character))))
-    (let ((coalescep
-           ;; When COALESCEP is true, the similarity table is "useful" for this object,
-           ;; and that also implies that the object is not circular.
-           (if (consp object)
-               (cons-coalesce-p object)
-               ;; Coalescing of SYMBOL, INSTANCE, CHARACTER is not useful - if OBJECT is
-               ;; one of those, it would only be findable in the EQL table.
-               ;; However, a coalescible objects with subparts may contain those.
-               (sb-xc:typep object '(or (unboxed-array (*)) number)))))
-
-      ;; If the constant is named, always look in the named-constants table first.
-      ;; This ensure that there is no chance of referring to the constant at load-time
-      ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
-      ;; Additionally, replace any unnamed constant that is similar to this one
-      ;; with the named constant. (THIS IS VERY SUSPICIOUS)
-      (when name
-        (return-from find-constant
-          (or (gethash name (named-constants namespace))
-              (let ((new (make-constant object (ctype-of object) name)))
-                (setf (gethash name (named-constants namespace)) new)
-                ;; If there was no EQL constant, or an unnamed one, add NEW
-                (let ((old (gethash object (eql-constants namespace))))
-                  (when (or (not old) (not (leaf-has-source-name-p old)))
-                    (setf (gethash object (eql-constants namespace)) new)))
-                ;; Same for SIMILAR table, if coalescible
-                (when coalescep
-                  (let ((old (get-similar object (similar-constants namespace))))
-                    (when (or (not old) (not (leaf-has-source-name-p old)))
-                      (setf (get-similar object (similar-constants namespace)) new))))
-                new))))
-
-      ;; Has the identical object or a similar object been seen before?
-      (let ((found (or (gethash object (eql-constants namespace))
-                       (and coalescep
-                            (get-similar object (similar-constants namespace))))))
-        (when found
-          (return-from find-constant found)))
-
-      (ensure-externalizable object)
-      (let ((new (make-constant object)))
-        (setf (gethash object (eql-constants namespace)) new)
-        (when coalescep
-          (setf (get-similar object (similar-constants namespace)) new))
-        new))))
+  (cond
+    ;; Pick off some objects that aren't actually constants in user
+    ;; code.  These things appear as literals in forms such as
+    ;; `(%POP-VALUES ,x) acting as a magic mechanism for passing data
+    ;; along.
+    ((opaque-box-p object)      ; quote an object without examining it
+     (make-constant (opaque-box-value object) *universal-type*))
+    ((not (producing-fasl-file))
+     ;;  "The consequences are undefined if literal objects are destructively modified
+     ;;   For this purpose, the following operations are considered destructive:
+     ;;   array - Storing a new value into some element of the array ..."
+     ;; so a string, once used as a literal in source, becomes logically immutable.
+     #-sb-xc-host
+     (when (sb-xc:typep object '(simple-array * (*)))
+       (logically-readonlyize object nil))
+     ;;  "The functions eval and compile are required to ensure that literal objects
+     ;;   referenced within the resulting interpreted or compiled code objects are
+     ;;   the _same_ as the corresponding objects in the source code.
+     ;;   ...
+     ;;   The constraints on literal objects described in this section apply only to
+     ;;   compile-file; eval and compile do not copy or coalesce constants."
+     ;;   (http://www.lispworks.com/documentation/HyperSpec/Body/03_bd.htm)
+     ;; The preceding notwithstanding, numbers are always freely copyable and coalescible.
+     (if namespace
+         (values (ensure-gethash object (eql-constants namespace) (make-constant object)))
+         (make-constant object)))
+    ((if name
+         ;; Git rev eded4f76 added an assertion that a named non-fixnum is referenced
+         ;; via its name at (defconstant +share-me-4+ (* 2 most-positive-fixnum))
+         ;; I'm not sure that test makes any sense, but whatever...
+         (sb-xc:typep object '(or fixnum character symbol))
+         (sb-xc:typep object '(or number character symbol)))
+     (values (ensure-gethash object (eql-constants namespace) (make-constant object))))
+    (t
+     ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when
+     ;; file-compiling.
+     (let ((coalescep (coalescible-object-p object)))
+       ;; When COALESCEP is true, the similarity table is "useful" for
+       ;; this object.
+       (if name
+           ;; If the constant is named, always look in the named-constants table first.
+           ;; This ensure that there is no chance of referring to the constant at load-time
+           ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
+           ;; Additionally, replace any unnamed constant that is similar to this one
+           ;; with the named constant. (THIS IS VERY SUSPICIOUS)
+           (or (gethash name (named-constants namespace))
+               (let ((new (make-constant object (ctype-of object) name)))
+                 (setf (gethash name (named-constants namespace)) new)
+                 ;; If there was no EQL constant, or an unnamed one, add NEW
+                 (let ((old (gethash object (eql-constants namespace))))
+                   (when (or (not old) (not (leaf-has-source-name-p old)))
+                     (setf (gethash object (eql-constants namespace)) new)))
+                 ;; Same for SIMILAR table, if coalescible
+                 (when coalescep
+                   (let ((old (get-similar object (similar-constants namespace))))
+                     (when (or (not old) (not (leaf-has-source-name-p old)))
+                       (setf (get-similar object (similar-constants namespace)) new))))
+                 new))
+           ;; If the constant is anonymous, just make a new constant
+           ;; unless it is EQL or similar to an existing leaf.
+           (or (gethash object (eql-constants namespace))
+               (and coalescep
+                    (get-similar object (similar-constants namespace)))
+               (let ((new (make-constant object)))
+                 (maybe-emit-make-load-forms object)
+                 (setf (gethash object (eql-constants namespace)) new)
+                 (when coalescep
+                   (setf (get-similar object (similar-constants namespace)) new))
+                 new)))))))
 
 ;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot
