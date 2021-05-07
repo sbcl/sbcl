@@ -347,14 +347,12 @@
                    #.complex-vector-widetag))))
     (make-case)))
 
-(define-load-time-global %%simple-array-n-bits-shifts%%
-    (make-array (1+ widetag-mask)))
-#.(loop for info across *specialized-array-element-type-properties*
-        collect `(setf (aref %%simple-array-n-bits-shifts%% ,(saetp-typecode info))
-                       ,(saetp-n-bits-shift info)) into forms
-        finally (return `(progn ,@forms)))
-
-(declaim (type (simple-vector #.(1+ widetag-mask)) %%simple-array-n-bits-shifts%%))
+(defconstant-eqx %%simple-array-n-bits-shifts%%
+    #.(let ((a (sb-xc:make-array (1+ widetag-mask) :initial-element -1 ; "illegal"
+                                 :element-type '(signed-byte 8))))
+        (dovector (saetp *specialized-array-element-type-properties* a)
+          (setf (aref a (saetp-typecode saetp)) (saetp-n-bits-shift saetp))))
+  #'equalp)
 
 (declaim (inline vector-length-in-words))
 (defun vector-length-in-words (length n-bits-shift)
