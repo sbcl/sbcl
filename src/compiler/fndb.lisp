@@ -1182,7 +1182,10 @@
   (movable foldable flushable))
 (defknown fill-pointer (complex-vector) index
     (unsafely-flushable))
-(defknown sb-impl::fill-pointer-error (t &optional t) nil)
+;;; We could cut 1 instruction off the call sequence by not loading the arg count
+;;; register for error-handler helpers that take fixed args.
+;;; Perhaps they should all be trap instead though?
+(defknown sb-vm::fill-pointer-error (t) nil)
 
 (defknown vector-push (t (modifying complex-vector)) (or index null) ())
 (defknown vector-push-extend (t (modifying complex-vector) &optional (and index (integer 1))) index

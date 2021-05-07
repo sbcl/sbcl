@@ -968,3 +968,10 @@ sb-vm::(define-vop (cl-user::test)
                 '(lambda (x) (if (boundp (truly-the symbol x)) x '(hi))))))
     (dolist (line lines)
       (assert (not (search "ERROR" line))))))
+
+;;; We were missing the fndb info that fill-pointer-error doesn't return
+;;; (not exactly "missing", but in the wrong package)
+(with-test (:name :fill-pointer-no-return-multiple)
+  (let ((lines (disassembly-lines '(lambda (x) (fill-pointer x)))))
+    (dolist (line lines)
+      (assert (not (search "RETURN-MULTIPLE" line))))))
