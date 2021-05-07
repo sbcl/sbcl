@@ -105,7 +105,7 @@
 
 (defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
-(defknown (compute-symbol-hash) (simple-string index) hash-code
+(defknown sb-impl::compute-symbol-hash (simple-string index) hash-code
   (foldable flushable))
 
 (defknown (symbol-hash ensure-symbol-hash) (symbol) hash-code

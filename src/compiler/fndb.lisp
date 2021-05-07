@@ -2085,7 +2085,7 @@
 ;;; Avoid a ton of FBOUNDP checks in the string stream constructors etc,
 ;;; by wiring in the needed functions instead of dereferencing their fdefns.
 (defknown (ill-in ill-bin ill-out ill-bout
-           sb-impl::string-inch sb-impl::string-in-misc
+           sb-impl::string-in-misc
            sb-impl::string-sout
            sb-impl::finite-base-string-ouch sb-impl::finite-base-string-out-misc
            sb-impl::fill-pointer-ouch sb-impl::fill-pointer-sout
