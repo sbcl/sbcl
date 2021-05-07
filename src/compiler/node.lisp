@@ -1734,6 +1734,26 @@
   funs)
 
 
+;;;; miscellaneous IR1 structures
+
+(defstruct (undefined-warning
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t)
+                               (prin1 (undefined-warning-name x) s))))
+            (:copier nil))
+  ;; the name of the unknown thing
+  (name nil :type (or symbol list))
+  ;; the kind of reference to NAME
+  (kind (missing-arg) :type (member :function :type :variable))
+  ;; the number of times this thing was used
+  (count 0 :type unsigned-byte)
+  ;; a list of COMPILER-ERROR-CONTEXT structures describing places
+  ;; where this thing was used. Note that we only record the first
+  ;; *UNDEFINED-WARNING-LIMIT* calls.
+  (warnings () :type list))
+(declaim (freeze-type undefined-warning))
+
+
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
 ;;; You might think that NIL as a policy becomes *POLICY*,
