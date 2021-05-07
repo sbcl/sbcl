@@ -541,4 +541,4 @@
       (t
        (values :default nil)))))
 
-(defparameter *register-names* +qword-register-names+)
+(defvar *register-names* +qword-register-names+)
