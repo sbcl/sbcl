@@ -298,7 +298,7 @@ static void trace_object(lispobj* where)
             }
             // Ok, we're looking at a weak hash-table.
             struct vector* v = (struct vector*)where;
-            lispobj lhash_table = v->data[fixnum_value(v->length)-1];
+            lispobj lhash_table = v->data[vector_len(v)-1];
             gc_dcheck(instancep(lhash_table));
             __mark_obj(lhash_table);
             struct hash_table* hash_table
@@ -448,7 +448,7 @@ static void local_smash_weak_pointers()
         struct vector* vector = (struct vector*)vectors->car;
         vectors = (struct cons*)vectors->cdr;
         UNSET_WEAK_VECTOR_VISITED(vector);
-        sword_t len = fixnum_value(vector->length);
+        sword_t len = vector_len(vector);
         sword_t i;
         for (i = 0; i<len; ++i) {
             lispobj obj = vector->data[i];

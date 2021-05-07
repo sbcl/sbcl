@@ -95,8 +95,7 @@ void allocation_profiler_start()
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
     if (!alloc_profiling && simple_vector_p(alloc_profile_data)) {
-        max_alloc_point_counters =
-            fixnum_value(VECTOR(alloc_profile_data)->length)/2;
+        max_alloc_point_counters = vector_len(VECTOR(alloc_profile_data))/2;
         size_t size = N_WORD_BYTES * max_alloc_point_counters;
         os_vm_address_t old_buffer = 0;
         if (size != profile_buffer_size) {

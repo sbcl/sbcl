@@ -280,7 +280,7 @@ uword_t sxhash_simple_string(struct vector* string)
     unsigned int* char_string = (unsigned int*)(string->data);
 #endif
     unsigned char* base_string = (unsigned char*)(string->data);
-    sword_t len = fixnum_value(string->length);
+    sword_t len = vector_len(string);
     uword_t result = 0;
     sword_t i;
     switch (widetag_of(&string->header)) {

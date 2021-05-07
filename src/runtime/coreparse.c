@@ -487,9 +487,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
               struct vector* v = (struct vector*)where;
               // If you could make a hash-table vector with space for exactly 1 k/v pair,
               // it would have length 5.
-              gc_assert(v->length >= make_fixnum(5));
+              gc_assert(vector_len(v) >= 5); // KLUDGE: need a manifest constant for fixed overhead
               lispobj* data = (lispobj*)v->data;
-              adjust_pointers(&data[fixnum_value(v->length)-1], 1, adj);
+              adjust_pointers(&data[vector_len(v)-1], 1, adj);
               int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
               boolean needs_rehash = 0;
               lispobj *where = &data[2], *end = &data[2*(hwm+1)];
@@ -1099,7 +1099,8 @@ char* get_asm_routine_by_name(const char* name)
             VECTOR(((struct hash_table*)native_pointer(ht))->pairs);
         lispobj sym;
         int i;
-        for (i=2 ; i < fixnum_value(table->length) ; i += 2)
+        // ASSUMPTION: hash-table representation is known (same as in gc-common of course)
+        for (i=2 ; i < vector_len(table) ; i += 2)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
                 && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
@@ -1159,8 +1160,11 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         RECURSE(CONS(ptr)->cdr);
     } else switch (widetag_of(obj = native_pointer(ptr))) {
         case SIMPLE_VECTOR_WIDETAG:
-            nwords = fixnum_value(obj[1]); // vector length
-            for(i=0; i<nwords; ++i) RECURSE(obj[i+2]);
+            {
+            struct vector* v = (void*)obj;
+            sword_t len = vector_len(v);
+            for(i=0; i<len; ++i) RECURSE(v->data[i]);
+            }
             break;
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:

@@ -110,7 +110,7 @@
     (simple-array-complex-double-float "vector_unsigned_byte_128")
 
     (simple-bit-vector "vector_bit")
-    (simple-vector "vector")
+    (simple-vector "vector_t")
 
     (simple-array-nil "vector_nil")
     (simple-base-string "base_string")

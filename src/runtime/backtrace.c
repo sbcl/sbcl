@@ -99,7 +99,7 @@ print_string (struct vector *vector, FILE *f)
         return;
     }
     int i;
-    int n = fixnum_value(vector->length);
+    int n = vector_len(vector);
     for (i = 0; i < n; i++) {
         unsigned int c = schar(vector, i);
         if (c > 0xFFFF) fprintf(f,"\\U%08x", c);

@@ -136,7 +136,7 @@ int closefrom_fddir(char *dir, int lowfd)
 void closefds_from(int lowfd, int* dont_close)
 {
     if (dont_close) {
-        /* dont_close is a sorted simple-array of ints */
+        /* dont_close is a sorted simple-array of tagged ints */
         uword_t length = fixnum_value(((uword_t*)dont_close)[-1]);
         uword_t i;
         for (i = 0; i < length; i++)

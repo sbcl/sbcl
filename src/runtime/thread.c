@@ -521,14 +521,14 @@ void* new_thread_trampoline(void* arg)
          *  restricted to 16 characters, including the terminating null byte ('\0').
          *  The pthread_setname_np() function can fail with the following error:
          *  ERANGE The length of the string ... exceeds the allowed limit." */
-        if (fixnum_value(VECTOR(name)->length) <= 15)
+        if (vector_len(VECTOR(name)) <= 15)
             pthread_setname_np(pthread_self(), (char*)VECTOR(name)->data);
 #endif
 #ifdef LISP_FEATURE_NETBSD
         /* This constant is an upper bound on the length including the NUL.
          * Exceeding it will fail the call. It happens to be 32.
          * Also, don't want to printf-format a name containing a '%' */
-        if (fixnum_value(VECTOR(name)->length) < PTHREAD_MAX_NAMELEN_NP)
+        if (vector_len(VECTOR(name)) < PTHREAD_MAX_NAMELEN_NP)
             pthread_setname_np(pthread_self(), "%s", (char*)VECTOR(name)->data);
 #endif
 #if defined LISP_FEATURE_FREEBSD || defined LISP_FEATURE_OPENBSD
@@ -537,7 +537,7 @@ void* new_thread_trampoline(void* arg)
         pthread_set_name_np(pthread_self(), (char*)VECTOR(name)->data);
 #endif
 #ifdef LISP_FEATURE_DARWIN
-        if (fixnum_value(VECTOR(name)->length) < 64)
+        if (vector_len(VECTOR(name)) < 64)
             pthread_setname_np((char*)VECTOR(name)->data);
 #endif
     }

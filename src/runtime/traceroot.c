@@ -703,7 +703,7 @@ static boolean ignorep(lispobj* base_ptr,
                        lispobj ignored_objects)
 {
     int i;
-    for (i = fixnum_value(VECTOR(ignored_objects)->length)-1; i >= 0; --i)
+    for (i = vector_len(VECTOR(ignored_objects))-1; i >= 0; --i)
       if (native_pointer(VECTOR(ignored_objects)->data[i]) == base_ptr)
           return 1;
     return 0;
@@ -768,8 +768,8 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 // If not a hashtable, just skip it.
                 if (!vector_flagp(*where, VectorHashing)) continue;
                 lispobj* data = where + 2;
-                int kv_vector_length = fixnum_value(where[1]);
-                lispobj lhash_table = data[kv_vector_length-1];
+                int kv_vector_len = vector_len((struct vector*)where);
+                lispobj lhash_table = data[kv_vector_len-1];
                 gc_assert(instancep(lhash_table));
                 struct hash_table* hash_table =
                   (struct hash_table *)native_pointer(lhash_table);
@@ -966,7 +966,8 @@ static int trace_paths(void (*context_scanner)(),
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
     i = 0;
     do {
-        gc_assert(make_fixnum(i) <= VECTOR(paths)->length);
+        // Oh dear, is this really supposed to be '<=' (vs '<') ?
+        gc_assert(i <= vector_len(VECTOR(paths)));
         lispobj car = CONS(weak_pointers)->car;
         lispobj value = ((struct weak_pointer*)native_pointer(car))->value;
         weak_pointers = CONS(weak_pointers)->cdr;

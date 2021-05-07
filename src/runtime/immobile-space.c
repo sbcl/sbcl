@@ -798,7 +798,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
         return fixedobj_points_to_younger_p(obj, sizetab[widetag](obj),
                                             gen, keep_gen, new_gen);
     } else if (widetag == SIMPLE_VECTOR_WIDETAG) {
-        sword_t length = fixnum_value(((struct vector *)obj)->length);
+        sword_t length = vector_len((struct vector *)obj);
         begin = obj + 2; // skip the header and length
         end = obj + ALIGN_UP(length + 2, 2);
     } else if (leaf_obj_widetag_p(widetag)) {
@@ -1630,7 +1630,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           if (vector_flagp(header_word, VectorAddrHashing)) {
               struct vector* kv_vector = (struct vector*)where;
               lispobj* data = kv_vector->data;
-              gc_assert(kv_vector->length >= 5);
+              gc_assert(vector_len(kv_vector) >= 5);
               boolean needs_rehash = 0;
               unsigned int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
               unsigned int i;
@@ -1707,9 +1707,9 @@ static int classify_symbol(lispobj* obj)
   if ((HeaderValue(*obj) & 0xFF) > (SYMBOL_SIZE-1))
       return 2;
   struct vector* symbol_name = VECTOR(symbol->name);
-  if (symbol_name->length >= make_fixnum(2) &&
+  if (vector_len(symbol_name) >= 2 &&
       schar(symbol_name, 0) == '*' &&
-      schar(symbol_name, fixnum_value(symbol_name->length)-1) == '*')
+      schar(symbol_name, vector_len(symbol_name)-1) == '*')
       return 3;
   return 4;
 }

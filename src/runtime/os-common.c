@@ -209,7 +209,7 @@ void os_link_runtime()
         return; // Linkage was already performed by coreparse
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    lisp_linkage_table_n_prelinked = fixnum_value(symbols->length);
+    lisp_linkage_table_n_prelinked = vector_len(symbols);
     for (j = 0 ; j < lisp_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];

@@ -3573,8 +3573,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
              * covered by the stack scan.  See also set_csp_from_context(). */
 #  ifndef LISP_FEATURE_WIN32
             if (th != get_sb_vm_thread()) {
-                long k = fixnum_value(
-                    read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+                int k = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0) {
                     os_context_t* context = nth_interrupt_context(--k, th);
                     if (context)
@@ -3700,7 +3699,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
             // ever be seen in the starting-threads list, but let's be cautious.
             if (is_lisp_pointer(info)) {
                 gc_assert(simple_vector_p(info));
-                gc_assert(VECTOR(info)->length >= make_fixnum(1));
+                gc_assert(vector_len(VECTOR(info)) >= 1);
                 lispobj fun = VECTOR(info)->data[0];
                 gc_assert(functionp(fun));
 #ifdef LISP_FEATURE_X86_64

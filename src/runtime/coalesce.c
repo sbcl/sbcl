@@ -73,7 +73,7 @@ static boolean eql_comparable_p(lispobj obj)
 static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
 {
     int i;
-    for (i = fixnum_value(v->length)-1; i >= 0; --i)
+    for (i = vector_len(v)-1; i >= 0; --i)
         if (!pred(v->data[i])) return 0;
     return 1;
 }
@@ -109,9 +109,9 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
              || specialized_vector_widetag_p(widetag)))
         || coalescible_number_p(obj)) {
         if (widetag == SIMPLE_VECTOR_WIDETAG) {
-            sword_t n_elts = fixnum_value(obj[1]), i;
-            for (i = 2 ; i < n_elts+2 ; ++i)
-                coalesce_obj(obj + i, ht);
+            struct vector* v = (void*)obj;
+            sword_t n_elts = vector_len(v), i;
+            for (i = 0 ; i < n_elts ; ++i) coalesce_obj(v->data+i, ht);
         }
         int index = hopscotch_get(ht, (uword_t)obj, 0);
         if (!index) // Not found

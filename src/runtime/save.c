@@ -259,7 +259,7 @@ void unwind_binding_stack()
     int i;
     if (!sym || !simple_vector_p(value = ((struct symbol*)sym)->value))
         fprintf(stderr, "warning: bad value in %s\n", symbol_name);
-    else for(i=fixnum_value(VECTOR(value)->length)-1; i>=0; --i)
+    else for(i=vector_len(VECTOR(value))-1; i>=0; --i)
         SYMBOL(VECTOR(value)->data[i])->value = UNBOUND_MARKER_WIDETAG;
     if (verbose) printf("done]\n");
 }

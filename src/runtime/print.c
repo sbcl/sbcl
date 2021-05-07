@@ -407,7 +407,7 @@ char * simple_base_stringize(struct vector * string)
 {
   if (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG)
       return (char*)string->data;
-  int length = string->length;
+  int length = vector_len(string);
   char * newstring = malloc(length+1);
   uint32_t * data = (uint32_t*)string->data;
   int i;
@@ -481,7 +481,7 @@ static void print_struct(lispobj obj)
 void show_lstring(struct vector * string, int quotes, FILE *s)
 {
   int ucs4_p = 0;
-  int i, len = fixnum_value(string->length);
+  int i, len = vector_len(string);
 
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
   if (widetag_of(&string->header) == SIMPLE_CHARACTER_STRING_WIDETAG) {
@@ -576,7 +576,7 @@ lispobj symbol_function(lispobj* symbol)
         info = CONS(info)->cdr;
     if (lowtag_of(info) == OTHER_POINTER_LOWTAG) {
         struct vector* v = VECTOR(info);
-        int len = fixnum_value(v->length);
+        int len = vector_len(v);
         if (len != 0) {
             lispobj elt = v->data[0];  // Just like INFO-VECTOR-FDEFN
             if (fixnump(elt) && (fixnum_value(elt) & 07777) >= 07701) {
@@ -716,7 +716,7 @@ static void print_fun_or_otherptr(lispobj obj)
     case SIMPLE_VECTOR_WIDETAG:
         NEWLINE_OR_RETURN;
         {
-        long length = fixnum_value(*ptr);
+        long length = vector_len(VECTOR(obj));
         printf("length = %ld", length);
         ptr++;
         index = 0;
@@ -795,11 +795,11 @@ static void print_fun_or_otherptr(lispobj obj)
         print_obj("entry: ", fdefn_callee_lispobj((struct fdefn*)(ptr-1)));
         break;
 
-    // Make certain vectors printable from C for when all hell breaks lose
+    // Make some vectors printable from C, for when all hell breaks lose
     case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
         NEWLINE_OR_RETURN;
         {
-        long length = fixnum_value(*ptr);
+        long length = vector_len(VECTOR(obj));
         uint32_t * data = (uint32_t*)(ptr + 1);
         long i;
         printf("#(");
@@ -813,8 +813,8 @@ static void print_fun_or_otherptr(lispobj obj)
     default:
         NEWLINE_OR_RETURN;
         if (type >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG &&
-            type <= SIMPLE_BIT_VECTOR_WIDETAG)
-            printf("length = %ld", (long)fixnum_value(*ptr));
+            type <= SIMPLE_BIT_VECTOR_WIDETAG) // ASSUMPTION: widetag ordering
+            printf("length = %ld", vector_len(VECTOR(obj)));
         else
             printf("Unknown header object?");
         break;

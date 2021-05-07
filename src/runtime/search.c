@@ -113,11 +113,11 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
             struct vector *symbol_name = VECTOR(symbol->name);
             if (gc_managed_addr_p((lispobj)symbol_name) &&
                 ((widetag_of(&symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
-                  && symbol_name->length == namelen
+                  && symbol_name->length_ == namelen // KLUDGE: abstraction leakage, but ok
                   && !(ignore_case ? strcasecmp : strcmp)((char *)symbol_name->data, name))
 #ifdef LISP_FEATURE_SB_UNICODE
                  || (widetag_of(&symbol_name->header) == SIMPLE_CHARACTER_STRING_WIDETAG
-                     && symbol_name->length == namelen
+                     && symbol_name->length_ == namelen
                      && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data,
                                            (unsigned char*)name, ignore_case))
 #endif
@@ -162,7 +162,7 @@ static boolean sym_stringeq(lispobj sym, const char *string, int len)
 {
     struct vector* name = VECTOR(SYMBOL(sym)->name);
     return widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG
-        && name->length == make_fixnum(len)
+        && vector_len(name) == len
         && !memcmp(name->data, string, len);
 }
 
@@ -180,7 +180,7 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
         struct vector* cells = VECTOR(symbols->slots[INSTANCE_DATA_START]);
         gc_assert(widetag_of(&cells->header) == SIMPLE_VECTOR_WIDETAG);
         lispobj namelen = strlen(symbol_name);
-        int cells_length = fixnum_value(cells->length);
+        int cells_length = vector_len(cells);
         int index = *hint >> 1;
         if (index >= cells_length)
             index = 0; // safeguard against vector shrinkage
@@ -214,13 +214,13 @@ lispobj find_package(char* package_name)
                                                     &kernelpkg_hint);
     if (!package_names)
         return 0;
-    lispobj namelen = strlen(package_name);
+    sword_t namelen = strlen(package_name);
     struct instance* names = (struct instance*)
         native_pointer(((struct symbol*)package_names)->value);
     struct vector* cells = (struct vector*)
         native_pointer(names->slots[INSTANCE_DATA_START]);
 #define LFHASH_KEY_OFFSET 3 /* KLUDGE */
-    int n = (fixnum_value(cells->length) - LFHASH_KEY_OFFSET) >> 1;
+    int n = (vector_len(cells) - LFHASH_KEY_OFFSET) >> 1;
     gc_assert(make_fixnum(n) == cells->data[0]);
     int i;
     // Search *PACKAGE-NAMES* for the package
@@ -229,7 +229,7 @@ lispobj find_package(char* package_name)
         if (is_lisp_pointer(element)) {
             struct vector* string = (struct vector*)native_pointer(element);
             if (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG
-                && string->length == make_fixnum(namelen)
+                && vector_len(string) == namelen
                 && !memcmp(string->data, package_name, namelen)) {
                 element = cells->data[LFHASH_KEY_OFFSET+n+i];
                 return listp(element) ? CONS(element)->car : element;

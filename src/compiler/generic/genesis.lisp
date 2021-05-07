@@ -3148,6 +3148,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format stream "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag))
 
+(defun mangle-c-slot-name (obj-name slot-name)
+  ;; For data hiding purposes, change the name of vector->length to vector->length_.
+  ;; This helped me catch some erroneous C code.
+  (if (and (eq obj-name 'vector) (eq slot-name 'length))
+      "length_"
+      (c-name (string-downcase slot-name))))
+
 (defun write-primitive-object (obj *standard-output*)
   (let* ((name (sb-vm:primitive-object-name obj))
          (c-name (c-name (string-downcase name)))
@@ -3171,10 +3178,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (dovector (slot slots)
                (format t "    ~A ~A~@[[1]~];~%"
                        (getf (cddr slot) :c-type "lispobj")
-                       (c-name (string-downcase (sb-vm:slot-name slot)))
+                       (mangle-c-slot-name name (sb-vm:slot-name slot))
                        (and (primitive-object-variable-length-p obj)
                             (eq slot (aref slots (1- (length slots)))))))
              (format t "};~%")
+             (when (eq name 'vector)
+               ;; This is 'sword_t' because we formerly would call fixnum_value() which
+               ;; is a signed int, but it isn't really; except that I made all C vars
+               ;; signed to avoid comparison mismatch, and don't want to change back.
+               (format t "static inline sword_t vector_len(struct vector* v) {")
+               (format t "  return v->length_ >> ~d; }~%" sb-vm:n-fixnum-tag-bits))
              (when (member name '(cons vector symbol fdefn instance))
                (write-cast-operator name c-name lowtag *standard-output*)))
            (output-asm ()

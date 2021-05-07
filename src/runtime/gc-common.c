@@ -886,23 +886,22 @@ trans_ratio_or_complex(lispobj object)
 
 /* vector-like objects */
 static lispobj
-trans_vector(lispobj object)
+trans_vector_t(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
-    sword_t length = fixnum_value(VECTOR(object)->length);
+    sword_t length = vector_len(VECTOR(object));
     return copy_large_object(object, ALIGN_UP(length + 2, 2), BOXED_PAGE_FLAG);
 }
 
 static sword_t
-size_vector(lispobj *where)
+size_vector_t(lispobj *where)
 {
-    sword_t length = fixnum_value(((struct vector*)where)->length);
+    sword_t length = vector_len(((struct vector*)where));
     return ALIGN_UP(length + 2, 2);
 }
 
-static inline uword_t
-NWORDS(uword_t x, uword_t n_bits)
+static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 {
     /* A good compiler should be able to constant-fold this whole thing,
        even with the conditional. */
@@ -923,16 +922,16 @@ NWORDS(uword_t x, uword_t n_bits)
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
   static sword_t __attribute__((unused)) scav_##name(\
       lispobj *where, lispobj __attribute__((unused)) header) { \
-    sword_t length = fixnum_value(((struct vector*)where)->length); \
+    sword_t length = vector_len(((struct vector*)where)); \
     return ALIGN_UP(nwords + 2, 2); \
   } \
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
-    sword_t length = fixnum_value(VECTOR(object)->length); \
+    sword_t length = vector_len(VECTOR(object)); \
     return copy_large_object(object, ALIGN_UP(nwords + 2, 2), UNBOXED_PAGE_FLAG); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
-    sword_t length = fixnum_value(((struct vector*)where)->length); \
+    sword_t length = vector_len(((struct vector*)where)); \
     return ALIGN_UP(nwords + 2, 2); \
   }
 
@@ -1010,7 +1009,7 @@ void smash_weak_pointers(void)
         struct vector* vector = (struct vector*)vectors->car;
         vectors = (struct cons*)vectors->cdr;
         UNSET_WEAK_VECTOR_VISITED(vector);
-        sword_t len = fixnum_value(vector->length);
+        sword_t len = vector_len(vector);
         sword_t i;
         for (i = 0; i<len; ++i) {
             lispobj val = vector->data[i];
@@ -1312,7 +1311,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     // rehashing, which occurs only when rehashing without growing.
     // When growing a weak table, the KV vector is not created as weak initially;
     // its last element points to the hash-vector as for any strong KV vector.
-    sword_t kv_length = fixnum_value(kv_vector->length);
+    sword_t kv_length = vector_len(kv_vector);
     lispobj kv_supplement = data[kv_length-1];
     boolean eql_hashing = 0; // whether this table is an EQL table
     if (instancep(kv_supplement)) {
@@ -1326,7 +1325,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
     uint32_t *hashvals = 0;
     if (kv_supplement != NIL) {
         hashvals = get_array_data(kv_supplement, SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
-        gc_assert(2 * fixnum_value(VECTOR(kv_supplement)->length) + 1 == kv_length);
+        gc_assert(2 * vector_len(VECTOR(kv_supplement)) + 1 == kv_length);
     }
     SCAV_ENTRIES(1, );
 }
@@ -1338,22 +1337,21 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
     lispobj *data = get_array_data(hash_table->pairs, SIMPLE_VECTOR_WIDETAG);
     if (data == NULL)
         lose("invalid kv_vector %"OBJ_FMTX, hash_table->pairs);
-    sword_t kv_length = fixnum_value(VECTOR(hash_table->pairs)->length);
+    sword_t kv_length = vector_len(VECTOR(hash_table->pairs));
 
     uint32_t *hashvals = 0;
     if (hash_table->hash_vector != NIL) {
         hashvals = get_array_data(hash_table->hash_vector,
                                      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
-        gc_assert(VECTOR(hash_table->hash_vector)->length ==
-                  VECTOR(hash_table->next_vector)->length);
+        gc_assert(vector_len(VECTOR(hash_table->hash_vector)) ==
+                  vector_len(VECTOR(hash_table->next_vector)));
     }
 
      /* next_vector and hash_vector have a 1:1 size relation.
       * kv_vector is twice that plus the supplemental cell.
       * The index vector length is arbitrary - it can be smaller or larger
       * than the maximum number of table entries. */
-    gc_assert(2 * fixnum_value(VECTOR(hash_table->next_vector)->length) + 1
-              == kv_length);
+    gc_assert(2 * vector_len(VECTOR(hash_table->next_vector)) + 1 == kv_length);
 
     int weakness = hashtable_weakness(hash_table);
     boolean eql_hashing = hashtable_kind(hash_table) == 1;
@@ -1368,9 +1366,9 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
 }
 
 sword_t
-scav_vector (lispobj *where, lispobj header)
+scav_vector_t(lispobj *where, lispobj header)
 {
-    sword_t length = fixnum_value(where[1]);
+    sword_t length = vector_len((struct vector*)where);
 
     /* SB-VM:VECTOR-HASHING-FLAG is set for all hash tables in the
      * Lisp HASH-TABLE code to indicate need for special GC support.
@@ -1558,7 +1556,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
     lispobj *kv_vector = get_array_data(hash_table->pairs, SIMPLE_VECTOR_WIDETAG);
     uint32_t *index_vector = get_array_data(hash_table->index_vector,
                                             SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
-    sword_t n_buckets = fixnum_value(VECTOR(hash_table->index_vector)->length);
+    sword_t n_buckets = vector_len(VECTOR(hash_table->index_vector));
     uint32_t *next_vector = get_array_data(hash_table->next_vector,
                                            SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
     uint32_t *hash_vector = 0;
