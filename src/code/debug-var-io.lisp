@@ -124,6 +124,27 @@
 
 (defun integer-from-octets (octets)
   (declare (type (array (unsigned-byte 8) (*)) octets))
+  #-sb-xc-host (aver (array-header-p octets))
+
+  ;; Bignums are little-endian by word, but native-endian within each word,
+  ;; making use of the less consy algorithm too tricky for big-endian CPUs.
+  ;; And this does not work for little-endian, but I don't know why.
+  ;; It should not be too hard to use random testing to find an input
+  ;; at which the output obviously differs from the shift+add loop.
+  #+nil
+  (let ((input (%array-data octets)))
+    (if (typep (%vector-raw-bits input 0) 'fixnum)
+        (%vector-raw-bits input 0)
+        (let* ((nbytes (length octets))
+               (last-byte (if (plusp nbytes) (aref octets (1- nbytes)) 0))
+               ;; If the high bit of the highest byte is 1, we might need one more
+               ;; byte to avoid the bignum coming out negative.
+               (nbits (* (+ nbytes (ash last-byte -7)) sb-vm:n-byte-bits))
+               (ndigits (ceiling nbits sb-vm:n-word-bits))
+               (bignum (sb-bignum:%allocate-bignum ndigits)))
+          (dotimes (i ndigits (sb-bignum::%normalize-bignum bignum ndigits))
+            (setf (%bignum-ref bignum i) (%vector-raw-bits input i))))))
+
   (let ((result 0) (shift 0))
     (dovector (byte octets result)
       (setf result (logior result (ash byte shift))
@@ -144,10 +165,11 @@
 ;;; It makes sense to store these externally to the object, as it would otherwise
 ;;; intrude on text pages. Also, some of the bignums are shareable this way.
 (defun pack-code-fixup-locs (abs-fixups rel-fixups)
-  (let ((bytes (make-array (* 2 (+ (length abs-fixups) ; guess at final length
-                                   (length rel-fixups)))
-                           :fill-pointer 0 :adjustable t
-                           :element-type '(unsigned-byte 8))))
+  (dx-let ((bytes (make-array (min (* 2 (+ (length abs-fixups) ; guess at final length
+                                           (length rel-fixups)))
+                                   1024) ; limit the stack usage
+                              :fill-pointer 0 :adjustable t
+                              :element-type '(unsigned-byte 8))))
     (flet ((pack (list &aux (prev 0))
              (dolist (x list)
                ;; two fixups at the same location have to be wrong,
