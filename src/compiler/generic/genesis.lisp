@@ -791,6 +791,13 @@
 
 ;;;; copying simple objects into the cold core
 
+(declaim (inline cold-vector-len))
+(defun cold-vector-len (vector)
+  (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
+
+(macrolet ((string-data (string-descriptor)
+             `(+ (descriptor-byte-offset ,string-descriptor)
+                 (* sb-vm:vector-data-offset sb-vm:n-word-bytes))))
 (defun base-string-to-core (string &optional (gspace *dynamic*))
   "Copy STRING (which must only contain STANDARD-CHARs) into the cold
 core and return a descriptor to it."
@@ -798,29 +805,21 @@ core and return a descriptor to it."
   ;; extra null byte at the end to aid in call-out to C.)
   (let* ((length (length string))
          (des (allocate-vector sb-vm:simple-base-string-widetag
+                               ;; add SAETP-N-PAD-ELEMENT
                                length (ceiling (1+ length) sb-vm:n-word-bytes)
                                gspace))
-         (bytes (gspace-data gspace))
-         (offset (+ (* sb-vm:vector-data-offset sb-vm:n-word-bytes)
-                    (descriptor-byte-offset des))))
-    (dotimes (i length)
-      (setf (bvref bytes (+ offset i))
-            (char-code (aref string i))))
-    (setf (bvref bytes (+ offset length))
-          0) ; null string-termination character for C
-    des))
+         (mem (descriptor-mem des))
+         (byte-base (string-data des)))
+    (dotimes (i length des) ; was prezeroed, so automatically null-terminated
+      (setf (bvref mem (+ byte-base i)) (char-code (aref string i))))))
 
 (defun base-string-from-core (descriptor)
-  (let* ((len (descriptor-fixnum
-               (read-wordindexed descriptor sb-vm:vector-length-slot)))
-         (str (make-string len))
-         (bytes (descriptor-mem descriptor)))
+  (let* ((mem (descriptor-mem descriptor))
+         (byte-base (string-data descriptor))
+         (len (cold-vector-len descriptor))
+         (str (make-string len)))
     (dotimes (i len str)
-      (setf (aref str i)
-            (code-char (bvref bytes
-                              (+ (descriptor-byte-offset descriptor)
-                                 (* sb-vm:vector-data-offset sb-vm:n-word-bytes)
-                                 i)))))))
+      (setf (aref str i) (code-char (bvref mem (+ byte-base i))))))))
 
 ;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
 ;;; least to most significant regardless of machine endianness.
@@ -987,9 +986,7 @@ core and return a descriptor to it."
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb-vm:vector-data-offset) value)))
 
-(declaim (inline cold-vector-len cold-svref))
-(defun cold-vector-len (vector)
-  (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
+(declaim (inline cold-svref))
 (defun cold-svref (vector i)
   (declare (type index i))
   (read-wordindexed vector (+ i sb-vm:vector-data-offset)))
@@ -2445,15 +2442,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-vector (size))
   (if (zerop size)
       *simple-vector-0-descriptor*
-      (let ((result (allocate-vector sb-vm:simple-vector-widetag
-                                     size size *dynamic*)))
-        (do ((index (1- size) (1- index)))
-            ((minusp index))
-          (declare (fixnum index))
-          (write-wordindexed result
-                             (+ index sb-vm:vector-data-offset)
-                             (pop-stack)))
-        (set-readonly result))))
+      (do* ((stack (%fasl-input-stack (fasl-input)))
+            (stackptr (fop-stack-pop-n stack size) (1+ stackptr))
+            (result (allocate-vector sb-vm:simple-vector-widetag
+                                     size size *dynamic*))
+            (index sb-vm:vector-data-offset (1+ index))
+            (end (+ sb-vm:vector-data-offset size)))
+           ((= index end) (set-readonly result))
+        (write-wordindexed result index (svref stack stackptr)))))
 
 ; (not-cold-fop fop-array) ; the syntax doesn't work
 #+nil
