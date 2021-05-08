@@ -37,13 +37,6 @@
                 eof-error-p 'read-from-string)
     t)))
 
-(eval-when (:compile-toplevel :execute)
-  (setf (sb-int:info :function :kind 'sb-c:policy) :macro
-        (sb-int:info :function :macro-function 'sb-c:policy)
-        (lambda (form env)
-          (declare (ignore env))
-          (values (cl:macroexpand-1 form nil)))))
-
 (define-compiler-macro read-from-string (&whole form string &rest args
                                          &environment env)
   ;; Check this at compile-time, and rewrite it so we're silent at runtime.
