@@ -27,32 +27,32 @@
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
            (type word words)
            (type index length))
-  ;; This does not need WITHOUT-GCING, but it will be implicitly wrapped
-  ;; in WITHOUT-INTERRUPTS due to the default behavior of system mutexes,
-  ;; which is important so that we don't leave an inconsistent state.
-  ;; To think about why it is OK to leave GC enabled, consider that
-  ;; neither GC nor another thread will examine static space above the
-  ;; current value of *STATIC-SPACE-FREE-POINTER*.
-  (or (with-system-mutex (*allocator-mutex*)
-        (let* ((pointer *static-space-free-pointer*)
-               (nbytes (pad-data-block (+ words vector-data-offset)))
-               (new-pointer (sap+ pointer nbytes)))
-          (when (sap<= new-pointer (int-sap static-space-end))
+  ;; Static space starts out zeroed, so it looks a bunch of cons cells
+  ;; containing (0 . 0) above the free pointer. Therefore bumping the pointer
+  ;; merely exposes a new range of cons cells, if GC should happen to run
+  ;; while executing this code. And because we assign the LENGTH of the vector
+  ;; prior to setting the widetag, and LENGTH is a fixnum, then at worst
+  ;; someone can transiently observe a cons of (0 . a-fixnum).
+  (let* ((nbytes (pad-data-block (+ words vector-data-offset)))
+         (pointer (alien-funcall (extern-alien "atomic_bump_static_space_free_ptr"
+                                               (function system-area-pointer int))
+                                 nbytes)))
+    (if (/= (sap-int pointer) 0)
             ;; By storing the length prior to the widetag, the word at the old
             ;; free pointer decodes as a cons instead of a 0-length vector.
             ;; Not that it should matter, but it seems slightly better to change
             ;; the new object atomically to a correctly-sized vector rather than
             ;; a cons changing into the wrong vector into the right vector.
-            (setf (sap-ref-word pointer (ash vector-length-slot word-shift))
-                  (fixnumize length))
+        (let ((v (%make-lisp-obj (sap-int (sap+ pointer other-pointer-lowtag)))))
+          (setf (%array-fill-pointer v) length
             ;; then store the widetag
-            (setf (sap-ref-word pointer 0) widetag)
-            ;; then the new free pointer
-            (setf *static-space-free-pointer* new-pointer)
-            (%make-lisp-obj (logior (sap-int pointer) other-pointer-lowtag)))))
-      (error 'simple-storage-condition
-             :format-control
-             "Not enough room left in static space to allocate vector.")))
+                (sap-ref-8 pointer #+big-endian (1- sb-vm:n-word-bytes)
+                                   #+little-endian 0)
+                widetag)
+          v)
+        (error 'simple-storage-condition
+               :format-control
+               "Not enough room left in static space to allocate vector."))))
 
 #+darwin-jit
 (defun allocate-static-code-vector (widetag length words)

@@ -600,12 +600,9 @@ of specialized arrays is supported."
   (multiple-value-bind (type n-bits-shift)
       (%vector-widetag-and-n-bits-shift element-type)
     (let* ((full-length
-             (if (or (= type simple-base-string-widetag)
-                     #+sb-unicode
-                     (= type
-                        simple-character-string-widetag))
-                 (1+ length)
-                 length))
+             ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
+             ;; but a single case involving it now.
+             (+ length (if (= type simple-base-string-widetag) 1 0)))
            (vector
              (allocate-static-vector type length
                                      (vector-length-in-words full-length

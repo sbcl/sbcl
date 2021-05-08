@@ -19,6 +19,21 @@
 #include "getallocptr.h"
 #include "genesis/code.h"
 
+lispobj* atomic_bump_static_space_free_ptr(int nbytes)
+{
+    gc_assert((nbytes & LOWTAG_MASK) == 0);
+    lispobj* claimed_ptr = static_space_free_pointer;
+    do {
+        lispobj* new = (lispobj*)((char*)claimed_ptr + nbytes);
+        // Fail if space exhausted or bogusly wrapped around
+        if (new > (lispobj*)STATIC_SPACE_END || new < claimed_ptr) return 0;
+        lispobj* actual_old = __sync_val_compare_and_swap(&static_space_free_pointer,
+                                                          claimed_ptr, new);
+        if (actual_old == claimed_ptr) return claimed_ptr;
+        claimed_ptr = actual_old;
+    } while (1);
+}
+
 // Work space for the deterministic allocation profiler.
 // Only supported on x86-64, but the variables are always referenced
 // to reduce preprocessor conditionalization.
