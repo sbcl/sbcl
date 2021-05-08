@@ -20,7 +20,7 @@
 ;;; The CLASSOID structure is a supertype of all classoid types.
 ;;; Its definition occurs in 'early-classoid.lisp'
 #+sb-xc-host
-(defmethod sb-xc:make-load-form ((self classoid) &optional env)
+(defmethod make-load-form ((self classoid) &optional env)
   (declare (ignore env))
   `(find-classoid ',(classoid-name self)))
 
@@ -68,7 +68,7 @@
                   (setf (layout-friend layout) wrapper)
                   wrapper)))
 ;; The target reconstructs wrappers using FOP-LAYOUT but the host uses MAKE-LOAD-FORM.
-(defmethod make-load-form ((wrapper wrapper) &optional env)
+(defmethod cl:make-load-form ((wrapper wrapper) &optional env)
   (declare (ignore env))
   (labels ((externalize (wrapper &aux (classoid (wrapper-classoid wrapper))
                                       (name (classoid-name classoid)))

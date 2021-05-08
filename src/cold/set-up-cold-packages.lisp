@@ -287,6 +287,7 @@
     "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
     "MACRO-FUNCTION"
     "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
+    "MAKE-LOAD-FORM"
     "MAKE-LOAD-FORM-SAVING-SLOTS"
     "PROCLAIM"
     "SPECIAL-OPERATOR-P"
@@ -355,7 +356,6 @@
                   "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
                   "GENSYM"
                   "MAKE-ARRAY"
-                  "MAKE-LOAD-FORM"
                   "SIMPLE-VECTOR"
                   "TYPEP"
                   ))

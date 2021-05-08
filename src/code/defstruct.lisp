@@ -2309,7 +2309,7 @@ or they must be declared locally notinline at each call site.~@:>"
                  (pop inits)
                  (return nil)))))
     (multiple-value-bind (creation-form init-form)
-        (handler-case (sb-xc:make-load-form constant (make-null-lexenv))
+        (handler-case (make-load-form constant (make-null-lexenv))
           (error (condition) (sb-c:compiler-error condition)))
       (cond ((and (listp creation-form)
                   (typep constant 'structure-object)

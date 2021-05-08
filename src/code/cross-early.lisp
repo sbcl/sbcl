@@ -116,7 +116,7 @@
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (xfloat-zerop x)))
 
-(defmethod make-load-form ((self target-num) &optional env)
+(defmethod cl:make-load-form ((self target-num) &optional env)
   (declare (ignore env))
   (if (complexp self)
       `(complex ,(complexnum-real self) ,(complexnum-imag self))

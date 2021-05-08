@@ -81,11 +81,11 @@
          (values nil `(funcall ,method obj env))))
     `(progn
        ,@(when (or #+sb-xc-host (member :host usable-by))
-           `((defmethod make-load-form ((obj ,class-name) &optional env)
+           `((defmethod cl:make-load-form ((obj ,class-name) &optional env)
                ,host-expr)))
        ,@(when (or #+sb-xc-host (member :xc usable-by))
            ;; Use the host's CLOS implementation to select the target's method.
-           `((defmethod sb-xc:make-load-form ((obj ,class-name) &optional env)
+           `((defmethod make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr)))
        ,@(when (or #-sb-xc-host (member :target usable-by))
