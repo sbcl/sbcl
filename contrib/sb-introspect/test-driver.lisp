@@ -338,6 +338,7 @@
      (sb-mop:find-method-combination #'documentation 'cl-user::r nil))
   (&optional (sb-pcl::order :most-specific-first)))
 
+(declaim (sb-ext:muffle-conditions style-warning))
 (define-method-combination long-form-mc (foo &rest args &key bar) ())
 
 (deftest method-combination-lambda-list.3
