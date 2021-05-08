@@ -223,7 +223,6 @@
  ("src/compiler/parse-lambda-list" :c-headers)
  ("src/compiler/macros" :c-headers)
  ("src/compiler/constantp" :c-headers)
- ("src/compiler/info-functions" :c-headers)
  ("src/code/specializable-array" :not-target)
 
  ("src/compiler/generic/vm-macs" :c-headers)

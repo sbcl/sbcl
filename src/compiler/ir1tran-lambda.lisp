@@ -1490,27 +1490,3 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
             (specifier-type 'function))))
 
   (values))
-
-;; Similar to above, detect duplicate definitions within a file,
-;; but the package lock check is unnecessary - it's handled elsewhere.
-;;
-;; Additionally, this is a STYLE-WARNING, not a WARNING, because there is
-;; meaningful behavior that can be ascribed to some redefinitions, e.g.
-;;  (defmacro foo () first-definition)
-;;  (defun f () (use-it (foo )))
-;;  (defmacro foo () other-definition)
-;; will use the first definition when compiling F, but make the second available
-;; in the loaded fasl. In this usage it would have made sense to wrap the
-;; respective definitions with EVAL-WHEN for different situations,
-;; but as long as the compile-time behavior is deterministic, it's just bad style
-;; and not flat-out wrong, though there is indeed some waste in the fasl.
-;;
-;; KIND is the globaldb KIND of this NAME
-(defun %compiler-defmacro (kind name)
-  (let ((name-key `(,kind ,name)))
-    (when (boundp '*lexenv*)
-      (aver (producing-fasl-file))
-      ;; a slight OAOO issue here wrt %COMPILER-DEFUN
-      (if (member name-key (fun-names-in-this-file *compilation*) :test #'equal)
-          (compiler-style-warn 'same-file-redefinition-warning :name name)
-          (push name-key (fun-names-in-this-file *compilation*))))))

@@ -12,6 +12,25 @@
 (in-package "SB-IMPL")
 
 
+;;;; DEFMACRO
+
+;;; Inform the cross-compiler how to expand SB-XC:DEFMACRO (= DEFMACRO)
+;;; and supporting macros using the already defined host macros until
+;;; this file is itself cross-compiled.
+#+sb-xc-host
+(flet ((defmacro-using-host-expander (name)
+         (setf (macro-function name)
+               (lambda (form env)
+                 (declare (ignore env))
+                 ;; Since SB-KERNEL:LEXENV isn't compatible with the host,
+                 ;; just pass NIL. The expansion correctly captures a non-null
+                 ;; environment, but the expander doesn't need it.
+                 (funcall (cl:macro-function name) form nil)))))
+  (defmacro-using-host-expander 'sb-xc:defmacro)
+  (defmacro-using-host-expander 'named-ds-bind)
+  (defmacro-using-host-expander 'binding*))
+
+
 ;;;; Destructuring-bind
 
 (sb-xc:defmacro destructuring-bind (lambda-list expression &body body
@@ -640,10 +659,10 @@ invoked. In that case it will store into PLACE and start over."
                                 lambda-list body 'define-compiler-macro name
                                 :accessor 'sb-c::compiler-macro-args)))
     `(progn
-          (eval-when (:compile-toplevel)
-           (sb-c::%compiler-defmacro :compiler-macro-function ',name))
-          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (sb-c::%define-compiler-macro ',name ,def)))))
+       (eval-when (:compile-toplevel)
+         (sb-c::%compiler-defmacro :compiler-macro-function ',name))
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (sb-c::%define-compiler-macro ',name ,def)))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun sb-c::%define-compiler-macro (name definition)

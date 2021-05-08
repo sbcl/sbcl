@@ -18,7 +18,7 @@
   (declare (symbol symbol))
   (eq (info :function :kind symbol) :special-form))
 
-(defvar sb-xc:*macroexpand-hook* 'funcall
+(defvar *macroexpand-hook* 'funcall
   "The value of this variable must be a designator for a function that can
   take three arguments, a macro expander function, the macro form to be
   expanded, and the lexical environment to expand in. The function should
@@ -59,7 +59,7 @@
                :datum hook
                :expected-type 'compiled-function))))
 
-(defun sb-xc:macroexpand-1 (form &optional env)
+(defun macroexpand-1 (form &optional env)
   "If form is a macro (or symbol macro), expand it once. Return two values,
    the expanded form and a T-or-NIL flag indicating whether the form was, in
    fact, a macro. ENV is the lexical environment to expand in, which defaults
@@ -110,7 +110,7 @@
            (t
             (values form nil)))))
 
-(defun sb-xc:macroexpand (form &optional env)
+(defun macroexpand (form &optional env)
   "Repetitively call MACROEXPAND-1 until the form can no longer be expanded.
    Returns the final resultant form, and T if it was expanded. ENV is the
    lexical environment to expand in, or NIL (the default) for the null
@@ -140,3 +140,35 @@
                    (frob new-form t)
                    (values new-form expanded)))))
     (frob form nil)))
+
+(defun compiler-macro-function (name &optional env)
+  "If NAME names a compiler-macro in ENV, return the expansion function, else
+return NIL. Can be set with SETF when ENV is NIL."
+  (legal-fun-name-or-type-error name)
+  ;; CLHS 3.2.2.1: Creating a lexical binding for the function name
+  ;; not only creates a new local function or macro definition, but
+  ;; also shadows[2] the compiler macro.
+  (unless (sb-c::fun-locally-defined-p name env)
+    ;; Note: CMU CL used to return NIL here when a NOTINLINE
+    ;; declaration was in force. That's fairly logical, given the
+    ;; specified effect of NOTINLINE declarations on compiler-macro
+    ;; expansion. However, (1) it doesn't seem to be consistent with
+    ;; the ANSI spec for COMPILER-MACRO-FUNCTION, and (2) it would
+    ;; give surprising behavior for (SETF (COMPILER-MACRO-FUNCTION
+    ;; FOO) ...) in the presence of a (PROCLAIM '(NOTINLINE FOO)). So
+    ;; we don't do it.
+    (values (info :function :compiler-macro-function name))))
+
+;;; FIXME: we don't generate redefinition warnings for these.
+(defun (setf compiler-macro-function) (function name &optional env)
+  (declare (type (or symbol list) name)
+           (type (or function null) function))
+  (when env
+    ;; ANSI says this operation is undefined.
+    (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
+  (when (eq (info :function :kind name) :special-form)
+    (error "~S names a special form." name))
+  (with-single-package-locked-error
+      (:symbol name "setting the compiler-macro-function of ~A")
+    (setf (info :function :compiler-macro-function name) function)
+    function))

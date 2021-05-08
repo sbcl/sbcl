@@ -19,8 +19,8 @@
 ;;; - The simple methods can be installed later by the full CLOS implementation.
 ;;;   They play nice by using the same call signature for the "fast function"
 
-(sb-xc:defmacro defmethod (&whole form name lambda-list &rest body
-                           &aux qualifier)
+(defmacro defmethod (&whole form name lambda-list &rest body
+                     &aux qualifier)
   (when (member name '((setf documentation) documentation) :test 'equal)
     (return-from defmethod `(push ',form *!documentation-methods*)))
   (when (keywordp lambda-list)

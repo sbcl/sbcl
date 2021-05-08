@@ -665,7 +665,7 @@ has written, having proved that it is unreachable."))
 ;;
 (defun warn-if-inline-failed/proclaim (name new-inlinep)
   (when (eq new-inlinep 'inline)
-    (let ((warning-count (emitted-full-call-count name)))
+    (let ((warning-count (sb-impl::emitted-full-call-count name)))
       (when (and warning-count
                  ;; Warn only if the the compiler did not have the expansion.
                  (not (fun-name-inline-expansion name))
