@@ -29,6 +29,7 @@
   (defmacro-using-host-expander 'sb-xc:defmacro)
   (defmacro-using-host-expander 'named-ds-bind)
   (defmacro-using-host-expander 'binding*)
+  (defmacro-using-host-expander 'sb-xc:deftype)
   ;; FIXME: POLICY doesn't support DEFMACRO, but we need it ASAP.
   (defmacro-using-host-expander 'sb-c:policy))
 

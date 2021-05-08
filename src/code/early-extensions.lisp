@@ -1203,7 +1203,7 @@ NOTE: This interface is experimental and subject to change."
 (defun setup-type-in-final-deprecation
     (software version name replacement-spec)
   (declare (ignore software version replacement-spec))
-  (%compiler-deftype name (constant-type-expander name t) nil))
+  (%deftype name (constant-type-expander name t) nil))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

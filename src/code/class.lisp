@@ -13,6 +13,10 @@
 
 (in-package "SB-KERNEL")
 
+;;; Has the type system been properly initialized? (I.e. is it OK to
+;;; use it?)
+(!define-load-time-global *type-system-initialized* nil)
+
 (!begin-collecting-cold-init-forms)
 
 ;;;; the CLASSOID structure

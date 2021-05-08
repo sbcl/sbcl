@@ -101,7 +101,6 @@
  ("src/code/defbangtype" :c-headers)
  ("src/code/early-constants" :c-headers)
 
- ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
  ("src/compiler/vop-existsp" :c-headers)
  ("src/compiler/early-globaldb" :c-headers)
 
@@ -216,7 +215,7 @@
 
  ("src/compiler/policies")
 
-  ;; needed by "compiler/vop"
+ ;; needed by "compiler/vop"
  ("src/compiler/sset" :c-headers)
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node" :c-headers :block-compile)
@@ -289,21 +288,17 @@
  ("src/code/condition" :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
+
+ ("src/compiler/proclaim" :c-headers)
+ ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
  ("src/code/type" :c-headers)
+ ("src/compiler/generic/vm-type" :c-headers)
+
  ("src/compiler/generic/primtype" :c-headers)
-
- ;; SB-XC:DEFTYPE is needed in order to compile type.lisp in the host
- ;; Common Lisp, and in order to run, it needs %COMPILER-DEFTYPE.
- ("src/compiler/compiler-deftype" :c-headers)
-
- ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
- ("src/compiler/knownfun")
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :c-headers :not-target)
- ("src/compiler/proclaim" :c-headers)
 
- ("src/compiler/generic/vm-type" :c-headers)
  ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
  ;; and all type-classes are defined.
  ("src/code/deftypes-for-target" :c-headers)
@@ -342,6 +337,7 @@
  ("src/code/pathname" :not-host)
  ("src/code/host-pprint")
 
+ ("src/compiler/knownfun")
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")
 
