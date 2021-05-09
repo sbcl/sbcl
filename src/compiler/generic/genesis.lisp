@@ -1854,7 +1854,7 @@ core and return a descriptor to it."
   (cold-set 'sb-vm::*free-tls-index*
             (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift)))
 
-  (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
+  (cold-set 'sb-c::*code-serialno* (make-fixnum-descriptor (1+ sb-c::*code-serialno*)))
 
   ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
   #+immobile-code
@@ -2630,7 +2630,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
         ;; assign serialno
         (write-wordindexed/raw
          des aligned-n-boxed-words
-         (logior (ash (incf *code-serialno*) (byte-position sb-vm::code-serialno-byte))
+         (logior (ash (incf sb-c::*code-serialno*) (byte-position sb-vm::code-serialno-byte))
                  jumptable-word)))
       (when *show-pre-fixup-code-p*
         (format *trace-output*

@@ -118,9 +118,9 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
-  (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
-  (show-and-call !pred-cold-init)
+  (show-and-call sb-kernel::!primordial-type-cold-init)
+
   (show-and-call !type-cold-init)
   ;; FIXME: It would be tidy to make sure that that these cold init
   ;; functions are called in the same relative order as the toplevel

@@ -525,6 +525,41 @@ between the ~A definition and the ~A definition"
       (note-class class)
       (topological-sort classes constraints #'std-cpl-tie-breaker))))
 
+
+;;; Return the layout for an object. This is the basic operation for
+;;; finding out the "type" of an object, and is used for generic
+;;; function dispatch. The standard doesn't seem to say as much as it
+;;; should about what this returns for built-in objects. For example,
+;;; it seems that we must return NULL rather than LIST when X is NIL
+;;; so that GF's can specialize on NULL.
+;;; x86-64 has a vop that implements this without even needing to place
+;;; the vector of layouts in the constant pool of the containing code.
+#-(or sb-xc-host (and compact-instance-header x86-64))
+(progn
+(declaim (inline wrapper-of))
+(defun wrapper-of (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (cond ((%instancep x) (%instance-wrapper x))
+        ((funcallable-instance-p x) (%fun-wrapper x))
+        ;; Compiler can dump literal layouts, which handily sidesteps
+        ;; the question of when cold-init runs L-T-V forms.
+        ((null x) #.(find-layout 'null))
+        (t
+         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
+         ;; improved - we've already ruled out some of the lowtags.
+         (layout-friend
+          (svref (load-time-value **primitive-object-layouts** t)
+                 (widetag-of x)))))))
+
+#-sb-xc-host
+(progn
+(declaim (inline classoid-of))
+(defun classoid-of (object)
+  "Return the class of the supplied object, which may be any Lisp object, not
+   just a CLOS STANDARD-OBJECT."
+  (wrapper-classoid (wrapper-of object))))
+
+
 ;;;; classoid namespace
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -1268,7 +1303,7 @@ between the ~A definition and the ~A definition"
                            :invalidate nil)))))
   (/show0 "done with loop over *!BUILTIN-CLASSOIDS*"))
 
-;;; Now that we have set up the class heterarchy, seal the sealed
+;;; Now that we have set up the class hierarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.
 (!cold-init-forms
   (dolist (x *builtin-classoids*)

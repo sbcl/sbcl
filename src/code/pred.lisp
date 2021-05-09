@@ -155,61 +155,6 @@
   (and (fixnump x)
        (<= 0 x limit)))
 
-;;; a vector that maps widetags to layouts, used for quickly finding
-;;; the layouts of built-in classes
-(define-load-time-global **primitive-object-layouts** nil)
-(declaim (type simple-vector **primitive-object-layouts**))
-(defun !pred-cold-init ()
-  ;; This vector is allocated in immobile space when possible. There isn't
-  ;; a way to do that from lisp, so it's special-cased in genesis.
-  #-immobile-space (setq **primitive-object-layouts** (make-array 256))
-  ;; If #+metaspace, we can't generally store layouts in heap objects except in
-  ;; the instance header, but this vector can because it too will go in metaspace.
-  (map-into **primitive-object-layouts**
-            (lambda (name) (wrapper-friend (classoid-wrapper (find-classoid name))))
-            #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))
-                (dolist (x sb-kernel::*builtin-classoids*)
-                  (destructuring-bind (name &key codes &allow-other-keys) x
-                    (dolist (code codes)
-                      (setf (svref table code) name))))
-                (loop for i from sb-vm:list-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
-                      below 256
-                      do (setf (aref table i) 'cons))
-                (loop for i from sb-vm:even-fixnum-lowtag by (ash 1 sb-vm:n-fixnum-tag-bits)
-                      below 256
-                      do (setf (aref table i) 'fixnum))
-                table)))
-
-;;; Return the layout for an object. This is the basic operation for
-;;; finding out the "type" of an object, and is used for generic
-;;; function dispatch. The standard doesn't seem to say as much as it
-;;; should about what this returns for built-in objects. For example,
-;;; it seems that we must return NULL rather than LIST when X is NIL
-;;; so that GF's can specialize on NULL.
-;;; x86-64 has a vop that implements this without even needing to place
-;;; the vector of layouts in the constant pool of the containing code.
-#-(and compact-instance-header x86-64)
-(progn
-(declaim (inline wrapper-of))
-(defun wrapper-of (x)
-  (declare (optimize (speed 3) (safety 0)))
-  (cond ((%instancep x) (%instance-wrapper x))
-        ((funcallable-instance-p x) (%fun-wrapper x))
-        ;; Compiler can dump literal layouts, which handily sidesteps
-        ;; the question of when cold-init runs L-T-V forms.
-        ((null x) #.(find-layout 'null))
-        (t
-         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
-         ;; improved - we've already ruled out some of the lowtags.
-         (layout-friend
-          (svref (load-time-value **primitive-object-layouts** t)
-                 (widetag-of x)))))))
-
-(declaim (inline classoid-of))
-(defun classoid-of (object)
-  "Return the class of the supplied object, which may be any Lisp object, not
-   just a CLOS STANDARD-OBJECT."
-  (wrapper-classoid (wrapper-of object)))
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different

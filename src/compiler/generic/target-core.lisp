@@ -250,7 +250,7 @@
 
 (defun assign-code-serialno (code-obj)
   (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
-                        (atomic-incf sb-fasl::*code-serialno*)))
+                        (atomic-incf *code-serialno*)))
          (insts (code-instructions code-obj))
          (jumptable-word (sap-ref-word insts 0)))
     (aver (zerop (ash jumptable-word -14)))

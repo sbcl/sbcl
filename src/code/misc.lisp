@@ -19,4 +19,3 @@
   ;; Read the version file once and once only
   #+sb-xc-host #.(sb-cold:read-from-file "version.lisp-expr")
   #-sb-xc-host #.(lisp-implementation-version))
-

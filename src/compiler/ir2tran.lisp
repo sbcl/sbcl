@@ -2133,6 +2133,32 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (emit-move node block (lvar-tn node block x) (first results))
     (move-lvar-result node block results lvar)))
 
+(defoptimizer (%compile-time-type-error ir2-convert)
+    ((objects atype dtype detail code-context cast-context) node block)
+  (declare (ignore objects code-context))
+  ;; Remove %COMPILE-TIME-TYPE-ERROR bits
+  (setf (node-source-path node)
+        (cdr (node-source-path node)))
+  (%compile-time-type-error-warn node
+                                 (lvar-value atype)
+                                 (lvar-value dtype)
+                                 (lvar-value detail)
+                                 :cast-context (lvar-value cast-context))
+  (ir2-convert-full-call node block))
+
+(defoptimizer (%compile-time-type-style-warn ir2-convert)
+    ((objects atype dtype detail code-context cast-context) node block)
+  (declare (ignore objects code-context block))
+  ;; Remove %COMPILE-TIME-TYPE-ERROR bits
+  (setf (node-source-path node)
+        (cddr (node-source-path node)))
+  (%compile-time-type-error-warn node
+                                 (lvar-value atype)
+                                 (lvar-value dtype)
+                                 (lvar-value detail)
+                                 :cast-context (lvar-value cast-context)
+                                 :condition 'type-style-warning))
+
 #-sb-xc-host ;; package-lock-violation-p is not present yet
 (defoptimizer (set ir2-hook) ((symbol value) node block)
   (declare (ignore value block))

@@ -11,6 +11,13 @@
 
 (in-package "SB-C")
 
+;;; Unique number assigned into high 4 bytes of 64-bit code size slot
+;;; so that we can sort the contents of varyobj space in a more-or-less
+;;; predictable manner based on the order in which code was loaded.
+;;; This wraps around at 32 bits, but it's still deterministic.
+(define-load-time-global *code-serialno* 0)
+(declaim (fixnum *code-serialno*))
+
 ;;; A CORE-OBJECT structure holds the state needed to resolve cross-component
 ;;; references during in-core compilation.
 (defstruct (core-object

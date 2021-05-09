@@ -9,6 +9,8 @@
 
 (in-package "SB-C")
 
+(declaim (special *lexenv*))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
     #(:required &optional &rest &more &key &aux &environment &whole

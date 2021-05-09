@@ -102,18 +102,17 @@
  ("src/code/early-constants" :c-headers)
 
  ("src/compiler/vop-existsp" :c-headers)
- ("src/compiler/early-globaldb" :c-headers)
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names" :c-headers)
 
+ ("src/compiler/early-globaldb" :c-headers)
  ;; for various constants e.g. SB-XC:MOST-POSITIVE-FIXNUM and
- ;; SB-VM:N-LOWTAG-BITS, needed by "early-objdef" and others
+ ;; SB-VM:N-LOWTAG-BITS, needed by "early-objdef" and others.
  ("src/compiler/generic/parms" :c-headers)
  ("src/compiler/target/parms" :c-headers)
  ("src/compiler/generic/early-vm" :c-headers)
  ("src/compiler/generic/early-objdef" :c-headers)
- ("src/code/early-array" :c-headers) ; needs "early-vm" numbers
 
  ;; This has the BARRIER stuff that the threading support needs,
  ;; required for some code in 'early-extensions'
@@ -124,17 +123,16 @@
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
- ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
- ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
 
- ("src/code/ansi-stream" :not-host)
- ("src/code/early-fasl" :c-headers)
+ ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
 
  ("src/code/defbangstruct" :c-headers :not-target)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
 
+ ("src/code/ansi-stream" :not-host)
+ ("src/code/restart" :not-host)
  ("src/code/early-print" :not-host)
  ("src/code/early-pprint" :not-host)
  ("src/code/early-impl" :not-host)
@@ -146,8 +144,6 @@
 
  ("src/code/early-raw-slots" :c-headers)
 
- ("src/code/funutils" :not-host)
-
  ("src/code/maphash" :not-host)
  ("src/code/xset" :c-headers) ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
@@ -158,90 +154,70 @@
  ("src/code/cas" :not-host)
  ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
  ("src/compiler/early-c" :c-headers)
- ("src/compiler/fun-info" :c-headers)
- ("src/pcl/slot-name") ; for calls from 'info-vector'
- ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
- ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
- ("src/code/signal" :not-host)
+ ("src/pcl/slot-name")
+
  ("src/code/sysmacs" :not-host)
- ("src/code/target-lfhash" :not-host)
- ("src/compiler/info-vector" :c-headers)
  ("src/code/early-classoid" :c-headers)
- ("src/compiler/globaldb" :c-headers)
- ("src/compiler/generic/vm-array" :c-headers)
+
  ("src/code/string-hash" :c-headers)
- ("src/code/primordial-type" :c-headers)
  ("src/compiler/generic/pinned-objects" :not-host)
  ("src/compiler/generic/layout-ids" :c-headers)
 
+ ("src/code/signal" :not-host)
  ("src/code/cold-error"  :not-host)
  ;; Define at most one INTERPRETED-FUNCTION type based on target features
  #+sb-eval ("src/code/early-full-eval" :not-host)
  #+sb-fasteval ("src/interpreter/function" :not-host)
- ("src/code/fdefinition" :not-host)
 
- ("src/code/weak"          :not-host)
- ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
- ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/debug-var-io")
  ("src/code/target-error" :not-host)
 
  ("src/code/early-float")
- ("src/code/pred" :not-host)
-
- ("src/code/list"   :not-host)
- ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
- ("src/code/coerce" :not-host)
 
  ("src/code/huffman")
 
- ("src/code/early-time" :c-headers)
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
-
- ("src/code/bignum"     :not-host)
- ("src/code/number-dispatch" :not-host)
- ("src/code/float-inf-nan"   :not-host)
+ ("src/code/early-time" :c-headers)
 
  ("src/code/misc" :c-headers)
 
  ("src/code/early-format")
 
- ("src/code/query"  :not-host)
- ("src/code/sort"  :not-host)
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
  ;;; convenient to stick them here)
 
+ ("src/compiler/parse-lambda-list" :c-headers)
+ ("src/compiler/fun-info" :c-headers)
+ ("src/compiler/constantp" :c-headers)
+ ("src/compiler/macros" :c-headers)
+ ("src/compiler/generic/vm-macs" :c-headers)
  ("src/compiler/policies")
 
- ;; needed by "compiler/vop"
+ ("src/code/target-lfhash" :not-host)
+ ("src/compiler/info-vector" :c-headers)
+ ("src/compiler/globaldb" :c-headers)
+ ("src/compiler/generic/objdef" :c-headers)
+
+ ("src/compiler/generic/vm-array" :c-headers)
+ ("src/code/primordial-type" :c-headers)
+ ("src/code/specializable-array" :not-target)
+
  ("src/compiler/sset" :c-headers)
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node" :c-headers :block-compile)
- ("src/compiler/parse-lambda-list" :c-headers)
- ("src/compiler/macros" :c-headers)
- ("src/compiler/constantp" :c-headers)
- ("src/code/specializable-array" :not-target)
-
- ("src/compiler/generic/vm-macs" :c-headers)
- ("src/compiler/generic/objdef" :c-headers)
+ ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
+ ;; and LABEL, needed by IR2-NLX-INFO
+ ("src/compiler/early-assem")
+ ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
+ ("src/compiler/vop" :c-headers :block-compile)
+ ("src/compiler/backend" :c-headers)
 
  ;; sparc-vm and ppc-vm need sc+offset defined to get at internal
  ;; error args. This file contains stuff previously in
  ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
  ;; 2002-02-05
  ("src/code/sc-offset" :c-headers)
-
- ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
- ;; and LABEL, needed by IR2-NLX-INFO
- ("src/compiler/early-assem")
-
- ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
- ("src/compiler/vop" :c-headers :block-compile)
-
- ;; needed by "vm" and "primtype"
- ("src/compiler/backend" :c-headers)
 
  ;; for e.g. MAX-VOP-TN-REFS, needed by "meta-vmdef"
  ("src/compiler/vmdef" :c-headers)
@@ -263,6 +239,14 @@
  ("output/stuff-groveled-from-headers" :not-host)
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)
+
+ ("src/code/weak"             :not-host)
+ ("src/code/array"            :not-host)
+
+ ("src/code/list"   :not-host)
+ ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
+ ("src/code/fdefinition"    :not-host)
+ ("src/code/coerce" :not-host)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
@@ -293,6 +277,7 @@
  ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
  ("src/code/type" :c-headers)
  ("src/compiler/generic/vm-type" :c-headers)
+ ("src/code/pred" :not-host)
 
  ("src/compiler/generic/primtype" :c-headers)
 
@@ -338,6 +323,7 @@
  ("src/code/host-pprint")
 
  ("src/compiler/knownfun")
+ ("src/compiler/ctype")
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")
 
@@ -347,21 +333,24 @@
 
  ("src/compiler/bit-util")
 
- ("src/code/linkage-table" :not-host)
- ("src/code/foreign"       :not-host)
- ("src/code/unix"          :not-host)
- ("src/code/symbol"        :not-host)
- ("src/code/fd-stream"     :not-host)
- ("src/code/stream"        :not-host)
+ ("src/code/linkage-table"   :not-host)
+ ("src/code/foreign"         :not-host)
+ ("src/code/unix"            :not-host)
+ ("src/code/symbol"          :not-host)
+ ("src/code/bignum"          :not-host)
+ ("src/code/number-dispatch" :not-host)
+ ("src/code/float-inf-nan"   :not-host)
+ ("src/code/numbers"         :not-host)
+ ("src/code/float-trap"      :not-host)
+ ("src/code/float"           :not-host)
+ ("src/code/irrat"           :not-host)
+
+ ("src/code/fd-stream"       :not-host)
+ ("src/code/stream"          :not-host)
  ("src/code/load")
  ("src/code/deadline"  :not-host)
  ("src/code/toplevel"  :not-host)
  ("src/code/common-os" :not-host)
-
- ("src/code/numbers"    :not-host)
- ("src/code/float-trap" :not-host)
- ("src/code/float"      :not-host)
- ("src/code/irrat"      :not-host)
 
  ("src/code/host-c-call")
 
@@ -371,7 +360,6 @@
 
  ("src/code/fop") ; needs macros from code/load.lisp
 
- ("src/compiler/ctype")
  ("src/compiler/disassem")
  ("src/compiler/assem")
 
@@ -426,7 +414,6 @@
  #+avx2
  ("src/compiler/target/avx2-insts")
  ("src/compiler/target/macros")
- ("src/compiler/generic/early-type-vops")
 
  ("src/assembly/target/support")
 
@@ -467,7 +454,7 @@
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
  ("src/compiler/generic/vm-tran")
- ("src/compiler/generic/late-type-vops")
+ ("src/compiler/generic/type-vops")
  ("src/compiler/target/type-vops")
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
@@ -536,8 +523,9 @@
  ("src/code/macroexpand")
  ("src/code/target-char"    :not-host)
  ("src/code/target-unicode" :not-host)
- ("src/code/mipsstrops" :not-host)
- ("src/code/string"     :not-host)
+ ("src/code/mipsstrops"     :not-host)
+ ("src/code/string"         :not-host)
+ ("src/code/funutils"       :not-host)
 
  #+win32 ("src/code/win32" :not-host)
  #+android ("src/code/android-os" :not-host)
@@ -583,6 +571,8 @@
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
+ ("src/code/query"  :not-host)
+ ("src/code/sort"  :not-host)
  ("src/code/final" :not-host)
  ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
  ("src/code/reader" :not-host) ; needs "code/readtable"
