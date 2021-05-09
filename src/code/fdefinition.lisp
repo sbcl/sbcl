@@ -438,8 +438,7 @@
 (defun fboundp (name)
   "Return true if name has a global function definition."
   (declare (explicit-check))
-  (let ((fdefn (find-fdefn name)))
-    (and fdefn (fdefn-fun fdefn) t)))
+  (awhen (find-fdefn name) (fdefn-fun it)))
 
 (defun fmakunbound (name)
   "Make NAME have no global function definition."
