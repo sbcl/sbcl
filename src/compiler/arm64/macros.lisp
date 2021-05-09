@@ -106,26 +106,16 @@
               fun-pointer-lowtag))
      (inst br lip)))
 
-(defmacro lisp-return (function lip return-style)
+(defmacro lisp-return (lip return-style)
   "Return to RETURN-PC."
-  `(let* ((function ,function)
-          (lip ,lip))
+  `(let* ((lip ,lip))
      (aver (sc-is lip interior-reg))
      ;; Indicate a single-valued return by clearing the Z flag
      ,@(ecase return-style
          (:single-value '((inst cmp null-tn 0)))
          (:multiple-values '((inst cmp zr-tn zr-tn)))
          (:known))
-     (inst sub lip function (- other-pointer-lowtag 8))
      (inst ret lip)))
-
-(defmacro emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  `(progn
-     (emit-alignment n-lowtag-bits)
-     (emit-label ,label)
-     (inst lra-header-word)))
-
 
 ;;;; Stack TN's
 
@@ -156,7 +146,7 @@
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
     `(sc-case ,n-reg
-       ((any-reg descriptor-reg)
+       ((any-reg descriptor-reg interior-reg)
         (sc-case ,n-stack
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))

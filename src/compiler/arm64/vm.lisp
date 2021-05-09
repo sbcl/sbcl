@@ -69,23 +69,23 @@
   (defreg csp 26)
   (defreg tmp 27)
   (defreg null 28)
-  (defreg code 29)
+  (defreg lr2 29)
   (defreg lr 30)
   (defreg nsp 31)
   (defreg zr 31)
 
   (defregset system-regs
-      null cfp nsp lr code)
+      null cfp nsp lr lr2)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 r7 #-darwin r8 r9 #-sb-thread r10 lexenv)
+      r0 r1 r2 r3 r4 r5 r6 #+nil r7 #-darwin r8 r9 #-sb-thread r10 lexenv)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
 
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 #-darwin r8 r9 #-sb-thread r10 #+sb-thread thread lexenv code)
+      r7 #-darwin r8 r9 #-sb-thread r10 #+sb-thread thread lexenv)
 
   ;; registers used to pass arguments
   ;;
@@ -188,7 +188,8 @@
 
   ;; Pointers to the interior of objects.  Used only as a temporary.
   (interior-reg registers
-                :locations (#.lr-offset))
+                :locations (#.lr-offset ;; #.r7-offset
+                                        ))
 
   ;; **** Things that can go in the floating point registers.
 
@@ -233,7 +234,6 @@
 
   (defregtn null descriptor-reg)
   (defregtn lexenv descriptor-reg)
-  (defregtn code descriptor-reg)
   (defregtn tmp any-reg)
 
   (defregtn nargs any-reg)
@@ -243,6 +243,7 @@
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
   (defregtn lr interior-reg)
+  (defregtn lr2 interior-reg)
   #+sb-thread
   (defregtn thread interior-reg))
 

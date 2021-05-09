@@ -11,7 +11,7 @@
     ((:temp nvals any-reg nargs-offset)
      (:temp vals any-reg nl1-offset)
      (:temp old-fp any-reg nl2-offset)
-     (:temp lra descriptor-reg r6-offset)
+     (:temp lra interior-reg lr-offset)
 
      ;; These are just needed to facilitate the transfer
      (:temp count any-reg nl3-offset)
@@ -23,8 +23,7 @@
      (:temp r0 descriptor-reg r0-offset)
      (:temp r1 descriptor-reg r1-offset)
      (:temp r2 descriptor-reg r2-offset)
-     (:temp r3 descriptor-reg r3-offset)
-     (:temp lip interior-reg lr-offset))
+     (:temp r3 descriptor-reg r3-offset))
 
   ;; Note, because of the way the return-multiple vop is written, we
   ;; can assume that we are never called with nvals == 1 (not that it
@@ -69,7 +68,7 @@
   (inst add csp-tn ocfp-tn (lsl nvals (- word-shift n-fixnum-tag-bits)))
 
   ;; Return.
-  (lisp-return lra lip :multiple-values))
+  (lisp-return lra :multiple-values))
 
 ;;;; tail-call-variable.
 
@@ -133,18 +132,18 @@
   (inst b :ne LOOP)
 
   DONE
+  (loadw lip cfp-tn lra-save-offset)
   ;; The call frame is all set up, so all that remains is to jump to
   ;; the new function.  We need a boxed register to hold the actual
   ;; function object (in case of closure functions or funcallable
   ;; instances)
   (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lip))
+  (lisp-jump temp lr2-tn))
 
 ;;;; Non-local exit noise.
 
-(define-assembly-routine (throw
-                             (:return-style :none))
+(define-assembly-routine (throw)
     ((:arg target descriptor-reg r0-offset)
      (:arg start any-reg r9-offset)
      (:arg count any-reg nargs-offset)
@@ -156,7 +155,18 @@
 
   LOOP
 
-  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
+  (let ((error (gen-label)))
+    (assemble (:elsewhere)
+      (emit-label error)
+
+      ;; Fake up a stack frame so that backtraces come out right.
+      (inst mov ocfp-tn cfp-tn)
+      (inst mov cfp-tn csp-tn)
+      (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
+
+      (emit-error-break nil error-trap
+                        (error-number-or-lose 'unseen-throw-tag-error)
+                        (list target)))
     (inst cbz catch error))
 
   (loadw-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot catch)
@@ -169,14 +179,12 @@
   (inst b (make-fixup 'unwind :assembly-routine)))
 
 (define-assembly-routine (unwind
-                          (:return-style :none)
                           (:translate %unwind)
                           (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) r0-offset)
      (:arg start (any-reg descriptor-reg) r9-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
      (:temp ocfp any-reg ocfp-offset)
-     (:temp lra descriptor-reg lexenv-offset)
      (:temp cur-uwp any-reg nl2-offset)
      (:temp lip interior-reg lr-offset)
      (:temp next-uwp any-reg nl3-offset)
@@ -199,7 +207,8 @@
   (unbind-to-here where symbol value tmp-tn)
 
   (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
-  (loadw-pair cfp-tn unwind-block-cfp-slot code-tn unwind-block-code-slot cur-uwp)
+  (loadw lip cur-uwp unwind-block-entry-pc-slot)
+  (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
 
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
@@ -210,5 +219,5 @@
   (inst mov (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset) tmp-tn)
   SKIP
 
-  (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra lip :known))
+
+  (lisp-return lip :known))

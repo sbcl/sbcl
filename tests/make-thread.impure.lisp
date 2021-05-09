@@ -57,12 +57,12 @@
                      (let ((obj (sb-vm::reconstitute-object (%make-lisp-obj baseptr))))
                        (when (code-component-p obj)
                          (cond
-                          #+c-stack-is-control-stack
+                          #+(or c-stack-is-control-stack arm64)
                           ((= (logand word sb-vm:lowtag-mask) sb-vm:fun-pointer-lowtag)
                            (dotimes (i (code-n-entries obj))
                              (when (= (get-lisp-obj-address (%code-entry-point obj i)) word)
                                (return (setq obj (%code-entry-point obj i))))))
-                          #-c-stack-is-control-stack ; i.e. does this backend have LRAs
+                          #-(or c-stack-is-control-stack arm64) ; i.e. does this backend have LRAs
                           ((= (logand (sap-ref-word (int-sap (logandc2 word sb-vm:lowtag-mask)) 0)
                                       sb-vm:widetag-mask) sb-vm:return-pc-widetag)
                            (setq obj (%make-lisp-obj word)))))

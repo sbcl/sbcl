@@ -823,11 +823,10 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
         }
     } else
 #elif defined (LISP_FEATURE_ARM)
-        access_control_frame_pointer(th) = (lispobj*)
-            SymbolValue(CONTROL_STACK_POINTER, th);
+        access_control_frame_pointer(th) = (lispobj*) SymbolValue(CONTROL_STACK_POINTER, th);
 #elif defined (LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =
-        (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP));
+        (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP)) + 2;
 #endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
@@ -841,9 +840,13 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
     access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
 
     access_control_frame_pointer(th)[0] = oldcont;
+#ifdef reg_CODE
     access_control_frame_pointer(th)[1] = NIL;
     access_control_frame_pointer(th)[2] =
         (lispobj)(*os_context_register_addr(context, reg_CODE));
+#else
+    access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
+#endif
 #endif
 }
 
@@ -1699,7 +1702,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_npc_addr(context) =
         4 + *os_context_pc_addr(context);
 #endif
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64) || defined(LISP_FEATURE_RISCV)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
 #endif

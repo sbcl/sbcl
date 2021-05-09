@@ -45,17 +45,17 @@
         (when (typep map '(cons (eql sb-c::coverage-map)))
           (return-from %find-coverage-map (values (cdr map) code))))))))
 
-#+darwin-jit
+#+arm64
 (declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
 ;;; Coverage marks are in the raw bytes following the jump tables
 ;;; preceding any other unboxed constants. This way we don't have to store
 ;;; a pointer to the coverage marks since their location is implicit.
 (defun code-coverage-marks (code)
-  #-darwin-jit
+  #-arm64
   (let ((insts (sb-kernel:code-instructions code)))
     (sb-sys:sap+ insts (ash (sb-kernel:code-jump-table-words code)
                             sb-vm:word-shift)))
-  #+darwin-jit
+  #+arm64
   (let* ((words (sb-kernel:code-header-words code))
          (last (sb-kernel:code-header-ref code (- words 2))))
     (if (vectorp last)
@@ -103,13 +103,13 @@ image."
   (multiple-value-bind (map code) (%find-coverage-map code)
     (when map
       (sb-int:collect ((paths))
-        #-darwin-jit
+        #-arm64
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
             (dotimes (i (length map) (paths))
               (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
                 (paths (svref map i))))))
-        #+darwin-jit
+        #+arm64
         (let ((marks (code-coverage-marks code)))
           (dotimes (i (length map) (paths))
             (when (byte-marked-p (aref marks i))
@@ -120,13 +120,13 @@ image."
   (cond (object ; reset only this object
          (multiple-value-bind (map code) (%find-coverage-map object)
            (when map
-             #-darwin-jit
+             #-arm64
              (sb-sys:with-pinned-objects (code)
                (let ((sap (code-coverage-marks code)))
                  (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
                    (setf (sb-sys:sap-ref-word sap (ash i sb-vm:n-word-bytes))
                          (empty-mark-word)))))
-             #+darwin-jit
+             #+arm64
              (fill (code-coverage-marks code) #xFF))))
         (t                              ; reset everything
          (do-instrumented-code (code)
@@ -164,7 +164,7 @@ image."
                 (gethash namestring namestring->path-tables) path-lookup-table)
           (dolist (item legacy-coverage-marks)
             (setf (gethash (car item) path-lookup-table) item)))
-        #-darwin-jit
+        #-arm64
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
             (dotimes (i (length map))   ; for each recorded mark
@@ -181,7 +181,7 @@ image."
                         #+nil
                         (warn "Missing coverage entry for ~S in ~S"
                               path namestring))))))))
-        #+darwin-jit
+        #+arm64
         (let ((marks (code-coverage-marks code)))
           (dotimes (i (length map))     ; for each recorded mark
             (when (byte-marked-p (aref marks i))

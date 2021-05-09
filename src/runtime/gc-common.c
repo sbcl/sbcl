@@ -2262,7 +2262,10 @@ scavenge_interrupt_context(os_context_t * context)
      * compile out for the registers that don't exist on a given
      * platform? */
 
+#ifdef reg_CODE
     INTERIOR_POINTER_VARS(pc);
+#endif
+
 #ifdef reg_LIP
     INTERIOR_POINTER_VARS(lip);
 #endif
@@ -2276,13 +2279,29 @@ scavenge_interrupt_context(os_context_t * context)
     INTERIOR_POINTER_VARS(ctr);
 #endif
 
+#ifdef reg_CODE
     PAIR_INTERIOR_POINTER(pc);
+#endif
+
 #ifdef reg_LIP
     PAIR_INTERIOR_POINTER(lip);
 #endif
+
 #ifdef ARCH_HAS_LINK_REGISTER
-    PAIR_INTERIOR_POINTER(lr);
+#ifndef reg_CODE
+    /* If LR has code in it don't pair it with anything else, since
+       there's reg_CODE and it may match something bogus. It will be pinned by pin_stack. */
+    int code_in_lr = 0;
+
+    if (dynamic_space_code_from_pc((char *)*os_context_register_addr(context, reg_LR))) {
+        code_in_lr = 1;
+    }
 #endif
+    {
+      PAIR_INTERIOR_POINTER(lr);
+    }
+#endif
+
 #ifdef ARCH_HAS_NPC_REGISTER
     PAIR_INTERIOR_POINTER(npc);
 #endif
@@ -2319,12 +2338,21 @@ scavenge_interrupt_context(os_context_t * context)
 
     /* Now that the scavenging is done, repair the various interior
      * pointers. */
+#ifdef reg_CODE
     FIXUP_INTERIOR_POINTER(pc);
+#endif
+
 #ifdef reg_LIP
     FIXUP_INTERIOR_POINTER(lip);
 #endif
 #ifdef ARCH_HAS_LINK_REGISTER
-    FIXUP_INTERIOR_POINTER(lr);
+
+#ifndef reg_CODE
+    if(!code_in_lr)
+#endif
+    {
+        FIXUP_INTERIOR_POINTER(lr);
+    }
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     FIXUP_INTERIOR_POINTER(npc);

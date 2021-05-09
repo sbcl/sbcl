@@ -372,7 +372,7 @@
     #+(or x86 x86-64) (coverage-mark-lowering-pass component asmstream)
     #-(or x86 x86-64)
     (when coverage-map
-      #+darwin-jit
+      #+arm64
       (vector-push-extend (make-constant (make-array (length coverage-map)
                                                      :element-type '(unsigned-byte 8)
                                                      :initial-element #xFF))
@@ -381,7 +381,7 @@
                           (ir2-component-constants ir2-component))
       ;; The mark vop can store the low byte from either ZERO-TN or NULLL-TN
       ;; to avoid loading a constant. Either one won't match #xff.
-      #-darwin-jit
+      #-arm64
       (emit (asmstream-data-section asmstream)
             `(.skip ,(length coverage-map) #xff)))
 

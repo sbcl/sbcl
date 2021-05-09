@@ -3428,6 +3428,60 @@ move_pinned_pages_to_newspace()
     }
 }
 
+#if GENCGC_IS_PRECISE && !defined(reg_CODE)
+
+lispobj *
+dynamic_space_code_from_pc(char *pc)
+{
+    /* Only look at untagged pointers, otherwise they won't be in the PC. */
+    if((long)pc % 4 == 0 && is_code(page_table[find_page_index(pc)].type)) {
+        lispobj *object = search_dynamic_space(pc);
+        if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
+            return object;
+    }
+
+    return NULL;
+}
+
+void maybe_pin_code(lispobj addr) {
+    page_index_t page = find_page_index((char*)addr);
+
+    if (page < 0) return;
+    if (not_condemned_p(page)) return;
+
+    struct code* code = (struct code*)component_ptr_from_pc((char *)addr);
+    if(code) {
+        pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
+    }
+}
+
+void pin_stack(struct thread* th) {
+
+    if(!conservative_stack)
+        return;
+
+    lispobj *cfp = access_control_frame_pointer(th);
+
+    if (cfp) {
+      while (1) {
+        lispobj* ocfp = (lispobj *) cfp[0];
+        lispobj lr = cfp[1];
+        if (ocfp == 0)
+          break;
+        maybe_pin_code(lr);
+        cfp = ocfp;
+      }
+    }
+    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    for (i = i - 1; i >= 0; --i) {
+        os_context_t* context = nth_interrupt_context(i, th);
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR2));
+    }
+
+}
+#endif
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
@@ -3634,6 +3688,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * the same mechanism is used for objects pinned for use by alien
      * code. */
     for_each_thread(th) {
+#if GENCGC_IS_PRECISE && !defined(reg_CODE)
+        pin_stack(th);
+#endif
         lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
         while (pin_list != NIL) {
             pin_exact_root(CONS(pin_list)->car);

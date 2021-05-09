@@ -48,14 +48,13 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 22
     (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew-pair temp unwind-block-uwp-slot cfp-tn unwind-block-cfp-slot block)
-    (inst compute-lra temp lip entry-label)
-    (storew-pair code-tn unwind-block-code-slot temp unwind-block-entry-pc-slot block)
+    (inst adr temp entry-label)
+    (storew temp block unwind-block-entry-pc-slot)
     #+sb-thread
     (loadw-pair
      temp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)
@@ -79,14 +78,13 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 44
     (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew-pair temp catch-block-uwp-slot cfp-tn catch-block-cfp-slot block)
-    (inst compute-lra temp lip entry-label)
-    (storew-pair code-tn catch-block-code-slot temp catch-block-entry-pc-slot block)
+    (inst adr temp entry-label)
+    (storew temp block catch-block-entry-pc-slot)
 
     #+sb-thread
     (loadw-pair
@@ -145,7 +143,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -191,7 +189,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
 
     ;; Setup results, and test for the zero value case.
@@ -227,10 +225,9 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))
 
-;;; Doesn't handle NSP and is disabled.
 #+unwind-to-frame-and-call-vop
 (define-vop (unwind-to-frame-and-call)
   (:args (ofp :scs (descriptor-reg))
@@ -269,21 +266,21 @@
       (storew nsp block unwind-block-nsp-slot)
       (storew zr-tn block unwind-block-nfp-slot)
       (storew catch-block block unwind-block-current-catch-slot)
-      ;; Don't need to save code at unwind-block-code-slot since
-      ;; it's not going to be used and will be overwritten after the
-      ;; function call
 
-      (inst compute-lra temp lip entry-label)
+      (inst adr temp entry-label)
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
       (load-inline-constant tmp-tn '(:fixup unwind :assembly-routine) lip)
       (inst br tmp-tn)
 
-      (emit-return-pc ENTRY-LABEL)
+      (emit-label ENTRY-LABEL)
       (inst mov nargs 0)
 
       (move lexenv saved-function)
 
+      (loadw lip cfp-tn lra-save-offset)
       (loadw saved-function lexenv closure-fun-slot fun-pointer-lowtag)
-      (lisp-jump saved-function lip))))
+
+      (lisp-jump saved-function lr2-tn))))
+

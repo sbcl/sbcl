@@ -56,6 +56,6 @@
 #define reg_wTMP        w27
 #define reg_NULL        REG(28)
 #define reg_wNULL       w28
-#define reg_CODE        REG(29)
+#define reg_LR2         REG(29)
 #define reg_LR          REG(30)
 #define reg_NSP         REG(31)

@@ -165,24 +165,18 @@
      (integer
       (emit-dword segment word)))))
 
-(defun emit-header-data (segment type)
-  (emit-back-patch segment
-                   8
-                   (lambda (segment posn)
-                     (emit-dword segment
-                                 (logior type
-                                         (ash (+ posn
-                                                 (component-header-length))
-                                              (- n-widetag-bits
-                                                 word-shift)))))))
-
 (define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment simple-fun-widetag)))
+   (emit-back-patch segment
+                    8
+                    (lambda (segment posn)
+                      (emit-dword segment
+                                  (logior simple-fun-widetag
+                                          (ash (+ posn
+                                                  (component-header-length))
+                                               (- n-widetag-bits
+                                                  word-shift))))))))
 
-(define-instruction lra-header-word (segment)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
 
 ;;;; Addressing mode 1 support
 
@@ -1749,7 +1743,7 @@
                (not label))
           (note-fixup segment :uncond-branch cond-or-label)
           (emit-uncond-branch segment 0 0))
-         ((and (fixup-p label))
+         ((fixup-p label)
           (note-fixup segment :cond-branch cond-or-label)
           (emit-cond-branch segment 0 (conditional-opcode cond-or-label)))
          (t
@@ -1770,7 +1764,7 @@
 (define-instruction bl (segment label)
   (:printer uncond-branch ((op 1)))
   (:emitter
-   (ecase label
+   (etypecase label
      (fixup
       (note-fixup segment :uncond-branch label)
       (emit-uncond-branch segment 1 0))
@@ -2388,70 +2382,6 @@
                                     #b111)
                                 (tn-offset rn) (tn-offset rd)))))))
 
-;;;; Boxed-object computation instructions (for LRA and CODE)
-
-;;; Compute the address of a CODE object by parsing the header of a
-;;; nearby LRA or SIMPLE-FUN.
-
-(defun emit-compute (segment vop dest lip compute-delta)
-  (labels ((multi-instruction-emitter (segment position)
-             (let* ((delta (funcall compute-delta position))
-                    (negative (minusp delta))
-                    (delta (abs delta))
-                    (low (* (if negative -1 1)
-                            (ldb (byte 19 0) delta)))
-                    (high (ldb (byte 16 19) delta)))
-               ;; ADR
-               (emit-pc-relative segment 0
-                                 (ldb (byte 2 0) low)
-                                 (ldb (byte 19 2) low)
-                                 (tn-offset lip))
-               (assemble (segment vop)
-                 (inst movz dest high 16)
-                 (if negative
-                     (inst sub dest lip (lsl dest 3))
-                     (inst add dest lip (lsl dest 3))))))
-           (one-instruction-emitter (segment position)
-             (let ((delta (funcall compute-delta position)))
-               ;; ADR
-               (emit-pc-relative segment 0
-                                 (ldb (byte 2 0) delta)
-                                 (ldb (byte 19 2) delta)
-                                 (tn-offset dest))))
-           (multi-instruction-maybe-shrink (segment chooser posn magic-value)
-             (declare (ignore chooser))
-             (when (typep (funcall compute-delta posn magic-value)
-                          '(signed-byte 21))
-               (emit-back-patch segment 4
-                                #'one-instruction-emitter)
-               t)))
-    (emit-chooser
-     segment 12 2
-     #'multi-instruction-maybe-shrink
-     #'multi-instruction-emitter)))
-
-(define-instruction compute-code (segment code lip object-label)
-  (:vop-var vop)
-  (:declare (ignore object-label))
-  (:emitter
-   (emit-compute segment vop code lip
-                 (lambda (position &optional magic-value)
-                   (declare (ignore magic-value))
-                   (- other-pointer-lowtag
-                      position
-                      (component-header-length))))))
-
-(define-instruction compute-lra (segment dest lip lra-label)
-  (:vop-var vop)
-  (:emitter
-   (emit-compute segment vop dest lip
-                 (lambda (position &optional magic-value)
-                   (- (+ (label-position lra-label
-                                         (when magic-value position)
-                                         magic-value)
-                         other-pointer-lowtag)
-                      position)))))
-
 (define-instruction load-from-label (segment dest label &optional lip)
   (:vop-var vop)
   (:emitter
@@ -2497,9 +2427,56 @@
           #'multi-instruction-emitter)
          (emit-back-patch segment 4 #'one-instruction-emitter)))))
 
+(define-instruction load-constant (segment dest index &optional lip)
+  (:vop-var vop)
+  (:emitter
+   (labels ((compute-delta (position &optional magic-value)
+              (+ (- (label-position (segment-origin segment)
+                                    (when magic-value position)
+                                    magic-value)
+                    (component-header-length)
+                    position)
+                 index))
+            (multi-instruction-emitter (segment position)
+              (let* ((delta (compute-delta position))
+                     (negative (minusp delta))
+                     (low (ldb (byte 19 0) delta))
+                     (high (ldb (byte 16 19) delta)))
+                ;; ADR
+                (emit-pc-relative segment 0
+                                  (ldb (byte 2 0) low)
+                                  (ldb (byte 19 2) low)
+                                  (tn-offset lip))
+                (assemble (segment vop)
+                  (inst movz dest high 16)
+                  (inst ldr dest (@ lip (extend dest (if negative
+                                                         :sxtw
+                                                         :lsl)
+                                                3))))))
+            (one-instruction-emitter (segment position)
+              (emit-ldr-literal segment
+                                #b01
+                                0
+                                (ldb (byte 19 0)
+                                     (ash (compute-delta position) -2))
+                                (tn-offset dest)))
+            (multi-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
+              (let ((delta (compute-delta posn magic-value)))
+                (when (typep delta '(signed-byte 21))
+                  (emit-back-patch segment 4
+                                   #'one-instruction-emitter)
+                  t))))
+     (if lip
+         (emit-chooser
+          segment 12 2
+          #'multi-instruction-maybe-shrink
+          #'multi-instruction-emitter)
+         (emit-back-patch segment 4 #'one-instruction-emitter)))))
+
 ;;; SIMD
 (def-emitter simd-three-diff
-  (#b0 1 31)
+    (#b0 1 31)
   (q 1 30)
   (u 1 29)
   (#b01110 5 24)
@@ -2877,10 +2854,15 @@
              (ash (- value (+ (sap-int sap) offset)) -2)))))
   nil)
 
-(define-instruction store-coverage-mark (segment path-index temp #+darwin-jit vector)
+;;; Even though non darwin-jit arm64 targets can store directly in the
+;;; code object, having two codepaths is cumbersome and, now that
+;;; there's no reg-code, STRB needs to load a literal first, which
+;;; isn't clearly a win compared to using a vector.
+(define-instruction store-coverage-mark (segment path-index temp vector)
   (:emitter
    ;; No backpatch is needed to compute the offset into the code header
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   segment path-index temp vector
    (flet ((encode-index (offset &optional word)
             (cond
               ((if word
@@ -2896,28 +2878,14 @@
                temp)
               (t
                (error "Bad offset ~a" offset)))))
-    #-darwin-jit
-    (let* ((offset (+ (component-header-length)
-                      n-word-bytes      ; skip over jump table word
-                      path-index
-                      (- other-pointer-lowtag)))
-           (addr
-             (@ sb-vm::code-tn (encode-index offset))))
-      (inst* segment 'strb sb-vm::null-tn addr))
-    #+darwin-jit
-    (let* ((vector-offset (-
-                           (* n-word-bytes
+     (let* ((vector-offset (* n-word-bytes
                               (- (length (ir2-component-constants
                                           (component-info *component-being-compiled*)))
-                                 2))
-                           other-pointer-lowtag))
-           (vector-addr
-             (@ sb-vm::code-tn
-                (encode-index vector-offset t)))
-           (offset (+ (* sb-vm:vector-data-offset n-word-bytes)
-                      path-index
-                      (- other-pointer-lowtag)))
-           (addr
-             (@ vector (encode-index offset))))
-      (inst* segment 'ldr vector vector-addr)
-      (inst* segment 'strb sb-vm::null-tn addr)))))
+                                 2)))
+            (offset (+ (* sb-vm:vector-data-offset n-word-bytes)
+                       path-index
+                       (- other-pointer-lowtag)))
+            (addr
+              (@ vector (encode-index offset))))
+       (inst* segment 'load-constant vector vector-offset)
+       (inst* segment 'strb sb-vm::null-tn addr)))))

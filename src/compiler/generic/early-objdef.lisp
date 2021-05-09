@@ -226,8 +226,8 @@
   funcallable-instance-widetag              ;  36   3D  36   3D
 
   ;; x86[-64] does not have objects with this widetag,
-  #-(or x86 x86-64) return-pc-widetag       ;  3A   41  3A   41
-  #+(or x86 x86-64) lra-widetag-notused
+  #-(or x86 x86-64 arm64) return-pc-widetag ;  3A   41  3A   41
+  #+(or x86 x86-64 arm64) lra-widetag-notused
 
   value-cell-widetag                        ;  3E   45  3E   45
   character-widetag                         ;  42   49  42   49

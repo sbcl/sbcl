@@ -874,7 +874,7 @@ between the ~A definition and the ~A definition"
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
   '(symbol system-area-pointer weak-pointer code-component
-    #-(or x86 x86-64) lra
+    #-(or x86 x86-64 arm64) lra
     fdefn random-class))
 
 (defun classoid-non-instance-p (classoid)
@@ -956,10 +956,10 @@ between the ~A definition and the ~A definition"
      (code-component :codes (,sb-vm:code-header-widetag)
                      :predicate code-component-p
                      :prototype-form (fun-code-header #'identity))
-     #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag)
-                            :predicate lra-p
-                            ;; Make the PROTOTYPE slot unbound.
-                            :prototype-form sb-pcl:+slot-unbound+)
+     #-(or x86 x86-64 arm64) (lra :codes (,sb-vm:return-pc-widetag)
+                                  :predicate lra-p
+                                  ;; Make the PROTOTYPE slot unbound.
+                                  :prototype-form sb-pcl:+slot-unbound+)
      (fdefn :codes (,sb-vm:fdefn-widetag)
             :predicate fdefn-p
             :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))

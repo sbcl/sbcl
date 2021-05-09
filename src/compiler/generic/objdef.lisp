@@ -259,7 +259,7 @@ during backtrace.
 (defconstant simple-fun-source-slot  2) ; form and/or docstring
 (defconstant simple-fun-info-slot    3) ; type and possibly xref
 
-#-(or x86 x86-64)
+#-(or x86 x86-64 arm64)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
@@ -328,7 +328,7 @@ during backtrace.
 (define-primitive-object (unwind-block)
   (uwp :c-type "struct unwind_block *")
   (cfp :c-type "lispobj *")
-  #-(or x86 x86-64) code
+  #-(or x86 x86-64 arm64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler
@@ -340,7 +340,7 @@ during backtrace.
 (define-primitive-object (catch-block)
   (uwp :c-type "struct unwind_block *")
   (cfp :c-type "lispobj *")
-  #-(or x86 x86-64) code
+  #-(or x86 x86-64 arm64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler

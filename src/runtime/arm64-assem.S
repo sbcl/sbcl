@@ -88,7 +88,7 @@ GNAME(funcall1_switching_stack):
 #endif
 	sub	sp, x9, #16
 	/* call function */
-	blr	x1
+ 	blr	x1
 	/* restore old SP, FP, LR and return */
 	add	sp, x29, #16
 	ldp	x29, x30, [x29]
@@ -168,8 +168,6 @@ GNAME(call_into_lisp):
         mov     reg_R8, #0
 #endif
 
-        mov     reg_CODE, #0
-
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
 #ifdef LISP_FEATURE_SB_THREAD
@@ -201,10 +199,6 @@ GNAME(call_into_lisp):
 	// Set up the "frame link"
 	str     reg_OCFP, [reg_CFP]
 
-	// Set up the return address
-	adr	reg_NL3, .lra
-        str     reg_NL3, [reg_CFP, #8]
-
 	LEAVE_PA
 
 	// Load our function args.
@@ -222,15 +216,11 @@ no_args:
 
         // Load the closure-fun (or simple-fun-self), in case we're
 	// trying to call a closure.
-        ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
+        ldr     reg_R3, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	// And, finally, call into Lisp!
-	add	reg_LR, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
-        br      reg_LR
-
-	.align 4
-	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.xword	RETURN_PC_WIDETAG
+	add	reg_LR, reg_R3, #SIMPLE_FUN_INSTS_OFFSET
+        blr     reg_LR
 
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq
@@ -286,40 +276,22 @@ GNAME(call_into_c):
         // X0-X7 arguments
         // All other C arguments are already stashed on the C stack.
 
-	// We need to convert our return address to a GC-safe format,
-	// build a stack frame to count for the "foreign" frame,
-	// switch to C mode, move the register arguments to the
-        // correct locations, call the C function, move the result to
-        // the correct location, switch back to Lisp mode, tear down
-        // our stack frame, restore the return address, and return to
-        // our caller.
-
-        sub     reg_NARGS, reg_LR, reg_CODE
-        add     reg_NFP, reg_NARGS, #OTHER_POINTER_LOWTAG
-
-        // Build a Lisp stack frame.  We need to stash our frame link,
-        // the code component, and our return offset.  Frame link goes
-	// in slot 0 (OCFP-SAVE-OFFSET), the offset (a FIXNUM) goes in
-        // slot 1 (LRA-SAVE-OFFSET), and reg_CODE goes in slot 2.  The
-        // debugger knows about this layout (see COMPUTE-CALLING-FRAME
-        // in SYS:SRC;CODE;DEBUG-INT.LISP).
+        // Build a Lisp stack frame.
+        mov     reg_TMP, reg_CSP
         add     reg_CSP, reg_CSP, #4*8
-        stp     reg_CFP, reg_NFP, [reg_CSP, #-4*8]
-        str     reg_CODE, [reg_CSP, #-2*8]
+        stp     reg_CFP, reg_LR, [reg_TMP]
 
 	ENTER_PA
 
         // Save the lisp stack and frame pointers.
 
 #ifdef LISP_FEATURE_SB_THREAD
-        sub     reg_TMP, reg_CSP, #4*8
         stp     reg_TMP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
         str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
 #else
 	ldr	reg_NFP, =GNAME(current_control_stack_pointer)
 	str	reg_CSP, [reg_NFP]
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
-        sub     reg_TMP, reg_CSP, #4*8
 	str	reg_TMP, [reg_NFP]
 
         // Set FFCA, so the runtime knows that we're not "in lisp".
@@ -358,7 +330,6 @@ GNAME(call_into_c):
         mov     reg_R10, #0
 #endif
         mov     reg_LEXENV, #0
-        mov     reg_CODE, #0
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* No longer OK to run GC except at safepoints. */
@@ -383,15 +354,15 @@ GNAME(call_into_c):
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
 	ldr	reg_NFP, [reg_NFP]
 #endif
-	LEAVE_PA
+
 
         // Restore our caller state from our stack frame.
-        ldr     reg_CODE, [reg_NFP, #16]
-        ldr     reg_CFP, [reg_NFP]
+        ldp     reg_CFP, reg_LR, [reg_NFP]
+
+	LEAVE_PA
+
         mov     reg_CSP, reg_NFP
 
-        // Return
-        add     reg_LR, reg_NARGS, reg_CODE // reg_NARGS has the offset from reg_CODE
         ret
 
 	SIZE(call_into_c)

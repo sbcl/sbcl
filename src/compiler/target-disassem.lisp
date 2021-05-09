@@ -360,7 +360,7 @@
            (type alignment size))
   (zerop (logand (1- size) address)))
 
-#-(or x86 x86-64)
+#-(or x86 x86-64 arm64)
 (progn
 (defconstant lra-size (words-to-bytes 1))
 (defun lra-hook (chunk stream dstate)
@@ -1401,7 +1401,7 @@
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
-  (list* #-(or x86 x86-64) #'lra-hook nil))
+  (list* #-(or x86 x86-64 arm64) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
@@ -2388,10 +2388,10 @@
               (ecase how
                (:relative
                 ;; When CODE-TN has a lowtag (as it usually does), we add it in here.
-                ;; x86-64 does not have a code-tn, but it behaves like ppc64
+                ;; x86-64 and arm64 do not have a code-tn, but they behave like ppc64
                 ;; in that the displacement is relative to the base of the code.
                 (let ((addr (+ location
-                               #-(or x86-64 ppc64) sb-vm:other-pointer-lowtag)))
+                               #-(or x86-64 ppc64 arm64) sb-vm:other-pointer-lowtag)))
                   (values addr (ash addr (- sb-vm:word-shift)))))
                (:absolute
                 ;; Concerning object movement:

@@ -1712,7 +1712,7 @@ variable: an unreadable object representing the error is printed instead.")
                       (write-string ", " stream)
                       (output-object (sb-c::debug-info-name dinfo) stream)))))))))
 
-#-(or x86 x86-64)
+#-(or x86 x86-64 arm64)
 (defmethod print-object ((lra lra) stream)
   (print-unreadable-object (lra stream :identity t)
     (write-string "return PC object" stream)))

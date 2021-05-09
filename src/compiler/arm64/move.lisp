@@ -90,13 +90,7 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
-  (let ((offset (- (tn-byte-offset x) other-pointer-lowtag)))
-    (cond
-      ((ldr-str-offset-encodable offset)
-       (inst ldr y (@ code-tn offset)))
-      (t
-       (load-immediate-word tmp-tn offset)
-       (inst ldr y (@ code-tn tmp-tn))))))
+  (inst load-constant y (tn-byte-offset x)))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))

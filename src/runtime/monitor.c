@@ -489,7 +489,7 @@ catchers_cmd(char __attribute__((unused)) **ptr)
                    catch,
                    catch->uwp,
                    catch->cfp,
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
                    component_ptr_from_pc((void*)catch->entry_pc),
 #else
                    catch->code,

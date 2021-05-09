@@ -315,8 +315,6 @@
 
 (defun annotate-ldr-str (register offset dstate)
   (case register
-    (#.sb-vm::code-offset
-     (note-code-constant offset dstate))
     (#.sb-vm::null-offset
      (let ((offset (+ sb-vm:nil-value offset)))
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
@@ -365,9 +363,16 @@
 
 (defun annotate-ldr-literal (value stream dstate)
   (declare (ignore stream))
-  (let* ((addr (+ (dstate-cur-addr dstate) (* value 4))))
-    (let ((value (sap-ref-word (int-sap addr) 0)))
-      (maybe-note-assembler-routine value nil dstate))))
+  (let* ((value (* 4 value))
+         (seg (dstate-segment dstate))
+         (code (seg-code seg)))
+    (or (and code
+             (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                                  (+ (dstate-cur-offs dstate) value) seg)
+                                 dstate))
+        (let* ((addr (+ (dstate-cur-addr dstate) value))
+               (value (sap-ref-word (int-sap addr) 0)))
+          (maybe-note-assembler-routine value nil dstate)))))
 
 ;;;; special magic to support decoding internal-error and related traps
 (defun snarf-error-junk (sap offset trap-number &optional length-only)

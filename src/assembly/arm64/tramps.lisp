@@ -78,8 +78,7 @@
           (inst str (32-bit-reg null-tn) (@ nl1))) ; (alien variable is 4 bytes, not 8)
         ;; Create a new frame
         (inst add csp-tn csp-tn (+ 32 80))
-        (inst stp cfp-tn null-tn (@ csp-tn -112))
-        (inst stp code-tn lr-tn (@ csp-tn -96))
+        (inst stp cfp-tn lr-tn (@ csp-tn -112))
 
         (map-pairs stp csp-tn -80 lisp-registers)
         (map-pairs stp nsp-tn 0 float-registers :pre-index -512 :delta 32)
@@ -90,7 +89,7 @@
         (map-pairs ldp nsp-tn 480 float-registers :post-index 512 :delta -32)
         (map-pairs ldp csp-tn -16 lisp-registers :delta -16)
 
-        (inst ldr lr-tn (@ csp-tn -88))
+        (inst ldr lr-tn (@ csp-tn -104))
 
         (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
         #+sb-thread
@@ -117,7 +116,7 @@
                                (undefined-tramp-tagged
                                 (+ xundefined-tramp
                                    fun-pointer-lowtag))))
-    ()
+    ((:temp fun any-reg r9-offset))
   HEADER
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'undefined-tramp-tagged
@@ -126,13 +125,13 @@
     (inst dword nil-value))
 
   UNDEFINED-TRAMP
-  (inst adr code-tn header fun-pointer-lowtag)
+  (inst str lr-tn (@ cfp-tn 8))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error)
                     (list lexenv-tn))
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
+  (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
 
-  (inst br lr-tn))
+  (inst br lr2-tn))
 
 (define-assembly-routine
     (xundefined-alien-tramp (:return-style :none)
@@ -150,7 +149,7 @@
     (inst dword nil-value))
 
   UNDEFINED-ALIEN-TRAMP
-  (inst adr code-tn header fun-pointer-lowtag)
+  (inst str lr-tn (@ cfp-tn 8))
   (error-call nil 'undefined-alien-fun-error r9-tn))
 
 (define-assembly-routine
@@ -160,7 +159,7 @@
                                (closure-tramp-tagged
                                 (+ xclosure-tramp
                                    fun-pointer-lowtag))))
-    ()
+    ((:temp fun any-reg r9-offset))
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'closure-tramp-tagged
                          :assembly-routine))
@@ -169,9 +168,9 @@
 
   CLOSURE-TRAMP
   (loadw lexenv-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-  (inst br lr-tn))
+  (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
+  (inst br lr2-tn))
 
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
@@ -179,13 +178,13 @@
                       (:export (funcallable-instance-tramp
                                 (+ xfuncallable-instance-tramp
                                    fun-pointer-lowtag))))
-    ()
+    ((:temp fun any-reg r9-offset))
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-  (inst br lr-tn))
+  (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
+  (inst br lr2-tn))

@@ -19,7 +19,7 @@
       `((progn
           ,@(if (eq style :none)
                 `((load-inline-constant tmp-tn '(:fixup ,name :assembly-routine))
-                  (inst br tmp-tn))
+                  (inst blr tmp-tn))
                 `((load-inline-constant lr-tn '(:fixup ,name :assembly-routine))
                   (inst blr lr-tn)))))
       nil))
