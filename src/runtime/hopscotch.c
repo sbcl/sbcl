@@ -334,7 +334,10 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
 
     int widetag1 = header_widetag(header1);
     sword_t nwords = sizetab[widetag1](obj1);
-    if (widetag1 < SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG)
+    // OMGWTF! Widetags have been rearranged so many times, I am not sure
+    // how to keep this code from regressing.
+    // ASSUMPTION: the range of number widetags ends with (COMPLEX DOUBLE-FLOAT)
+    if (widetag1 <= COMPLEX_DOUBLE_FLOAT_WIDETAG)
         // All words must match exactly. Start by comparing the length
         // (as encoded in the header) since we don't yet know that obj2
         // occupies the correct number of words.
@@ -343,8 +346,14 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
 
     // Vector elements must have already been coalesced
     // when comparing simple-vectors for similarity.
-    return (obj1[1] == obj2[1]) // same length vectors
-        && !memcmp(obj1 + 2, obj2 + 2, (nwords-2) << WORD_SHIFT);
+    // Note that only vectors marked "shareable" will get here, so no
+    // hash-table storage vectors or anything of that nature.
+    struct vector *v1 = (void*)obj1;
+    struct vector *v2 = (void*)obj2;
+    return (vector_len(v1) == vector_len(v2)) // same length vectors
+        && !memcmp(v1->data, v2->data,
+                   // ASSUMPTION: exactly 2 non-data words
+                   (nwords-2) << WORD_SHIFT);
 }
 
 /* Initialize 'ht' for first use, which entails zeroing the counters
