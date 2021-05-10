@@ -28,9 +28,12 @@
 (with-test (:name :weak-table-gc-invariant :skipped-on (not :sb-thread))
   (weak-table-allocation-test))
 
+(defun vector-flag-bits (v)
+  (logand (sb-kernel:get-header-data v) #xFF))
+
 (defun is-address-sensitive (tbl)
-  (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
-    (logtest data sb-vm:vector-addr-hashing-flag)))
+  (logtest (vector-flag-bits (sb-impl::hash-table-pairs tbl))
+           sb-vm:vector-addr-hashing-flag))
 
 (with-test (:name (hash-table :eql-hash-symbol-not-eq-based))
   ;; If you ask for #'EQ as the test, then everything is address-sensitive,
@@ -104,7 +107,7 @@
   (let ((h (make-hash-table :test 'eq)))
     (dotimes (i 100)
       (setf (gethash i h) (- i)))
-    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs h))
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs h))
                sb-vm:vector-hashing-flag))))
 
 (defmacro kv-vector-needs-rehash (x) `(svref ,x 1))
@@ -120,13 +123,13 @@
         (setf (gethash key tbl) (sb-kernel:get-lisp-obj-address key)))
       (let ((key (make-symbol (make-string (1+ i) :initial-element #\a))))
         (setf (gethash key tbl) (sb-kernel:get-lisp-obj-address key))))
-    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
                sb-vm:vector-hashing-flag)) ; noo address-based key
     (let ((foo (cons 0 0)))
       (setf (gethash foo tbl) foo)
       (remhash foo tbl))
     ;; now we've added an address-based key (but removed it)
-    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
                (+ sb-vm:vector-addr-hashing-flag
                   sb-vm:vector-hashing-flag)))
     (gc)
@@ -141,7 +144,7 @@
       (assert (zerop (kv-vector-needs-rehash
                       (sb-impl::hash-table-pairs tbl)))))
     ;; the vector type is unchanged
-    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
                (+ sb-vm:vector-addr-hashing-flag
                   sb-vm:vector-hashing-flag)))
     (setf (gethash (cons 1 2) tbl) 'one)
@@ -169,7 +172,7 @@
             do (setf (aref pairs i) i))) ; highly illegal!
     ;; try to find an address-sensitive key
     (assert (not (gethash '(foo) tbl)))
-    (assert (= (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))
+    (assert (= (vector-flag-bits (sb-impl::hash-table-pairs tbl))
                ;; Table is no longer address-sensitive
                sb-vm:vector-hashing-flag))))
 

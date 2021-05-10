@@ -348,13 +348,16 @@
                                nil ,n-words (ash 1 (- word-shift n-fixnum-tag-bits))))
                      (inst and ,result-tn (lognot lowtag-mask))
                      ,result-tn)))
-           (put-header (vector-tn lowtag type length zeroed)
-             `(progn (storew* (if (sc-is ,type immediate) (tn-value ,type) ,type)
-                              ,vector-tn 0 ,lowtag ,zeroed)
-                     (storew* (if (sc-is ,length immediate)
-                                  (fixnumize (tn-value ,length))
-                                  ,length)
-                              ,vector-tn vector-length-slot ,lowtag ,zeroed))))
+           (put-header (vector-tn lowtag type len zeroed)
+             `(let ((len (if (sc-is ,len immediate) (fixnumize (tn-value ,len)) ,len)))
+                (storew* (if (sc-is ,type immediate) (tn-value ,type) ,type)
+                         ,vector-tn 0 ,lowtag ,zeroed)
+                #+array-ubsan (progn
+                                (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
+                                ;; Temporary: scribble on the LENGTH slot
+                                (inst mov :qword (object-slot-ea ,vector-tn 1 ,lowtag) -2))
+                #-array-ubsan (storew* len ,vector-tn vector-length-slot
+                                       ,lowtag ,zeroed))))
 
   (define-vop (allocate-vector-on-heap)
     (:args (type :scs (unsigned-reg immediate))

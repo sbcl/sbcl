@@ -247,7 +247,7 @@
   (inst cmp :dword r10-tn (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
   (inst jmp :b undefined)
 
-  (loadw length vector 1 other-pointer-lowtag)
+  (inst mov vector-len-op-size length (vector-len-ea vector))
   (inst mov fun (ea (- 8 other-pointer-lowtag) vector length
                     (ash 1 (- word-shift n-fixnum-tag-bits))))
 

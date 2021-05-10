@@ -1223,14 +1223,17 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     }
     // Write a padding object if necessary
     if ((uword_t)limit & (IMMOBILE_CARD_BYTES-1)) {
-        int remainder = IMMOBILE_CARD_BYTES -
-          ((uword_t)limit & (IMMOBILE_CARD_BYTES-1));
-        lispobj array_length = make_fixnum((remainder >> WORD_SHIFT) - 2);
+        int remainder = IMMOBILE_CARD_BYTES - ((uword_t)limit & (IMMOBILE_CARD_BYTES-1));
+        int words = (remainder >> WORD_SHIFT) - 2; // discount the array header itself
         if (limit[0] == SIMPLE_ARRAY_FIXNUM_WIDETAG) {
-            gc_assert(limit[1] == array_length);
+            gc_assert(vector_len((struct vector*)limit) == words);
         } else {
+#ifdef LISP_FEATURE_ARRAY_UBSAN
+            limit[0] = ((uword_t)words << (32+N_FIXNUM_TAG_BITS)) | SIMPLE_ARRAY_FIXNUM_WIDETAG;
+#else
             limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
-            limit[1] = array_length;
+            limit[1] = make_fixnum(words);
+#endif
         }
         int size = sizetab[SIMPLE_ARRAY_FIXNUM_WIDETAG](limit);
         lispobj* __attribute__((unused)) padded_end = limit + size;

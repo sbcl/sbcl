@@ -80,12 +80,20 @@
 (defconstant array-rank-limit 256
   "the exclusive upper bound on the rank of an array")
 
+#-array-ubsan ; usual way
+(progn
 ;;; - 2 to leave space for the array header
 (defconstant array-dimension-limit (- most-positive-fixnum 2)
   "the exclusive upper bound on any given dimension of an array")
 
 (defconstant array-total-size-limit (- most-positive-fixnum 2)
   "the exclusive upper bound on the total number of elements in an array")
+)
+
+#+array-ubsan ; only supported if 64-bit
+(progn
+(defconstant array-dimension-limit (ash 1 30))
+(defconstant array-total-size-limit (ash 1 30)))
 
 (defconstant char-code-limit #-sb-unicode 256 #+sb-unicode #x110000
   "the upper exclusive bound on values produced by CHAR-CODE")

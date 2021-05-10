@@ -126,14 +126,12 @@
              (when (and %test-fixnum (not (integerp index)))
                (%test-fixnum index nil error t))
              (cond (use-length-p
-                    (let ((len (ea (- (ash vector-length-slot word-shift)
-                                      other-pointer-lowtag)
-                                   array)))
+                    (let ((len (vector-len-ea array)))
                       (cond ((integerp index)
-                             (inst cmp :qword len index)
+                             (inst cmp vector-len-op-size len index)
                              (inst jmp :be error))
                             (t
-                             (inst cmp index len)
+                             (inst cmp vector-len-op-size index len)
                              (inst jmp :nb error)))))
                    ((integerp bound)
                     (inst cmp index bound)

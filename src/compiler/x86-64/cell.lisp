@@ -13,13 +13,22 @@
 
 ;;;; data object ref/set stuff
 
+(defconstant vector-len-op-size #+array-ubsan :dword #-array-ubsan :qword)
+(defmacro vector-len-ea (v &optional (lowtag sb-vm:other-pointer-lowtag))
+  #+array-ubsan `(ea (- 4 ,lowtag) ,v) ; high 4 bytes of header
+  #-array-ubsan `(ea (- (ash vector-length-slot word-shift) ,lowtag) ,v))
+
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
-  (:ignore name)
+  #-array-ubsan (:ignore name)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-   (loadw result object offset lowtag)))
+   (cond #+array-ubsan
+         ((member name '(sb-c::vector-length %array-fill-pointer)) ; half-sized slot
+          (inst mov :dword result (vector-len-ea object)))
+         (t
+          (loadw result object offset lowtag)))))
 
 ;; This vop is selected by name from vm-ir2tran for converting any
 ;; setter or setf'er that is defined by 'objdef'
@@ -55,6 +64,12 @@
            (invoke-asm-routine 'call 'code-header-set vop))
           ((equal name '(setf %funcallable-instance-fun))
            (gen-cell-set (object-slot-ea object offset lowtag) value nil vop t))
+          #+array-ubsan
+          ((equal name '(setf %array-fill-pointer)) ; half-sized slot
+           (inst mov :dword (vector-len-ea object)
+                 (or (encode-value-if-immediate value) value))
+           ;; Set it in two places. (* I DON'T KNOW WHY IT NEEDS THIS *)
+           (gen-cell-set (object-slot-ea object offset lowtag) value nil))
           (t
            (gen-cell-set (object-slot-ea object offset lowtag) value nil)))))
 
@@ -70,6 +85,10 @@
                  (if (sc-is value immediate)
                      (make-fixup (tn-value value) :layout)
                      value)))
+          #+array-ubsan
+          ((and (eq name 'make-array) (eql offset sb-vm:array-fill-pointer-slot))
+           (inst mov :dword (vector-len-ea object)
+                 (or (encode-value-if-immediate value) value)))
           ((sc-is value immediate)
            (move-immediate (ea (- (* offset n-word-bytes) lowtag) object)
                            (encode-value-if-immediate value)

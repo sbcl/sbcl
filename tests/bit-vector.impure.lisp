@@ -124,8 +124,10 @@
                             (logior sb-posix:map-private sb-posix:map-anon sb-posix:map-fixed)
                             -1 0)))
     (setf (sb-sys:sap-ref-word addr 0) sb-vm:simple-bit-vector-widetag)
-    (setf (sb-sys:sap-ref-word addr sb-vm:n-word-bytes)
-          (ash n-bits sb-vm:n-fixnum-tag-bits))
+    (setf (sb-kernel:%array-fill-pointer
+           (sb-kernel:%make-lisp-obj (logior (sb-sys:sap-int addr)
+                                             sb-vm:other-pointer-lowtag)))
+          n-bits)
     (let* ((object
              (sb-vm::reconstitute-object
               (sb-c::mask-signed-field

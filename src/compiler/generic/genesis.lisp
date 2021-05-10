@@ -730,15 +730,19 @@
              (= length 0)
              *simple-vector-0-descriptor*)
     (return-from allocate-vector *simple-vector-0-descriptor*))
-  (let ((des (allocate-cold-descriptor gspace
-                                       (sb-vm:pad-data-block
-                                        (+ words sb-vm:vector-data-offset))
-                                       sb-vm:other-pointer-lowtag)))
-    (write-header-data+tag des 0 widetag)
-    (write-wordindexed des
-                       sb-vm:vector-length-slot
-                       (make-fixnum-descriptor length))
-    des))
+  (emplace-vector (allocate-cold-descriptor
+                   gspace
+                   (sb-vm:pad-data-block (+ words sb-vm:vector-data-offset))
+                   sb-vm:other-pointer-lowtag)
+                  widetag length))
+(defun emplace-vector (des widetag length)
+  #+array-ubsan
+  (write-header-word des (logior (ash length (+ 32 sb-vm:n-fixnum-tag-bits))
+                                 widetag))
+  #-array-ubsan
+  (progn (write-header-data+tag des 0 widetag)
+         (write-wordindexed des sb-vm:vector-length-slot (make-fixnum-descriptor length)))
+  des)
 
 ;;; The COLD-LAYOUT is a reflection of or proxy for the words stored
 ;;; in the core for a cold layout, so that we don't have to extract
@@ -793,7 +797,8 @@
 
 (declaim (inline cold-vector-len))
 (defun cold-vector-len (vector)
-  (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
+  #+array-ubsan (ash (read-bits-wordindexed vector 0) (- -32 sb-vm:n-fixnum-tag-bits))
+  #-array-ubsan (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
 
 (macrolet ((string-data (string-descriptor)
              `(+ (descriptor-byte-offset ,string-descriptor)
@@ -1775,14 +1780,11 @@ core and return a descriptor to it."
                                sb-vm:immobile-card-bytes
                                (* (+ 2 256) (- sb-vm:n-word-bytes)))
                             sb-vm:other-pointer-lowtag))))
-              (write-header-word filler sb-vm:simple-array-fixnum-widetag)
-              (write-wordindexed filler 1
-                                 (make-fixnum-descriptor
-                                  (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
-                                     ;; subtract 2 object headers + 256 words
-                                     (+ 4 256))))
-              (write-header-word vector sb-vm:simple-vector-widetag)
-              (write-wordindexed vector 1 (make-fixnum-descriptor 256))
+              (emplace-vector filler sb-vm:simple-array-fixnum-widetag
+                              (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
+                                 ;; subtract 2 object headers + 256 words
+                                 (+ 4 256)))
+              (emplace-vector vector sb-vm:simple-vector-widetag 256)
               vector))
 
   ;; Immobile code prefers all FDEFNs adjacent so that code can be located
@@ -3184,7 +3186,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
                ;; is a signed int, but it isn't really; except that I made all C vars
                ;; signed to avoid comparison mismatch, and don't want to change back.
                (format t "static inline sword_t vector_len(struct vector* v) {")
-               (format t "  return v->length_ >> ~d; }~%" sb-vm:n-fixnum-tag-bits))
+               #+array-ubsan (format t "  return v->header >> ~d; }~%"
+                                     (+ 32 sb-vm:n-fixnum-tag-bits))
+               #-array-ubsan (format t "  return v->length_ >> ~d; }~%"
+                                     sb-vm:n-fixnum-tag-bits))
              (when (member name '(cons vector symbol fdefn instance))
                (write-cast-operator name c-name lowtag *standard-output*)))
            (output-asm ()

@@ -224,10 +224,10 @@
     (let ((n-trailing-bytes
            (- (nth-value 1 (ceiling free-ptr immobile-card-bytes)))))
       (setf (sap-ref-word (int-sap free-ptr) 0) simple-array-fixnum-widetag
-            (sap-ref-word (int-sap free-ptr) n-word-bytes)
+            (%array-fill-pointer
+             (%make-lisp-obj (logior free-ptr sb-vm:other-pointer-lowtag)))
             ;; Convert bytes to words, subtract the header and vector length.
-            (ash (- (ash n-trailing-bytes (- word-shift)) 2)
-                 n-fixnum-tag-bits)))))
+            (- (ash n-trailing-bytes (- word-shift)) 2)))))
 
 (defun unallocate (hole)
   #+immobile-space-debug
