@@ -543,7 +543,7 @@ error if any of PACKAGES is not a valid package designator."
 ;;; making this a generic function then packages with custom package classes
 ;;; could hook into this to provide their own resolution.
 ;;; (Any such generic solution will turn the performance to crap, so let's not)
-(declaim (inline find-package-using-package))
+(declaim (maybe-inline find-package-using-package))
 (defun find-package-using-package (package-designator base)
   (let ((string (typecase package-designator
                   (package
@@ -575,11 +575,11 @@ Example:
 
 See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (inline find-package-using-package))
   ;; We had a BOUNDP check on *PACKAGE* here, but it's effectless due to the
   ;; always-bound proclamation.
   (find-package-using-package package-designator *package*))
-(declaim (notinline find-package-using-package))
 
 ;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
 ;;; most other operations, are unspecified for deleted packages. We

@@ -904,7 +904,7 @@ IF-NOT-OWNER is :FORCE)."
   #-sb-futex
   protected)
 
-(declaim (inline %condition-wait))
+(declaim (sb-ext:maybe-inline %condition-wait))
 (defun %condition-wait (queue mutex
                         timeout to-sec to-usec stop-sec stop-usec deadlinep)
   #-sb-thread
@@ -1019,7 +1019,6 @@ IF-NOT-OWNER is :FORCE)."
          ;; The only case we return normally without re-acquiring
          ;; the mutex is when there is a :TIMEOUT that runs out.
          (bug "%CONDITION-WAIT: invalid status on normal return: ~S" status))))))
-(declaim (notinline %condition-wait))
 
 (declaim (ftype (sfunction (waitqueue mutex &key (:timeout (or null (real 0)))) boolean) condition-wait))
 (defun condition-wait (queue mutex &key timeout)

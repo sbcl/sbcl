@@ -1001,13 +1001,9 @@
 (define-bitfield-emitter emit-word 16
   (byte 16 0))
 
-;; FIXME: a nice enhancement would be to save all sexprs of small functions
-;; within the same file, and drop them at the end.
-;; Expressly declaimed inline definitions would be saved as usual though.
-(declaim (inline emit-dword))
+(declaim (maybe-inline emit-dword))
 (define-bitfield-emitter emit-dword 32
   (byte 32 0))
-(declaim (notinline emit-dword))
 
 (define-bitfield-emitter emit-qword 64
   (byte 64 0))
@@ -1020,7 +1016,7 @@
 (defun emit-signed-dword (segment value)
   (declare (type sb-assem:segment segment)
            (type (signed-byte 32) value))
-  (declare (inline emit-dword))
+  #-sb-xc-host (declare (inline emit-dword))
   (emit-dword segment value))
 
 (define-bitfield-emitter emit-mod-reg-r/m-byte 8

@@ -390,8 +390,9 @@
               (values (eof-or-lose stream eof-error-p eof-value) t)
               (values string eof)))))
 
-;;; We proclaim them INLINE here, then proclaim them NOTINLINE later on,
-;;; so, except in this file, they are not inline by default, but they can be.
+;;; We proclaim them INLINE here, then proclaim them MAYBE-INLINE
+;;; later on, so, except in this file, they are not inline by default,
+;;; but they can be.
 (declaim (inline read-char unread-char read-byte))
 
 (declaim (inline ansi-stream-read-char))
@@ -784,7 +785,7 @@
   integer)
 
 
-(declaim (notinline read-char unread-char read-byte)) ; too big
+(declaim (maybe-inline read-char unread-char read-byte)) ; too big
 
 ;;; This is called from ANSI-STREAM routines that encapsulate CLOS
 ;;; streams to handle the misc routines and dispatch to the
@@ -2314,7 +2315,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     :native (ansi-stream-read-sequence seq stream start end)
     :gray (stream-read-sequence stream seq start end)))
 
-(declaim (inline read-sequence/read-function))
+(declaim (maybe-inline read-sequence/read-function))
 (defun read-sequence/read-function (seq stream start %end
                                     stream-element-mode
                                     character-read-function binary-read-function)
@@ -2382,7 +2383,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                             data offset-start offset-end))))
         (t
          (read-generic-sequence (compute-read-function nil)))))))
-(declaim (notinline read-sequence/read-function))
 
 (defun ansi-stream-read-sequence (seq stream start %end)
   (declare (type sequence seq)
@@ -2462,7 +2462,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          (declare (type index i))
          (funcall ,write-function ,stream (aref ,seq i))))))
 
-(declaim (inline write-sequence/write-function))
+(declaim (maybe-inline write-sequence/write-function))
 (defun write-sequence/write-function (seq stream start %end
                                       stream-element-mode
                                       character-write-function
@@ -2525,7 +2525,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                   (buffer-output stream data offset-start offset-end)))))
         (sequence
          (write-generic-sequence (compute-write-function nil)))))))
-(declaim (notinline write-sequence/write-function))
 
 ;;; This takes any kind of stream, not just ansi streams, because of recursion.
 ;;; It's basically just the non-keyword-accepting entry for WRITE-SEQUENCE.

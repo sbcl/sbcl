@@ -1102,7 +1102,7 @@ and the number of 0 bits if INTEGER is negative."
                 (values n m))
           (* (truncate max (gcd n m)) min)))))
 
-(declaim (inline fixnum-gcd))
+(declaim (maybe-inline fixnum-gcd))
 (defun fixnum-gcd (u v)
   (declare (optimize (safety 0)))
   (locally
@@ -1131,7 +1131,8 @@ and the number of 0 bits if INTEGER is negative."
 ;;; of 0 before the dispatch so that the bignum code doesn't have to worry
 ;;; about "small bignum" zeros.
 (defun two-arg-gcd (u v)
-  (declare (muffle-conditions compiler-note))
+  (declare (muffle-conditions compiler-note)
+           (inline fixnum-gcd))
   (cond ((eql u 0) (abs v))
         ((eql v 0) (abs u))
         (t
@@ -1166,7 +1167,6 @@ and the number of 0 bits if INTEGER is negative."
                 (values x y)
                 (values (truncate x gcd) (truncate y gcd)))
           (build-ratio num den)))))
-(declaim (notinline fixnum-gcd))
 
 (defun two-arg-/ (x y)
   (number-dispatch ((x number) (y number))

@@ -830,13 +830,13 @@
 (declaim (end-block))
 
 ;; Misc. utilities
-(declaim (inline unbounded-sc-p))
+(declaim (maybe-inline unbounded-sc-p))
 (defun unbounded-sc-p (sc)
   (eq (sb-kind (sc-sb sc)) :unbounded))
 
 (defun unbounded-tn-p (tn)
+  #-sb-xc-host (declare (inline unbounded-sc-p))
   (unbounded-sc-p (tn-sc tn)))
-(declaim (notinline unbounded-sc-p))
 
 
 ;;;; load TN packing

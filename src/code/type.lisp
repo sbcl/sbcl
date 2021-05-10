@@ -5328,7 +5328,7 @@ used for a COMPLEX component.~:@>"
 ;;; We represent sets as a pair of (negate-p finite-set) in order to
 ;;; support negation types.
 
-(declaim (inline generic-abstract-type-function))
+(declaim (maybe-inline generic-abstract-type-function))
 (defun generic-abstract-type-function
     (type overapproximate
      union intersection difference
@@ -5469,11 +5469,10 @@ used for a COMPLEX component.~:@>"
                                 (funcall under type)
                                 (default nil))))))))
     (multiple-value-call #'normalize (walk type overapproximate))))
-(declaim (notinline generic-abstract-type-function))
 
 ;;; Standard list representation of sets. Use CL:* for the universe.
 (defun list-abstract-type-function (type over &key under (overapproximate t))
-  (declare (inline generic-abstract-type-function))
+  #-sb-xc-host (declare (inline generic-abstract-type-function))
   (generic-abstract-type-function
    type overapproximate
    #'union #'intersection #'set-difference

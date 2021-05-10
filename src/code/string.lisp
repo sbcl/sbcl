@@ -454,7 +454,7 @@ new string COUNT long filled with the fill character."
                          :initial-element (the character fill-char))
       (make-string count :element-type element-type)))
 
-(declaim (inline nstring-upcase))
+(declaim (maybe-inline nstring-upcase))
 (defun nstring-upcase (string &key (start 0) end)
   (declare (explicit-check))
   (if (typep string '(array nil (*)))
@@ -480,14 +480,13 @@ new string COUNT long filled with the fill character."
                     (setf (schar string index)
                           (code-char (truly-the char-code code)))))))))
         string)))
-(declaim (notinline nstring-upcase))
 
 (defun string-upcase (string &key (start 0) end)
   (declare (explicit-check)
            (inline nstring-upcase))
   (nstring-upcase (copy-seq (%string string)) :start start :end end))
 
-(declaim (inline nstring-downcase))
+(declaim (maybe-inline nstring-downcase))
 (defun nstring-downcase (string &key (start 0) end)
   (declare (explicit-check))
   (if (typep string '(array nil (*)))
@@ -516,7 +515,6 @@ new string COUNT long filled with the fill character."
                     (setf (schar string index)
                           (code-char (truly-the char-code code)))))))))
         string)))
-(declaim (notinline nstring-downcase))
 
 (defun string-downcase (string &key (start 0) end)
   (declare (explicit-check)
