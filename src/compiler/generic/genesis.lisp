@@ -696,11 +696,6 @@
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
                                  widetag)))
 
-(defun set-header-data (object data)
-  (write-header-data+tag object data (ldb (byte sb-vm:n-widetag-bits 0)
-                                          (read-bits-wordindexed object 0)))
-  object) ; return the object itself, like SB-KERNEL:SET-HEADER-DATA
-
 (defun get-header-data (object)
   (ash (read-bits-wordindexed object 0) (- sb-vm:n-widetag-bits)))
 
@@ -1466,7 +1461,11 @@ core and return a descriptor to it."
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
 
-(defun set-readonly (string) (set-header-data string sb-vm:+vector-shareable+))
+(defun set-readonly (vector)
+  (write-wordindexed/raw vector 0 (logior (read-bits-wordindexed vector 0)
+                                          (ash sb-vm:+vector-shareable+
+                                               sb-vm:n-widetag-bits)))
+  vector)
 
 (defun initialize-packages ()
   (let ((package-data-list

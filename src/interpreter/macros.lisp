@@ -83,10 +83,9 @@
             (when immediate
               (aver (symbol-extra-slot-p name))
               (setf (symbol-extra name) immediate))
-            (set-header-data
+            (logior-header-bits
              name (logior +special-op-symbol+
-                          (if simple +simple-special-op+ 0)
-                          (get-header-data name))))
+                          (if simple +simple-special-op+ 0))))
           ',name
           ',simple-p
           ,(when immediate-code

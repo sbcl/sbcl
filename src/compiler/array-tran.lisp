@@ -795,7 +795,7 @@
                       (if (eq has-fill-pointer :maybe)
                           `(let ((%array ,array-header))
                              (when fill-pointer
-                               (set-header-bits %array sb-vm:+array-fill-pointer-p+))
+                               (logior-header-bits %array sb-vm:+array-fill-pointer-p+))
                              %array)
                           array-header))))))
       (cond ;; Case (1) - :INITIAL-ELEMENT

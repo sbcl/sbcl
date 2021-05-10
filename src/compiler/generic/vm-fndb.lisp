@@ -161,11 +161,15 @@
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
     (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) t)
-;;; Perform a bitwise OR or AND-not of the existing header data with
-;;; the new bits and return no value.
-(defknown (set-header-bits unset-header-bits)
-  (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (values)
-  ())
+;;; Like SET-HEADER-DATA, but instead of writing the entire header,
+;;; LOGIOR of the specified value into the "data" portion of the word.
+(defknown logior-header-bits (t (unsigned-byte 16)) t
+    (#+x86-64 always-translatable))
+;;; ASSIGN-VECTOR-FLAGSS assign all and only the flags byte.
+;;; RESET- performs LOGANDC2 and returns no value.
+(defknown (assign-vector-flags reset-header-bits)
+  (t (unsigned-byte 8)) (values)
+  (#+x86-64 always-translatable))
 (defknown (test-header-bit)
   (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (boolean)
   (flushable))

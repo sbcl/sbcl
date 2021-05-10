@@ -443,17 +443,6 @@
         (setf (%array-displaced-from old-data)
               (purge (%array-displaced-from old-data)))))))
 
-(sb-c::unless-vop-existsp (:translate set-header-bits)
-  (declaim (inline set-header-bits unset-header-bits))
-  (defun set-header-bits (vector bits)
-    (set-header-data vector (logior (get-header-data vector) bits))
-    (values))
-  (defun unset-header-bits (vector bits)
-    (set-header-data vector (logand (get-header-data vector)
-                                    (ldb (byte (- sb-vm:n-word-bits sb-vm:n-widetag-bits) 0)
-                                         (lognot bits))))
-    (values)))
-
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -523,11 +512,11 @@
                                 (t complex-array-widetag))
                           array-rank)))
              (cond (fill-pointer
-                    (set-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (logior-header-bits array sb-vm:+array-fill-pointer-p+)
                     (setf (%array-fill-pointer array)
                           (if (eq fill-pointer t) dimension-0 fill-pointer)))
                    (t
-                    (unset-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (reset-header-bits array sb-vm:+array-fill-pointer-p+)
                     (setf (%array-fill-pointer array) total-size)))
              (setf (%array-available-elements array) total-size)
              (setf (%array-data array) data)
@@ -1519,10 +1508,10 @@ of specialized arrays is supported."
     (setf (%array-available-elements array) length)
     (cond (fill-pointer
            (setf (%array-fill-pointer array) fill-pointer)
-           (set-header-bits array sb-vm:+array-fill-pointer-p+))
+           (logior-header-bits array sb-vm:+array-fill-pointer-p+))
           (t
            (setf (%array-fill-pointer array) length)
-           (unset-header-bits array sb-vm:+array-fill-pointer-p+)))
+           (reset-header-bits array sb-vm:+array-fill-pointer-p+)))
     (setf (%array-displacement array) displacement)
     (if (listp dimensions)
         (dotimes (axis (array-rank array))

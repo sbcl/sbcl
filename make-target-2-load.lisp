@@ -326,9 +326,8 @@ Please check that all strings which were not recognizable to the compiler
   ;; Except that symbols which existed at SBCL build time must be.
   (do-all-symbols (symbol)
     (when (sb-kernel:immobile-space-obj-p symbol)
-      (sb-kernel:set-header-data
-           symbol (logior (sb-kernel:get-header-data symbol)
-                          (ash 1 sb-vm::+initial-core-symbol-bit+)))))
+      (sb-kernel:logior-header-bits
+       symbol (ash 1 sb-vm::+initial-core-symbol-bit+))))
 
   ;; A symbol whose INFO slot underwent any kind of manipulation
   ;; such that it now has neither properties nor globaldb info,

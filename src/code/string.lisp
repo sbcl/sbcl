@@ -602,9 +602,7 @@ new string COUNT long filled with the fill character."
   ;; "Always" means that regardless of whether the user want
   ;; coalescing of strings used as literals in code compiled to memory,
   ;; the string is shareable.
-  ;;  #b01_ ; symbol name, literal compiled to fasl, some other stuff
-  ;;  #b10_ ; literal compiled to core
-  (set-header-data (the (simple-array * 1) vector)
+  (logior-header-bits (the (simple-array * 1) vector)
                    (if always-shareable
                        sb-vm:+vector-shareable+
                        sb-vm:+vector-shareable-nonstd+)))
