@@ -721,10 +721,15 @@
     (write-header-data+tag des (if (= widetag sb-vm:fdefn-widetag) 0 (1- length))
                            widetag)
     des))
+(defvar *simple-vector-0-descriptor*)
 (defun allocate-vector (widetag length words &optional (gspace *dynamic*))
   ;; Allocate a vector with WORDS payload words (excluding the header+length).
   ;; WORDS may be an odd number.
   ;; Store WIDETAG in the header and LENGTH in the length slot.
+  (when (and (= widetag sb-vm:simple-vector-widetag)
+             (= length 0)
+             *simple-vector-0-descriptor*)
+    (return-from allocate-vector *simple-vector-0-descriptor*))
   (let ((des (allocate-cold-descriptor gspace
                                        (sb-vm:pad-data-block
                                         (+ words sb-vm:vector-data-offset))
@@ -1171,7 +1176,6 @@ core and return a descriptor to it."
                      :inherits (cddr flags+depthoid+inherits))))))))
 
 (defvar core-file-name)
-(defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #+metaspace '*read-only*
                                  #+immobile-space '*immobile-fixedobj*
@@ -2439,16 +2443,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (bug "CHARACTER-STRING[~D] dumped by cross-compiler." len))
 
 (define-cold-fop (fop-vector (size))
-  (if (zerop size)
-      *simple-vector-0-descriptor*
-      (do* ((stack (%fasl-input-stack (fasl-input)))
-            (stackptr (fop-stack-pop-n stack size) (1+ stackptr))
-            (result (allocate-vector sb-vm:simple-vector-widetag
-                                     size size *dynamic*))
-            (index sb-vm:vector-data-offset (1+ index))
-            (end (+ sb-vm:vector-data-offset size)))
-           ((= index end) (set-readonly result))
-        (write-wordindexed result index (svref stack stackptr)))))
+  (do* ((stack (%fasl-input-stack (fasl-input)))
+        (stackptr (fop-stack-pop-n stack size) (1+ stackptr))
+        (result (allocate-vector sb-vm:simple-vector-widetag
+                                 size size *dynamic*))
+        (index sb-vm:vector-data-offset (1+ index))
+        (end (+ sb-vm:vector-data-offset size)))
+       ((= index end) (set-readonly result))
+    (write-wordindexed result index (svref stack stackptr))))
 
 ; (not-cold-fop fop-array) ; the syntax doesn't work
 #+nil
