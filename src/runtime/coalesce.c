@@ -88,7 +88,7 @@ static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
 static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj ptr = *where;
-    if (lowtag_of(ptr) != OTHER_POINTER_LOWTAG)
+    if (lowtag_of(ptr) != OTHER_POINTER_LOWTAG || !gc_managed_heap_space_p(ptr))
         return;
 
     extern char gc_coalesce_string_literals;
