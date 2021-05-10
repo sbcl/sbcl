@@ -70,6 +70,9 @@ if [ "$1" == --load -o "$1" == --load-with-sb-devel ]; then
     shift
 fi
 
+# Load our build configuration
+. output/build-config
+
 HOST_TYPE="${1:-sbcl}"
 
 echo //HOST_TYPE=\"$HOST_TYPE\"
@@ -85,7 +88,7 @@ case "$HOST_TYPE" in
            INIT="-noinit"
            CORE="-core"
            ;;
-    sbcl)  LISP="${XC_LISP:-sbcl}"
+    sbcl)  LISP="${SBCL_XC_HOST:-sbcl}"
            INIT="--no-sysinit --no-userinit"
            CORE="--core"
            ;;
