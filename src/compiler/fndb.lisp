@@ -124,7 +124,7 @@
 (defknown (symbol-function) (symbol) function ())
 
 (defknown boundp (symbol) boolean (flushable))
-(defknown fboundp ((or symbol cons)) boolean (unsafely-flushable))
+(defknown fboundp ((or symbol cons)) (or null function) (unsafely-flushable))
 (defknown special-operator-p (symbol) t
   ;; The set of special operators never changes.
   (movable foldable flushable))

@@ -5095,3 +5095,10 @@
            't)
           (t
            (give-up-ir1-transform)))))
+
+;;; Normally we don't create fdefns by side-effect of calling FBOUNDP,
+;;; but this transform is neutral in terms of the sum of code and data size.
+;;; So for the cost of an FDEFN that might never store a function, the code
+;;; is smaller by about the size of an fdefn; and it's faster, so do it.
+(deftransform fboundp ((name) ((constant-arg symbol)))
+  `(fdefn-fun (load-time-value (find-or-create-fdefn ',(lvar-value name)) t)))
