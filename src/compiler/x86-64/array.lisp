@@ -242,16 +242,16 @@
 ;;; variants built on top of WORD-INDEX-REF, etc. I.e., those vectors
 ;;; whose elements are represented in integer registers and are built
 ;;; out of 8, 16, or 32 bit elements.
-(macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
-             `(progn
-                (define-full-reffer+offset
-                  ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
-                  ,type vector-data-offset other-pointer-lowtag ,scs
-                  ,element-type data-vector-ref-with-offset)
-                (define-full-setter+offset
-                  ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
-                  ,type vector-data-offset other-pointer-lowtag ,scs
-                  ,element-type data-vector-set-with-offset))))
+;;; Toplevel macro for ease of viewing the expansion.
+(defmacro def-full-data-vector-frobs (type element-type &rest scs)
+  `(progn
+     (define-full-reffer+offset ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
+       ,type vector-data-offset other-pointer-lowtag ,scs
+       ,element-type data-vector-ref-with-offset)
+     (define-full-setter+offset ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
+       ,type vector-data-offset other-pointer-lowtag ,scs
+       ,element-type data-vector-set-with-offset)))
+(progn
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg immediate)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
     unsigned-reg)
@@ -327,6 +327,68 @@
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors
 
+;;; SIMPLE-BIT-VECTOR
+(defun bit-base (dword-index)
+  (+ (* dword-index 4)
+     (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
+(defun emit-sbit-op (inst bv index)
+  (cond ((sc-is index immediate)
+         (setq index (tn-value index))
+         (multiple-value-bind (dword-index bit) (floor index 32)
+           (let ((disp (bit-base dword-index)))
+             (cond ((typep disp '(signed-byte 32))
+                    (inst* inst :dword (ea disp bv) bit))
+                   (t ; excessive index, really?
+                    (inst mov temp-reg-tn index)
+                    (inst* inst (ea (bit-base 0) bv) temp-reg-tn))))))
+        (t
+         (inst* inst (ea (bit-base 0) bv) index))))
+
+(define-vop (data-vector-set-with-offset/simple-bit-vector)
+  (:translate data-vector-set-with-offset)
+  (:policy :fast-safe)
+  ;; Arg order is (VECTOR INDEX OFFSET VALUE)
+  (:arg-types simple-bit-vector positive-fixnum (:constant (eql 0)) positive-fixnum)
+  (:args (bv :scs (descriptor-reg))
+         (index :scs (unsigned-reg immediate))
+         (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
+                      signed-stack unsigned-stack)))
+  (:info offset)
+  (:ignore offset)
+  (:results (result :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (when (sc-is value immediate)
+      (ecase (tn-value value)
+        (1 (emit-sbit-op 'bts bv index) (inst mov result (fixnumize (tn-value value))))
+        (0 (emit-sbit-op 'btr bv index) (inst xor :dword result result)))
+      (return-from data-vector-set-with-offset/simple-bit-vector))
+    (inst test :byte value
+          (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
+    (inst jmp :z ZERO)
+    (emit-sbit-op 'bts bv index)
+    (inst jmp OUT)
+    ZERO
+    (emit-sbit-op 'btr bv index)
+    OUT
+    ;; This part is just sad. We almost never use the result of data-vector-set.
+    ;; The comment at DEFINE-SETTER in src/code/array says as much.
+    ;; Except maybe there's somewhere that uses the value, I don't know.
+    ;; Would it be too much of a kludge to elide the final move
+    ;; when we see that the node name is INITIALIZE-VECTOR? Probably.
+    (sc-case value
+      ((signed-reg unsigned-reg) ; double it to tagify
+       ;; ASSUMPTION: N-FIXNUM-TAG-BITS = 1.
+       ;; (x86-64 with 2 or 3 fixnum tag bits has been broken for quite some time, AFAICT)
+       (if (location= result value)
+           (inst shl :dword value 1)
+           (inst lea :dword (ea value value))))
+      ((signed-stack unsigned-stack)
+       (inst mov :dword result value)
+       (inst shl :dword result 1))
+      (t
+       (unless (location= result value) (inst mov :dword result value))))))
+
 (define-vop (data-vector-ref-with-offset/simple-bit-vector-c)
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -342,10 +404,7 @@
   (:generator 3
     ;; using 32-bit operand size might elide the REX prefix on mov + shift
     (multiple-value-bind (dword-index bit) (floor index 32)
-      (inst mov :dword result
-                (ea (+ (* dword-index 4)
-                       (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))
-                    object))
+      (inst mov :dword result (ea (bit-base dword-index) object))
       (let ((right-shift (- bit n-fixnum-tag-bits)))
         (cond ((plusp right-shift)
                (inst shr :dword result right-shift))
@@ -373,8 +432,7 @@
              (let* ((elements-per-word (floor n-word-bits bits))
                     (bit-shift (1- (integer-length elements-per-word))))
     `(progn
-      ,@(unless (= bits 1)
-       `((define-vop (,(symbolicate 'data-vector-ref-with-offset/ type))
+       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type))
          (:note "inline array access")
          (:translate data-vector-ref-with-offset)
          (:policy :fast-safe)
@@ -419,7 +477,7 @@
              (unless (zerop extra)
                (inst shr result (* extra ,bits)))
              (unless (= extra ,(1- elements-per-word))
-               (inst and result ,(1- (ash 1 bits)))))))))
+               (inst and result ,(1- (ash 1 bits)))))))
        (define-vop (,(symbolicate 'data-vector-set-with-offset/ type))
          (:note "inline array store")
          (:translate data-vector-set-with-offset)
@@ -519,7 +577,6 @@
                 (inst mov result (tn-value value)))
                (unsigned-reg
                 (move result value))))))))))
-  (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 ;;; And the float variants.

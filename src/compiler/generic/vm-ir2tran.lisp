@@ -216,6 +216,7 @@
                         (array-type-specialized-element-type vector-ctype)
                         (bug "Unknown vector type in IR2 conversion for ~S."
                              'initialize-vector)))
+         (bit-vector-p (type= elt-ctype (specifier-type 'bit)))
          (saetp (find-saetp-by-ctype elt-ctype))
          (lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list vector-ctype)))
@@ -224,38 +225,44 @@
          (tmp (make-normal-tn elt-ptype)))
     (emit-move node block (lvar-tn node block vector) result)
     (flet ((compute-setter ()
+             ;; Such cringe. I had no idea why all the "-C" vops were mandatory.
+             ;; Too bad we can't let the backend decide how it would like to do things.
+             ;; Not to mention, this code is confusing because RESULT is the argument,
+             ;; and TN - the value to store - is the result, and an argument.
+             ;; Also note that the constant-index vops want the operands to the
+             ;; VOP macro as (VECTOR VALUE INDEX OFFSET) + (RESULT)
+             ;; but the non-constant want (VECTOR INDEX VALUE OFFSET) + (RESULT).
+             ;; They could totally have been made the same.
              (macrolet
                  ((frob ()
-                    (let ((*package* (find-package :sb-vm))
-                          (clauses nil))
-                      (map nil (lambda (s)
-                                 (when (sb-vm:saetp-specifier s)
-                                   (push
-                                    `(,(sb-vm:saetp-typecode s)
-                                       (lambda (index tn)
-                                         #+x86-64
-                                         (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
-                                                            (sb-vm:saetp-primitive-type-name s)
-                                                            "-C")
-                                              node block result tn index 0 tn)
-                                         #+x86
-                                         (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
-                                                            (sb-vm:saetp-primitive-type-name s))
-                                              node block result index tn 0 tn)
-                                         #-(or x86 x86-64)
-                                         (vop ,(symbolicate "DATA-VECTOR-SET/"
-                                                            (sb-vm:saetp-primitive-type-name s))
-                                              node block result index tn tn)))
-                                    clauses)))
-                           sb-vm:*specialized-array-element-type-properties*)
-                      `(ecase (sb-vm:saetp-typecode saetp)
-                         ,@(nreverse clauses)))))
+                    `(ecase (sb-vm:saetp-typecode saetp)
+                       ,@(map 'list
+                          (lambda (s &aux (ptype (sb-vm:saetp-primitive-type-name s))
+                                          (*package* (find-package "SB-VM")))
+                            `(,(sb-vm:saetp-typecode s)
+                              (lambda (index tn)
+                                #+x86-64
+                                ,(if (eq ptype 'simple-bit-vector) ; no "-C" setter exists
+                                     `(vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype)
+                                           node block result index tn 0 tmp)
+                                     `(vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C")
+                                           node block result tn index 0 tmp))
+                                #+x86
+                                (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype)
+                                     node block result index tn 0 tmp)
+                                #-(or x86 x86-64)
+                                (vop ,(symbolicate "DATA-VECTOR-SET/" ptype)
+                                     node block result index tn tmp))))
+                          (remove nil sb-vm:*specialized-array-element-type-properties*
+                                  :key #'sb-vm:saetp-specifier)))))
                (frob)))
            (tnify (index)
              #-x86-64
              (emit-constant index)
              #+x86-64
-             index))
+             (if bit-vector-p ; moar cringe
+                 (emit-constant index)
+                 index)))
       (let ((setter (compute-setter))
             (length (length initial-contents))
             (dx-p (and lvar
@@ -270,8 +277,19 @@
                          (if character
                              (eql (char-code (lvar-value value)) 0)
                              (eql (lvar-value value) 0)))
-              (emit-move node block (lvar-tn node block value) tmp)
-              (funcall setter (tnify i) tmp))))))
+              ;; With SIMPLE-BIT-VECTOR, prefer to pass a constant TN if we can, as it emits
+              ;; better code (at least on x86-64) by using the constant to discern between
+              ;; the BTS or BTR opcode. However, a new suboptimality comes from that,
+              ;; which is that by not passing a LOCATION= TN for the output, the final MOVE
+              ;; in the setter thinks that it has to do something.
+              ;; Nonetheless it's far better than it was. In all other scenarios, don't pass
+              ;; a constant TN, because we don't know that generated code is better.
+              (cond #+x86-64 ; still moar cringe
+                    ((and bit-vector-p (constant-lvar-p value))
+                     (funcall setter (tnify i) (emit-constant (lvar-value value))))
+                    (t
+                     (emit-move node block (lvar-tn node block value) tmp)
+                     (funcall setter (tnify i) tmp))))))))
     (move-lvar-result node block locs lvar)))
 
 ;;; An array header for simple non-unidimensional arrays is a fixed alloc,

@@ -1734,6 +1734,17 @@
       (try-coalescing vop-info-targets)))
   (setf (gethash (vop-info-name vop-info) *backend-template-names*)
         vop-info))
+
+(defun undefine-vop (name)
+  (let ((parse (gethash name *backend-parsed-vops*)))
+    (dolist (translate (vop-parse-translate parse))
+      (let ((info (info :function :info translate)))
+        (setf (fun-info-templates info)
+              (delete name (fun-info-templates info)
+                      :key #'vop-info-name))
+        (format t "~&~s has ~d templates~%" translate (length (fun-info-templates info)))))
+    (remhash name *backend-parsed-vops*)
+    (remhash name *backend-template-names*)))
 
 ;;;; emission macros
 
