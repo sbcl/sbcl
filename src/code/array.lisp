@@ -369,12 +369,9 @@
            (type index length))
   (let* ((n-bits-shift (or n-bits-shift
                            (aref %%simple-array-n-bits-shifts%% widetag)))
-         (full-length (if (or (= widetag simple-base-string-widetag)
-                              #+sb-unicode
-                              (= widetag
-                                 simple-character-string-widetag))
-                          (1+ length)
-                          length)))
+             ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
+             ;; but a single case involving it now.
+         (full-length (+ length (if (= widetag simple-base-string-widetag) 1 0))))
     ;; Be careful not to allocate backing storage for element type NIL.
     ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
     ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.

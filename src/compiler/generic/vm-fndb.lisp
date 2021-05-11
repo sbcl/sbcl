@@ -271,6 +271,15 @@
 ;;; and WORDS words long. Note: it is your responsibility to ensure that the
 ;;; relation between LENGTH and WORDS is correct.
 ;;; The extra bit beyond N_WIDETAG_BITS is for the vector weakness flag.
+;;; Note that in almost all situations the first argument is a constant.
+;;; There are only 3 places that it can be non-constant, and not at all
+;;; after self-build is complete. The three non-constant places are from:
+;;;  - ALLOCATE-VECTOR-WITH-WIDETAG in src/code/array
+;;;  - ALLOCATE-VECTOR (which is basically a stub) in src/code/array
+;;;  - FOP-SPEC-VECTOR which calls allocate-vector
+;;; Apart from those, user code that does not have a compile-time-determined
+;;; vector type will usuallly end up calling allocate-vector-with-widetag
+;;; via %MAKE-ARRAY.
 (defknown allocate-vector ((unsigned-byte 9) index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.

@@ -180,6 +180,10 @@
                 :key #'sb-vm:saetp-specifier :test #'equal)
       (error "No saetp for ~S" element-type)))
 
+;;; I don't understand why we didn't use this more often, instead of
+;;; having introduced special cases. Oh well, what's done is done.
+;;; At least you can grep for SAETP-N-PAD-ELEMENTS in the comments
+;;; as a signal that the padding is calculated in yet another place.
 (defun vector-n-data-octets (vector saetp)
   (declare (type (simple-array * (*)) vector))
   (let* ((length (+ (length vector) (saetp-n-pad-elements saetp)))
