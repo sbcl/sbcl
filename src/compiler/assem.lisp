@@ -333,6 +333,9 @@
   ;; can print "in the {x} section" whenever it changes.
   (tracing-state (list nil nil) :read-only t)) ; segment and vop
 (declaim (freeze-type asmstream))
+;;; FIXME: suboptimal since *asmstream* was declaimed earlier because reasons.
+;;; (so we're missing uses of the known type even though the special var is known)
+(declaim (type asmstream *asmstream*))
 
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)

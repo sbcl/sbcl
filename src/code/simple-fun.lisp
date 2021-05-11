@@ -470,6 +470,7 @@
 
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
+  ;; FIXME: it should probably be an error to pass FUN-INDEX too large
   (when (< fun-index (code-n-entries code-obj))
     (truly-the function
       (values (%primitive sb-c:compute-fun code-obj

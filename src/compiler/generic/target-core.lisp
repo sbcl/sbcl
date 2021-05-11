@@ -318,6 +318,7 @@
         (let ((fun (%code-entry-point code-obj (decf fun-index)))
               (w (+ sb-vm:code-constants-offset
                     (* sb-vm:code-slots-per-simple-fun fun-index))))
+          (aver (functionp fun)) ; in case %CODE-ENTRY-POINT returns NIL
           (setf (code-header-ref code-obj (+ w sb-vm:simple-fun-name-slot))
                 (entry-info-name entry-info)
                 (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))

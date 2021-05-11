@@ -268,7 +268,8 @@
 (defglobal *static-vop-usage-counts* nil)
 (defparameter *do-instcombine-pass* t)
 
-(defun generate-code (component)
+(defun generate-code (component &aux (ir2-component (component-info component)))
+  (declare (type ir2-component ir2-component))
   (when *compiler-trace-output*
     (format *compiler-trace-output*
             "~|~%assembly code for ~S~2%"
@@ -375,9 +376,9 @@
       (vector-push-extend (make-constant (make-array (length coverage-map)
                                                      :element-type '(unsigned-byte 8)
                                                      :initial-element #xFF))
-                          (ir2-component-constants (component-info component)))
+                          (ir2-component-constants ir2-component))
       (vector-push-extend (make-constant (cons 'coverage-map coverage-map))
-                          (ir2-component-constants (component-info component)))
+                          (ir2-component-constants ir2-component))
       ;; The mark vop can store the low byte from either ZERO-TN or NULLL-TN
       ;; to avoid loading a constant. Either one won't match #xff.
       #-darwin-jit
@@ -386,20 +387,18 @@
 
     (emit-inline-constants)
 
-    (let* ((info (component-info component))
-           (simple-fun-labels
-            (mapcar #'entry-info-offset (ir2-component-entries info)))
-           (n-boxed (length (ir2-component-constants info)))
+    (let* ((n-boxed (length (ir2-component-constants ir2-component)))
            ;; Skew is either 0 or N-WORD-BYTES depending on whether the boxed
            ;; header length is even or odd
            (skew (if (and (= code-boxed-words-align 1) (oddp n-boxed))
                      sb-vm:n-word-bytes
                      0)))
       (multiple-value-bind (segment text-length fixup-notes fun-table)
-          (assemble-sections asmstream
-                             simple-fun-labels
-                             (make-segment :header-skew skew
-                                           :run-scheduler (default-segment-run-scheduler)))
+          (assemble-sections
+           asmstream
+           (mapcar #'entry-info-offset (ir2-component-entries ir2-component))
+           (make-segment :header-skew skew
+                         :run-scheduler (default-segment-run-scheduler)))
         (values segment text-length fun-table
                 (asmstream-elsewhere-label asmstream) fixup-notes)))))
 
