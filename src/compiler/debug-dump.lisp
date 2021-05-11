@@ -452,7 +452,7 @@
          ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
          (large-fixnums (>= (integer-length most-positive-fixnum) 62))
          more)
-    (declare (type (and fixnum unsigned-byte) flags))
+    (declare (type (and sb-xc:fixnum unsigned-byte) flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
       (unless (and tn (tn-offset tn))
