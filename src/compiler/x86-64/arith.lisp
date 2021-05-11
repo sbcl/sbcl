@@ -1353,7 +1353,13 @@ constant shift greater than word length")))
                        ;; value to fixnum. However, in practive it doesn't work anyway
                        ;; because there seems to be a spurious MOVE vop in between
                        ;; the SLOT and the FAST-LOGTEST-C/FIXNUM.
-                       slot))))
+                       ;; But ironically enough we _did_ seem to want to optimize
+                       ;; an expression in GENERATE-CODE along the lines of:
+                       ;;  (if (oddp (length (ir2-component-constants ir2-component))) ...)
+                       ;; which, if #+array-ubsan, would not be admissible
+                       ;; because VECTOR-LENGTH is not in a slot.
+                       ;; Obviously a GENERATE-CODE bug is the mother of all bugs.
+                       #-array-ubsan slot))))
       (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
         (let ((arg (sb-c::vop-args vop)))

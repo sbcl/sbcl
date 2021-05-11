@@ -335,6 +335,8 @@
   ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
   ;; This CMOV safely reads from memory when it does not move, because if
   ;; there is an info-vector in the slot, it has at least one element.
+  ;; Use bit index 3 of the lowtag to distinguish list from vector.
+  ;; A vector will have a 1 in that bit.
   ;; This would compile to almost the same code without a VOP,
   ;; but using a jmp around a mov instead.
   (aver (= (logior list-pointer-lowtag #b1000) other-pointer-lowtag))
@@ -356,13 +358,25 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp)
   (:generator 1
+    #-array-ubsan
+    (progn
     (loadw res x symbol-info-slot other-pointer-lowtag)
     ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
     ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst mov temp nil-value)
     (inst test :byte res fixnum-tag-mask)
-    (inst cmov :e res temp)))
+    (inst cmov :e res temp))
+    ;; This way doesn't assume that CAR and VECTOR-LENGTH are the same memory access.
+    ;; (And it's not even clear that using CMOV is preferable)
+    #+array-ubsan
+    (let ((out (gen-label)))
+      (loadw temp x symbol-info-slot other-pointer-lowtag)
+      (inst mov res nil-value)
+      (inst test :byte temp #b1000) ; if temp-reg-tn is a vector, return NIL
+      (inst jmp :ne out)
+      (loadw res temp cons-car-slot list-pointer-lowtag)
+      (emit-label out))))
 
 ;;;; other miscellaneous VOPs
 

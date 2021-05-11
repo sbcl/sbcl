@@ -67,9 +67,7 @@
           #+array-ubsan
           ((equal name '(setf %array-fill-pointer)) ; half-sized slot
            (inst mov :dword (vector-len-ea object)
-                 (or (encode-value-if-immediate value) value))
-           ;; Set it in two places. (* I DON'T KNOW WHY IT NEEDS THIS *)
-           (gen-cell-set (object-slot-ea object offset lowtag) value nil))
+                 (or (encode-value-if-immediate value) value)))
           (t
            (gen-cell-set (object-slot-ea object offset lowtag) value nil)))))
 
@@ -87,6 +85,7 @@
                      value)))
           #+array-ubsan
           ((and (eq name 'make-array) (eql offset sb-vm:array-fill-pointer-slot))
+           (inst mov :qword (object-slot-ea object 1 lowtag) nil-value)
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           ((sc-is value immediate)

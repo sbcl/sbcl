@@ -339,6 +339,77 @@
       (inst mov size (ea (- (* slot n-word-bytes) lowtag) object) word)))))
 
 ;;; ALLOCATE-VECTOR
+(defun store-string-trailing-null (vector type length words)
+  ;; BASE-STRING needs to have a null terminator. The byte is inaccessible
+  ;; to lisp, so clear it now.
+  (cond ((and (sc-is type immediate)
+              (/= (tn-value type) sb-vm:simple-base-string-widetag))) ; do nothing
+        ((and (sc-is type immediate)
+              (= (tn-value type) sb-vm:simple-base-string-widetag)
+              (sc-is length immediate))
+         (inst mov :byte (ea (- (+ (ash vector-data-offset word-shift)
+                                   (tn-value length))
+                                other-pointer-lowtag)
+                             vector)
+               0))
+        ;; Zeroizing the entire final word is easier than using LENGTH now.
+        ((sc-is words immediate)
+         ;; I am not convinced that this case is reachable -
+         ;; we won't DXify a vector of unknown type.
+         (inst mov :qword
+               ;; Given N data words, write to word N-1
+               (ea (- (ash (+ (tn-value words) vector-data-offset -1)
+                           word-shift)
+                      other-pointer-lowtag)
+                   vector)
+               0))
+        (t
+         ;; This final case is ok with 0 data words - it might clobber the LENGTH
+         ;; slot, but subsequently we rewrite that slot.
+         ;; But strings always have at least 1 word, so no worries either way.
+         (inst mov :qword
+               (ea (- (ash (1- vector-data-offset) word-shift)
+                      other-pointer-lowtag)
+                   vector
+                   words (ash 1 (- word-shift n-fixnum-tag-bits)))
+               0))))
+
+(defun make-shadow-bits (type length rax rcx rdi stackp exit-label)
+  (declare (ignore stackp))
+  (inst xor rax rax)
+  ;; If we're not sure at compile-time what type the vector is, then generate
+  ;; code to check what it is. Can this actually happen? Not on the stack,
+  ;; but yes on the heap.
+  (when (sc-is type unsigned-reg)
+    (inst cmp :byte type simple-vector-widetag)
+    (inst jmp :e exit-label))
+  (let ((nbytes
+         (cond ((sc-is length immediate)
+                ;; Calculate number of dualwords (as 128 bits per dualword)
+                ;; and multiply by 16 to get number of bytes. Also add the 2 header words.
+                (* 16 (+ 2 (ceiling (tn-value length) 128))))
+               (t
+                ;; Compute (CEILING length 128) by adding 127, then truncating divide
+                ;; by 128, and untag as part of the divide step.
+                ;; Account for the two fixed words by adding in 128 more bits initially.
+                (inst lea :dword rcx (ea (fixnumize (+ 128 127)) length))
+                (inst shr :dword rcx 8) ; divide by 128 and untag as one operation
+                (inst shl :dword rcx 4) ; multiply by 16 bytes per dualword
+                rcx))))
+    (stack-allocation rdi nbytes 0)
+    ;; Due to a bug in our emitter for STOS, you do not have the ability
+    ;; to choose to emit STOSB, STOSW, or STOSD. (No Coke, Pepsi.)
+    (if (sc-is length immediate)
+        (inst mov rcx (/ nbytes 8)) ; compute in words now (including header is fine)
+        (inst shr rcx sb-vm:word-shift)))
+  (inst rep)
+  (inst stos rax) ; was zeroed
+  (inst lea rax (ea other-pointer-lowtag rsp-tn))
+  (inst mov :dword (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
+  (inst mov :dword (vector-len-ea rax)
+        (if (sc-is length immediate) (fixnumize (tn-value length)) length))
+  (inst mov :qword (ea (- 8 other-pointer-lowtag) rax) nil-value))
+
 (macrolet ((calc-size-in-bytes (n-words result-tn)
              `(cond ((sc-is ,n-words immediate)
                      (pad-data-block (+ (tn-value ,n-words) vector-data-offset)))
@@ -349,15 +420,17 @@
                      (inst and ,result-tn (lognot lowtag-mask))
                      ,result-tn)))
            (put-header (vector-tn lowtag type len zeroed)
-             `(let ((len (if (sc-is ,len immediate) (fixnumize (tn-value ,len)) ,len)))
-                (storew* (if (sc-is ,type immediate) (tn-value ,type) ,type)
-                         ,vector-tn 0 ,lowtag ,zeroed)
-                #+array-ubsan (progn
-                                (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
-                                ;; Temporary: scribble on the LENGTH slot
-                                (inst mov :qword (object-slot-ea ,vector-tn 1 ,lowtag) -2))
+             `(let ((len (if (sc-is ,len immediate) (fixnumize (tn-value ,len)) ,len))
+                    (type (if (sc-is ,type immediate) (tn-value ,type) ,type)))
+                (storew* type ,vector-tn 0 ,lowtag ,zeroed)
+                #+array-ubsan (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
                 #-array-ubsan (storew* len ,vector-tn vector-length-slot
-                                       ,lowtag ,zeroed))))
+                                       ,lowtag ,zeroed)))
+           (want-shadow-bits ()
+             `(and (sb-c::policy node (> safety 0))
+                   (if (sc-is type immediate)
+                       (/= (tn-value type) simple-vector-widetag)
+                       :maybe))))
 
   (define-vop (allocate-vector-on-heap)
     (:args (type :scs (unsigned-reg immediate))
@@ -379,41 +452,6 @@
          (put-header result 0 type length t)
          (inst or :byte result other-pointer-lowtag)))))
 
-  (defun store-string-trailing-null (vector type length words)
-    ;; BASE-STRING needs to have a null terminator. The byte is inaccessible
-    ;; to lisp, so clear it now.
-    (cond ((and (sc-is type immediate)
-                (/= (tn-value type) sb-vm:simple-base-string-widetag))) ; do nothing
-          ((and (sc-is type immediate)
-                (= (tn-value type) sb-vm:simple-base-string-widetag)
-                (sc-is length immediate))
-           (inst mov :byte (ea (- (+ (ash vector-data-offset word-shift)
-                                     (tn-value length))
-                                  other-pointer-lowtag)
-                               vector)
-                 0))
-          ;; Zeroizing the entire final word is easier than using LENGTH now.
-          ((sc-is words immediate)
-           ;; I am not convinced that this case is reachable -
-           ;; we won't DXify a vector of unknown type.
-           (inst mov :qword
-                 ;; Given N data words, write to word N-1
-                 (ea (- (ash (+ (tn-value words) vector-data-offset -1)
-                             word-shift)
-                        other-pointer-lowtag)
-                     vector)
-                 0))
-          (t
-           ;; This final case is ok with 0 data words - it might clobber the LENGTH
-           ;; slot, but subsequently we rewrite that slot.
-           ;; But strings always have at least 1 word, so no worries either way.
-           (inst mov :qword
-                 (ea (- (ash (1- vector-data-offset) word-shift)
-                        other-pointer-lowtag)
-                     vector
-                     words (ash 1 (- word-shift n-fixnum-tag-bits)))
-                 0))))
-
   (define-vop (allocate-vector-on-stack)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
@@ -421,8 +459,20 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:translate allocate-vector)
+    #+array-ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
+    #+array-ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
+    #+array-ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
+    #+array-ubsan (:node-var node)
     (:policy :fast-safe)
     (:generator 10
+      #+array-ubsan
+      (when (want-shadow-bits)
+        ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
+        ;; which can use unbound-marker as a poison value on reads.
+        ;; This is overly conservative because this vector might get explicitly filled.
+        ;; If it does, we can zero out the slot for the shadow bits.
+        (make-shadow-bits type length rax rcx rdi t NO-SHADOW-BITS))
+      NO-SHADOW-BITS
       (let ((size (calc-size-in-bytes words result)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
@@ -433,22 +483,12 @@
         (store-string-trailing-null result type length words)
         ;; FIXME: It would be good to check for stack overflow here.
         (put-header result other-pointer-lowtag type length nil)
-        ;; If the array was safely created then it can't contain junk.
-        ;; If the type is such that it may contain safely readable random bits,
-        ;; it is as if safe. Otherwise mark is as potentially unsafe,
-        ;; so that OUTPUT-UGLY-OBJECT will try to detect whether each
-        ;; element individually is a valid pointer.
-        ;; Unfortunately this is impossible - how can we detect whether
-        ;; an element which points to the stack is valid or garbage?
-        #+nil
-        (unless (or (policy node (= safety 3))
-                    (and (constant-tn-p type)
-                         (not (sb-c::should-zerofill-p
-                               (find (tn-value type)
-                                     *specialized-array-element-type-properties*
-                                     :key #'saetp-typecode)))))
-          (inst or :byte (ea (- 1 other-pointer-lowtag) result)
-                +vector-dynamic-extent+)))))
+        )
+      #+array-ubsan
+      (when (want-shadow-bits)
+        (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
+                      result)
+              rax))))
 
   #+linux ; unimplemented for others
   (define-vop (allocate-vector-on-stack+msan-unpoison)
