@@ -573,13 +573,6 @@
 (with-test (:name (the values))
   (assert (= (the (values integer symbol) (values 1 'foo 13)) 1)))
 
-(with-test (:name (compile eval the type-error))
-  (checked-compile-and-assert (:optimize :safe)
-      '(lambda (v)
-        (list (the fixnum (the (real 0) (eval v)))))
-    ((0.1) (condition 'type-error))
-    ((-1)  (condition 'type-error))))
-
 ;;; the implicit block does not enclose lambda list
 (with-test (:name (compile :implicit block :does-not-enclose :lambda-list))
   (let ((forms '((defmacro #1=#:foo (&optional (x (return-from #1#)))
@@ -3469,37 +3462,6 @@
                                t))))
     (ctu:assert-no-consing (funcall f))))
 
-(with-test (:name :array-type-predicates)
-  (dolist (et (list* '(integer -1 200) '(integer -256 1)
-                     '(integer 0 128)
-                     '(integer 0 (128))
-                     '(double-float 0d0 (1d0))
-                     '(single-float (0s0) (1s0))
-                     '(or (eql 1d0) (eql 10d0))
-                     '(member 1 2 10)
-                     '(complex (member 10 20))
-                     '(complex (member 10d0 20d0))
-                     '(complex (member 10s0 20s0))
-                     '(or integer double-float)
-                     '(mod 1)
-                     '(member #\a #\b)
-                     '(eql #\a)
-                     #+sb-unicode 'extended-char
-                     #+sb-unicode '(eql #\cyrillic_small_letter_yu)
-                     (map 'list 'sb-vm:saetp-specifier
-                          sb-vm:*specialized-array-element-type-properties*)))
-    (when et
-      (let* ((v (make-array 3 :element-type et)))
-        (checked-compile-and-assert ()
-            `(lambda ()
-               (list (if (typep ,v '(simple-array ,et (*)))
-                         :good
-                         ',et)
-                     (if (typep (elt ,v 0) '(simple-array ,et (*)))
-                         ',et
-                         :good)))
-          (() '(:good :good)))))))
-
 (with-test (:name :truncate-float)
   (let ((s (checked-compile `(lambda (x)
                                (declare (single-float x))
@@ -4959,37 +4921,6 @@
          (logand (lognand a -6) (* b -502823994)))
     ((-1491588365 -3745511761) 1084329992)))
 
-(with-test (:name (compile equal equalp :transforms))
-  (let* ((s "foo")
-         (bit-vector #*11001100)
-         (values `(nil 1 2 "test"
-                       ;; Floats duplicated here to ensure we get newly created instances
-                       (read-from-string "1.1") (read-from-string "1.2d0")
-                       (read-from-string "1.1") (read-from-string "1.2d0")
-                       1.1 1.2d0 '("foo" "bar" "test")
-                       #(1 2 3 4) #*101010 (make-broadcast-stream) #p"/tmp/file"
-                       ,s (copy-seq ,s) ,bit-vector (copy-seq ,bit-vector)
-                       ,(make-hash-table) #\a #\b #\A #\C
-                       ,(make-random-state) 1/2 2/3)))
-
-    (dolist (predicate '(equal equalp))
-      ;; Test all permutations of different types
-      (loop for x in values
-         do (loop for y in values
-               do (checked-compile-and-assert (:optimize nil)
-                      `(lambda (x y)
-                         (,predicate (the ,(type-of x) x)
-                                     (the ,(type-of y) y)))
-                    ((x y) (funcall predicate x y)))))
-      (checked-compile-and-assert ()
-          `(lambda (x y)
-             (,predicate (the (cons (or simple-bit-vector simple-base-string))
-                              x)
-                         (the (cons (or (and bit-vector (not simple-array))
-                                        (simple-array character (*))))
-                              y)))
-        (((list (string 'list)) (list "LIST")) t)))))
-
 (with-test (:name (compile restart-case optimize speed compiler-note))
   (checked-compile '(lambda ()
                      (declare (optimize speed))
@@ -5688,25 +5619,6 @@
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
 
-(with-test (:name (sb-c::mask-signed-field :randomized))
-  (let (result)
-    (dotimes (i 1000)
-      (let* ((ool (checked-compile '(lambda (s i)
-                                     (sb-c::mask-signed-field s i))))
-             (size (random (* sb-vm:n-word-bits 2)))
-             (constant (checked-compile `(lambda (i)
-                                           (sb-c::mask-signed-field ,size i))))
-             (arg (- (random (* most-positive-fixnum 8)) (* most-positive-fixnum 4)))
-             (declared (checked-compile `(lambda (i)
-                                           (declare (type (integer ,(- (abs arg)) ,(abs arg)) i))
-                                           (sb-c::mask-signed-field ,size i))))
-             (ool-answer (funcall ool size arg))
-             (constant-answer (funcall constant arg))
-             (declared-answer (funcall declared arg)))
-        (unless (= ool-answer constant-answer declared-answer)
-          (push (list size arg ool-answer constant-answer declared-answer) result))))
-    (assert (null result))))
-
 (with-test (:name (array-dimension *))
   (checked-compile-and-assert ()
       `(lambda  (array)
@@ -6050,45 +5962,6 @@
                      (+ a b x))
                    s)))
     (('(1 2) 3) 6)))
-
-(with-test (:name (multiple-value-call :type-checking-rest))
-  (checked-compile-and-assert (:allow-warnings t
-                               :optimize :safe)
-      `(lambda (list)
-         (multiple-value-call
-             (lambda (&optional a &rest r)
-               (declare ((satisfies eval) r)
-                        (ignore r))
-               (list a))
-           (values-list list)))
-    (('(1 list 2)) '(1))
-    (('(1)) (condition 'type-error))))
-
-(with-test (:name (multiple-value-call :type-checking-rest.2))
-  (checked-compile-and-assert (:allow-warnings t
-                               :optimize :safe)
-      `(lambda (list)
-         (multiple-value-call
-             (lambda (&optional a &rest r)
-               (declare (null r)
-                        (ignore r))
-               (list a))
-           (values-list list)))
-    (('(1 list 2)) (condition 'type-error))
-    (('(1)) '(1))))
-
-(with-test (:name (multiple-value-call :type-checking-rest :type-derivation))
-  (checked-compile-and-assert (:allow-warnings t
-                               :optimize :safe)
-      `(lambda (list)
-         (multiple-value-call
-             (lambda (&optional a &rest r)
-               (declare (cons r)
-                        (ignore r))
-               (list a))
-           (values-list list)))
-    (('(1 2)) '(1))
-    (('(1)) (condition 'type-error))))
 
 (with-test (:name :delete-optional-dispatch-xep)
   (let ((name (gensym)))
