@@ -264,40 +264,39 @@ and
        (:generator 4
          (loadw value object (+ ,offset index) ,lowtag)))))
 
-(defmacro define-full-setter (name type offset lowtag scs eltype &optional translate)
+(defmacro define-full-setter (name type offset lowtag scs eltype &optional translate
+                              &aux (resultp (neq translate 'sb-bignum:%bignum-set)))
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
        ,@(when fixnum-as-word-index-needs-temp
            `((:temporary (:sc non-descriptor-reg) temp)))
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 3
          (with-fixnum-as-word-index (index temp)
            (inst add lip object index))
          (storew value lip ,offset ,lowtag)
-         (move result value)))
+         ,@(when resultp '((move result value)))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:info index)
        (:arg-types ,type
          (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
          ,eltype)
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
+       ,@(when resultp '((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 1
          (storew value object (+ ,offset index) ,lowtag)
-         (move result value)))))
+         ,@(when resultp '((move result value)))))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs eltype &optional translate)
   (let ((shift (- (integer-length size) n-fixnum-tag-bits 1)))

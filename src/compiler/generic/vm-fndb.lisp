@@ -462,7 +462,12 @@
   bignum-element-type (flushable always-translatable))
 
 (defknown %bignum-set (bignum bignum-index bignum-element-type)
-  bignum-element-type
+  ;; ppc and sparc don't use DEFINE-FULL-SETTER to define %BIGNUM-SET,
+  ;; and I didn't feel like plumbing the changes through whatever layers
+  ;; of macros they use that aren't like the others.
+  #+(or ppc ppc64 sparc) bignum-element-type
+  ;; The preferred approach is to define %BIGNUM-SET not to produce a value
+  #-(or ppc ppc64 sparc) (values)
   ())
 
 (defknown %digit-0-or-plusp (bignum-element-type) boolean

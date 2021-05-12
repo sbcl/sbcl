@@ -315,17 +315,16 @@
                                               ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  `(progn
-     (define-vop (,name)
+  (let ((resultp (neq translate 'sb-bignum:%bignum-set)))
+    `(define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:generator 4                    ; was 5
          (sc-case index
            (immediate
@@ -338,7 +337,7 @@
             (inst mov (make-ea :dword :base object :index index
                                :disp (- (* ,offset n-word-bytes) ,lowtag))
                   value)))
-        (move result value)))))
+         ,@(when resultp '((move result value)))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
   `(progn

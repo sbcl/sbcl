@@ -223,6 +223,7 @@
          (result (first locs))
          (elt-ptype (primitive-type elt-ctype))
          (tmp (make-normal-tn elt-ptype)))
+    (declare (ignorable bit-vector-p))
     (emit-move node block (lvar-tn node block vector) result)
     (flet ((compute-setter ()
              ;; Such cringe. I had no idea why all the "-C" vops were mandatory.

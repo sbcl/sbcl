@@ -368,18 +368,18 @@
           (loadw value lip ,offset ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
-                              &optional translate)
+                              &optional translate
+                              &aux (resultp (neq translate 'sb-bignum:%bignum-set)))
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate))
-            (value :scs ,scs :target result))
+            (value :scs ,scs ,@(when resultp '(:target result))))
      (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
-     (:results (result :scs ,scs))
-     (:result-types ,el-type)
+     ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
      (:generator 2
        (sc-case index
          (immediate
@@ -389,7 +389,7 @@
          (t
           (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
           (storew value lip ,offset ,lowtag)))
-       (move result value))))
+       ,@(when resultp '((move result value))))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
                                  el-type &optional translate)

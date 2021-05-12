@@ -340,7 +340,8 @@
                (t
                 (aver (typep name '(cons symbol (cons (eql :no-constant-variant) null))))
                 (setq name (car name))
-                nil))))
+                nil)))
+        (resultp (if (eq translate 'sb-bignum:%bignum-set) nil 'result)))
   `(progn
      (define-vop (,name)
        ,@(when translate
@@ -348,10 +349,9 @@
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
+       ,@(when resultlp '((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:vop-var vop)
        (:generator 4                    ; was 5
          ,@(if (eq name 'code-header-set)
@@ -367,7 +367,7 @@
                `((gen-cell-set
                    (ea (- (* ,offset n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                   value result vop
+                   value ,resultp vop
                    ,(eq name 'set-funcallable-instance-info))))))
      ,@(when want-both-variants
          `((define-vop (,(symbolicate name "-C"))
@@ -375,20 +375,19 @@
                 `((:translate ,translate)))
             (:policy :fast-safe)
             (:args (object :scs (descriptor-reg))
-                   (value :scs ,scs :target result))
+                   (value :scs ,scs ,@(when resultp '(:target result))))
             (:info index)
             (:arg-types ,type
                         (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
                                                      ,(eval offset)))
                         ,el-type)
-            (:results (result :scs ,scs))
-            (:result-types ,el-type)
+             ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
             (:vop-var vop)
             (:generator 3                    ; was 5
               (gen-cell-set
                    (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
                        object)
-                   value result vop
+                   value ,result vop
                    ,(eq name 'set-funcallable-instance-info)))))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
