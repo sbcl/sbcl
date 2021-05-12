@@ -1903,4 +1903,6 @@ function to be removed without further warning."
               (if element-p initial-element nil)))))
 
 (defun weak-vector-p (x)
-  (and (simple-vector-p x) (test-header-bit x vector-weak-flag)))
+  (and (simple-vector-p x)
+       #+(or x86 x86-64) (test-header-bit x vector-weak-flag)
+       #-(or x86 x86-64) (logtest (get-header-data x) vector-weak-flag)))

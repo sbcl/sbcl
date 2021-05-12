@@ -4878,8 +4878,9 @@
         (loop for info in (sb-c::fun-info-templates
                            (sb-c::fun-info-or-lose dvr))
               for (nil second-arg third-arg) = (sb-c::vop-info-arg-types info)
-              unless (or (eq (sb-c::vop-info-name info)
-                             'sb-vm::data-vector-set-with-offset/simple-bit-vector)
+              unless (or (string= (sb-c::vop-info-name info)
+                                  ;; don't violate package lock if symbol isn't there
+                                  "DATA-VECTOR-SET-WITH-OFFSET/SIMPLE-BIT-VECTOR")
                          (typep second-arg '(cons (eql :constant)))
                          (equal third-arg '(:constant . (integer 0 0)))
                          (equal second-arg
