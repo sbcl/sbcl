@@ -181,9 +181,7 @@
            (data-vector-ref string index))
           #+sb-unicode
           ((simple-array base-char (*))
-           (data-vector-ref string index))
-          ((simple-array nil (*))
-           (data-nil-vector-ref string index))))))
+           (data-vector-ref string index))))))
 
 ;;; This and the corresponding -SET transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
@@ -272,9 +270,7 @@
            ((simple-array base-char (*))
             (data-vector-set string index (the* (base-char :context :aref
                                                            :silent-conflict t)
-                                                new-value)))
-           (t
-            (%type-check-error/c string 'nil-array-accessed-error nil))))))
+                                                new-value)))))))
 
 ;;; This and the corresponding -REF transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
