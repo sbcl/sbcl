@@ -351,7 +351,7 @@
               (index :scs (any-reg))
               (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,el-type)
-       ,@(when resultlp '((:results (result :scs ,scs)) (:result-types ,el-type)))
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:vop-var vop)
        (:generator 4                    ; was 5
          ,@(if (eq name 'code-header-set)
@@ -387,7 +387,7 @@
               (gen-cell-set
                    (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
                        object)
-                   value ,result vop
+                   value ,resultp vop
                    ,(eq name 'set-funcallable-instance-info)))))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
