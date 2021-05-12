@@ -56,17 +56,18 @@
 ;;; and there is no case in which left-shift is required.
 (defmacro define-indexer (name shift write-p ri-op rr-op &key sign-extend-byte
                                                               multiple-of-four
+                                                              (result t)
                           &aux (net-shift (- shift n-fixnum-tag-bits)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate))
             ,@(when write-p
-                '((value :scs (any-reg descriptor-reg) :target result))))
+                `((value :scs (any-reg descriptor-reg) ,@(when result '(:target result))))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
      (:temporary (:scs (non-descriptor-reg)) temp)
-     (:results (,(if write-p 'result 'value)
-                :scs (any-reg descriptor-reg)))
-     (:result-types *)
+     ,@(when result
+         `((:results (,(if write-p 'result 'value) :scs (any-reg descriptor-reg)))
+           (:result-types *)))
      (:variant-vars offset lowtag)
      (:policy :fast-safe)
      (:generator 5
@@ -93,20 +94,26 @@
           (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
            `((inst extsb value value)))
-       ,@(when write-p
+       ,@(when (and write-p result)
            '((move result value))))))
 
 (define-indexer word-index-ref           3 nil ld  ldx) ;; Word means Lisp Word
-(define-indexer word-index-set           3 t   std stdx)
 (define-indexer 32-bits-index-ref        2 nil lwz lwzx)
 (define-indexer signed-32-bits-index-ref 2 nil lwa lwax :multiple-of-four t)
-(define-indexer 32-bits-index-set        2 t   stw stwx)
 (define-indexer 16-bits-index-ref        1 nil lhz lhzx)
 (define-indexer signed-16-bits-index-ref 1 nil lha lhax)
-(define-indexer 16-bits-index-set        1 t   sth sthx)
 (define-indexer byte-index-ref           0 nil lbz lbzx)
 (define-indexer signed-byte-index-ref    0 nil lbz lbzx :sign-extend-byte t)
+
+(define-indexer word-index-set           3 t   std stdx)
+(define-indexer 32-bits-index-set        2 t   stw stwx)
+(define-indexer 16-bits-index-set        1 t   sth sthx)
 (define-indexer byte-index-set           0 t   stb stbx)
+;; the -NR setters yield no result
+(define-indexer word-index-set-nr        3 t   std stdx :result nil)
+(define-indexer 32-bits-index-set-nr     2 t   stw stwx :result nil)
+(define-indexer 16-bits-index-set-nr     1 t   sth sthx :result nil)
+(define-indexer byte-index-set-nr        0 t   stb stbx :result nil)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))

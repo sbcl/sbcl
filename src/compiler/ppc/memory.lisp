@@ -34,17 +34,18 @@
 ;;;; Indexed references:
 
 ;;; Define some VOPs for indexed memory reference.
-(defmacro define-indexer (name write-p ri-op rr-op shift &optional sign-extend-byte)
+(defmacro define-indexer (name write-p ri-op rr-op shift &key sign-extend-byte
+                                                              (result t))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg zero immediate))
             ,@(when write-p
-                '((value :scs (any-reg descriptor-reg) :target result))))
+                `((value :scs (any-reg descriptor-reg) ,@(when result '(:target result))))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
      (:temporary (:scs (non-descriptor-reg)) temp)
-     (:results (,(if write-p 'result 'value)
-                :scs (any-reg descriptor-reg)))
-     (:result-types *)
+     ,@(when result
+         `((:results (,(if write-p 'result 'value) :scs (any-reg descriptor-reg)))
+           (:result-types *)))
      (:variant-vars offset lowtag)
      (:policy :fast-safe)
      (:generator 5
@@ -70,17 +71,22 @@
           (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
            `((inst extsb value value)))
-       ,@(when write-p
+       ,@(when (and write-p result)
            '((move result value))))))
 
-(define-indexer word-index-ref nil lwz lwzx 0)
-(define-indexer word-index-set t stw stwx 0)
-(define-indexer halfword-index-ref nil lhz lhzx 1)
+(define-indexer word-index-ref            nil lwz lwzx 0)
+(define-indexer halfword-index-ref        nil lhz lhzx 1)
 (define-indexer signed-halfword-index-ref nil lha lhax 1)
-(define-indexer halfword-index-set t sth sthx 1)
-(define-indexer byte-index-ref nil lbz lbzx 2)
-(define-indexer signed-byte-index-ref nil lbz lbzx 2 t)
-(define-indexer byte-index-set t stb stbx 2)
+(define-indexer byte-index-ref            nil lbz lbzx 2)
+(define-indexer signed-byte-index-ref     nil lbz lbzx 2 :sign-extend-byte t)
+
+(define-indexer word-index-set              t stw stwx 0)
+(define-indexer halfword-index-set          t sth sthx 1)
+(define-indexer byte-index-set              t stb stbx 2)
+;; the -NR setters yield no result
+(define-indexer word-index-set-nr           t stw stwx 0 :result nil)
+(define-indexer halfword-index-set-nr       t sth sthx 1 :result nil)
+(define-indexer byte-index-set-nr           t stb stbx 2 :result nil)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))

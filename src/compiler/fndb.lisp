@@ -1857,9 +1857,10 @@
   (foldable unsafely-flushable always-translatable))
 (defknown data-nil-vector-ref (simple-array index) nil
   (always-translatable))
-(defknown data-vector-set (array index t) t
-  (always-translatable))
-(defknown data-vector-set-with-offset (array fixnum fixnum t) t
+;;; The lowest-level vector SET operators should not return a value.
+;;; Functions built upon them may return the input value.
+(defknown data-vector-set (array index t) (values) (always-translatable))
+(defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
   (always-translatable))
 (defknown hairy-data-vector-ref (array index) t (foldable))
 (defknown hairy-data-vector-set (array index t) t ())

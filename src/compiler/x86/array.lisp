@@ -293,12 +293,10 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg) :to (:argument 2))
                 (index :scs (unsigned-reg) :target ecx)
-                (value :scs (unsigned-reg immediate) :target result))
+                (value :scs (unsigned-reg immediate)))
          (:info offset)
          (:arg-types ,type positive-fixnum (:constant (integer 0 0))
                      positive-fixnum)
-         (:results (result :scs (unsigned-reg)))
-         (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg) word-index)
          (:temporary (:sc unsigned-reg) old)
          (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
@@ -328,22 +326,15 @@
               (inst or old value)))
            (inst rol old :cl)
            (inst mov (make-ea-for-vector-data object :index word-index)
-                 old)
-           (sc-case value
-             (immediate
-              (inst mov result (tn-value value)))
-             (unsigned-reg
-              (move result value)))))
+                 old)))
        (define-vop (,(symbolicate 'data-vector-set-with-offset/ type "-C"))
          (:translate data-vector-set-with-offset)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs (unsigned-reg immediate) :target result))
+                (value :scs (unsigned-reg immediate)))
          (:arg-types ,type (:constant index) (:constant (integer 0 0))
                      positive-fixnum)
          (:info index offset)
-         (:results (result :scs (unsigned-reg)))
-         (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg :to (:result 0)) old)
          (:generator 20
            (aver (zerop offset))
@@ -367,12 +358,7 @@
                   (inst or old value)
                   (unless (zerop shift)
                     (inst rol old shift)))))
-             (storew old object (+ word vector-data-offset) other-pointer-lowtag)
-             (sc-case value
-               (immediate
-                (inst mov result (tn-value value)))
-               (unsigned-reg
-                (move result value))))))))))
+             (storew old object (+ word vector-data-offset) other-pointer-lowtag))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
@@ -417,33 +403,21 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
-         (value :scs (single-reg) :target result))
+         (value :scs (single-reg)))
   (:info offset)
   (:arg-types simple-array-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 4 vector-data-offset))
               single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fst (float-ref-ea object index offset 4))
-           (unless (zerop (tn-offset result))
-             ;; Value is in ST0 but not result.
-             (inst fst result)))
+           (inst fst (float-ref-ea object index offset 4)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
            (inst fst (float-ref-ea object index offset 4))
-           (cond ((zerop (tn-offset result))
-                  ;; The result is in ST0.
-                  (inst fst value))
-                 (t
-                  ;; Neither value or result are in ST0
-                  (unless (location= value result)
-                    (inst fst result))
-                  (inst fxch value)))))))
+           (inst fxch value)))))
 
 (define-vop (data-vector-ref-with-offset/simple-array-double-float)
   (:note "inline array access")
@@ -468,33 +442,21 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
-         (value :scs (double-reg) :target result))
+         (value :scs (double-reg)))
   (:info offset)
   (:arg-types simple-array-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
               double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
   (:generator 20
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fstd (float-ref-ea object index offset 8 :scale 2))
-           (unless (zerop (tn-offset result))
-                   ;; Value is in ST0 but not result.
-                   (inst fstd result)))
+           (inst fstd (float-ref-ea object index offset 8 :scale 2)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
            (inst fstd (float-ref-ea object index offset 8 :scale 2))
-           (cond ((zerop (tn-offset result))
-                  ;; The result is in ST0.
-                  (inst fstd value))
-                 (t
-                  ;; Neither value or result are in ST0
-                  (unless (location= value result)
-                          (inst fstd result))
-                  (inst fxch value)))))))
+           (inst fxch value)))))
 
 ;;; complex float variants
 
@@ -526,42 +488,26 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
-         (value :scs (complex-single-reg) :target result))
+         (value :scs (complex-single-reg)))
   (:info offset)
   (:arg-types simple-array-complex-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
               complex-single-float)
-  (:results (result :scs (complex-single-reg)))
-  (:result-types complex-single-float)
   (:generator 5
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
+    (let ((value-real (complex-single-reg-real-tn value)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fst (float-ref-ea object index offset 8 :scale 2))
-             (unless (zerop (tn-offset result-real))
-               ;; Value is in ST0 but not result.
-               (inst fst result-real)))
+             (inst fst (float-ref-ea object index offset 8 :scale 2)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
              (inst fst (float-ref-ea object index offset 8 :scale 2))
-             (cond ((zerop (tn-offset result-real))
-                    ;; The result is in ST0.
-                    (inst fst value-real))
-                   (t
-                    ;; Neither value or result are in ST0
-                    (unless (location= value-real result-real)
-                      (inst fst result-real))
-                    (inst fxch value-real))))))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
+             (inst fxch value-real))))
+    (let ((value-imag (complex-single-reg-imag-tn value)))
       (inst fxch value-imag)
       (inst fst (float-ref-ea object index offset 8
                                        :scale 2 :complex-offset 4))
-      (unless (location= value-imag result-imag)
-        (inst fst result-imag))
       (inst fxch value-imag))))
 
 (define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
@@ -591,44 +537,28 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
-         (value :scs (complex-double-reg) :target result))
+         (value :scs (complex-double-reg)))
   (:info offset)
   (:arg-types simple-array-complex-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 16 vector-data-offset))
               complex-double-float)
-  (:results (result :scs (complex-double-reg)))
-  (:result-types complex-double-float)
   (:generator 20
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
+    (let ((value-real (complex-double-reg-real-tn value)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
              (inst fstd (float-ref-ea object index offset 16
-                                               :scale 4))
-             (unless (zerop (tn-offset result-real))
-               ;; Value is in ST0 but not result.
-               (inst fstd result-real)))
+                                               :scale 4)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
              (inst fstd (float-ref-ea object index offset 16
                                                :scale 4))
-             (cond ((zerop (tn-offset result-real))
-                    ;; The result is in ST0.
-                    (inst fstd value-real))
-                   (t
-                    ;; Neither value or result are in ST0
-                    (unless (location= value-real result-real)
-                      (inst fstd result-real))
-                    (inst fxch value-real))))))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
+             (inst fxch value-real))))
+    (let ((value-imag (complex-double-reg-imag-tn value)))
       (inst fxch value-imag)
       (inst fstd (float-ref-ea object index offset 16
                                         :scale 4 :complex-offset 8))
-      (unless (location= value-imag result-imag)
-        (inst fstd result-imag))
       (inst fxch value-imag))))
 
 
@@ -671,11 +601,9 @@
                                                     1 vector-data-offset))
                   ,element-type)
       ,@(unless 8-bit-tns-p
-         '((:temporary (:sc unsigned-reg :offset eax-offset :target result
+         '((:temporary (:sc unsigned-reg :offset eax-offset
                         :from (:argument 2) :to (:result 0))
             eax)))
-      (:results (result :scs ,scs))
-      (:result-types ,element-type)
       (:generator 5
         ,@(unless 8-bit-tns-p
            '((move eax value)))
@@ -691,10 +619,7 @@
                                               :index index :offset offset)
                  ,(if 8-bit-tns-p
                       'value
-                      'al-tn))))
-        (move result ,(if 8-bit-tns-p
-                          'value
-                          'eax)))))))
+                      'al-tn)))))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
     movzx nil unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 positive-fixnum
@@ -734,17 +659,15 @@
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
                (index :scs (signed-reg immediate) :to (:eval 0))
-               (value :scs ,scs :target eax))
+               (value :scs ,scs))
         (:info offset)
         (:arg-types ,ptype tagged-num
                     (:constant (constant-displacement other-pointer-lowtag
                                                       2 vector-data-offset))
                     ,element-type)
-        (:temporary (:sc unsigned-reg :offset eax-offset :target result
+        (:temporary (:sc unsigned-reg :offset eax-offset
                          :from (:argument 2) :to (:result 0))
                     eax)
-        (:results (result :scs ,scs))
-        (:result-types ,element-type)
         (:generator 5
           (move eax value)
           (sc-case index
@@ -755,8 +678,7 @@
             (t
              (inst mov (make-ea-for-vector-data object :size :word
                                                 :index index :offset offset)
-                   ax-tn)))
-          (move result eax))))))
+                   ax-tn))))))))
   (define-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum
     movzx unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum

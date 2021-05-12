@@ -240,10 +240,8 @@
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg) :target shift)
-                     (value :scs (unsigned-reg immediate) :target result))
+                     (value :scs (unsigned-reg immediate)))
               (:arg-types ,type positive-fixnum positive-fixnum)
-              (:results (result :scs (unsigned-reg)))
-              (:result-types positive-fixnum)
               (:temporary (:scs (interior-reg)) lip)
               (:temporary (:scs (non-descriptor-reg)) temp old)
               (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
@@ -274,17 +272,12 @@
                 (inst sll temp temp shift)
                 (inst or old old temp)
                 ;; Write the altered word back to the array.
-                (storew old lip vector-data-offset other-pointer-lowtag)
-                (sc-case value
-                  (immediate
-                   (inst li result (tn-value value)))
-                  (unsigned-reg
-                   (move result value)))))
+                (storew old lip vector-data-offset other-pointer-lowtag)))
             (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
               (:translate data-vector-set)
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
-                     (value :scs (unsigned-reg immediate) :target result))
+                     (value :scs (unsigned-reg immediate)))
               (:arg-types ,type
                           (:constant
                            (integer 0
@@ -295,8 +288,6 @@
                                             elements-per-word))))
                           positive-fixnum)
               (:info index)
-              (:results (result :scs (unsigned-reg)))
-              (:result-types positive-fixnum)
               (:temporary (:scs (non-descriptor-reg)) temp old)
               (:generator 20
                 (multiple-value-bind (word extra) (floor index ,elements-per-word)
@@ -323,12 +314,7 @@
                     (unsigned-reg
                      (inst slli temp value (* extra ,bits))
                      (inst or old old temp)))
-                  (storew old object (+ word vector-data-offset) other-pointer-lowtag)
-                  (sc-case value
-                    (immediate
-                     (inst li result (tn-value value)))
-                    (unsigned-reg
-                     (move result value))))))))))
+                  (storew old object (+ word vector-data-offset) other-pointer-lowtag))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))

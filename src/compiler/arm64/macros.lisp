@@ -369,7 +369,8 @@
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                               &optional translate
-                              &aux (resultp (neq translate 'sb-bignum:%bignum-set)))
+                              &aux (resultp (not (memq translate '(sb-bignum:%bignum-set
+                                                                   data-vector-set)))))
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
@@ -441,11 +442,9 @@
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg unsigned-reg immediate))
-            (value :scs ,scs :target result))
+            (value :scs ,scs))
      (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
-     (:results (result :scs ,scs))
-     (:result-types ,el-type)
      (:generator 5
        ,@(multiple-value-bind (op shift)
              (ecase size
@@ -473,8 +472,7 @@
                                              (asr index (- shift))
                                              (lsl index shift)))
                     (inst ,op
-                          ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))
-       (move result value))))
+                          ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))))))))
 
 (defun load-inline-constant (dst value &optional lip)
   (destructuring-bind (size . label) (register-inline-constant value)

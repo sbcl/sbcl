@@ -245,15 +245,15 @@
                                 #+x86-64
                                 ,(if (eq ptype 'simple-bit-vector) ; no "-C" setter exists
                                      `(vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype)
-                                           node block result index tn 0 tmp)
+                                           node block result index tn 0)
                                      `(vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C")
-                                           node block result tn index 0 tmp))
+                                           node block result tn index 0))
                                 #+x86
                                 (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype)
-                                     node block result index tn 0 tmp)
+                                     node block result index tn 0)
                                 #-(or x86 x86-64)
                                 (vop ,(symbolicate "DATA-VECTOR-SET/" ptype)
-                                     node block result index tn tmp))))
+                                     node block result index tn))))
                           (remove nil sb-vm:*specialized-array-element-type-properties*
                                   :key #'sb-vm:saetp-specifier)))))
                (frob)))

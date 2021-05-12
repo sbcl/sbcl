@@ -802,10 +802,7 @@ of specialized arrays is supported."
                                        (declare (optimize (speed 1)
                                                           (safety 1)))
                                      (the* (,type :context :aref) new-value)))
-                  ;; For specialized arrays, the return from
-                  ;; data-vector-set would have to be reboxed to be a
-                  ;; (Lisp) return value; instead, we use the
-                  ;; already-boxed value as the return.
+                  ;; Low-level setters return no value
                   new-value)))
            (define-reffers (symbol deffer check-form slow-path)
              `(progn

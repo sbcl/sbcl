@@ -347,12 +347,10 @@
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:info offset)
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement ,lowtag n-word-bytes ,offset)) ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 4                    ; was 5
          (sc-case index
            (immediate
@@ -365,8 +363,7 @@
             (inst mov (make-ea :dword :base object :index index
                                :disp (- (* (+ ,offset offset)
                                            n-word-bytes) ,lowtag))
-                  value)))
-        (move result value)))))
+                  value)))))))
 
 ;;; Helper to hide the fact that thread access on Windows needs one more
 ;;; instruction, needs the FS prefix in that instruction _instead_ of

@@ -265,7 +265,8 @@ and
          (loadw value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate
-                              &aux (resultp (neq translate 'sb-bignum:%bignum-set)))
+                              &aux (resultp (not (memq translate '(sb-bignum:%bignum-set
+                                                                   data-vector-set)))))
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
@@ -293,7 +294,7 @@ and
        (:arg-types ,type
          (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
          ,eltype)
-       ,@(when resultp '((:results (result :scs ,scs)) (:result-types ,eltype)))
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 1
          (storew value object (+ ,offset index) ,lowtag)
          ,@(when resultp '((move result value)))))))
@@ -352,11 +353,9 @@ and
                 (index :scs (any-reg))
                 (value :scs ,scs))
          (:arg-types ,type positive-fixnum ,eltype)
-         (:results (result :scs ,scs))
          (:temporary (:scs (interior-reg)) lip)
          ,@(unless (zerop shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
-         (:result-types ,eltype)
          (:generator 5
            ,@(cond ((zerop shift)
                     '((inst add lip object index)))
@@ -366,25 +365,21 @@ and
                            `(inst slli temp index ,shift))
                       (inst add lip object temp))))
            (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
-                 value lip (- (* ,offset n-word-bytes) ,lowtag))
-           (move result value)))
+                 value lip (- (* ,offset n-word-bytes) ,lowtag))))
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs))
          (:info index)
          (:arg-types ,type
            (:constant (load/store-index ,(eval size) ,(eval lowtag) ,(eval offset)))
            ,eltype)
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
          (:generator 4
            (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
                  value object
-                 (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))
-           (move result value))))))
+                 (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag)))))))
 
 (defmacro define-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
@@ -426,7 +421,8 @@ and
 (defmacro define-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits 1)
-                   (- word-shift n-fixnum-tag-bits))))
+                   (- word-shift n-fixnum-tag-bits)))
+        (resultp (neq translate 'data-vector-set)))
     `(progn
        (define-vop (,name)
          (:note ,note)
@@ -434,13 +430,12 @@ and
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs ,@(when resultp '(:target result))))
          (:arg-types ,type tagged-num ,eltype)
          (:temporary (:scs (interior-reg)) lip)
          ,@(unless (zerop shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
+         ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
          (:generator 5
            ,@(cond ((zerop shift)
                     `((inst add lip object index)))
@@ -448,24 +443,23 @@ and
                     `((inst slli temp index ,shift)
                       (inst add lip object temp))))
            (inst fstore ,format value lip (- (* ,offset n-word-bytes) ,lowtag))
-           (unless (location= result value)
-             (inst fmove ,format result value))))
+           ,@(when resultp
+               `((unless (location= result value) (inst fmove ,format result value))))))
        (define-vop (,(symbolicate name "-C"))
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs ,@(when resultp '(:target result))))
          (:info index)
          (:arg-types ,type
            (:constant (load/store-index ,(if arrayp size n-word-bytes) ,(eval lowtag) ,(eval offset)))
            ,eltype)
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
+         ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
          (:generator 4
            (inst fstore ,format value object (- (+ (* ,offset n-word-bytes) (* index ,(if arrayp size n-word-bytes))) ,lowtag))
-           (unless (location= result value)
-             (inst fmove ,format result value)))))))
+           ,@(when resultp
+               `((unless (location= result value) (inst fmove ,format result value)))))))))
 
 ;; FIXME: constant arg VOPs missing.
 (defmacro define-complex-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
@@ -504,20 +498,20 @@ and
 (defmacro define-complex-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits)
-                   (- word-shift n-fixnum-tag-bits))))
+                   (- word-shift n-fixnum-tag-bits)))
+        (resultp (neq translate 'data-vector-set)))
     `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
        ,@(unless (zerop shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 6
          ,@(cond ((zerop shift)
                   `((inst add lip object index)))
@@ -534,7 +528,7 @@ and
                   (inst fstore ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
                 (let ((imag-tn (complex-reg-imag-tn ,format value)))
                   (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
-         (move-complex ,format result value)))))
+         ,@(when resultp `((move-complex ,format result value)))))))
 
 (defmacro define-full-casser (name type offset lowtag scs eltype &optional translate)
   `(define-vop (,name)

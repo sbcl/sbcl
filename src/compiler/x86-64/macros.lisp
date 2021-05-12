@@ -398,26 +398,24 @@
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:info offset)
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement other-pointer-lowtag
                                                      n-word-bytes
                                                      vector-data-offset))
                    ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 4                    ; was 5
          (gen-cell-set
                    (ea (- (* (+ ,offset offset) n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                   value result)))
+                   value nil)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:info index offset)
        (:arg-types ,type
                    (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
@@ -426,11 +424,9 @@
                                                      n-word-bytes
                                                      vector-data-offset))
                    ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 3                    ; was 5
          (gen-cell-set
                    (ea (- (* (+ ,offset index offset) n-word-bytes) ,lowtag)
                        object)
-                   value result)))))
+                   value nil)))))
 

@@ -263,14 +263,18 @@
     (if (array-type-p ctype)
         ;; the other transform will kick in, so that's OK
         (give-up-ir1-transform)
+        ;; HAIRY-DATA-VECTOR-SET returns a value but DATA-VECTOR-SET does not,
+        ;; so explicitly return the NEW-VALUE
         `(typecase string
            ((simple-array character (*))
-            (data-vector-set string index (the* (character :context :aref) new-value)))
+            (let ((c (the* (character :context :aref) new-value)))
+              (data-vector-set string index c)
+              c))
            #+sb-unicode
            ((simple-array base-char (*))
-            (data-vector-set string index (the* (base-char :context :aref
-                                                           :silent-conflict t)
-                                                new-value)))))))
+            (let ((c (the* (base-char :context :aref :silent-conflict t) new-value)))
+              (data-vector-set string index c)
+              c))))))
 
 ;;; This and the corresponding -REF transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
@@ -293,10 +297,11 @@
          (declare (type (simple-array ,element-type-specifier 1) array)
                   (type ,element-type-specifier new-value))
          ,(if (type= element-ctype declared-element-ctype)
-              '(data-vector-set array index new-value)
-              (truly-the-unwild declared-element-ctype
-                 `(data-vector-set array index
-                   ,(the-unwild declared-element-ctype 'new-value))))))))
+              '(progn (data-vector-set array index new-value)
+                      new-value)
+              `(progn (data-vector-set array index
+                       ,(the-unwild declared-element-ctype 'new-value))
+                      ,(truly-the-unwild declared-element-ctype 'new-value)))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.

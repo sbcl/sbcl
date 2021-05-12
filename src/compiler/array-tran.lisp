@@ -256,12 +256,8 @@
                 (assert-new-value-type new-value array))))
   (define hairy-data-vector-set)
   (define hairy-data-vector-set/check-bounds)
-  (define data-vector-set))
-
-#+(or x86 x86-64)
-(defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
-  (declare (ignore index offset))
-  (assert-new-value-type new-value array))
+  ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
+  )
 
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
@@ -1715,17 +1711,14 @@
   (let ((elt-type (let ((var (and (symbolp vector) (lexenv-find vector vars))))
                     (when (lambda-var-p var)
                       (declared-array-element-type (lambda-var-type var))))))
-    (with-unique-names (n-vector)
-      `(let ((,n-vector ,vector))
-         ,(truly-the-unwild elt-type
-                             `(data-vector-set
-                               (the simple-vector
-                                    (with-annotations
-                                        (,(make-lvar-modified-annotation :caller
-                                                                         '(setf svref)))
-                                      ,n-vector))
-                               (check-bound ,n-vector (length ,n-vector) ,index)
-                               ,(the-unwild elt-type value)))))))
+    `(let* ((%sv (the simple-vector
+                      (with-annotations
+                          (,(make-lvar-modified-annotation :caller '(setf svref)))
+                        ,vector)))
+            (%indx (check-bound %sv (length %sv) ,index))
+            (%val ,(the-unwild elt-type value)))
+       (data-vector-set %sv %indx %val)
+       %val)))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call

@@ -277,10 +277,8 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg) :target shift)
-                (value :scs (unsigned-reg immediate) :target result))
+                (value :scs (unsigned-reg immediate)))
          (:arg-types ,type positive-fixnum positive-fixnum)
-         (:results (result :scs (unsigned-reg)))
-         (:result-types positive-fixnum)
          (:temporary (:scs (interior-reg)) lip)
          (:temporary (:scs (non-descriptor-reg)) temp old)
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
@@ -315,13 +313,7 @@
            ;; Write the altered word back to the array.
            (inst str old (@ lip
                             (- (* vector-data-offset n-word-bytes)
-                               other-pointer-lowtag)))
-           ;; And present the result properly.
-           (sc-case value
-             (immediate
-              (inst mov result (tn-value value)))
-             (unsigned-reg
-              (move result value)))))))))
+                               other-pointer-lowtag)))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
@@ -349,18 +341,14 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (single-reg) :target result))
+         (value :scs (single-reg)))
   (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 5
     (inst lsl offset index (1- (- word-shift n-fixnum-tag-bits)))
     (inst add offset offset (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag))
-    (inst str value (@ object offset))
-    (unless (location= result value)
-      (inst fmov result value))))
+    (inst str value (@ object offset))))
 
 (define-vop (data-vector-ref/simple-array-double-float)
   (:note "inline array access")
@@ -384,18 +372,14 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (double-reg) :target result))
+         (value :scs (double-reg)))
   (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 20
     (inst lsl offset index (- word-shift n-fixnum-tag-bits))
     (inst add offset offset (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag))
-    (inst str value (@ object offset))
-    (unless (location= result value)
-      (inst fmov result value))))
+    (inst str value (@ object offset))))
 
 ;;; Complex float arrays.
 
@@ -421,19 +405,15 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to :result)
          (index :scs (any-reg))
-         (value :scs (complex-single-reg) :target result))
+         (value :scs (complex-single-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum
               complex-single-float)
-  (:results (result :scs (complex-single-reg)))
-  (:result-types complex-single-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 5
     (inst lsl offset index (- word-shift n-fixnum-tag-bits))
     (inst add offset offset (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag))
-    (inst str value (@ object offset))
-    (unless (location= result value)
-      (inst fmov result value))))
+    (inst str value (@ object offset))))
 
 (define-vop (data-vector-ref/simple-array-complex-double-float)
   (:note "inline array access")
@@ -457,19 +437,15 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to :result)
          (index :scs (any-reg))
-         (value :scs (complex-double-reg) :target result))
+         (value :scs (complex-double-reg)))
   (:arg-types simple-array-complex-double-float positive-fixnum
               complex-double-float)
-  (:results (result :scs (complex-double-reg)))
-  (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 5
     (inst lsl offset index (1+ (- word-shift n-fixnum-tag-bits)))
     (inst add offset offset (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag))
-    (inst str value (@ object offset))
-    (unless (location= result value)
-      (inst s-mov result value))))
+    (inst str value (@ object offset))))
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
