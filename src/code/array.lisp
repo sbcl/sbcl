@@ -440,6 +440,14 @@
         (setf (%array-displaced-from old-data)
               (purge (%array-displaced-from old-data)))))))
 
+(defmacro populate-dimensions (header list-or-index rank)
+  `(if (listp ,list-or-index)
+       (let ((dims ,list-or-index))
+         (dotimes (axis ,rank)
+           (declare ((integer 0 ,array-rank-limit) axis))
+           (%set-array-dimension ,header axis (pop dims))))
+       (%set-array-dimension ,header 0 ,list-or-index)))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -528,11 +536,7 @@
                       (%save-displaced-array-backpointer array data)))
                    (t
                     (setf (%array-displaced-p array) nil)))
-             (if (listp dimensions)
-                 (let ((dims dimensions)) ; avoid "prevents use of assertion"
-                   (dotimes (axis array-rank)
-                     (setf (%array-dimension array axis) (pop dims))))
-                 (setf (%array-dimension array 0) dimension-0))
+             (populate-dimensions array dimensions array-rank)
              array)))))
 
 (defun make-array (dimensions &rest args
@@ -1192,8 +1196,8 @@ of specialized arrays is supported."
               (%array-available-elements vector) new-length
               (%array-fill-pointer vector) fill-pointer
               (%array-displacement vector) 0
-              (%array-dimension vector 0) new-length
               (%array-displaced-p vector) nil)
+        (%set-array-dimension vector 0 new-length)
         vector))))
 
 (defun vector-push-extend (new-element vector &optional min-extension)
@@ -1492,7 +1496,7 @@ of specialized arrays is supported."
                              (%array-available-elements from) 0
                              (%array-displaced-p from) (array-dimensions array))
                        (dotimes (i (%array-rank from))
-                         (setf (%array-dimension from i) 0)))))))))
+                         (%set-array-dimension from i 0)))))))))
     (if newp
         (setf (%array-displaced-from array) nil)
         (%walk-displaced-array-backpointers array length))
@@ -1507,11 +1511,7 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) length)
            (reset-header-bits array sb-vm:+array-fill-pointer-p+)))
     (setf (%array-displacement array) displacement)
-    (if (listp dimensions)
-        (dotimes (axis (array-rank array))
-          (declare (type index axis))
-          (setf (%array-dimension array axis) (pop dimensions)))
-        (setf (%array-dimension array 0) dimensions))
+    (populate-dimensions array dimensions (array-rank array))
     (setf (%array-displaced-p array) displacedp)
     array))
 

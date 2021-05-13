@@ -166,7 +166,6 @@
 (defsetf svref %svset)
 (defsetf char %charset)
 (defsetf schar %scharset)
-(defsetf %array-dimension %set-array-dimension)
 (defsetf %vector-raw-bits %set-vector-raw-bits)
 (defsetf symbol-value set)
 (defsetf symbol-global-value set-symbol-global-value)

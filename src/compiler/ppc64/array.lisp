@@ -53,7 +53,7 @@
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
-(define-vop (%set-array-dimension word-index-set)
+(define-vop (%set-array-dimension word-index-set-nr)
   (:translate %set-array-dimension)
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))

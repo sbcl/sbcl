@@ -334,6 +334,8 @@
          (inst mov value (ea (- (* (+ ,offset index offset) n-word-bytes) ,lowtag)
                              object))))))
 
+;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO %INSTANCE-SET
+;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
   (let ((want-both-variants
          (cond ((symbolp name) t)
@@ -341,7 +343,8 @@
                 (aver (typep name '(cons symbol (cons (eql :no-constant-variant) null))))
                 (setq name (car name))
                 nil)))
-        (resultp (if (eq translate 'sb-bignum:%bignum-set) nil 'result)))
+        (resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension))
+                     nil 'result)))
   `(progn
      (define-vop (,name)
        ,@(when translate

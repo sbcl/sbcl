@@ -176,7 +176,7 @@
 
 (defknown %array-dimension (array index) index
   (flushable))
-(defknown %set-array-dimension (array index index) index
+(defknown %set-array-dimension (array index index) (values)
   ())
 (defknown %array-rank (array) array-rank
   (flushable))

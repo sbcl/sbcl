@@ -315,7 +315,7 @@
                                               ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  (let ((resultp (neq translate 'sb-bignum:%bignum-set)))
+  (let ((resultp (not (memq translate '(sb-bignum:%bignum-set %set-array-dimension)))))
     `(define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
