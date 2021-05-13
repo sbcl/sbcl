@@ -337,18 +337,11 @@
 ;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO %INSTANCE-SET
 ;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  (let ((want-both-variants
-         (cond ((symbolp name) t)
-               (t
-                (aver (typep name '(cons symbol (cons (eql :no-constant-variant) null))))
-                (setq name (car name))
-                nil)))
-        (resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension))
+  (let ((resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension))
                      nil 'result)))
   `(progn
      (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
+       ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
@@ -356,42 +349,28 @@
        (:arg-types ,type tagged-num ,el-type)
        ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:vop-var vop)
-       (:generator 4                    ; was 5
-         ,@(if (eq name 'code-header-set)
-               '((inst push value)
-                 ;; the asm routine wants a natural machine integer as the index,
-                 ;; but this macro declares the index arg as 'any-reg', so it has a tag bit,
-                 ;; so we'll push the arg and then shift right as the next instruction.
-                 (inst push index)
-                 (inst shr :qword (ea rsp-tn) n-fixnum-tag-bits)
-                 (inst push object)
-                 (invoke-asm-routine 'call 'code-header-set vop)
-                 (move result value))
-               `((gen-cell-set
-                   (ea (- (* ,offset n-word-bytes) ,lowtag)
-                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                   value ,resultp vop
-                   ,(eq name 'set-funcallable-instance-info))))))
-     ,@(when want-both-variants
-         `((define-vop (,(symbolicate name "-C"))
-            ,@(when translate
-                `((:translate ,translate)))
-            (:policy :fast-safe)
-            (:args (object :scs (descriptor-reg))
-                   (value :scs ,scs ,@(when resultp '(:target result))))
-            (:info index)
-            (:arg-types ,type
-                        (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
-                                                     ,(eval offset)))
-                        ,el-type)
-             ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
-            (:vop-var vop)
-            (:generator 3                    ; was 5
-              (gen-cell-set
-                   (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
-                       object)
-                   value ,resultp vop
-                   ,(eq name 'set-funcallable-instance-info)))))))))
+       (:generator 4
+         (gen-cell-set (ea (- (* ,offset n-word-bytes) ,lowtag)
+                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))
+                       value ,resultp vop
+                       ,(eq name 'set-funcallable-instance-info))))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (value :scs ,scs ,@(when resultp '(:target result))))
+       (:info index)
+       (:arg-types ,type
+                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                ,(symbol-value offset)))
+                   ,el-type)
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
+       (:vop-var vop)
+       (:generator 3
+         (gen-cell-set (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
+                           object)
+                       value ,resultp vop
+                       ,(eq name 'set-funcallable-instance-info)))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
   `(progn

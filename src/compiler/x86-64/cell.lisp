@@ -771,13 +771,21 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (any-reg descriptor-reg) * code-header-ref)
 
-;; CODE-HEADER-SET of a constant index is seldom used, so we specifically
-;; ask not to get it defined. (It's not impossible to use, it's just not
-;; helpful to have - either you want to access CODE-FIXUPS or CODE-DEBUG-INFO,
-;; which do things their own way, or you want a variable index.)
-(define-full-setter (code-header-set :no-constant-variant)
-  * 0 other-pointer-lowtag
-  (any-reg descriptor-reg) * code-header-set)
+(define-vop ()
+  (:translate code-header-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg))
+         (value :scs (any-reg descriptor-reg) :target result))
+   (:arg-types * unsigned-num *)
+   (:results (result :scs (any-reg descriptor-reg)))
+   (:vop-var vop)
+   (:generator 10
+     (inst push value)
+     (inst push index)
+     (inst push object)
+     (invoke-asm-routine 'call 'code-header-set vop)
+     (move result value)))
 
 ;;;; raw instance slot accessors
 
