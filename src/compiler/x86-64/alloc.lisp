@@ -376,7 +376,7 @@
 
 (defun make-shadow-bits (type length rax rcx rdi stackp exit-label)
   (declare (ignore stackp))
-  (inst xor rax rax)
+  (zeroize rax)
   ;; If we're not sure at compile-time what type the vector is, then generate
   ;; code to check what it is. Can this actually happen? Not on the stack,
   ;; but yes on the heap.

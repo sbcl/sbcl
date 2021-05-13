@@ -603,7 +603,7 @@
           (inst cmp y 0))
       (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
-    (inst xor edx edx)
+    (zeroize edx)
     (inst div eax y)
     (move quo eax)
     (move rem edx)))
@@ -626,7 +626,7 @@
   (:save-p :compute-only)
   (:generator 32
     (move eax x)
-    (inst xor edx edx)
+    (zeroize edx)
     (inst mov y-arg y)
     (inst div eax y-arg)
     (move quo eax)
