@@ -165,15 +165,12 @@
                 (starts-with-p string "/proc/self")
                 ;; Temp files created by test-util's scratch file routine
                 (starts-with-p (stem-of string) *scratch-file-prefix*)
-                ;; These are likely candidates for scratch files'
-                ;; directories. However, if we're testing these cases,
-                ;; FILENAME wasn't created using SCRATCH-FILE-NAME,
-                ;; and might be bypassing the value of TMPDIR; so the
-                ;; test that produces FILENAME should be double-checked.
-                (and (or (starts-with-p string "/tmp/")
-                         (starts-with-p string "/var/tmp/")
-                         (starts-with-p string "/private/var/folders/"))
-                     (warn "ignoring dubious temporary file ~A" filename))
+                ;; These have been accepted as okay for a while.  Test
+                ;; files should never explicitly create files in these
+                ;; directories, but should always use a scratch file.
+                (starts-with-p string "/tmp/")
+                (starts-with-p string "/var/tmp/")
+                (starts-with-p string "/private/var/folders/")
                 (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
                                              "a.txt" "b.lisp"
