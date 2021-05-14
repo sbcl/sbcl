@@ -36,12 +36,11 @@
           do (setf frame (sb-di::frame-down frame)))
     (assert frame)
     (assert (sb-debug::frame-has-debug-tag-p frame))
-    (let* ((call-list (print (sb-debug::frame-call-as-list frame)))
+    (let* ((call-list (sb-debug::frame-call-as-list frame))
            (fun (fdefinition (car call-list))))
       (sb-debug::unwind-to-frame-and-call frame
                                           (lambda ()
-                                            (print "restart")
-                                            (apply (print fun) (print (cdr call-list))))))))
+                                            (apply fun (cdr call-list)))))))
 
 (defvar *foo*)
 (defvar *a*)
