@@ -280,25 +280,25 @@
 ;;; MAKE-STRING-OUTPUT-STREAM and WITH-OUTPUT-TO-STRING take an
 ;;; :ELEMENT-TYPE keyword argument
 (with-test (:name (make-string-output-stream with-output-to-string :element-type))
-  (macrolet ((frob (element-type-form)
+  (macrolet ((frob (element-type-form expect &optional (expect2 expect))
                `(progn
                   (let ((s (with-output-to-string
                                (s nil ,@(when element-type-form
                                           `(:element-type ,element-type-form))))))
-                    (assert (typep s '(simple-array ,(or (eval element-type-form)
-                                                         'character)
-                                       (0)))))
-                  (get-output-stream-string
-                   (make-string-output-stream
-                    ,@(when element-type-form
-                        `(:element-type ,element-type-form)))))))
+                    (assert (typep s '(simple-array ,expect (0)))))
+                  (let ((s (get-output-stream-string
+                            (make-string-output-stream
+                             ,@(when element-type-form
+                                 `(:element-type ,element-type-form))))))
+                    (assert (typep s '(simple-array ,expect2 (0))))))))
     ;; If you pass NIL as element-type, note that there seems to be no requirement
     ;; to produce a stream that can *accept* only characters of that type.
     ;; We produce a CHARACTER-STRING-OUTPUT-STREAM if you do something so pointless.
-    (frob nil)
-    (frob 'character)
-    (frob 'base-char)
-    (frob 'nil)))
+    (frob nil character)
+    (frob 'character character)
+    (frob 'base-char base-char)
+    ;; I literally do not care why these results differ.
+    (frob 'nil base-char character)))
 
 (with-test (:name (make-string-output-stream :element-type :bogosity))
   (assert-error (make-string-output-stream :element-type 'real)))

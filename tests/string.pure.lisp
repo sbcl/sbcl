@@ -125,7 +125,11 @@ claim that any particular result from these edge cases constitutes a bug.
                        :allow-failure t :allow-warnings t)
     (assert failure-p)
     (assert (= 1 (length warnings)))
-    (assert-error (funcall fun) type-error)))
+    ;; It's not clear why this function should be expected to return a TYPE-ERROR.
+    ;; There is no object created which is of the wrong type,
+    ;; and the type of the legal value of ELEMENT-TYPE isn't really in question
+    ;; nor is the best way to describe what you can't pass.
+    (assert-error (funcall fun) #|type-error|#)))
 
 ;; MISC.574
 (with-test (:name (string<= base-string :optimized))
@@ -258,3 +262,19 @@ claim that any particular result from these edge cases constitutes a bug.
   (let ((result (funcall (checked-compile `(lambda (x) (write-to-string x))) 33d0)))
     (assert (equal result "33.0d0"))
     (assert (typep result 'simple-base-string))))
+
+(with-test (:name :make-string-fail-early)
+  ;; This used to get "Heap exhausted"
+  (assert-error
+   (funcall (opaque-identity 'make-string) (truncate array-total-size-limit 2)
+            :element-type '(unsigned-byte 8))))
+
+(with-test (:name :make-string-pedantic-initial-element)
+  ;; This used to be silently accepted (at least in the interpreter)
+  (assert-error
+   (funcall (opaque-identity 'make-string) 10
+            :element-type '(member #\a #\b #\c) :initial-element nil))
+  ;; As was this
+  (assert-error
+   (funcall (opaque-identity 'make-string) 10
+            :element-type '(member #\a #\b #\c) :initial-element #\x)))

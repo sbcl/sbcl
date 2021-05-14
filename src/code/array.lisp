@@ -349,6 +349,7 @@
 
 (defconstant-eqx %%simple-array-n-bits-shifts%%
     #.(let ((a (sb-xc:make-array (1+ widetag-mask) :initial-element -1 ; "illegal"
+                                 :retain-specialization-for-after-xc-core t ; what a kludge!
                                  :element-type '(signed-byte 8))))
         (dovector (saetp *specialized-array-element-type-properties* a)
           (setf (aref a (saetp-typecode saetp)) (saetp-n-bits-shift saetp))))

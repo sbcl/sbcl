@@ -378,16 +378,24 @@
 (define-source-transform vector (&rest elements)
   `(make-array ,(length elements) :initial-contents (list ,@elements)))
 
-;;; Just convert it into a MAKE-ARRAY.
+;;; Convert it into a MAKE-ARRAY if the element-type is known at compile-time.
+;;; Otherwise, don't. This prevents allocating memory for a million element
+;;; array of things that are not characters, and then signaling an error.
 (deftransform make-string ((length &key element-type initial-element))
-  ;; There's a minor edge case that is debatable: if you specify a type that is not
-  ;; spelled 'NIL, but equates to the empty type, then we should still return a
-  ;; string. MAKE-ARRAY won't do that. The safe thing to do would be to abort this
-  ;; transform if we don't see a constant type that is known not to be empty.
-  ;; But it's unnecessary hair-splitting: the old behavior was to produce a string
-  ;; that for all intents and purposes was unusable; the new behavior is to similarly
-  ;; produce an unusable object, but signal a TYPE-ERROR.
-  ;; The lisp hackers I surveyed would rather see the error sooner than later.
+  (let ((elt-ctype
+         (cond ((not element-type) (specifier-type 'character))
+               ((constant-lvar-p element-type)
+                (ir1-transform-specifier-type (lvar-value element-type))))))
+    (when (or (not elt-ctype)
+              (eq elt-ctype *empty-type*) ; silly, don't do it
+              (contains-unknown-type-p elt-ctype))
+      (give-up-ir1-transform))
+    (multiple-value-bind (subtypep certainp)
+        (csubtypep elt-ctype (specifier-type 'character))
+      (if (not certainp) (give-up-ir1-transform)) ; could be valid, don't know
+      (if (not subtypep)
+          (abort-ir1-transform "~S is not a valid :ELEMENT-TYPE for MAKE-STRING"
+                               (lvar-value element-type)))))
   `(the simple-string (make-array (the index length)
                        :element-type (or element-type 'character)
                        ,@(when initial-element

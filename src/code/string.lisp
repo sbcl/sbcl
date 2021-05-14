@@ -435,24 +435,45 @@
 (defun two-arg-string-not-greaterp (string1 string2)
   (string-not-greaterp* string1 string2 0 nil 0 nil))
 
-(defun make-string (count &key
-                    (element-type 'character)
-                    ((:initial-element fill-char)))
+(defun make-string (count &key (element-type 'character)
+                               (initial-element nil iep))
   "Given a character count and an optional fill character, makes and returns a
 new string COUNT long filled with the fill character."
   (declare (index count))
   (declare (explicit-check))
-  ;; FIXME: while this is a correct implementation relying on an IR1 transform,
-  ;; it would be better if in the following example (assuming NOTINLINE):
-  ;;  (MAKE-STRING 1000 :ELEMENT-TYPE 'BIT :INITIAL-element #\a)
-  ;; we could report that "BIT is not a subtype of CHARACTER"
-  ;; instead of "#\a is not of type BIT". Additionally, in this case:
-  ;;  (MAKE-STRING 200000000 :ELEMENT-TYPE 'WORD :INITIAL-ELEMENT #\a)
-  ;; the error reported is heap exhaustion rather than type mismatch.
-  (if fill-char
-      (make-string count :element-type element-type
-                         :initial-element (the character fill-char))
-      (make-string count :element-type element-type)))
+  (cond ((eq element-type 'character)
+         (let ((c (if iep (the character initial-element)))
+               (s (make-string count :element-type 'character)))
+           (when c (fill s c))
+           s))
+         ((or (eq element-type 'base-char)
+              (eq element-type 'standard-char)
+              ;; What's the "most specialized" thing possible that's still a string?
+              ;; Well clearly it's a string whose elements have the smallest domain.
+              ;; So that would be 8 bits per character, not 32 bits per character.
+              (eq element-type nil))
+          (let ((c (if iep (the base-char initial-element)))
+                (s (make-string count :element-type 'base-char)))
+            (when c (fill s c))
+            s))
+         (t
+          (multiple-value-bind (widetag n-bits-shift)
+              (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+            (unless (or #+sb-unicode (= widetag sb-vm:simple-character-string-widetag)
+                        (= widetag sb-vm:simple-base-string-widetag))
+              (error "~S is not a valid :ELEMENT-TYPE for MAKE-STRING" element-type))
+            ;; If you give a ridiculous type such as (member #\EN_SPACE) as your
+            ;; :ELEMENT-TYPE, then you get what you deserve - slow type checking.
+            (when (and iep (not (typep initial-element element-type)))
+              (error 'simple-type-error
+                     :datum initial-element
+                     :expected-type element-type
+                     :format-control "~S is not a ~S"
+                     :format-arguments (list initial-element element-type)))
+            (let ((string
+                   (sb-vm::allocate-vector-with-widetag widetag count n-bits-shift)))
+              (when initial-element (fill string initial-element))
+              string)))))
 
 (declaim (maybe-inline nstring-upcase))
 (defun nstring-upcase (string &key (start 0) end)
