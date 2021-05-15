@@ -344,16 +344,17 @@
   (let ((type (two-arg-derive-type x y
                                    #'logand-derive-type-aux
                                    #'logand)))
-    (multiple-value-bind (typep definitely)
-        (ctypep 0 type)
-      (cond ((and (not typep) definitely)
-             t)
-            ((type= type (specifier-type '(eql 0)))
-             nil)
-            ((neq :default (combination-implementation-style node))
-             (give-up-ir1-transform))
-            (t
-             `(not (zerop (logand x y))))))))
+    (when type
+     (multiple-value-bind (typep definitely)
+         (ctypep 0 type)
+       (cond ((and (not typep) definitely)
+              t)
+             ((type= type (specifier-type '(eql 0)))
+              nil)
+             ((neq :default (combination-implementation-style node))
+              (give-up-ir1-transform))
+             (t
+              `(not (zerop (logand x y)))))))))
 
 (deftransform logbitp ((index integer))
   (let ((integer-type (lvar-type integer))

@@ -3197,3 +3197,11 @@
        (dotimes (i 2 a)
          (count i #(61) :test '>=))))
    ((1 2 3 4) 1985)))
+
+(with-test (:name :logtest-derive-type-nil)
+  (checked-compile-and-assert
+   (:allow-warnings t)
+   `(lambda (c)
+      (block nil
+        (evenp (the integer (ignore-errors (return c))))))
+   ((1) 1)))
