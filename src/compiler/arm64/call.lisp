@@ -155,14 +155,13 @@
   (:info nargs)
   (:results (res :scs (any-reg)))
   (:generator 2
-    ;; Unlike most other backends, we store the "OCFP" at frame
-    ;; allocation time rather than at function-entry time, largely due
-    ;; to a lack of usable registers.
-    ;; Our minimum caller frame size is two words, one for the frame
-              ;; link and one for the LRA.
     (move res csp-tn)
-    (inst add csp-tn csp-tn (add-sub-immediate (* (max 2 nargs) n-word-bytes)))
-    (storew cfp-tn res ocfp-save-offset)))
+        (let ((size (add-sub-immediate (* (max 2 nargs) n-word-bytes))))
+      (cond ((typep size '(signed-byte 9))
+             (inst str cfp-tn (@ csp-tn size :post-index)))
+            (t
+             (inst add csp-tn csp-tn size)
+             (storew cfp-tn res ocfp-save-offset))))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  VALUES is the head of the TN-REF
@@ -1036,11 +1035,11 @@
 
 ;;; Return a single value using the unknown-values convention.
 (define-vop (return-single)
-  (:args (old-fp :scs (any-reg) :to :eval)
+  (:args (old-fp)
          (return-pc)
          (value))
   (:temporary (:scs (interior-reg)) lip)
-  (:ignore value)
+  (:ignore value old-fp return-pc)
   (:vop-var vop)
   (:generator 6
     ;; Clear the number stack.
@@ -1048,11 +1047,11 @@
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (maybe-load-stack-tn lip return-pc)
-    ;; Clear the control stack, and restore the frame pointer.
+    ;; Interrupts leave two words of space for the new frame, so it's safe
+    ;; to deallocate the frame before accessing OCFP/LR.
     (move csp-tn cfp-tn)
-    (move cfp-tn old-fp)
-
+    (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
+    ;; Clear the control stack, and restore the frame pointer.
 
     ;; Out of here.
     (lisp-return lip :single-value)))
@@ -1071,10 +1070,10 @@
 ;;; current frame.)
 (define-vop (return)
   (:args
-   (old-fp :scs (any-reg))
+   (old-fp)
    (return-pc)
    (values :more t))
-  (:ignore values)
+  (:ignore values old-fp return-pc)
   (:info nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
   (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
@@ -1090,19 +1089,18 @@
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (maybe-load-stack-tn lip return-pc)
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
-           (move cfp-tn old-fp)
+           (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
            ;; Out of here.
            (lisp-return lip :single-value))
           (t
            ;; Establish the values pointer.
            (move val-ptr cfp-tn)
            ;; restore the frame pointer and clear as much of the control
-           ;; stack as possible.
-           (move cfp-tn old-fp)
+           ;; stack as possible.           
+           (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
            (inst add csp-tn val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            ;; Establish the values count.
            (load-immediate-word nargs (fixnumize nvals))
