@@ -38,7 +38,7 @@
            (inst pxor y y))
           ((= p0 p1 p2 p3 (ldb (byte 64 0) -1))
            ;; don't think this is recognized as dependency breaking...
-           (inst vpcmpeqd y y))
+           (inst vpcmpeqd y y y))
           (t
            (inst vmovdqu y (register-inline-constant x))))))
 
