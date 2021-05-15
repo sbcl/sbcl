@@ -3476,7 +3476,6 @@ void pin_stack(struct thread* th) {
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
         maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
-        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR2));
     }
 
 }

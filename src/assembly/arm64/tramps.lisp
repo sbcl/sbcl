@@ -129,9 +129,9 @@
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error)
                     (list lexenv-tn))
   (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-
-  (inst br lr2-tn))
+  (inst add lr-tn fun (+ (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)
+                          4))
+  (inst br lr-tn))
 
 (define-assembly-routine
     (xundefined-alien-tramp (:return-style :none)
@@ -167,10 +167,12 @@
     (inst dword nil-value))
 
   CLOSURE-TRAMP
+  (inst str lr-tn (@ cfp-tn 8))
   (loadw lexenv-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
   (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-  (inst br lr2-tn))
+  (inst add lr-tn fun (+ (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)
+                          4))
+  (inst br lr-tn))
 
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
@@ -183,8 +185,9 @@
   (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
-
+  (inst str lr-tn (@ cfp-tn 8))
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add lr2-tn fun (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
-  (inst br lr2-tn))
+  (inst add lr-tn fun (+ (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)
+                          4))
+  (inst br lr-tn))

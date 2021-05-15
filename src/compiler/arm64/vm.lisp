@@ -51,41 +51,40 @@
   (defreg r5 15)
   (defreg r6 16)
   (defreg r7 17)
-  ;; Can't use it on Darwin
-  (defreg r8 18)
+  (defreg #-darwin r8 #+darwin reserved 18)
   (defreg r9 19)
 
+  (defreg #+darwin r8 #-darwin r10 20)
   #+sb-thread
-  (defreg thread 20)
+  (defreg thread 21)
   #-sb-thread
-  (defreg r10 20)
+  (defreg r11 21)
 
-  (defreg lexenv 21)
+  (defreg lexenv 22)
 
-  (defreg nargs 22)
-  (defreg nfp 23)
-  (defreg ocfp 24)
-  (defreg cfp 25)
-  (defreg csp 26)
-  (defreg tmp 27)
-  (defreg null 28)
-  (defreg lr2 29)
+  (defreg nargs 23)
+  (defreg nfp 24)
+  (defreg ocfp 25)
+  (defreg cfp 26)
+  (defreg csp 27)
+  (defreg tmp 28)
+  (defreg null 29)
   (defreg lr 30)
   (defreg nsp 31)
   (defreg zr 31)
 
   (defregset system-regs
-      null cfp nsp lr lr2)
+      null cfp nsp lr)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 #+nil r7 #-darwin r8 r9 #-sb-thread r10 lexenv)
+      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
 
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 #-darwin r8 r9 #-sb-thread r10 #+sb-thread thread lexenv)
+      r7 r8 r9 #-darwin r10 #-sb-thread r11 #+sb-thread thread lexenv)
 
   ;; registers used to pass arguments
   ;;
@@ -188,8 +187,7 @@
 
   ;; Pointers to the interior of objects.  Used only as a temporary.
   (interior-reg registers
-                :locations (#.lr-offset ;; #.r7-offset
-                                        ))
+                :locations (#.lr-offset))
 
   ;; **** Things that can go in the floating point registers.
 
@@ -243,7 +241,6 @@
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
   (defregtn lr interior-reg)
-  (defregtn lr2 interior-reg)
   #+sb-thread
   (defregtn thread interior-reg))
 

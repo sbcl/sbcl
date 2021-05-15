@@ -139,7 +139,7 @@
   ;; instances)
   (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lr2-tn))
+  (lisp-jump temp lip))
 
 ;;;; Non-local exit noise.
 

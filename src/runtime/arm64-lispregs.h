@@ -37,25 +37,31 @@
 #define reg_R5         REG(15)
 #define reg_R6         REG(16)
 #define reg_R7         REG(17)
+
+#ifdef LISP_FEATURE_DARWIN
+#define reg_R8         REG(20)
+#else
 #define reg_R8         REG(18)
+#define reg_R10         REG(20)
+#endif
+
 #define reg_R9         REG(19)
 
 #ifdef LISP_FEATURE_SB_THREAD
-#define reg_THREAD      REG(20)
+#define reg_THREAD      REG(21)
 #else
-#define reg_R10         REG(20)
+#define reg_R11         REG(21)
 #endif
-#define reg_LEXENV      REG(21)
+#define reg_LEXENV      REG(22)
 
-#define reg_NARGS       REG(22)
-#define reg_NFP         REG(23)
-#define reg_OCFP        REG(24)
-#define reg_CFP         REG(25)
-#define reg_CSP         REG(26)
-#define reg_TMP         REG(27)
-#define reg_wTMP        w27
-#define reg_NULL        REG(28)
-#define reg_wNULL       w28
-#define reg_LR2         REG(29)
+#define reg_NARGS       REG(23)
+#define reg_NFP         REG(24)
+#define reg_OCFP        REG(25)
+#define reg_CFP         REG(26)
+#define reg_CSP         REG(27)
+#define reg_TMP         REG(28)
+#define reg_wTMP        w28
+#define reg_NULL        REG(29)
+#define reg_wNULL       w29
 #define reg_LR          REG(30)
 #define reg_NSP         REG(31)

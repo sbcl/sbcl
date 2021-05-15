@@ -826,10 +826,10 @@
      (:ignore
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
       ,@(unless variable '(args))
-      ,(ecase return
-         (:fixed 'ocfp-temp)
-         (:tail 'old-fp)
-         (:unknown 'r0-temp)))
+      ,@(ecase return
+          (:fixed '(ocfp-temp))
+          (:tail '(old-fp return-pc))
+          (:unknown '(r0-temp))))
 
      ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
@@ -873,7 +873,6 @@
                           (remove nil
                                   (list ,@(if (eq return :tail)
                                               '(:load-nargs
-                                                :load-return-pc
                                                 (when cur-nfp
                                                   :frob-nfp))
                                               '(:load-nargs
@@ -907,9 +906,7 @@
                                          (storew cfp-tn new-fp ocfp-save-offset))
                                        '((load-immediate-word nargs-pass (fixnumize nargs)))))
                                 ,@(if (eq return :tail)
-                                      '((:load-return-pc
-                                         (maybe-load-stack-tn lip return-pc))
-                                        (:frob-nfp
+                                      '((:frob-nfp
                                          (inst add nsp-tn cur-nfp (add-sub-immediate
                                                                    (bytes-needed-for-non-descriptor-stack-frame)))))
                                       `((:frob-nfp
@@ -962,24 +959,28 @@
                       (if filler
                           (do-next-filler)
                           (return)))
-                     (let ((lip ,(if (eq return :tail)
-                                     'lr2-tn
-                                     'lip)))
-                       ,@(ecase named
-                           ((t)
-                            `((loadw lip name-pass fdefn-raw-addr-slot other-pointer-lowtag)))
-                           (:direct
-                            `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))))
-                           ((nil)
-                            `((inst add lip function
-                                    (- (ash simple-fun-insts-offset word-shift)
-                                       fun-pointer-lowtag)))))
+                     ,@(ecase named
+                         ((t)
+                          `((loadw lip name-pass fdefn-raw-addr-slot other-pointer-lowtag)
+                            ,(if (eq return :tail)
+                                 `(inst add lip lip 4))))
+                         (:direct
+                          `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))
+                            ,(if (eq return :tail)
+                                 `(inst add lip lip 4))))
+                         ((nil)
+                          `((inst add lip function
+                                  (+ (- (ash simple-fun-insts-offset word-shift)
+                                        fun-pointer-lowtag)
+                                     ,(if (eq return :tail)
+                                          4
+                                          0))))))
 
-                       (note-this-location vop :call-site)
+                     (note-this-location vop :call-site)
 
-                       ,(if (eq return :tail)
-                            `(inst br lip)
-                            `(inst blr lip))))
+                     ,(if (eq return :tail)
+                          `(inst br lip)
+                          `(inst blr lip)))
 
                    ,@(ecase return
                        (:fixed
@@ -1099,7 +1100,7 @@
            ;; Establish the values pointer.
            (move val-ptr cfp-tn)
            ;; restore the frame pointer and clear as much of the control
-           ;; stack as possible.           
+           ;; stack as possible.
            (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
            (inst add csp-tn val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            ;; Establish the values count.

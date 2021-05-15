@@ -164,9 +164,14 @@ GNAME(call_into_lisp):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-#ifndef LISP_FEATURE_DARWIN
         mov     reg_R8, #0
+#ifndef LISP_FEATURE_DARWIN
+        mov     reg_R10,#0
+#ifndef LISP_FEATURE_SB_THREAD
+        mov     reg_R11,#0
 #endif
+#endif
+
 
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
@@ -322,12 +327,12 @@ GNAME(call_into_c):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-#ifndef LISP_FEATURE_DARWIN
         mov     reg_R8, #0
-#endif
-        mov     reg_R9, #0
+#ifndef LISP_FEATURE_DARWIN
+        mov     reg_R10,#0
 #ifndef LISP_FEATURE_SB_THREAD
-        mov     reg_R10, #0
+        mov     reg_R11,#0
+#endif
 #endif
         mov     reg_LEXENV, #0
 

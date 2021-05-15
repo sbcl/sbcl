@@ -102,8 +102,9 @@
          (lip ,lip))
      (aver (sc-is lip interior-reg))
      (inst add lip function
-           (- (ash simple-fun-insts-offset word-shift)
-              fun-pointer-lowtag))
+           (+ (- (ash simple-fun-insts-offset word-shift)
+                 fun-pointer-lowtag)
+              4))
      (inst br lip)))
 
 (defmacro lisp-return (lip return-style)

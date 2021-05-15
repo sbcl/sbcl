@@ -279,8 +279,6 @@
 
       (move lexenv saved-function)
 
-      (loadw lip cfp-tn lra-save-offset)
       (loadw saved-function lexenv closure-fun-slot fun-pointer-lowtag)
-
-      (lisp-jump saved-function lr2-tn))))
+      (lisp-jump saved-function lip))))
 
