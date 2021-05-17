@@ -321,7 +321,7 @@
   #+immobile-code
   (let* ((fdefns-start (+ code-constants-offset
                           (* code-slots-per-simple-fun (code-n-entries code))))
-         (fdefns-count (code-n-named-calls code))
+         (fdefns-count (the index (code-n-named-calls code)))
          (replacements (make-array fdefns-count :initial-element nil))
          (ambiguous (make-array fdefns-count :initial-element 0 :element-type 'bit))
          (any-replacements)
