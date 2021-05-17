@@ -114,7 +114,9 @@
 
     (simple-array-nil "vector_nil")
     (simple-base-string "base_string")
-    #+sb-unicode (simple-character-string "character_string")
+    ;; UB32 works fine for character string, unless we decide to reimplement
+    ;; using 3 octets per code point.
+    #+sb-unicode (simple-character-string "vector_unsigned_byte_32")
     #+sb-unicode (complex-character-string "array")
     (complex-base-string "array")
 

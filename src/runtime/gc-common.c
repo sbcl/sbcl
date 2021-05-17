@@ -917,8 +917,6 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
     }
 }
 
-#define DEF_SCAV_TRANS_SIZE_UB(nbits) \
-  DEF_SPECIALIZED_VECTOR(vector_unsigned_byte_##nbits, NWORDS(length, nbits))
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
   static sword_t __attribute__((unused)) scav_##name(\
       lispobj *where, lispobj __attribute__((unused)) header) { \
@@ -941,7 +939,8 @@ DEF_SPECIALIZED_VECTOR(vector_bit, NWORDS(length,1))
  * to help interface with C functions) than indicated by the length slot.
  * UCS4 strings do not get a terminator element */
 DEF_SPECIALIZED_VECTOR(base_string, NWORDS((length+1), 8))
-DEF_SPECIALIZED_VECTOR(character_string, NWORDS(length, 32))
+#define DEF_SCAV_TRANS_SIZE_UB(nbits) \
+  DEF_SPECIALIZED_VECTOR(vector_unsigned_byte_##nbits, NWORDS(length, nbits))
 DEF_SCAV_TRANS_SIZE_UB(2)
 DEF_SCAV_TRANS_SIZE_UB(4)
 DEF_SCAV_TRANS_SIZE_UB(8)
