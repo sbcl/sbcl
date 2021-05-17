@@ -265,7 +265,7 @@
                       :original-form form
                       :format-args args
                       :context src-context
-                      :file-name (file-info-name file-info)
+                      :file-name (file-info-truename file-info)
                       :file-position
                       (nth-value 1 (find-source-root tlf *source-info*))
                       :path path

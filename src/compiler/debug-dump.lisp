@@ -352,14 +352,14 @@
                      (make-file-info-namestring
                       (let ((pathname
                              (case *name-context-file-path-selector*
-                               (pathname (file-info-untruename file-info))
-                               (truename (file-info-name file-info)))))
+                               (pathname (file-info-pathname file-info))
+                               (truename (file-info-truename file-info)))))
                         (if (pathnamep pathname) pathname))
                       file-info))
      :created (file-info-write-date file-info)
      (if function
          (values :form (let ((direct-file-info (source-info-file-info info)))
-                         (when (eq :lisp (file-info-name direct-file-info))
+                         (when (eq :lisp (file-info-truename direct-file-info))
                            (elt (file-info-forms direct-file-info) 0)))
                  :function function)
          (values)))))

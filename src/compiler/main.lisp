@@ -848,7 +848,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :untruename ; becomes *C-F-PATHNAME*
+   :file-info (make-file-info :pathname ; becomes *C-F-PATHNAME*
                               (if *merge-pathnames* (merge-pathnames file) file)
                               :external-format external-format
                               :subforms
@@ -859,17 +859,17 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;; LOAD-AS-SOURCE uses this.
 (defun make-file-stream-source-info (file-stream)
   (make-source-info
-   :file-info (make-file-info :name (truename file-stream)
+   :file-info (make-file-info :truename (truename file-stream)
                               ;; This T-L-P has been around since at least 2011.
                               ;; It's unclear why an LPN isn't good enough.
-                              :untruename (translate-logical-pathname file-stream)
+                              :pathname (translate-logical-pathname file-stream)
                               :external-format (stream-external-format file-stream)
                               :write-date (file-write-date file-stream))))
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
 (defun make-lisp-source-info (form &key parent)
   (make-source-info
-   :file-info (make-file-info :name :lisp
+   :file-info (make-file-info :truename :lisp
                               :forms (vector form)
                               :positions '#(0))
    :parent parent))
@@ -883,7 +883,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             (finfo (source-info-file-info sinfo)
                    (source-info-file-info sinfo)))
            ((or (not (source-info-p (source-info-parent sinfo)))
-                (pathnamep (file-info-name finfo)))
+                (pathnamep (file-info-truename finfo)))
             finfo))))
 
 ;;; If STREAM is present, return it, otherwise open a stream to the
@@ -903,7 +903,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (or (source-info-stream info)
       (let* ((file-info (source-info-file-info info))
-             (pathname (file-info-untruename file-info))
+             (pathname (file-info-pathname file-info))
              (external-format (file-info-external-format file-info)))
         (let ((stream
                (open pathname
@@ -918,7 +918,7 @@ necessary, since type inference may take arbitrarily long to converge.")
           ;; it seems to me that asking the stream for its name is expressly backwards]
           (setf *compile-file-pathname* (if *merge-pathnames* (pathname stream) pathname)
                 *compile-file-truename* (truename stream)
-                (file-info-name file-info) *compile-file-truename*)
+                (file-info-truename file-info) *compile-file-truename*)
           (when (file-info-subforms file-info)
             (setf (form-tracking-stream-observer stream)
                   (make-form-tracking-stream-observer file-info)))
@@ -1866,10 +1866,10 @@ necessary, since type inference may take arbitrarily long to converge.")
     #+sb-xc-host
     (compiler-mumble "~&; ~Aing file ~S:~%"
                      (if sb-cold::*compile-for-effect-only* "load" "x-compil")
-                     (namestring (file-info-name file-info)))
+                     (namestring (file-info-truename file-info)))
     #-sb-xc-host
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
-                     (namestring (file-info-name file-info))
+                     (namestring (file-info-truename file-info))
                      (format-universal-time nil
                                             (file-info-write-date file-info)
                                             :style :government

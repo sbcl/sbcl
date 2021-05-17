@@ -439,18 +439,18 @@
              (:copier nil)
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
-                                (princ (file-info-name s) stream)))))
+                                (princ (file-info-truename s) stream)))))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. In COMPILE-FILE, this gets filled lazily
   ;; after the file gets opened.
-  (name nil :type (or pathname null (eql :lisp)))
+  (truename nil :type (or pathname null (eql :lisp)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
   ;; *COMPILE-FILE-PATHNAME*, and if absolute (a harmful constraint to be sure),
   ;; is dumped in the debug-info.
-  (untruename nil :type (or pathname null) :read-only t)
+  (pathname nil :type (or pathname null) :read-only t)
   ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null)  :read-only t)
   ;; parallel vectors containing the forms read out of the file and

@@ -463,7 +463,7 @@
                                   (*compiler-error-context*
                                     (make-compiler-error-context
                                      :original-form form
-                                     :file-name (file-info-name file-info)
+                                     :file-name (file-info-truename file-info)
                                      :initialized t
                                      :file-position
                                      (nth-value 1 (find-source-root tlf *source-info*))
