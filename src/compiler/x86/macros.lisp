@@ -281,7 +281,7 @@
                                      :disp (- (* ,offset n-word-bytes)
                                               ,lowtag)))))))))
 
-(defmacro define-full-reffer+offset (name type offset lowtag scs el-type &optional translate)
+(defmacro define-full-reffer+addend (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
@@ -291,7 +291,7 @@
               (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement ,lowtag n-word-bytes ,offset)))
-       (:info offset)
+       (:info addend)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
@@ -300,17 +300,17 @@
             (inst mov value (make-ea :dword :base object
                                      :disp (- (* (+ ,offset
                                                     (tn-value index)
-                                                    offset)
+                                                    addend)
                                                  n-word-bytes)
                                               ,lowtag))))
            (unsigned-reg
             (inst mov value (make-ea :dword :base object :index index :scale 4
-                                     :disp (- (* (+ ,offset offset)
+                                     :disp (- (* (+ ,offset addend)
                                                  n-word-bytes)
                                               ,lowtag))))
            (t
             (inst mov value (make-ea :dword :base object :index index
-                                     :disp (- (* (+ ,offset offset)
+                                     :disp (- (* (+ ,offset addend)
                                                  n-word-bytes)
                                               ,lowtag)))))))))
 
@@ -338,32 +338,6 @@
                                :disp (- (* ,offset n-word-bytes) ,lowtag))
                   value)))
          ,@(when resultp '((move result value)))))))
-
-(defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
-  `(progn
-     (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate))
-              (value :scs ,scs))
-       (:info offset)
-       (:arg-types ,type tagged-num
-                   (:constant (constant-displacement ,lowtag n-word-bytes ,offset)) ,el-type)
-       (:generator 4                    ; was 5
-         (sc-case index
-           (immediate
-            (inst mov (make-ea :dword :base object
-                               :disp (- (* (+ ,offset (tn-value index) offset)
-                                           n-word-bytes)
-                                        ,lowtag))
-                  value))
-           (t
-            (inst mov (make-ea :dword :base object :index index
-                               :disp (- (* (+ ,offset offset)
-                                           n-word-bytes) ,lowtag))
-                  value)))))))
 
 ;;; Helper to hide the fact that thread access on Windows needs one more
 ;;; instruction, needs the FS prefix in that instruction _instead_ of

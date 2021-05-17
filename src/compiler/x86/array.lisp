@@ -165,15 +165,37 @@
 
 ;;;; accessors/setters
 
-;;; variants built on top of WORD-INDEX-REF, etc. I.e., those vectors
-;;; whose elements are represented in integer registers and are built
-;;; out of 8, 16, or 32 bit elements.
+;;; variants which affect an entire lispword-sized value.
+(defmacro define-full-setter+addend (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+       ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg immediate))
+              (value :scs ,scs))
+       (:info addend)
+       (:arg-types ,type tagged-num
+                   (:constant (constant-displacement ,lowtag n-word-bytes ,offset)) ,el-type)
+       (:generator 4
+         (sc-case index
+           (immediate
+            (inst mov (make-ea :dword :base object
+                               :disp (- (* (+ ,offset (tn-value index) addend)
+                                           n-word-bytes)
+                                        ,lowtag))
+                  value))
+           (t
+            (inst mov (make-ea :dword :base object :index index
+                               :disp (- (* (+ ,offset addend)
+                                           n-word-bytes) ,lowtag))
+                  value)))))))
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
              `(progn
-                (define-full-reffer+offset ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
+                (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
                   ,type vector-data-offset other-pointer-lowtag ,scs
                   ,element-type data-vector-ref-with-offset)
-                (define-full-setter+offset ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
+                (define-full-setter+addend ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
                   ,type vector-data-offset other-pointer-lowtag ,scs
                   ,element-type data-vector-set-with-offset))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
@@ -202,8 +224,8 @@
   (:args (object :scs (descriptor-reg)))
   (:arg-types simple-bit-vector
               (:constant (integer 0 #x7fffffff)) (:constant (integer 0 0)))
-  (:info index offset)
-  (:ignore offset)
+  (:info index addend)
+  (:ignore addend)
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 3
@@ -225,8 +247,8 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg)))
-  (:info offset)
-  (:ignore offset)
+  (:info addend)
+  (:ignore addend)
   (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
@@ -249,13 +271,13 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg)))
-         (:info offset)
+         (:info addend)
+         (:ignore addend)
          (:arg-types ,type positive-fixnum (:constant (integer 0 0)))
          (:results (result :scs (unsigned-reg) :from (:argument 0)))
          (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
          (:generator 20
-           (aver (zerop offset))
            (move ecx index)
            (inst shr ecx ,bit-shift)
            (inst mov result (make-ea-for-vector-data object :index ecx))
@@ -275,11 +297,11 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
          (:arg-types ,type (:constant index) (:constant (integer 0 0)))
-         (:info index offset)
+         (:info index addend)
+         (:ignore addend)
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
          (:generator 15
-           (aver (zerop offset))
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
              (loadw result object (+ word vector-data-offset)
                     other-pointer-lowtag)
@@ -294,14 +316,14 @@
          (:args (object :scs (descriptor-reg) :to (:argument 2))
                 (index :scs (unsigned-reg) :target ecx)
                 (value :scs (unsigned-reg immediate)))
-         (:info offset)
+         (:info addend)
+         (:ignore addend)
          (:arg-types ,type positive-fixnum (:constant (integer 0 0))
                      positive-fixnum)
          (:temporary (:sc unsigned-reg) word-index)
          (:temporary (:sc unsigned-reg) old)
          (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
          (:generator 25
-           (aver (zerop offset))
            (move word-index index)
            (inst shr word-index ,bit-shift)
            (inst mov old (make-ea-for-vector-data object :index word-index))
@@ -334,10 +356,10 @@
                 (value :scs (unsigned-reg immediate)))
          (:arg-types ,type (:constant index) (:constant (integer 0 0))
                      positive-fixnum)
-         (:info index offset)
+         (:info index addend)
+         (:ignore addend)
          (:temporary (:sc unsigned-reg :to (:result 0)) old)
          (:generator 20
-           (aver (zerop offset))
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
              (loadw old object (+ word vector-data-offset) other-pointer-lowtag)
              (sc-case value
@@ -387,7 +409,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 4 vector-data-offset)))
@@ -395,7 +417,7 @@
   (:result-types single-float)
   (:generator 5
    (with-empty-tn@fp-top(value)
-     (inst fld (float-ref-ea object index offset 4)))))
+     (inst fld (float-ref-ea object index addend 4)))))
 
 (define-vop (data-vector-set-with-offset/simple-array-single-float)
   (:note "inline array store")
@@ -404,7 +426,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (single-reg)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 4 vector-data-offset))
@@ -412,11 +434,11 @@
   (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fst (float-ref-ea object index offset 4)))
+           (inst fst (float-ref-ea object index addend 4)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fst (float-ref-ea object index offset 4))
+           (inst fst (float-ref-ea object index addend 4))
            (inst fxch value)))))
 
 (define-vop (data-vector-ref-with-offset/simple-array-double-float)
@@ -425,7 +447,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-double-float
               tagged-num
               (:constant (constant-displacement other-pointer-lowtag
@@ -434,7 +456,7 @@
   (:result-types double-float)
   (:generator 7
    (with-empty-tn@fp-top(value)
-     (inst fldd (float-ref-ea object index offset 8 :scale 2)))))
+     (inst fldd (float-ref-ea object index addend 8 :scale 2)))))
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float)
   (:note "inline array store")
@@ -443,7 +465,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (double-reg)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
@@ -451,11 +473,11 @@
   (:generator 20
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fstd (float-ref-ea object index offset 8 :scale 2)))
+           (inst fstd (float-ref-ea object index addend 8 :scale 2)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fstd (float-ref-ea object index offset 8 :scale 2))
+           (inst fstd (float-ref-ea object index addend 8 :scale 2))
            (inst fxch value)))))
 
 ;;; complex float variants
@@ -466,7 +488,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-complex-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset)))
@@ -475,11 +497,11 @@
   (:generator 5
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fld (float-ref-ea object index offset 8 :scale 2))))
+        (inst fld (float-ref-ea object index addend 8 :scale 2))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
         ;; FIXME
-        (inst fld (float-ref-ea object index offset 8
+        (inst fld (float-ref-ea object index addend 8
                                          :scale 2 :complex-offset 4))))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
@@ -489,7 +511,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (complex-single-reg)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-complex-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
@@ -498,15 +520,15 @@
     (let ((value-real (complex-single-reg-real-tn value)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fst (float-ref-ea object index offset 8 :scale 2)))
+             (inst fst (float-ref-ea object index addend 8 :scale 2)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fst (float-ref-ea object index offset 8 :scale 2))
+             (inst fst (float-ref-ea object index addend 8 :scale 2))
              (inst fxch value-real))))
     (let ((value-imag (complex-single-reg-imag-tn value)))
       (inst fxch value-imag)
-      (inst fst (float-ref-ea object index offset 8
+      (inst fst (float-ref-ea object index addend 8
                                        :scale 2 :complex-offset 4))
       (inst fxch value-imag))))
 
@@ -516,7 +538,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-complex-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 16 vector-data-offset)))
@@ -525,10 +547,10 @@
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fldd (float-ref-ea object index offset 16 :scale 4)))
+        (inst fldd (float-ref-ea object index addend 16 :scale 4)))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-        (inst fldd (float-ref-ea object index offset 16
+        (inst fldd (float-ref-ea object index addend 16
                                           :scale 4 :complex-offset 8)))))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
@@ -538,7 +560,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (complex-double-reg)))
-  (:info offset)
+  (:info addend)
   (:arg-types simple-array-complex-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 16 vector-data-offset))
@@ -547,17 +569,17 @@
     (let ((value-real (complex-double-reg-real-tn value)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fstd (float-ref-ea object index offset 16
+             (inst fstd (float-ref-ea object index addend 16
                                                :scale 4)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fstd (float-ref-ea object index offset 16
+             (inst fstd (float-ref-ea object index addend 16
                                                :scale 4))
              (inst fxch value-real))))
     (let ((value-imag (complex-double-reg-imag-tn value)))
       (inst fxch value-imag)
-      (inst fstd (float-ref-ea object index offset 16
+      (inst fstd (float-ref-ea object index addend 16
                                         :scale 4 :complex-offset 8))
       (inst fxch value-imag))))
 
@@ -572,7 +594,7 @@
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg))
              (index :scs (signed-reg immediate)))
-      (:info offset)
+      (:info addend)
       (:arg-types ,ptype tagged-num
                   (:constant (constant-displacement other-pointer-lowtag
                                                     1 vector-data-offset)))
@@ -583,11 +605,11 @@
           (immediate
            (inst ,ref-inst value (make-ea-for-vector-data
                                   object :size :byte
-                                  :offset (+ (tn-value index) offset))))
+                                  :offset (+ (tn-value index) addend))))
           (t
            (inst ,ref-inst value
                  (make-ea-for-vector-data object :size :byte
-                                          :index index :offset offset))))))
+                                          :index index :offset addend))))))
     (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
       (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
@@ -595,7 +617,7 @@
              (index :scs (signed-reg immediate) :to (:eval 0))
              (value :scs ,scs ,@(unless 8-bit-tns-p
                                   '(:target eax))))
-      (:info offset)
+      (:info addend)
       (:arg-types ,ptype tagged-num
                   (:constant (constant-displacement other-pointer-lowtag
                                                     1 vector-data-offset))
@@ -610,13 +632,13 @@
         (sc-case index
           (immediate
            (inst mov (make-ea-for-vector-data
-                      object :size :byte :offset (+ (tn-value index) offset))
+                      object :size :byte :offset (+ (tn-value index) addend))
                  ,(if 8-bit-tns-p
                       'value
                       'al-tn)))
           (t
            (inst mov (make-ea-for-vector-data object :size :byte
-                                              :index index :offset offset)
+                                              :index index :offset addend)
                  ,(if 8-bit-tns-p
                       'value
                       'al-tn)))))))))
@@ -638,7 +660,7 @@
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
                (index :scs (signed-reg immediate)))
-        (:info offset)
+        (:info addend)
         (:arg-types ,ptype tagged-num
                     (:constant (constant-displacement other-pointer-lowtag
                                                       2 vector-data-offset)))
@@ -649,18 +671,18 @@
             (immediate
              (inst ,ref-inst value
                    (make-ea-for-vector-data object :size :word
-                                            :offset (+ (tn-value index) offset))))
+                                            :offset (+ (tn-value index) addend))))
             (t
              (inst ,ref-inst value
                    (make-ea-for-vector-data object :size :word
-                                            :index index :offset offset))))))
+                                            :index index :offset addend))))))
       (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
                (index :scs (signed-reg immediate) :to (:eval 0))
                (value :scs ,scs))
-        (:info offset)
+        (:info addend)
         (:arg-types ,ptype tagged-num
                     (:constant (constant-displacement other-pointer-lowtag
                                                       2 vector-data-offset))
@@ -673,11 +695,11 @@
           (sc-case index
             (immediate
              (inst mov (make-ea-for-vector-data
-                        object :size :word :offset (+ (tn-value index) offset))
+                        object :size :word :offset (+ (tn-value index) addend))
                    ax-tn))
             (t
              (inst mov (make-ea-for-vector-data object :size :word
-                                                :index index :offset offset)
+                                                :index index :offset addend)
                    ax-tn))))))))
   (define-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum
     movzx unsigned-reg signed-reg)

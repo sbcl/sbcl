@@ -3171,7 +3171,7 @@
    ((-98) -98)
    ((95) t)))
 
-(with-test (:name :svref-with-offset+if-eq-immediate)
+(with-test (:name :svref-with-addend+if-eq-immediate)
   (checked-compile-and-assert
    ()
    `(lambda (a d)
