@@ -374,8 +374,10 @@
 
 ;;; Skip for MSAN. Instead of returning 0, the intercepted malloc is configured
 ;;; to cause process termination by default on failure to allocate memory.
+;;; Skip also for ARRAY-UBSAN which has a smaller ARRAY-TOTAL-SIZE-LIMIT
+;;; and so doesn't get ENOMEM.
 (with-test (:name :malloc-failure
-                  :skipped-on :msan)
+                  :skipped-on (or :array-ubsan :msan))
   (assert (eq :enomem
               (handler-case
                   (loop repeat 128

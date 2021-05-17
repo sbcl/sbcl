@@ -4778,7 +4778,7 @@
   (checked-compile-and-assert ()
       `(lambda (i)
          (if (typep i '(integer -31 31))
-             (aref #. (make-array 63) (+ i 31))
+             (aref #.(make-array 63 :initial-element 0) (+ i 31))
              (error "foo")))
     ((-31) 0)))
 
@@ -5634,7 +5634,7 @@
     (('vector #()) #() :test #'equalp)))
 
 (with-test (:name (make-list :large)
-            :skipped-on (not :64-bit))
+            :skipped-on (or :array-ubsan (not :64-bit)))
   (checked-compile `(lambda ()
                       (make-list (expt 2 28) :initial-element 0)))
   (checked-compile `(lambda ()

@@ -949,7 +949,7 @@
                   (with-test (:name (:dx-flet-test ,n))
                     (test-dx-flet-test #',name ,n ,f1 ,f2 ,f3))))))
   (def 0 (list :one) (list :two) (list :three))
-  (def 1 (make-array 128) (list 1 2 3 4 5 6 7 8) (list 'list))
+  (def 1 (make-array 128 :initial-element nil) (list 1 2 3 4 5 6 7 8) (list 'list))
   (def 2 (list 1) (list 2 3) (list 4 5 6 7)))
 
 ;;; Test that unknown-values coming after a DX value won't mess up the

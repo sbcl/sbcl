@@ -1785,7 +1785,7 @@
   (checked-compile-and-assert
       ()
       `(lambda (type)
-         (make-array 4 :element-type type))
+         (make-array 4 :element-type type :initial-element 0))
     (('(or (cons (satisfies eval)) atom)) #(0 0 0 0) :test #'equalp)))
 
 (with-test (:name :substitute-single-use-lvar-exit-cleanups)

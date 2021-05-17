@@ -168,10 +168,17 @@
             ,@(loop for saetp across
                     sb-vm:*specialized-array-element-type-properties*
                     for specifier = (sb-vm:saetp-specifier saetp)
-                    for array = (make-array (if specifier 10 0)
-                                            :element-type specifier)
+                    for init = (cond ((member specifier '(character base-char))
+                                      '(:initial-element #\X))
+                                     ((eq specifier 't) '(:initial-element :hello))
+                                     (specifier
+                                      `(:initial-element
+                                        ,(sb-vm:saetp-initial-element-default saetp))))
+                    for array = (apply 'make-array (if specifier 10 0)
+                                       :element-type specifier init)
                     for make-array = `(make-array ,(if specifier 10 0)
-                                                  :element-type ',specifier)
+                                                  :element-type ',specifier
+                                                  ,@init)
                     collect `(assert (and (equal (type-of ,array)
                                                  ',(type-of array))
                                           (equalp ,array

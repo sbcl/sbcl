@@ -5,6 +5,34 @@
     ((0.1) (condition 'type-error))
     ((-1)  (condition 'type-error))))
 
+(defun pick-acceptable-default (specifier)
+  (let ((parse (sb-kernel:specifier-type specifier)))
+    ; (format t "~&testcase: ~s~%" specifier)
+    (typecase parse
+      (sb-kernel:character-set-type #\a)
+      (sb-kernel:numeric-type
+       (cond ((eq (sb-kernel:numeric-type-class parse) 'float)
+              (ecase (sb-kernel:numeric-type-complexp parse)
+                (:real
+                 (ecase (sb-kernel:numeric-type-format parse)
+                   (single-float 1009f0)
+                   (double-float pi)))
+                (:complex
+                 (ecase (sb-kernel:numeric-type-format parse)
+                   (single-float #c(101f0 -1f0))
+                   (double-float #c(2d0 3.5d0))))))
+             (t
+              1)))
+      (t
+       (cond ((equal specifier '(or (eql 1.0d0) (eql 10.0d0))) ; KLUDGE
+              1.0d0)
+             ((equal specifier '(member 1 2 10))
+              2)
+             ((equal specifier '(complex (member 10.0 20.0)))
+              (complex 10.0 10.0))
+             (t
+              'whatever))))))
+
 (with-test (:name :array-type-predicates)
   (dolist (et (list* '(integer -1 200) '(integer -256 1)
                      '(integer 0 128)
@@ -25,7 +53,9 @@
                      (map 'list 'sb-vm:saetp-specifier
                           sb-vm:*specialized-array-element-type-properties*)))
     (when et
-      (let* ((v (make-array 3 :element-type et)))
+      (let* ((v (make-array 3 :element-type et
+                            ;; Pick an initial element because of the (ELT ,v 0)
+                              :initial-element (pick-acceptable-default et))))
         (checked-compile-and-assert ()
             `(lambda ()
                (list (if (typep ,v '(simple-array ,et (*)))

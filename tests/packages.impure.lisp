@@ -924,7 +924,7 @@ if a restart was invoked."
 
 ;;; Use array of fixnums because there're no atomic ops on array of word.
 ;;; This is either 58000 useful bits or 126000 bits depending on word size.
-(defglobal *scoreboard* (make-array 2000))
+(defglobal *scoreboard* (make-array 2000 :initial-element 0))
 (defglobal *testpkg* (make-package "A-NICE-PACKAGE"))
 
 (defun hammer-on-gentemp (package n-iter)

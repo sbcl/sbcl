@@ -17,7 +17,8 @@
   (let ((testcases '(;; Bug 126, confusion between high-level default string
                      ;; initial element #\SPACE and low-level default array
                      ;; element #\NULL, is gone.
-                     (#\null (make-array 11 :element-type 'character) simple-string)
+                     (#\null (make-array 11 :element-type 'character :initial-element #\null)
+                             simple-string)
                      (#\space (make-string 11 :initial-element #\space) string)
                      (#\* (make-string 11 :initial-element #\*))
                      (#\null (make-string 11))
@@ -25,10 +26,11 @@
                      (#\x (make-string 11 :initial-element #\x))
                      ;; And the other tweaks made when fixing bug 126 didn't
                      ;; mess things up too badly either.
-                     (0 (make-array 11) simple-vector)
+                     (0 (make-array 11 :initial-element 0) simple-vector)
                      (nil (make-array 11 :initial-element nil))
                      (12 (make-array 11 :initial-element 12))
-                     (0 (make-array 11 :element-type '(unsigned-byte 4)) (simple-array (unsigned-byte 4) (*)))
+                     (0 (make-array 11 :element-type '(unsigned-byte 4) :initial-element 0)
+                        (simple-array (unsigned-byte 4) (*)))
                      (12 (make-array 11
                           :element-type '(unsigned-byte 4)
                           :initial-element 12)))))
@@ -411,7 +413,10 @@
     (test 'inline)
     (test 'notinline)))
 
-(with-test (:name (make-array :size-overflow))
+(with-test (:name (make-array :size-overflow)
+                  ;; size limit is small enough that this fails by not failing
+                  ;; in the expected way
+                  :skipped-on :array-ubsan)
   ;; 1-bit fixnum tags make array limits overflow the word length
   ;; when converted to bytes
   (when (= sb-vm:n-fixnum-tag-bits 1)
@@ -590,7 +595,7 @@
   (checked-compile-and-assert
       ()
       '(lambda (type)
-        (make-array 1 :element-type type))
+        (make-array 1 :element-type type :initial-element 0))
     (('(or (eql -16) unsigned-byte)) #(0) :test #'equalp)))
 
 (with-test (:name :check-bound-signed-bound-notes
