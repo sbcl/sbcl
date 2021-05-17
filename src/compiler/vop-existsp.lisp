@@ -28,9 +28,6 @@
   ;;; This function is invoked after compiling the cross-compiler
   ;;; before quitting the image, and when loading it from compiled fasls
   ;;; (because toplevel forms might use %VOP-EXISTSP at any time).
-  (defun check-vop-existence-correctness ()
-    (dolist (entry *vop-not-existsp*)
-      (assert (not (%vop-existsp (car entry) (cdr entry))))))
   (defun %vop-existsp (name query &optional optimistic)
     (declare (notinline info fun-info-templates))
     (let ((answer
@@ -43,7 +40,10 @@
       ;; Negatives won't be stored in the journal in optimistic mode.
       (when (and (not answer) (not optimistic))
         (pushnew (cons name query) *vop-not-existsp* :test 'equal))
-      answer)))
+      answer))
+  (defun check-vop-existence-correctness ()
+    (dolist (entry *vop-not-existsp*)
+      (assert (not (%vop-existsp (car entry) (cdr entry)))))))
 
 (defmacro vop-existsp (query name)
   #+sb-xc-host
