@@ -9,11 +9,11 @@
       (setf (aref code-to-byte-table (aref byte-to-code-table i)) i))
     `(progn
        (defun ,byte-code-name (byte)
-         (declare (optimize speed (safety 0))
+         (declare (optimize speed #.*safety-0*)
                   (type (unsigned-byte 8) byte))
          (aref ,byte-to-code-table byte))
        (defun ,code-byte-name (code)
-         (declare (optimize speed (safety 0))
+         (declare (optimize speed #.*safety-0*)
                   (type char-code code))
          (if (> code 255)
              nil
@@ -39,13 +39,13 @@
 
 (declaim (inline get-ebcdic-us-bytes))
 (defun get-ebcdic-us-bytes (string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range pos))
   (get-latin-bytes #'code->ebcdic-us-mapper :ebcdic-us string pos))
 
 (defun string->ebcdic-us (string sstart send null-padding)
-    (declare (optimize speed (safety 0))
+    (declare (optimize speed #.*safety-0*)
              (type simple-string string)
              (type array-range sstart send))
   (values (string->latin% string sstart send #'get-ebcdic-us-bytes null-padding)))

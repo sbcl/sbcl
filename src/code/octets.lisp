@@ -22,6 +22,9 @@
 
 ;;; encoding condition
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *safety-0* '(safety 0)))
+
 (define-condition octets-encoding-error (character-encoding-error)
   ((string :initarg :string :reader octets-encoding-error-string)
    (position :initarg :position :reader octets-encoding-error-position)
@@ -181,7 +184,7 @@
          ;; this, you generally want a load-time ref to a global constant.
        ;(declaim (inline ,byte-char-name))
          (defun ,byte-char-name (byte)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type (unsigned-byte 8) byte))
            ,(let ((byte-to-code
                    (loop for byte below 256
@@ -203,7 +206,7 @@
                   `(aref ,(sb-c::coerce-to-smallest-eltype byte-to-code)
                          byte))))
          (defun ,code-byte-name (code)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type char-code code))
            (if (< code ,lowest-non-equivalent-code)
                code
@@ -295,7 +298,7 @@
     `(progn
       (declaim (inline ,name))
       (defun ,name (string sstart send array astart aend mapper)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type simple-string string)
                  (type ,type array)
                  (type array-range sstart send astart aend)
@@ -312,7 +315,7 @@
     `(progn
       (declaim (inline ,name))
       (defun ,name (array astart aend mapper)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend)
                  (type function mapper))
