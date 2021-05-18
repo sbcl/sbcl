@@ -1141,7 +1141,7 @@ symbol-case giving up: case=((V U) (F))
         ;; every consequent is trivial.
         (when (= maxprobes 1)
           (block try-table-lookup
-            (let ((values (make-array (length bins)))
+            (let ((values (make-array (length bins) :initial-element 0))
                   (single-value) ; only if exactly one clause
                   (types nil))
               (dolist (clause clauses)

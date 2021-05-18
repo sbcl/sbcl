@@ -25,7 +25,7 @@
 (defmacro finalizer-max-id (store) `(elt ,store 2))
 
 (defun make-finalizer-store (array-length)
-  (let* ((v (make-array (the index array-length)))
+  (let* ((v (make-array (the index array-length) :initial-element 0))
          (ht (make-system-hash-table :test 'eq :weakness :key :synchronized nil
                                      :finalizer t)))
     ;; The recycle bin has a dummy item in front so that the simple-vector

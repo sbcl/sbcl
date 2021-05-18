@@ -551,7 +551,9 @@
 
 ;; lp#1333731
 (with-test (:name (adjust-array :changes type-of))
-  (let ((a (make-array 10 :adjustable t)))
+  ;; I think adjusting an array to enlarge it must read all the old data,
+  ;; which would be undefined behavior if you hadn't initialized the array.
+  (let ((a (make-array 10 :adjustable t :initial-element 0)))
     (assert (equal (type-of a) '(vector t 10)))
     (adjust-array a 20)
     (assert (equal (type-of a) '(vector t 20)))))

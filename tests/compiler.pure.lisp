@@ -3100,7 +3100,7 @@
            (setq x (make-array '(4 4)))
            (adjust-array y '(3 5))
            (array-dimension y 0)))
-    (((make-array '(4 4) :adjustable t)) 3)))
+    (((make-array '(4 4) :initial-element nil :adjustable t)) 3)))
 
 (with-test (:name :with-timeout-code-deletion-note)
   (checked-compile `(lambda ()

@@ -852,7 +852,8 @@
 ;;; The compiler will never look at the toplevel value though.
 (defvar *finite-sbs*
   #-sb-xc-host
-  (make-array #.(count :non-packed *backend-sbs* :key #'sb-kind :test #'neq)))
+  (make-array #.(count :non-packed *backend-sbs* :key #'sb-kind :test #'neq)
+              :initial-element (make-unbound-marker)))
 #-sb-xc-host
 (progn
   (declaim (type (simple-vector #.(length *finite-sbs*)) *finite-sbs*)

@@ -131,7 +131,8 @@
                         (let* ((unicode-table
                                  (make-array
                                   (* 64 (1+ (aref **character-case-pages**
-                                                  (1- (length **character-case-pages**)))))))
+                                                  (1- (length **character-case-pages**)))))
+                                  :initial-element 0))
                                (table (make-array
                                        (* 2 (length unicode-table))
                                        :element-type '(unsigned-byte 32)))

@@ -252,7 +252,8 @@
   ;;; space-efficient form, and return that packed form.
   (defun pack-xref-data (xref-data)
     (unless xref-data (return-from pack-xref-data))
-    (let* ((result (make-array 1 :adjustable t :fill-pointer 1))
+    (let* ((result (make-array 1 :adjustable t :fill-pointer 1
+                                 :initial-element 0))
            (ensure-index (name->index result))
            (entries '())
            (max-index 0)
@@ -287,7 +288,7 @@
              (number-bits (integer-length max-number))
              (encoder (index-and-number-encoder name-bits number-bits))
              (vector (make-array 0 :element-type '(unsigned-byte 8)
-                                 :adjustable t :fill-pointer 0)))
+                                 :adjustable t :fill-pointer 0 :initial-element 0)))
         (write-var-integer name-bits vector)
         (write-var-integer number-bits vector)
         (loop for (kind-number . kind-entries) in entries
