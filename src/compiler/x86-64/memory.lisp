@@ -186,29 +186,45 @@
           ;; to select byte 1 of the header word.
           (ash 1 (- stable-hash-required-flag 8)))))
 
+(defmacro compute-splat-bits (value)
+  ;; :SAFE-DEFAULT means any unspecific value that is safely a default.
+  ;; Heap allocation uses 0 since that costs nothing.
+  ;; Stack allocation pick no-tls-value-marker even though it differs from the heap.
+  ;; If the user wanted a specific value, it could have been explicitly given.
+  `(if (typep ,value 'sb-vm:word)
+       ,value
+       (case ,value
+         (:unbound (unbound-marker-bits))
+         ((nil) (bug "Should not see SPLAT NIL"))
+         (t #+array-ubsan no-tls-value-marker-widetag
+            #-array-ubsan 0))))
+
 ;;; This logic was formerly in ALLOCATE-VECTOR-ON-STACK.
-;;; Splitting it into 3 vops potentially gets better register allocation
+;;; Choosing amongst 3 vops gets potentially better register allocation
 ;;; by not wasting registers in the cases that don't use them.
-(define-vop (zero-fill-word)
+(define-vop (splat-word)
   (:policy :fast-safe)
-  (:translate zero-fill)
+  (:translate splat)
   (:args (vector :scs (descriptor-reg)))
-  (:info words elidable)
-  (:arg-types * (:constant (eql 1)) (:constant boolean))
+  (:info words value)
+  (:arg-types * (:constant (eql 1)) (:constant t))
   (:results (result :scs (descriptor-reg)))
-  (:ignore elidable)
   (:generator 1
    (progn words) ; don't put it in :ignore, which gets inherited
    (inst mov :qword
          (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
-         0)
+         (compute-splat-bits value))
    (move result vector)))
 
-(define-vop (zero-fill-small zero-fill-word)
-  (:arg-types * (:constant (integer 2 10)) (:constant boolean))
+(define-vop (splat-small splat-word)
+  (:arg-types * (:constant (integer 2 10)) (:constant t))
   (:temporary (:sc complex-double-reg) zero)
   (:generator 5
-   (inst xorpd zero zero)
+   (let ((bits (compute-splat-bits value)))
+     (if (= bits 0)
+         (inst xorpd zero zero)
+         (inst movdqa zero
+               (register-inline-constant :oword (logior (ash bits 64) bits)))))
    (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                         vector)))
      (multiple-value-bind (double single) (truncate words 2)
@@ -220,13 +236,13 @@
          (inst movaps data-addr zero))))
    (move result vector)))
 
-(define-vop (zero-fill-any zero-fill-word)
+(define-vop (splat-any splat-word)
   ;; vector has to conflict with everything so that a tagged pointer
   ;; corresponding to RDI always exists
   (:args (vector :scs (descriptor-reg) :to (:result 0))
          (words :scs (unsigned-reg immediate) :target rcx))
-  (:info elidable)
-  (:arg-types * positive-fixnum (:constant boolean))
+  (:info value)
+  (:arg-types * positive-fixnum (:constant t))
   (:temporary (:sc any-reg :offset rdi-offset :from (:argument 0)
                :to (:result 0)) rdi)
   (:temporary (:sc any-reg :offset rcx-offset :from (:argument 1)
@@ -237,18 +253,21 @@
   (:generator 10
    (inst lea rdi (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                         vector))
-   (cond ((and (constant-tn-p words) (typep (tn-value words) '(unsigned-byte 7)))
-          (zeroize rax)
-          (inst lea :dword rcx (ea (tn-value words) rax))) ; smaller encoding
-         (t
-          ;; words could be in RAX, so read it first, then zeroize
-          (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
-          (zeroize rax)))
+   (let ((bits (compute-splat-bits value)))
+     (cond ((and (= bits 0)
+                 (constant-tn-p words)
+                 (typep (tn-value words) '(unsigned-byte 7)))
+            (zeroize rax)
+            (inst lea :dword rcx (ea (tn-value words) rax))) ; smaller encoding
+           (t
+            ;; words could be in RAX, so read it first, then zeroize
+            (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
+            (if (= bits 0) (zeroize rax) (inst mov rax bits)))))
    (inst rep)
    (inst stos rax)
    (move result vector)))
 
-(dolist (name '(zero-fill-word zero-fill-small zero-fill-any))
+(dolist (name '(splat-word splat-small splat-any))
   ;; It wants a function, not a symbol
   (setf (sb-c::vop-info-optimizer (template-or-lose name))
         (lambda (vop) (sb-c::elide-zero-fill vop))))

@@ -594,12 +594,14 @@
   :derive-type #'result-type-first-arg
   :result-arg 0)
 ;;; Like FILL but with no keyword argument parsing
-(defknown splat ((modifying (simple-array * 1)) t) (simple-array * 1) ()
+(defknown quickfill ((modifying (simple-array * 1)) t) (simple-array * 1) ()
   :derive-type #'result-type-first-arg
   :result-arg 0)
-;;; Special case of SPLAT using an assumed initial element.
+;;; Special case of FILL that takes either a machine word with which to fill,
+;;; or a keyword indicating a certain behavior to compute the word.
+;;; In either case the supplied count is lispwords, not elements.
 ;;; This might be a no-op depending on whether memory is prezeroized.
-(defknown sb-vm::zero-fill ((modifying (simple-array * 1)) index boolean)
+(defknown sb-vm::splat ((modifying (simple-array * 1)) index (or symbol sb-vm:word))
     (simple-array * 1)
   (always-translatable)
   :derive-type #'result-type-first-arg

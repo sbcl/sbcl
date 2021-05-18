@@ -518,11 +518,11 @@
                                 (t complex-array-widetag))
                           array-rank)))
              (cond (fill-pointer
-                    (logior-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (logior-header-bits array +array-fill-pointer-p+)
                     (setf (%array-fill-pointer array)
                           (if (eq fill-pointer t) dimension-0 fill-pointer)))
                    (t
-                    (reset-header-bits array sb-vm:+array-fill-pointer-p+)
+                    (reset-header-bits array +array-fill-pointer-p+)
                     (setf (%array-fill-pointer array) total-size)))
              (setf (%array-available-elements array) total-size)
              (setf (%array-data array) data)
@@ -609,7 +609,7 @@ of specialized arrays is supported."
 (defun make-static-code-vector (length initial-contents)
   "Allocate vector of LENGTH elements in static space. Only allocation
 of specialized arrays is supported."
-  (let ((vector (allocate-static-code-vector sb-vm:simple-array-unsigned-byte-8-widetag
+  (let ((vector (allocate-static-code-vector simple-array-unsigned-byte-8-widetag
                                              length
                                              (* length n-word-bytes))))
     (with-pinned-objects (initial-contents)
@@ -1507,10 +1507,10 @@ of specialized arrays is supported."
     (setf (%array-available-elements array) length)
     (cond (fill-pointer
            (setf (%array-fill-pointer array) fill-pointer)
-           (logior-header-bits array sb-vm:+array-fill-pointer-p+))
+           (logior-header-bits array +array-fill-pointer-p+))
           (t
            (setf (%array-fill-pointer array) length)
-           (reset-header-bits array sb-vm:+array-fill-pointer-p+)))
+           (reset-header-bits array +array-fill-pointer-p+)))
     (setf (%array-displacement array) displacement)
     (populate-dimensions array dimensions (array-rank array))
     (setf (%array-displaced-p array) displacedp)
@@ -1882,8 +1882,7 @@ function to be removed without further warning."
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   ;; Explicitly compute a widetag with the weakness bit ORed in.
-  (let ((type (logior (ash vector-weak-flag sb-vm:n-widetag-bits)
-                      sb-vm:simple-vector-widetag)))
+  (let ((type (logior (ash vector-weak-flag n-widetag-bits) simple-vector-widetag)))
     ;; These allocation calls are the transforms of MAKE-ARRAY for a vector with
     ;; the respective initializing keyword arg. This is badly OAOO-violating and
     ;; almost makes me want to cry, but not quite enough for me to improve it.

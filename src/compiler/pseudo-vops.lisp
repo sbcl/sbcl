@@ -51,21 +51,24 @@
   (:generator 0
     (sb-assem:inst* 'sb-assem:.coverage-mark path)))
 
-;;; Stack-allocation vops for precise GC have to zero-fill at the
-;;; time of allocation, while inside the pseudo-atomic.
-;;; We don't have a way to combine a fill operation with allocation,
-;;; so there is some redundant work if subsequently filling
-;;; with a non-default value.
-;;; This is why why distinguish ZERO-FILL from SPLAT - so that
-;;; ZERO-FILL outside of the allocator always becomes a no-op.
+;;; SPLAT is always a no-op for architectures other than x86-64
+;;; because:
+;;; - the heap is zero-filled, and only value that can be
+;;;   splatted is zero which would be redundant.
+;;; - stack-allocation vops for precise GC have to zero-fill at the
+;;;   time of allocation, while inside the pseudo-atomic,
+;;;   so zero-filling would be redundant.
+;;; Those architectures which require the initializing inside the
+;;; pseudo-atomic would benefit from a way to advise the allocator
+;;; to fill with a non-default value.
 #-x86-64
 (define-vop ()
   (:policy :fast-safe)
-  (:translate sb-vm::zero-fill)
+  (:translate sb-vm::splat)
   (:args (vector :scs (sb-vm::descriptor-reg))
          (words :scs (sb-vm::unsigned-reg sb-vm::immediate)))
-  (:info elidable)
-  (:arg-types * sb-vm::positive-fixnum (:constant boolean))
+  (:info value)
+  (:arg-types * sb-vm::positive-fixnum (:constant t))
   (:results (result :scs (sb-vm::descriptor-reg)))
-  (:ignore words elidable)
+  (:ignore words value)
   (:generator 1 (move result vector)))

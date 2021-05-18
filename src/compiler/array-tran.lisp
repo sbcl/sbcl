@@ -698,6 +698,44 @@
              `(ash (+ (truly-the index ,padded-length-form) ,(1- n-elements-per-word))
                    ,(- (1- (integer-length n-elements-per-word)))))))))
 
+;;; TODO: "initial-element #\space" for strings would be nice to handle.
+(declaim (inline splat-value-p))
+(defun splat-value-p (elt-ctype initial-element default-initial-element)
+  (declare (ignorable elt-ctype))
+  ;; If the initial-element is specified and equivalent to 0-fill
+  ;; then use SPLAT.
+  (if (constant-lvar-p initial-element)
+      (cond ((eql (lvar-value initial-element) default-initial-element)
+             0)
+            ;; If SPLAT is not always a no-op - which it is for everything
+            ;; but x86-64 - then also use it to store NIL or unbound-marker,
+            ;; which is better than QUICKFILL on small arrays. Arguably it is
+            ;; a defect of the FILL transforms that they can't do as well.
+            #+x86-64
+            ((eq (lvar-value initial-element) nil)
+             sb-vm:nil-value))
+      ;; This case should not be architecture-dependent, and it isn't,
+      ;; except that the other architectures lack the ability
+      ;; to convert SPLAT via a vop.
+      ;; I feel that it would be a lot easier if unbound-marker manifested
+      ;; itself as a compile-time literal, but there's no lisp type for it
+      ;; and I guess we don't like that.
+      ;; So why not just return T from ctype-of for that object?
+      #+x86-64
+      (when (eq elt-ctype *universal-type*)
+        (let ((node (lvar-uses initial-element)))
+          (when (and (combination-p node)
+                     (lvar-fun-is (combination-fun node) '(%%primitive))
+                     (let* ((args (combination-args node))
+                            (arg (car args))
+                            (leaf (when (ref-p (lvar-uses arg))
+                                    (ref-leaf (lvar-uses arg)))))
+                       (and (constant-p leaf) ; (I think it has to be)
+                            (eq (constant-value leaf) 'make-unbound-marker))))
+            ;; don't need to look at the other codegen arg which is
+            ;; surely NIL.
+            :unbound)))))
+
 ;;; This baby is a bit of a monster, but it takes care of any MAKE-ARRAY
 ;;; call which creates a vector with a known element type -- and tries
 ;;; to do a good job with all the different ways it can happen.
@@ -805,28 +843,32 @@
       (cond ;; Case (1) - :INITIAL-ELEMENT
             (initial-element
              ;; If the specified initial element is equivalent to zero-filling,
-             ;; then use ZERO-FILL, which is elidable for heap allocations.
-             ;; But if that element induces a type error based on the specified
-             ;; (not upgraded) array element type, use SPLAT instead of ZERO-FILL
-             ;; so that a THE cast will produce a warning.
-             (let ((defaultp (and (constant-lvar-p initial-element)
-                                  (eql (lvar-value initial-element) default-initial-element)
-                                  (multiple-value-bind (ok sure)
-                                      (if (testable-type-p elt-ctype)
-                                          (ctypep (lvar-value initial-element) elt-ctype)
-                                          (values t t))
-                                    (or ok (not sure)))))
+             ;; then use SPLAT, which is elidable for heap allocations.
+             ;; Also pick off (at least 2) other common cases for SPLAT: NIL and
+             ;; unbound-marker. The latter helps PCL ctors not to call FILL.
+             (let ((splat (splat-value-p elt-ctype initial-element
+                                         default-initial-element))
+                   (init (if (constant-lvar-p initial-element)
+                             (list 'quote (lvar-value initial-element))
+                             'initial-element))
                    (lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
-                  ,(wrap (if defaultp
-                             `(sb-vm::zero-fill ,data-alloc-form nwords nil)
-                             (let ((init (if (constant-lvar-p initial-element)
-                                             (list 'quote (lvar-value initial-element))
-                                             'initial-element)))
-                               `(splat ,data-alloc-form
-                                       ,(if (eq elt-spec t) init
-                                            `(the ,elt-spec ,init)))))))))
+                  ,(wrap (cond ((not splat)
+                                `(quickfill ,data-alloc-form
+                                            ,(if (eq elt-spec t) init
+                                                 `(the ,elt-spec ,init))))
+                               ((or (eq splat :unbound)
+                                    (and (constant-lvar-p initial-element)
+                                         (testable-type-p elt-ctype)
+                                         (ctypep (lvar-value initial-element) elt-ctype)))
+                                ;; all good
+                                `(sb-vm::splat ,data-alloc-form nwords ,splat))
+                               (t
+                                ;; uncertain if initial-element is type-correct
+                                `(progn (the ,elt-spec ,init) ; check en passant
+                                        (sb-vm::splat ,data-alloc-form nwords
+                                                      ,splat))))))))
 
             ;; Case (2) - neither element nor contents specified.
             ((not initial-contents)
@@ -864,7 +906,7 @@
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
                   ,(wrap (cond ((eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
-                                `(sb-vm::zero-fill ,data-alloc-form nwords nil))
+                                `(sb-vm::splat ,data-alloc-form nwords :safe-default))
                                (t
                                 ;; otherwise, reading an element can't cause an invalid bit pattern
                                 ;; to be observed, but the bits could be random.
@@ -935,6 +977,7 @@
 ;;; specific must come first, otherwise suboptimal transforms will result for
 ;;; some forms.
 
+;;; 3rd choice
 (deftransform make-array ((dims &key initial-element initial-contents
                                      element-type
                                      adjustable fill-pointer
@@ -1046,6 +1089,7 @@
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
 ;;; and displaced-to keywords ensures that it will be simple.
+;;; 2nd choice
 (deftransform make-array ((dims &key
                                 element-type initial-element initial-contents
                                 adjustable fill-pointer)
@@ -1147,6 +1191,7 @@
                                                ;; dimensions
                                                ,@dims))))))))
 
+;;; 1st choice
 (deftransform make-array ((dims &key element-type initial-element initial-contents
                                      adjustable fill-pointer)
                           (integer &key

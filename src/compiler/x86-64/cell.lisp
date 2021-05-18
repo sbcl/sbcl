@@ -116,8 +116,7 @@
   (:args)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (inst mov result (logior (+ sb-vm:static-space-start #x100)
-                             unbound-marker-widetag))))
+    (inst mov result (unbound-marker-bits))))
 
 (define-vop (%set-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate))

@@ -1345,6 +1345,7 @@ constant shift greater than word length")))
 (defoptimizer (sb-c::vop-optimize fast-logtest-c/fixnum) (vop)
   (unless (tn-ref-memory-access (sb-c::vop-args vop))
     (let ((prev (sb-c::previous-vop-is
+                 ;; TODO: missing data-vector-ref/simple-vector-c
                  vop '(raw-instance-ref-c/signed-word
                        raw-instance-ref-c/word
                        instance-index-ref-c

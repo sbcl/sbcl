@@ -764,19 +764,19 @@
                  '(char-code item)
                  'item)))))))
 
-(deftransform splat ((seq item) (vector t) * :node node)
-  ;; The SPLAT function has no START,END lexical vars, but if
+(deftransform quickfill ((seq item) (vector t) * :node node)
+  ;; The QUICKFILL function has no START,END lexical vars, but if
   ;; the transform hits the bashable non-simple or non-bashable case,
   ;; it will invoke WITH-ARRAY-DATA using these variables.
   `(let ((start 0) (end nil))
      (declare (ignorable start end))
-     ,(splat-transform 'splat node seq item nil nil)))
+     ,(fill-transform 'quickfill node seq item nil nil)))
 (deftransform fill ((seq item &key (start 0) (end nil))
                     (vector t &key (:start t) (:end t))
                     *
                     :node node)
-  (splat-transform 'fill node seq item start end))
-(defun splat-transform (fun-name node seq item start end)
+  (fill-transform 'fill node seq item start end))
+(defun fill-transform (fun-name node seq item start end)
   (declare (ignorable end))
   (let* ((type (lvar-type seq))
          (element-ctype (array-type-upgraded-element-type type))
@@ -795,9 +795,9 @@
                     (and (constant-lvar-p start)
                          (eql (lvar-value start) 0)))
                 (or (not end)
-                    ;; Splat always splats the whole vector, but I anticipate
+                    ;; QUICKFILL always fills the whole vector, but I anticipate
                     ;; supplying END to avoid a call to VECTOR-LENGTH
-                    (eq fun-name 'splat)))
+                    (eq fun-name 'quickfill)))
            ;; VECTOR-LENGTH entails one fewer transform than LENGTH
            ;; and it too can derive a constant length if known.
            '(vector-fill/t seq item 0 (vector-length seq)))
@@ -807,7 +807,7 @@
               ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
               ;; dynamic-extent for MAKE-ARRAY :INITIAL-ELEMENT initialization.
               (cond
-                ((eq fun-name 'splat)
+                ((eq fun-name 'quickfill)
                  ;; array is simple, and out-of-bounds can't happen
                  `(,basher ,bash-value seq 0 (vector-length seq)))
                 ;; FIXME: isn't this (NOT (CONSERVATIVE-ARRAY-TYPE-COMPLEXP (lvar-type seq))) ?

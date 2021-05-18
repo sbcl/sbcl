@@ -426,22 +426,24 @@
         (tn-ref-vop (tn-writes (tn-ref-tn (vop-args vop)))))))
 
 (defun elide-zero-fill (vop)
-  (let ((writer (producer-vop (vop-args vop))))
-    (when (ecase (vop-name writer)
-            ;; Zero-fill is always elidable on the heap, because it's prezeroed.
-            (sb-vm::allocate-vector-on-heap t)
-            ;; It is elidable on the stack if the codegen arg is T.
-            ;; But in practice we never pass T, we just elide the call as per
-            ;; lexical policy. But we might wish to wait until after vop
-            ;; selection whether to elide stack zeroing, because we could
-            ;; cause stack arrays to be filled with #<unbound-marker> instead,
-            ;; so we need to distinguish between "zero and I really mean it"
-            ;; versus the array having no :initial-element.
+  (let* ((writer (producer-vop (vop-args vop)))
+         ;; Take the last of the info arguments
+         ;; in case WORDS is also an info argument.
+         (value
+          (the (or sb-vm:word
+                   (member :trap :unbound :safe-default :unsafe-default))
+               (car (last (vop-codegen-info vop)))))
+         (elidep
+          (ecase (vop-name writer)
+            (sb-vm::allocate-vector-on-heap
+             (member value '(0 :safe-default :unsafe-default)))
             ((sb-vm::allocate-vector-on-stack
               sb-vm::allocate-vector-on-stack+msan-unpoison)
-             ;; Take the last of the info arguments
-             ;; in case WORDS is also an info argument.
-             (the boolean (car (last (vop-codegen-info vop))))))
+             ;; For most specialized vectors, any random bits can
+             ;; be regarded as a :SAFE-DEFAULT. If :UNSAFE-DEFAULT, then random
+             ;; bits are OK (even for SIMPLE-VECTOR if not using precise gencgc).
+             (eq value :unsafe-default)))))
+    (when elidep ; change it to a MOVE
       (let ((new (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                       (template-or-lose 'move)
                                       (reference-tn (tn-ref-tn (vop-args vop)) nil)

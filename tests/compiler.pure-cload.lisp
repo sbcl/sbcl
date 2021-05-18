@@ -194,3 +194,20 @@
     (let (a)
       (declare (type vector a))
       (x #.#'list))))
+
+(defparameter *my-type-test-ran* 0)
+(deftype some-weird-type () '(satisfies my-thing-p))
+(defun my-thing-p (x)
+  (incf *my-type-test-ran*)
+  (member x '(nil :foo)))
+
+(defun make-array-fill-nil ()
+  (sb-int:dx-let ((a (make-array 5 :initial-element nil
+                                 :element-type '(or (and complex) some-weird-type))))
+    (values (stack-allocated-p a)
+            *my-type-test-ran*)))
+
+(with-test (:name :splat-nil)
+  (multiple-value-bind (ok tested) (make-array-fill-nil)
+    ;; should not inhibit stack allocation, should check that NIL is OK
+    (assert (and ok (eql tested 1)))))

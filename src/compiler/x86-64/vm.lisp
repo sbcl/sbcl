@@ -542,3 +542,6 @@
        (values :default nil)))))
 
 (defvar *register-names* +qword-register-names+)
+
+(defmacro unbound-marker-bits ()
+  (logior (+ sb-vm:static-space-start #x100) unbound-marker-widetag))
