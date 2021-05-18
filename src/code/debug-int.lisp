@@ -621,13 +621,14 @@
 ;;; to malloc() in that regard.
 
 (defun code-header-from-pc (pc)
-  (declare (system-area-pointer pc))
   (with-code-pages-pinned (:dynamic)
     (let ((base-ptr
            (sb-alien:alien-funcall
             (sb-alien:extern-alien "component_ptr_from_pc"
                                    (function sb-alien:unsigned system-area-pointer))
-            pc)))
+            (etypecase pc
+              (system-area-pointer pc)
+              (sb-vm:word (int-sap pc))))))
       (unless (= base-ptr 0)
         (%make-lisp-obj (logior base-ptr sb-vm:other-pointer-lowtag))))))
 

@@ -356,6 +356,9 @@
                  (setf (code-header-ref code-obj index) referent)))))))
     (when named-call-fixups
       (sb-vm::statically-link-code-obj code-obj named-call-fixups))
+    (when sb-fasl::*show-new-code*
+      (let ((*print-pretty* nil))
+        (format t "~&~X New code(core): ~A~%" (get-lisp-obj-address code-obj) code-obj)))
     code-obj))
 
 (defun set-code-fdefn (code index fdefn)

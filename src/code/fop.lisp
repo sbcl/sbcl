@@ -436,6 +436,7 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
+(define-load-time-global *show-new-code* nil)
 (define-fop 16 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
   (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
@@ -487,6 +488,9 @@
               (incf stack-index)))
           ;; Now apply fixups. The fixups to perform are popped from the fasl stack.
           (sb-c::apply-fasl-fixups stack code n-fixups))
+        (when *show-new-code*
+          (let ((*print-pretty* nil))
+            (format t "~&~X New code(load): ~A~%" (get-lisp-obj-address code) code)))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))

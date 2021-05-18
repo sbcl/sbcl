@@ -1489,6 +1489,7 @@ We could try a few things to mitigate this:
                           #b1111111 ; all generations
                           3 3))))
 
+(export 'code-from-serialno)
 (defun code-from-serialno (serial)
   (dx-flet ((visit (obj)
               (when (= (%code-serialno obj) serial)

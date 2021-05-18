@@ -918,11 +918,15 @@ the current thread are replaced with dummy objects which can safely escape."
   ;; until bug 403 is fixed, PPRINT-LOGICAL-BLOCK (STREAM NIL) is
   ;; definitely preferred, because the FORMAT alternative was acting odd.
   (pprint-logical-block (stream nil)
+    #-sb-thread
+    (format stream "debugger invoked on a ~S: ~2I~_~A" (type-of condition) condition)
+    #+sb-thread
     (format stream
-            "debugger invoked on a ~S~@[ in thread ~_~A~]: ~2I~_~A"
+            "debugger invoked on a ~S~@[ @~x~] in thread ~_~A: ~2I~_~A"
             (type-of condition)
-            #+sb-thread sb-thread:*current-thread*
-            #-sb-thread nil
+            (when (boundp '*current-internal-error-context*)
+              (sap-int (sb-vm:context-pc *current-internal-error-context*)))
+            sb-thread:*current-thread*
             condition))
   (terpri stream))
 
