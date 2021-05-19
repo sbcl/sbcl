@@ -57,8 +57,9 @@ if [ "$warm_compile" = yes ]; then
      --eval '(sb-fasl::!warm-load "src/cold/warm.lisp")' --quit
 fi
 echo //doing warm init - load and dump phase
-./src/runtime/sbcl --core output/cold-sbcl.core \
- --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit <<EOF
+./src/runtime/sbcl --noinform --core output/cold-sbcl.core \
+                   --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS \
+                   --no-sysinit --no-userinit --noprint <<EOF
 (progn ${devel})
 (sb-fasl::!warm-load "make-target-2-load.lisp")
 (setf (extern-alien "gc_coalesce_string_literals" char) 2)
