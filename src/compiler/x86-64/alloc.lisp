@@ -485,14 +485,9 @@
         (when (sc-is type unsigned-reg) (bug "vector-on-stack: unknown type"))
         (zeroize rax)
         (let ((nbytes (calc-shadow-bits-size rcx)))
-          (stack-allocation rdi nbytes 0)
-          ;; Due to a bug in our emitter for STOS, you do not have the ability
-          ;; to choose to emit STOSB, STOSW, or STOSD. (No Coke, Pepsi.)
-          (if (sc-is length immediate)
-              (inst mov rcx (/ nbytes 8)) ; compute in words now (including header is fine)
-              (inst shr rcx sb-vm:word-shift)))
+          (stack-allocation rdi nbytes 0))
         (inst rep)
-        (inst stos rax) ; was zeroed
+        (inst stos :byte) ; RAX was zeroed
         (inst lea rax (ea other-pointer-lowtag rsp-tn))
         (inst mov :dword (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
         (inst mov :dword (vector-len-ea rax)

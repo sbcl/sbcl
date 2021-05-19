@@ -50,7 +50,7 @@
 
   (inst shr count n-fixnum-tag-bits)
   (inst rep)
-  (inst stos item)
+  (inst stos :qword)
   DONE
   (inst ret)
   UNROLL

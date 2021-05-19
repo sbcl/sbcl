@@ -1682,7 +1682,8 @@
 
   (define-instruction movzx (segment sizes dst src)
     (:printer move-with-extension ((op #b1011011)))
-    (:emitter (emit* segment sizes dst src nil))))
+    (:emitter (aver (not (equal sizes '(:dword :qword)))) ; should use MOV instead
+              (emit* segment sizes dst src nil))))
 
 (flet ((emit* (segment thing gpr-opcode mem-opcode subcode)
          (let ((size (or (operand-size thing) :qword)))
@@ -2151,30 +2152,25 @@
     (:printer string-op ((op #b1010011)))
     (:emitter (emit* segment #b1010011 size)))
 
-  (define-instruction lods (segment acc)
+  (define-instruction lods (segment size)
     (:printer string-op ((op #b1010110)))
-    (:emitter (aver (accumulator-p acc))
-              (emit* segment #b1010110 (operand-size acc))))
+    (:emitter (emit* segment #b1010110 size)))
 
-  (define-instruction scas (segment acc)
+  (define-instruction scas (segment size)
     (:printer string-op ((op #b1010111)))
-    (:emitter (aver (accumulator-p acc))
-              (emit* segment #b1010111 (operand-size acc))))
+    (:emitter (emit* segment #b1010111 size)))
 
-  (define-instruction stos (segment acc)
+  (define-instruction stos (segment size)
     (:printer string-op ((op #b1010101)))
-    (:emitter (aver (accumulator-p acc))
-              (emit* segment #b1010101 (operand-size acc))))
+    (:emitter (emit* segment #b1010101 size)))
 
-  (define-instruction ins (segment acc)
+  (define-instruction ins (segment size)
     (:printer string-op ((op #b0110110)))
-    (:emitter (aver (accumulator-p acc))
-              (emit* segment #b0110110 (operand-size acc))))
+    (:emitter (emit* segment #b0110110 size)))
 
-  (define-instruction outs (segment acc)
+  (define-instruction outs (segment size)
     (:printer string-op ((op #b0110111)))
-    (:emitter (aver (accumulator-p acc))
-              (emit* segment #b0110111 (operand-size acc)))))
+    (:emitter (emit* segment #b0110111 size))))
 
 (define-instruction xlat (segment)
   (:printer byte ((op #b11010111)))

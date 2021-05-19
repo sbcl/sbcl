@@ -264,7 +264,7 @@
             (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
             (if (= bits 0) (zeroize rax) (inst mov rax bits)))))
    (inst rep)
-   (inst stos rax)
+   (inst stos :qword)
    (move result vector)))
 
 (dolist (name '(splat-word splat-small splat-any))
