@@ -220,7 +220,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                     size)
              (let ((ref-name-c (symbolicate ref-name "-C"))
                    (set-name-c (symbolicate set-name "-C"))
-                   (modifier (if (eq ref-insn 'mov) size `(,size :qword))))
+                   (modifier (if (eq ref-insn 'mov)
+                                 size
+                                 `(,size ,(if (eq ref-insn 'movzx) :dword :qword)))))
                `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
@@ -275,7 +277,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     unsigned-reg positive-fixnum :word)
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16 movsx
     signed-reg tagged-num :word)
-  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 movzx
+  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 mov
     unsigned-reg unsigned-num :dword)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32 movsx
     signed-reg signed-num :dword)

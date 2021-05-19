@@ -934,7 +934,7 @@
                                             type &rest scs)
   (binding* ((opcode-modifier (if (eq mov-inst 'mov)
                                   operand-size
-                                  `(,operand-size :qword)))
+                                  `(,operand-size ,(if (eq mov-inst 'movzx) :dword :qword))))
              (n-bytes (the (member 1 2 4) (size-nbyte operand-size)))
              ((index-sc scale)
               (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
@@ -1014,14 +1014,14 @@
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-16 movsx :word
     tagged-num signed-reg)
-  (define-data-vector-frobs simple-array-unsigned-byte-32 movzx :dword
+  (define-data-vector-frobs simple-array-unsigned-byte-32 mov :dword
     positive-fixnum unsigned-reg signed-reg)
-  (define-data-vector-frobs simple-array-unsigned-byte-31 movzx :dword
+  (define-data-vector-frobs simple-array-unsigned-byte-31 mov :dword
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-32 movsx :dword
     tagged-num signed-reg)
   #+sb-unicode
-  (define-data-vector-frobs simple-character-string movzx :dword
+  (define-data-vector-frobs simple-character-string mov :dword
     character character-reg))
 
 

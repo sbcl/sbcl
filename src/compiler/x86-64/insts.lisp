@@ -1661,15 +1661,6 @@
          (let ((dst-size (cadr sizes)) ; DST-SIZE size governs the OPERAND-SIZE
                (src-size (car sizes))) ; SRC-SIZE is controlled by the opcode
            (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
-           ;; Zero-extending into a 64-bit register is the same as zero-extending
-           ;; into the 32-bit register.
-           (when (and (not signed-p) (eq dst-size :qword))
-             ;; It's slightly strange for the assembler to output a different instruction
-             ;; from the one you said to. I'm not sure how to feel about this.
-             ;; There might be reasons you wanted to emit a certain thing.
-             (when (eq src-size :dword) ; this is a straight MOV
-               (return-from emit* (emit-mov segment :dword dst src)))
-             (setf dst-size :dword))
            (emit-prefixes segment (sized-thing src src-size) dst dst-size)
            (if (eq src-size :dword)
                ;; AMD calls this MOVSXD. If emitted without REX.W, it writes
