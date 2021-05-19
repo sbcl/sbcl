@@ -485,7 +485,8 @@
         (when (sc-is type unsigned-reg) (bug "vector-on-stack: unknown type"))
         (zeroize rax)
         (let ((nbytes (calc-shadow-bits-size rcx)))
-          (stack-allocation rdi nbytes 0))
+          (stack-allocation rdi nbytes 0)
+          (when (sc-is length immediate) (inst mov rcx nbytes)))
         (inst rep)
         (inst stos :byte) ; RAX was zeroed
         (inst lea rax (ea other-pointer-lowtag rsp-tn))
