@@ -218,17 +218,17 @@
   (if (member widetag
               `(,simple-bit-vector-widetag
                 ,simple-base-string-widetag
-                ,simple-character-string-widetag
+                #+sb-unicode ,simple-character-string-widetag
                 ,simple-array-unsigned-byte-2-widetag
                 ,simple-array-unsigned-byte-4-widetag
                 ,simple-array-unsigned-byte-8-widetag
                 ,simple-array-unsigned-byte-16-widetag
                 ,simple-array-unsigned-byte-32-widetag
-                ,simple-array-unsigned-byte-64-widetag
+                #+64-bit ,simple-array-unsigned-byte-64-widetag
                 ,simple-array-signed-byte-8-widetag
                 ,simple-array-signed-byte-16-widetag
                 ,simple-array-signed-byte-32-widetag
-                ,simple-array-signed-byte-64-widetag))
+                #+64-bit ,simple-array-signed-byte-64-widetag))
       t
       nil))
 
