@@ -22,7 +22,7 @@
       (inst mov result base)
       (inst lea result (ea lowtag base))))
 
-(defun stack-allocation (alloc-tn size lowtag)
+(defun stack-allocation (alloc-tn size lowtag &optional known-alignedp)
   (aver (not (location= alloc-tn rsp-tn)))
   (inst sub rsp-tn size)
   ;; see comment in x86/macros.lisp implementation of this
@@ -32,7 +32,8 @@
   ;; - It's not the job of FIXED-ALLOC to realign anything.
   ;; - The real issue is that it's not obvious that the stack is
   ;;   16-byte-aligned at *all* times. Maybe it is, maybe it isn't.
-  (inst and rsp-tn #.(lognot lowtag-mask))
+  (unless known-alignedp ; can skip this AND if we're all good
+    (inst and rsp-tn #.(lognot lowtag-mask)))
   (tagify alloc-tn rsp-tn lowtag)
   (values))
 
@@ -374,42 +375,6 @@
                    words (ash 1 (- word-shift n-fixnum-tag-bits)))
                0))))
 
-(defun make-shadow-bits (type length rax rcx rdi stackp exit-label)
-  (declare (ignore stackp))
-  (zeroize rax)
-  ;; If we're not sure at compile-time what type the vector is, then generate
-  ;; code to check what it is. Can this actually happen? Not on the stack,
-  ;; but yes on the heap.
-  (when (sc-is type unsigned-reg)
-    (inst cmp :byte type simple-vector-widetag)
-    (inst jmp :e exit-label))
-  (let ((nbytes
-         (cond ((sc-is length immediate)
-                ;; Calculate number of dualwords (as 128 bits per dualword)
-                ;; and multiply by 16 to get number of bytes. Also add the 2 header words.
-                (* 16 (+ 2 (ceiling (tn-value length) 128))))
-               (t
-                ;; Compute (CEILING length 128) by adding 127, then truncating divide
-                ;; by 128, and untag as part of the divide step.
-                ;; Account for the two fixed words by adding in 128 more bits initially.
-                (inst lea :dword rcx (ea (fixnumize (+ 128 127)) length))
-                (inst shr :dword rcx 8) ; divide by 128 and untag as one operation
-                (inst shl :dword rcx 4) ; multiply by 16 bytes per dualword
-                rcx))))
-    (stack-allocation rdi nbytes 0)
-    ;; Due to a bug in our emitter for STOS, you do not have the ability
-    ;; to choose to emit STOSB, STOSW, or STOSD. (No Coke, Pepsi.)
-    (if (sc-is length immediate)
-        (inst mov rcx (/ nbytes 8)) ; compute in words now (including header is fine)
-        (inst shr rcx sb-vm:word-shift)))
-  (inst rep)
-  (inst stos rax) ; was zeroed
-  (inst lea rax (ea other-pointer-lowtag rsp-tn))
-  (inst mov :dword (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
-  (inst mov :dword (vector-len-ea rax)
-        (if (sc-is length immediate) (fixnumize (tn-value length)) length))
-  (inst mov :qword (ea (- 8 other-pointer-lowtag) rax) nil-value))
-
 (macrolet ((calc-size-in-bytes (n-words result-tn)
              `(cond ((sc-is ,n-words immediate)
                      (pad-data-block (+ (tn-value ,n-words) vector-data-offset)))
@@ -430,7 +395,28 @@
              `(and (sb-c::policy node (> safety 0))
                    (if (sc-is type immediate)
                        (/= (tn-value type) simple-vector-widetag)
-                       :maybe))))
+                       :maybe)))
+           (calc-shadow-bits-size (reg)
+             `(cond ((sc-is length immediate)
+                     ;; Calculate number of dualwords (as 128 bits per dualword)
+                     ;; and multiply by 16 to get number of bytes. Also add the 2 header words.
+                     (* 16 (+ 2 (ceiling (tn-value length) 128))))
+                    (t
+                     ;; Compute (CEILING length 128) by adding 127, then truncating divide
+                     ;; by 128, and untag as part of the divide step.
+                     ;; Account for the two fixed words by adding in 128 more bits initially.
+                     (inst lea :dword ,reg (ea (fixnumize (+ 128 127)) length))
+                     (inst shr :dword ,reg 8) ; divide by 128 and untag as one operation
+                     (inst shl :dword ,reg 4) ; multiply by 16 bytes per dualword
+                     ,reg)))
+           (store-originating-pc (vector)
+             ;; Put the current program-counter into the length slot of the shadow bits
+             ;; so that we can ascribe blame to the array's creator.
+             `(let ((here (gen-label)))
+                (emit-label here)
+                (inst lea temp-reg-tn (rip-relative-ea here))
+                (inst shl temp-reg-tn 4)
+                (inst mov (ea (- 8 other-pointer-lowtag) ,vector) temp-reg-tn))))
 
   (define-vop (allocate-vector-on-heap)
     (:args (type :scs (unsigned-reg immediate))
@@ -443,6 +429,27 @@
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
+      #+array-ubsan
+      (when (want-shadow-bits)
+        ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
+        ;; which can use unbound-marker as a poison value on reads.
+        (when (sc-is type unsigned-reg)
+          (inst cmp :byte type simple-vector-widetag)
+          (inst push 0)
+          (inst jmp :e NO-SHADOW-BITS))
+        ;; It would be possible to do this and the array proper
+        ;; in a single pseudo-atomic section, but I don't care to do that.
+        (let ((nbytes (calc-shadow-bits-size result)))
+          (pseudo-atomic ()
+            ;; Allocate the bits into RESULT
+            (allocation nil nbytes 0 node nil result)
+            (inst mov :byte (ea result) simple-bit-vector-widetag)
+            (inst mov :dword (vector-len-ea result 0)
+                  (if (sc-is length immediate) (fixnumize (tn-value length)) length))
+            (inst or :byte result other-pointer-lowtag)))
+        (store-originating-pc result)
+        (inst push result)) ; save the pointer to the shadow bits
+      NO-SHADOW-BITS
       ;; The LET generates instructions that needn't be pseudoatomic
       ;; so don't move it inside.
       (let ((size (calc-size-in-bytes words result)))
@@ -450,7 +457,13 @@
         (pseudo-atomic ()
          (allocation nil size 0 node nil result)
          (put-header result 0 type length t)
-         (inst or :byte result other-pointer-lowtag)))))
+         (inst or :byte result other-pointer-lowtag)))
+      #+array-ubsan
+      (cond ((want-shadow-bits)
+             (inst pop temp-reg-tn) ; restore shadow bits
+             (inst mov (object-slot-ea result 1 other-pointer-lowtag) temp-reg-tn))
+            (t
+             (store-originating-pc result)))))
 
   (define-vop (allocate-vector-on-stack)
     (:args (type :scs (unsigned-reg immediate))
@@ -469,14 +482,28 @@
       (when (want-shadow-bits)
         ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
         ;; which can use unbound-marker as a poison value on reads.
-        ;; This is overly conservative because this vector might get explicitly filled.
-        ;; If it does, we can zero out the slot for the shadow bits.
-        (make-shadow-bits type length rax rcx rdi t NO-SHADOW-BITS))
-      NO-SHADOW-BITS
+        (when (sc-is type unsigned-reg) (bug "vector-on-stack: unknown type"))
+        (zeroize rax)
+        (let ((nbytes (calc-shadow-bits-size rcx)))
+          (stack-allocation rdi nbytes 0)
+          ;; Due to a bug in our emitter for STOS, you do not have the ability
+          ;; to choose to emit STOSB, STOSW, or STOSD. (No Coke, Pepsi.)
+          (if (sc-is length immediate)
+              (inst mov rcx (/ nbytes 8)) ; compute in words now (including header is fine)
+              (inst shr rcx sb-vm:word-shift)))
+        (inst rep)
+        (inst stos rax) ; was zeroed
+        (inst lea rax (ea other-pointer-lowtag rsp-tn))
+        (inst mov :dword (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
+        (inst mov :dword (vector-len-ea rax)
+              (if (sc-is length immediate) (fixnumize (tn-value length)) length))
+        (store-originating-pc rax))
       (let ((size (calc-size-in-bytes words result)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
-        (stack-allocation result size other-pointer-lowtag)
+        (stack-allocation result size other-pointer-lowtag
+                          ;; If already aligned RSP, don't need to do it again.
+                          #+array-ubsan (want-shadow-bits))
         ;; NB: store the trailing null BEFORE storing the header,
         ;; in case the length in words is 0, which stores into the LENGTH slot
         ;; as if it were element -1 of data (which probably can't happen).
@@ -485,10 +512,12 @@
         (put-header result other-pointer-lowtag type length nil)
         )
       #+array-ubsan
-      (when (want-shadow-bits)
-        (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
-                      result)
-              rax))))
+      (cond ((want-shadow-bits)
+             (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
+                           result)
+                   rax))
+            (t
+             (store-originating-pc result)))))
 
   #+linux ; unimplemented for others
   (define-vop (allocate-vector-on-stack+msan-unpoison)

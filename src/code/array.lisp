@@ -478,6 +478,13 @@
           ((and simple (= array-rank 1))
            (let ((vector ; a (SIMPLE-ARRAY * (*))
                   (allocate-vector-with-widetag widetag dimension-0 n-bits)))
+             ;; store the function which bears responsibility for creation of this
+             ;; array in case we need to blame it for not initializing.
+             #+array-ubsan
+             (set-vector-extra-data (if (= widetag simple-vector-widetag) ; no shadow bits.
+                                        vector ; use the LENGTH slot directly
+                                        (vector-extra-data vector))
+              (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: array-ubsan magic
              ;; presence of at most one :INITIAL-thing keyword was ensured above
              (cond (initial-element-p
                     (fill vector initial-element))
@@ -487,7 +494,17 @@
                         (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
                                 the vector length is ~W."
                                content-length dimension-0)))
-                    (replace vector initial-contents)))
+                    (replace vector initial-contents))
+                   #+array-ubsan
+                   (t
+                    (cond ((= widetag simple-vector-widetag)
+                           (fill vector (%make-lisp-obj no-tls-value-marker-widetag)))
+                          ((array-may-contain-random-bits-p widetag)
+                           ;; Leave the last word alone for base-string,
+                           ;; in case the mandatory trailing null is part of a data word.
+                           (dotimes (i (- (vector-length-in-words dimension-0 n-bits)
+                                          (if (= widetag simple-base-string-widetag) 1 0)))
+                             (setf (%vector-raw-bits vector i) sb-ext:most-positive-word))))))
              vector))
           ((and (arrayp displaced-to)
                 (/= (array-underlying-widetag displaced-to) widetag))

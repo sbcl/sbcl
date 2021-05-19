@@ -1071,6 +1071,11 @@ sweep_varyobj_pages(int raise)
             size = sizetab[header_widetag(word)](obj);
             if (filler_obj_p(obj)) { // do nothing
             } else if ((gen = immobile_obj_gen_bits(obj)) == discard_gen) {
+                if (header_widetag(word) == CODE_HEADER_WIDETAG) {
+                    /* fprintf(stderr, "%lX freed (id=%x)\n",
+                            make_lispobj(obj, OTHER_POINTER_LOWTAG),
+                            code_serialno((struct code*)obj)); */
+                }
                 make_filler(obj, size * N_WORD_BYTES);
             } else if (gen == keep_gen) {
                 assign_generation(obj, gen = new_gen);

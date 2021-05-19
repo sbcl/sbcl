@@ -57,7 +57,7 @@
            ;; Features that are also in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
            ;; and would probably mess up something if made non-public,
            ;; though I don't think they should all be public.
-           :MSAN
+           :MSAN :ARRAY-UBSAN
            :SB-SAFEPOINT
            :SB-THREAD :SB-UNICODE
            ;; Things which (I think) at least one person has requested be kept around

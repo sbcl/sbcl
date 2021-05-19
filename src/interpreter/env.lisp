@@ -894,7 +894,7 @@
   ;; then insert assertions for all variables bound by this scope.
   (when (and (policy env (>= safety 1))
              (find-if #'cdr symbols :end n-var-bindings))
-    (let ((checks (make-array n-var-bindings)))
+    (let ((checks (make-array n-var-bindings :initial-element 0)))
       (dotimes (i n-var-bindings (setf (binding-typechecks decl-scope) checks))
         (awhen (cdr (svref symbols i))
           (setf (svref checks i) (type-checker it))))))

@@ -1157,6 +1157,7 @@ We could try a few things to mitigate this:
 ;;; code-components are considered to reference their embedded
 ;;; simple-funs for this purpose; if THIS is a simple-fun, it is ignored.
 (defun references-p (this that)
+  (declare (optimize (sb-c::aref-trapping 0)))
   (macrolet ((test (x) `(when (eq ,x that) (go win))))
     (tagbody
        (do-referenced-object (this test)
@@ -1529,6 +1530,21 @@ We could try a few things to mitigate this:
                     (acond ((wrapper-info x) (ldb (byte (dd-length it) 0) m))
                            (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))
+
+#+array-ubsan
+(defun find-poisoned-vectors (&aux result)
+  (dolist (v (sb-vm:list-allocated-objects :all :type sb-vm:simple-vector-widetag)
+             result)
+    (when (dotimes (i (length v))
+            (declare (optimize (sb-c::aref-trapping 0)))
+            (let ((val (svref v i)))
+              (when (= (get-lisp-obj-address val) no-tls-value-marker-widetag)
+                (return t))))
+      (push (make-weak-pointer v) result)
+      (let* ((origin (vector-extra-data v))
+             (code (sb-di::code-header-from-pc (ash origin -3)))
+             (*print-array* nil))
+        (format t "g~d ~a ~a~%" (sb-kernel:generation-of v) v code)))))
 
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add

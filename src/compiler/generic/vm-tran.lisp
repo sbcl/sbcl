@@ -55,6 +55,15 @@
 #+(or x86 x86-64)
 (defun fold-index-addressing (fun-name element-size lowtag data-offset
                               index offset &optional setter-p)
+  ;; UNINITIALIZED-ELEMENT-ERROR does not take the ADDEND,
+  ;; so we need to make sure that it's always 0 for #+array-ubsan.
+  ;; #-array-ubsan has a minor problem in terms of error-reporting.
+  ;; The condition report method does not try to show the index of the
+  ;; trapping element, so we're at least not wrong. A good solution might be
+  ;; to have separate 2-arg and 3-arg variants of UNINITIALIZED-ELEMENT,
+  ;; or else always emit the addend even if zero. As things are, a 0 in the
+  ;; error payload eats 4 bytes due to design choices in sc+offset encoding.
+  #+array-ubsan (give-up-ir1-transform)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
     (destructuring-bind (x constant) index-args
       (unless (and (constant-lvar-p constant)

@@ -309,7 +309,7 @@
                   :good)))))
 
 (with-test (:name (adjust-array :multidimensional))
-  (let ((ary (make-array '(2 2))))
+  (let ((ary (make-array '(2 2) :initial-element 0)))
     ;; SBCL used to give multidimensional arrays a bogus fill-pointer
     (assert (not (array-has-fill-pointer-p (adjust-array ary '(2 2)))))))
 
@@ -463,7 +463,7 @@
     (() #(4 5 6) :test #'equalp)))
 
 (with-test (:name (adjust-array :fill-pointer))
-  (let ((array (make-array 10 :fill-pointer t)))
+  (let ((array (make-array 10 :fill-pointer t :initial-element 0)))
     (assert (= (fill-pointer (adjust-array array 5 :fill-pointer 2))
                2))))
 

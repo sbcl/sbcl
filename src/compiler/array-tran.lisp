@@ -906,7 +906,11 @@
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
                   ,(wrap (cond ((eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
-                                `(sb-vm::splat ,data-alloc-form nwords :safe-default))
+                                `(sb-vm::splat ,data-alloc-form nwords
+                                               ;; uninitialized reads are trapped regardless of safety
+                                               ;; if #+array-ubsan
+                                               #+array-ubsan :trap
+                                               #-array-ubsan 0))
                                (t
                                 ;; otherwise, reading an element can't cause an invalid bit pattern
                                 ;; to be observed, but the bits could be random.
@@ -1050,10 +1054,14 @@
                             ,@(maybe-arg fill-pointer)
                             ,@(maybe-arg displaced-to)
                             ,@(maybe-arg displaced-index-offset))))
-      (cond ((or (not initial-element)
-                 (and (constant-lvar-p initial-element)
-                      (eql (lvar-value initial-element)
-                           (sb-vm:saetp-initial-element-default saetp))))
+      (cond ((not initial-element) creation-form)
+            ;; with array-ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
+            ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
+            ;; to scribble on the array. Same for allocators that don't prezero
+            #-array-ubsan
+            ((and (constant-lvar-p initial-element)
+                  (eql (lvar-value initial-element)
+                       (sb-vm:saetp-initial-element-default saetp)))
              creation-form)
             (t
              ;; error checking for target, disabled on the host because

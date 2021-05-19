@@ -604,7 +604,18 @@
     (let ((prev (sb-c::previous-vop-is
                  vop
                  '(instance-index-ref-c slot
+                   ;; FIXME: could we also handle the non "-C" vop?
+                   ;; The problem is that because FIXNUMP only takes one arg,
+                   ;; an additional TN would have to be grafted into the data flow
+                   ;; to convey the INDEX arg. So it's not the same fixnump vop
+                   ;; any more - it's like a two-arg variant of fixnump.
                    data-vector-ref-with-offset/simple-vector-c))))
+      ;; Inhibit the optimization on simple-vector if we need to trap uninitialized reads.
+      ;; #+array-ubsan always inhibits, otherwise it's policy-based
+      (when (and prev
+                 (eq (vop-name prev) 'data-vector-ref-with-offset/simple-vector-c)
+                 #-array-ubsan (sb-c::policy (sb-c::vop-node vop) (= safety 3)))
+        (return-from vop-optimize-fixnump-optimizer nil))
       (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
         (let ((arg (sb-c::vop-args vop)))

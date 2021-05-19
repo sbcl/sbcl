@@ -16,6 +16,49 @@
 ;; field of an EA can't contain 64 bit values.
 (sb-xc:deftype low-index () '(signed-byte 29))
 
+(defun unpoison-element (array index &optional (addend 0))
+  #-array-ubsan (declare (ignore array index addend))
+  #+array-ubsan
+  (let ((no-bits (gen-label)))
+    (aver (= addend 0))
+    (inst mov temp-reg-tn (object-slot-ea array 1 other-pointer-lowtag))
+    ;; See if the ancillary slot holds a bit-vector and not a list.
+    ;; A list will denote the stack trace at the creation site
+    ;; rather than shadow bits.
+    (inst test :byte temp-reg-tn #b1000)
+    (inst jmp :z no-bits)
+    (flet ((constant-index (index)
+             (multiple-value-bind (dword-index bit) (floor index 32) dword-index bit
+               (inst bts :lock :dword (ea (bit-base dword-index) temp-reg-tn) bit))))
+      (if (integerp index)
+          (constant-index index)
+          (sc-case index
+           (immediate (constant-index (tn-value index)))
+           ((signed-reg unsigned-reg)
+            (inst bts :lock (ea (bit-base 0) temp-reg-tn) index))
+           (t
+            (aver (sc-is index any-reg))
+            (inst shr :dword index 1) ; untag it
+            (inst bts :lock (ea (bit-base 0) temp-reg-tn) index)
+            (inst shl :dword index 1)))))
+    (emit-label no-bits)))
+
+(defun test-poisoned (vop temp array index &optional (addend 0))
+  (declare (ignore vop temp array index addend))
+  #+nil
+  (unless (sb-c::policy (sb-c::vop-node vop) (= safety 0))
+    (let ((ok (gen-label)))
+      (when (integerp index) (setq index (emit-constant index)))
+      (inst mov temp (object-slot-ea object 1 other-pointer-lowtag)) ; shadow bits
+      (inst test :byte temp temp)
+      (inst jmp :z ok) ; no shadow bits
+      (if (and (eql addend 0) (eql (tn-sc index unsigned-reg)))
+          (inst bt (ea (bit-base 0) temp) index)
+          (error "Unhandled SCs in test-poisoned"))
+      (inst jmp :nc (generate-error-code vop 'uninitialized-element-error
+                                         object index addend))
+      (emit-label ok))))
+
 ;;;; allocator for the array header
 
 (define-vop (make-array-header)
@@ -256,6 +299,7 @@
                                                      vector-data-offset))
                    ,el-type)
        (:generator 4
+         ,@(unless (eq type 'simple-vector) '((unpoison-element object index addend)))
          (gen-cell-set
                    (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))
@@ -274,6 +318,7 @@
                                                      vector-data-offset))
                    ,el-type)
        (:generator 3
+         ,@(unless (eq type 'simple-vector) '((unpoison-element object (+ index addend))))
          (gen-cell-set
                    (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag)
                        object)
@@ -298,9 +343,15 @@
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
     unsigned-reg))
 
+;;; Try to combine DATA-VECTOR-REF/SIMPLE-VECTOR + IF-EQ.
+;;; But never do it under array-ubsan.
+#-array-ubsan
 (defoptimizer (sb-c::vop-optimize data-vector-ref-with-offset/simple-vector) (vop)
   (let ((next (vop-next vop)))
-    (when (and next (eq (vop-name next) 'if-eq))
+    (when (and next
+               (eq (vop-name next) 'if-eq)
+               ;; Prevent this optimization in safe code
+               (sb-c::policy (sb-c::vop-node vop) (< safety 3)))
       (let* ((result-tn (tn-ref-tn (sb-c::vop-results vop)))
              (next-args (sb-c::vop-args next))
              (left (tn-ref-tn next-args))
@@ -312,7 +363,8 @@
                    (or (eq result-tn left) (eq result-tn right))
                    (or (not (constant-tn-p comparand))
                        (and (tn-sc comparand)
-                            (plausible-signed-imm32-operand-p (encode-value-if-immediate comparand)))))
+                            (plausible-signed-imm32-operand-p
+                             (encode-value-if-immediate comparand)))))
           (let* ((new-args (sb-c::reference-tn-list
                             (list (tn-ref-tn (sb-c::vop-args vop))
                                   (tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))
@@ -354,14 +406,12 @@
     (inst mov value (ea (* addend n-word-bytes) array
                         index (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
+;;; TODO: check for uninitialized element if safety = 3
 (define-full-compare-and-swap %compare-and-swap-svref simple-vector
   vector-data-offset other-pointer-lowtag
   (descriptor-reg any-reg) *
   %compare-and-swap-svref)
 
-;;;; integer vectors whose elements are smaller than a byte, i.e.,
-;;;; bit, 2-bit, and 4-bit vectors
-
 ;;; SIMPLE-BIT-VECTOR
 (defun bit-base (dword-index)
   (+ (* dword-index 4)
@@ -382,7 +432,7 @@
 (define-vop (data-vector-set-with-offset/simple-bit-vector)
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
-  ;; Arg order is (VECTOR INDEX OFFSET VALUE)
+  ;; Arg order is (VECTOR INDEX ADDEND VALUE)
   (:arg-types simple-bit-vector positive-fixnum (:constant (eql 0)) positive-fixnum)
   (:args (bv :scs (descriptor-reg))
          (index :scs (unsigned-reg immediate))
@@ -391,6 +441,7 @@
   (:info addend)
   (:ignore addend)
   (:generator 6
+    (unpoison-element bv index)
     (when (sc-is value immediate)
       (ecase (tn-value value)
         (1 (emit-sbit-op 'bts bv index))
@@ -436,14 +487,20 @@
   (:info addend)
   (:ignore addend)
   (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
+  ;; SIGNED-REG has a smaller SC number than UNSIGNED-REG so it encodes shorter
+  ;; in the error trap
+  (:temporary (:sc signed-reg :offset #.(tn-offset temp-reg-tn)) temp)
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
+  (:vop-var vop)
   (:generator 4
+    (progn temp)
     (inst bt (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                  object) index)
     (inst sbb :dword result result)
     (inst and :dword result (fixnumize 1))))
 
+;;;; vectors whose elements are 2 or 4 bits each
 (macrolet ((def-small-data-vector-frobs (type bits)
              (let* ((elements-per-word (floor n-word-bits bits))
                     (bit-shift (1- (integer-length elements-per-word))))
@@ -509,6 +566,7 @@
          (:temporary (:sc unsigned-reg) old)
          (:temporary (:sc unsigned-reg :offset rcx-offset) ecx)
          (:generator 25
+           (unpoison-element object index)
            (move word-index index)
            (inst shr word-index ,bit-shift)
            (inst mov old
@@ -549,6 +607,7 @@
          (:ignore addend)
          (:temporary (:sc unsigned-reg :to (:result 0)) old)
          (:generator 20
+           (unpoison-element object index)
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
              (inst mov old
                    (ea (- (* (+ word vector-data-offset) n-word-bytes)
@@ -583,18 +642,18 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 ;;; And the float variants.
 
-(defun float-ref-ea (object index offset element-size
+(defun float-ref-ea (object index addend element-size
                               &key (scale 1) (complex-offset 0))
   (etypecase index
       (integer
        (ea (- (+ (* vector-data-offset n-word-bytes)
-                 (* (+ index offset) element-size)
+                 (* (+ index addend) element-size)
                  complex-offset)
               other-pointer-lowtag)
            object))
       (tn
        (ea (- (+ (* vector-data-offset n-word-bytes)
-                 (* offset element-size)
+                 (* addend element-size)
                  complex-offset)
               other-pointer-lowtag)
            object index scale))))
@@ -652,6 +711,7 @@
                   single-float)
      ,@(when use-temp '((:temporary (:sc unsigned-reg) dword-index)))
      (:generator 5
+      (unpoison-element object index addend)
       ;; NOTE: this can not possibly work with n-fixnum-tag-bits = 3
       ;; because (ash 4 -3) is 0
       ,@(if use-temp
@@ -673,6 +733,7 @@
                                                 4 vector-data-offset))
               single-float)
   (:generator 4
+   (unpoison-element object (+ index addend))
    (inst movss (float-ref-ea object index addend 4) value)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-double-float)
@@ -718,6 +779,7 @@
                                                 8 vector-data-offset))
               double-float)
   (:generator 20
+   (unpoison-element object index addend)
    (inst movsd (float-ref-ea object index addend 8
                                       :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
          value)))
@@ -734,6 +796,7 @@
                                                 8 vector-data-offset))
               double-float)
   (:generator 19
+   (unpoison-element object (+ index addend))
    (inst movsd (float-ref-ea object index addend 8) value)))
 
 ;;; complex float variants
@@ -781,6 +844,7 @@
                                                 8 vector-data-offset))
               complex-single-float)
   (:generator 5
+    (unpoison-element object index addend)
     (inst movq (float-ref-ea object index addend 8
                                       :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
           value)))
@@ -797,6 +861,7 @@
                                                 8 vector-data-offset))
               complex-single-float)
   (:generator 4
+    (unpoison-element object (+ index addend))
     (inst movq (float-ref-ea object index addend 8) value)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
@@ -842,6 +907,7 @@
                                                 16 vector-data-offset))
               complex-double-float)
   (:generator 20
+    (unpoison-element object index addend)
     (inst movapd (float-ref-ea object index addend 16
                                         :scale (ash 2 (- word-shift n-fixnum-tag-bits)))
           value)))
@@ -858,6 +924,7 @@
                                                 16 vector-data-offset))
               complex-double-float)
   (:generator 19
+    (unpoison-element object (+ index addend))
     (inst movapd (float-ref-ea object index addend 16) value)))
 
 
@@ -917,7 +984,9 @@
                        (:constant (constant-displacement other-pointer-lowtag
                                                          ,n-bytes vector-data-offset))
                        ,type)
-           (:generator 5 (inst mov ,operand-size ,ea-expr value)))
+           (:generator 5
+            (unpoison-element object index addend)
+            (inst mov ,operand-size ,ea-expr value)))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-set-with-offset)
            (:policy :fast-safe)
@@ -928,7 +997,9 @@
                        (:constant (constant-displacement other-pointer-lowtag
                                                          ,n-bytes vector-data-offset))
                        ,type)
-           (:generator 4 (inst mov ,operand-size ,ea-expr-const value)))))))
+           (:generator 4
+            (unpoison-element object (+ index addend))
+            (inst mov ,operand-size ,ea-expr-const value)))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 movzx :byte
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 movzx :byte

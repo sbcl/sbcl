@@ -360,6 +360,8 @@
   (invalid-array-index-error array index bound))
 (deferr invalid-vector-index-error (vector index)
   (invalid-array-index-error vector index (length vector)))
+(deferr uninitialized-element-error (vector index)
+  (error 'uninitialized-element-error :name (cons vector index)))
 
 (deferr tls-exhausted-error ()
   ;; There is nothing we can do about it. A number of entries in the

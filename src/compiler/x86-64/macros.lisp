@@ -301,28 +301,47 @@
                              object))))))
 
 (defmacro define-full-reffer+addend (name type offset lowtag scs el-type &optional translate)
+  (flet ((trap (index-to-encode)
+           (declare (ignorable index-to-encode))
+           #+array-ubsan
+           ;; It's OK that the cell is read twice when testing for a trap value.
+           ;; The value should only change from trapping to non-trapping, so if we loaded
+           ;; a trap, and then one instruction later the data is valid (due to being
+           ;; stored in another thread), then it's a false positive that is indicative
+           ;; of a race. A false negative (failure to signal on a trap value) can not
+           ;; occur unless unsafely using REPLACE into this vector.
+           (when (memq name '(data-vector-ref-with-offset/simple-vector
+                              data-vector-ref-with-offset/simple-vector-c))
+             `((when (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-trapping 0))
+                 (inst cmp :byte ea no-tls-value-marker-widetag)
+                 (inst jmp :e (generate-error-code
+                               vop 'uninitialized-element-error object
+                               ,index-to-encode)))))))
   `(progn
      (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
+       ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
-       (:info offset)
+       (:info addend)
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement other-pointer-lowtag
                                                      n-word-bytes vector-data-offset)))
        (:results (value :scs ,scs))
        (:result-types ,el-type)
-       (:generator 3                    ; pw was 5
-         (inst mov value (ea (- (* (+ ,offset offset) n-word-bytes) ,lowtag)
-                             object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+       (:vop-var vop)
+       (:generator 3
+         (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
+                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))))
+           ,@(trap 'index)
+           (inst mov value ea))))
+     ;; This vop is really not ideal to have.  Couldn't we recombine two constants
+     ;; and use a vop that only takes the object and just ONE index?
      (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
+       ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
-       (:info index offset)
+       (:info index addend)
        (:arg-types ,type
                    (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
                                                 ,(eval offset)))
@@ -330,9 +349,11 @@
                                                      n-word-bytes vector-data-offset)))
        (:results (value :scs ,scs))
        (:result-types ,el-type)
-       (:generator 2                    ; pw was 5
-         (inst mov value (ea (- (* (+ ,offset index offset) n-word-bytes) ,lowtag)
-                             object))))))
+       (:vop-var vop)
+       (:generator 2
+         (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
+           ,@(trap '(emit-constant (+ index addend)))
+           (inst mov value ea)))))))
 
 ;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO %INSTANCE-SET
 ;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
@@ -371,5 +392,3 @@
                            object)
                        value ,resultp vop
                        ,(eq name 'set-funcallable-instance-info)))))))
-
-

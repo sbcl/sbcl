@@ -195,6 +195,43 @@
         (* length (ash n-bits -3))
         (ash (* (+ length alignment-pad) n-bits) -3))))
 
+;;; Access the shadow bits for a simple rank-1 array
+;;; It is important that the pointer to these bits be a normal full-lispword
+;;; pointer, because otherwise update_page_write_prot() would fail to see
+;;; the pointer to the shadow bits.
+;;; Alternatively we could place them in malloc()'ed memory
+;;; but then we'd need a finalizer per array.
+#+array-ubsan
+(progn
+(export '(vector-extra-data))
+(defmacro vector-extra-data (vector)
+  `(%primitive slot ,vector 'length 1 other-pointer-lowtag))
+(defmacro set-vector-extra-data (vector data)
+  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag)))
+
+;;; Return T if arrays with the given WIDETAG may contain random data
+;;; initially unless expressly initialized.
+;;; Some types such as SB-VM:SIMPLE-ARRAY-FIXNUM-WIDETAG must not have
+;;; random bits in them because a 1 in the LSB of a word would not be
+;;; a fixnum, and could lead to corruption on use.
+(defun array-may-contain-random-bits-p (widetag)
+  (if (member widetag
+              `(,simple-bit-vector-widetag
+                ,simple-base-string-widetag
+                ,simple-character-string-widetag
+                ,simple-array-unsigned-byte-2-widetag
+                ,simple-array-unsigned-byte-4-widetag
+                ,simple-array-unsigned-byte-8-widetag
+                ,simple-array-unsigned-byte-16-widetag
+                ,simple-array-unsigned-byte-32-widetag
+                ,simple-array-unsigned-byte-64-widetag
+                ,simple-array-signed-byte-8-widetag
+                ,simple-array-signed-byte-16-widetag
+                ,simple-array-signed-byte-32-widetag
+                ,simple-array-signed-byte-64-widetag))
+      t
+      nil))
+
 (in-package "SB-C")
 
 (defun find-saetp (element-type)

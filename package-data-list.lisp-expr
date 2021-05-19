@@ -2106,7 +2106,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "UNDEFINED-FUN-ERROR" "UNDEFINED-ALIEN-FUN-ERROR"
                "UNION-TYPE" "UNION-TYPE-P"
                "UNION-TYPE-TYPES" "UNKNOWN-ERROR"
-               "UNINITIALIZED-MEMORY-ERROR"
+               "UNINITIALIZED-ELEMENT-ERROR" ; for Lisp arrays
+               "UNINITIALIZED-MEMORY-ERROR" ; for SAPs
                "UNKNOWN-KEY-ARG-ERROR" "UNKNOWN-TYPE" "UNKNOWN-TYPE-P"
                "UNKNOWN-TYPE-SPECIFIER" "UNSEEN-THROW-TAG-ERROR"
                "UNSIGNED-BYTE-32-P" "UNSIGNED-BYTE-64-P"

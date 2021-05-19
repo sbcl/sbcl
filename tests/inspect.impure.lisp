@@ -37,7 +37,7 @@
     (assert (search "PROTOTYPE: " (test-inspect class)))))
 
 (with-test (:name (inspect array :element-type :lp-1835934))
-  (let* ((array (make-array '()))
+  (let* ((array (make-array '() :initial-element 0))
          (result (test-inspect array)))
     (assert (search "an ARRAY of T" result))
     (assert (search "dimensions are ()" result)))
@@ -45,7 +45,7 @@
   (let ((array (make-array '() :element-type 'fixnum)))
     (assert (search "an ARRAY of FIXNUM" (test-inspect array))))
 
-  (let ((array (let ((a (make-array ())))
+  (let ((array (let ((a (make-array () :initial-element 0)))
                  (make-array '() :displaced-to a))))
     (assert (search "a displaced ARRAY of T" (test-inspect array)))))
 
@@ -66,6 +66,6 @@
     (assert (not (search "10." result)))))
 
 (with-test (:name (inspect vector fill-pointer))
-  (let* ((array (make-array 3 :fill-pointer 2))
+  (let* ((array (make-array 3 :fill-pointer 2 :initial-element 0))
          (result (test-inspect array)))
     (assert (search "VECTOR of length 2" result))))
