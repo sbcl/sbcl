@@ -384,12 +384,42 @@
                           (:copier nil))
   ;; When the DEBUG-SOURCE describes a file, the file's namestring.
   ;; Otherwise, NIL.
-  (namestring nil :type (or null string))
+  (namestring-1 nil :type (or null string))
+  ;; When NAMESTRING-1 is relative, the namestring of the pathname
+  ;; relative to which NAMESTRING-1 named a file at COMPILE-FILE
+  ;; time.
+  (namestring-2 nil :type (or null string))
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
   (plist *source-plist* :read-only t))
+
+(declaim (type (or (member nil :default) pathname)))
+(defvar *source-file-defaulting* :default
+  "Influences how introspection routines return namestrings for source
+files originally compiled using relative pathname designators. One of
+NIL (return the relative namestring), :DEFAULT (return the namestring
+of the defaulted pathname at compile-time).")
+
+(defun maybe-reconstitute-namestring (namestring-1 namestring-2
+                                      &optional (mode *source-file-defaulting*))
+  (cond ((null mode)
+         namestring-1)
+        ((eql :default mode)
+         ;; If NAMESTRING-2 is NIL, there's a chance
+         ;; NAMESTRING-1's syntax will be ambiguous in the dynamic
+         ;; environment where someone is calling this. (This is
+         ;; probably why we used to only dump absolute names.) Nothing
+         ;; much we can do about that, though.
+         (concatenate 'string (or namestring-2 "") namestring-1))))
+
+;; This used to be an accessor, but now it obeys
+;; *SOURCE-FILE-DEFAULTING*.
+(defun debug-source-namestring (debug-source)
+  (maybe-reconstitute-namestring
+   (debug-source-namestring-1 debug-source)
+   (debug-source-namestring-2 debug-source)))
 
 ;;;; DEBUG-INFO structures
 
@@ -446,11 +476,13 @@
   (truename nil :type (or pathname null (eql :lisp)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil  :read-only t)
-  ;; the defaulted, but not necessarily absolute file name (i.e. prior
-  ;; to TRUENAME call.) Null if not a file. This is used to set
-  ;; *COMPILE-FILE-PATHNAME*, and if absolute (a harmful constraint to be sure),
-  ;; is dumped in the debug-info.
-  (pathname nil :type (or pathname null) :read-only t)
+  ;; the defaulted, but not necessarily absolute file name. Null if not a file.
+  (pathname-1 nil :type (or pathname null) :read-only t)
+  ;; the *DEFAULT-PATHNAME-DEFAULTS* used to open the file in
+  ;; COMPILE-FILE, or NIL if merging that with PATHNAME doesn't make a
+  ;; difference. Gets stored in the fasl so that users can optionally
+  ;; reconstruct the compile-time pathname later.
+  (pathname-2 nil :type (or pathname null) :read-only t)
   ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null)  :read-only t)
   ;; parallel vectors containing the forms read out of the file and

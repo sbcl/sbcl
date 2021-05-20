@@ -836,25 +836,23 @@ necessary, since type inference may take arbitrarily long to converge.")
   (terpri)
   (values))
 
-;;; Leave this as NIL if you want modern, rational, correct, behavior,
-;;; or switch it to T for legacy (CLHS-specified) bullshit a la
-;;;  "During a call to compile-file, *compile-file-pathname* is bound to the pathname
-;;;   denoted by the first argument to compile-file, merged against the defaults"
-;;; The normal build sets it to T in make-target-2, despite that I think most people would
-;;; prefer the nonstandard behavior. The standard behavior makes stored pathnames all wrong
-;;; when files are physically moved. (Same problem as SBCL_HOME embedded into C pretty much)
-(defglobal *merge-pathnames* t)
-
 ;;; Given a pathname, return a SOURCE-INFO structure.
-(defun make-file-source-info (file external-format &optional form-tracking-p)
+(defun make-file-source-info (pathname external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :pathname ; becomes *C-F-PATHNAME*
-                              (if *merge-pathnames* (merge-pathnames file) file)
-                              :external-format external-format
-                              :subforms
-                              (if form-tracking-p
-                                  (make-array 100 :fill-pointer 0 :adjustable t))
-                              :write-date (file-write-date file))))
+   :file-info (make-file-info
+               :pathname-1 pathname
+               ;; FIXME: this shouldn't have to be initialized here,
+               ;; but delaying it till GET-SOURCE-STREAM somehow
+               ;; prevents it from showing up in DEBUG-SOURCEs later.
+               :pathname-2 (unless (equal (merge-pathnames pathname) pathname)
+                             *default-pathname-defaults*)
+               :external-format external-format
+               :subforms (if form-tracking-p
+                             (make-array 100 :fill-pointer 0 :adjustable t))
+               ;; FIXME: this shouldn't have to be initialized here,
+               ;; but delaying it till GET-SOURCE-STREAM somehow
+               ;; prevents it from showing up in DEBUG-SOURCEs later.
+               :write-date (file-write-date pathname))))
 
 ;; LOAD-AS-SOURCE uses this.
 (defun make-file-stream-source-info (file-stream)
@@ -862,7 +860,7 @@ necessary, since type inference may take arbitrarily long to converge.")
    :file-info (make-file-info :truename (truename file-stream)
                               ;; This T-L-P has been around since at least 2011.
                               ;; It's unclear why an LPN isn't good enough.
-                              :pathname (translate-logical-pathname file-stream)
+                              :pathname-1 (translate-logical-pathname file-stream)
                               :external-format (stream-external-format file-stream)
                               :write-date (file-write-date file-stream))))
 
@@ -903,7 +901,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (or (source-info-stream info)
       (let* ((file-info (source-info-file-info info))
-             (pathname (file-info-pathname file-info))
+             (pathname (file-info-pathname-1 file-info))
              (external-format (file-info-external-format file-info)))
         (let ((stream
                (open pathname
@@ -912,12 +910,17 @@ necessary, since type inference may take arbitrarily long to converge.")
                      ;; SBCL stream classes aren't available in the host
                      #-sb-xc-host :class
                      #-sb-xc-host 'form-tracking-stream)))
-          ;; If you don't want merged pathnames embedded in your build artifacts,
-          ;; then you surely don't want them in *COMPILE-FILE-PATHNAME* either.
-          ;; [And can't we just bind this to PATHNAME is all cases? If anything,
-          ;; it seems to me that asking the stream for its name is expressly backwards]
-          (setf *compile-file-pathname* (if *merge-pathnames* (pathname stream) pathname)
+          ;; OPEN is required to merge PATHNAME, and the FILE-STREAM
+          ;; is required to return that merge from #'PATHNAME. So we
+          ;; can get the merged pathname we used to open the file from
+          ;; the stream itself.
+          (setf *compile-file-pathname* (pathname stream)
                 *compile-file-truename* (truename stream)
+                ;; FIXME: it ought to be possible to defer setting the
+                ;; PATHNAME-2 and WRITE-DATE slots to here (i.e.,
+                ;; delaying some work/computation till we know we've
+                ;; got an open file), but doing so somehow leaves the
+                ;; corresponding slots NIL in DEBUG-SOURCEs later.
                 (file-info-truename file-info) *compile-file-truename*)
           (when (file-info-subforms file-info)
             (setf (form-tracking-stream-observer stream)
@@ -1835,6 +1838,9 @@ necessary, since type inference may take arbitrarily long to converge.")
        (values t t t)))))
 
 ;;; Return a pathname for the named file. The file must exist.
+;; FIXME: is this anything other than a merge-pathnames wrapped in a
+;; minor time-of-check/time-of-use bug?  OPEN will surely tell us if
+;; the file doesn't exist.
 (defun verify-source-file (pathname-designator)
   (let* ((pathname (pathname pathname-designator))
          (default-host (make-pathname :host (pathname-host pathname))))

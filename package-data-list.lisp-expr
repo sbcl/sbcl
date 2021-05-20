@@ -940,6 +940,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "PRINT-SYMBOL-WITH-PREFIX"
                "*PRINT-VECTOR-LENGTH*"
                "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
+               "*SOURCE-FILE-DEFAULTING*"
                ;;"OBJECT-SIZE"
 
                ;; stepping interface

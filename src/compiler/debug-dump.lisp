@@ -346,23 +346,25 @@
 (defun debug-source-for-info (info &key function)
   (declare (type source-info info))
   (let ((file-info (get-toplevelish-file-info info)))
-    (multiple-value-call
-        (if function 'sb-di::make-core-debug-source 'make-debug-source)
-     :namestring (or *source-namestring*
-                     (make-file-info-namestring
-                      (let ((pathname
-                             (case *name-context-file-path-selector*
-                               (pathname (file-info-pathname file-info))
-                               (truename (file-info-truename file-info)))))
-                        (if (pathnamep pathname) pathname))
-                      file-info))
-     :created (file-info-write-date file-info)
-     (if function
-         (values :form (let ((direct-file-info (source-info-file-info info)))
-                         (when (eq :lisp (file-info-truename direct-file-info))
-                           (elt (file-info-forms direct-file-info) 0)))
-                 :function function)
-         (values)))))
+    (multiple-value-bind (namestring-1 namestring-2)
+        (make-file-info-namestrings
+         (let ((pathname
+                (case *name-context-file-path-selector*
+                  (pathname (file-info-pathname-1 file-info))
+                  (truename (file-info-truename file-info)))))
+           (if (pathnamep pathname) pathname))
+         file-info)
+        (multiple-value-call
+            (if function 'sb-di::make-core-debug-source 'make-debug-source)
+          :namestring-1 (or *source-namestring* namestring-1)
+          :namestring-2 (unless *source-namestring* namestring-2)
+          :created (file-info-write-date file-info)
+          (if function
+              (values :form (let ((direct-file-info (source-info-file-info info)))
+                              (when (eq :lisp (file-info-truename direct-file-info))
+                                (elt (file-info-forms direct-file-info) 0)))
+                      :function function)
+              (values))))))
 
 (defun smallest-element-type (integer negative)
   (let ((bits (max (+ (integer-length integer)
