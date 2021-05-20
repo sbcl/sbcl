@@ -280,7 +280,8 @@
 ;;; Apart from those, user code that does not have a compile-time-determined
 ;;; vector type will usuallly end up calling allocate-vector-with-widetag
 ;;; via %MAKE-ARRAY.
-(defknown allocate-vector ((unsigned-byte 9) index
+(defknown allocate-vector (#+array-ubsan boolean
+                           (unsigned-byte 9) index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
                            (and index

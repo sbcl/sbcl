@@ -392,7 +392,7 @@
                 #-array-ubsan (storew* len ,vector-tn vector-length-slot
                                        ,lowtag ,zeroed)))
            (want-shadow-bits ()
-             `(and (sb-c::policy node (> safety 0))
+             `(and poisoned
                    (if (sc-is type immediate)
                        (/= (tn-value type) simple-vector-widetag)
                        :maybe)))
@@ -419,13 +419,15 @@
                 (inst mov (ea (- 8 other-pointer-lowtag) ,vector) temp-reg-tn))))
 
   (define-vop (allocate-vector-on-heap)
+    #+array-ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     ;; Result is live from the beginning, like a temp, because we use it as such
     ;; in 'calc-size-in-bytes'
     (:results (result :scs (descriptor-reg) :from :load))
-    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    (:arg-types #+array-ubsan (:constant t)
+                positive-fixnum positive-fixnum positive-fixnum)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
@@ -462,19 +464,21 @@
       (cond ((want-shadow-bits)
              (inst pop temp-reg-tn) ; restore shadow bits
              (inst mov (object-slot-ea result 1 other-pointer-lowtag) temp-reg-tn))
-            (t
+            (poisoned ; uninitialized SIMPLE-VECTOR
              (store-originating-pc result)))))
 
   (define-vop (allocate-vector-on-stack)
+    #+array-ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
-    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    (:vop-var vop)
+    (:arg-types #+array-ubsan (:constant t)
+                positive-fixnum positive-fixnum positive-fixnum)
     #+array-ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
     #+array-ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
     #+array-ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
-    #+array-ubsan (:node-var node)
     (:policy :fast-safe)
     (:generator 10
       #+array-ubsan
@@ -511,16 +515,19 @@
              (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
                            result)
                    rax))
-            (t
+            (poisoned ; uninitialized SIMPLE-VECTOR
              (store-originating-pc result)))))
 
   #+linux ; unimplemented for others
   (define-vop (allocate-vector-on-stack+msan-unpoison)
+    #+array-ubsan (:info poisoned)
+    #+array-ubsan (:ignore poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
-    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    (:arg-types #+array-ubsan (:constant t)
+                positive-fixnum positive-fixnum positive-fixnum)
     ;; This is a separate vop because it needs more temps.
     (:temporary (:sc any-reg :offset rcx-offset) rcx)
     (:temporary (:sc any-reg :offset rax-offset) rax)

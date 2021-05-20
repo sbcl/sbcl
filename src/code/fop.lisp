@@ -366,7 +366,8 @@
          (bytes (ceiling bits sb-vm:n-byte-bits))
          (words (ceiling bytes sb-vm:n-word-bytes))
          (vector (logically-readonlyize
-                  (allocate-vector widetag length words))))
+                  (allocate-vector #+(and (not sb-xc-host) array-ubsan) nil
+                                   widetag length words))))
     (declare (type index length bytes words)
              (type word bits))
     (read-n-bytes (fasl-input-stream) vector 0 bytes)

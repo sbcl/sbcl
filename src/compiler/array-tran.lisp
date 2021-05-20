@@ -395,11 +395,10 @@
       (if (not certainp) (give-up-ir1-transform)) ; could be valid, don't know
       (if (not subtypep)
           (abort-ir1-transform "~S is not a valid :ELEMENT-TYPE for MAKE-STRING"
-                               (lvar-value element-type)))))
-  `(the simple-string (make-array (the index length)
-                       :element-type (or element-type 'character)
-                       ,@(when initial-element
-                           '(:initial-element initial-element)))))
+                               (lvar-value element-type))))
+    `(the simple-string (make-array (the index length)
+                         ,@(when initial-element '(:initial-element initial-element))
+                         :element-type ',(type-specifier elt-ctype)))))
 
 ;; Traverse the :INTIAL-CONTENTS argument to an array constructor call,
 ;; changing the skeleton of the data to be constructed by calls to LIST
@@ -784,8 +783,10 @@
          (n-words-form (or (calc-nwords-form saetp c-length) (give-up-ir1-transform)))
          (default-initial-element (sb-vm:saetp-initial-element-default saetp))
          (data-alloc-form
-          `(truly-the (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
-                      (allocate-vector ,(sb-vm:saetp-typecode saetp) %length nwords))))
+          `(truly-the
+            (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
+            (allocate-vector #+array-ubsan ,(not (or initial-contents initial-element))
+                             ,(sb-vm:saetp-typecode saetp) %length nwords))))
 
     (flet ((eliminate-keywords ()
              (eliminate-keyword-args

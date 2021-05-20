@@ -223,7 +223,12 @@
 (defmacro vector-extra-data (vector)
   `(%primitive slot ,vector 'length 1 other-pointer-lowtag))
 (defmacro set-vector-extra-data (vector data)
-  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag)))
+  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag))
+(defmacro unpoison (vector)
+  `(set-vector-extra-data ,vector 0)))
+#-array-ubsan
+(defmacro unpoison (vector)
+  (declare (ignore vector)))
 
 ;;; Return T if arrays with the given WIDETAG may contain random data
 ;;; initially unless expressly initialized.

@@ -357,25 +357,28 @@
 
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into bits
 ;;; or NIL, %%simple-array-n-bits-shifts%% will be used in that case.
-(defun allocate-vector-with-widetag (widetag length n-bits-shift)
+(defun allocate-vector-with-widetag (#+array-ubsan poisoned widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
   (let* ((n-bits-shift (or n-bits-shift
                            (aref %%simple-array-n-bits-shifts%% widetag)))
              ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
              ;; but a single case involving it now.
-         (full-length (+ length (if (= widetag simple-base-string-widetag) 1 0))))
-    ;; Be careful not to allocate backing storage for element type NIL.
-    ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
-    ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.
-    (allocate-vector widetag length
-                     ;; VECTOR-LENGTH-IN-WORDS potentially returns a machine-word-sized
-                     ;; integer, so it doesn't match the primitive type restriction of
-                     ;; POSITIVE-FIXNUM for the last argument of the vector alloc vops.
-                     (the fixnum
-                          (if (/= widetag simple-array-nil-widetag)
-                              (vector-length-in-words full-length n-bits-shift)
-                              0)))))
+         (full-length (+ length (if (= widetag simple-base-string-widetag) 1 0)))
+         ;; Be careful not to allocate backing storage for element type NIL.
+         ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
+         ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.
+         ;; VECTOR-LENGTH-IN-WORDS potentially returns a machine-word-sized
+         ;; integer, so it doesn't match the primitive type restriction of
+         ;; POSITIVE-FIXNUM for the last argument of the vector alloc vops.
+         (nwords (the fixnum
+                      (if (/= widetag simple-array-nil-widetag)
+                          (vector-length-in-words full-length n-bits-shift)
+                          0))))
+    #+array-ubsan (if poisoned ; first arg to allocate-vector must be a constant
+                      (allocate-vector t widetag length nwords)
+                      (allocate-vector nil widetag length nwords))
+    #-array-ubsan (allocate-vector widetag length nwords)))
 
 (declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag))
 (defun array-underlying-widetag (array)
@@ -401,8 +404,14 @@
           (recurse (%array-data x))
           (truly-the (integer 128 255) result))))))
 
+;;; One use of this is for %make-sequence-like which should pass
+;;; poisoned = T to the allocator, the other use is for vector-substitute*
+;;; which should pass poisoned = NIL.
+;;; Since we can't do both, just use NIL, and if you screw up
+;;; by your sequence without writing, ... oh well.
 (defun sb-impl::make-vector-like (vector length)
-  (allocate-vector-with-widetag (array-underlying-widetag vector) length nil))
+  (allocate-vector-with-widetag #+array-ubsan nil
+                                (array-underlying-widetag vector) length nil))
 
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
 ;; returning the two initialization arguments needed for DATA-VECTOR-FROM-INITS.
@@ -473,14 +482,9 @@
            (error "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
           ((and simple (= array-rank 1))
            (let ((vector ; a (SIMPLE-ARRAY * (*))
-                  (allocate-vector-with-widetag widetag dimension-0 n-bits)))
-             ;; store the function which bears responsibility for creation of this
-             ;; array in case we need to blame it for not initializing.
-             #+array-ubsan
-             (set-vector-extra-data (if (= widetag simple-vector-widetag) ; no shadow bits.
-                                        vector ; use the LENGTH slot directly
-                                        (vector-extra-data vector))
-              (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: array-ubsan magic
+                  (allocate-vector-with-widetag
+                   #+array-ubsan (not (or initial-element-p initial-contents-p))
+                   widetag dimension-0 n-bits)))
              ;; presence of at most one :INITIAL-thing keyword was ensured above
              (cond (initial-element-p
                     (fill vector initial-element))
@@ -493,6 +497,12 @@
                     (replace vector initial-contents))
                    #+array-ubsan
                    (t
+                    ;; store the function which bears responsibility for creation of this
+                    ;; array in case we need to blame it for not initializing.
+                    (set-vector-extra-data (if (= widetag simple-vector-widetag) ; no shadow bits.
+                                               vector ; use the LENGTH slot directly
+                                               (vector-extra-data vector))
+                                           (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: magic
                     (cond ((= widetag simple-vector-widetag)
                            (fill vector (%make-lisp-obj no-tls-value-marker-widetag)))
                           ((array-may-contain-random-bits-p widetag)
@@ -642,7 +652,8 @@ of specialized arrays is supported."
     ;;   (error "~S cannot be used to initialize an array of type ~S."
     ;;          initial-element element-type))
   (let ((data (if widetag
-                  (allocate-vector-with-widetag widetag total-size n-bits)
+                  (allocate-vector-with-widetag #+array-ubsan nil
+                                                widetag total-size n-bits)
                   (make-array total-size :element-type element-type))))
     (ecase initialize
      (:initial-element
@@ -1204,7 +1215,9 @@ of specialized arrays is supported."
       (let* ((widetag (%other-pointer-widetag old-data))
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
-               (allocate-vector-with-widetag widetag new-length n-bits-shift)))
+              ;; vector is partially poisoned, which we can't represent
+              (allocate-vector-with-widetag #+array-ubsan nil
+                                            widetag new-length n-bits-shift)))
         (copy-vector-data old-data new-data old-start old-end n-bits-shift)
         (setf (%array-data vector) new-data
               (%array-available-elements vector) new-length
@@ -1899,11 +1912,13 @@ function to be removed without further warning."
     (if contents-p
         (let ((contents-length (length initial-contents)))
           (if (= length contents-length)
-              (replace (truly-the simple-vector (allocate-vector type length length))
+              (replace (truly-the simple-vector
+                                  (allocate-vector #+array-ubsan nil type length length))
                        initial-contents)
               (error "~S has ~D elements, vector length is ~D."
                      :initial-contents contents-length length)))
-        (fill (truly-the simple-vector (allocate-vector type length length))
+        (fill (truly-the simple-vector
+                         (allocate-vector #+array-ubsan nil type length length))
               ;; 0 is the usual default, but NIL makes more sense for weak vectors
               ;; as it is the value assigned to broken hearts.
               (if element-p initial-element nil)))))

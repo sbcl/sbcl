@@ -444,7 +444,7 @@ new string COUNT long filled with the fill character."
   (cond ((eq element-type 'character)
          (let ((c (if iep (the character initial-element)))
                (s (make-string count :element-type 'character)))
-           (when c (fill s c))
+           (when c (sb-vm::unpoison s) (fill s c))
            s))
          ((or (eq element-type 'base-char)
               (eq element-type 'standard-char)
@@ -454,7 +454,7 @@ new string COUNT long filled with the fill character."
               (eq element-type nil))
           (let ((c (if iep (the base-char initial-element)))
                 (s (make-string count :element-type 'base-char)))
-            (when c (fill s c))
+            (when c (sb-vm::unpoison s) (fill s c))
             s))
          (t
           (multiple-value-bind (widetag n-bits-shift)
@@ -471,7 +471,8 @@ new string COUNT long filled with the fill character."
                      :format-control "~S is not a ~S"
                      :format-arguments (list initial-element element-type)))
             (let ((string
-                   (sb-vm::allocate-vector-with-widetag widetag count n-bits-shift)))
+                   (sb-vm::allocate-vector-with-widetag
+                    #+array-ubsan nil widetag count n-bits-shift)))
               (when initial-element (fill string initial-element))
               string)))))
 
