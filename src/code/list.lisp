@@ -381,12 +381,7 @@
 
 (defun make-list (size &key initial-element)
   "Construct and return a list with SIZE elements each set to INITIAL-ELEMENT."
-  ;; Can't EXPLICIT-CHECK here, otherwise SIZE gets primitive type T
-  ;; which does not match the restriction on the allocator vop.
-  ;; Despite that %MAKE-LIST says it's the "preferred entry point",
-  ;; it's faster *not* to call it from MAKE-LIST because this way
-  ;; grabs all the memory at once.
-  ;; I wish I could remember why %MAKE-LIST claims preference though.
+  (declare (explicit-check))
   (%make-list size initial-element))
 ;;; This entry point is to be preferred, irrespective of
 ;;; whether or not the backend has vops for %MAKE-LIST.
