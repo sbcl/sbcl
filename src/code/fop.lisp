@@ -360,30 +360,13 @@
     (set-array-header res vec length nil 0 (fop-list (fasl-input) rank) nil t)
     res))
 
-(defglobal **saetp-bits-per-length**
-    (let ((array (make-array (1+ sb-vm:widetag-mask)
-                             :element-type '(unsigned-byte 8)
-                             :initial-element 255)))
-      (loop for saetp across sb-vm:*specialized-array-element-type-properties*
-            do
-            (setf (aref array (sb-vm:saetp-typecode saetp))
-                  (sb-vm:saetp-n-bits saetp)))
-      array)
-    "255 means bad entry.")
-(declaim (type (simple-array (unsigned-byte 8) (#.(1+ sb-vm:widetag-mask)))
-               **saetp-bits-per-length**))
-
 (define-fop 43 (fop-spec-vector  ((:operands length)))
   (let* ((widetag (read-byte-arg (fasl-input-stream)))
-         (bits-per-length (aref **saetp-bits-per-length** widetag))
-         (bits (progn (aver (< bits-per-length 255))
-                      (* length bits-per-length)))
+         (bits (* length (sb-vm::simple-array-widetag->bits-per-elt widetag)))
          (bytes (ceiling bits sb-vm:n-byte-bits))
          (words (ceiling bytes sb-vm:n-word-bytes))
-         (vector
-          (progn (aver (/= widetag sb-vm:simple-vector-widetag))
-                 (logically-readonlyize
-                  (allocate-vector widetag length words)))))
+         (vector (logically-readonlyize
+                  (allocate-vector widetag length words))))
     (declare (type index length bytes words)
              (type word bits))
     (read-n-bytes (fasl-input-stream) vector 0 bytes)

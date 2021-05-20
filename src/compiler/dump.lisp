@@ -916,9 +916,11 @@
   #-sb-xc-host (declare (type (simple-unboxed-array (*)) vector))
   (let* ((length (length vector))
          (widetag (%other-pointer-widetag vector))
-         (bits-per-length (aref **saetp-bits-per-length** widetag)))
-    (aver (< bits-per-length 255))
+         (bits-per-elt (sb-vm::simple-array-widetag->bits-per-elt widetag)))
     (unless data-only
+      ;; fop-spec-vector doesn't grok trailing #\null convention.
+      (aver (and (/= widetag sb-vm:simple-base-string-widetag)
+                 (/= widetag sb-vm:simple-vector-widetag)))
       (dump-fop 'fop-spec-vector file length)
       (dump-byte widetag file))
 
@@ -933,8 +935,8 @@
     (sb-impl::buffer-output (fasl-output-stream file)
                             vector
                             0
-                            (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
-                            #+sb-xc-host bits-per-length))))
+                            (ceiling (* length bits-per-elt) sb-vm:n-byte-bits)
+                            #+sb-xc-host bits-per-elt))))
 
 ;;; Dump string-ish things.
 

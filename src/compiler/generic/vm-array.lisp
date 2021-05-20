@@ -170,10 +170,26 @@
   #-sb-xc-host
   '#.*vector-without-complex-typecode-infos*)
 
-;;; Return the shift amount needed to turn length into bits
+;;; Return the shift amount needed to turn length as number of elements
+;;; into length as number of bits.
 (defun saetp-n-bits-shift (saetp)
   (max (1- (integer-length (saetp-n-bits saetp)))
        0)) ;; because of NIL
+
+#-sb-xc-host ; not computable as constant in make-host-1
+(defconstant-eqx %%simple-array-n-bits-shifts%%
+    #.(let ((a (sb-xc:make-array (1+ widetag-mask) :initial-element -1 ; "illegal"
+                                 :retain-specialization-for-after-xc-core t ; what a kludge!
+                                 :element-type '(signed-byte 8))))
+        (dovector (saetp *specialized-array-element-type-properties* a)
+          (setf (aref a (saetp-typecode saetp)) (saetp-n-bits-shift saetp))))
+  #'equalp)
+(defun simple-array-widetag->bits-per-elt (widetag)
+  #+sb-xc-host (saetp-n-bits (find widetag *specialized-array-element-type-properties*
+                                   :key #'saetp-typecode))
+  #-sb-xc-host (if (= widetag simple-array-nil-widetag)
+                   0
+                   (ash 1 (aref %%simple-array-n-bits-shifts%% widetag))))
 
 (defun saetp-index-or-lose (element-type)
   (or (position element-type sb-vm:*specialized-array-element-type-properties*
