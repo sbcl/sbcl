@@ -303,7 +303,6 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:translate allocate-vector)
   (:policy :fast-safe)
   (:generator 100
     (inst lea result (make-ea :byte :base words :disp

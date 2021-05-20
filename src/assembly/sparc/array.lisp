@@ -13,7 +13,6 @@
 
 (define-assembly-routine (allocate-vector-on-heap
                           (:policy :fast-safe)
-                          (:translate allocate-vector)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -57,7 +56,6 @@
 
 (define-assembly-routine (allocate-vector-on-stack
                           (:policy :fast-safe)
-                          (:translate allocate-vector)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))

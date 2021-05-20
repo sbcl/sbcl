@@ -471,7 +471,6 @@
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
-    (:translate allocate-vector)
     #+array-ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
     #+array-ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
     #+array-ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
@@ -526,7 +525,6 @@
     (:temporary (:sc any-reg :offset rcx-offset) rcx)
     (:temporary (:sc any-reg :offset rax-offset) rax)
     (:temporary (:sc any-reg :offset rdi-offset) rdi)
-    (:translate allocate-vector)
     (:policy :fast-safe)
     (:generator 10
       (let ((size (calc-size-in-bytes words result)))
