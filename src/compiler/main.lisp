@@ -836,6 +836,15 @@ necessary, since type inference may take arbitrarily long to converge.")
   (terpri)
   (values))
 
+;;; Leave this as NIL if you want modern, rational, correct, behavior,
+;;; or switch it to T for legacy (CLHS-specified) bullshit a la
+;;;  "During a call to compile-file, *compile-file-pathname* is bound to the pathname
+;;;   denoted by the first argument to compile-file, merged against the defaults"
+;;; The normal build sets it to T in make-target-2, despite that I think most people would
+;;; prefer the nonstandard behavior. The standard behavior makes stored pathnames all wrong
+;;; when files are physically moved. (Same problem as SBCL_HOME embedded into C pretty much)
+(defglobal *merge-pathnames* t)
+
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (pathname external-format &optional form-tracking-p)
   (make-source-info
@@ -844,7 +853,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                ;; FIXME: this shouldn't have to be initialized here,
                ;; but delaying it till GET-SOURCE-STREAM somehow
                ;; prevents it from showing up in DEBUG-SOURCEs later.
-               :pathname-2 (unless (equal (merge-pathnames pathname) pathname)
+               :pathname-2 (unless (or (null *merge-pathnames*)
+                                       (equal (merge-pathnames pathname) pathname))
                              *default-pathname-defaults*)
                :external-format external-format
                :subforms (if form-tracking-p

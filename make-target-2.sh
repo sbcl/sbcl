@@ -66,6 +66,7 @@ echo //doing warm init - load and dump phase
 ;;; Use the historical (bad) convention for storing pathname
 ;;; namestrings in fasls.
 (setq sb-c::*name-context-file-path-selector* 'truename)
+(setq sb-c::*merge-pathnames* t)
 (let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF

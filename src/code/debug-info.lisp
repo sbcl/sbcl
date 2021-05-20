@@ -420,6 +420,11 @@ of the defaulted pathname at compile-time).")
   (maybe-reconstitute-namestring
    (debug-source-namestring-1 debug-source)
    (debug-source-namestring-2 debug-source)))
+
+;; sb-fasteval needs this.
+(defun (setf debug-source-namestring) (namestring debug-source)
+  (setf (debug-source-namestring-1 debug-source) namestring
+        (debug-source-namestring-2 debug-source) nil))
 
 ;;;; DEBUG-INFO structures
 

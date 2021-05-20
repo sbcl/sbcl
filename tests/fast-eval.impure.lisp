@@ -305,7 +305,8 @@
             (sb-kernel:find-layout 'testme)))))
 (let ((f #'testme-x))
   (let ((source-loc (sb-interpreter:fun-source-location f)))
-    (setf (slot-value source-loc 'sb-c::namestring) "myfile.lisp")))
+    (setf (slot-value (sb-c::definition-source-location-filenames source-loc) 'sb-c::namestring-1) "myfile.lisp"
+          (slot-value (sb-c::definition-source-location-filenames source-loc) 'sb-c::namestring-2) nil)))
 (defun foo (s) (testme-x s))
 (test-util:with-test (:name :source-namestring)
   (assert (string= (sb-kernel::function-file-namestring #'testme-x)
