@@ -369,9 +369,13 @@
     ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
     ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.
     (allocate-vector widetag length
-                     (if (/= widetag simple-array-nil-widetag)
-                         (vector-length-in-words full-length n-bits-shift)
-                         0))))
+                     ;; VECTOR-LENGTH-IN-WORDS potentially returns a machine-word-sized
+                     ;; integer, so it doesn't match the primitive type restriction of
+                     ;; POSITIVE-FIXNUM for the last argument of the vector alloc vops.
+                     (the fixnum
+                          (if (/= widetag simple-array-nil-widetag)
+                              (vector-length-in-words full-length n-bits-shift)
+                              0)))))
 
 (declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag))
 (defun array-underlying-widetag (array)
@@ -1878,16 +1882,13 @@ function to be removed without further warning."
            (array-dimensions array)))
   array)
 
-;;; Why is this needed for ARM and not x86 ???
-(defun allocate-vector (type length words)
-  (allocate-vector type length words))
-
 ;;; Horrible kludge for the "static-vectors" system
 ;;; which uses an internal symbol in SB-IMPL.
 (import '%vector-widetag-and-n-bits-shift 'sb-impl)
 
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
+  (declare (index length))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   ;; Explicitly compute a widetag with the weakness bit ORed in.
@@ -1897,13 +1898,12 @@ function to be removed without further warning."
     ;; almost makes me want to cry, but not quite enough for me to improve it.
     (if contents-p
         (let ((contents-length (length initial-contents)))
-          (if (= (truly-the index length) contents-length)
+          (if (= length contents-length)
               (replace (truly-the simple-vector (allocate-vector type length length))
                        initial-contents)
               (error "~S has ~D elements, vector length is ~D."
                      :initial-contents contents-length length)))
-        (fill (truly-the simple-vector
-                         (allocate-vector type (truly-the index length) length))
+        (fill (truly-the simple-vector (allocate-vector type length length))
               ;; 0 is the usual default, but NIL makes more sense for weak vectors
               ;; as it is the value assigned to broken hearts.
               (if element-p initial-element nil)))))

@@ -162,8 +162,11 @@
       ;; Something fishy here- If THE is removed, OPERAND-RESTRICTION-OK
       ;; returns NIL because type inference on MAKE-LIST never happens.
       ;; But the fndb entry for %MAKE-LIST is right, so I'm slightly bewildered.
-      `(%make-list (the (integer 0 (,(1- array-dimension-limit))) ,length)
-                   ,(second rest))
+      ;; OK, much more than "slightly" now.
+      ;; Casting to (integer 0 ,make-list-limit) fails in the ltn-annotate helper.
+      #+64-bit `(%make-list (the (integer 0 (,(1- array-dimension-limit))) ,length)
+                            ,(second rest))
+      #-64-bit `(%make-list (the (integer 0 (,make-list-limit)) ,length) ,(second rest))
       (values nil t))) ; give up
 
 (deftransform %make-list ((length item) ((constant-arg (eql 0)) t)) nil)

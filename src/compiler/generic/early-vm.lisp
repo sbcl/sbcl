@@ -80,6 +80,13 @@
 (defconstant array-rank-limit 256
   "the exclusive upper bound on the rank of an array")
 
+;;; FIXME: these limits are wrong at the most basic level according to the spec,
+;;; because if there are different limits for different element types, then
+;;; this constant should be the _smallest_ of the limits for any element type.
+;;; The largest element size is (COMPLEX DOUBLE-FLOAT) taking 16 bytes per element.
+;;; If you had an array of this size on 32-bit machines, it would consume about
+;;; 8GB of payload. So not only is it larger than a fixnum - a problem for the
+;;; allocator vops - it exceeds the address space.
 #-array-ubsan ; usual way
 (progn
 ;;; - 2 to leave space for the array header

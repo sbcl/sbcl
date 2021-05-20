@@ -683,7 +683,8 @@
           ((> n-bits sb-vm:n-word-bits) ; e.g. double-float on 32-bit
            (let ((n-words-per-element
                   (the fixnum (/ n-bits sb-vm:n-word-bits)))) ; i.e., not RATIO
-             `(* ,padded-length-form ,n-words-per-element)))
+             #+64-bit `(* ,padded-length-form ,n-words-per-element)
+             #-64-bit `(the fixnum (* ,padded-length-form ,n-words-per-element))))
           (t
            ;; This would have to change if we ever implement Unicode strings
            ;; using 3 bytes per char (as has been suggested by xof) which makes

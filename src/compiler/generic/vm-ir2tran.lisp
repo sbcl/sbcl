@@ -368,11 +368,13 @@
         (setf (lvar-info arg)
               (make-ir2-lvar (primitive-type (lvar-type arg)))))
       (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
-        (ltn-default-call call)
-        (return-from vectorish-ltn-annotate-helper (values)))
+        (cond ((lvar-fun-is (combination-fun call) '(%make-list))
+               (ltn-default-call call)
+               (return-from vectorish-ltn-annotate-helper (values)))
+              (t
+               (bug "vectorish-ltn-annotate-helper must not fail"))))
       (setf (basic-combination-info call) template)
       (setf (node-tail-p call) nil)
-
       (dolist (arg args)
         (annotate-1-value-lvar arg))))
 

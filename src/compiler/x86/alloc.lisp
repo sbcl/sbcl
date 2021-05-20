@@ -247,9 +247,7 @@
          (length :scs (any-reg immediate))
          (words :scs (any-reg immediate)))
   (:results (result :scs (descriptor-reg) :from :load))
-  (:arg-types positive-fixnum
-              positive-fixnum
-              positive-fixnum)
+  (:arg-types positive-fixnum positive-fixnum positive-fixnum)
   (:policy :fast-safe)
   (:node-var node)
   (:generator 100

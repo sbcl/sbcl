@@ -584,6 +584,26 @@
         (unless (operand-restriction-ok type (lvar-ptype arg)
                                         :lvar arg)
           (return nil))))))
+(defun diagnose-template-args (template call)
+  ;; Scan all except the MORE args. If you've managed to create not-ok MORE args,
+  ;; you're probably smart enough to figure it out on your own.
+  (let ((args (basic-combination-args call))
+        (types (template-arg-types template)))
+    (unless (= (length args) (length types))
+      (return-from diagnose-template-args "bad length"))
+    (do ((args args (cdr args))
+         (i 0 (1+ i))
+         (any-fail nil)
+         (types types (cdr types)))
+        ((null types) any-fail)
+      (let* ((arg (car args))
+             (type (car types))
+             (ok (operand-restriction-ok type (lvar-ptype arg) :lvar arg)))
+        (let ((*print-pretty* nil))
+          (format t "arg~d: is ~s need ~s, ~a~%" i
+                  (primitive-type-name (lvar-ptype arg))
+                  type (if ok "OK" "FAIL")))
+        (unless ok (setq any-fail :fail))))))
 
 ;;; Check that TEMPLATE can be used with the specifed RESULT-TYPE.
 ;;; Result type checking is pretty different from argument type
