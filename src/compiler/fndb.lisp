@@ -909,11 +909,10 @@
 ;;;   to combine the fixnum + range test into one instruction
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant make-list-limit
-    #+64-bit (floor (/ sb-ext:most-positive-word 2) (* 2 sb-vm:n-word-bytes))
-    #-64-bit (floor (ash sb-xc:most-positive-fixnum -1) (* 2 sb-vm:n-word-bytes))))
-(defknown make-list ((integer 0 (#.make-list-limit)) &key (:initial-element t)) list
+    (ash most-positive-fixnum (- (+ sb-vm:word-shift 1)))))
+(defknown make-list ((integer 0 #.make-list-limit) &key (:initial-element t)) list
   (movable flushable))
-(defknown %make-list ((integer 0 (#.make-list-limit)) t) list (movable flushable))
+(defknown %make-list ((integer 0 #.make-list-limit) t) list (movable flushable))
 
 (defknown sb-impl::|List| (&rest t) list (movable flushable))
 (defknown sb-impl::|List*| (t &rest t) t (movable flushable))
