@@ -112,12 +112,14 @@ missing MAKE-LOAD-FORM methods?")
       (let ((spec (type-specifier (leaf-type internal-fun)))
             (result))
         (setf (entry-info-type info)
-              (if (and (listp spec)
-                       (typep (setq result (third spec))
-                              '(cons (eql values)
-                                     (cons t (cons (eql &optional) null)))))
-                  `(sfunction ,(cadr spec) ,(cadr result))
-                  spec)))))
+              (constant-value
+               (find-constant
+                (if (and (listp spec)
+                         (typep (setq result (third spec))
+                                '(cons (eql values)
+                                  (cons t (cons (eql &optional) null)))))
+                    `(sfunction ,(cadr spec) ,(cadr result))
+                    spec)))))))
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear

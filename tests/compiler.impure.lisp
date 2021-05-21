@@ -3095,3 +3095,20 @@
   (ctu:file-compile
    "(lambda (&optional b) (declare (type integer b)) b)"
    :load t))
+
+(defstruct entry-info-type-struct)
+
+(defvar *entry-info-type-struct* (make-entry-info-type-struct))
+
+(defmethod make-load-form ((struct entry-info-type-struct) &optional env)
+  (declare (ignore env))
+  '*entry-info-type-struct*)
+
+(declaim (ftype (function () (member #.*entry-info-type-struct*)) entry-info-type-func))
+
+
+(with-test (:name :dump-entry-info-type)
+  (ctu:file-compile
+   "(lambda () (entry-info-type-func))"
+   :load t))
+
