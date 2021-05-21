@@ -282,13 +282,25 @@
 
 ;;;; accessors/setters
 
+;;; Ancestors
+(define-vop (dvref)
+  ;; I don't think we should print these notes even if we could, which we can't.
+  ;; We do, however, seem to print
+  ;;  "The first argument is a (SIMPLE-ARRAY * (1)), not a SIMPLE-STRING."
+  ;; for pretty much any general type-unknown AREF.
+  ;; (:note "inline array access")
+  (:translate data-vector-ref-with-offset)
+  (:policy :fast-safe))
+(define-vop (dvset)
+  ;; (:note "inline array store")
+  (:translate data-vector-set-with-offset)
+  (:policy :fast-safe))
+
 ;;; variants which affect an entire lispword-sized value.
 ;;; Toplevel macro for ease of viewing the expansion.
-(defmacro define-full-setter+addend (name type offset lowtag scs el-type &optional translate)
+(defmacro define-full-setter+addend (name type offset lowtag scs el-type)
   `(progn
-     (define-vop (,name)
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
+     (define-vop (,name dvset)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
               (value :scs ,scs))
@@ -304,9 +316,7 @@
                    (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))
                    value nil)))
-     (define-vop (,(symbolicate name "-C"))
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
+     (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
        (:info index addend)
@@ -330,7 +340,7 @@
        ,element-type data-vector-ref-with-offset)
      (define-full-setter+addend ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
        ,type vector-data-offset other-pointer-lowtag ,scs
-       ,element-type data-vector-set-with-offset)))
+       ,element-type)))
 (progn
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg immediate)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
@@ -456,9 +466,7 @@
     (emit-sbit-op 'btr bv index)
     OUT))
 
-(define-vop (data-vector-ref-with-offset/simple-bit-vector-c)
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-bit-vector-c dvref)
   (:args (object :scs (descriptor-reg)))
   (:arg-types simple-bit-vector
               ;; this constant is possibly off by something
@@ -479,9 +487,7 @@
                (inst shl :dword result (- right-shift))))))
     (inst and :dword result (fixnumize 1))))
 
-(define-vop (data-vector-ref-with-offset/simple-bit-vector)
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-bit-vector dvref)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg)))
   (:info addend)
@@ -505,10 +511,7 @@
              (let* ((elements-per-word (floor n-word-bits bits))
                     (bit-shift (1- (integer-length elements-per-word))))
     `(progn
-       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type))
-         (:note "inline array access")
-         (:translate data-vector-ref-with-offset)
-         (:policy :fast-safe)
+       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type) dvref)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg)))
          (:info addend)
@@ -534,9 +537,7 @@
                  (inst shl ecx ,(1- (integer-length bits)))))
            (inst shr result :cl)
            (inst and result ,(1- (ash 1 bits)))))
-       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type "-C"))
-         (:translate data-vector-ref-with-offset)
-         (:policy :fast-safe)
+       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type "-C") dvref)
          (:args (object :scs (descriptor-reg)))
          (:arg-types ,type (:constant low-index) (:constant (integer 0 0)))
          (:info index addend)
@@ -551,10 +552,7 @@
                (inst shr result (* extra ,bits)))
              (unless (= extra ,(1- elements-per-word))
                (inst and result ,(1- (ash 1 bits)))))))
-       (define-vop (,(symbolicate 'data-vector-set-with-offset/ type))
-         (:note "inline array store")
-         (:translate data-vector-set-with-offset)
-         (:policy :fast-safe)
+       (define-vop (,(symbolicate 'data-vector-set-with-offset/ type) dvset)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg) :target ecx)
                 (value :scs (unsigned-reg immediate)))
@@ -595,9 +593,7 @@
            (inst mov (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                          object word-index n-word-bytes)
                  old)))
-       (define-vop (,(symbolicate 'data-vector-set-with-offset/ type "-C"))
-         (:translate data-vector-set-with-offset)
-         (:policy :fast-safe)
+       (define-vop (,(symbolicate 'data-vector-set-with-offset/ type "-C") dvset)
          (:args (object :scs (descriptor-reg))
                 (value :scs (unsigned-reg immediate)))
          (:arg-types ,type (:constant low-index)
@@ -660,10 +656,7 @@
 
 #.
 (let ((use-temp (<= word-shift n-fixnum-tag-bits)))
-  `(define-vop (data-vector-ref-with-offset/simple-array-single-float)
-     (:note "inline array access")
-     (:translate data-vector-ref-with-offset)
-     (:policy :fast-safe)
+  `(define-vop (data-vector-ref-with-offset/simple-array-single-float dvref)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg)))
      (:info addend)
@@ -681,10 +674,7 @@
             '((inst movss value (float-ref-ea object index addend 4
                                  :scale (ash 4 (- n-fixnum-tag-bits)))))))))
 
-(define-vop (data-vector-ref-with-offset/simple-array-single-float-c)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-single-float-c dvref)
   (:args (object :scs (descriptor-reg)))
   (:info index addend)
   (:arg-types simple-array-single-float (:constant low-index)
@@ -697,10 +687,7 @@
 
 #.
 (let ((use-temp (<= word-shift n-fixnum-tag-bits)))
-  `(define-vop (data-vector-set-with-offset/simple-array-single-float)
-     (:note "inline array store")
-     (:translate data-vector-set-with-offset)
-     (:policy :fast-safe)
+  `(define-vop (data-vector-set-with-offset/simple-array-single-float dvset)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg))
             (value :scs (single-reg)))
@@ -721,10 +708,7 @@
             '((inst movss (float-ref-ea object index addend 4
                            :scale (ash 4 (- n-fixnum-tag-bits))) value))))))
 
-(define-vop (data-vector-set-with-offset/simple-array-single-float-c)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-single-float-c dvset)
   (:args (object :scs (descriptor-reg))
          (value :scs (single-reg)))
   (:info index addend)
@@ -736,10 +720,7 @@
    (unpoison-element object (+ index addend))
    (inst movss (float-ref-ea object index addend 4) value)))
 
-(define-vop (data-vector-ref-with-offset/simple-array-double-float)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-double-float dvref)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info addend)
@@ -752,10 +733,7 @@
    (inst movsd value (float-ref-ea object index addend 8
                                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
-(define-vop (data-vector-ref-c/simple-array-double-float)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-c/simple-array-double-float dvref)
   (:args (object :scs (descriptor-reg)))
   (:info index addend)
   (:arg-types simple-array-double-float (:constant low-index)
@@ -766,10 +744,7 @@
   (:generator 6
    (inst movsd value (float-ref-ea object index addend 8))))
 
-(define-vop (data-vector-set-with-offset/simple-array-double-float)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-double-float dvset)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (double-reg)))
@@ -784,10 +759,7 @@
                                       :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
          value)))
 
-(define-vop (data-vector-set-with-offset/simple-array-double-float-c)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-double-float-c dvset)
   (:args (object :scs (descriptor-reg))
          (value :scs (double-reg)))
   (:info index addend)
@@ -801,10 +773,7 @@
 
 ;;; complex float variants
 
-(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float dvref)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info addend)
@@ -817,10 +786,7 @@
     (inst movq value (float-ref-ea object index addend 8
                                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
-(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float-c)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float-c dvref)
   (:args (object :scs (descriptor-reg)))
   (:info index addend)
   (:arg-types simple-array-complex-single-float (:constant low-index)
@@ -831,10 +797,7 @@
   (:generator 4
     (inst movq value (float-ref-ea object index addend 8))))
 
-(define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-complex-single-float dvset)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (complex-single-reg)))
@@ -849,10 +812,7 @@
                                       :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
           value)))
 
-(define-vop (data-vector-set-with-offset/simple-array-complex-single-float-c)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-complex-single-float-c dvset)
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-single-reg)))
   (:info index addend)
@@ -864,10 +824,7 @@
     (unpoison-element object (+ index addend))
     (inst movq (float-ref-ea object index addend 8) value)))
 
-(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float dvref)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info addend)
@@ -880,10 +837,7 @@
     (inst movapd value (float-ref-ea object index addend 16
                                               :scale (ash 2 (- word-shift n-fixnum-tag-bits))))))
 
-(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float-c)
-  (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float-c dvref)
   (:args (object :scs (descriptor-reg)))
   (:info index addend)
   (:arg-types simple-array-complex-double-float (:constant low-index)
@@ -894,10 +848,7 @@
   (:generator 6
     (inst movapd value (float-ref-ea object index addend 16))))
 
-(define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-complex-double-float dvset)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (complex-double-reg)))
@@ -912,10 +863,7 @@
                                         :scale (ash 2 (- word-shift n-fixnum-tag-bits)))
           value)))
 
-(define-vop (data-vector-set-with-offset/simple-array-complex-double-float-c)
-  (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
+(define-vop (data-vector-set-with-offset/simple-array-complex-double-float-c dvset)
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-double-reg)))
   (:info index addend)
@@ -949,9 +897,7 @@
                                     (- other-pointer-lowtag))
                                  object)))
     `(progn
-         (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
-           (:translate data-vector-ref-with-offset)
-           (:policy :fast-safe)
+         (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype) dvref)
            (:args (object :scs (descriptor-reg))
                   (index :scs (,index-sc)))
            (:info addend)
@@ -961,9 +907,7 @@
            (:results (value :scs ,scs))
            (:result-types ,type)
            (:generator 5 (inst ,mov-inst ',opcode-modifier value ,ea-expr)))
-         (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype "-C"))
-           (:translate data-vector-ref-with-offset)
-           (:policy :fast-safe)
+         (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype "-C") dvref)
            (:args (object :scs (descriptor-reg)))
            (:info index addend)
            (:arg-types ,ptype (:constant low-index)
@@ -973,9 +917,7 @@
            (:result-types ,type)
            (:generator 4 (inst ,mov-inst ',opcode-modifier value ,ea-expr-const)))
          ;; FIXME: these all need to accept immediate SC for the value
-         (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
-           (:translate data-vector-set-with-offset)
-           (:policy :fast-safe)
+         (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype) dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))
                   (index :scs (,index-sc) :to (:eval 0))
                   (value :scs ,scs))
@@ -987,9 +929,7 @@
            (:generator 5
             (unpoison-element object index addend)
             (inst mov ,operand-size ,ea-expr value)))
-         (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C"))
-           (:translate data-vector-set-with-offset)
-           (:policy :fast-safe)
+         (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C") dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))
                   (value :scs ,scs))
            (:info index addend)
