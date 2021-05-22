@@ -785,7 +785,7 @@
 ;;; In tail call with fixed arguments, the passing locations are passed as a
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
-
+;(defvar fun-type :function)
 (defmacro define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
@@ -821,7 +821,9 @@
             ,@(unless variable '(nargs))
             ,@(when (eq named :direct) '(fun))
             ,@(when (eq return :fixed) '(nvals))
-            step-instrumenting)
+            step-instrumenting
+            ,@(unless named
+                '(fun-type)))
 
      (:ignore
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
@@ -952,14 +954,12 @@
                                (load-constant vop arg-fun lexenv)
                                (do-next-filler)))
                             (insert-step-instrumenting)
-                            (loadw function lexenv closure-fun-slot
-                                fun-pointer-lowtag)
                             (do-next-filler))))
                      (loop
                       (if filler
                           (do-next-filler)
                           (return)))
-                     ,@(ecase named
+                     ,@(case named
                          ((t)
                           `((loadw lip name-pass fdefn-raw-addr-slot other-pointer-lowtag)
                             ,(if (eq return :tail)
@@ -967,20 +967,17 @@
                          (:direct
                           `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))
                             ,(if (eq return :tail)
-                                 `(inst add lip lip 4))))
-                         ((nil)
-                          `((inst add lip function
-                                  (+ (- (ash simple-fun-insts-offset word-shift)
-                                        fun-pointer-lowtag)
-                                     ,(if (eq return :tail)
-                                          4
-                                          0))))))
+                                 `(inst add lip lip 4)))))
 
                      (note-this-location vop :call-site)
 
-                     ,(if (eq return :tail)
-                          `(inst br lip)
-                          `(inst blr lip)))
+                     ,(if named
+                          (if (eq return :tail)
+                              `(inst br lip)
+                              `(inst blr lip))
+                          (if (eq return :tail)
+                              `(tail-call-unnamed lexenv function lip fun-type)
+                              `(call-unnamed lexenv function lip fun-type))))
 
                    ,@(ecase return
                        (:fixed
@@ -1015,6 +1012,7 @@
    (function-arg :scs (descriptor-reg) :target lexenv)
    (old-fp-arg :scs (any-reg) :load-if nil)
    (lra-arg :scs (descriptor-reg) :load-if nil))
+  (:info fun-type)
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:scs (interior-reg)) lip)
@@ -1029,8 +1027,56 @@
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (load-inline-constant tmp-tn '(:fixup tail-call-variable :assembly-routine) lip)
+    (load-inline-constant tmp-tn
+                          (if (eq fun-type :function)
+                              '(:fixup tail-call-variable :assembly-routine)
+                              '(:fixup tail-call-callable-variable :assembly-routine))
+                          lip)
     (inst br tmp-tn)))
+
+;;; Invoke the function-designator FUN.
+(defun tail-call-unnamed (lexenv fun lip type)
+  (case type
+    (:symbol
+     (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
+     (inst br tmp-tn))
+    (t
+     (assemble ()
+       (when (eq type :designator)
+         (inst and tmp-tn lexenv lowtag-mask)
+         (inst cmp tmp-tn fun-pointer-lowtag)
+         (inst b :eq call)
+         (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
+         (inst br tmp-tn))
+       call
+       (loadw fun lexenv closure-fun-slot fun-pointer-lowtag)
+       (inst add lip fun
+             (+ (- (ash simple-fun-insts-offset word-shift)
+                   fun-pointer-lowtag)
+                4))
+       (inst br lip)))))
+
+(defun call-unnamed (lexenv fun lip type)
+  (case type
+    (:symbol
+     (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
+     (inst blr tmp-tn))
+    (t
+     (assemble ()
+       (when (eq type :designator)
+         (inst and tmp-tn lexenv lowtag-mask)
+         (inst cmp tmp-tn fun-pointer-lowtag)
+         (inst b :eq call)
+         (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
+         (inst blr tmp-tn)
+         (inst b ret))
+       call
+       (loadw fun lexenv closure-fun-slot fun-pointer-lowtag)
+       (inst add lip fun
+             (- (ash simple-fun-insts-offset word-shift)
+                fun-pointer-lowtag))
+       (inst blr lip)
+       ret))))
 
 ;;;; Unknown values return:
 

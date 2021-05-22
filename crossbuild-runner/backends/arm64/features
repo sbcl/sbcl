@@ -3,3 +3,4 @@
 :unbind-in-unwind
 :compare-and-swap-vops :undefined-fun-restarts
 :unwind-to-frame-and-call-vop
+:call-symbol

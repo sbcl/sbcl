@@ -71,8 +71,47 @@
   (lisp-return lra :multiple-values))
 
 ;;;; tail-call-variable.
+(defun prepare-for-tail-call-variable (nargs args count dest temp r0 r1 r2 r3)
+  (assemble ()
+    ;; We're in a tail-call scenario, so we use the existing LRA and
+    ;; OCFP, both already set up in the stack frame.  We have a set of
+    ;; arguments, represented as the address of the first argument
+    ;; (ARGS) and the address just beyond the last argument (CSP-TN),
+    ;; and need to set up the arg-passing-registers, any stack arguments
+    ;; (the fourth and subsequent arguments, if such exist), and the
+    ;; total arg count (NARGS).
 
-#+sb-assembling ;; no vop for this one either.
+    ;; Calculate NARGS
+    (inst sub nargs csp-tn args)
+
+    ;; Load the argument regs (must do this now, 'cause the blt might
+    ;; trash these locations, and we need ARGS to be dead for the blt)
+    (inst ldp r0 r1 (@ args))
+    (inst ldp r2 r3 (@ args (* n-word-bytes 2)))
+
+    ;; ARGS is now dead, we access the remaining arguments by offset
+    ;; from CSP-TN.
+
+    ;; Figure out how many arguments we really need to shift.
+    (inst subs count nargs (* register-arg-count n-word-bytes))
+    ;; If there aren't any stack args then we're done.
+    (inst b :le DONE)
+
+    ;; Find where our shifted arguments need to go.
+    (inst add dest cfp-tn nargs)
+
+    (inst neg count count)
+    LOOP
+    ;; Copy one arg.
+    (inst ldr temp (@ csp-tn count))
+    (inst str temp (@ dest count))
+    (inst adds count count n-word-bytes)
+    (inst b :ne LOOP)
+
+    DONE
+    (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))))
+
+#+sb-assembling
 (define-assembly-routine
     (tail-call-variable
      (:return-style :none))
@@ -96,50 +135,92 @@
      (:temp r2 descriptor-reg r2-offset)
      (:temp r3 descriptor-reg r3-offset))
 
-  ;; We're in a tail-call scenario, so we use the existing LRA and
-  ;; OCFP, both already set up in the stack frame.  We have a set of
-  ;; arguments, represented as the address of the first argument
-  ;; (ARGS) and the address just beyond the last argument (CSP-TN),
-  ;; and need to set up the arg-passing-registers, any stack arguments
-  ;; (the fourth and subsequent arguments, if such exist), and the
-  ;; total arg count (NARGS).
-
-  ;; Calculate NARGS
-  (inst sub nargs csp-tn args)
-
-  ;; Load the argument regs (must do this now, 'cause the blt might
-  ;; trash these locations, and we need ARGS to be dead for the blt)
-  (inst ldp r0 r1 (@ args))
-  (inst ldp r2 r3 (@ args (* n-word-bytes 2)))
-
-  ;; ARGS is now dead, we access the remaining arguments by offset
-  ;; from CSP-TN.
-
-  ;; Figure out how many arguments we really need to shift.
-  (inst subs count nargs (* register-arg-count n-word-bytes))
-  ;; If there aren't any stack args then we're done.
-  (inst b :le DONE)
-
-  ;; Find where our shifted arguments need to go.
-  (inst add dest cfp-tn nargs)
-
-  (inst neg count count)
-  LOOP
-  ;; Copy one arg.
-  (inst ldr temp (@ csp-tn count))
-  (inst str temp (@ dest count))
-  (inst adds count count n-word-bytes)
-  (inst b :ne LOOP)
-
-  DONE
-  (loadw lip cfp-tn lra-save-offset)
-  ;; The call frame is all set up, so all that remains is to jump to
-  ;; the new function.  We need a boxed register to hold the actual
-  ;; function object (in case of closure functions or funcallable
-  ;; instances)
-  (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
+  (prepare-for-tail-call-variable nargs args count dest temp r0 r1 r2 r3)
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
   (lisp-jump temp lip))
+
+#+sb-assembling
+(define-assembly-routine
+    (tail-call-callable-variable
+     (:return-style :none))
+
+    ;; These are really args.
+    ((:temp args any-reg nl2-offset)
+     (:temp lexenv descriptor-reg lexenv-offset)
+
+     ;; We need to compute this
+     (:temp nargs any-reg nargs-offset)
+
+     ;; These are needed by the blitting code.
+     (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
+     (:temp count any-reg nl3-offset)
+     (:temp temp descriptor-reg r9-offset)
+     (:temp lip interior-reg lr-offset)
+
+     ;; These are needed so we can get at the register args.
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp r3 descriptor-reg r3-offset))
+
+  (prepare-for-tail-call-variable nargs args count dest temp r0 r1 r2 r3)
+  (inst and tmp-tn lexenv lowtag-mask)
+  (inst cmp tmp-tn fun-pointer-lowtag)
+  (inst b :eq call)
+  (inst b (make-fixup 'tail-call-symbol :assembly-routine))
+  call
+  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump temp lip))
+
+#+sb-assembling
+(define-assembly-routine (call-symbol
+                          (:return-style :none)
+                          (:export tail-call-symbol))
+    ((:temp fun (any-reg descriptor-reg) lexenv-offset)
+     (:temp length (any-reg descriptor-reg) nl0-offset)
+     (:temp vector (any-reg descriptor-reg) r7-offset)
+     (:temp temp (any-reg descriptor-reg) nl1-offset)
+     (:temp temp2 (any-reg descriptor-reg) nl2-offset))
+  (inst str lr-tn (@ cfp-tn 8))
+  TAIL-CALL-SYMBOL
+  (inst and temp fun lowtag-mask)
+  (inst cmp temp other-pointer-lowtag)
+  (inst b :ne not-callable)
+
+  (inst ldrb temp (@ fun (- other-pointer-lowtag)))
+  (inst cmp temp symbol-widetag)
+  (inst b :ne not-callable)
+
+  (load-symbol-info-vector vector fun temp)
+
+  ;; info-vector-fdefn
+  (inst cmp vector null-tn)
+  (inst b :eq undefined)
+
+  (inst ldr temp (@ vector (- (* 2 n-word-bytes) other-pointer-lowtag)))
+  (inst and temp temp (fixnumize (1- (ash 1 (* info-number-bits 2)))))
+  (inst movz temp2 (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
+  (inst cmp temp temp2)
+  (inst b :lt undefined)
+
+  (inst ldr length (@ vector
+                      (- (ash vector-length-slot word-shift) other-pointer-lowtag)))
+
+  (inst lsl length length (- word-shift n-fixnum-tag-bits))
+  (inst sub length length (- other-pointer-lowtag 8))
+  (inst ldr fun (@ vector length))
+  (loadw lr-tn fun fdefn-raw-addr-slot other-pointer-lowtag)
+  (inst add lr-tn lr-tn 4)
+  (inst br lr-tn)
+  UNDEFINED
+  (inst b (make-fixup 'undefined-tramp :assembly-routine))
+  NOT-CALLABLE
+  (inst cmp fun null-tn) ;; NIL doesn't have SYMBOL-WIDETAG
+  (inst b :eq undefined)
+
+  (emit-error-break nil error-trap (error-number-or-lose 'sb-kernel::object-not-callable-error)
+                    (list fun)))
+
 
 ;;;; Non-local exit noise.
 

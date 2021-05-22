@@ -226,6 +226,17 @@
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 ;;;
+
+(defun load-symbol-info-vector (result symbol temp)
+  (assemble ()
+    (loadw result symbol symbol-info-slot other-pointer-lowtag)
+    ;; If RESULT has list-pointer-lowtag, take its CDR. If not, use it as-is.
+    (inst and temp result lowtag-mask)
+    (inst cmp temp list-pointer-lowtag)
+    (inst b :ne NE)
+    (loadw result result cons-cdr-slot list-pointer-lowtag)
+    NE))
+
 (define-vop (symbol-info-vector)
   (:policy :fast-safe)
   (:translate symbol-info-vector)
@@ -233,13 +244,7 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp)
   (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-    (inst and temp res lowtag-mask)
-    (inst cmp temp list-pointer-lowtag)
-    (inst b :ne NE)
-    (loadw res res cons-cdr-slot list-pointer-lowtag)
-    NE))
+    (load-symbol-info-vector res x temp)))
 
 (define-vop (symbol-plist)
   (:policy :fast-safe)
