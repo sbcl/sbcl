@@ -1838,8 +1838,9 @@
 (defknown %type-check-error (t t t) nil)
 (defknown %type-check-error/c (t t t) nil)
 
-(defknown (%compile-time-type-error) (t t t t t t) nil)
-(defknown (%compile-time-type-style-warn) (t t t t t t) *)
+;; %compile-time-type-error does not return, but due to the implementation
+;; of FILTER-LVAR we cannot write it here.
+(defknown (%compile-time-type-error %compile-time-type-style-warn) (t t t t t t) *)
 (defknown (etypecase-failure ecase-failure) (t t) nil)
 
 (defknown %odd-key-args-error () nil)

@@ -2763,7 +2763,12 @@
                                                  ',(type-specifier value-type)
                                                  ',detail
                                                  ',(compile-time-type-error-context source-form)
-                                                 ',context)))))
+                                                 ',context))))
+               ;; maybe-terminate-block during ir1-convert (in filter-lvar) doesn't
+               ;; properly terminate blocks for NIL returning functions, do it manually here.
+               (setq value (cast-value cast))
+               (derive-node-type (lvar-uses value) *empty-type*)
+               (maybe-terminate-block (lvar-uses value) nil))
              (return-from ir1-optimize-cast)))
       (when (eq (node-derived-type cast) *empty-type*)
         (maybe-terminate-block cast nil))

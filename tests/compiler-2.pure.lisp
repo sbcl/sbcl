@@ -3205,3 +3205,17 @@
       (block nil
         (evenp (the integer (ignore-errors (return c))))))
    ((1) 1)))
+
+(with-test (:name :cast-filter-lvar)
+  (checked-compile-and-assert
+   (:allow-warnings t)
+   `(lambda ()
+      (block nil
+        (equal
+         (the integer (tagbody
+                         (let ((* (lambda () (go tag))))
+                           (return))
+                       tag))
+         (the integer (block nil
+                        (return))))))
+   (() nil)))
