@@ -355,10 +355,11 @@
            ,@(trap '(emit-constant (+ index addend)))
            (inst mov value ea)))))))
 
-;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO %INSTANCE-SET
+;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO
 ;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  (let ((resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension))
+  (let ((resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension
+                                       %instance-set))
                      nil 'result)))
   `(progn
      (define-vop (,name)

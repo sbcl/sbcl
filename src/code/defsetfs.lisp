@@ -49,16 +49,6 @@
 (in-package "SB-IMPL")
 (defsetf %bignum-ref %bignum-set)
 
-;;; from defstruct.lisp
-(defsetf %instance-ref %instance-set)
-
-(defsetf %raw-instance-ref/word %raw-instance-set/word)
-(defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
-(defsetf %raw-instance-ref/single %raw-instance-set/single)
-(defsetf %raw-instance-ref/double %raw-instance-set/double)
-(defsetf %raw-instance-ref/complex-single %raw-instance-set/complex-single)
-(defsetf %raw-instance-ref/complex-double %raw-instance-set/complex-double)
-
 (defsetf %instance-layout %set-instance-layout)
 (defsetf %funcallable-instance-info %set-funcallable-instance-info)
 ;;; The writer is named after the reader, but only operates on FUNCALLABLE-INSTANCE

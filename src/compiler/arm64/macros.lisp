@@ -361,6 +361,7 @@
 (defmacro define-full-setter (name type offset lowtag scs el-type
                               &optional translate
                               &aux (resultp (not (memq translate '(sb-bignum:%bignum-set
+                                                                   %instance-set
                                                                    %set-array-dimension
                                                                    data-vector-set)))))
   `(define-vop (,name)

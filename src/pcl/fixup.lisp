@@ -123,7 +123,7 @@
 
 (flet ((set-predicate (classoid-name pred)
          (let ((c (find-classoid classoid-name)))
-           (setf (%instance-ref c (get-dsd-index built-in-classoid predicate))
+           (%instance-set c (get-dsd-index built-in-classoid predicate)
                  pred))))
   (set-predicate 't #'constantly-t)
   (set-predicate 'random-class #'constantly-nil)

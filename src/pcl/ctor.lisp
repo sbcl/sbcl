@@ -788,7 +788,7 @@
                          ,@(when early-unbound-markers-p
                                  '(:initial-element +slot-unbound+)))))
            (setf (%instance-wrapper .instance.) ,wrapper)
-           (setf (std-instance-slots .instance.) .slots.)
+           (%instance-set .instance. sb-vm:instance-data-start .slots.)
            ,body
            .instance.))
       (funcallable-standard-class

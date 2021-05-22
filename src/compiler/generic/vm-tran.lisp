@@ -138,8 +138,8 @@
               ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
               ;; or the GC will treat random bit patterns as conservative pointers
               ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
-              (setf ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
-                            append `((%instance-ref copy ,i) (%instance-ref instance ,i))))
+              ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
+                      collect `(%instance-set copy ,i (%instance-ref instance ,i)))
               copy))
           (t
            `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
@@ -173,8 +173,14 @@
 (progn
   (define-source-transform %instance-layout (x)
     `(truly-the sb-vm:layout (%instance-ref ,x 0)))
+  ;; I'm unsure if anything needs the return value of %SET-INSTANCE-LAYOUT,
+  ;; but until I remove the defsetf for it - which removes the guarantee
+  ;; that it acts like SETF - then it needs to act like SETF.
   (define-source-transform %set-instance-layout (x val)
-    `(%instance-set ,x 0 (the sb-vm:layout ,val)))
+    `(let ((instance ,x)
+           (layout (the sb-vm:layout ,val)))
+        (%instance-set instance 0 layout)
+        layout))
   (define-source-transform function-with-layout-p (x)
     `(funcallable-instance-p ,x)))
 

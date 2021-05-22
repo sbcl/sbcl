@@ -315,7 +315,7 @@
 
 (macrolet ((def (suffix sc primtype)
              `(progn
-                (define-vop (,(symbolicate "RAW-INSTANCE-REF/" suffix))
+                (define-vop ()
                   (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
                   (:policy :fast-safe)
                   (:args (object :scs (descriptor-reg))
@@ -328,24 +328,21 @@
                     (inst addu lip object index)
                     (loadw value lip instance-slots-offset instance-pointer-lowtag)))
 
-                (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix))
+                (define-vop ()
                   (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
                   (:policy :fast-safe)
                   (:args (object :scs (descriptor-reg))
                          (index :scs (any-reg))
-                         (value :scs (,sc) :target result))
+                         (value :scs (,sc)))
                   (:arg-types * positive-fixnum ,primtype)
-                  (:results (result :scs (,sc)))
                   (:temporary (:scs (interior-reg)) lip)
-                  (:result-types ,primtype)
                   (:generator 5
                     (inst addu lip object index)
-                    (storew value lip instance-slots-offset instance-pointer-lowtag)
-                    (move result value))))))
+                    (storew value lip instance-slots-offset instance-pointer-lowtag))))))
   (def word unsigned-reg unsigned-num)
   (def signed-word signed-reg signed-num))
 
-(define-vop (raw-instance-ref/single)
+(define-vop ()
   (:translate %raw-instance-ref/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
@@ -359,24 +356,20 @@
     (inst lwc1 value lip (- (* instance-slots-offset n-word-bytes)
                             instance-pointer-lowtag))))
 
-(define-vop (raw-instance-set/single)
+(define-vop ()
   (:translate %raw-instance-set/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (single-reg) :target result))
+         (value :scs (single-reg)))
   (:arg-types * positive-fixnum single-float)
-  (:results (result :scs (single-reg)))
   (:temporary (:scs (interior-reg)) lip)
-  (:result-types single-float)
   (:generator 5
     (inst addu lip object index)
     (inst swc1 value lip (- (* instance-slots-offset n-word-bytes)
-                            instance-pointer-lowtag))
-    (unless (location= result value)
-      (inst fmove :single result value))))
+                            instance-pointer-lowtag))))
 
-(define-vop (raw-instance-ref/double)
+(define-vop ()
   (:translate %raw-instance-ref/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
@@ -398,16 +391,14 @@
         (:big-endian (inst lwc1 value lip immediate-offset))
         (:little-endian (inst lwc1-odd value lip immediate-offset))))))
 
-(define-vop (raw-instance-set/double)
+(define-vop ()
   (:translate %raw-instance-set/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (double-reg) :target result))
+         (value :scs (double-reg)))
   (:arg-types * positive-fixnum double-float)
-  (:results (result :scs (double-reg)))
   (:temporary (:scs (interior-reg)) lip)
-  (:result-types double-float)
   (:generator 5
     (inst addu lip object index)
     (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
@@ -419,11 +410,9 @@
                                instance-pointer-lowtag)))
       (ecase *backend-byte-order*
         (:big-endian (inst swc1 value lip immediate-offset))
-        (:little-endian (inst swc1-odd value lip immediate-offset))))
-    (unless (location= result value)
-      (inst fmove :double result value))))
+        (:little-endian (inst swc1-odd value lip immediate-offset))))))
 
-(define-vop (raw-instance-ref/complex-single)
+(define-vop ()
   (:translate %raw-instance-ref/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
@@ -445,36 +434,23 @@
           (- (* (1+ instance-slots-offset) n-word-bytes)
              instance-pointer-lowtag))))
 
-(define-vop (raw-instance-set/complex-single)
+(define-vop ()
   (:translate %raw-instance-set/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (complex-single-reg) :target result))
+         (value :scs (complex-single-reg)))
   (:arg-types * positive-fixnum complex-single-float)
-  (:results (result :scs (complex-single-reg)))
   (:temporary (:scs (interior-reg)) lip)
-  (:result-types complex-single-float)
   (:generator 5
     (inst addu lip object index)
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
-      (inst swc1
-            value-real
-            lip
-            (- (* instance-slots-offset n-word-bytes)
-               instance-pointer-lowtag))
-      (unless (location= result-real value-real)
-        (inst fmove :single result-real value-real)))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
-      (inst swc1
-            value-imag
-            lip
-            (- (* (1+ instance-slots-offset) n-word-bytes)
-               instance-pointer-lowtag))
-      (unless (location= result-imag value-imag)
-        (inst fmove :single result-imag value-imag)))))
+    (inst swc1 (complex-single-reg-real-tn value)
+          lip (- (* instance-slots-offset n-word-bytes)
+                 instance-pointer-lowtag))
+    (inst swc1
+          (complex-single-reg-imag-tn value)
+          lip (- (* (1+ instance-slots-offset) n-word-bytes)
+                 instance-pointer-lowtag))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
@@ -532,20 +508,17 @@
                               lip
                               immediate-offset))))))
 
-(define-vop (raw-instance-set/complex-double)
+(define-vop ()
   (:translate %raw-instance-set/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (complex-double-reg) :target result))
+         (value :scs (complex-double-reg)))
   (:arg-types * positive-fixnum complex-double-float)
-  (:results (result :scs (complex-double-reg)))
   (:temporary (:scs (interior-reg)) lip)
-  (:result-types complex-double-float)
   (:generator 5
     (inst addu lip object index)
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
+    (let ((value-real (complex-double-reg-real-tn value)))
       (let ((immediate-offset (- (* instance-slots-offset n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
@@ -567,11 +540,8 @@
           (:little-endian (inst swc1-odd
                                 value-real
                                 lip
-                                immediate-offset))))
-      (unless (location= result-real value-real)
-        (inst fmove :double result-real value-real)))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
+                                immediate-offset)))))
+    (let ((value-imag (complex-double-reg-imag-tn value)))
       (let ((immediate-offset (- (* (+ instance-slots-offset 2) n-word-bytes)
                                  instance-pointer-lowtag)))
         (ecase *backend-byte-order*
@@ -593,6 +563,4 @@
           (:little-endian (inst swc1-odd
                                 value-imag
                                 lip
-                                immediate-offset))))
-      (unless (location= result-imag value-imag)
-        (inst fmove :double result-imag value-imag)))))
+                                immediate-offset)))))))

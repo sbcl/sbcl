@@ -177,7 +177,7 @@
   (acond ((dsd-raw-slot-data dsd) (raw-slot-data-raw-type it))
          (t)))
 (defun dsd-primitive-accessor (dsd &aux (rsd (dsd-raw-slot-data dsd)))
-  (if rsd (raw-slot-data-accessor-name rsd) '%instance-ref))
+  (if rsd (raw-slot-data-reader-name rsd) '%instance-ref))
 
 ;;;; typed (non-class) structures
 
@@ -1109,42 +1109,32 @@ unless :NAMED is also specified.")))
       (setf (classoid-source-location classoid) source-location))))
 
 
-;;; Return a form accessing the writable place used for the slot
-;;; described by DD and DSD in the INSTANCE (a form).
-(defun %accessor-place-form (dd dsd instance)
-  (let (;; Compute REF even if not using it, as a sanity-check of DD-TYPE.
-        (ref (ecase (dd-type dd)
-               (structure '%instance-ref)
-               (funcallable-structure '%funcallable-instance-info)
-               (list 'nth)
-               (vector 'aref)))
-        (index (dsd-index dsd))
-        (rsd (dsd-raw-slot-data dsd)))
-    (cond (rsd
-           (list (raw-slot-data-accessor-name rsd) instance index))
-          ((eq ref 'nth)
-           (list ref index instance))
-          (t
-           (list ref instance index)))))
-
 ;;; Return the transform of conceptual FUNCTION one of {:READ,:WRITE,:SETF}
 ;;; as applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
 ;;; Return NIL on failure.
 (defun slot-access-transform (function args slot-key)
-  (when (consp args) ; need at least one arg
-    (let* ((dd (car slot-key))
-           (dsd (cdr slot-key))
-           ;; optimistically compute PLACE before checking length of ARGS
-           ;; because we expect success, and this unifies the three cases.
-           ;; :SETF is like an invocation of the SETF macro - newval is
-           ;; the second arg, but :WRITER is #'(SETF fn) - newval is first.
-           (place
-            (%accessor-place-form
-             dd dsd `(the ,(dd-name dd)
-                       ,(car (if (eq function :write) (cdr args) args)))))
-           (type-spec (dsd-type dsd)))
-      (if (eq function :read)
-          (when (singleton-p args)
+  (declare (type (member :read :write :setf) function))
+  (unless (if (eq function :read)
+              (singleton-p args) ; need exactly 1 arg
+              (and (consp argS) (singleton-p (cdr args)))) ; need exactly 2 args
+    (return-from slot-access-transform nil)) ; fail
+  (let* ((dd (car slot-key))
+         (dsd (cdr slot-key))
+         (type-spec (dsd-type dsd))
+         (index (dsd-index dsd)))
+    (if (eq function :read)
+        (let* ((instance-form `(the ,(dd-name dd) ,(car args)))
+               (place
+                (acond ((eq (dd-type dd) 'list)
+                        ;;(list 'list index instance-form)
+                        (bug "What?"))
+                       ((dsd-raw-slot-data dsd)
+                        (list (raw-slot-data-reader-name it) instance-form index))
+                       (t
+                        (list (ecase (dd-type dd)
+                                (funcallable-structure '%funcallable-instance-info)
+                                (structure '%instance-ref))
+                              instance-form index)))))
             ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
             ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
             ;; check the type on each read. Assuming that type-checks reject
@@ -1153,28 +1143,36 @@ unless :NAMED is also specified.")))
                    `(the ,type-spec ,place))
                   (t
                    (unless (dsd-always-boundp dsd)
-                     (setf place `(the* ((not (satisfies sb-vm::unbound-marker-p))
-                                         :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
-                                         ,place)))
-                   (if (eq type-spec t) place `(the* (,type-spec :derive-type-only t) ,place)))))
-          (when (singleton-p (cdr args))
-            (let ((inverse (car (info :setf :expander (car place)))))
-              (flet ((check (newval)
-                       (if (eq type-spec t)
-                           newval
-                           `(the* (,type-spec :context
-                                              (:struct ,(dd-name dd) . ,(dsd-name dsd)))
-                                  ,newval))))
-                (ecase function
-                  (:setf
-                   ;; Instance setters take newval last, which matches
-                   ;; the order in which a use of SETF has them.
-                   `(,inverse ,@(cdr place) ,(check (second args))))
-                  (:write
-                   ;; The call to #'(SETF fn) had newval first.
-                   ;; We need to preserve L-to-R evaluation.
-                   (once-only ((new (first args)))
-                     `(,inverse ,@(cdr place) ,(check new))))))))))))
+                     (setf place
+                           `(the* ((not (satisfies sb-vm::unbound-marker-p))
+                                   :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
+                                  ,place)))
+                   (if (eq type-spec t) place
+                       `(the* (,type-spec :derive-type-only t) ,place)))))
+        ;; The primitive object slot setting vops take newval last, which matches
+        ;; the order in which a use of SETF has them, but because the vops
+        ;; do not return anything, we have to bind both arguments.
+        (binding* ((setter (acond ((dsd-raw-slot-data dsd)
+                                   (raw-slot-data-writer-name it))
+                                  (t
+                                   (ecase (dd-type dd)
+                                     (funcallable-structure '%set-funcallable-instance-info)
+                                     (structure '%instance-set)))))
+                   ((newval-form instance-form)
+                    (if (eq function :write)
+                        (values (first args) (second args))
+                        (values (second args) (first args)))))
+            (if (eq function :write) ; #'(SETF accessor) - newval is first
+                `(let ((#2=#:val
+                        #4=,(if (eq type-spec t)
+                                newval-form
+                                `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                       ,newval-form)))
+                       (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
+                   (,setter #1# ,index #2#)
+                   #2#)
+                ;; (SETF (ACCESS INSTANCE) NEWVAL) ; has instance first, returns newval
+                `(let ((#1# #3#) (#2# #4#)) (,setter #1# ,index #2#) #2#))))))
 
 ;;; Apply TRANSFORM - a special indicator stored in :SOURCE-TRANSFORM
 ;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
@@ -1736,26 +1734,11 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;
 ;;; This is split into two functions:
 ;;;   * INSTANCE-CONSTRUCTOR-FORM has to deal with raw slots
-;;;     (there are two variations on this)
 ;;;   * TYPED-CONSTRUCTOR-FORM deal with LIST & VECTOR
 ;;;     which might have "name" symbols stuck in at various weird places.
 (defun instance-constructor-form (dd values &aux (dd-slots (dd-slots dd)))
-   ;; The difference between the two implementations here is that on all
-   ;; platforms we don't have the appropriate RAW-INSTANCE-INIT VOPS, which
-   ;; must be able to deal with immediate values as well -- unlike
-   ;; RAW-INSTANCE-SET VOPs, which never end up seeing immediate values. With
-   ;; some additional cleverness we might manage without them and just a single
-   ;; implementation here, though -- figure out a way to ensure that on those
-   ;; platforms we always still get a non-immediate TN in every case...
-   ;;
-   ;; Until someone does that, this means that instances with raw slots can be
-   ;; DX allocated only on platforms with those additional VOPs.
   (aver (= (length dd-slots) (length values)))
-  ;; FIXME: why does SB-C::VOP-EXISTSP fail the defined-in-time post-check
-  ;; if employed here in lieu of the reader conditional?
-  (if (or #+(or ppc ppc64 x86 x86-64) t)
-    ;; Have raw-instance-init vops
-    (collect ((slot-specs) (slot-values))
+  (collect ((slot-specs) (slot-values))
       (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
                                     (spec (list* :slot raw-type (dsd-index dsd))))
               (cond ((eq value '.do-not-initialize-slot.)
@@ -1767,36 +1750,7 @@ or they must be declared locally notinline at each call site.~@:>"
                      (slot-values value))))
             dd-slots values)
       `(%make-structure-instance-macro ,dd ',(slot-specs) ,@(slot-values)))
-    ;; Don't have raw-instance-init vops
-    (collect ((slot-specs) (slot-values) (raw-slots) (raw-values))
-      ;; Partition into non-raw and raw
-      (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
-                                    (spec (list* :slot raw-type (dsd-index dsd))))
-              (cond ((eq value '.do-not-initialize-slot.)
-                     (when (eq raw-type t)
-                       (rplaca spec :unbound)
-                       (slot-specs spec)))
-                    ((eq raw-type t)
-                     (slot-specs spec)
-                     (slot-values value))
-                    (t
-                     (raw-slots dsd)
-                     (raw-values value))))
-            dd-slots values)
-      (let ((instance-form
-             `(%make-structure-instance-macro ,dd
-                                              ',(slot-specs) ,@(slot-values))))
-        (if (raw-slots)
-            (let ((temp (make-symbol "INSTANCE")))
-              `(let ((,temp ,instance-form))
-                 ;; Transform to %RAW-INSTANCE-SET/foo, not SETF,
-                 ;; in case any slots are readonly.
-                 ,@(mapcar (lambda (dsd value)
-                             (slot-access-transform
-                              :setf (list temp value) (cons dd dsd)))
-                           (raw-slots) (raw-values))
-                 ,temp))
-            instance-form)))))
+  )
 
 ;;; A "typed" constructor prefers to use a single call to LIST or VECTOR
 ;;; if possible, but can't always do that for VECTOR because it might not

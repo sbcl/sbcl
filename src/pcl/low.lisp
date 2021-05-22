@@ -196,14 +196,10 @@
 ;;;        (2) why isn't this named STANDARD-OBJECT-P?
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
-(defmacro %std-instance-slots (x)
-  `(%instance-ref ,x ,sb-vm:instance-data-start))
 (defmacro std-instance-slots (x)
-  `(truly-the simple-vector (%std-instance-slots ,x)))
-(defmacro %fsc-instance-slots (fin)
-  `(%funcallable-instance-info ,fin 0))
+  `(truly-the simple-vector (%instance-ref ,x ,sb-vm:instance-data-start)))
 (defmacro fsc-instance-slots (x)
-  `(truly-the simple-vector (%fsc-instance-slots ,x)))
+  `(truly-the simple-vector (%funcallable-instance-info ,x 0)))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth

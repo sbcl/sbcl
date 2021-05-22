@@ -153,7 +153,7 @@
 ;;; The stub for sb-c::%structure-is-a should really use layout-id in the same way
 ;;; that the vop does, however, because the all 64-bit architectures other than
 ;;; x86-64 need to use with-pinned-objects to extract a layout-id, it is cheaper not to.
-;;; I shouid add a vop for uint32 access to raw slots.
+;;; I should add a vop for uint32 access to raw slots.
 (defun sb-c::%structure-is-a (object-layout test-layout)
   (or (eq object-layout test-layout)
       (let ((depthoid (wrapper-depthoid test-layout))

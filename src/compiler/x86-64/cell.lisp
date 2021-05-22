@@ -789,82 +789,44 @@
 ;;;; raw instance slot accessors
 
 (flet ((instance-slot-ea (object index)
-         (etypecase index
-           (integer
-              (ea (+ (* (+ instance-slots-offset index) n-word-bytes)
-                     (- instance-pointer-lowtag))
-                  object))
-           (tn
-              (ea (+ (* instance-slots-offset n-word-bytes)
-                     (- instance-pointer-lowtag))
-                  object index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
+         (let ((constant-index
+                (if (integerp index) index
+                    (if (sc-is index immediate) (tn-value index)))))
+           (if constant-index
+               (ea (+ (* (+ instance-slots-offset constant-index) n-word-bytes)
+                      (- instance-pointer-lowtag))
+                   object)
+               (ea (+ (* instance-slots-offset n-word-bytes)
+                      (- instance-pointer-lowtag))
+                   object index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
   (macrolet
-      ((def (suffix result-sc result-type inst &optional (inst/c (list 'quote inst)))
+      ((def (suffix result-sc result-type inst)
          `(progn
-            (define-vop (,(symbolicate "RAW-INSTANCE-REF/" suffix))
+            (define-vop ()
               (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
               (:policy :fast-safe)
-              (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
+              (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
               (:arg-types * tagged-num)
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
-              (:generator 5
-                (inst ,inst value (instance-slot-ea object index))))
-            (define-vop (,(symbolicate "RAW-INSTANCE-REF-C/" suffix))
-              (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
-              (:policy :fast-safe)
-              (:args (object :scs (descriptor-reg)))
-              ;; Why are we pedantic about the index constraint here
-              ;; if we're not equally so in the init vop?
-              (:arg-types * (:constant (load/store-index #.n-word-bytes
-                                                         #.instance-pointer-lowtag
-                                                         #.instance-slots-offset)))
-              (:info index)
-              (:results (value :scs (,result-sc)))
-              (:result-types ,result-type)
-              (:generator 4
-                (inst* ,inst/c value (instance-slot-ea object index))))
-            (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix))
+              (:generator 1 (inst ,inst value (instance-slot-ea object index))))
+            (define-vop ()
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
-                     (index :scs (any-reg))
-                     (value :scs (,result-sc) :target result))
-              (:arg-types * tagged-num ,result-type)
-              (:results (result :scs (,result-sc)))
-              (:result-types ,result-type)
-              (:generator 5
-                (inst ,inst (instance-slot-ea object index) value)
-                (move result value)))
-            (define-vop (,(symbolicate "RAW-INSTANCE-SET-C/" suffix))
-              (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
-              (:policy :fast-safe)
-              (:args (object :scs (descriptor-reg))
-                     (value :scs (,result-sc) :target result))
-              (:arg-types * (:constant (load/store-index #.n-word-bytes
-                                                         #.instance-pointer-lowtag
-                                                         #.instance-slots-offset))
-                          ,result-type)
-              (:info index)
-              (:results (result :scs (,result-sc)))
-              (:result-types ,result-type)
-              (:generator 4
-                (inst* ,inst/c (instance-slot-ea object index) value)
-                (move result value)))
-            (define-vop (,(symbolicate "RAW-INSTANCE-INIT/" suffix))
-              (:args (object :scs (descriptor-reg))
+                     (index :scs (any-reg immediate))
                      (value :scs (,result-sc)))
-              (:arg-types * ,result-type)
-              (:info index)
-              (:generator 4
-                (inst* ,inst/c (instance-slot-ea object index) value))))))
+              (:arg-types * tagged-num ,result-type)
+              (:generator 1 (inst ,inst (instance-slot-ea object index) value))))))
     (def word unsigned-reg unsigned-num mov)
     (def signed-word signed-reg signed-num mov)
     (def single single-reg single-float movss)
     (def double double-reg double-float movsd)
     (def complex-single complex-single-reg complex-single-float movq)
     (def complex-double complex-double-reg complex-double-float
-         movupd (if (oddp index) 'movapd 'movupd)))
+      ;; Todo: put back the choice of using APD or UPD.
+      ;; But was it even right for either +/- compact-instance-header?
+         movupd #| (if (oddp index) 'movapd 'movupd) |#))
 
   (define-vop (raw-instance-atomic-incf/word)
     (:translate %raw-instance-atomic-incf/word)

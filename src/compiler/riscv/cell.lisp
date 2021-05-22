@@ -453,10 +453,10 @@
 
 (macrolet ((define-raw-slot-word-vops (name value-sc value-primtype)
              `(progn
-                (define-full-reffer ,(symbolicate "RAW-INSTANCE-REF/" name) * instance-slots-offset
+                (define-full-reffer ,(symbolicate "%RAW-INSTANCE-REF/" name) * instance-slots-offset
                   instance-pointer-lowtag (,value-sc) ,value-primtype
                   ,(symbolicate "%RAW-INSTANCE-REF/" name))
-                (define-full-setter ,(symbolicate "RAW-INSTANCE-SET/" name) * instance-slots-offset
+                (define-full-setter ,(symbolicate "%RAW-INSTANCE-SET/" name) * instance-slots-offset
                   instance-pointer-lowtag (,value-sc) ,value-primtype
                   ,(symbolicate "%RAW-INSTANCE-SET/" name))
                 (define-full-casser ,(symbolicate "RAW-INSTANCE-CAS/" name) instance instance-slots-offset
@@ -466,21 +466,21 @@
   (define-raw-slot-word-vops signed-word signed-reg signed-num))
 
 (macrolet ((define-raw-slot-float-vops (name value-primtype value-sc size format &optional complexp)
-             (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))
-                   (set-vop (symbolicate "RAW-INSTANCE-SET/" name)))
+             (let ((ref-vop (symbolicate "%RAW-INSTANCE-REF/" name))
+                   (set-vop (symbolicate "%RAW-INSTANCE-SET/" name)))
                `(progn
                   (,(if complexp
                         'define-complex-float-reffer
                         'define-float-reffer)
                    ,ref-vop * ,size ,format instance-slots-offset
                    instance-pointer-lowtag (,value-sc) ,value-primtype nil "raw instance access"
-                   ,(symbolicate "%" ref-vop))
+                   ,ref-vop)
                   (,(if complexp
                         'define-complex-float-setter
                         'define-float-setter)
                    ,set-vop * ,size ,format instance-slots-offset
                    instance-pointer-lowtag (,value-sc) ,value-primtype nil "raw instance store"
-                   ,(symbolicate "%" set-vop))))))
+                   ,set-vop)))))
   (define-raw-slot-float-vops single single-float single-reg 4 :single)
   (define-raw-slot-float-vops double double-float double-reg 8 :double)
   (define-raw-slot-float-vops complex-single complex-single-float complex-single-reg 4 :single t)

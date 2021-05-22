@@ -35,7 +35,7 @@
   (let* ((instance (%make-instance (1+ sb-vm:instance-data-start)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+)))
     (setf (%instance-wrapper instance) wrapper)
-    (setf (std-instance-slots instance) slots)
+    (%instance-set instance sb-vm:instance-data-start slots)
     instance))
 
 (define-condition unset-funcallable-instance-function
@@ -667,8 +667,7 @@
   ;; explains why we differentiate between SGF and everything else.
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
-      (setf (%raw-instance-ref/signed-word
-             layout (sb-kernel::type-dd-length sb-vm:layout))
+      (%raw-instance-set/signed-word layout (sb-kernel::type-dd-length sb-vm:layout)
             #+immobile-code ; there are two possible bitmaps
             (if (or (find *sgf-wrapper* inherits) (eq wrapper *sgf-wrapper*))
                 sb-kernel::standard-gf-primitive-obj-layout-bitmap

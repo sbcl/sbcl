@@ -346,6 +346,6 @@
                                copy-of-next)))
                    copy))))
     (let ((new (copy-structure lfl)))
-      (setf (%instance-ref new (get-dsd-index linked-list head))
+      (%instance-set new (get-dsd-index linked-list head)
             (copy-chain (list-head new)))
       new)))

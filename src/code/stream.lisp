@@ -1334,10 +1334,11 @@
   (setf (%instance-wrapper (truly-the instance stream))
         #.(find-layout 'string-input-stream))
   (macrolet ((initforms ()
-               `(setf
-                 ,@(mapcan (lambda (dsd)
-                             (list `(%instance-ref stream ,(dsd-index dsd))
-                                   (case (dsd-name dsd)
+               `(progn
+                 ,@(mapcar (lambda (dsd)
+                             ;; good thing we have no raw slots in stream structures
+                             `(%instance-set stream ,(dsd-index dsd)
+                                   ,(case (dsd-name dsd)
                                      ((index start) 'start)
                                      (limit 'end)
                                      (string 'simple-string)
@@ -1405,9 +1406,10 @@
            (ignorable wild-result-type)) ; if #-sb-unicode
   (setf (%instance-wrapper (truly-the instance stream)) #.(find-layout 'string-output-stream))
   (macrolet ((initforms ()
-               `(setf ,@(mapcan (lambda (dsd)
-                                  (list `(%instance-ref stream ,(dsd-index dsd))
-                                        (case (dsd-name dsd)
+               `(progn
+                  ,@(mapcar (lambda (dsd)
+                              `(%instance-set stream ,(dsd-index dsd)
+                                       ,(case (dsd-name dsd)
                                           (sout '#'string-sout) ; global fun
                                           (misc '#'misc) ; local fun
                                           ((element-type unicode-p out sout-aux buffer)
@@ -1904,9 +1906,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (setf (%instance-wrapper (truly-the instance stream))
         #.(find-layout 'fill-pointer-output-stream))
   (macrolet ((initforms ()
-               `(setf ,@(mapcan (lambda (dsd)
-                                  (list `(%instance-ref stream ,(dsd-index dsd))
-                                        (case (dsd-name dsd)
+               `(progn ,@(mapcar (lambda (dsd)
+                                   `(%instance-set stream ,(dsd-index dsd)
+                                       ,(case (dsd-name dsd)
                                           (string 'string)
                                           (t (dsd-default dsd)))))
                                 (dd-slots

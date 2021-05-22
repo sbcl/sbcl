@@ -22,7 +22,7 @@
        (slot (1- (sb-kernel:%instance-length l))))
   (assert (eql (sb-kernel:%raw-instance-ref/signed-word l slot)
                sb-kernel:+layout-all-tagged+))
-  (setf (sb-kernel:%raw-instance-ref/word l slot) 1))
+  (sb-kernel:%raw-instance-set/word l slot 1))
 
 (defun ll-alloc ()
   ;; This must be in its own function because the vop preserves no registers

@@ -93,8 +93,8 @@
           (declare (type index i))
           (let ((val (fop-stack-ref ptr)))
             (if (logbitp i bitmap)
-                (setf (%instance-ref res i) val)
-                (setf (%raw-instance-ref/word res i) val))
+                (%instance-set res i val)
+                (%raw-instance-set/word res i val))
             (incf ptr)))))
     res))
 
@@ -406,7 +406,8 @@
   (setf (svref (ref-fop-table (fasl-input) tbl-slot) idx) val))
 
 (define-fop 14 :not-host (fop-structset ((:operands tbl-slot idx) val) nil)
-  (setf (%instance-ref (ref-fop-table (fasl-input) tbl-slot) idx) val))
+  (%instance-set (ref-fop-table (fasl-input) tbl-slot) idx val)
+  val) ; I can't remmeber whether this fop needs to return VAL. maybe?
 
 (define-fop 15 (fop-nthcdr ((:operands n) obj))
   (nthcdr n obj))

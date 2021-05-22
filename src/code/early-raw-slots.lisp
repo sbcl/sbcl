@@ -75,13 +75,21 @@
   ;; themselves are aligned by exactly two words, so specifying more
   ;; than two words here would not work.
   (alignment 1 :type (integer 1 2) :read-only t))
-
-#-sb-xc-host
-(progn (declaim (inline raw-slot-data-accessor-name))
-       (defun raw-slot-data-accessor-name (rsd)
-         (%simple-fun-name (raw-slot-data-accessor-fun rsd))))
-
 (declaim (freeze-type raw-slot-data))
+
+(declaim (inline raw-slot-data-reader-name))
+(defun raw-slot-data-reader-name (rsd)
+  #+sb-xc-host (raw-slot-data-accessor-name rsd)
+  #-sb-xc-host (%simple-fun-name (raw-slot-data-accessor-fun rsd)))
+
+(defun raw-slot-data-writer-name (rsd)
+  (ecase (raw-slot-data-reader-name rsd)
+    (%raw-instance-ref/word '%raw-instance-set/word)
+    (%raw-instance-ref/single '%raw-instance-set/single)
+    (%raw-instance-ref/double '%raw-instance-set/double)
+    (%raw-instance-ref/signed-word '%raw-instance-set/signed-word)
+    (%raw-instance-ref/complex-single '%raw-instance-set/complex-single)
+    (%raw-instance-ref/complex-double '%raw-instance-set/complex-double)))
 
 ;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
 ;; but not eval'd in the compiler.

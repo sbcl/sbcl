@@ -102,9 +102,7 @@
                            (zero-init-p arg))
                 (let ((arg-tn (lvar-tn node block arg)))
                   (macrolet
-                      ((make-case (&aux (rsd-list
-                                         (if (vop-existsp :named sb-vm::raw-instance-init/word)
-                                             sb-kernel::*raw-slot-data*)))
+                      ((make-case (&aux (rsd-list sb-kernel::*raw-slot-data*))
                          `(ecase raw-type
                             ((t)
                              (vop init-slot node block object arg-tn
@@ -112,8 +110,8 @@
                             ,@(map 'list
                                (lambda (rsd)
                                  `(,(sb-kernel::raw-slot-data-raw-type rsd)
-                                   (vop ,(sb-kernel::raw-slot-data-init-vop rsd)
-                                        node block object arg-tn slot)))
+                                   (vop ,(sb-kernel::raw-slot-data-writer-name rsd)
+                                        node block object (emit-constant slot) arg-tn)))
                                rsd-list))))
                     (make-case))))))
            (:dd

@@ -77,7 +77,7 @@
     (set-layout-inherits wrapper inherits (logtest flags +structure-layout-flag+) id)
     (let ((bitmap-base (+ fixed-words extra-id-words)))
       (dotimes (i bitmap-words)
-        (setf (%raw-instance-ref/word layout (+ bitmap-base i))
+        (%raw-instance-set/word layout (+ bitmap-base i)
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
     ;; It's not terribly important that we recycle layout IDs, but I have some other
     ;; changes planned that warrant a finalizer per layout.
@@ -119,7 +119,7 @@
     (setf (%instance-wrapper structure) wrapper)
     (dolist (dsd (dd-slots (wrapper-dd wrapper)) structure)
       (when (eq (dsd-raw-type dsd) 't)
-        (setf (%instance-ref structure (dsd-index dsd)) (make-unbound-marker))))))
+        (%instance-set structure (dsd-index dsd) (make-unbound-marker))))))
 
 ;;; Return the value from the INDEXth slot of INSTANCE. This is SETFable.
 ;;; This is used right away in warm compile by MAKE-LOAD-FORM-SAVING-SLOTS,
@@ -127,6 +127,28 @@
 ;;; debug info structures. Were it not for that, this would go in 'stubs'.
 (defun %instance-ref (instance index)
   (%instance-ref instance index))
+(defun (setf %instance-ref) (newval instance index)
+  (%instance-set instance index newval)
+  newval)
+#.`(progn
+     ,@(map 'list
+            (lambda (rsd)
+              (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
+                     (writer (sb-kernel::raw-slot-data-writer-name rsd))
+                     (type (sb-kernel::raw-slot-data-raw-type rsd)))
+                `(progn
+                   (defun ,reader (instance index) (,reader instance index))
+                   ;; create a well-behaving SETF-compatible slot setter
+                   (defun (setf ,reader) (newval instance index)
+                     (declare (,type newval))
+                     (,writer instance index newval)
+                     newval)
+                   ;; .. and a non-SETF-compatible one
+                   (defun ,writer (instance index newval)
+                     (declare (,type newval))
+                     (,writer instance index newval)
+                     (values)))))
+            sb-kernel::*raw-slot-data*))
 
 (macrolet ((id-bits-sap ()
              `(sap+ (int-sap (get-lisp-obj-address layout))
@@ -179,6 +201,8 @@
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
+;;; [Hmm, do we correctly type-check in the call to the constructor?
+;;; Because this sure as heck doesn't check anything]
 #+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
   (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
@@ -188,18 +212,15 @@
     (dolist (spec slot-specs instance)
       (destructuring-bind (kind raw-type . index) spec
         (if (eq kind :unbound)
-            (setf (%instance-ref instance index)
-                  (sb-sys:%primitive make-unbound-marker))
+            (%instance-set instance index (make-unbound-marker))
             (macrolet ((make-case ()
                            `(ecase raw-type
-                              ((t)
-                               (setf (%instance-ref instance index) value))
+                              ((t) (%instance-set instance index value))
                               ,@(map 'list
                                  (lambda (rsd)
                                    `(,(raw-slot-data-raw-type rsd)
-                                      (setf (,(raw-slot-data-accessor-name rsd)
-                                              instance index)
-                                            value)))
+                                     (,(raw-slot-data-writer-name rsd)
+                                      instance index value)))
                                  *raw-slot-data*))))
                 (let ((value (fast-&rest-nth value-index slot-values)))
                   (incf value-index)
@@ -215,7 +236,7 @@
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
 (defmacro set-wrapper-equalp-impl (wrapper newval)
-  `(setf (%instance-ref ,wrapper (get-dsd-index wrapper equalp-impl)) ,newval))
+  `(%instance-set ,wrapper (get-dsd-index wrapper equalp-impl) ,newval))
 
 (defun assign-equalp-impl (type-name function)
   (set-wrapper-equalp-impl (find-layout type-name) function))
@@ -289,9 +310,8 @@
                           ((>= i len))
                         (declare (index i))
                         (if ,tagged-p
-                            (setf (%instance-ref res i)
-                                  (%instance-ref structure i))
-                            (setf (%raw-instance-ref/word res i)
+                            (%instance-set res i (%instance-ref structure i))
+                            (%raw-instance-set/word res i
                                   (%raw-instance-ref/word structure i)))
                         ,step)))
           (cond ((eql bitmap +layout-all-tagged+) (copy-loop t))
@@ -309,13 +329,13 @@
   (declare (structure-object to from) (optimize (safety 0)))
   (setf (%instance-layout to) (%instance-layout from))
   (dotimes (i (%instance-length to) to)
-    (setf (%instance-ref to i) (%instance-ref from i))))
+    (%instance-set to i (%instance-ref from i))))
 ;;; Like %COPY-INSTANCE, but layout was already assigned.
 ;;; Similarly, will not be called if raw slots and precise GC.
 (defun %copy-instance-slots (to from)
   (declare (structure-object to from) (optimize (safety 0)))
   (loop for i from sb-vm:instance-data-start below (%instance-length to)
-        do (setf (%instance-ref to i) (%instance-ref from i)))
+        do (%instance-set to i (%instance-ref from i)))
   to)
 (defun (setf %instance-wrapper) (newval x)
   (setf (%instance-layout x) (wrapper-friend newval))

@@ -284,7 +284,9 @@
                      `(let* ((old ,place)
                              (new (recurse old)))
                         (unless (eq old new)
-                          (setf ,place new)))))
+                          ,(if (eq (car place) '%instance-ref)
+                               `(%instance-set ,@(cdr place) new)
+                               `(setf ,place new))))))
           (typecase tree
             (cons
              (process (car tree))

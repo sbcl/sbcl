@@ -57,6 +57,9 @@
                     current)))))
   (def %compare-and-swap-car (cons) car)
   (def %compare-and-swap-cdr (cons) cdr)
+  ;; %instance-set is OK here even though it doesn't return a value
+  ;; because it is used for effect. And if compare-and-swap vops exist,
+  ;; then the setter isn't used at all.
   (def %instance-cas (instance index) %instance-ref %instance-set)
   #+(or x86-64 x86 riscv)
   (def %raw-instance-cas/word (instance index)

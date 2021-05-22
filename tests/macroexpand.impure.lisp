@@ -221,12 +221,14 @@
 (defmacro capture-env (&environment e &rest r)
   (declare (ignore r))
   e)
-(with-test (:name :macroexpand-of-setf-structure-access)
-  (assert (equal (macroexpand-1 '(setf (foo-a x) 3))
-                 `(sb-kernel:%instance-set (the foo x)
-                                           ,sb-vm:instance-data-start
-                                           (sb-kernel:the* (fixnum :context (:struct foo . a)) 3))))
-
+(with-test (:name :macroexpand-setf-instance-ref.1)
+  (assert (equal-mod-gensyms
+           (macroexpand-1 '(setf (foo-a x) 3))
+           `(let ((#1=instance (the foo x))
+                  (#2=val (sb-kernel:the* (fixnum :context (:struct foo . a)) 3)))
+              (sb-kernel:%instance-set #1# #.sb-vm:instance-data-start #2#)
+              #2#))))
+(with-test (:name :macroexpand-setf-instance-ref.2)
   ;; Lexical definition of (SETF FOO-A) inhibits source-transform.
   ;; This is not required behavior - SETF of structure slots
   ;; do not necessarily go through a function named (SETF your-slot),

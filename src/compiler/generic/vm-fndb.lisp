@@ -220,9 +220,7 @@
   (flushable always-translatable))
 (defknown (%instance-ref-eq) (instance index t) boolean
   (flushable always-translatable))
-(defknown %instance-set (instance index t) t
-  (always-translatable)
-  :derive-type #'result-type-last-arg)
+(defknown %instance-set (instance index t) (values) (always-translatable))
 (defknown update-object-layout (t) sb-vm:layout)
 
 #+(or arm64 ppc ppc64 riscv x86 x86-64)
@@ -235,22 +233,14 @@
 #.`(progn
      ,@(map 'list
             (lambda (rsd)
-              (let* ((reader (sb-kernel::raw-slot-data-accessor-name rsd))
-                     (name (copy-seq (string reader)))
-                     (writer (intern (replace name "-SET/"
-                                              :start1 (search "-REF/" name))))
+              (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
+                     (writer (sb-kernel::raw-slot-data-writer-name rsd))
                      (type (sb-kernel::raw-slot-data-raw-type rsd)))
                 `(progn
                    (defknown ,reader (instance index) ,type
                      (flushable always-translatable))
-                   (defknown ,writer (instance index ,type) ,type
-                     (always-translatable) :derive-type #'result-type-last-arg)
-                   ;; Interpreter stubs, harmless but unnecessary on host
-                   #-sb-xc-host
-                   (progn (defun ,reader (instance index)
-                            (,reader instance index))
-                          (defun ,writer (instance index new-value)
-                            (,writer instance index new-value))))))
+                   (defknown ,writer (instance index ,type) (values)
+                     (always-translatable)))))
             sb-kernel::*raw-slot-data*))
 
 #+compare-and-swap-vops

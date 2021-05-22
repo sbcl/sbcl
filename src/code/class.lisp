@@ -310,7 +310,7 @@ between the ~A definition and the ~A definition"
                      (+ (type-dd-length sb-vm:layout)
                         (calculate-extra-id-words (layout-depthoid ,from-layout)))))
                 (dotimes (i (bitmap-nwords ,from-layout))
-                  (setf (%raw-instance-ref/word ,to-layout (+ to-index i))
+                  (%raw-instance-set/word ,to-layout (+ to-index i)
                         (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
 (defun register-layout (wrapper &key (invalidate t) modify)
   (declare (type wrapper wrapper) (type (or wrapper null) modify))
@@ -371,9 +371,9 @@ between the ~A definition and the ~A definition"
             ;;   (/ (- (1+ layout-id-vector-fixed-capacity) 2) number-of-ids-per-word)
             ;; which is surely more confusing than spelling it as 3 or 6.
             (dotimes (i (+ extra-id-words #+64-bit 3 #-64-bit 6))
-              (setf (%raw-instance-ref/word (wrapper-friend modify)
-                                            (+ (get-dsd-index sb-vm:layout id-word0) i))
-                    0))
+              (%raw-instance-set/word (wrapper-friend modify)
+                                      (+ (get-dsd-index sb-vm:layout id-word0) i)
+                                      0))
             (set-layout-inherits modify inherits t id)
             (let ((dst (wrapper-friend modify))
                   (src (wrapper-friend wrapper)))
@@ -1258,8 +1258,8 @@ between the ~A definition and the ~A definition"
              (classoid
               (acond #-sb-xc-host ; genesis dumps some classoid literals
                      ((find-classoid name nil)
-                      (setf (%instance-ref it (get-dsd-index built-in-classoid predicate))
-                            pred-fn)
+                      (%instance-set it (get-dsd-index built-in-classoid predicate)
+                                     pred-fn)
                       ;; Unseal it so that REGISTER-LAYOUT doesn't warn
                       (setf (classoid-state it) nil)
                       it)

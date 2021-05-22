@@ -525,8 +525,7 @@ sb-c::
                      (cond ((not foundp)
                             (setf (gethash name name-ht) name))
                            ((neq name new)
-                            (setf (%instance-ref debug-fun
-                                                 (get-dsd-index compiled-debug-fun name))
+                            (%instance-set debug-fun (get-dsd-index compiled-debug-fun name)
                                   new))))
                    while next))
             (sb-lockless::linked-list

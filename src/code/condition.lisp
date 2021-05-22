@@ -242,8 +242,8 @@
         (setf (%instance-wrapper instance) layout
               (condition-assigned-slots instance) nil)
         (macrolet ((store-pair (key val)
-                     `(setf (%instance-ref instance data-index) ,key
-                            (%instance-ref instance (1+ data-index)) ,val)))
+                     `(progn (%instance-set instance data-index ,key)
+                             (%instance-set instance (1+ data-index) ,val))))
           (cond ((not any-dx)
                  ;; uncomplicated way
                  (loop (when (>= arg-index (length initargs)) (return))

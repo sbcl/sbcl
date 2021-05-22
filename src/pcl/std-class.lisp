@@ -1560,10 +1560,11 @@
 (macrolet ((replace-wrapper-and-slots (thing layout slot-vector)
              `(if (functionp ,thing)
                   (setf (%fun-wrapper ,thing) ,layout
-                        (%fsc-instance-slots ,thing) ,slot-vector)
+                        (fsc-instance-slots ,thing) ,slot-vector)
                   ;; TODO: use a double-wide CAS here if CPU supports it
-                  (setf (%instance-wrapper ,thing) ,layout
-                        (std-instance-slots ,thing) ,slot-vector))))
+                  (progn
+                    (setf (%instance-wrapper ,thing) ,layout)
+                    (%instance-set ,thing sb-vm:instance-data-start ,slot-vector)))))
 
 (defun %obsolete-instance-trap (owrapper nwrapper instance)
   (cond

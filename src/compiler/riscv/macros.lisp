@@ -266,6 +266,9 @@ and
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate
                               &aux (resultp (not (memq translate '(sb-bignum:%bignum-set
+                                                                   %instance-set
+                                                                   %raw-instance-set/word
+                                                                   %raw-instance-set/signed-word
                                                                    %set-array-dimension
                                                                    data-vector-set)))))
   `(progn
@@ -423,7 +426,7 @@ and
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits 1)
                    (- word-shift n-fixnum-tag-bits)))
-        (resultp (neq translate 'data-vector-set)))
+        (resultp nil))
     `(progn
        (define-vop (,name)
          (:note ,note)
@@ -500,7 +503,7 @@ and
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits)
                    (- word-shift n-fixnum-tag-bits)))
-        (resultp (neq translate 'data-vector-set)))
+        (resultp nil))
     `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
