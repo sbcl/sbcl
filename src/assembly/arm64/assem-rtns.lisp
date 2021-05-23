@@ -224,7 +224,8 @@
 
 ;;;; Non-local exit noise.
 
-(define-assembly-routine (throw)
+(define-assembly-routine (throw
+                          (:return-style :none))
     ((:arg target descriptor-reg r0-offset)
      (:arg start any-reg r9-offset)
      (:arg count any-reg nargs-offset)
@@ -261,7 +262,8 @@
 
 (define-assembly-routine (unwind
                           (:translate %unwind)
-                          (:policy :fast-safe))
+                          (:policy :fast-safe)
+                          (:return-style :none))
     ((:arg block (any-reg descriptor-reg) r0-offset)
      (:arg start (any-reg descriptor-reg) r9-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
@@ -273,32 +275,58 @@
      (:temp where any-reg r1-offset)
      (:temp symbol descriptor-reg r2-offset)
      (:temp value descriptor-reg r3-offset))
-  (declare (ignore start count))
+  AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst cbz block error))
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-uwp-slot)
-  (inst mov next-uwp cur-uwp)
   (inst cmp cur-uwp ocfp)
-  (inst b :eq EQ)
-  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
-  EQ
-  (inst csel cur-uwp block cur-uwp :eq)
+  (inst b :eq DO-EXIT)
+
+  (inst stp block start (@ csp-tn 32 :post-index))
+  (inst adr next-uwp RET) ;; Avoids saving the link register on uwp entry
+  (inst stp count next-uwp (@ csp-tn -16))
+
+  ;; Need to perform unbinding before unlinking the UWP so that if
+  ;; interrupted here it can still run the clean up form. While the
+  ;; cleanup form itself cannot be protected from interrupts (can't
+  ;; run it twice) one of the variables being unbound can be
+  ;; *interrupts-enabled*
   (loadw where cur-uwp unwind-block-bsp-slot)
   (unbind-to-here where symbol value tmp-tn)
 
-  (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
-  (loadw lip cur-uwp unwind-block-entry-pc-slot)
-  (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
+  ;; Set next unwind protect context.
 
+  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
+  (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
+
+  (loadw-pair cfp-tn unwind-block-cfp-slot lip unwind-block-entry-pc-slot cur-uwp)
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
-
-  (loadw-pair tmp-tn unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
+  (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
+              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
   (inst mov-sp nsp-tn next-uwp)
-  (inst cbz tmp-tn SKIP)
-  (inst mov (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset) tmp-tn)
-  SKIP
+  (inst br lip)
+  RET
+  (inst ldr count (@ csp-tn -8 :pre-index))
+  (inst ldp block start (@ csp-tn -16 :pre-index))
+  (inst b AGAIN)
 
+  DO-EXIT
+  (loadw where block unwind-block-bsp-slot)
+  (unbind-to-here where symbol value tmp-tn)
+  (loadw-pair cfp-tn unwind-block-cfp-slot lip unwind-block-entry-pc-slot block)
+  (loadw next-uwp block unwind-block-current-catch-slot)
+  (store-tl-symbol-value next-uwp *current-catch-block*)
+  (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
+              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
+  (inst mov-sp nsp-tn next-uwp)
 
-  (lisp-return lip :known))
+  (inst br lip))
+
+(define-vop ()
+  (:translate %continue-unwind)
+  (:policy :fast-safe)
+  (:generator 0
+    (inst ldr lr-tn (@ csp-tn -8 :pre-index))
+    (inst ret)))

@@ -66,9 +66,12 @@
       (load-tl-symbol-value tmp-tn *current-catch-block*))
     (storew-pair temp unwind-block-bsp-slot tmp-tn unwind-block-current-catch-slot block)
     (inst mov-sp temp nsp-tn)
-    (storew-pair (or (current-nfp-tn vop) zr-tn) unwind-block-nfp-slot
-                 temp unwind-block-nsp-slot
-                 block)))
+    (let ((nfp (current-nfp-tn vop)))
+      (if nfp
+          (storew-pair nfp unwind-block-nfp-slot
+                       temp unwind-block-nsp-slot
+                       block)
+          (storew temp block unwind-block-nsp-slot)))))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -98,9 +101,12 @@
     (storew-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot block)
     (storew temp block catch-block-bsp-slot)
     (inst mov-sp temp nsp-tn)
-    (storew-pair (or (current-nfp-tn vop) zr-tn) unwind-block-nfp-slot
-                 temp unwind-block-nsp-slot
-                 block)
+    (let ((nfp (current-nfp-tn vop)))
+      (if nfp
+          (storew-pair nfp unwind-block-nfp-slot
+                       temp unwind-block-nsp-slot
+                       block)
+          (storew temp block unwind-block-nsp-slot)))
     (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP.  This
@@ -221,12 +227,21 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the block saved in UNWIND
+    (inst ldr block (@ csp-tn (* -4 n-word-bytes)))))
 
 #+unwind-to-frame-and-call-vop
 (define-vop (unwind-to-frame-and-call)
@@ -264,7 +279,6 @@
       (storew temp block unwind-block-cfp-slot)
       (storew bsp block unwind-block-bsp-slot)
       (storew nsp block unwind-block-nsp-slot)
-      (storew zr-tn block unwind-block-nfp-slot)
       (storew catch-block block unwind-block-current-catch-slot)
 
       (inst adr temp entry-label)
