@@ -925,7 +925,11 @@ the current thread are replaced with dummy objects which can safely escape."
             "debugger invoked on a ~S~@[ @~x~] in thread ~_~A: ~2I~_~A"
             (type-of condition)
             (when (boundp '*current-internal-error-context*)
-              (sap-int (sb-vm:context-pc *current-internal-error-context*)))
+              (if (system-area-pointer-p *current-internal-error-context*)
+                  (sb-alien:with-alien ((context (* os-context-t)
+                                                 sb-kernel:*current-internal-error-context*))
+                    (sap-int (sb-vm:context-pc context)))
+                  (sap-int (sb-vm:context-pc *current-internal-error-context*))))
             sb-thread:*current-thread*
             condition))
   (terpri stream))
