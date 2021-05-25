@@ -6171,8 +6171,15 @@
              (assert (search "is not a proper list."
                              (princ-to-string (first compiler-errors)))))))
     (test '(cons 1 . 2))
-    (test '((lambda (x) x) . 1))
-    (test '(let () . 1))))
+    (test '((lambda (x) x) . 3))
+    (test '(let () . 4))))
+(with-test (:name (compile :macro-dotted-list))
+  (checked-compile-and-assert ()
+      `(lambda (i j)
+         (macrolet ((k (a . b)
+                      `(+ ,a ,b)))
+           (k i . j)))
+    ((1 2) 3)))
 
 (with-test (:name (ldb :rlwinm))
   (checked-compile-and-assert ()

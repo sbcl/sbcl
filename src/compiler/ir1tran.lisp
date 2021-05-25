@@ -68,6 +68,11 @@
     (setf (gethash form *source-paths*)
           (apply #'list* 'original-source-start *current-form-number* arguments))))
 
+(defun proper-list (form)
+  (if (proper-list-p form)
+      form
+      (compiler-error "~@<~S is not a proper list.~@:>" form)))
+
 ;;; *CURRENT-COMPONENT* is the COMPONENT structure which we link
 ;;; blocks into as we generate them. This just serves to glue the
 ;;; emitted blocks together until local call analysis and flow graph
@@ -633,8 +638,6 @@
                       (reference-leaf start next result form))
                      (t
                       (reference-constant start next result form))))
-              ((not (proper-list-p form))
-               (compiler-error "~@<~S is not a proper list.~@:>" form))
               (t
                (ir1-convert-functoid start next result form)))))
     (values))
@@ -823,7 +826,7 @@
   (let* ((op (car form))
          (translator (and (symbolp op) (info :function :ir1-convert op))))
     (if translator
-        (funcall translator start next result form)
+        (funcall translator start next result (proper-list form))
         (multiple-value-bind (res cmacro-fun-name)
                (expand-compiler-macro form)
              (cond ((eq res form)
@@ -1042,7 +1045,7 @@
     (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
     (let ((combination
            (ir1-convert-combination-args fun-lvar ctran next result
-                                         (cdr form))))
+                                         (cdr (proper-list form)))))
       (when (step-form-p form)
         ;; Store a string representation of the form in the
         ;; combination node. This will let the IR2 translator know
@@ -1113,7 +1116,9 @@
                       (struct-fun-transform transform form name))
                 ;; Note that "pass" means fail. Gotta love it.
                 (cond (pass
-                       (ir1-convert-maybe-predicate start next result form var))
+                       (ir1-convert-maybe-predicate start next result
+                                                    (proper-list form)
+                                                    var))
                       (t
                        (unless (policy *lexenv* (zerop store-xref-data))
                          (record-call name (ctran-block start) *current-path*))
@@ -1121,7 +1126,10 @@
                          (show-transform "src" name transformed))
                        (let ((*transforming* t))
                          (ir1-convert start next result transformed)))))
-              (ir1-convert-maybe-predicate start next result form var))))))
+              (ir1-convert-maybe-predicate start next result
+                                           (proper-list form)
+                                           var))))))
+
 
 ;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE
 ;;; attribute, don't generate any branch coverage instrumentation for it.

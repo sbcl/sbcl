@@ -385,3 +385,9 @@
     (assert (and (vectorp constant1) (vectorp constant2)))
     (assert (equal (funcall f 'o) '(o p)))
     (assert (eql (funcall f 42) -1))))
+
+(defmacro macro-with-dotted-list (&rest args)
+  args)
+(with-test (:name :macro-with-dotted-list)
+  (let ((expansion (macroexpand '(macro-with-dotted-list . 1))))
+    (assert (equal expansion 1))))
