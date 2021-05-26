@@ -171,7 +171,15 @@
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
               (!early-collect-inheritance name)
             (let* ((class (find-class name))
-                   (bitmap (if (memq name '(standard-generic-function))
+                   ;; With #+compact-instance-header there are two possible bitmaps
+                   ;; for funcallable instances - for self-contained trampoline
+                   ;; instructions and external trampoline instructions.
+                   ;; With #-compact-instance-header all funcallable layouts
+                   ;; need the same bitmap, which is that of standard-GF.
+                   ;; These requirements are checked in verify_range() of gencgc.
+                   (bitmap (if (memq name '(standard-generic-function
+                                            #-compact-instance-header funcallable-standard-object
+                                            #-compact-instance-header generic-function))
                                sb-kernel::standard-gf-primitive-obj-layout-bitmap
                                +layout-all-tagged+))
                    (wrapper (cond ((eq class slot-class)
