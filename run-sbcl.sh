@@ -42,7 +42,7 @@ BASE=`dirname "$this"`
 # relative target. We need BASE to be an absolute pathname in order to
 # make MODULE-PROVIDE-CONTRIB work throughout the Lisp session, even
 # after frobbing *DEFAULT-PATHNAME-DEFAULTS*.
-if ! expr "$BASE" : '^/.*' > /dev/null; then
+if expr "$BASE" : '^/.*' > /dev/null; [ $? != 0 ]; then
     BASE=`cd ./"$BASE" && pwd`
 fi
 
@@ -71,7 +71,11 @@ fi
 
 if build_directory_p "$BASE"; then
     export SBCL_HOME
-    SBCL_HOME="$BASE"/obj/sbcl-home exec "$BASE"/src/runtime/sbcl ${CORE:+--core "$CORE"} "$@"
+    if [ "$CORE_DEFINED" = "no" ]; then
+	SBCL_HOME="$BASE"/obj/sbcl-home exec "$BASE"/src/runtime/sbcl --core "$CORE" "$@"
+    else
+	SBCL_HOME="$BASE"/obj/sbcl-home exec "$BASE"/src/runtime/sbcl "$@"
+    fi
 else
     echo "No built SBCL here ($BASE): run 'sh make.sh' first!"
     exit 1
