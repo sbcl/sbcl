@@ -1,11 +1,35 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.4:
+  * minor incompatible change: on x86-64, the backend instruction encoders for
+    movzx and for string opcodes have changed their semantics.
+  * platform support:
+    ** compatibility: support the latest MinGW on x86.  (lp#1923325, thanks to
+       Alexis Rivera)
+    ** bug fix: on x86-64, fix instruction encoding for TEST on RIP-relative
+       addresses.  (lp#1925808, reported by Shinmera on #sbcl, thanks also to
+       3b)
+    ** bug fix: on x86-64, loading all-1s into an AVX2 register no longer
+       causes an error.  (thanks to Marco Heisig)
+    ** bug fix: on arm64, improve disassembly of ADD with constant 0 as MOV
+    ** enhancement: on arm64, support debugger commands RETURN-FROM-FRAME and
+       RESTART-FRAME more efficiently.
+    ** enhancement: on x86-64, add support for vshuf* AVX2 instructions.
+       (reported by Bela Pecsek)
+    ** optimization: faster function calls on arm64.
+    ** optimization: (SETF SBIT) is faster on x86-64.
+  * bug fix: INTEGER-DECODE-FLOAT was computing the wrong answer for denormal
+    double floats.  (lp#1926383, reported by Stavros Macrakis)
+  * bug fix: RANDOM on a floating point argument now does not cons.  (reported
+    by Tito Latini)
+  * bug fix: fix a compiler crash in type derivation of LOGTEST.  (lp#1928243)
+  * bug fix: fix a compiler failure when a declared function type contains a
+    literal structure with a valid MAKE-LOAD-FORM method.  (lp#1929160, thanks
+    to Yurii Hryhorenko)
+  * optimization: FBOUNDP on a constant symbol is now faster.
   * optimization: file compilation now produces smaller fasls for files which
     reference package literals.
-  * optimization: faster function calls on ARM64.
-  * bug fix: on x86-64, fix instruction encoding for TEST on RIP-relative
-    addresses.  (lp#1925808, reported by Shinmera on #sbcl, thanks also to 3b)
+  * optimization: derive the type of calls to FLOAT-SIGN.
 
 changes in sbcl-2.1.4 relative to sbcl-2.1.3:
   * platform support:
