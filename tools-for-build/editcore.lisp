@@ -1069,12 +1069,9 @@
               (let* ((source
                       (sb-c::compiled-debug-info-source
                        (truly-the sb-c::compiled-debug-info
-                        (translate (%code-debug-info code) spaces))))
-                     ;; FIXME: we used to have just one namestring in
-                     ;; the debug-source, now we've got two, and this
-                     ;; ignores one of them.
+                                  (translate (%code-debug-info code) spaces))))
                      (namestring
-                      (sb-c::debug-source-namestring-1
+                      (debug-source-namestring
                        (truly-the sb-c::debug-source (translate source spaces)))))
                 (setq namestring (if (eq namestring (core-nil-object core))
                                      "sbcl.core"

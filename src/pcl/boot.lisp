@@ -2828,8 +2828,7 @@ bootstrapping.
                             (debug-source (sb-c::debug-info-source debug-info))
                             (debug-fun (debug-info-debug-function function debug-info)))
                        (sb-c::%make-definition-source-location
-                        (sb-c::debug-source-namestring-1 debug-source)
-                        (sb-c::debug-source-namestring-2 debug-source)
+                        (sb-c::debug-source-namestring debug-source)
                         (sb-c::compiled-debug-info-tlf-number debug-info)
                         (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)

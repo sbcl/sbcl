@@ -63,10 +63,10 @@ echo //doing warm init - load and dump phase
 (progn ${devel})
 (sb-fasl::!warm-load "make-target-2-load.lisp")
 (setf (extern-alien "gc_coalesce_string_literals" char) 2)
-;;; Use the historical (bad) convention for storing pathname
-;;; namestrings in fasls.
+;;; Use the historical (bad) convention for *compile-file-pathname*
+(setf sb-c::*merge-pathnames* t)
+;;; and for storing pathname namestrings in fasls too.
 (setq sb-c::*name-context-file-path-selector* 'truename)
-(setq sb-c::*merge-pathnames* t)
 (let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF

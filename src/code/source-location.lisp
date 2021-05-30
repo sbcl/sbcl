@@ -11,37 +11,22 @@
 
 (in-package "SB-C")
 
-;;; Some uses of source locations want absolute filenames that were
-;;; (implicitly) involved at compile- or load-time, some want relative
-;;; filenames, and some want absolute filenames derived from runtime
-;;; state. In order to keep the DEFINITION-SOURCE-LOCATION structure
-;;; small, we separate out the filename pieces to its own record.
-(def!struct (definition-source-location-filenames
-                (:constructor %make-definition-source-location-filenames
-                    (namestring-1 namestring-2)))
-  ;; Namestring (often not always relative) of the source file that the
-  ;; definition was compiled from.  This is null if the definition was
-  ;; not compiled from a file.
-  (namestring-1 nil :type (or string null) :read-only t)
-  ;; Either null or the namestring relative to which NAMESTRING-1 named
-  ;; a file at compile-file-time.
-  (namestring-2 nil :type (or string null) :read-only t))
-(!set-load-form-method definition-source-location-filenames  (:xc :target))
-
 ;;; A DEFINITION-SOURCE-LOCATION contains two packed fixnums in the INDICES slot,
 ;;; and unless there is a non-nil plist, does not store the plist.
 ;;; Packed representation is: header + layout, namestring, indices, (padding)
 (def!struct (definition-source-location
              (:constructor %make-basic-definition-source-location
-                           (filenames indices))
+                           (namestring indices))
              (:copier nil))
-  (filenames nil :type (or null definition-source-location-filenames) :read-only t)
+  ;; Namestring of the source file that the definition was compiled from.
+  ;; This is null if the definition was not compiled from a file.
+  (namestring nil :type (or string null) :read-only t)
   (indices 0 :type integer :read-only t))
 (!set-load-form-method definition-source-location  (:xc :target))
 (def!struct (definition-source-location+plist
              (:include definition-source-location)
              (:constructor %make-full-definition-source-location
-                           (filenames indices plist))
+                           (namestring indices plist))
              (:copier nil))
   (plist nil :read-only t))
 
@@ -63,15 +48,7 @@
                'definition-source-location+plist)
     (definition-source-location+plist-plist source-loc)))
 
-;; This used to be an accessor, but now it obeys
-;; *SOURCE-NAMESTRING-DEFAULTING*.
-(defun definition-source-location-namestring (source-loc)
-  (let* ((filenames (definition-source-location-filenames source-loc))
-         (namestring-1 (definition-source-location-filenames-namestring-1 filenames))
-         (namestring-2 (definition-source-location-filenames-namestring-2 filenames)))
-    (maybe-reconstitute-namestring namestring-1 namestring-2)))
-
-(defun %make-definition-source-location (namestring-1 namestring-2 tlf-num subform-num)
+(defun %make-definition-source-location (namestring tlf-num subform-num)
   (declare (type (or null (integer -1 *)) tlf-num)
            (type (or null unsigned-byte) subform-num))
   (let* ((plist *source-plist*)
@@ -88,58 +65,44 @@
                       0)))
          (source-info (and (boundp '*source-info*) *source-info*))
          (last (and source-info
-                    (source-info-last-defn-source-loc source-info)))
-         (last-filenames (if last (definition-source-location-filenames last)))
-         (filenames (if (and last
-                             (equal (definition-source-location-filenames-namestring-1
-                                     last-filenames)
-                                    namestring-1)
-                             (equal (definition-source-location-filenames-namestring-2
-                                      last-filenames)
-                                    namestring-2))
-                        last-filenames
-                        (%make-definition-source-location-filenames
-                         namestring-1 namestring-2))))
+                    (source-info-last-defn-source-loc source-info))))
     (if (and last
              (eql (definition-source-location-indices last) indices)
-             (eql last-filenames filenames)
+             (string= (definition-source-location-namestring last) namestring)
              (equal (definition-source-location-plist last) plist))
         last
         (let ((new (if plist
-                       (%make-full-definition-source-location filenames indices plist)
-                       (%make-basic-definition-source-location filenames indices))))
+                       (%make-full-definition-source-location namestring indices plist)
+                       (%make-basic-definition-source-location namestring indices))))
           (when source-info
             (setf (source-info-last-defn-source-loc source-info) new))
           new))))
 
 (defun make-definition-source-location ()
-  (let ((source-info (and (boundp '*source-info*) *source-info*))
+  (let* ((source-info (and (boundp '*source-info*) *source-info*))
+         (namestring
+          (or *source-namestring*
+              (when source-info
+                (make-file-info-namestring
+                 cl:*compile-file-pathname*
+                 (get-toplevelish-file-info source-info)))))
          tlf-number
          form-number)
-    (multiple-value-bind (namestring-1 namestring-2)
-        (or *source-namestring*
-            (when source-info
-              (make-file-info-namestrings
-               cl:*compile-file-pathname*
-               (get-toplevelish-file-info source-info))))
-      (acond ((boundp '*current-path*)
-              (setf tlf-number (source-path-tlf-number *current-path*)
-                    form-number (source-path-form-number *current-path*)))
-             ((and source-info (source-info-file-info source-info))
-              (setf tlf-number (1- (fill-pointer (file-info-forms it))))))
-      (%make-definition-source-location namestring-1 namestring-2 tlf-number form-number))))
+    (acond ((boundp '*current-path*)
+            (setf tlf-number (source-path-tlf-number *current-path*)
+                  form-number (source-path-form-number *current-path*)))
+           ((and source-info (source-info-file-info source-info))
+            (setf tlf-number (1- (fill-pointer (file-info-forms it))))))
+    (%make-definition-source-location namestring tlf-number form-number)))
 
-(defun make-file-info-namestrings (name file-info)
-  (let* ((pathname-1 (file-info-pathname-1 file-info))
-         (dir (and pathname-1 (pathname-directory pathname-1)))
-         (pathname-2 (file-info-pathname-2 file-info)))
-    (cond ((and dir (eq (first dir) :absolute))
-           (values (namestring pathname-1) nil))
-          ((and pathname-1 pathname-2)
-           (values (namestring pathname-1) (namestring pathname-2)))
-          (t (if name
-                 (namestring name)
-                 nil)))))
+(defun make-file-info-namestring (name file-info)
+  (let* ((pathname (file-info-pathname file-info))
+         (dir (and pathname (pathname-directory pathname))))
+    (if (and dir (eq (first dir) :absolute))
+        (namestring pathname)
+        (if name
+            (namestring name)
+            nil))))
 
 (in-package "SB-IMPL")
 
