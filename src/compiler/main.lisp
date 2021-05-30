@@ -843,7 +843,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; The normal build sets it to T in make-target-2, despite that I think most people would
 ;;; prefer the nonstandard behavior. The standard behavior makes stored pathnames all wrong
 ;;; when files are physically moved. (Same problem as SBCL_HOME embedded into C pretty much)
-(defglobal *merge-pathnames* t)
+(defglobal *merge-pathnames* nil)
 
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)

@@ -550,7 +550,7 @@
         (inst xor rdi rsp-tn) ; compute shadow address
         (zeroize rax)
         (inst rep)
-        (inst stos rax)))))
+        (inst stos :qword)))))
 
 ;;; ALLOCATE-LIST
 (macrolet ((calc-size-in-bytes (length answer)

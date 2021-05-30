@@ -916,7 +916,8 @@
                                (t
                                 ;; otherwise, reading an element can't cause an invalid bit pattern
                                 ;; to be observed, but the bits could be random.
-                                data-alloc-form))))))
+                                ;; KLUDGE: backward-compatibile 0-fill
+                                `(sb-vm::splat ,data-alloc-form nwords 0)))))))
 
             ;; Case (3) - constant :INITIAL-CONTENTS and LENGTH
             ((and c-length

@@ -4,10 +4,6 @@ changes relative to sbcl-2.1.4:
   * optimization: file compilation now produces smaller fasls for files which
     reference package literals.
   * optimization: faster function calls on ARM64.
-  * incompatible change: on certain platforms (currently just x86-64),
-    dynamic-extent arrays specialized on character and numeric types and
-    created without either :INITIAL-ELEMENT or :INITIAL-CONTENTS will reflect
-    previous contents of the stack instead of #\null (or 0) in all elements.
   * bug fix: on x86-64, fix instruction encoding for TEST on RIP-relative
     addresses.  (lp#1925808, reported by Shinmera on #sbcl, thanks also to 3b)
 
