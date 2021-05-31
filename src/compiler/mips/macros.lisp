@@ -297,11 +297,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
          (loadw value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
-                                   &optional translate
-                              &aux (resultp (not (memq translate '(sb-bignum:%bignum-set
-                                                                   %instance-set
-                                                                   %set-array-dimension
-                                                                   data-vector-set)))))
+                                   &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
@@ -309,14 +305,12 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs ,@(when resultp '(:target result))))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:generator 2
          (inst addu lip object index)
-         (storew value lip ,offset ,lowtag)
-         ,@(when resultp '((move result value)))))
+         (storew value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -328,10 +322,8 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
                    (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
                                                 ,(eval offset)))
                    ,el-type)
-       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:generator 1
-         (storew value object (+ ,offset index) ,lowtag)
-         ,@(when resultp '((move result value)))))))
+         (storew value object (+ ,offset index) ,lowtag)))))
 
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs

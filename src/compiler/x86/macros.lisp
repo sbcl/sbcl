@@ -315,17 +315,14 @@
                                               ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  (let ((resultp (not (memq translate '(sb-bignum:%bignum-set %set-array-dimension
-                                        %instance-set)))))
     `(define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
-              (value :scs ,scs ,@(when resultp '(:target result))))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
-       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:generator 4                    ; was 5
          (sc-case index
            (immediate
@@ -337,8 +334,7 @@
            (t
             (inst mov (make-ea :dword :base object :index index
                                :disp (- (* ,offset n-word-bytes) ,lowtag))
-                  value)))
-         ,@(when resultp '((move result value)))))))
+                  value))))))
 
 ;;; Helper to hide the fact that thread access on Windows needs one more
 ;;; instruction, needs the FS prefix in that instruction _instead_ of

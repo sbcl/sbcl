@@ -18,49 +18,20 @@
                  (+ nil-value (static-symbol-offset symbol) offset)
                  (make-fixup symbol :immobile-symbol offset)))))
 
-(defun gen-cell-set (ea value result &optional vop pseudo-atomic)
-  (when pseudo-atomic
-    ;; (SETF %FUNCALLABLE-INSTANCE-FUN) and (SETF %FUNCALLABLE-INSTANCE-INFO)
-    ;; pass in pseudo-atomic = T.
-    (pseudo-atomic ()
-     (inst push (ea-base ea))
-     (invoke-asm-routine 'call 'touch-gc-card vop)
-     (gen-cell-set ea value result))
-    (return-from gen-cell-set))
-  (when (sc-is value immediate)
-    (let ((bits (encode-value-if-immediate value)))
-      (cond ((not result)
-             ;; Try to move imm-to-mem if BITS fits
-             (acond ((or (and (fixup-p bits)
-                              ;; immobile-object fixups must fit in 32 bits
-                              (eq (fixup-flavor bits) :immobile-symbol)
-                              bits)
-                         (plausible-signed-imm32-operand-p bits))
-                     (inst mov :qword ea it))
-                    (t
-                     (inst mov temp-reg-tn bits)
-                     (inst mov ea temp-reg-tn)))
-             (return-from gen-cell-set))
-            ;; Move the immediate value into RESULT provided that doing so
-            ;; doesn't clobber EA. If it would, use TEMP-REG-TN instead.
-            ;; TODO: if RESULT is unused, and the immediate fits in an
-            ;; imm32 operand, then perform imm-to-mem move, but as the comment
-            ;; observes, there's no easy way to spot an unused TN.
-            ((or (location= (ea-base ea) result)
-                 (awhen (ea-index ea) (location= it result)))
-             (inst mov temp-reg-tn bits)
-             (setq value temp-reg-tn))
-            (t
-             ;; Can move into RESULT, then into EA
-             (inst mov result bits)
-             (inst mov ea result)
-             (return-from gen-cell-set)))))
-  (inst mov :qword ea value) ; specify the size for when VALUE is an integer
-  (when result
-    ;; Ideally we would skip this move if RESULT is unused hereafter,
-    ;; but unfortunately (NOT (TN-READS RESULT)) isn't equivalent
-    ;; to there being no reads from the TN at all.
-    (move result value)))
+(defun gen-cell-set (ea value)
+  (if (sc-is value immediate)
+      (let ((bits (encode-value-if-immediate value)))
+        ;; Try to move imm-to-mem if BITS fits
+        (acond ((or (and (fixup-p bits)
+                         ;; immobile-object fixups must fit in 32 bits
+                         (eq (fixup-flavor bits) :immobile-symbol)
+                         bits)
+                    (plausible-signed-imm32-operand-p bits))
+                (inst mov :qword ea it))
+               (t
+                (inst mov temp-reg-tn bits)
+                (inst mov ea temp-reg-tn))))
+      (inst mov :qword ea value)))
 
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
@@ -79,7 +50,7 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (gen-cell-set (object-slot-ea object offset lowtag) value nil)))
+    (gen-cell-set (object-slot-ea object offset lowtag) value)))
 
 ;;; X86 special
 (define-vop (cell-xadd)

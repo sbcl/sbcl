@@ -50,7 +50,10 @@
 (defsetf %bignum-ref %bignum-set)
 
 (defsetf %instance-layout %set-instance-layout)
-(defsetf %funcallable-instance-info %set-funcallable-instance-info)
+(declaim (inline (setf %funcallable-instance-info)))
+(defun (setf %funcallable-instance-info) (value instance index)
+  (%set-funcallable-instance-info instance index value)
+  value)
 ;;; The writer is named after the reader, but only operates on FUNCALLABLE-INSTANCE
 ;;; even if the reader operates on any FUNCTION.
 (defsetf %fun-layout %set-fun-layout)
@@ -156,7 +159,10 @@
 (defsetf svref %svset)
 (defsetf char %charset)
 (defsetf schar %scharset)
-(defsetf %vector-raw-bits %set-vector-raw-bits)
+(declaim (inline (setf %vector-raw-bits)))
+(defun (setf %vector-raw-bits) (bits vector index)
+  (%set-vector-raw-bits vector index bits)
+  bits)
 (defsetf symbol-value set)
 (defsetf symbol-global-value set-symbol-global-value)
 (defsetf symbol-plist %set-symbol-plist)

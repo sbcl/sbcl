@@ -63,13 +63,16 @@
                   (inst push object)))
            (invoke-asm-routine 'call 'code-header-set vop))
           ((equal name '(setf %funcallable-instance-fun))
-           (gen-cell-set (object-slot-ea object offset lowtag) value nil vop t))
+           (pseudo-atomic ()
+             (inst push object)
+             (invoke-asm-routine 'call 'touch-gc-card vop)
+             (gen-cell-set (object-slot-ea object offset lowtag) value)))
           #+array-ubsan
           ((equal name '(setf %array-fill-pointer)) ; half-sized slot
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
-           (gen-cell-set (object-slot-ea object offset lowtag) value nil)))))
+           (gen-cell-set (object-slot-ea object offset lowtag) value)))))
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)
@@ -128,7 +131,7 @@
                         (t
                          (object-slot-ea object symbol-value-slot
                                                   other-pointer-lowtag)))
-                  value nil)))
+                  value)))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -247,7 +250,7 @@
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
         (compute-virtual-symbol)
-        (gen-cell-set (symbol-value-slot-ea cell) value nil)))
+        (gen-cell-set (symbol-value-slot-ea cell) value)))
 
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)

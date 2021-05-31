@@ -486,7 +486,7 @@
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %funcallable-instance-info))
 
-(define-vop (set-funcallable-instance-info word-index-set)
+(define-vop (set-funcallable-instance-info word-index-set-nr)
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %set-funcallable-instance-info))
 

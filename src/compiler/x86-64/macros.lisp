@@ -357,39 +357,24 @@
 
 ;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO
 ;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
-(defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  (let ((resultp (if (memq translate '(sb-bignum:%bignum-set %set-array-dimension
-                                       %instance-set))
-                     nil 'result)))
-  `(progn
-     (define-vop (,name)
+(defmacro define-full-setter (name type offset lowtag scs el-type translate)
+  `(define-vop (,name)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg))
-              (value :scs ,scs ,@(when resultp '(:target result))))
+              (index :scs (any-reg immediate))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
-       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
        (:vop-var vop)
        (:generator 4
-         (gen-cell-set (ea (- (* ,offset n-word-bytes) ,lowtag)
-                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                       value ,resultp vop
-                       ,(eq name 'set-funcallable-instance-info))))
-     (define-vop (,(symbolicate name "-C"))
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (value :scs ,scs ,@(when resultp '(:target result))))
-       (:info index)
-       (:arg-types ,type
-                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
-                                                ,(symbol-value offset)))
-                   ,el-type)
-       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,el-type)))
-       (:vop-var vop)
-       (:generator 3
-         (gen-cell-set (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
+         (let ((ea (if (sc-is index immediate)
+                       (ea (- (* (+ ,offset (tn-value index)) n-word-bytes) ,lowtag)
                            object)
-                       value ,resultp vop
-                       ,(eq name 'set-funcallable-instance-info)))))))
+                       (ea (- (* ,offset n-word-bytes) ,lowtag)
+                           object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+           ,(if (eq name 'set-funcallable-instance-info)
+                '(pseudo-atomic () ; if immobile space, need to touch a card mark bit
+                  (inst push object)
+                  (invoke-asm-routine 'call 'touch-gc-card vop)
+                  (gen-cell-set ea value))
+                '(gen-cell-set ea value))))))

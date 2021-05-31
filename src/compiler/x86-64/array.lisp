@@ -312,10 +312,9 @@
                    ,el-type)
        (:generator 4
          ,@(unless (eq type 'simple-vector) '((unpoison-element object index addend)))
-         (gen-cell-set
-                   (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
-                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                   value nil)))
+         (gen-cell-set (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
+                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))
+                       value)))
      (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
@@ -329,10 +328,9 @@
                    ,el-type)
        (:generator 3
          ,@(unless (eq type 'simple-vector) '((unpoison-element object (+ index addend))))
-         (gen-cell-set
-                   (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag)
-                       object)
-                   value nil)))))
+         (gen-cell-set (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag)
+                           object)
+                       value)))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
