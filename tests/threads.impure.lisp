@@ -584,8 +584,8 @@
       (when (and a-done b-done) (return))
       (sleep 1))))
 
-(defun waste (&optional (n 100000))
-  (loop repeat n do (make-string 16384)))
+(defun waste (&optional (n 1000))
+  (loop repeat n do (test-util:opaque-identity (make-string 16384))))
 
 (compile 'waste)
 
