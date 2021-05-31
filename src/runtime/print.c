@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <setjmp.h>
 
 /* FSHOW and odxprint provide debugging output for low-level information
  * (signal handling, exceptions, safepoints) which is hard to debug by
@@ -237,6 +238,7 @@ static void indent(int in)
         fputs(spaces + 64 - in, stdout);
 }
 
+static jmp_buf ldb_print_nlx;
 static boolean continue_p(boolean newline)
 {
     char buffer[256];
@@ -256,7 +258,7 @@ static boolean continue_p(boolean newline)
 
             if (fgets(buffer, sizeof(buffer), stdin)) {
                 if (buffer[0] == 'n' || buffer[0] == 'N')
-                    throw_to_monitor();
+                    longjmp(ldb_print_nlx, 1);
                 else
                     cur_lines = 0;
             } else {
@@ -727,15 +729,21 @@ static void print_fun_or_otherptr(lispobj obj)
         }
         break;
 
-    // FIXME: This case looks unreachable. print_struct() does it
-    case INSTANCE_WIDETAG:
+    case SIMPLE_BIT_VECTOR_WIDETAG:
         NEWLINE_OR_RETURN;
-        count = instance_length(header);
-        printf("length = %ld", (long) count);
-        index = 0;
-        while (count-- > 0) {
-            sprintf(buffer, "%d: ", index++);
-            print_obj(buffer, *ptr++);
+        {
+        long length = vector_len(VECTOR(obj));
+        printf("length = %ld : ", length);
+        int bits_to_print = (length < N_WORD_BITS) ? length : N_WORD_BITS;
+        uword_t word = ptr[1];
+        int i;
+        for(i=0; i<bits_to_print; ++i) {
+            putchar((word & 1) ? '1' : '0');
+            if ((i%8)==7) putchar('_');
+            word >>= 1;
+        }
+        if(bits_to_print < length) printf("...");
+        printf("\n");
         }
         break;
 
@@ -891,7 +899,8 @@ void print(lispobj obj)
     max_depth = 5;
     max_lines = 20;
 
-    print_obj("", obj);
+    if (!setjmp(ldb_print_nlx))
+        print_obj("", obj);
 
     putchar('\n');
 }

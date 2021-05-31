@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
-#include <setjmp.h>
 #include <sys/time.h>
 #ifndef LISP_FEATURE_WIN32
 #include <sys/resource.h>
@@ -92,8 +91,6 @@ static struct cmd {
     {"search", "Search heap for object.", search_cmd},
     {NULL, NULL, NULL}
 };
-
-static jmp_buf curbuf;
 
 static int
 visible(unsigned char c)
@@ -530,14 +527,15 @@ grab_sigs_cmd(char __attribute__((unused)) **ptr)
     return 0;
 }
 
-static void
-sub_monitor(void)
+void
+ldb_monitor(void)
 {
     struct cmd *cmd, *found;
     char buf[256];
     char *line, *ptr, *token;
     int ambig;
 
+    printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
     if (!ldb_in) {
 #ifndef LISP_FEATURE_WIN32
         ldb_in = fopen("/dev/tty","r+");
@@ -586,28 +584,6 @@ sub_monitor(void)
             if (done) return;
         }
     }
-}
-
-void
-ldb_monitor()
-{
-    jmp_buf oldbuf;
-
-    memcpy(oldbuf, curbuf, sizeof(oldbuf));
-
-    printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
-
-    setjmp(curbuf);
-
-    sub_monitor();
-
-    memcpy(curbuf, oldbuf, sizeof(curbuf));
-}
-
-void
-throw_to_monitor()
-{
-    longjmp(curbuf, 1);
 }
 
 /* what we do when things go badly wrong at a low level */
