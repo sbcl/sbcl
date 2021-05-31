@@ -136,11 +136,9 @@
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &optional signed)
-               (let ((ref-name-c (symbolicate ref-name "-C"))
-                     (set-name-c (symbolicate set-name "-C")))
-                 `(progn
+             `(progn
                    (define-vop (,ref-name)
-                       (:translate ,ref-name)
+                     (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg))
                       (offset :scs (signed-reg)))
@@ -157,8 +155,8 @@
                             result sap offset)
                       ,@(when (and (eq size :byte) signed)
                               '((inst extsb result result)))))
-                   (define-vop (,ref-name-c)
-                       (:translate ,ref-name)
+                   (define-vop (,(symbolicate ref-name "-C"))
+                     (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
                      (:arg-types system-area-pointer (:constant (signed-byte 16)))
@@ -176,14 +174,12 @@
                       ,@(when (and (eq size :byte) signed)
                               '((inst extsb result result)))))
                    (define-vop (,set-name)
-                       (:translate ,set-name)
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer signed-num ,type)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg))
+                            (offset :scs (signed-reg)))
+                     (:arg-types ,type system-area-pointer signed-num)
                      (:generator 5
                       (inst ,(ecase size
                                     (:byte 'stbx)
@@ -191,24 +187,14 @@
                                     (:long 'stwx)
                                     (:single 'stfsx)
                                     (:double 'stfdx))
-                            value sap offset)
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst frsp result value)))
-                                (:double
-                                 '((inst fmr result value)))
-                                (t
-                                 '((inst mr result value)))))))
-                   (define-vop (,set-name-c)
-                       (:translate ,set-name)
+                            value sap offset)))
+                   (define-vop (,(symbolicate set-name "-C"))
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer (:constant (signed-byte 16)) ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg)))
+                     (:arg-types ,type system-area-pointer (:constant (signed-byte 16)))
                      (:info offset)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
                      (:generator 4
                       (inst ,(ecase size
                                     (:byte 'stb)
@@ -216,15 +202,7 @@
                                     (:long 'stw)
                                     (:single 'stfs)
                                     (:double 'stfd))
-                            value sap offset)
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst frsp result value)))
-                                (:double
-                                 '((inst fmr result value)))
-                                (t
-                                 '((inst mr result value)))))))))))
+                            value sap offset))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8

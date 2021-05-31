@@ -981,3 +981,19 @@ sb-vm::(define-vop (cl-user::test)
          (lines (disassembly-lines f)))
     (dolist (line lines)
       (assert (not (search "REPE STOSQ" line))))))
+
+;;; Word-sized stores (or larger, like double-float on 32-bit) would cons a new lisp object
+(with-test (:name :sap-set-does-not-cons)
+  (loop for (type accessor telltale) in
+        '((sb-vm:word sb-sys:sap-ref-word "ALLOC-UNSIGNED-BIGNUM")
+          (double-float sb-sys:sap-ref-double "CONS"))
+        do (let* ((positive-test
+                   (compile nil `(lambda (sap) (,accessor sap 0))))
+                  (negative-test
+                   (compile nil `(lambda (sap obj) (setf (,accessor sap 0) obj)))))
+             ;; Positive test ensures we know the right telltale for the type
+             ;; in case the allocation logic changes
+             (assert (loop for line in (disassembly-lines positive-test)
+                           thereis (search telltale line)))
+             (assert (not (loop for line in (disassembly-lines negative-test)
+                                thereis (search telltale line)))))))

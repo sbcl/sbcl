@@ -138,14 +138,12 @@
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
 (macrolet ((def-system-ref-and-set (ref-name set-name sc type size &optional signed)
-               (let ((ref-name-c (symbolicate ref-name "-C"))
-                     (set-name-c (symbolicate set-name "-C")))
-                 `(progn
+             `(progn
                    (define-vop (,ref-name)
-                       (:translate ,ref-name)
+                     (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg)))
+                            (offset :scs (signed-reg)))
                      (:arg-types system-area-pointer signed-num)
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
@@ -159,8 +157,8 @@
                                             (:single 'ldf)
                                             (:double 'lddf))
                                result sap offset)))))
-                   (define-vop (,ref-name-c)
-                       (:translate ,ref-name)
+                   (define-vop (,(symbolicate ref-name "-C"))
+                     (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
                      (:arg-types system-area-pointer (:constant (signed-byte 13)))
@@ -178,14 +176,12 @@
                                             (:double 'lddf))
                                result sap offset)))))
                    (define-vop (,set-name)
-                       (:translate ,set-name)
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer signed-num ,type)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg))
+                            (offset :scs (signed-reg)))
+                     (:arg-types ,type system-area-pointer signed-num)
                      (:generator 5
                       ,@(if (eql size :long-float)
                             '((store-long-reg value sap offset t))
@@ -195,26 +191,14 @@
                                             (:long 'st)
                                             (:single 'stf)
                                             (:double 'stdf))
-                               value sap offset)))
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst fmovs result value)))
-                                (:double
-                                 '((move-double-reg result value)))
-                                (:long-float
-                                 '((move-long-reg result value)))
-                                (t
-                                 '((inst move result value)))))))
-                   (define-vop (,set-name-c)
-                       (:translate ,set-name)
+                               value sap offset)))))
+                   (define-vop (,(symbolicate set-name "-C"))
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer (:constant (signed-byte 13)) ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg)))
+                     (:arg-types ,type system-area-pointer (:constant (signed-byte 13)))
                      (:info offset)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
                      (:generator 4
                       ,@(if (eql size :long-float)
                             '((store-long-reg value sap offset t))
@@ -224,17 +208,7 @@
                                             (:long 'st)
                                             (:single 'stf)
                                             (:double 'stdf))
-                               value sap offset)))
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst fmovs result value)))
-                                (:double
-                                 '((move-double-reg result value)))
-                                (:long-float
-                                 '((move-long-reg result value)))
-                                (t
-                                 '((inst move result value)))))))))))
+                               value sap offset))))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte nil)

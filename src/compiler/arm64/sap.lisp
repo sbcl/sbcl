@@ -169,12 +169,10 @@
                 (define-vop (,set-name)
                   (:translate ,set-name)
                   (:policy :fast-safe)
-                  (:args (sap :scs (sap-reg))
-                         (offset :scs (signed-reg))
-                         (value :scs (,sc) :target result))
-                  (:arg-types system-area-pointer signed-num ,type)
-                  (:results (result :scs (,sc)))
-                  (:result-types ,type)
+                  (:args (value :scs (,sc))
+                         (sap :scs (sap-reg))
+                         (offset :scs (signed-reg)))
+                  (:arg-types ,type system-area-pointer signed-num)
                   (:generator 5
                               (inst ,(case size
                                        (:byte 'strb)
@@ -183,13 +181,7 @@
                                     ,(if (eq size :word)
                                          '(32-bit-reg value)
                                          'value)
-                                    (@ sap offset))
-                              (unless (location= result value)
-                                ,@(case size
-                                    ((:single :double)
-                                     '((inst fmov result value)))
-                                    (t
-                                     '((inst mov result value))))))))))
+                                    (@ sap offset)))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8

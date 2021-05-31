@@ -29,7 +29,8 @@
   (def sap-int)
   (def int-sap)
   (macrolet ((def-accessor (name)
-               `(progn (def ,(symbolicate "%SET-" name) (sap offset value))
+               ;; the low-level %SET functions should not need stubs
+               `(progn (def (setf ,name) (value sap offset))
                        (def ,name (sap offset)))))
     (def-accessor sap-ref-8)
     (def-accessor sap-ref-16)

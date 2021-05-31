@@ -151,15 +151,12 @@
                ;; be sign-magnitude encoded.  FIXME: Figure these
                ;; things out, and re-enable the VOPs.
                (ref-name set-name sc type size &key signed use-lip)
-               (let ((ref-name-c (symbolicate ref-name "-C"))
-                     (set-name-c (symbolicate set-name "-C")))
-                 (declare (ignorable ref-name-c set-name-c))
-                 `(progn
+             `(progn
                    (define-vop (,ref-name)
                        (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg)))
+                            (offset :scs (signed-reg)))
                      (:arg-types system-area-pointer signed-num)
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
@@ -178,8 +175,8 @@
                                         '(@ lip)
                                         '(@ sap offset)))))
                    #+(or)
-                   (define-vop (,ref-name-c)
-                       (:translate ,ref-name)
+                   (define-vop (,(symbolicate ref-name "-C"))
+                     (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
                      (:arg-types system-area-pointer (:constant (signed-byte 16)))
@@ -195,14 +192,12 @@
                                     (:double 'fldd))
                             result (@ sap offset))))
                    (define-vop (,set-name)
-                       (:translate ,set-name)
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer signed-num ,type)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg))
+                            (offset :scs (signed-reg)))
+                     (:arg-types ,type system-area-pointer signed-num)
                      ,@(when use-lip
                              '((:temporary (:sc interior-reg) lip)))
                      (:generator 5
@@ -216,25 +211,15 @@
                                     (:double 'fstd))
                             value ,(if use-lip
                                        '(@ lip)
-                                       '(@ sap offset)))
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst fcpys result value)))
-                                (:double
-                                 '((inst fcpyd result value)))
-                                (t
-                                 '((inst mov result value)))))))
+                                       '(@ sap offset)))))
                    #+(or)
-                   (define-vop (,set-name-c)
-                       (:translate ,set-name)
+                   (define-vop (,(symbolicate set-name "-C"))
+                     (:translate ,set-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (value :scs (,sc) :target result))
-                     (:arg-types system-area-pointer (:constant (signed-byte 16)) ,type)
+                     (:args (value :scs (,sc))
+                            (sap :scs (sap-reg)))
+                     (:arg-types ,type system-area-pointer (:constant (signed-byte 16)))
                      (:info offset)
-                     (:results (result :scs (,sc)))
-                     (:result-types ,type)
                      (:generator 4
                       (inst ,(ecase size
                                     (:byte 'strb)
@@ -242,15 +227,7 @@
                                     (:long 'str)
                                     (:single 'fsts)
                                     (:double 'fstd))
-                            value (@ sap offset))
-                      (unless (location= result value)
-                        ,@(case size
-                                (:single
-                                 '((inst fcpys result value)))
-                                (:double
-                                 '((inst fcpyd result value)))
-                                (t
-                                 '((inst mov result value)))))))))))
+                            value (@ sap offset)))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
