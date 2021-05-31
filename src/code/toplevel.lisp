@@ -549,9 +549,9 @@ any non-negative real number."
                                                  (pathname it))
                                              :if-does-not-exist nil)
                        (cond (stream
-                              (dx-flet ((thunk ()
-                                          (load-as-source stream :context kind)))
-                                (sb-fasl::call-with-load-bindings #'thunk stream)))
+                              (sb-fasl::call-with-load-bindings
+                               (lambda (stream kind) (load-as-source stream :context kind))
+                               stream nil kind))
                              (specified-pathname
                               (cerror "Ignore missing init file"
                                       "The specified ~A file ~A was not found."
