@@ -210,7 +210,7 @@ of condition handling occurring."
 
 ;;; These functions definitions are for cold-init.
 ;;; The real definitions are found in 'condition.lisp'
-(defvar *!cold-warn-action* nil)
+(defvar *!cold-warn-action* #+sb-devel 'print #-sb-devel nil)
 (defun warn (datum &rest arguments)
   (when (and (stringp datum) (plusp (mismatch "defining setf macro" datum)))
     (return-from warn nil))
@@ -221,13 +221,27 @@ of condition handling occurring."
                        'print))))
     (when (member action '(lose print))
       (let ((*package* *cl-package*))
-        (write-string "cold WARN: datum=") ; WRITE could be too broken as yet
+        (write-string "cold WARN: datum=")
         (write (get-lisp-obj-address datum) :radix t :base 16)
         (write-string " = ")
         (write datum)
         (write-char #\space)
         (write (get-lisp-obj-address arguments) :radix t :base 16)
-        (terpri)))
+        (terpri)
+        (cond ((typep datum 'instance)
+               (dotimes (i (%instance-length datum))
+                 (write-string "  Slot ")
+                 (write i)
+                 (write-string " = ")
+                 (write (%instance-ref datum i))
+                 (terpri)))
+              (arguments
+               (write-string "Args:")
+               (terpri)
+               (do-rest-arg ((arg) arguments)
+                 (write-string " | ")
+                 (write arg)
+                 (terpri))))))
     (when (eq action 'lose) (sb-sys:%primitive sb-c:halt))))
 (defun style-warn (datum &rest arguments)
   (declare (notinline warn))

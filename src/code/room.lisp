@@ -246,6 +246,8 @@
                                     (room-info-mask room-info))))))))))))
         (* (align-up words 2) n-word-bytes)))
 
+;;; Macros not needed after this file (and avoids a redefinition warning this way)
+(eval-when (:compile-toplevel)
 (defmacro widetag@baseptr (sap)
   #+big-endian `(sap-ref-8 ,sap ,(1- n-word-bytes))
   #+little-endian `(sap-ref-8 ,sap 0))
@@ -254,7 +256,7 @@
   `(%make-lisp-obj
     (logior (sap-int ,sap)
             (logand (deref (extern-alien "widetag_lowtag" (array char 256)) ,widetag)
-                    lowtag-mask))))
+                    lowtag-mask)))))
 
 ;;; This uses the funny fixnum representation of ADDRESS. I'd like to change this
 ;;; to take a SAP but god forbid people are using it?

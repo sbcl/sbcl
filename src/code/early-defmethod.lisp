@@ -90,13 +90,16 @@
   (let* ((methods (the simple-vector
                        (cdr (or (assoc gf-name *!trivial-methods*)
                                 (error "No methods on ~S" gf-name)))))
-         ;; LAYOUT-OF can't be called until its constants have been patched in,
+         ;; WRAPPER-OF can't be called until its constants have been patched in,
          ;; which is potentially too early in cold init especially if trying
          ;; to debug to figure out what has been patched in.
-         (arg-wrapper (if (%instancep specialized-arg)
-                          (%instance-wrapper specialized-arg)
-                          ;; Non-instance types always call a predicate.
-                          #.(find-layout 't)))
+         ;; And sometimes the thing we need to print is a FMT-CONTROL,
+         ;; which means we can see a funcallable-instance here.
+         (arg-wrapper
+          (cond ((%instancep specialized-arg) (%instance-wrapper specialized-arg))
+                ((funcallable-instance-p specialized-arg) (%fun-wrapper specialized-arg))
+                ;; Non-instance-like types always call a predicate.
+                (t #.(find-layout 't))))
          (applicable-method
           ;; Each "method" is represented as a vector:
           ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
