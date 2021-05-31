@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.4:
+changes in sbcl-2.1.5 relative to sbcl-2.1.4:
   * minor incompatible change: on x86-64, the backend instruction encoders for
     movzx and for string opcodes have changed their semantics.
   * platform support:
