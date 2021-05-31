@@ -217,9 +217,6 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
  * exception frame on nested funcall()s also points to it.
  */
 
-
-void *base_seh_frame;
-
 HMODULE runtime_module_handle = 0u;
 
 static void *get_seh_frame(void)
@@ -752,8 +749,6 @@ void os_init(char __attribute__((__unused__)) *argv[],
     fast_bzero_pointer = fast_bzero_detect;
 #endif
     os_number_of_processors = system_info.dwNumberOfProcessors;
-
-    base_seh_frame = get_seh_frame();
 
     resolve_optional_imports();
     runtime_module_handle = (HMODULE)win32_get_module_handle_by_address(&runtime_module_handle);
