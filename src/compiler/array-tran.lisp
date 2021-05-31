@@ -799,49 +799,50 @@
            (wrap (underlying)
              `(let* ((%length ,(or c-length '(the index length)))
                      (nwords ,n-words-form))
-               ,(if (not array-header-p)
-                    underlying ; was already cast using TRULY-THE
-                    (let* ((constant-fill-pointer-p (and fill-pointer
-                                                         (constant-lvar-p fill-pointer)))
-                           (fill-pointer-value (and constant-fill-pointer-p
-                                                    (lvar-value fill-pointer)))
-                           (length-expr
-                            (cond ((eq fill-pointer-value t) '%length)
-                                  (fill-pointer-value)
-                                  ((and fill-pointer (not constant-fill-pointer-p))
-                                   `(cond ((or (eq fill-pointer t) (null fill-pointer))
-                                           %length)
-                                          ((> fill-pointer %length)
-                                           (error "Invalid fill-pointer ~a" fill-pointer))
-                                          (t fill-pointer)))
-                                  (t '%length)))
-                           ;; MAKE-ARRAY-HEADER* demands a constant, not an expression
-                           ;; for the the header word.
-                           (header-bits
-                            (logior (if (eq has-fill-pointer t) ; (i.e. can't handle :maybe)
-                                        (ash sb-vm:+array-fill-pointer-p+ sb-vm:n-widetag-bits)
-                                        0)
-                                    (or (sb-vm:saetp-complex-typecode saetp)
-                                        sb-vm:complex-vector-widetag)))
-                           (array-header
-                            `(truly-the
-                              ;; A constant length must not be part of the result type.
-                              (and (array ,(sb-vm:saetp-specifier saetp) (*))
-                                   (not simple-array))
-                              (make-array-header* ,header-bits
-                                                  ,length-expr  ; fill-pointer
-                                                  %length       ; total number of elements
-                                                  ,underlying
-                                                  0             ; displacement
-                                                  nil           ; displaced-p
-                                                  nil           ; displaced-from
-                                                  %length))))   ; dimensions
-                      (if (eq has-fill-pointer :maybe)
-                          `(let ((%array ,array-header))
-                             (when fill-pointer
-                               (logior-header-bits %array sb-vm:+array-fill-pointer-p+))
-                             %array)
-                          array-header))))))
+                (declare (flushable sb-vm::splat))
+                ,(if (not array-header-p)
+                     underlying     ; was already cast using TRULY-THE
+                     (let* ((constant-fill-pointer-p (and fill-pointer
+                                                          (constant-lvar-p fill-pointer)))
+                            (fill-pointer-value (and constant-fill-pointer-p
+                                                     (lvar-value fill-pointer)))
+                            (length-expr
+                              (cond ((eq fill-pointer-value t) '%length)
+                                    (fill-pointer-value)
+                                    ((and fill-pointer (not constant-fill-pointer-p))
+                                     `(cond ((or (eq fill-pointer t) (null fill-pointer))
+                                             %length)
+                                            ((> fill-pointer %length)
+                                             (error "Invalid fill-pointer ~a" fill-pointer))
+                                            (t fill-pointer)))
+                                    (t '%length)))
+                            ;; MAKE-ARRAY-HEADER* demands a constant, not an expression
+                            ;; for the the header word.
+                            (header-bits
+                              (logior (if (eq has-fill-pointer t) ; (i.e. can't handle :maybe)
+                                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:n-widetag-bits)
+                                          0)
+                                      (or (sb-vm:saetp-complex-typecode saetp)
+                                          sb-vm:complex-vector-widetag)))
+                            (array-header
+                              `(truly-the
+                                ;; A constant length must not be part of the result type.
+                                (and (array ,(sb-vm:saetp-specifier saetp) (*))
+                                     (not simple-array))
+                                (make-array-header* ,header-bits
+                                                    ,length-expr ; fill-pointer
+                                                    %length ; total number of elements
+                                                    ,underlying
+                                                    0 ; displacement
+                                                    nil ; displaced-p
+                                                    nil ; displaced-from
+                                                    %length)))) ; dimensions
+                       (if (eq has-fill-pointer :maybe)
+                           `(let ((%array ,array-header))
+                              (when fill-pointer
+                                (logior-header-bits %array sb-vm:+array-fill-pointer-p+))
+                              %array)
+                           array-header))))))
       (cond ;; Case (1) - :INITIAL-ELEMENT
             (initial-element
              ;; If the specified initial element is equivalent to zero-filling,

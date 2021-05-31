@@ -1120,7 +1120,7 @@
                           (lexenv-disabled-package-locks default))
                          (policy (lexenv-policy default))
                          (user-data (lexenv-user-data default))
-                         (flushable (lexenv-flushable default))
+                         flushable
                          (parent default))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
