@@ -467,7 +467,7 @@
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))
 
-(define-vop (code-header-set word-index-set)
+(define-vop (code-header-set word-index-set-nr)
   (:translate code-header-set)
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))

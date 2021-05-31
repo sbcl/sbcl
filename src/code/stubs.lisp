@@ -68,7 +68,6 @@
   (def make-array-header (type rank))
   (def code-instructions)
   #-untagged-fdefns (def code-header-ref (code-obj index))
-  #-darwin-jit (def code-header-set (code-obj index new))
   (def %vector-raw-bits (object offset))
   (def %set-vector-raw-bits (object offset value))
   (def single-float-bits)

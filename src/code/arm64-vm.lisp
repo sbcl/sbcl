@@ -128,12 +128,13 @@
   (defun (setf sap-ref-8-jit) (value sap offset)
     (jit-patch-uchar (+ (sap-int sap) offset) value))
 
-  (defun code-header-set (code index value)
+  (defun (setf code-header-ref) (value code index)
     (with-pinned-objects (code value)
       (jit-patch (+ (get-lisp-obj-address code)
                     (- other-pointer-lowtag)
                     (* index n-word-bytes))
-                 (get-lisp-obj-address value))))
+                 (get-lisp-obj-address value)))
+    value)
 
   (defun (setf %code-debug-info) (value code)
     (with-pinned-objects (code value)

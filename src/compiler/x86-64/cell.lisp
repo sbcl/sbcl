@@ -778,16 +778,14 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
-         (value :scs (any-reg descriptor-reg) :target result))
+         (value :scs (any-reg descriptor-reg)))
    (:arg-types * unsigned-num *)
-   (:results (result :scs (any-reg descriptor-reg)))
    (:vop-var vop)
    (:generator 10
      (inst push value)
      (inst push index)
      (inst push object)
-     (invoke-asm-routine 'call 'code-header-set vop)
-     (move result value)))
+     (invoke-asm-routine 'call 'code-header-set vop)))
 
 ;;;; raw instance slot accessors
 

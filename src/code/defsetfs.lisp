@@ -189,7 +189,12 @@
 (defsetf fdefinition %set-fdefinition)
 
 ;;; from kernel.lisp
-(defsetf code-header-ref code-header-set)
+#-darwin-jit
+(progn
+(declaim (inline (setf code-header-ref)))
+(defun (setf code-header-ref) (value code index)
+  (code-header-set code index value)
+  value))
 
 ;;; from pcl
 (defsetf slot-value sb-pcl::set-slot-value)

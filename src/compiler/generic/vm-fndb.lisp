@@ -542,7 +542,7 @@
 ;;; Extract the INDEXth element from the header of CODE-OBJ. Can be
 ;;; set with SETF.
 (defknown code-header-ref (code-component index) t (flushable))
-(defknown code-header-set (code-component index t) t ())
+(defknown code-header-set (code-component index t) (values) ())
 ;;; Extract a 4-byte element relative to the end of CODE-OBJ.
 ;;; The index should be strictly negative and a multiple of 4.
 (defknown code-trailer-ref (code-component fixnum) (unsigned-byte 32)

@@ -598,7 +598,7 @@
         (%primitive code-header-ref-fdefn code index)
         (%primitive code-header-ref-any code index))))
 
-(define-vop (code-header-set word-index-set)
+(define-vop (code-header-set word-index-set-nr)
   (:translate code-header-set)
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))

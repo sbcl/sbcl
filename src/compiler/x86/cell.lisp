@@ -490,16 +490,13 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
-         (value :scs (any-reg descriptor-reg) :target result))
+         (value :scs (any-reg descriptor-reg)))
   (:arg-types * unsigned-num *)
-  (:results (result :scs (any-reg descriptor-reg)))
-  (:result-types *)
   (:generator 10
     (inst push value)
     (inst push index)
     (inst push object)
-    (inst call (make-fixup 'code-header-set :assembly-routine))
-    (move result value)))
+    (inst call (make-fixup 'code-header-set :assembly-routine))))
 
 ;;;; raw instance slot accessors
 
