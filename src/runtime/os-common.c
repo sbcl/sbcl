@@ -23,7 +23,6 @@
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 #include "thread.h"
-#include "sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "interr.h"

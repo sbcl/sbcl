@@ -16,7 +16,6 @@
 #include "globals.h"
 #include "validate.h"
 #include "os.h"
-#include "sbcl.h"
 #include "arch.h"
 #include "lispregs.h"
 #include "signal.h"
@@ -28,7 +27,6 @@
 #include "getallocptr.h"
 #include "unaligned.h"
 #include "search.h"
-#include "globals.h" // for asm_routines_start,end
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"

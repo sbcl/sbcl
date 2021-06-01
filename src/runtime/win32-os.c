@@ -36,7 +36,6 @@
 #include "os.h"
 #include "arch.h"
 #include "globals.h"
-#include "sbcl.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
