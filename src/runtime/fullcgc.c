@@ -523,6 +523,15 @@ static void sweep_fixedobj_pages(long *zeroed)
             }
         }
     }
+    // The reserved fixedobj page has the vector of primitive object layouts.
+    lispobj* obj = fixedobj_page_address(0);
+    lispobj* limit = fixedobj_page_address(FIXEDOBJ_RESERVED_PAGES);
+    while (obj < limit) {
+        lispobj header = *obj;
+        uword_t markbit = (header_widetag(header) == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
+        if (header & markbit) *obj = header ^ markbit;
+        obj += sizetab[widetag_of(obj)](obj);
+    }
 }
 #endif
 
