@@ -219,25 +219,19 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
 
 HMODULE runtime_module_handle = 0u;
 
+#ifdef LISP_FEATURE_X86
 static void *get_seh_frame(void)
 {
     void* retval;
-#ifdef LISP_FEATURE_X86
     asm volatile ("mov %%fs:0,%0": "=r" (retval));
-#else
-    asm volatile ("mov %%gs:0,%0": "=r" (retval));
-#endif
     return retval;
 }
 
 static void set_seh_frame(void *frame)
 {
-#ifdef LISP_FEATURE_X86
     asm volatile ("mov %0,%%fs:0": : "r" (frame));
-#else
-    asm volatile ("mov %0,%%gs:0": : "r" (frame));
-#endif
 }
+#endif
 
 #if defined(LISP_FEATURE_SB_THREAD)
 
