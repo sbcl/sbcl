@@ -380,7 +380,7 @@
 
 ;;; The character database is made of several arrays.
 ;;; **CHARACTER-MISC-DATABASE** is an array of bytes that encode character
-;;; attributes. Each entry in the misc database is +misc-width+ (currently 8)
+;;; attributes. Each entry in the misc database is +misc-width+ (currently 9)
 ;;; bytes wide. Within each entry, the bytes represent: general category, BIDI
 ;;; class, canonical combining class, digit value, decomposition info, other
 ;;; flags, script, line break class, and age, respectively. Several of the
