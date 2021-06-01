@@ -79,6 +79,8 @@
                )))
     (let*
         ((spaces (append `((read-only ,ro-space-size)
+                           #+(and win32 x86-64)
+                           (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
                            (linkage-table ,small-space-size)
                            #+sb-safepoint
                            ;; Must be just before NIL.

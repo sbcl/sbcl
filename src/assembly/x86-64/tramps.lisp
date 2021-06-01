@@ -77,6 +77,13 @@
   (inst push (ea n-word-bytes rbp-tn))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
 
+#+win32
+(define-assembly-routine
+    (undefined-alien-tramp (:return-style :none))
+    ()
+  (error-call nil 'undefined-alien-fun-error rbx-tn))
+
+#-win32
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()

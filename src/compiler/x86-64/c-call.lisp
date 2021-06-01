@@ -281,13 +281,17 @@
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   #+sb-safepoint
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
+  #+win32
+  (:temporary (:sc unsigned-reg :offset r15-offset :from :eval :to :result) r15)
   (:ignore results)
   (:vop-var vop)
   (:generator 0
     (move rbx function)
     (emit-c-call vop rax rbx args
                  sb-alien::*alien-fun-type-varargs-default*
-                 #+sb-safepoint pc-save))
+                 #+sb-safepoint pc-save
+                 #+win32 rbx))
+  #+win32 (:ignore r15)
   . #.(destroyed-c-registers))
 
 ;;; Calls to C can generally be made without loading a register
@@ -299,13 +303,26 @@
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   #+sb-safepoint
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
+  #+win32
+  (:temporary (:sc unsigned-reg :offset r15-offset :from :eval :to :result) r15)
+  #+win32
+  (:ignore r15)
+  #+win32
+  (:temporary (:sc unsigned-reg :offset rbx-offset :from :eval :to :result) rbx)
   (:ignore results)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop rax c-symbol args varargsp #+sb-safepoint pc-save))
+    (emit-c-call vop rax c-symbol args varargsp
+                 #+sb-safepoint pc-save
+                 #+win32 rbx))
   . #.(destroyed-c-registers))
 
-(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save)
+#+win32
+(defconstant win64-seh-direct-thunk-addr win64-seh-data-addr)
+#+win32
+(defconstant win64-seh-indirect-thunk-addr (+ win64-seh-data-addr 8))
+
+(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
   (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
@@ -349,9 +366,24 @@
   ;; where ea is the address of the linkage table entry's operand.
   ;; So while the former is a jump to a jump, we can optimize out
   ;; one jump in a statically linked executable.
+  #-win32
   (inst call (cond ((tn-p fun) fun)
                    ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
                    (t (ea (make-fixup fun :foreign 8)))))
+  ;; On win64, we don't support immobile space (yet) and calls go through one of
+  ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is
+  ;; involved, RBX either points to a linkage table trampoline or to the linkage
+  ;; table operand; this simplifies UNDEFINED-ALIEN-TRAMP's job.
+  #+win32
+  (cond ((tn-p fun)
+         (move rbx fun)
+         (inst mov rax win64-seh-direct-thunk-addr)
+         (inst call rax))
+        (t
+         (inst mov rbx (make-fixup fun :foreign 8))
+         (inst mov rax win64-seh-indirect-thunk-addr)
+         (inst call rax)))
+
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
   #+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space

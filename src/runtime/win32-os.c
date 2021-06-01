@@ -58,6 +58,7 @@
 #include "validate.h"
 #include "thread.h"
 #include "align.h"
+#include "unaligned.h"
 
 #include "gc.h"
 #include "gencgc-internal.h"
@@ -715,6 +716,127 @@ intptr_t win32_get_module_handle_by_address(os_vm_address_t addr)
                       ? result : 0);
 }
 
+/*
+ * x86-64 exception handling around foreign function calls.
+ *
+ * On x86-64, when an exception is raised, the Windows kernel looks up the RIP
+ * to retrieve an associated UNWIND_INFO object. This object informs the kernel
+ * whether there's an exception handler and how to find the start of the current
+ * frame. If there's no exception handler or it has declined to handle the
+ * exception, the frame's return address is looked up and the process is
+ * repeated, walking the stack until an exception handler handles the exception.
+ * If the exception goes unhandled, the process is usually terminated. Our goal,
+ * then, is to associate an appropriate UNWIND_INFO object with return addresses
+ * that point to Lisp code. We don't need to inform the kernel how to walk a
+ * Lisp frame, since our exception handler will always handle the exception.
+ *
+ * UNWIND_INFO objects are mapped onto their respective address ranges by
+ * RUNTIME_FUNCTION objects. These objects are usually stored in the .pdata
+ * section of an executable file, but can also be mapped dynamically via
+ * RtlAddFunctionTable().
+ *
+ * A major constraint imposed by UNWIND_INFO and RUNTIME_FUNCTION is that the
+ * code's address range is specified by 32-bit relative addresses, which means
+ * we can only establish a frame-based handler for a 4 GB region at most. This
+ * is problematic because most Lisp code lives in dynamic space which can be
+ * much larger than 4 GB. Furthermore, the exception handler is also specified
+ * as a 32-bit relative address, so we can't directly reference our
+ * handle_exception() function.
+ *
+ * We work around this constraint by allocating these data structures in a fixed
+ * memory region at WIN64_SEH_DATA_ADDR and map an UNWIND_INFO to this region
+ * using RtlAddFunctionTable(). Foreign calls (see EMIT-C-CALL) place the target
+ * address in RBX and call a thunk within this region. The thunk swaps out the
+ * return address with the thunk's return address thereby establishing a
+ * frame-based exception handler. The original address (pointing into Lisp code)
+ * is stored in a non-volatile, callee-saved register, allowing the thunk to
+ * jump back to Lisp. The exception handler is a trampoline to
+ * handle_exception().
+ *
+ * In the future, should we segregate code objects into dedicated code areas
+ * smaller than 4 GB, these thunks could be removed, and UNWIND_INFO could be
+ * associated directly with such areas.
+ */
+
+#ifdef LISP_FEATURE_X86_64
+typedef struct _UNWIND_INFO {
+  uint8_t Version : 3;
+  uint8_t Flags : 5;
+  uint8_t SizeOfProlog;
+  uint8_t CountOfCodes;
+  uint8_t FrameRegister : 4;
+  uint8_t FrameOffset : 4;
+  ULONG ExceptionHandler;
+  ULONG ExceptionData[1];
+} UNWIND_INFO;
+
+struct win64_seh_data {
+    uint8_t direct_thunk[8];
+    uint8_t indirect_thunk[8];
+    uint8_t handler_trampoline[16];
+    UNWIND_INFO ui; // needs to be DWORD-aligned
+    RUNTIME_FUNCTION rt;
+};
+
+static void
+set_up_win64_seh_thunk(size_t page_size)
+{
+    if (page_size < sizeof(struct win64_seh_data))
+        lose("Not enough space to allocate struct win64_seh_data");
+
+    AVER(VirtualAlloc(WIN64_SEH_DATA_ADDR, page_size,
+                      MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+
+    struct win64_seh_data *seh_data = (void *) WIN64_SEH_DATA_ADDR;
+    DWORD64 base = (DWORD64) seh_data;
+
+    uint8_t *dthunk = seh_data->direct_thunk;
+    dthunk[0] = 0x41; // pop r15
+    dthunk[1] = 0x5F;
+    dthunk[2] = 0xFF; // call rbx
+    dthunk[3] = 0xD3;
+    dthunk[4] = 0x41; // push r15
+    dthunk[5] = 0x57;
+    dthunk[6] = 0xC3; // ret
+    dthunk[7] = 0x90; // nop (padding)
+
+    uint8_t *ithunk = seh_data->indirect_thunk;
+    ithunk[0] = 0x41; // pop r15
+    ithunk[1] = 0x5F;
+    ithunk[2] = 0xFF; // call qword ptr [rbx]
+    ithunk[3] = 0x13;
+    ithunk[4] = 0x41; // push r15
+    ithunk[5] = 0x57;
+    ithunk[6] = 0xC3; // ret
+    ithunk[7] = 0x90; // nop (padding)
+
+    uint8_t *tramp = seh_data->handler_trampoline;
+    tramp[0] = 0xFF; // jmp qword ptr [rip+2]
+    tramp[1] = 0x25;
+    UNALIGNED_STORE32((tramp+2), 2);
+    tramp[6] = 0x66; // 2-byte nop
+    tramp[7] = 0x90;
+    *(void **)(tramp+8) = handle_exception;
+
+    UNWIND_INFO *ui = &seh_data->ui;
+    ui->Version = 1;
+    ui->Flags = UNW_FLAG_EHANDLER;
+    ui->SizeOfProlog = 0;
+    ui->CountOfCodes = 0;
+    ui->FrameRegister = 0;
+    ui->FrameOffset = 0;
+    ui->ExceptionHandler = (DWORD64) tramp - base;
+    ui->ExceptionData[0] = 0;
+
+    RUNTIME_FUNCTION *rt = &seh_data->rt;
+    rt->BeginAddress = 0;
+    rt->EndAddress = 16;
+    rt->UnwindData = (DWORD64) ui - base;
+
+    AVER(RtlAddFunctionTable(rt, 1, base));
+}
+#endif
+
 static LARGE_INTEGER lisp_init_time;
 static double qpcMultiplier;
 
@@ -742,6 +864,10 @@ void os_init(char __attribute__((__unused__)) *argv[],
     fast_bzero_pointer = fast_bzero_detect;
 #endif
     os_number_of_processors = system_info.dwNumberOfProcessors;
+
+#ifdef LISP_FEATURE_X86_64
+    set_up_win64_seh_thunk(os_vm_page_size);
+#endif
 
     resolve_optional_imports();
     runtime_module_handle = (HMODULE)win32_get_module_handle_by_address(&runtime_module_handle);
@@ -1105,18 +1231,11 @@ signal_internal_error_or_lose(os_context_t *ctx,
     lose("Exception too early in cold init, cannot continue.");
 }
 
-/*
- * A good explanation of the exception handling semantics is
- *   http://win32assembly.online.fr/Exceptionhandling.html (possibly defunct)
- * or:
- *   http://www.microsoft.com/msj/0197/exception/exception.aspx
- */
-
-EXCEPTION_DISPOSITION
-handle_exception(EXCEPTION_RECORD *exception_record,
-                 struct lisp_exception_frame *exception_frame,
-                 CONTEXT *win32_context,
-                 void __attribute__((__unused__)) *dispatcher_context)
+static EXCEPTION_DISPOSITION
+handle_exception_ex(EXCEPTION_RECORD *exception_record,
+                    struct lisp_exception_frame *exception_frame,
+                    CONTEXT *win32_context,
+                    BOOL continue_search_on_unhandled_access_violation)
 {
     if (!win32_context)
         /* Not certain why this should be possible, but let's be safe... */
@@ -1176,10 +1295,14 @@ handle_exception(EXCEPTION_RECORD *exception_record,
      * isn't happy: */
 
     int rc;
+    EXCEPTION_DISPOSITION disp = ExceptionContinueExecution;
     switch (code) {
     case EXCEPTION_ACCESS_VIOLATION:
-        rc = handle_access_violation(
-            ctx, exception_record, fault_address, self);
+        rc = handle_access_violation(ctx, exception_record, fault_address, self);
+        if (rc && continue_search_on_unhandled_access_violation) {
+            rc = 0;
+            disp = ExceptionContinueSearch;
+        }
         break;
 
     case SBCL_EXCEPTION_BREAKPOINT:
@@ -1203,7 +1326,35 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     errno = lastErrno;
     SetLastError(lastError);
-    return ExceptionContinueExecution;
+    return disp;
+}
+
+/*
+ * A good explanation of the exception handling semantics is
+ *   https://web.archive.org/web/20120628151428/http://win32assembly.online.fr/Exceptionhandling.html
+ *   (x86-specific)
+ * or:
+ *   https://docs.microsoft.com/en-us/windows/win32/debug/structured-exception-handling
+ * or:
+ *   James McNellis's CppCon 2018 talk: "Unwinding the Stack: Exploring How C++
+ *   Exceptions Work on Windows"
+ *
+ * On x86, this function is always invoked by frame-based exception handlers,
+ * either the one established by call_into_lisp in x86-assem.S or the top-level
+ * handler established by wos_install_interrupt_handlers().
+ *
+ * On x86-64, this function may be invoked by the frame-based exception handler
+ * established by set_up_win64_seh_thunk(). Our vectored exception handler,
+ * veh(), invokes handle_exception_ex directly.
+ */
+
+EXCEPTION_DISPOSITION
+handle_exception(EXCEPTION_RECORD *exception_record,
+                 struct lisp_exception_frame *exception_frame,
+                 CONTEXT *win32_context,
+                 void __attribute__((__unused__)) *dispatcher_context)
+{
+    return handle_exception_ex(exception_record, exception_frame, win32_context, FALSE);
 }
 
 #ifdef LISP_FEATURE_X86_64
@@ -1212,26 +1363,50 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     int sbcl__lastErrno = errno;                                \
     RUN_BODY_ONCE(restoring_errno, errno = sbcl__lastErrno)
 
+/*
+ * This vectored exception handler runs before frame-based handlers, so we only
+ * want to handle exceptions triggered by Lisp code. Exceptions raised by
+ * foreign function calls are handled by the frame-based handler established by
+ * set_up_win64_seh_thunk().
+ *
+ * Access violation exceptions can be triggered by the runtime as well, and
+ * that's neither Lisp code nor is it covered the SEH thunk, so we handle those
+ * exceptions differently.
+ */
 LONG
 veh(EXCEPTION_POINTERS *ep)
 {
-    EXCEPTION_DISPOSITION disp;
+    EXCEPTION_DISPOSITION disp = ExceptionContinueSearch;
 
     RESTORING_ERRNO() {
         if (!get_sb_vm_thread())
             return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    disp = handle_exception(ep->ExceptionRecord,0,ep->ContextRecord,0);
+    DWORD64 rip = ep->ContextRecord->Rip;
+    DWORD code = ep->ExceptionRecord->ExceptionCode;
+    BOOL from_lisp =
+        (rip >= READ_ONLY_SPACE_START &&
+         rip <= READ_ONLY_SPACE_END) ||
+        (rip >= DYNAMIC_SPACE_START &&
+         rip <= DYNAMIC_SPACE_START+dynamic_space_size);
 
-    switch (disp)
-    {
+    if (code == EXCEPTION_ACCESS_VIOLATION || from_lisp)
+        disp = handle_exception_ex(ep->ExceptionRecord, 0, ep->ContextRecord,
+                                   // continue search on unhandled memory faults
+                                   // if not in Lisp code. This gives foreign
+                                   // handlers a chance to handle the
+                                   // exception. If nothing handles it, our
+                                   // frame-based handler will.
+                                   !from_lisp);
+
+    switch (disp) {
     case ExceptionContinueExecution:
         return EXCEPTION_CONTINUE_EXECUTION;
     case ExceptionContinueSearch:
         return EXCEPTION_CONTINUE_SEARCH;
     default:
-        fprintf(stderr,"Exception handler is mad\n");
+        fprintf(stderr, "Exception handler is mad\n"); fflush(stderr);
         ExitProcess(0);
     }
 }

@@ -224,7 +224,7 @@
         (expect "#<FDEFN G>" lines)
         (expect "#<FUNCTION H>" lines)))))
 
-(with-test (:name :c-call)
+(with-test (:name :c-call :skipped-on (and :win32 :x86-64))
   (let* ((lines (split-string
                  (with-output-to-string (s)
                    (let ((sb-disassem:*disassem-location-column-width* 0))
