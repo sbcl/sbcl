@@ -191,6 +191,7 @@
                 read-char unread-char read-byte
                 read-sequence/read-function write-sequence/write-function
                 stream-element-mode))
+  (clear-info :function :inlinep name)
   (clear-info :function :inlining-data name))
 ;;; Can all the ANSI- function names be removed now? Maybe?
 (push '("SB-IMPL" ansi-stream-peek-char ansi-stream-unread-char)
