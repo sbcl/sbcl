@@ -4704,7 +4704,7 @@
                (and car-good cdr-good
                     (values (cons car cdr) t)))))))))
 
-(defoptimizer (coerce derive-type) ((value type) node)
+(defoptimizer (coerce derive-type) ((value type))
   (multiple-value-bind (type constant)
       (if (constant-lvar-p type)
           (values (lvar-value type) t)
@@ -4751,12 +4751,6 @@
               (type-union result-typeoid
                           (type-intersection (lvar-type value)
                                              (specifier-type 'rational))))))
-          ;; At zero safety the deftransform for COERCE can elide dimension
-          ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
-          ;; need to simplify the type to drop the dimension information.
-          ((and (policy node (zerop safety))
-                (csubtypep result-typeoid (specifier-type '(array * (*))))
-                (simplify-vector-type result-typeoid)))
           (t
            result-typeoid))))))
 

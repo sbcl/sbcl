@@ -1251,49 +1251,56 @@
                     `(the ,result-type
                           (complex (coerce (realpart x) ',part-type)
                                    (coerce (imagpart x) ',part-type)))))))))
-      ;; Special case STRING and SIMPLE-STRING as they are union types
-      ;; in SBCL.
-      ((member tval '(string simple-string))
-       `(the ,tval
-             (if (typep x ',tval)
-                 x
-                 (replace (make-array (length x) :element-type 'character) x))))
       ((eq tval 'character)
        `(character x))
-      ;; Special case VECTOR
-      ((eq tval 'vector)
-       `(the ,tval
-             (if (vectorp x)
-                 x
-                 (replace (make-array (length x)) x))))
       ;; Handle specialized element types for 1D arrays.
-      ((csubtypep tspec (specifier-type '(array * (*))))
-       ;; Can we avoid checking for dimension issues like (COERCE FOO
-       ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
-       ;;
-       ;; CLHS actually allows this for all code with SAFETY < 3,
-       ;; but we're a conservative bunch.
-       (if (or (policy node (zerop safety)) ; no need in unsafe code
-               (and (array-type-p tspec) ; no need when no dimensions
-                    (equal (array-type-dimensions tspec) '(*))))
-           ;; We can!
-           (multiple-value-bind (vtype etype upgraded) (simplify-vector-type tspec)
-             (unless upgraded
-               (give-up-ir1-transform))
-             (let ((vtype (type-specifier vtype)))
-               `(the ,vtype
-                     (if (typep x ',vtype)
-                         x
-                         (replace
-                          (make-array (length x)
-                                      ,@(and (not (eq etype *universal-type*))
-                                             (not (eq etype *wild-type*))
-                                             `(:element-type ',(type-specifier etype))))
-                          x)))))
-           ;; No, duh. Dimension checking required.
-           (give-up-ir1-transform
-            "~@<~S specifies dimensions other than (*) in safe code.~:@>"
-            tval)))
+      ((multiple-value-bind (result already-type-p dimension specialization)
+           (cond ((or (and (array-type-p tspec)
+                           (neq (array-type-complexp tspec) t) ; :MAYBE and NIL are good
+                           (not (contains-unknown-type-p (array-type-element-type tspec)))
+                           ;; just for requesting (array nil (*)), you lose
+                           (neq (array-type-specialized-element-type tspec) *empty-type*)))
+                  (values tspec
+                          (source-transform-array-typep 'x tspec)
+                          (car (array-type-dimensions tspec))
+                          (let ((et (array-type-specialized-element-type tspec)))
+                            (unless (or (eq et *universal-type*) ; don't need
+                                        ;; * is illegal as :element-type; in this context
+                                        ;; it means to produce a SIMPLE-VECTOR
+                                        (eq et *wild-type*))
+                              `(:element-type ',(type-specifier et))))))
+                 ;; Check for string types.  This loses on (STRING 1) and such.
+                 #+sb-unicode
+                 ((type= tspec (specifier-type 'simple-string))
+                  (values 'simple-string '(simple-string-p x) '* '(:element-type 'character)))
+                 #+sb-unicode
+                 ((type= tspec (specifier-type 'string))
+                  (values 'string '(stringp x) '* '(:element-type 'character))))
+         (when result
+           ;; If the dimension is in the type, we check the input length if safety > 0,
+           ;; though technically CLHS would allow not checking in safety < 3.
+           ;; And if mismatch occurs in unsafe code, the results accords with the
+           ;; specifier, NOT the dimension of the input. This is a rational choice
+           ;; because one could not argue that incorrect code should have taken the
+           ;; bad input's length when COERCE was asked for an exact type of output.
+           `(truly-the ,result
+               (if ,already-type-p
+                   x
+                   ,(cond ((eq dimension '*)
+                           #+array-ubsan
+                           ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
+                           ;; but redundantly checks the length of the input in MAKE-ARRAY's
+                           ;; transform because we don't or can't infer that LENGTH gives the
+                           ;; same answer each time it is called on X. There may be a way to
+                           ;; extract more efficiency - at least eliminate the unreachable
+                           ;; error-signaling code on mismatch - but I don't care to try.
+                           `(make-array (length x) ,@specialization :initial-contents x)
+                           #-array-ubsan ; better: do not generate a redundant LENGTH check
+                           `(replace (make-array (length x) ,@specialization) x))
+                          ((policy node (= safety 0)) ; Disregard the input length
+                           `(replace (make-array ,dimension ,@specialization) x))
+                          (t
+                           `(make-array ,dimension ,@specialization :initial-contents x))))))))
       ((type= tspec (specifier-type 'list))
        `(coerce-to-list x))
       ((csubtypep tspec (specifier-type 'function))

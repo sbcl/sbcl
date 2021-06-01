@@ -3803,22 +3803,18 @@
   (let ((f (checked-compile
             `(lambda (x)
                (declare (optimize (safety 3)))
-               (aref (locally (declare (optimize (safety 0)))
-                       (coerce x '(simple-vector 128)))
-                     60))))
+               (let ((coerced
+                      (locally (declare (optimize (safety 0)))
+                       (coerce x '(simple-vector 128)))))
+                 (values coerced (aref coerced 60))))))
         (long (make-array 100 :element-type 'fixnum)))
     (dotimes (i 100)
       (setf (aref long i) i))
     ;; 1. COERCE doesn't check the length in unsafe code.
-    (assert (eql 60 (funcall f long)))
-    ;; 2. The compiler doesn't trust the length from COERCE
-    (assert (eq :caught
-                (handler-case
-                    (funcall f (list 1 2 3))
-                  (sb-int:invalid-array-index-error (e)
-                    (assert (eql 60 (type-error-datum e)))
-                    (assert (equal '(integer 0 (3)) (type-error-expected-type e)))
-                    :caught))))))
+    (assert (eql 60 (nth-value 1 (funcall f long))))
+    ;; 2. The compiler forces the result of COERCE to have the specified length
+    (assert (= (length (funcall f long)) 128))
+    (assert (= (length (funcall f #*1001)) 128))))
 
 (with-test (:name (compile :bug-655203-regression))
   (let ((fun (checked-compile

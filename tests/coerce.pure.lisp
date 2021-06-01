@@ -144,3 +144,16 @@
                        :allow-warnings t)
     (assert (and warnp errorp))
     (assert-error (funcall fun 1))))
+
+;; lp#1929614
+(with-test (:name :no-coerce-to-union-of-array)
+  (let ((fun
+         (checked-compile '(lambda (x)
+                            (declare (optimize speed)) ; want to see notes
+                            ;; safety doesn't matter now (in terms of getting
+                            ;; the transform to try to run), but it used to matter,
+                            ;; so keep it in.
+                            (declare (optimize (safety 0)))
+                            (coerce x '(or (array (signed-byte 8) (*))
+                                           (array (unsigned-byte 8) (*))))))))
+    (assert-error (funcall fun '(1 2 1)))))
