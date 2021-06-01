@@ -890,26 +890,6 @@ extern boolean internal_errors_enabled;
 
 extern void exception_handler_wrapper();
 
-void
-c_level_backtrace(const char* header, int depth)
-{
-    void* frame;
-    int n = 0;
-    void** lastseh;
-
-    for (lastseh = get_seh_frame(); lastseh && (lastseh!=(void*)-1);
-         lastseh = *lastseh);
-
-    fprintf(stderr, "Backtrace: %s (thread %p)\n", header, get_sb_vm_thread());
-    for (frame = __builtin_frame_address(0); frame; frame=*(void**)frame)
-    {
-        if ((n++)>depth)
-            return;
-        fprintf(stderr, "[#%02d]: ebp = %p, ret = %p\n",n,
-                frame, ((void**)frame)[1]);
-    }
-}
-
 #ifdef LISP_FEATURE_X86
 #define voidreg(ctxptr,name) ((void*)((ctxptr)->E##name))
 #else
