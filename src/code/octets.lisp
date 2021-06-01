@@ -405,12 +405,6 @@ STRING (or the subsequence bounded by START and END)."
       (funcall (ef-string-to-octets-fun ef) string start end
                (if null-terminate 1 0)))))
 
-#+sb-unicode
-(defvar +unicode-replacement-character+ (string (code-char #xfffd)))
-#+sb-unicode
-(defun use-unicode-replacement-char (condition)
-  (use-value +unicode-replacement-character+ condition))
-
 ;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
 ;;; by one or more keyword symbols. The mapping from symbol to index into this
 ;;; vector is memoized into the symbol's :EXTERNAL-FORMAT property.
