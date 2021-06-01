@@ -103,10 +103,8 @@
                       (vals (newvals 1)))
                   (return-from retry
                     (values (list instance) (list (cadr form)) vals
-                            (slot-access-transform
-                             :setf (list instance (car vals)) it)
-                            (slot-access-transform
-                             :read (list instance) it))))))
+                            (slot-access-transform :setf (list instance (car vals)) it)
+                            (slot-access-transform :read (list instance) it))))))
             (multiple-value-bind (expansion expanded)
                 (%macroexpand-1 form environment)
               (if expanded
@@ -186,8 +184,7 @@
               (return-from setf `(,(car inverse) ,@(cdr place) ,value-form))))
           (awhen (transformable-struct-setf-p place env)
             (return-from setf
-              (slot-access-transform
-               :setf (list (cadr place) value-form) it)))))
+              (slot-access-transform :setf (list (cadr place) value-form) it)))))
 
       (multiple-value-bind (temps vals newval setter)
           (get-setf-expansion place env)

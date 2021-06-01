@@ -1109,32 +1109,33 @@ unless :NAMED is also specified.")))
       (setf (classoid-source-location classoid) source-location))))
 
 
-;;; Return the transform of conceptual FUNCTION one of {:READ,:WRITE,:SETF}
+;;; Return the transform of OPERATION which is either :READ or :SETF.
 ;;; as applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
+;;; FUN-OR-MACRO, which is used only for the :SETF operation,
+;;; indicates whether the argument order corresponds to
+;;;    (funcall #'(setf mystruct-myslot) newval s) ; :FUNCTION
+;;; versus
+;;;    (setf (mystruct-myslot s) newval) ; :MACRO
 ;;; Return NIL on failure.
-(defun slot-access-transform (function args slot-key)
-  (declare (type (member :read :write :setf) function))
-  (unless (if (eq function :read)
-              (singleton-p args) ; need exactly 1 arg
-              (and (consp argS) (singleton-p (cdr args)))) ; need exactly 2 args
-    (return-from slot-access-transform nil)) ; fail
-  (let* ((dd (car slot-key))
-         (dsd (cdr slot-key))
-         (type-spec (dsd-type dsd))
-         (index (dsd-index dsd)))
-    (if (eq function :read)
-        (let* ((instance-form `(the ,(dd-name dd) ,(car args)))
-               (place
-                (acond ((eq (dd-type dd) 'list)
-                        ;;(list 'list index instance-form)
-                        (bug "What?"))
-                       ((dsd-raw-slot-data dsd)
-                        (list (raw-slot-data-reader-name it) instance-form index))
-                       (t
-                        (list (ecase (dd-type dd)
-                                (funcallable-structure '%funcallable-instance-info)
-                                (structure '%instance-ref))
-                              instance-form index)))))
+(defun slot-access-transform (operation args slot-key &optional (fun-or-macro :macro))
+  (binding* ((dd (car slot-key))
+             (dsd (cdr slot-key))
+             (type-spec (dsd-type dsd))
+             (index (dsd-index dsd))
+             ((writer reader)
+              (acond ((dsd-raw-slot-data dsd)
+                      (values (raw-slot-data-writer-name it) (raw-slot-data-reader-name it)))
+                     (t
+                      (ecase (dd-type dd)
+                        (funcallable-structure
+                         (values '%set-funcallable-instance-info '%funcallable-instance-info))
+                        (structure
+                         (values '%instance-set '%instance-ref)))))))
+    (ecase operation
+      (:read
+       (when (singleton-p args)
+         (let* ((instance-form `(the ,(dd-name dd) ,(car args)))
+                (place `(,reader ,instance-form ,index)))
             ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
             ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
             ;; check the type on each read. Assuming that type-checks reject
@@ -1148,31 +1149,32 @@ unless :NAMED is also specified.")))
                                    :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
                                   ,place)))
                    (if (eq type-spec t) place
-                       `(the* (,type-spec :derive-type-only t) ,place)))))
+                       `(the* (,type-spec :derive-type-only t) ,place)))))))
+      (:setf
         ;; The primitive object slot setting vops take newval last, which matches
         ;; the order in which a use of SETF has them, but because the vops
         ;; do not return anything, we have to bind both arguments.
-        (binding* ((setter (acond ((dsd-raw-slot-data dsd)
-                                   (raw-slot-data-writer-name it))
-                                  (t
-                                   (ecase (dd-type dd)
-                                     (funcallable-structure '%set-funcallable-instance-info)
-                                     (structure '%instance-set)))))
-                   ((newval-form instance-form)
-                    (if (eq function :write)
-                        (values (first args) (second args))
-                        (values (second args) (first args)))))
-            (if (eq function :write) ; #'(SETF accessor) - newval is first
+        (when (and (listp args) (singleton-p (cdr args)))
+          (multiple-value-bind (newval-form instance-form)
+              (ecase fun-or-macro
+                (:function (values (first args) (second args)))
+                (:macro (values (second args) (first args))))
+            (if (eq fun-or-macro :function)
+                ;; This used only for source-transforming (funcall #'(setf myslot) ...).
+                ;; (SETF x) writer functions have been defined as source-transforms instead of
+                ;; inline functions, which improved the semantics around clobbering defstruct
+                ;; writers with random DEFUNs either deliberately or accidentally.
+                ;; Since users can't define source-transforms (not portably anyway),
+                ;; we can easily discern which functions were system-generated.
                 `(let ((#2=#:val
                         #4=,(if (eq type-spec t)
                                 newval-form
                                 `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
                                        ,newval-form)))
                        (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
-                   (,setter #1# ,index #2#)
+                   (,writer #1# ,index #2#)
                    #2#)
-                ;; (SETF (ACCESS INSTANCE) NEWVAL) ; has instance first, returns newval
-                `(let ((#1# #3#) (#2# #4#)) (,setter #1# ,index #2#) #2#))))))
+                `(let ((#1# #3#) (#2# #4#)) (,writer #1# ,index #2#) #2#))))))))
 
 ;;; Apply TRANSFORM - a special indicator stored in :SOURCE-TRANSFORM
 ;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
@@ -1193,8 +1195,8 @@ unless :NAMED is also specified.")))
                       (:predicate `(sb-c::%instance-typep ,arg ',type))
                       (:copier `(copy-structure (the ,type ,arg)))))))
                 (t
-                 (slot-access-transform (if (consp name) :write :read)
-                                        (cdr sexpr) transform)))))
+                 (slot-access-transform (if (consp name) :setf :read)
+                                        (cdr sexpr) transform :function)))))
     (values result (not result))))
 
 ;;; Return a LAMBDA form which can be used to set a slot
