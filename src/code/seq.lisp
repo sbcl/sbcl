@@ -470,6 +470,12 @@
 ;;;; SUBSEQ
 ;;;;
 
+;;; FIXME: surely we can emit tighter code by not having 16 copies of the
+;;; vector allocator buried inside this (and similar) functions.
+;;; Instead there can be a size calculation up front, then ALLOCATE-VECTOR
+;;; with the underlying widetag, then perform an N-way dispatch for the copy.
+;;; Also, there should only be as many different ways to copy
+;;; as there are different element sizes.
 (!define-array-dispatch :jump-table vector-subseq-dispatch (array start end)
   (declare (optimize speed (safety 0)))
   (declare (type index start end))

@@ -293,8 +293,10 @@
                                 #-sb-xc-host
                                 (declare (muffle-conditions array-initial-element-mismatch))
                               (make-sequence result-type
-                                             (min ,@(loop for arg in seq-args
-                                                          collect `(length ,arg)))))
+                                             ,(if (cdr seq-args)
+                                                  `(min ,@(loop for arg in seq-args
+                                                                collect `(length ,arg)))
+                                                  `(length ,(car seq-args)))))
                             fun ,@seq-args))))
             (t
              (let* ((all-seqs (cons seq seqs))
@@ -1019,62 +1021,74 @@
 ;;; you tweak it, make sure that you compare the disassembly, if not the
 ;;; performance of, the functions implementing string streams
 ;;; (e.g. SB-IMPL::BASE-STRING-SOUT).
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun !make-replace-transform (saetp sequence-type1 sequence-type2)
-    `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                            (,sequence-type1 ,sequence-type2 &rest t)
-                            ,sequence-type1
-                            :node node)
-       `(let* ((len1 (length seq1))
-               (len2 (length seq2))
-               (end1 (or end1 len1))
-               (end2 (or end2 len2))
-               (replace-len (min (- end1 start1) (- end2 start2))))
-          ,(unless (policy node (= insert-array-bounds-checks 0))
-             `(progn
-                (unless (<= 0 start1 end1 len1)
-                  (sequence-bounding-indices-bad-error seq1 start1 end1))
-                (unless (<= 0 start2 end2 len2)
-                  (sequence-bounding-indices-bad-error seq2 start2 end2))))
-          ,',(cond
-               ((and saetp (sb-vm:valid-bit-bash-saetp-p saetp))
-                (let* ((n-element-bits (sb-vm:saetp-n-bits saetp))
-                       (bash-function (intern (format nil "UB~D-BASH-COPY"
-                                                      n-element-bits)
-                                              (find-package "SB-KERNEL"))))
-                  `(funcall (function ,bash-function) seq2 start2
-                    seq1 start1 replace-len)))
-               (t
-                `(if (and
-                      ;; If the sequence types are different, SEQ1 and
-                      ;; SEQ2 must be distinct arrays.
-                      ,(eql sequence-type1 sequence-type2)
-                      (eq seq1 seq2) (> start1 start2))
-                     (do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1))
-                             (1- i))
-                          (j (truly-the (or (eql -1) index) (+ start2 replace-len -1))
-                             (1- j)))
-                         ((< i start1))
-                       (declare (optimize (insert-array-bounds-checks 0)))
-                       (setf (aref seq1 i) (aref seq2 j)))
-                     (do ((i start1 (1+ i))
-                          (j start2 (1+ j))
-                          (end (+ start1 replace-len)))
-                         ((>= i end))
-                       (declare (optimize (insert-array-bounds-checks 0)))
-                       (setf (aref seq1 i) (aref seq2 j))))))
-          seq1))))
-
+(defun transform-replace-bashable (bash-function node)
+  `(let* ((len1 (length seq1))
+          (len2 (length seq2))
+          (end1 (or end1 len1))
+          (end2 (or end2 len2))
+          (replace-len (min (- end1 start1) (- end2 start2))))
+     ,@(when (policy node (/= insert-array-bounds-checks 0))
+         '((unless (<= 0 start1 end1 len1)
+             (sequence-bounding-indices-bad-error seq1 start1 end1))
+           (unless (<= 0 start2 end2 len2)
+             (sequence-bounding-indices-bad-error seq2 start2 end2))))
+     (,bash-function seq2 start2 seq1 start1 replace-len)
+     seq1))
+(defun transform-replace (type1 type2 node)
+  `(let* ((len1 (length seq1))
+          (len2 (length seq2))
+          (end1 (or end1 len1))
+          (end2 (or end2 len2))
+          (replace-len (min (- end1 start1) (- end2 start2))))
+     ,@(when (policy node (/= insert-array-bounds-checks 0))
+         '((unless (<= 0 start1 end1 len1)
+             (sequence-bounding-indices-bad-error seq1 start1 end1))
+           (unless (<= 0 start2 end2 len2)
+             (sequence-bounding-indices-bad-error seq2 start2 end2))))
+     ,(flet ((down ()
+               '(do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1)) (1- i))
+                     (j (truly-the (or (eql -1) index) (+ start2 replace-len -1)) (1- j)))
+                 ((< i start1))
+                 (setf (aref seq1 i) (data-vector-ref seq2 j))))
+             (up ()
+               '(do ((i start1 (1+ i))
+                     (j start2 (1+ j))
+                     (end (+ start1 replace-len)))
+                 ((>= i end))
+                 (setf (aref seq1 i) (data-vector-ref seq2 j)))))
+        ;; "If sequence-1 and sequence-2 are the same object and the region being modified
+        ;;  overlaps the region being copied from, then it is as if the entire source region
+        ;;  were copied to another place and only then copied back into the target region.
+        ;;  However, if sequence-1 and sequence-2 are not the same, but the region being modified
+        ;;  overlaps the region being copied from (perhaps because of shared list structure or
+        ;;  displaced arrays), then after the replace operation the subsequence of sequence-1
+        ;;  being modified will have unpredictable contents."
+        (if (eq type1 type2) ; source and destination sequences could be EQ
+            `(if (and (eq seq1 seq2) (> start1 start2)) ,(down) ,(up))
+            (up)))
+     seq1))
+;;; I don't think that having 26 separate transforms is the best way to do this.
+;;; Can we reduce it to just a few somehow?
 (macrolet
     ((define-replace-transforms ()
-       (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+       `(progn
+          ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
              for sequence-type = `(simple-array ,(sb-vm:saetp-specifier saetp) (*))
              unless (= (sb-vm:saetp-typecode saetp) sb-vm:simple-array-nil-widetag)
-             collect (!make-replace-transform saetp sequence-type sequence-type)
-             into forms
-             finally (return `(progn ,@forms))))
+             collect `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                                             (,sequence-type ,sequence-type &rest t) ,sequence-type
+                                             :node node)
+                        ,(if (sb-vm:valid-bit-bash-saetp-p saetp)
+                             (let* ((n-element-bits (sb-vm:saetp-n-bits saetp))
+                                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
+                                                           (find-package "SB-KERNEL"))))
+                               `(transform-replace-bashable ',bash-function node))
+                             `(transform-replace ',sequence-type ',sequence-type node))))))
      (define-one-transform (sequence-type1 sequence-type2)
-       (!make-replace-transform nil sequence-type1 sequence-type2)))
+       `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                               (,sequence-type1 ,sequence-type2 &rest t) ,sequence-type1
+                               :node node)
+          (transform-replace ',sequence-type1 ',sequence-type2 node))))
   (define-replace-transforms)
   #+sb-unicode
   (progn
@@ -1309,10 +1323,9 @@
        (let ((element-type (type-specifier (array-type-specialized-element-type type))))
          `(let* ((length (length seq))
                  (end (or end length)))
-            ,(unless (policy node (zerop insert-array-bounds-checks))
-                     '(progn
-                       (unless (<= 0 start end length)
-                         (sequence-bounding-indices-bad-error seq start end))))
+            ,@(when (policy node (/= insert-array-bounds-checks 0))
+                '((unless (<= 0 start end length)
+                    (sequence-bounding-indices-bad-error seq start end))))
             (let* ((size (- end start))
                    (result (make-array size :element-type ',element-type)))
               ,(maybe-expand-copy-loop-inline 'seq (if (constant-lvar-p start)
