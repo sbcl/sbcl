@@ -44,26 +44,7 @@
          (index :scs (unsigned-reg))
          (value :scs (descriptor-reg)))
   (:arg-types simple-array-nil positive-fixnum *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value result)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 1
-    (error-call vop 'nil-array-accessed-error object)))
-
-(define-vop (data-vector-set/simple-array-nil)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg))
-         (value :scs (descriptor-reg)))
-  (:info offset)
-  (:arg-types simple-array-nil positive-fixnum *
-              (:constant (integer 0 0)))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value result offset)
+  (:ignore index value)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1

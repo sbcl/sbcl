@@ -19,7 +19,7 @@
   (:generator 1
     (load-csp res)))
 
-(define-vop ()
+(define-vop (current-fp-sap)
   (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))

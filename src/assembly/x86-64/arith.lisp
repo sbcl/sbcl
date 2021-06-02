@@ -323,7 +323,7 @@
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
   (def-it positive-fixnum-count 12 any-reg positive-fixnum)
-  (def-it positive-fixnum-count 13 any-reg fixnum :signed t))
+  (def-it signed-fixnum-count 13 any-reg fixnum :signed t))
 
 ;;; General case of EQL
 
