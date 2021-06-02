@@ -50,18 +50,15 @@
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
          (offset :scs (any-reg) :target temp)
-         (value :scs (descriptor-reg) :to :result :target result))
+         (value :scs (descriptor-reg)))
   (:arg-types system-area-pointer positive-fixnum *)
-  (:temporary (:sc unsigned-reg :from (:argument 1) :to :result) temp)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) temp)
   (:generator 9
     (move temp offset)
     (inst neg temp)
     (inst mov
           (make-ea :dword :base sap :disp (frame-byte-offset 0) :index temp)
-          value)
-    (move result value)))
+          value)))
 
 (define-vop ()
   (:translate fun-code-header)

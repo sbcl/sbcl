@@ -47,15 +47,12 @@
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg))
-         (value :scs (descriptor-reg) :target result))
+         (value :scs (descriptor-reg)))
   (:arg-types system-area-pointer positive-fixnum *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
   (:generator 2
     (inst addu sap object offset)
-    (inst sw value sap 0)
-    (move result value)))
+    (inst sw value sap 0)))
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)

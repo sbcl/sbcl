@@ -407,8 +407,10 @@
   system-area-pointer (flushable))
 (defknown (current-sp current-fp) () system-area-pointer (flushable))
 (defknown current-fp-fixnum () fixnum (flushable))
+;; STACK-REF is pretty nearly just SAP-REF-LISPOBJ except that
+;; it takes a word index, not a byte displacement from the SAP.
 (defknown stack-ref (system-area-pointer index) t (flushable))
-(defknown %set-stack-ref (system-area-pointer index t) t ())
+(defknown %set-stack-ref (system-area-pointer index t) (values) ())
 (defknown lra-code-header (t) t (movable flushable))
 ;; FUN-CODE-HEADER returns NIL for assembly routines that have a simple-fun header
 ;; with 0 as the data value. We should probably ensure that assembly routines

@@ -2687,7 +2687,8 @@ register."
                #-(or x86 x86-64)
                (the long-float (realpart value)))))
       (#.sb-vm:control-stack-sc-number
-       (setf (stack-ref fp (sb-c:sc+offset-offset sc+offset)) value))
+       (%set-stack-ref fp (sb-c:sc+offset-offset sc+offset) value)
+       value) ; I doubt that the return value matters, but who knows ...
       (#.sb-vm:character-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-word nfp (number-stack-offset 0))
