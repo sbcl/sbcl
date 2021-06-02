@@ -11,6 +11,7 @@
 
 (in-package "SB-X86-64-ASM")
 
+(eval-when (:compile-toplevel) ; not needed outside this file
 (defmacro do-immobile-code ((code-var) &body body)
   ;; Loop over all code objects
   `(let* ((call (find-inst #xE8 (get-inst-space)))
@@ -39,7 +40,7 @@
         ;; Slowness here is bothersome, especially for SB-VM::REMOVE-STATIC-LINKS,
         ;; so skip right over all fixedobj pages.
         (ash varyobj-space-start (- n-fixnum-tag-bits))
-        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
+        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))))))
 
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components

@@ -17,7 +17,8 @@
 
 ;;;; utilities
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+;;; Don't need to define it in the host in both passes
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; These functions let us create floats from bits with the
 ;;; significand uniformly represented as an integer. This is less
