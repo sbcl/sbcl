@@ -1091,8 +1091,13 @@
         (setf (combination-args node) (arg-lvars))))
     node))
 
+(defun show-transform-p (showp fun-name)
+  (or (and (listp showp) (member fun-name showp :test 'equal))
+      (eq showp t)))
 (defun show-transform (kind name new-form)
-  (let ((*print-right-margin* 100))
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
     (format *trace-output* "~&xform (~a) ~S~% -> ~S~%"
             kind name new-form)))
 ;;; Convert a call to a global function. If not NOTINLINE, then we do
@@ -1122,7 +1127,7 @@
                       (t
                        (unless (policy *lexenv* (zerop store-xref-data))
                          (record-call name (ctran-block start) *current-path*))
-                       (when *show-transforms-p*
+                       (when (show-transform-p *show-transforms-p* name)
                          (show-transform "src" name transformed))
                        (let ((*transforming* t))
                          (ir1-convert start next result transformed)))))

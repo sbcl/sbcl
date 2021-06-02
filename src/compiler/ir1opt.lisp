@@ -1511,14 +1511,11 @@
                (valid-fun-use node type))
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
-                 (transform-call node
-                                 (let ((new-form (funcall fun node)))
-                                   (when show
-                                     (show-transform "ir"
-                                                     (combination-fun-source-name node)
-                                                     new-form))
-                                   new-form)
-                                 (combination-fun-source-name node))
+                 (let ((new-form (funcall fun node))
+                       (fun-name (combination-fun-source-name node)))
+                   (when (show-transform-p show fun-name)
+                     (show-transform "ir" fun-name new-form))
+                   (transform-call node new-form fun-name))
                  (values :none nil))
              (ecase severity
                (:none
