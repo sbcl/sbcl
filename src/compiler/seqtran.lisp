@@ -1034,7 +1034,7 @@
              (sequence-bounding-indices-bad-error seq2 start2 end2))))
      (,bash-function seq2 start2 seq1 start1 replace-len)
      seq1))
-(defun transform-replace (type1 type2 node)
+(defun transform-replace (same-types-p node)
   `(let* ((len1 (length seq1))
           (len2 (length seq2))
           (end1 (or end1 len1))
@@ -1063,37 +1063,40 @@
         ;;  overlaps the region being copied from (perhaps because of shared list structure or
         ;;  displaced arrays), then after the replace operation the subsequence of sequence-1
         ;;  being modified will have unpredictable contents."
-        (if (eq type1 type2) ; source and destination sequences could be EQ
+        (if same-types-p ; source and destination sequences could be EQ
             `(if (and (eq seq1 seq2) (> start1 start2)) ,(down) ,(up))
             (up)))
      seq1))
-;;; I don't think that having 26 separate transforms is the best way to do this.
-;;; Can we reduce it to just a few somehow?
-(macrolet
-    ((define-replace-transforms ()
-       `(progn
-          ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
-             for sequence-type = `(simple-array ,(sb-vm:saetp-specifier saetp) (*))
-             unless (= (sb-vm:saetp-typecode saetp) sb-vm:simple-array-nil-widetag)
-             collect `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                                             (,sequence-type ,sequence-type &rest t) ,sequence-type
-                                             :node node)
-                        ,(if (sb-vm:valid-bit-bash-saetp-p saetp)
-                             (let* ((n-element-bits (sb-vm:saetp-n-bits saetp))
-                                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
-                                                           (find-package "SB-KERNEL"))))
-                               `(transform-replace-bashable ',bash-function node))
-                             `(transform-replace ',sequence-type ',sequence-type node))))))
-     (define-one-transform (sequence-type1 sequence-type2)
-       `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                               (,sequence-type1 ,sequence-type2 &rest t) ,sequence-type1
-                               :node node)
-          (transform-replace ',sequence-type1 ',sequence-type2 node))))
-  (define-replace-transforms)
-  #+sb-unicode
-  (progn
-   (define-one-transform (simple-array base-char (*)) (simple-array character (*)))
-   (define-one-transform (simple-array character (*)) (simple-array base-char (*)))))
+
+(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                       ((simple-array * (*)) (simple-array * (*)) &rest t) (simple-array * (*))
+                       :node node)
+  (let ((et (and (array-type-p (lvar-type seq1))
+                 (array-type-p (lvar-type seq2))
+                 (array-type-specialized-element-type (lvar-type seq1)))))
+    (if (and et
+             (neq et *empty-type*)
+             (neq et *wild-type*)
+             (eq (array-type-specialized-element-type (lvar-type seq2)) et))
+        (let ((saetp (find-saetp-by-ctype et)))
+          (if (sb-vm:valid-bit-bash-saetp-p saetp)
+              (transform-replace-bashable
+               (intern (format nil "UB~D-BASH-COPY" (sb-vm:saetp-n-bits saetp))
+                       #.(find-package "SB-KERNEL"))
+               node)
+              (transform-replace t node)))
+        (give-up-ir1-transform))))
+#+sb-unicode
+(progn
+(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                       (simple-base-string simple-character-string &rest t) simple-base-string
+                       :node node)
+  (transform-replace nil node))
+(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                       (simple-character-string simple-base-string &rest t) simple-character-string
+                       :node node)
+  (transform-replace nil node)))
+
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
