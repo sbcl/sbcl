@@ -446,6 +446,7 @@ sufficiently motivated to do lengthy fixes."
                                (%set-symbol-global-value obj (coalesce part)))))
                          ((not (memq accessor
                                      '(%closure-fun
+                                       %fun-layout %instance-layout
                                        symbol-package symbol-name fdefn-name
                                        %numerator %denominator
                                        %realpart %imagpart

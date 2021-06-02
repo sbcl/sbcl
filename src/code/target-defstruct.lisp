@@ -58,7 +58,7 @@
                       (logior (ash nwords sb-vm:instance-length-shift)
                               sb-vm:instance-widetag))))
          (wrapper #-metaspace layout))
-    (setf (%instance-layout layout)
+    (%set-instance-layout layout
           (wrapper-friend #.(find-layout #+metaspace 'sb-vm:layout
                                          #-metaspace 'wrapper)))
     #+metaspace
@@ -302,7 +302,7 @@
       (declare (type index len))
       (let ((bitmap (dd-bitmap (wrapper-dd wrapper))))
         ;; Don't assume that %INSTANCE-REF can access the layout.
-        (setf (%instance-layout res) (%instance-layout structure))
+        (%set-instance-layout res (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor
         ;; registers, we could speed up this code in an obvious way.
         (macrolet ((copy-loop (tagged-p &optional step)
@@ -327,7 +327,7 @@
 ;;; this won't ever be called.
 (defun %copy-instance (to from)
   (declare (structure-object to from) (optimize (safety 0)))
-  (setf (%instance-layout to) (%instance-layout from))
+  (%set-instance-layout to (%instance-layout from))
   (dotimes (i (%instance-length to) to)
     (%instance-set to i (%instance-ref from i))))
 ;;; Like %COPY-INSTANCE, but layout was already assigned.
@@ -338,10 +338,10 @@
         do (%instance-set to i (%instance-ref from i)))
   to)
 (defun (setf %instance-wrapper) (newval x)
-  (setf (%instance-layout x) (wrapper-friend newval))
+  (%set-instance-layout x (wrapper-friend newval))
   newval)
 (defun (setf %fun-wrapper) (newval x)
-  (setf (%fun-layout x) (wrapper-friend newval))
+  (%set-fun-layout x (wrapper-friend newval))
   newval)
 
 ;;; default PRINT-OBJECT method

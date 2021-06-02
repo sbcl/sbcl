@@ -133,7 +133,7 @@
               (* (1+ (sb-kernel:%instance-length layout))
                  sb-vm:n-word-bytes))
              new-layout)))
-    (setf (sb-kernel:%instance-layout myfoo)
+    (sb-kernel:%set-instance-layout myfoo
           (copy-layout (sb-kernel:%instance-layout myfoo)))
     nil))
 

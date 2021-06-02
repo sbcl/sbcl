@@ -206,8 +206,10 @@
                         #+compact-instance-header function)
   wrapper
   (foldable flushable))
-(defknown %set-instance-layout (instance sb-vm:layout) sb-vm:layout ())
-(defknown %set-fun-layout (funcallable-instance sb-vm:layout) sb-vm:layout ())
+(defknown %set-instance-layout (instance sb-vm:layout) (values) ())
+;;; %SET-FUN-LAYOUT should only called on FUNCALLABLE-INSTANCE
+;;; (but %set-funcallable-instance-layout is too long a name)
+(defknown %set-fun-layout (funcallable-instance sb-vm:layout) (values) ())
 ;;; Layout getter that accepts any object, and if it has INSTANCE- or FUN-
 ;;; POINTER-LOWTAG returns the layout, otherwise some agreed-upon layout.
 (defknown %instanceoid-layout (t) sb-vm:layout (flushable))

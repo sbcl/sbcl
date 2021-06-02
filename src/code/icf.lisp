@@ -48,9 +48,12 @@
      (lambda (object widetag size &aux touchedp)
        (declare (ignore size))
        (macrolet ((rewrite (place &aux (accessor (if (listp place) (car place))))
-                    ;; These two slots have no setters, but nor are
+                    ;; SYMBOL-NAME and SYMBOL-PACKAGE have no setters, but nor are
                     ;; they possibly affected by code folding.
-                    (unless (member accessor '(symbol-name symbol-package))
+                    ;; {%INSTANCE,%FUN}-LAYOUT have setters but they are not spelled
+                    ;; SETF, nor are they affected by code folding.
+                    (unless (member accessor '(symbol-name symbol-package
+                                               %fun-layout %instance-layout))
                       `(let* ((oldval ,place) (newval (forward oldval)))
                          (unless (eq newval oldval)
                            ,(case accessor

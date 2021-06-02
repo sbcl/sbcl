@@ -1216,8 +1216,6 @@
       ;; Never produce a warning from (DECLARE (INLINE LENGTH)) etc
       (return-from ponder-full-call))
 
-    (when (equal fname '(setf %vector-raw-bits))
-      (warn "bork"))
     ;; Warn about cross-compiling certain full-calls,
     ;; as it is indicative of dependency order problems.
     #+sb-xc-host

@@ -48,14 +48,10 @@
 (in-package "SB-IMPL")
 (defsetf %bignum-ref %bignum-set)
 
-(defsetf %instance-layout %set-instance-layout)
 (declaim (inline (setf %funcallable-instance-info)))
 (defun (setf %funcallable-instance-info) (value instance index)
   (%set-funcallable-instance-info instance index value)
   value)
-;;; The writer is named after the reader, but only operates on FUNCALLABLE-INSTANCE
-;;; even if the reader operates on any FUNCTION.
-(defsetf %fun-layout %set-fun-layout)
 
 ;;; from early-setf.lisp
 

@@ -173,14 +173,8 @@
 (progn
   (define-source-transform %instance-layout (x)
     `(truly-the sb-vm:layout (%instance-ref ,x 0)))
-  ;; I'm unsure if anything needs the return value of %SET-INSTANCE-LAYOUT,
-  ;; but until I remove the defsetf for it - which removes the guarantee
-  ;; that it acts like SETF - then it needs to act like SETF.
-  (define-source-transform %set-instance-layout (x val)
-    `(let ((instance ,x)
-           (layout (the sb-vm:layout ,val)))
-        (%instance-set instance 0 layout)
-        layout))
+  (define-source-transform %set-instance-layout (instance layout)
+    `(%instance-set ,instance 0 (the sb-vm:layout ,layout)))
   (define-source-transform function-with-layout-p (x)
     `(funcallable-instance-p ,x)))
 

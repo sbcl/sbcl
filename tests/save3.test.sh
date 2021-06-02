@@ -36,7 +36,7 @@ run_sbcl <<EOF
       (:metaclass sb-mop:funcallable-standard-class))
     (let ((nl (sb-kernel:wrapper-friend (sb-kernel:find-layout 'subgf)))) ; new layout
       (assert (not (eq (sb-kernel:%fun-layout #'myfun) nl)))
-      (setf (sb-kernel:%fun-layout #'myfun) nl)
+      (sb-kernel:%set-fun-layout #'myfun nl)
       (gc)))
   (save-lisp-and-die "$tmpcore" :toplevel #'assign-layout)
 EOF
