@@ -396,7 +396,7 @@
 ;;; CSR inserted a bug into Burger & Dybvig's float printer.  Caught
 ;;; by Raymond Toy
 (with-test (:name (format :exponential-floating-point-directive :smoke))
-  (assert (string= (format nil "~E" 1d23) "1.d+23")))
+  (assert (string= (format nil "~E" 1d23) "1.0d+23")))
 
 ;;; Fixed-format bugs from CLISP's test suite (reported by Bruno
 ;;; Haible, bug 317)
@@ -593,7 +593,7 @@
 (with-test (:name (format :bug-308961))
   (assert (string= (format nil "~4,1F" 0.001) " 0.0"))
   (assert (string= (format nil "~4,1@F" 0.001) "+0.0"))
-  (assert (string= (format nil "~E" 0.01) "1.e-2"))
+  (assert (string= (format nil "~E" 0.01) "1.0e-2"))
   (assert (string= (format nil "~G" 0.01) "1.00e-2")))
 
 (with-test (:name (:fp-print-read-consistency single-float))
@@ -871,3 +871,19 @@ there"))))
   (let ((x (sb-kernel:%make-funcallable-instance 5)))
     (let ((str (write-to-string x :pretty nil)))
       (assert (search "#<SB-KERNEL:FUNCALLABLE-INSTANCE {" str)))))
+
+(with-test (:name :bug-885320)
+  (let* ((form `(format nil "~E"))
+         (fun (compile nil `(lambda (x) (,@form x)))))
+    (assert (string= (funcall fun 1.0) "1.0e+0"))
+    (assert (string= (funcall fun 1.0d0) "1.0d+0"))
+    (assert (string= (apply (car form) (append (cdr form) (list 1.0))) "1.0e+0"))
+    (assert (string= (apply (car form) (append (cdr form) (list 1.0d0))) "1.0d+0"))))
+
+(with-test (:name (:bug-885320 :d-k+1))
+  (let* ((form `(format nil "~,2,,3E"))
+         (fun (compile nil `(lambda (x) (,@form x)))))
+    (assert (string= (funcall fun 1.0) "100.e-2"))
+    (assert (string= (funcall fun 1.0d0) "100.d-2"))
+    (assert (string= (apply (car form) (append (cdr form) (list 1.0))) "100.e-2"))
+    (assert (string= (apply (car form) (append (cdr form) (list 1.0d0))) "100.d-2"))))

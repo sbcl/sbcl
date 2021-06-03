@@ -4,6 +4,9 @@ changes relative to sbcl-2.1.5:
   * minor incompatible change: COMPILE-FILE does not merge the input file's
     pathname-directory into the output path if :OUTPUT-FILE was specified
     and has a directory that is not :UNSPECIFIC.
+  * bug fix: print a single trailing zero after the decimal point for FORMAT
+    ~E if there are no digits remaining to be printed and the width allows it.
+    (lp#883520)
 
 changes in sbcl-2.1.5 relative to sbcl-2.1.4:
   * minor incompatible change: on x86-64, the backend instruction encoders for

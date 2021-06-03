@@ -688,15 +688,17 @@
                      (fmin (if (minusp k) 1 fdig)))
                 (multiple-value-bind (fstr flen lpoint tpoint)
                     (sb-impl::flonum-to-string num spaceleft fdig k fmin)
-                  (when (and d (zerop d)) (setq tpoint nil))
+                  (when (eql fdig 0) (setq tpoint nil))
                   (when w
                     (decf spaceleft flen)
                     (when lpoint
                       (if (or (> spaceleft 0) tpoint)
                           (decf spaceleft)
                           (setq lpoint nil)))
-                    (when (and tpoint (<= spaceleft 0))
-                      (setq tpoint nil)))
+                    (when tpoint
+                      (if (<= spaceleft 0)
+                          (setq tpoint nil)
+                          (decf spaceleft))))
                   (cond ((and w (< spaceleft 0) ovf)
                          ;;significand overflow
                          (dotimes (i w) (write-char ovf stream)))
@@ -707,6 +709,7 @@
                                (if atsign (write-char #\+ stream)))
                            (when lpoint (write-char #\0 stream))
                            (write-string fstr stream)
+                           (when tpoint (write-char #\0 stream))
                            (write-char (if marker
                                            marker
                                            (format-exponent-marker number))
