@@ -31,17 +31,11 @@
   (def %array-displaced-p)
   (def %array-displaced-from))
 
-;;; For compatibility: DO NOT USE IN NEW CODE.
-(defun %array-data-vector (array) (%array-data array))
-
 (defun %array-rank (array)
   (%array-rank array))
 
 (defun %array-dimension (array axis)
   (%array-dimension array axis))
-
-(defun %set-array-dimension (array axis value)
-  (%set-array-dimension array axis value))
 
 (defun %check-bound (array bound index)
   (declare (type index bound)
