@@ -163,7 +163,7 @@
   (verify-backtrace test-function expected-frames :details details
                                                   :error t))
 
-(defvar *p* (namestring *load-truename*))
+(defvar *p* (namestring (if sb-c::*merge-pathnames* *load-truename* *load-pathname*)))
 
 (defvar *undefined-function-frame*
   '("undefined function"))

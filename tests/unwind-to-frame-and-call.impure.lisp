@@ -277,12 +277,14 @@
         (assert (eql *foo* 'y)))
       (assert (eql *foo* 'x)))))
 
+(defvar *p* (namestring (if sb-c::*merge-pathnames* *load-truename* *load-pathname*)))
+
 (with-test (:name (:return-from-frame :anonymous :toplevel) :fails-on :win32)
-  (test-anon *anon-1* 'foo (namestring *load-truename*)))
+  (test-anon *anon-1* 'foo *p*))
 
 (with-test (:name (:return-from-frame :anonymous :toplevel-special)
                   :fails-on :win32)
-  (test-anon *anon-2* '*foo* (namestring *load-truename*)))
+  (test-anon *anon-2* '*foo* *p*))
 
 (with-test (:name (:return-from-frame :anonymous) :fails-on :win32)
   (test-anon *anon-3* 'foo 'make-anon-3))
