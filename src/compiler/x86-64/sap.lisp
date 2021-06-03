@@ -209,9 +209,13 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (inst lea temp-reg-tn ea)
     (inst xor temp-reg-tn (thread-slot-ea thread-msan-xor-constant-slot))
     (inst mov size (ea temp-reg-tn) 0))
-  (inst mov size ea (if (and (tn-p value) (sc-is value immediate))
-                        (tn-value value)
-                        value)))
+  (when (sc-is value constant immediate)
+    (cond ((plausible-signed-imm32-operand-p (tn-value value))
+           (setq value (tn-value value)))
+          (t
+           (inst mov temp-reg-tn (tn-value value))
+           (setq value temp-reg-tn))))
+  (inst mov size ea value))
 
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
@@ -221,7 +225,8 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                     size)
              (let ((value-scs (cond ((member ref-name '(sap-ref-64 signed-sap-ref-64))
                                      `(,sc constant immediate))
-                                    ((not (member ref-name '(sap-ref-sap sap-ref-lispobj)))
+                                    ((not (member ref-name '(sap-ref-single sap-ref-sap
+                                                             sap-ref-lispobj)))
                                      `(,sc immediate))
                                     (t
                                      `(,sc))))
@@ -261,13 +266,6 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                            (offset :scs (signed-reg)))
                     (:arg-types ,type system-area-pointer signed-num)
                     (:generator 5
-                      ,@(cond ((member set-name '(%set-sap-ref-64 %set-signed-sap-ref-64))
-                               '((when (sc-is value constant immediate)
-                                   (cond ((plausible-signed-imm32-operand-p (tn-value value))
-                                          (setq value (tn-value value)))
-                                         (t
-                                          (inst mov temp-reg-tn (tn-value value))
-                                          (setq value temp-reg-tn)))))))
                       (emit-sap-set ,size (ea sap offset) value)))
                   (define-vop (,(symbolicate set-name "-C"))
                     (:translate ,set-name)
@@ -277,13 +275,6 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:arg-types ,type system-area-pointer (:constant (signed-byte 32)))
                     (:info offset)
                     (:generator 4
-                      ,@(cond ((member set-name '(%set-sap-ref-64 %set-signed-sap-ref-64))
-                               `((when (sc-is value constant immediate)
-                                   (cond ((plausible-signed-imm32-operand-p (tn-value value))
-                                          (setq value (tn-value value)))
-                                         (t
-                                          (inst mov temp-reg-tn (tn-value value))
-                                          (setq value temp-reg-tn)))))))
                       (emit-sap-set ,size (ea offset sap) value)))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
