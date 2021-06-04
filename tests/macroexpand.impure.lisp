@@ -28,8 +28,6 @@
 (assert (equal (let ((glob nil)) (push 'foo glob) glob) '(foo)))
 (assert (null glob))
 
-
-
 ;;; CLHS 3.1.2.1.1 specifies that symbol macro expansion must also
 ;;; go through *MACROEXPAND-HOOK*. (2007-09-22, -TCR.)
 
@@ -40,11 +38,23 @@
 ;;; as :compile, but now we support running the test suite with any
 ;;; *evaluator-mode*, so must explicitly COMPILE the macroexpand hook.
 ;;; Notice that the lambda expressions being compiled are closures.
-;;; This is allowed by sb-interpreter but not sb-eval.
+;;; This is allowed by sb-interpreter. sb-eval gets an error
+;;; "Unhandled INTERPRETER-ENVIRONMENT-TOO-COMPLEX-ERROR:
+;;;  Lexical environment of #<INTERPRETED-FUNCTION NIL {1001850EBB}>
+;;   is too complex to compile."
+
+;;; Like CHECKED-COMPILE, this disallows unexpected warnings.
+;;; But unlike CHECKED-COMPILE, it allows the argument to be a function.
+(defun compilefun (fun)
+  (multiple-value-bind (result warnp errorp)
+      (compile nil fun)
+    (assert (not warnp))
+    (assert (not errorp))
+    result))
 
 (let* ((expanded-p nil)
        (*macroexpand-hook*
-        (compile nil #'(lambda (fn form env)
+        (compilefun  #'(lambda (fn form env)
                          (when (eq form '.foo.)
                            (setq expanded-p t))
                          (funcall fn form env)))))
@@ -57,7 +67,7 @@
 (let ((sb-ext:*evaluator-mode* :interpret))
   (let* ((expanded-p nil)
          (*macroexpand-hook*
-          (compile nil #'(lambda (fn form env)
+          (compilefun  #'(lambda (fn form env)
                            (when (eq form '.foo.)
                              (setq expanded-p t))
                            (funcall fn form env)))))
@@ -66,7 +76,7 @@
 
 (let* ((expanded-p nil)
        (*macroexpand-hook*
-        (compile nil #'(lambda (fn form env)
+        (compilefun  #'(lambda (fn form env)
                          (when (eq form '/foo/)
                            (setq expanded-p t))
                          (funcall fn form env)))))

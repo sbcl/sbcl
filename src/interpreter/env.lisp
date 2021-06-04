@@ -1144,7 +1144,9 @@
                          (specialize binding))
                         ((eq reason 'compile)
                          ;; access interpreter's lexical vars
-                         (macroize sym `(svref ,payload ,i)))
+                         ;; Prevent SETF on the variable from getting
+                         ;; "Destructive function (SETF SVREF) called on constant data"
+                         (macroize sym `(svref (load-time-value ,payload) ,i)))
                         (t
                          (let ((leaf (make-lambda-var
                                       :%source-name sym
