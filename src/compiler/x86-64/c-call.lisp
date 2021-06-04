@@ -332,10 +332,10 @@
   ;; for vararg calls.
   (when varargsp
     (move-immediate rax
-                  (loop for tn-ref = args then (tn-ref-across tn-ref)
-                        while tn-ref
-                        count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
-                                  'float-registers))))
+                    (loop for tn-ref = args then (tn-ref-across tn-ref)
+                          while tn-ref
+                          count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+                                    'float-registers))))
 
   ;; Store SP in thread struct, unless the enclosing block says not to
   #+sb-safepoint
