@@ -551,7 +551,7 @@ any non-negative real number."
                        (cond (stream
                               (sb-fasl::call-with-load-bindings
                                (lambda (stream kind) (load-as-source stream :context kind))
-                               stream nil kind))
+                               stream kind stream))
                              (specified-pathname
                               (cerror "Ignore missing init file"
                                       "The specified ~A file ~A was not found."

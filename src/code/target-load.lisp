@@ -107,28 +107,16 @@
              (invalid-fasl-expected condition)
              (invalid-fasl-fhsss condition)))))
 
-
-;;; The following comment preceded the pre 1.0.12.36 definition of
-;;; LOAD; it may no longer be accurate:
-
-;; FIXME: Daniel Barlow's ilsb.tar ILISP-for-SBCL patches contain an
-;; implementation of "DEFUN SOURCE-FILE" which claims, in a comment,
-;; that CMU CL does not correctly record source file information when
-;; LOADing a non-compiled file. Check whether this bug exists in SBCL
-;; and fix it if so.
-
-(defun call-with-load-bindings (function stream &optional pathspec (arg nil argp))
+(defun call-with-load-bindings (function stream arg pathname-designator)
   (let* (;; FIXME: we should probably document the circumstances
          ;; where *LOAD-PATHNAME* and *LOAD-TRUENAME* aren't
          ;; pathnames during LOAD.  ANSI makes no exceptions here.
-         (*load-pathname* (if pathspec
-                              (pathname pathspec)
-                              (handler-case (pathname stream)
-                                ;; FIXME: it should probably be a type
-                                ;; error to try to get a pathname for a
-                                ;; stream that doesn't have one, but I
-                                ;; don't know if we guarantee that.
-                                (error () nil))))
+         (*load-pathname* (handler-case (pathname pathname-designator)
+                            ;; FIXME: it should probably be a type
+                            ;; error to try to get a pathname for a
+                            ;; stream that doesn't have one, but I
+                            ;; don't know if we guarantee that.
+                            (error () nil)))
          ;; FIXME: this ANSI-specified nonsense should have been an accessor call
          ;; because eager binding might force dozens of syscalls to occur.
          ;; And you wonder why I/O is slow.  What a joke. Making this a symbol-macro
@@ -140,9 +128,7 @@
                               (file-error () nil))))
          ;; Bindings used internally.
          (*load-depth* (1+ *load-depth*)))
-    (if argp
-        (funcall function stream arg)
-        (funcall function stream))))
+    (funcall function stream arg)))
 
 ;;; Returns T if the stream is a binary input stream with a FASL header.
 (defun fasl-header-p (stream &key errorp)
@@ -159,7 +145,10 @@
       (when p ; Can't do it non-destructively on non-seekable streams.
         (unwind-protect
              (let* ((header *fasl-header-string-start-string*)
-                    (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
+                    ;; MISMATCH is called no matter how few octets are read in,
+                    ;; so start with BUFFER completely 0-initialized.
+                    (buffer (make-array (length header) :element-type '(unsigned-byte 8)
+                                                        :initial-element 0))
                     (n 0))
                (flet ((scan ()
                         (maybe-skip-shebang-line stream)
@@ -195,12 +184,14 @@
                         :format-arguments (list (pathname stream)))
                  (call-with-load-bindings
                   #'load-stream-1 stream
-                  ;; If using pragmatic semantics, CALL-WITH-LOAD-BINDINGS
-                  ;; with exactly what it should bind *LOAD-PATHNAME* to,
-                  ;; which is PATHSPEC as-given, coerced to a pathname.
-                  ;; Otherwise, let it pick the value to bind it to.
-                  (unless sb-c::*merge-pathnames* pathspec)
-                  faslp)))
+                  faslp
+                  ;; If you prefer *LOAD-PATHNAME* to reflect what the user specified prior
+                  ;; to merging, then CALL-WITH-LOAD-BINDINGS is passed PATHSPEC,
+                  ;; otherwise it is passed STREAM.
+                  (cond ((and (not sb-c::*merge-pathnames*)
+                              (typep pathspec '(or string pathname)))
+                         pathspec)
+                        (t stream)))))
            (load-stream-1 (stream faslp)
              (let (;; Bindings required by ANSI.
                    (*readtable* *readtable*)
