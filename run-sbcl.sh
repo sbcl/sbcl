@@ -43,7 +43,7 @@ BASE=`dirname "$this"`
 # make MODULE-PROVIDE-CONTRIB work throughout the Lisp session, even
 # after frobbing *DEFAULT-PATHNAME-DEFAULTS*.
 if expr "$BASE" : '^/.*' > /dev/null; [ $? != 0 ]; then
-    BASE=`cd ./"$BASE" && pwd`
+    BASE=`cd "$BASE" && pwd`
 fi
 
 CORE_DEFINED=no
