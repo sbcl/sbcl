@@ -431,17 +431,11 @@
 ;;;; BIT-VECTOR hackery
 
 ;;; SIMPLE-BIT-VECTOR bit-array operations are transformed to a word
-;;; loop that does 32 bits at a time.
-;;;
-;;; FIXME: This is a lot of repeatedly macroexpanded code. It should
-;;; be a function call instead.
-(macrolet ((def (bitfun wordfun)
-             `(deftransform ,bitfun ((bit-array-1 bit-array-2 result-bit-array)
-                                     (simple-bit-vector
-                                      simple-bit-vector
-                                      simple-bit-vector)
-                                     *
-                                     :node node :policy (>= speed space))
+;;; loop that does N-WORD-BITS bits at a time.
+(deftransform bit-op->word-op ((bit-array-1 bit-array-2 result-bit-array)
+                               (simple-bit-vector simple-bit-vector simple-bit-vector)
+                               *
+                               :node node :defun-only t :info wordfun)
                 `(progn
                    ,@(unless (policy node (zerop safety))
                              '((unless (= (length bit-array-1)
@@ -456,12 +450,12 @@
                     (if (= length 0)
                         ;; We avoid doing anything to 0-length
                         ;; bit-vectors, or rather, the memory that
-                        ;; follows them. Other divisible-by-32 cases
+                        ;; follows them. Other divisible-by-(N-WORD-BITS) cases
                         ;; are handled by the (1- length), below.
                         ;; CSR, 2002-04-24
                         result-bit-array
                         (do ((index 0 (1+ index))
-                             ;; bit-vectors of length 1-32 need
+                             ;; bit-vectors of length 1 .. N-WORD-BITS need
                              ;; precisely one (SETF %VECTOR-RAW-BITS),
                              ;; done here in the epilogue. - CSR,
                              ;; 2002-04-24
@@ -469,14 +463,21 @@
                                               sb-vm:n-word-bits)))
                             ((>= index end-1)
                              (setf (%vector-raw-bits result-bit-array index)
-                                   (,',wordfun (%vector-raw-bits bit-array-1 index)
-                                               (%vector-raw-bits bit-array-2 index)))
+                                   (,wordfun (%vector-raw-bits bit-array-1 index)
+                                             (%vector-raw-bits bit-array-2 index)))
                              result-bit-array)
                           (declare (optimize (speed 3) (safety 0))
                                    (type index index end-1))
                           (setf (%vector-raw-bits result-bit-array index)
-                                (,',wordfun (%vector-raw-bits bit-array-1 index)
-                                            (%vector-raw-bits bit-array-2 index))))))))))
+                                (,wordfun (%vector-raw-bits bit-array-1 index)
+                                          (%vector-raw-bits bit-array-2 index))))))))
+
+(flet ((policy-test (node) (policy node (>= speed space))))
+(macrolet ((def (bitfun wordfun)
+             `(%deftransform ',bitfun #'policy-test
+                             '(function (simple-bit-vector simple-bit-vector simple-bit-vector)
+                                        *)
+                             (cons #'bit-op->word-op ',wordfun))))
  (def bit-and word-logical-and)
  (def bit-ior word-logical-or)
  (def bit-xor word-logical-xor)
@@ -486,7 +487,7 @@
  (def bit-andc1 word-logical-andc1)
  (def bit-andc2 word-logical-andc2)
  (def bit-orc1 word-logical-orc1)
- (def bit-orc2 word-logical-orc2))
+ (def bit-orc2 word-logical-orc2)))
 
 (deftransform bit-not
               ((bit-array result-bit-array)
@@ -788,6 +789,8 @@
 ;;; position of the last set bit. We can't use this second method when
 ;;; the high order bit is bit 31 because shifting by 32 doesn't work
 ;;; too well.
+;;; This is used only for ppc + sparc.
+;;; FIXME: ppc64 should have a UB64-STRENGTH-REDUCE-
 (defun ub32-strength-reduce-constant-multiply (arg num)
   (declare (type (unsigned-byte 32) num))
   (let ((adds 0) (shifts 0)

@@ -266,6 +266,8 @@
 ;;;           - Don't actually instantiate a transform, instead just DEFUN
 ;;;             Name with the specified transform definition function. This
 ;;;             may be later instantiated with %DEFTRANSFORM.
+;;;   :INFO   - an extra piece of information the transform receives,
+;;;             typically for use with :DEFUN-ONLY
 ;;;   :IMPORTANT
 ;;;           - If the transform fails and :IMPORTANT is
 ;;;               NIL,       then never print an efficiency note.
@@ -275,9 +277,15 @@
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                           (result-type '*)
                                           &key result policy node defun-only
+                                          (info nil info-p)
                                           (important :slightly))
                              &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
+  (cond (defun-only
+         (aver (eq important :slightly)) ; can't be specified
+         (aver (not policy))) ; has no effect on the defun
+        (t
+         (aver (not info))))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node '#:node))
           (n-decls '#:decls)
@@ -286,7 +294,7 @@
           (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
         (let ((stuff
-                `((,n-node &aux ,@bindings
+                `((,n-node ,@(if info-p (list info)) &aux ,@bindings
                            ,@(when result
                                `((,result (node-lvar ,n-node)))))
                   (declare (ignorable ,@(mapcar #'car bindings)))

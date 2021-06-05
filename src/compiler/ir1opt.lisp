@@ -1078,7 +1078,7 @@
 ;;; the code - it does; but compiler doesn't appear to respect the DX-FLET.
 (defglobal *dxify-args-transform*
   (make-transform :type (specifier-type 'function)
-                  :function (lambda (node)
+                  :%fun (lambda (node)
                               "auto-DX"
                               (or (let ((name (combination-fun-source-name node)))
                                     (dxify-downward-funargs
@@ -1497,7 +1497,7 @@
   (declare (type combination node) (type transform transform))
   (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (let* ((type (transform-type transform))
-         (fun (transform-function transform))
+         (fun (transform-%fun transform))
          (constrained (fun-type-p type))
          (table (component-failed-optimizations *component-being-compiled*))
          (flame (case (transform-important transform)
@@ -1511,7 +1511,9 @@
                (valid-fun-use node type))
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
-                 (let ((new-form (funcall fun node))
+                 (let ((new-form (if (listp fun) ; the deftransform had :INFO
+                                     (funcall (car fun) node (cdr fun))
+                                     (funcall fun node)))
                        (fun-name (combination-fun-source-name node)))
                    (when (show-transform-p show fun-name)
                      (show-transform "ir" fun-name new-form))

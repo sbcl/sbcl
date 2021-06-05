@@ -30,7 +30,9 @@
   (type (missing-arg) :type ctype)
   ;; the transformation function. Takes the COMBINATION node and
   ;; returns a lambda expression, or throws out.
-  (function (missing-arg) :type function)
+  ;; If a cons, then the CAR is the function to call, and the CDR is an argument
+  ;; to pass to that function in addition to the NODE being considered.
+  (%fun (missing-arg) :type (or function (cons function)))
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
   (important nil :type (member nil :slightly t))
   ;; A function with NODE as an argument that checks wheteher the
@@ -40,6 +42,8 @@
   ;; wouldn't have been applied with the right types anyway,
   ;; or if another transform could be applied with the right policy.
   (policy nil :type (or null function)))
+(defun transform-function (transform)
+  (let ((fun (transform-%fun transform))) (if (listp fun) (car fun) fun)))
 (defun transform-note (transform)
   (or #+sb-xc-host (documentation (transform-function transform) 'function)
       #-sb-xc-host (and (fboundp 'sb-pcl::fun-doc)
@@ -60,11 +64,11 @@
                     :key #'transform-type)))
     (cond (old
            (style-warn 'redefinition-with-deftransform :transform old)
-           (setf (transform-function old) fun
+           (setf (transform-%fun old) fun
                  (transform-important old) important
                  (transform-policy old) policy))
           (t
-           (push (make-transform :type ctype :function fun
+           (push (make-transform :type ctype :%fun fun
                                  :important important
                                  :policy policy)
                  (fun-info-transforms info))))
