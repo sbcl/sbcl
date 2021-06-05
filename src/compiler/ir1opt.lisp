@@ -1079,11 +1079,11 @@
 (defglobal *dxify-args-transform*
   (make-transform :type (specifier-type 'function)
                   :function (lambda (node)
+                              "auto-DX"
                               (or (let ((name (combination-fun-source-name node)))
                                     (dxify-downward-funargs
                                      node (fun-name-dx-args name) name))
-                                  (give-up-ir1-transform)))
-                  :note "auto-DX"))
+                                  (give-up-ir1-transform)))))
 
 (defun check-proper-sequences (combination info)
   (when (fun-info-annotation info)

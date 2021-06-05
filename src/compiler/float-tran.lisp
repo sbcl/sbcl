@@ -338,18 +338,20 @@
 
 ;;; Do some stuff to recognize when the loser is doing mixed float and
 ;;; rational arithmetic, or different float types, and fix it up. If
-;;; we don't, he won't even get so much as an efficiency note.
+;;; we don't, we won't even get so much as an efficiency note.
 ;;; Unfortunately this produces unnecessarily bad code for something
 ;;; as simple as (ZEROP (THE FLOAT X)) because we _know_ that the thing
 ;;; is a float, but the ZEROP transform injected a rational 0,
 ;;; which we then go to the trouble of coercing to a float.
 (progn
   (deftransform real-float-contagion-arg1 ((x y) * * :defun-only t :node node)
+    "open-code float conversion in mixed numeric operation"
     (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
             (safe-ctype-for-single-coercion-p (lvar-type x)))
         `(,(lvar-fun-name (basic-combination-fun node)) (float x y) y)
         (give-up-ir1-transform #1="the first argument cannot safely be converted to SINGLE-FLOAT")))
   (deftransform complex-float-contagion-arg1 ((x y) * * :defun-only t :node node)
+    "open-code float conversion in mixed numeric operation"
     (if (or (not (types-equal-or-intersect
                   (lvar-type y) (specifier-type '(complex single-float))))
             (safe-ctype-for-single-coercion-p (lvar-type x)))
@@ -357,11 +359,13 @@
           (float x (realpart y)) y)
         (give-up-ir1-transform #1#)))
   (deftransform real-float-contagion-arg2 ((x y) * * :defun-only t :node node)
+    "open-code float conversion in mixed numeric operation"
     (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type 'single-float)))
             (safe-ctype-for-single-coercion-p (lvar-type y)))
         `(,(lvar-fun-name (basic-combination-fun node)) x (float y x))
         (give-up-ir1-transform #2="the second argument cannot safely be converted to SINGLE-FLOAT")))
   (deftransform complex-float-contagion-arg2 ((x y) * * :defun-only t :node node)
+    "open-code float conversion in mixed numeric operation"
     (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(complex single-float))))
             (safe-ctype-for-single-coercion-p (lvar-type y)))
         `(,(lvar-fun-name (basic-combination-fun node))
@@ -377,11 +381,7 @@
                (2 (if complexp
                       (values `(complex ,float-type) other-type #'complex-float-contagion-arg2)
                       (values float-type other-type #'real-float-contagion-arg2))))
-           (let ((note (format nil "open-code float conversion of ~:R ~
-                                    argument in mixed ~S-~S numeric ~
-                                    operation"
-                               argument type1 type2)))
-             (%deftransform operator `(function (,type1 ,type2) *) function note :slightly)))))
+             (%deftransform operator nil `(function (,type1 ,type2) *) function))))
 
   (dolist (operator '(+ * / -))
     (def operator 'float 'rational nil 1)

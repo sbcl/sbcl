@@ -46,8 +46,7 @@
           (cons (cons type name)
                 (remove name *backend-type-predicates*
                         :key #'cdr)))
-    (%deftransform name '(function (t) *) #'fold-type-predicate)
-    name))
+    (%deftransform name nil '(function (t) *) #'fold-type-predicate)))
 
 ;;;; IR1 transforms
 

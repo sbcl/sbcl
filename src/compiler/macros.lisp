@@ -279,9 +279,9 @@
                              &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
-    (let ((n-node (or node (make-symbol "NODE")))
-          (n-decls (sb-xc:gensym))
-          (n-lambda (sb-xc:gensym)))
+    (let ((n-node (or node '#:node))
+          (n-decls '#:decls)
+          (n-lambda '#:lambda))
       (multiple-value-bind (bindings vars)
           (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
@@ -292,7 +292,7 @@
                   (declare (ignorable ,@(mapcar #'car bindings)))
                   (declare (lambda-list (node)))
                   ,@decls
-                  ,@(and defun-only doc `(,doc))
+                  ,@(if doc `(,doc))
                   ;; What purpose does it serve to allow the transform's body
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
@@ -307,15 +307,11 @@
                            ,,n-lambda)))))))
           (if defun-only
               `(defun ,name ,@stuff)
-              `(%deftransform
-                ',name
-                '(function ,arg-types ,result-type)
-                (named-lambda (deftransform ,name) ,@stuff)
-                ,doc
-                ,important
-                ,(and policy
-                      `(lambda (,n-node)
-                         (policy ,n-node ,policy))))))))))
+              `(%deftransform ',name
+                              ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
+                              '(function ,arg-types ,result-type)
+                              (named-lambda (deftransform ,name) ,@stuff)
+                              ,important)))))))
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
@@ -323,24 +319,18 @@
                          &body body-decls-doc)
 
   (let ((transform-name (symbolicate (car names) '-transform))
-        (type (list 'function arg-types result-type))
-        (doc (nth-value 2 (parse-body body-decls-doc t))))
+        (type (list 'function arg-types result-type)))
     `(progn
        (deftransform ,transform-name
            (,lambda-list ,arg-types ,result-type
             :defun-only t
             :result ,result :policy ,policy :node ,node)
          ,@body-decls-doc)
-       ,@(loop for name in names
-               collect
-               `(let ((policy ,(and policy
-                                    (let ((node-sym (gensym "NODE")))
-                                      `(lambda (,node-sym)
-                                         (policy ,node-sym ,policy))))))
-                  (%deftransform ',name ',type #',transform-name
-                                 ,doc
-                                 ,important
-                                 policy))))))
+       (flet ,(if policy `((policy-test (node) (policy node ,policy))))
+         ,@(mapcar (lambda (name)
+                     `(%deftransform ',name ,(if policy '#'policy-test) ',type
+                                     #',transform-name ,important))
+                   names)))))
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
