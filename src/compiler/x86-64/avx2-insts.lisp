@@ -581,26 +581,30 @@
   (def vpmovzxwq #x66 #x34 #x0f38)
   (def vpmovzxdq #x66 #x35 #x0f38))
 
-(macrolet ((def (name prefix opcode n-bits radix)
-             (let ((shuffle-pattern
-                     (find-symbol (format nil "SSE-SHUFFLE-PATTERN-~D-~D"
-                                          n-bits radix))))
-               `(define-instruction ,name (segment dst src pattern)
-                  ,@(avx2-inst-printer-list
-                     'ymm-ymm/mem prefix opcode
-                     :more-fields `((imm nil :type ',shuffle-pattern))
-                     :printer '(:name :tab reg ", " reg/mem ", " imm))
+(macrolet ((def (name prefix)
+             `(define-instruction ,name (segment dst src pattern)
+                ,@(avx2-inst-printer-list
+                   'ymm-ymm/mem prefix #x70
+                   :printer '(:name :tab reg ", " reg/mem ", " imm))
+                (:emitter
+                 (emit-avx2-inst segment dst src ,prefix #x70
+                                 :remaining-bytes 1)
+                 (emit-byte segment pattern)))))
+  (def vpshufd  #x66)
+  (def vpshufhw #xf3)
+  (def vpshuflw #xf2))
 
-                  (:emitter
-                   (aver (typep pattern '(unsigned-byte ,n-bits)))
-                   (emit-avx2-inst segment dst src ,prefix ,opcode
-                                   :remaining-bytes 1)
-                   (emit-byte segment pattern))))))
-  (def vpshufd  #x66 #x70 8 4)
-  (def vpshufhw #xf3 #x70 8 4)
-  (def vpshuflw #xf2 #x70 8 4)
-  (def vshufpd  #x66 #xc6 2 2)
-  (def vshufps  nil  #xc6 8 4))
+(macrolet ((def (name prefix)
+             `(define-instruction ,name (segment dst src src2 pattern)
+                ,@(avx2-inst-printer-list
+                   'ymm-ymm/mem-imm prefix #xc6)
+                (:emitter
+                 (emit-avx2-inst segment src2 dst ,prefix #xc6
+                                 :vvvv src
+                                 :remaining-bytes 1)
+                 (emit-byte segment pattern)))))
+  (def vshufpd #x66)
+  (def vshufps nil))
 
 (macrolet
     ((def (name prefix opcode)
