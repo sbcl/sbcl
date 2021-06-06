@@ -432,6 +432,10 @@
 
 ;;; SIMPLE-BIT-VECTOR bit-array operations are transformed to a word
 ;;; loop that does N-WORD-BITS bits at a time.
+;;; Note that all of these array operations cause the unused bits
+;;; of the last word to be operated on, so they are effectively
+;;; in an indeterminate state which is why equality testing, COUNT,
+;;; and FIND have to ignore them.
 (deftransform bit-op->word-op ((bit-array-1 bit-array-2 result-bit-array)
                                (simple-bit-vector simple-bit-vector simple-bit-vector)
                                *
@@ -522,6 +526,8 @@
             (setf (%vector-raw-bits result-bit-array index)
                   (word-logical-not (%vector-raw-bits bit-array index))))))))
 
+;;; This transform has to deal with the fact that unused bits
+;;; in the last data word of a simple-bit-vector can be random.
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
   ;; TODO: unroll if length is known and not more than a few words
   `(and (= (length x) (length y))
@@ -531,10 +537,6 @@
                     (end-1 (floor (1- length) sb-vm:n-word-bits)))
                    ((>= i end-1)
                     (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
-                           ;; Why do we need to mask anything? Do we allow use of
-                           ;; the extra bits to record data steganographically?
-                           ;; Or maybe we didn't zero-fill trailing bytes of stack-allocated
-                           ;; bit-vectors?
                            (mask (ash sb-ext:most-positive-word (- extra sb-vm:n-word-bits)))
                            (numx
                             (logand
@@ -562,6 +564,8 @@
                   (unless (= numx numy)
                     (return nil))))))))
 
+;;; This transform has to deal with the fact that unused bits
+;;; in the last data word of a simple-bit-vector can be random.
 (deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
   ;; TODO: unroll if length is known and not more than a few words
@@ -576,11 +580,6 @@
              ;; "(mod (1- length) ...)" is the bit index within the word
              ;; of the array index of the ultimate bit to be examined.
              ;; "1+" it is the number of bits in that word.
-             ;; But I don't get why people are allowed to store random data that
-             ;; we mask off, as if we could accomodate all possible ways that
-             ;; unsafe code can spew bits where they don't belong.
-             ;; Does it have to do with %shrink-vector, perhaps?
-             ;; Some rationale would be nice...
              (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
                     (mask (ash most-positive-word (- extra sb-vm:n-word-bits)))
                     ;; The above notwithstanding, for big-endian wouldn't it
