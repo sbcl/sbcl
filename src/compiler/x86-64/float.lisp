@@ -1070,7 +1070,7 @@
     complex-double-reg fp-complex-double-immediate complex-double-float
     movsd movapd cmppd movmskpd #b11))
 
-(macrolet ((define-</> (op single-name double-name &rest flags)
+(macrolet ((define (op single-name double-name &rest flags)
                `(progn
                   (define-vop (,double-name double-float-compare)
                     (:translate ,op)
@@ -1101,10 +1101,14 @@
                          (setf y (register-inline-constant (tn-value y))))
                         (t))
                       (inst comiss x y))))))
-  (define-</> < <single-float <double-float not :p :nc)
-  (define-</> > >single-float >double-float not :p :na)
-  (define-</> <= <=single-float <=double-float not :p :a)
-  (define-</> >= >=single-float >=double-float not :p :b))
+  ;;   UNORDERED:    ZF,PF,CF <- 111;
+  ;;   GREATER_THAN: ZF,PF,CF <- 000;
+  ;;   LESS_THAN:    ZF,PF,CF <- 001;
+  ;;   EQUAL:        ZF,PF,CF <- 100;
+  (define < <single-float <double-float not :p :nc)
+  (define > >single-float >double-float not :p :na)
+  (define <= <=single-float <=double-float not :p :a)
+  (define >= >=single-float >=double-float not :p :b))
 
 
 ;;;; conversion

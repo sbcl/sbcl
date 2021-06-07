@@ -2366,7 +2366,7 @@
 
 ;;;; conditional byte set
 
-(define-instruction set (segment dst cond)
+(define-instruction set (segment cond dst) ; argument order is like JMPcc
   (:printer cond-set ())
   (:emitter
    (emit-prefixes segment (sized-thing dst :byte) nil :byte)
@@ -3584,6 +3584,31 @@
       (add-stmt-labels next (stmt-labels stmt))
       (delete-stmt stmt)
       next)))
+
+;;; In "{AND,OR,...} reg, src ; TEST reg, reg ; {JMP,SET} {:z,:nz,:s,:ns}"
+;;; the TEST is unnecessary since ALU operations set the Z and S flags.
+;;; Per the processor manual, TEST clears OF and CF, so presumably
+;;; there is not a branch-if on either of those flags.
+;;; It shouldn't be a problem that removal of TEST leaves more flags affected.
+(defpattern "ALU + test" ((add adc sub sbb and or xor neg sar shl shr) (test)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next))
+             (next-next (stmt-next next)))
+    (declare (ignore src1))
+    (when (and (not (stmt-labels next))
+               (gpr-tn-p dst2)
+               (location= dst1 dst2) ; they can have different SCs
+               (eq dst2 src2)
+               next-next
+               (memq (stmt-mnemonic next-next) '(jmp set))
+               ;; TODO: figure out when it would be correct to omit TEST for the carry flag
+               (case (car (stmt-operands next-next))
+                 ((:s :ns)
+                  (eq size2 size1))
+                 ((:ne :e :nz :z)
+                  (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))))
+      (delete-stmt next)
+      next-next)))
 
 ;;; "fixnumize" + "SHR reg, N" where N > n-tag-bits skips the fixnumize.
 ;;; (could generalize: masking out N bits with AND, following by shifting

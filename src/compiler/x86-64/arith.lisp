@@ -1889,7 +1889,7 @@ constant shift greater than word length")))
     (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
     (inst adc result b)
     (unless (eq (tn-kind carry) :unused)
-     (inst set carry :c)
+     (inst set :c carry)
      (inst and :dword carry 1))))
 
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite

@@ -1636,7 +1636,7 @@
 
 ;;;; conditional byte set
 
-(define-instruction set (segment dst cond)
+(define-instruction set (segment cond dst)
   (:printer cond-set ())
   (:emitter
    (emit-byte segment #b00001111)

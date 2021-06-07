@@ -1626,7 +1626,7 @@ constant shift greater than word length")))
     (move temp c)
     (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
     (inst adc result b)
-    (inst set carry-temp :c)
+    (inst set :c carry-temp)
     (inst and carry-temp 1)
     (move carry carry-temp)))
 

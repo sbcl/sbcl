@@ -36,7 +36,26 @@
 
 (define-vop (branch-if)
   (:info dest not-p flags)
+  (:vop-var vop)
   (:generator 0
+    (when (cdr flags)
+      ;; Specifying multiple flags is an extremely confusing convention that supports
+      ;; floating-point inequality tests utilizing the flag register in an unusual way,
+      ;; as documented in the COMISS and COMISD instructions:
+      ;; "the ZF, PF, and CF flags in the EFLAGS register according
+      ;;  to the result (unordered, greater than, less than, or equal)"
+      ;; I think it would have been better if, instead of allowing more than one flag,
+      ;; we passed in a pseudo-condition code such as ':sf<=' and deferred to this vop
+      ;; to interpret the abstract condition in terms of how to CPU sets the bits
+      ;; in those particular instructions.
+      ;; Note that other architectures allow only 1 flag in branch-if, if it works at all.
+      ;; Enable this assertion if you need to sanity-check the preceding claim.
+      ;; There's really no "dynamic" reason for it to fail.
+      #+nil
+      (aver (memq (vop-name (sb-c::vop-prev vop))
+                  '(<single-float <double-float <=single-float <=double-float
+                    >single-float >double-float >=single-float >=double-float
+                    =/single-float =/double-float))))
      (when (eq (car flags) 'not)
        (pop flags)
        (setf not-p (not not-p)))
@@ -299,7 +318,7 @@
            ;; T is at the lower address, so to pick it out we need index=0
            ;; which makes the condition in (IF BIT T NIL) often flipped.
            (setq flag (negate-condition flag)))
-         (inst set res flag)
+         (inst set flag res)
          (inst movzx '(:byte :dword) res res)
          (inst mov :dword res
                (ea (ash thread-t-nil-constants-slot word-shift) thread-base-tn res 4)))
@@ -307,7 +326,7 @@
          (when (eql x 0)
            (setq flag (negate-condition flag)))
          (let ((bit (1- (integer-length (fixnumize (logior x y))))))
-           (inst set res flag)
+           (inst set flag res)
            (inst movzx '(:byte :dword) res res)
            (inst shl (if (> bit 31) :qword :dword) res bit)))
         (add
@@ -318,7 +337,7 @@
                 (ea (ea min nil res delta)))
            (when (eql x min)
              (setq flag (negate-condition flag)))
-           (inst set res flag)
+           (inst set flag res)
            (inst movzx '(:byte :dword) res res)
            ;; Retain bit 63... if either is negative
            (inst lea (if (or (minusp x) (minusp y)) :qword :dword) res ea)))))))
