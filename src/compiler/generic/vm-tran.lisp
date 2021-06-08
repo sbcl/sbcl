@@ -440,41 +440,21 @@
                                (simple-bit-vector simple-bit-vector simple-bit-vector)
                                *
                                :node node :defun-only t :info wordfun)
-                `(progn
-                   ,@(unless (policy node (zerop safety))
-                             '((unless (= (length bit-array-1)
-                                          (length bit-array-2)
-                                          (length result-bit-array))
-                                 (error "Argument and/or result bit arrays are not the same length:~
+  `(let ((length (length result-bit-array)))
+     ,@(unless (policy node (zerop safety))
+         `((unless (= length
+                      ,@(unless (same-leaf-ref-p bit-array-1 result-bit-array)
+                          '((length bit-array-1)))
+                      (length bit-array-2))
+             (error "Argument and/or result bit arrays are not the same length:~
                          ~%  ~S~%  ~S  ~%  ~S"
-                                        bit-array-1
-                                        bit-array-2
-                                        result-bit-array))))
-                  (let ((length (length result-bit-array)))
-                    (if (= length 0)
-                        ;; We avoid doing anything to 0-length
-                        ;; bit-vectors, or rather, the memory that
-                        ;; follows them. Other divisible-by-(N-WORD-BITS) cases
-                        ;; are handled by the (1- length), below.
-                        ;; CSR, 2002-04-24
-                        result-bit-array
-                        (do ((index 0 (1+ index))
-                             ;; bit-vectors of length 1 .. N-WORD-BITS need
-                             ;; precisely one (SETF %VECTOR-RAW-BITS),
-                             ;; done here in the epilogue. - CSR,
-                             ;; 2002-04-24
-                             (end-1 (truncate (truly-the index (1- length))
-                                              sb-vm:n-word-bits)))
-                            ((>= index end-1)
-                             (setf (%vector-raw-bits result-bit-array index)
-                                   (,wordfun (%vector-raw-bits bit-array-1 index)
-                                             (%vector-raw-bits bit-array-2 index)))
-                             result-bit-array)
-                          (declare (optimize (speed 3) (safety 0))
-                                   (type index index end-1))
-                          (setf (%vector-raw-bits result-bit-array index)
-                                (,wordfun (%vector-raw-bits bit-array-1 index)
-                                          (%vector-raw-bits bit-array-2 index))))))))
+                    bit-array-1 bit-array-2 result-bit-array))))
+     (dotimes (index (ceiling length sb-vm:n-word-bits))
+       (declare (optimize (speed 3) (safety 0)) (type index index))
+       (setf (%vector-raw-bits result-bit-array index)
+             (,wordfun (%vector-raw-bits bit-array-1 index)
+                       (%vector-raw-bits bit-array-2 index))))
+     result-bit-array))
 
 (flet ((policy-test (node) (policy node (>= speed space))))
 (macrolet ((def (bitfun wordfun)
@@ -498,114 +478,56 @@
                (simple-bit-vector simple-bit-vector) *
                :node node :policy (>= speed space))
   `(progn
-     ,@(unless (policy node (zerop safety))
+     ,@(unless (or (policy node (zerop safety))
+                   (same-leaf-ref-p bit-array result-bit-array))
          '((unless (= (length bit-array)
                       (length result-bit-array))
              (error "Argument and result bit arrays are not the same length:~
                      ~%  ~S~%  ~S"
                     bit-array result-bit-array))))
     (let ((length (length result-bit-array)))
-      (if (= length 0)
-          ;; We avoid doing anything to 0-length bit-vectors, or rather,
-          ;; the memory that follows them. Other divisible-by
-          ;; n-word-bits cases are handled by the (1- length), below.
-          ;; CSR, 2002-04-24
-          result-bit-array
-          (do ((index 0 (1+ index))
-               ;; bit-vectors of length 1 to n-word-bits need precisely
-               ;; one (SETF %VECTOR-RAW-BITS), done here in the
-               ;; epilogue. - CSR, 2002-04-24
-               (end-1 (truncate (truly-the index (1- length))
-                                sb-vm:n-word-bits)))
-              ((>= index end-1)
-               (setf (%vector-raw-bits result-bit-array index)
-                     (word-logical-not (%vector-raw-bits bit-array index)))
-               result-bit-array)
-            (declare (optimize (speed 3) (safety 0))
-                     (type index index end-1))
-            (setf (%vector-raw-bits result-bit-array index)
-                  (word-logical-not (%vector-raw-bits bit-array index))))))))
+      (dotimes (index (ceiling length sb-vm:n-word-bits))
+        (declare (optimize (speed 3) (safety 0)) (type index index))
+        (setf (%vector-raw-bits result-bit-array index)
+              (word-logical-not (%vector-raw-bits bit-array index))))
+      result-bit-array)))
 
 ;;; This transform has to deal with the fact that unused bits
 ;;; in the last data word of a simple-bit-vector can be random.
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
   ;; TODO: unroll if length is known and not more than a few words
-  `(and (= (length x) (length y))
-        (let ((length (length x)))
-          (or (= length 0)
-              (do* ((i 0 (+ i 1))
-                    (end-1 (floor (1- length) sb-vm:n-word-bits)))
-                   ((>= i end-1)
-                    (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
-                           (mask (ash sb-ext:most-positive-word (- extra sb-vm:n-word-bits)))
-                           (numx
-                            (logand
-                             (ash mask
-                                  ,(ecase sb-c:*backend-byte-order*
-                                     (:little-endian 0)
-                                     (:big-endian
-                                      '(- sb-vm:n-word-bits extra))))
-                             (%vector-raw-bits x i)))
-                           (numy
-                            (logand
-                             (ash mask
-                                  ,(ecase sb-c:*backend-byte-order*
-                                     (:little-endian 0)
-                                     (:big-endian
-                                      '(- sb-vm:n-word-bits extra))))
-                             (%vector-raw-bits y i))))
-                      (declare (type (integer 1 #.sb-vm:n-word-bits) extra)
-                               (type sb-vm:word mask numx numy))
-                      (= numx numy)))
-                (declare (type index i end-1))
-                (let ((numx (%vector-raw-bits x i))
-                      (numy (%vector-raw-bits y i)))
-                  (declare (type sb-vm:word numx numy))
-                  (unless (= numx numy)
-                    (return nil))))))))
+  `(let ((length (length x)))
+     (and (= (length y) length)
+          (let ((words (floor length sb-vm:n-word-bits)))
+            (and (dotimes (i words t)
+                   (unless (= (%vector-raw-bits x i) (%vector-raw-bits y i))
+                     (return nil)))
+                 (let ((remainder (mod length sb-vm:n-word-bits)))
+                   (or (zerop remainder)
+                       ;; - To examine 1 bit, shift over 63 bits, 0-filling on the other side
+                       ;; - To examine 2 bits, shift over 62 bits, etc
+                       (zerop (shift-towards-end (logxor (%vector-raw-bits x words)
+                                                         (%vector-raw-bits y words))
+                                                 (- sb-vm:n-word-bits remainder))))))))))
 
 ;;; This transform has to deal with the fact that unused bits
 ;;; in the last data word of a simple-bit-vector can be random.
 (deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
-  ;; TODO: unroll if length is known and not more than a few words
-  `(let ((length (length sequence)))
-    (if (zerop length)
-        0
-        (do ((index 0 (1+ index))
-             (count 0)
-             (end-1 (truncate (truly-the index (1- length))
-                              sb-vm:n-word-bits)))
-            ((>= index end-1)
-             ;; "(mod (1- length) ...)" is the bit index within the word
-             ;; of the array index of the ultimate bit to be examined.
-             ;; "1+" it is the number of bits in that word.
-             (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
-                    (mask (ash most-positive-word (- extra sb-vm:n-word-bits)))
-                    ;; The above notwithstanding, for big-endian wouldn't it
-                    ;; be possible to write this expression as a single shift?
-                    ;;  (LOGAND MOST-POSITIVE-WORD (ASH most-positive-word (- n-word-bits extra)))
-                    ;; rather than a right-shift to fill in zeros on the left
-                    ;; then by a left-shift to left-align the 1s?
-                    (bits (logand (ash mask
-                                       ,(ecase sb-c:*backend-byte-order*
-                                               (:little-endian 0)
-                                               (:big-endian
-                                                '(- sb-vm:n-word-bits extra))))
-                                  (%vector-raw-bits sequence index))))
-               (declare (type (integer 1 #.sb-vm:n-word-bits) extra))
-               (declare (type sb-vm:word mask bits))
-               (incf count (logcount bits))
-               ,(if (constant-lvar-p item)
-                    (if (zerop (lvar-value item))
-                        '(- length count)
-                        'count)
-                    '(if (zerop item)
-                         (- length count)
-                         count))))
-          (declare (type index index count end-1)
-                   (optimize (speed 3) (safety 0)))
-          (incf count (logcount (%vector-raw-bits sequence index)))))))
+  `(let* ((length (length sequence))
+          (count 0)
+          (words (floor length sb-vm:n-word-bits)))
+     (declare (index count))
+     (declare (optimize (speed 3) (safety 0)))
+     (dotimes (i words)
+       (incf count (logcount (%vector-raw-bits sequence i))))
+     (let ((remainder (mod length sb-vm:n-word-bits)))
+       (unless (zerop remainder)
+         (incf count (logcount (shift-towards-end (%vector-raw-bits sequence words)
+                                                  (- sb-vm:n-word-bits remainder))))))
+     ,(if (constant-lvar-p item)
+          (if (zerop (lvar-value item)) '(- length count) 'count)
+          '(if (zerop item) (- length count) count))))
 
 (deftransform fill ((sequence item) (simple-bit-vector bit) *
                     :policy (>= speed space))
