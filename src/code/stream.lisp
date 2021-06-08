@@ -1525,7 +1525,7 @@
                               nil))
 (defun %make-character-string-ostream ()
   (%init-string-output-stream (%allocate-string-ostream)
-                              (make-array 31 :element-type 'character) ; 2w + 128b
+                              (make-array 32 :element-type 'character) ; 2w + 128b
                               nil))
 
 (defun make-string-output-stream (&key (element-type 'character))
