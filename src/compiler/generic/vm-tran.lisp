@@ -440,12 +440,12 @@
                                (simple-bit-vector simple-bit-vector simple-bit-vector)
                                *
                                :node node :defun-only t :info wordfun)
-  `(let ((length (length result-bit-array)))
+  `(let ((length (vector-length result-bit-array)))
      ,@(unless (policy node (zerop safety))
          `((unless (= length
                       ,@(unless (same-leaf-ref-p bit-array-1 result-bit-array)
-                          '((length bit-array-1)))
-                      (length bit-array-2))
+                          '((vector-length bit-array-1)))
+                      (vector-length bit-array-2))
              (error "Argument and/or result bit arrays are not the same length:~
                          ~%  ~S~%  ~S  ~%  ~S"
                     bit-array-1 bit-array-2 result-bit-array))))
@@ -480,12 +480,12 @@
   `(progn
      ,@(unless (or (policy node (zerop safety))
                    (same-leaf-ref-p bit-array result-bit-array))
-         '((unless (= (length bit-array)
-                      (length result-bit-array))
+         '((unless (= (vector-length bit-array)
+                      (vector-length result-bit-array))
              (error "Argument and result bit arrays are not the same length:~
                      ~%  ~S~%  ~S"
                     bit-array result-bit-array))))
-    (let ((length (length result-bit-array)))
+    (let ((length (vector-length result-bit-array)))
       (dotimes (index (ceiling length sb-vm:n-word-bits))
         (declare (optimize (speed 3) (safety 0)) (type index index))
         (setf (%vector-raw-bits result-bit-array index)
@@ -496,8 +496,8 @@
 ;;; in the last data word of a simple-bit-vector can be random.
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
   ;; TODO: unroll if length is known and not more than a few words
-  `(let ((length (length x)))
-     (and (= (length y) length)
+  `(let ((length (vector-length x)))
+     (and (= (vector-length y) length)
           (let ((words (floor length sb-vm:n-word-bits)))
             (and (dotimes (i words t)
                    (unless (= (%vector-raw-bits x i) (%vector-raw-bits y i))
@@ -514,7 +514,7 @@
 ;;; in the last data word of a simple-bit-vector can be random.
 (deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
-  `(let* ((length (length sequence))
+  `(let* ((length (vector-length sequence))
           (count 0)
           (words (floor length sb-vm:n-word-bits)))
      (declare (index count))
@@ -529,57 +529,51 @@
           (if (zerop (lvar-value item)) '(- length count) 'count)
           '(if (zerop item) (- length count) count))))
 
-(deftransform fill ((sequence item) (simple-bit-vector bit) *
+;;; This transform does not require that ITEM be derived as BIT,
+;;; but at runtime it has to be.
+(deftransform fill ((sequence item) (simple-bit-vector t) *
                     :policy (>= speed space))
-  (let ((value (if (constant-lvar-p item)
-                   (if (= (lvar-value item) 0)
-                       0
-                       most-positive-word)
-                   `(if (= item 0) 0 ,most-positive-word))))
-    `(let ((length (length sequence))
-           (value ,value))
-       (if (= length 0)
-           sequence
-           (do ((index 0 (1+ index))
-                ;; bit-vectors of length 1 to n-word-bits need precisely
-                ;; one (SETF %VECTOR-RAW-BITS), done here in the
-                ;; epilogue. - CSR, 2002-04-24
-                (end-1 (truncate (truly-the index (1- length))
-                                 sb-vm:n-word-bits)))
-               ((>= index end-1)
-                (setf (%vector-raw-bits sequence index) value)
-                sequence)
-             (declare (optimize (speed 3) (safety 0))
-                      (type index index end-1))
-             (setf (%vector-raw-bits sequence index) value))))))
+  `(let ((value (logand (- (the bit item)) most-positive-word)))
+     ;; Unlike for the SIMPLE-BASE-STRING case, we are allowed to touch
+     ;; bits beyond LENGTH with impunity.
+     (dotimes (index (ceiling (vector-length sequence) sb-vm:n-word-bits))
+       (declare (optimize (speed 3) (safety 0))
+                (type index index))
+       (setf (%vector-raw-bits sequence index) value))
+     sequence))
 
-(deftransform fill ((sequence item) (simple-base-string base-char) *
-                    :policy (>= speed space))
-  (let ((value (if (constant-lvar-p item)
-                   (let* ((char (lvar-value item))
-                          (code (char-code char))
-                          (accum 0))
-                     (dotimes (i sb-vm:n-word-bytes accum)
-                       (setf accum (logior accum (ash code (* 8 i))))))
-                   `(let ((code (char-code item)))
-                      (setf code (dpb code (byte 8 8) code))
-                      (setf code (dpb code (byte 16 16) code))
-                      (dpb code (byte 32 32) code)))))
-    `(let ((length (length sequence))
-           (value ,value))
-       (multiple-value-bind (times rem)
-           (truncate length sb-vm:n-word-bytes)
-         (do ((index 0 (1+ index))
-              (end times))
-             ((>= index end)
-              (let ((place (* times sb-vm:n-word-bytes)))
-                (declare (fixnum place))
-                (dotimes (j rem sequence)
-                  (declare (index j))
-                  (setf (schar sequence (the index (+ place j))) item))))
-           (declare (optimize (speed 3) (safety 0))
-                    (type index index))
-           (setf (%vector-raw-bits sequence index) value))))))
+(deftransform fill ((sequence item) (simple-base-string t) *
+                                    :policy (>= speed space))
+  (let ((multiplier (logand #x0101010101010101 most-positive-word)))
+    `(let* ((value ,(if (and (constant-lvar-p item) (typep item 'base-char))
+                        (* multiplier (char-code (lvar-value item)))
+                        ;; Use multiplication if it's known to be cheap
+                        #+(or x86 x86-64)
+                        `(* ,multiplier (char-code (the base-char item)))
+                        #-(or x86 x86-64)
+                        '(let ((code (char-code (the base-char item))))
+                          (setf code (dpb code (byte 8 8) code))
+                          (setf code (dpb code (byte 16 16) code))
+                          #+64-bit (dpb code (byte 32 32) code))))
+            (len (vector-length sequence))
+            (words (truncate len sb-vm:n-word-bytes)))
+       (dotimes (index words)
+         (declare (optimize (speed 3) (safety 0))
+                  (type index index))
+         (setf (%vector-raw-bits sequence index) value))
+       ;; For 64-bit:
+       ;;  if 1 more byte should be written, then shift-towards-start 56
+       ;;  if 2 more bytes ...               then shift-towards-start 48
+       ;;  etc
+       ;; This correctly rewrites the trailing null in its proper place.
+       (let ((bits (ash (mod len sb-vm:n-word-bytes) 3)))
+         (when (plusp bits)
+           (setf (%vector-raw-bits sequence words)
+                 ;; If we could standardize on SHIFT-TOWARDS-START treating the count
+                 ;; as masked by #b11111 (32-bit) or #b111111 (64-bit) then we could
+                 ;; more simply pass (- bits) as the count.
+                 (shift-towards-start value (- sb-vm:n-word-bits bits)))))
+       sequence)))
 
 ;;;; %BYTE-BLT
 
