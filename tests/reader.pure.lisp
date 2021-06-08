@@ -418,6 +418,10 @@
                 (sb-int:simple-reader-error () :win))
               :win)))
 
+(with-test (:name :sharp-star-default-fill :skipped-on :big-endian)
+  (let ((bv (opaque-identity #*11)))
+    (assert (= (sb-kernel:%vector-raw-bits bv 0) 3))))
+
 ;;; The WITH-FAST-READ-BYTE macro accidentally left the package lock
 ;;; of FAST-READ-BYTE disabled during its body.
 (with-test (:name :fast-read-byte-package-lock)

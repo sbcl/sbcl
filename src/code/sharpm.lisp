@@ -49,42 +49,33 @@
 (defun sharp-star (stream ignore numarg)
   (declare (ignore ignore))
   (declare (type (or null integer) numarg))
-  (binding* (((buffer escape-appearedp) (read-extended-token stream))
+  (binding* (((buffer escaped) (read-extended-token stream))
              (input-len (token-buf-fill-ptr buffer))
              (bstring (token-buf-string buffer)))
-    (cond (*read-suppress* nil)
-          (escape-appearedp
-           (simple-reader-error stream
-                                "An escape character appeared after #*."))
-          ((and numarg (zerop input-len) (not (zerop numarg)))
-           (simple-reader-error
-            stream
-            "You have to give a little bit for non-zero #* bit-vectors."))
-          ((or (null numarg) (>= numarg input-len))
-           (do ((bvec
-                 (make-array (or numarg input-len)
-                             :element-type 'bit
-                             :initial-element
-                             (if (and (plusp input-len)
-                                      (char= (char bstring (1- input-len)) #\1))
-                                 1 0)))
-                (i 0 (1+ i)))
-               ((= i input-len) bvec)
-             (declare (index i) (optimize (sb-c::insert-array-bounds-checks 0)))
-             (let ((char (char bstring i)))
-               (setf (elt bvec i)
-                     (case char
-                       (#\0 0)
-                       (#\1 1)
-                       (t (simple-reader-error
-                           stream "illegal element given for bit-vector: ~S"
-                           char)))))))
-          (t
-           (simple-reader-error
-            stream
-            "Bit vector is longer than specified length #~A*~A"
-            numarg
-            (copy-token-buf-string buffer))))))
+    (when *read-suppress* (return-from sharp-star nil))
+    (when escaped (simple-reader-error stream "An escape character appeared after #*."))
+    (when numarg
+      (cond ((and (not (eql numarg 0)) (zerop input-len))
+             (simple-reader-error
+              stream "#~D* requires at least 1 bit of input." numarg))
+            ((> input-len numarg)
+             (simple-reader-error
+              stream "Too many bits in ~S: expected ~D or fewer"
+              (copy-token-buf-string buffer) numarg)))
+      (when (eql numarg 0) (setq numarg nil)))
+    (let* ((fill (if numarg (logand (char-code (char bstring (1- input-len))) 1) 0))
+           (bvec (make-array (or numarg input-len)
+                             :element-type 'bit :initial-element fill)))
+      (do ((i 0 (1+ i)))
+          ((= i input-len) bvec)
+        (declare (index i) (optimize (sb-c::insert-array-bounds-checks 0)))
+        (let ((char (char bstring i)))
+          (setf (elt bvec i)
+                (case char
+                  (#\0 0)
+                  (#\1 1)
+                  (t (simple-reader-error
+                      stream "illegal element given for bit-vector: ~S"  char)))))))))
 
 (defun sharp-A (stream ignore rank)
   (declare (ignore ignore))
