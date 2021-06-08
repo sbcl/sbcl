@@ -1610,7 +1610,7 @@ constant shift greater than word length")))
                 (:result-types unsigned-num)
                 (:generator 1
                  (move r num)
-                 (unless (location= rcx amount) (inst mov :dword rcx amount))
+                 (move rcx amount :dword)
                  (inst ,operation r :cl)))))
   (define shift-towards-start shr)
   (define shift-towards-end   shl))

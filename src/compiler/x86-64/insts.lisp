@@ -2905,8 +2905,7 @@
 ;;;     This is simply saying that we can faithfully round-trip our own asm.
 ;;; (3) On top of that, we'll _require_ that MOVD only operate on 32 bits,
 ;;;     and MOVQ on 64 bits. This is stricter than other assemblers.
-;;;     The rationale is after removing REG-IN-SIZE, the correct behavior
-;;;     is obtained with no further "opcode modifier" such as
+;;;     Furthermore MOVD does not accept a size prefix such as
 ;;;     (INST MOVD :QWORD X Y) ; <- What is this, I can't even.
 ;;;
 ;;; For further reading:

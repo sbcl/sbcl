@@ -35,7 +35,7 @@
   (if (and (location= src dst) (stack-tn-p dst)) ; shift right in memory
       (inst shr :dword dst shift)
       (let ((reg (if (stack-tn-p dst) temp-reg-tn dst)))
-        (32bit-move reg src)
+        (move reg src :dword)
         (inst shr :dword reg shift)
         (when (stack-tn-p dst) ; store as qword to ensure upper bytes are 0
           (inst mov dst temp-reg-tn)))))
@@ -68,8 +68,7 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (unless (location= x y)
-      (inst mov :dword y x))
+    (move y x :dword)
     (inst shl :dword y n-widetag-bits)
     (inst or :dword y character-widetag)))
 (define-move-vop move-from-character :move

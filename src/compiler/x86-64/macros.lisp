@@ -17,25 +17,8 @@
 ;;; the support for SC-dependent move instructions needed here makes
 ;;; that expand into so large an expression that the resulting code
 ;;; bloat is not justifiable.
-(defun move (dst src)
+(defun move (dst src &optional size)
   "Move SRC into DST unless they are location=."
-  ;; The first case is for backward-compatibility. It's not necessary
-  ;; for any of our code, but it is for code that performs
-  ;;   (MOVE (REG-IN-SIZE blah :dword) (REG-IN-SIZE from :dword))
-  ;; Most of this garbage will go away because eventually I'd like to preserve
-  ;; all seemingly redundant moves, and then eliminate them before emission.
-  ;; This way we can track movement of TNs into the same physical reg in a
-  ;; different SC which will give useful information to a peephole optimizer.
-  (when (and (sb-x86-64-asm::register-p dst)
-             (sb-x86-64-asm::register-p src))
-    (let ((dst (sb-x86-64-asm::reg-id dst))
-          (src (sb-x86-64-asm::reg-id src)))
-      (aver (sb-x86-64-asm::is-gpr-id-p dst))
-      (aver (sb-x86-64-asm::is-gpr-id-p src))
-      (unless (= (sb-x86-64-asm::reg-id-num dst)
-                 (sb-x86-64-asm::reg-id-num src))
-        (inst mov dst src)))
-    (return-from move))
   (unless (location= dst src)
     (sc-case dst
       ((single-reg complex-single-reg)
@@ -61,11 +44,9 @@
        (aver (xmm-tn-p src))
        (inst vmovaps dst src))
       (t
-       (inst mov dst src)))))
-
-(defun 32bit-move (dst src)
-  (unless (location= dst src)
-    (inst mov :dword dst src)))
+       (if size
+           (inst mov size dst src)
+           (inst mov dst src))))))
 
 (defmacro object-slot-ea (ptr slot lowtag)
   `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr))
