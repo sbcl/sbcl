@@ -489,14 +489,12 @@ new string COUNT long filled with the fill character."
                     string))
         (with-one-string (string start end)
           (do ((index start (1+ index))
-               (cases **character-cases**)
-               (case-pages **character-case-pages**))
+               (cases +character-cases+))
               ((>= index end))
             (declare (optimize (sb-c::insert-array-bounds-checks 0)))
             (let ((char (schar string index)))
               (with-case-info (char case-index cases
-                               :cases cases
-                               :case-pages case-pages)
+                               :cases cases)
                 (let ((code (aref cases (1+ case-index))))
                   (unless (zerop code)
                     (setf (schar string index)
@@ -521,8 +519,7 @@ new string COUNT long filled with the fill character."
                     string))
         (with-one-string (string start end)
           (do ((index start (1+ index))
-               (cases **character-cases**)
-               (case-pages **character-case-pages**))
+               (cases +character-cases+))
               ((>= index end))
             (declare (optimize (sb-c::insert-array-bounds-checks 0)))
             (let ((char (schar (truly-the (or simple-base-string
@@ -530,8 +527,7 @@ new string COUNT long filled with the fill character."
                                           string)
                                index)))
               (with-case-info (char case-index cases
-                               :cases cases
-                               :case-pages case-pages)
+                               :cases cases)
                 (let ((code (aref cases case-index)))
                   (unless (zerop code)
                     (setf (schar string index)
@@ -628,3 +624,8 @@ new string COUNT long filled with the fill character."
                    (if always-shareable
                        sb-vm:+vector-shareable+
                        sb-vm:+vector-shareable-nonstd+)))
+
+(clear-info :function :inlining-data 'nstring-upcase)
+(clear-info :function :inlinep 'nstring-upcase)
+(clear-info :function :inlining-data 'nstring-downcase)
+(clear-info :function :inlinep 'nstring-downcase)

@@ -143,12 +143,12 @@ with underscores replaced by dashes."
       :Bn
       (svref-or-null
        #.(read-ucd-constant '*bidi-classes*)
-       (aref **character-misc-database** (1+ (misc-index character))))))
+       (aref +character-misc-database+ (1+ (misc-index character))))))
 
 (declaim (inline combining-class))
 (defun combining-class (character)
   "Returns the canonical combining class (CCC) of CHARACTER"
-  (aref **character-misc-database** (+ 2 (misc-index character))))
+  (aref +character-misc-database+ (+ 2 (misc-index character))))
 
 (defun decimal-value (character)
   "Returns the decimal digit value associated with CHARACTER or NIL if
@@ -168,7 +168,7 @@ All characters with decimal digit values have the same digit value,
 but there are characters (such as digits of number systems without a 0 value)
 that have a digit value but no decimal digit value"
   (let ((%digit (clear-flag 6
-                            (aref **character-misc-database**
+                            (aref +character-misc-database+
                                   (+ 3 (misc-index character))))))
     (if (< %digit 10) %digit nil)))
 
@@ -183,7 +183,7 @@ The only constraint on the numeric value is that it be a rational number."
 (defun mirrored-p (character)
   "Returns T if CHARACTER needs to be mirrored in bidirectional text.
 Otherwise, returns NIL."
-  (logbitp 5 (aref **character-misc-database**
+  (logbitp 5 (aref +character-misc-database+
                     (+ 5 (misc-index character)))))
 
 (defun bidi-mirroring-glyph (character)
@@ -199,14 +199,14 @@ one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 :W (Wide), :F (Fullwidth), or :NA (Not applicable)"
   (svref-or-null #.(read-ucd-constant '*east-asian-widths*)
                  (ldb (byte 3 0)
-                      (aref **character-misc-database**
+                      (aref +character-misc-database+
                             (+ 5 (misc-index character))))))
 
 (defun script (character)
   "Returns the Script property of CHARACTER as a keyword.
 If CHARACTER does not have a known script, returns :UNKNOWN"
   (svref-or-null #.(read-ucd-constant '*scripts*)
-                 (aref **character-misc-database** (+ 6 (misc-index character)))))
+                 (aref +character-misc-database+ (+ 6 (misc-index character)))))
 
 (defun char-block (character)
   "Returns the Unicode block in which CHARACTER resides as a keyword.
@@ -235,7 +235,7 @@ is only included for backwards compatibility."
   "Returns the version of Unicode in which CHARACTER was assigned as a pair
 of values, both integers, representing the major and minor version respectively.
 If CHARACTER is not assigned in Unicode, returns NIL for both values."
-  (let* ((value (aref **character-misc-database** (+ 8 (misc-index character))))
+  (let* ((value (aref +character-misc-database+ (+ 8 (misc-index character))))
          (major (ash value -3))
          (minor (ldb (byte 3 0) value)))
     (if (zerop value) (values nil nil) (values major minor))))
@@ -269,7 +269,7 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (not character)) (return-from line-break-class :nil))
   (let ((raw-class
          (svref-or-null #.(read-ucd-constant '*line-break-classes*)
-                        (aref **character-misc-database** (+ 7 (misc-index character)))))
+                        (aref +character-misc-database+ (+ 7 (misc-index character)))))
         (syllable-type (hangul-syllable-type character)))
     (when syllable-type
       (setf raw-class
@@ -367,7 +367,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 ;;; Implements UAX#15: Normalization Forms
 (declaim (inline char-decomposition-info))
 (defun char-decomposition-info (char)
-  (let ((value (aref **character-misc-database**
+  (let ((value (aref +character-misc-database+
                      (+ 4 (misc-index char)))))
     (values (clear-flag 7 value) (logbitp 7 value))))
 
@@ -376,10 +376,10 @@ disappears when accents are placed on top of it. and NIL otherwise"
   ;; Caller should have gotten length from char-decomposition-info
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (decompositions **character-decompositions**)
-         (high-page (aref **character-high-pages** cp-high))
+         (decompositions +character-decompositions+)
+         (high-page (aref +character-high-pages+ cp-high))
          (index (unless (logbitp 15 high-page) ;; Hangul syllable
-                  (aref **character-low-pages**
+                  (aref +character-low-pages+
                         (+ 1 (* 2 (+ (ldb (byte 8 0) cp) (ash high-page 8))))))))
     (cond ((= length 1)
            (funcall callback (code-char (aref decompositions index))))
@@ -582,7 +582,7 @@ only characters for which it returns T are collected."
 
 (defun has-case-p (char)
   ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
-  (logbitp 6 (aref **character-misc-database** (+ 5 (misc-index char)))))
+  (logbitp 6 (aref +character-misc-database+ (+ 5 (misc-index char)))))
 
 (defun char-uppercase (char)
   (if (has-case-p char)

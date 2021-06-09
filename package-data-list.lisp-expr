@@ -1481,13 +1481,7 @@ possibly temporarily, because it might be used internally."
                "*REPL-READ-FORM-FUN*"
 
                ;; Character database
-               "**CHARACTER-MISC-DATABASE**"
-               "**CHARACTER-HIGH-PAGES**"
-               "**CHARACTER-LOW-PAGES**"
-               "**CHARACTER-DECOMPOSITIONS**"
                "**CHARACTER-PRIMARY-COMPOSITIONS**"
-               "**CHARACTER-CASES**"
-               "**CHARACTER-CASE-PAGES**"
                "**CHARACTER-COLLATIONS**"
                "**UNICODE-CHAR-NAME-DATABASE**"
                "**UNICODE-NAME-CHAR-DATABASE**"
