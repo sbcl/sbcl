@@ -11,60 +11,42 @@
 
 (in-package "SB-UNICODE")
 
-(declaim (type simple-vector **special-numerics**))
-(sb-ext:define-load-time-global **special-numerics**
-  #.(sb-cold:read-from-file "output/numerics.lisp-expr"))
+(defconstant-eqx +special-numerics+
+    #.(sb-cold:read-from-file "output/numerics.lisp-expr")
+    #'equalp)
 
-(macrolet ((unicode-property-init ()
-             (let ((confusable-sets
-                     (sb-cold:read-from-file "output/confusables.lisp-expr"))
-                   (bidi-mirroring-list
-                     (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
-               `(progn
-                  (sb-ext:define-load-time-global **proplist-properties** nil)
-                  (sb-ext:define-load-time-global **confusables**
-                      ',confusable-sets)
-                  (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-                      ',bidi-mirroring-list)
-                  (defun !unicode-properties-cold-init ()
-                    ;;
-                    (let ((hash (make-hash-table)) ; keys are symbols
-                          (list ',(sb-cold:read-from-file
-                                   "output/misc-properties.lisp-expr")))
-                      (setq **proplist-properties** hash)
-                      (loop for (symbol ranges) on list by #'cddr
-                            do (setf (gethash symbol hash)
-                                     (coerce ranges '(vector (unsigned-byte 32))))))
-                    ;;
-                    (let* ((data ',confusable-sets)
-                           (hash (make-hash-table :test #'eq
-                                                  #+sb-unicode :size #+sb-unicode (length data))))
-                      (loop for (source . target) in data
-                            when (and #-sb-unicode
-                                      (< source char-code-limit))
-                            do (flet ((minimize (x)
-                                        (case (length x)
-                                          (1
-                                           (elt x 0))
-                                          (2
-                                           (pack-3-codepoints (elt x 0) (elt x 1)))
-                                          (3
-                                           (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
-                                          (t
-                                           (logically-readonlyize
-                                            (possibly-base-stringize
-                                             (map 'string #'code-char x)))))))
+(sb-ext:define-load-time-global **proplist-properties**
+    (let* ((list '#.(sb-cold:read-from-file "output/misc-properties.lisp-expr"))
+           (hash (make-hash-table :size (length list))))
+      (loop for (symbol ranges) on list by #'cddr
+            do (setf (gethash symbol hash)
+                     (coerce ranges '(vector (unsigned-byte 32)))))
+      hash))
 
-                                 (setf (gethash (code-char source) hash)
-                                       (minimize target))))
-                      (setf **confusables** hash))
-                    ;;
-                    (let* ((list ',bidi-mirroring-list)
-                           (hash (make-hash-table :test #'eq :size (length list))))
-                      (loop for (k v) in list do
-                            (setf (gethash k hash) v))
-                      (setf **bidi-mirroring-glyphs** hash)))))))
-  (unicode-property-init))
+(sb-ext:define-load-time-global **confusables**
+    (let* ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr"))
+           (hash (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))))
+      (loop for (source . target) in data
+            when (and #-sb-unicode (< source char-code-limit))
+            do (flet ((minimize (x)
+                        (case (length x)
+                          (1
+                           (elt x 0))
+                          (2
+                           (pack-3-codepoints (elt x 0) (elt x 1)))
+                          (3
+                           (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
+                          (t
+                           (logically-readonlyize
+                            (possibly-base-stringize (map 'string #'code-char x)))))))
+                 (setf (gethash (code-char source) hash) (minimize target))))
+      hash))
+
+(sb-ext:define-load-time-global **bidi-mirroring-glyphs**
+    (let* ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr"))
+           (hash (make-hash-table :test #'eq :size (length list))))
+      (loop for (k v) in list do (setf (gethash k hash) v))
+      hash))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
@@ -176,8 +158,7 @@ that have a digit value but no decimal digit value"
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (double-vector-binary-search (char-code character)
-                                   **special-numerics**)
+  (or (double-vector-binary-search (char-code character) +special-numerics+)
       (digit-value character)))
 
 (defun mirrored-p (character)
