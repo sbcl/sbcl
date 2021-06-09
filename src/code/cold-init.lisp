@@ -110,7 +110,6 @@
   ;; Must be done before any non-opencoded array references are made.
   (show-and-call sb-vm::!hairy-data-vector-reffer-init)
 
-  (show-and-call !character-name-database-cold-init)
   (show-and-call sb-unicode::!unicode-properties-cold-init)
 
   ;; Various toplevel forms call MAKE-ARRAY, which calls SUBTYPEP, so

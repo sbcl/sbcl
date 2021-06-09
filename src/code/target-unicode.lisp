@@ -227,9 +227,9 @@ This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
   (let* ((char-code (char-code character))
          (h-code (double-vector-binary-search char-code
-                                              **unicode-1-char-name-database**)))
+                                              +unicode-1-char-name-database+)))
     (when h-code
-      (huffman-decode h-code **unicode-character-name-huffman-tree**))))
+      (huffman-decode h-code +unicode-character-name-huffman-tree+))))
 
 (defun age (character)
   "Returns the version of Unicode in which CHARACTER was assigned as a pair

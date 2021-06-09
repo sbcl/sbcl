@@ -20,8 +20,6 @@
 (deftype char-code ()
   `(integer 0 (,char-code-limit)))
 
-(define-load-time-global **unicode-character-name-huffman-tree** ())
-
 (declaim (inline pack-3-codepoints))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun pack-3-codepoints (first &optional (second 0) (third 0))
@@ -87,16 +85,7 @@
                                  do (incf element (ash (aref raw-bytes (+ i offset))
                                                        (* 8 (- n offset 1))))
                                  finally (setf (aref array (/ i n)) element)))
-                        array))
-                    (init-global (name type &optional length)
-                      `(progn
-                         (define-load-time-global ,name
-                             ,(if (eql type 'hash-table)
-                                  `(make-hash-table)
-                                  `(make-array ,length :element-type ',type)))
-                         (declaim (type ,(if (eql type 'hash-table)
-                                             'hash-table
-                                             `(simple-array ,type (,length))) ,name)))))
+                        array)))
               (let* ((misc-database (read-ub8-vector (file "ucdmisc" "dat")))
                      (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
                      (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
@@ -221,7 +210,7 @@
                                   (make-hash-table :size ,n-entries #+64-bit :test #+64-bit #'eq)
                                   ',(nreverse table))))
 
-                    ,(with-open-file
+                    ,@(with-open-file
                          (stream (file "ucd-names" "lisp-expr"))
                        (with-open-file (u1-stream (file "ucd1-names" "lisp-expr"))
                          (flet ((convert-to-double-vector (vector &optional reversed)
@@ -284,25 +273,16 @@
                                      (sort (copy-seq code->u1-name) #'< :key #'cdr)
                                      code->u1-name
                                      (sort (copy-seq u1-name->code) #'< :key #'car))
-                               `(progn
-                                  ,(init-global '**unicode-char-name-database** t
-                                                (* 2 (length code->name)))
-                                  ,(init-global '**unicode-name-char-database** t
-                                                (* 2 (length name->code)))
-                                  ,(init-global '**unicode-1-char-name-database** t
-                                                (* 2 (length code->u1-name)))
-                                  ,(init-global '**unicode-1-name-char-database** t
-                                                (* 2 (length u1-name->code)))
-                                  (defun !character-name-database-cold-init ()
-                                    (setf **unicode-character-name-huffman-tree** ',tree
-                                          **unicode-char-name-database**
-                                          ',(convert-to-double-vector code->name)
-                                          **unicode-name-char-database**
-                                          ',(convert-to-double-vector name->code t)
-                                          **unicode-1-char-name-database**
-                                          ',(convert-to-double-vector code->u1-name)
-                                          **unicode-1-name-char-database**
-                                          ',(convert-to-double-vector u1-name->code t))))))))))))))
+                               `((defconstant-eqx +unicode-char-name-database+
+                                     ',(convert-to-double-vector code->name) #'equalp)
+                                 (defconstant-eqx +unicode-name-char-database+
+                                     ',(convert-to-double-vector name->code t) #'equalp)
+                                 (defconstant-eqx sb-unicode::+unicode-1-char-name-database+
+                                     ',(convert-to-double-vector code->u1-name) #'equalp)
+                                 (defconstant-eqx +unicode-1-name-char-database+
+                                     ',(convert-to-double-vector u1-name->code t) #'equalp)
+                                 (defconstant-eqx sb-unicode::+unicode-character-name-huffman-tree+
+                                     ',tree #'equal))))))))))))
 
   (frob))
 
@@ -505,10 +485,10 @@ strings and symbols of length 1."
   (let ((char-code (char-code char)))
     (or (second (assoc char-code *base-char-name-alist*))
         (let ((h-code (double-vector-binary-search char-code
-                                                   **unicode-char-name-database**)))
+                                                   +unicode-char-name-database+)))
           (cond
             (h-code
-             (huffman-decode h-code **unicode-character-name-huffman-tree**))
+             (huffman-decode h-code sb-unicode::+unicode-character-name-huffman-tree+))
             (t
              (format nil "U~X" char-code)))))))
 
@@ -531,14 +511,14 @@ name is that string, if one exists. Otherwise, NIL is returned."
                   (code-char (parse-integer name :start start :radix 16)))))
           (t
            (let ((encoding (huffman-encode (string-upcase name)
-                                           **unicode-character-name-huffman-tree**)))
+                                           sb-unicode::+unicode-character-name-huffman-tree+)))
              (when encoding
                (let ((char-code
                        (or
                         (double-vector-binary-search encoding
-                                                     **unicode-name-char-database**)
+                                                     +unicode-name-char-database+)
                         (double-vector-binary-search encoding
-                                                     **unicode-1-name-char-database**))))
+                                                     +unicode-1-name-char-database+))))
                  (and char-code
                       (code-char char-code)))))))))
 
