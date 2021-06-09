@@ -1357,7 +1357,6 @@
                         (t
                          (setf (string-input-stream-index stream) (1+ index))
                          (char string index))))))
-    (declare (string string))
     (flet ((base-char-in (stream eof-error-p eof-value)
              (declare (optimize (sb-c::verify-arg-count 0)
                                 (sb-c::insert-array-bounds-checks 0)))
@@ -1365,17 +1364,11 @@
            (character-in (stream eof-error-p eof-value)
              (declare (optimize (sb-c::verify-arg-count 0)
                                 (sb-c::insert-array-bounds-checks 0)))
-             (char-in character))
-           (nil-in (stream eof-error-p eof-value)
-             (if (>= (string-input-stream-index stream)
-                     (string-input-stream-limit stream))
-                 (eof-or-lose stream eof-error-p eof-value)
-                 (error "Attempt to read from stream with NIL element type"))))
+             (char-in character)))
       (let ((input-routine
-              (typecase string
-                #+sb-unicode (sb-kernel::character-string #'character-in)
-                (base-string #'base-char-in)
-                (t #'nil-in))))
+             (etypecase string
+               (base-string #'base-char-in)
+               (string #'character-in))))
         (with-array-data ((simple-string string :offset-var offset)
                           (start start)
                           (end end)
