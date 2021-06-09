@@ -472,7 +472,7 @@ new string COUNT long filled with the fill character."
                      :format-arguments (list initial-element element-type)))
             (let ((string
                    (sb-vm::allocate-vector-with-widetag
-                    #+array-ubsan nil widetag count n-bits-shift)))
+                    #+ubsan nil widetag count n-bits-shift)))
               (when initial-element (fill string initial-element))
               string)))))
 

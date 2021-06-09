@@ -416,7 +416,7 @@
 (with-test (:name (make-array :size-overflow)
                   ;; size limit is small enough that this fails by not failing
                   ;; in the expected way
-                  :skipped-on :array-ubsan)
+                  :skipped-on :ubsan)
   ;; 1-bit fixnum tags make array limits overflow the word length
   ;; when converted to bytes
   (when (= sb-vm:n-fixnum-tag-bits 1)

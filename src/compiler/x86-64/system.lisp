@@ -358,7 +358,7 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp)
   (:generator 1
-    #-array-ubsan
+    #-ubsan
     (progn
     (loadw res x symbol-info-slot other-pointer-lowtag)
     ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
@@ -369,7 +369,7 @@
     (inst cmov :e res temp))
     ;; This way doesn't assume that CAR and VECTOR-LENGTH are the same memory access.
     ;; (And it's not even clear that using CMOV is preferable)
-    #+array-ubsan
+    #+ubsan
     (let ((out (gen-label)))
       (loadw temp x symbol-info-slot other-pointer-lowtag)
       (inst mov res nil-value)

@@ -87,7 +87,7 @@
 ;;; If you had an array of this size on 32-bit machines, it would consume about
 ;;; 8GB of payload. So not only is it larger than a fixnum - a problem for the
 ;;; allocator vops - it exceeds the address space.
-#-array-ubsan ; usual way
+#-ubsan ; usual way
 (progn
 ;;; - 2 to leave space for the array header
 (defconstant array-dimension-limit (- most-positive-fixnum 2)
@@ -97,7 +97,7 @@
   "the exclusive upper bound on the total number of elements in an array")
 )
 
-#+array-ubsan ; only supported if 64-bit
+#+ubsan ; only supported if 64-bit
 (progn
 (defconstant array-dimension-limit (ash 1 30))
 (defconstant array-total-size-limit (ash 1 30)))

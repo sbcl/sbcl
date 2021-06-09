@@ -785,7 +785,7 @@
          (data-alloc-form
           `(truly-the
             (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
-            (allocate-vector #+array-ubsan ,(not (or initial-contents initial-element))
+            (allocate-vector #+ubsan ,(not (or initial-contents initial-element))
                              ,(sb-vm:saetp-typecode saetp) %length nwords))))
 
     (flet ((eliminate-keywords ()
@@ -911,9 +911,9 @@
                   ,(wrap (cond ((eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
                                 `(sb-vm::splat ,data-alloc-form nwords
                                                ;; uninitialized reads are trapped regardless of safety
-                                               ;; if #+array-ubsan
-                                               #+array-ubsan :trap
-                                               #-array-ubsan 0))
+                                               ;; if #+ubsan
+                                               #+ubsan :trap
+                                               #-ubsan 0))
                                (t
                                 ;; otherwise, reading an element can't cause an invalid bit pattern
                                 ;; to be observed, but the bits could be random.
@@ -1059,10 +1059,10 @@
                             ,@(maybe-arg displaced-to)
                             ,@(maybe-arg displaced-index-offset))))
       (cond ((not initial-element) creation-form)
-            ;; with array-ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
+            ;; with ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
             ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
             ;; to scribble on the array. Same for allocators that don't prezero
-            #-array-ubsan
+            #-ubsan
             ((and (constant-lvar-p initial-element)
                   (eql (lvar-value initial-element)
                        (sb-vm:saetp-initial-element-default saetp)))

@@ -1286,7 +1286,7 @@
                (if ,already-type-p
                    x
                    ,(cond ((eq dimension '*)
-                           #+array-ubsan
+                           #+ubsan
                            ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
                            ;; but redundantly checks the length of the input in MAKE-ARRAY's
                            ;; transform because we don't or can't infer that LENGTH gives the
@@ -1294,7 +1294,7 @@
                            ;; extract more efficiency - at least eliminate the unreachable
                            ;; error-signaling code on mismatch - but I don't care to try.
                            `(make-array (length x) ,@specialization :initial-contents x)
-                           #-array-ubsan ; better: do not generate a redundant LENGTH check
+                           #-ubsan ; better: do not generate a redundant LENGTH check
                            `(replace (make-array (length x) ,@specialization) x))
                           ((policy node (= safety 0)) ; Disregard the input length
                            `(replace (make-array ,dimension ,@specialization) x))

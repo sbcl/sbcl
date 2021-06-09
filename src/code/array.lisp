@@ -351,7 +351,7 @@
 
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into bits
 ;;; or NIL, %%simple-array-n-bits-shifts%% will be used in that case.
-(defun allocate-vector-with-widetag (#+array-ubsan poisoned widetag length n-bits-shift)
+(defun allocate-vector-with-widetag (#+ubsan poisoned widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
   (let* ((n-bits-shift (or n-bits-shift
@@ -369,10 +369,10 @@
                       (if (/= widetag simple-array-nil-widetag)
                           (vector-length-in-words full-length n-bits-shift)
                           0))))
-    #+array-ubsan (if poisoned ; first arg to allocate-vector must be a constant
+    #+ubsan (if poisoned ; first arg to allocate-vector must be a constant
                       (allocate-vector t widetag length nwords)
                       (allocate-vector nil widetag length nwords))
-    #-array-ubsan (allocate-vector widetag length nwords)))
+    #-ubsan (allocate-vector widetag length nwords)))
 
 (declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag))
 (defun array-underlying-widetag (array)
@@ -404,7 +404,7 @@
 ;;; Since we can't do both, just use NIL, and if you screw up
 ;;; by your sequence without writing, ... oh well.
 (defun sb-impl::make-vector-like (vector length)
-  (allocate-vector-with-widetag #+array-ubsan nil
+  (allocate-vector-with-widetag #+ubsan nil
                                 (array-underlying-widetag vector) length nil))
 
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
@@ -477,7 +477,7 @@
           ((and simple (= array-rank 1))
            (let ((vector ; a (SIMPLE-ARRAY * (*))
                   (allocate-vector-with-widetag
-                   #+array-ubsan (not (or initial-element-p initial-contents-p))
+                   #+ubsan (not (or initial-element-p initial-contents-p))
                    widetag dimension-0 n-bits)))
              ;; presence of at most one :INITIAL-thing keyword was ensured above
              (cond (initial-element-p
@@ -489,7 +489,7 @@
                                 the vector length is ~W."
                                content-length dimension-0)))
                     (replace vector initial-contents))
-                   #+array-ubsan
+                   #+ubsan
                    (t
                     ;; store the function which bears responsibility for creation of this
                     ;; array in case we need to blame it for not initializing.
@@ -646,7 +646,7 @@ of specialized arrays is supported."
     ;;   (error "~S cannot be used to initialize an array of type ~S."
     ;;          initial-element element-type))
   (let ((data (if widetag
-                  (allocate-vector-with-widetag #+array-ubsan nil
+                  (allocate-vector-with-widetag #+ubsan nil
                                                 widetag total-size n-bits)
                   (make-array total-size :element-type element-type))))
     (ecase initialize
@@ -1210,7 +1210,7 @@ of specialized arrays is supported."
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
               ;; vector is partially poisoned, which we can't represent
-              (allocate-vector-with-widetag #+array-ubsan nil
+              (allocate-vector-with-widetag #+ubsan nil
                                             widetag new-length n-bits-shift)))
         (copy-vector-data old-data new-data old-start old-end n-bits-shift)
         (setf (%array-data vector) new-data
@@ -1907,12 +1907,12 @@ function to be removed without further warning."
         (let ((contents-length (length initial-contents)))
           (if (= length contents-length)
               (replace (truly-the simple-vector
-                                  (allocate-vector #+array-ubsan nil type length length))
+                                  (allocate-vector #+ubsan nil type length length))
                        initial-contents)
               (error "~S has ~D elements, vector length is ~D."
                      :initial-contents contents-length length)))
         (fill (truly-the simple-vector
-                         (allocate-vector #+array-ubsan nil type length length))
+                         (allocate-vector #+ubsan nil type length length))
               ;; 0 is the usual default, but NIL makes more sense for weak vectors
               ;; as it is the value assigned to broken hearts.
               (if element-p initial-element nil)))))

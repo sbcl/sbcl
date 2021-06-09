@@ -17,8 +17,8 @@
 (sb-xc:deftype low-index () '(signed-byte 29))
 
 (defun unpoison-element (array index &optional (addend 0))
-  #-array-ubsan (declare (ignore array index addend))
-  #+array-ubsan
+  #-ubsan (declare (ignore array index addend))
+  #+ubsan
   (let ((no-bits (gen-label)))
     (aver (= addend 0))
     (inst mov temp-reg-tn (object-slot-ea array 1 other-pointer-lowtag))
@@ -352,8 +352,8 @@
     unsigned-reg))
 
 ;;; Try to combine DATA-VECTOR-REF/SIMPLE-VECTOR + IF-EQ.
-;;; But never do it under array-ubsan.
-#-array-ubsan
+;;; But never do it under ubsan.
+#-ubsan
 (defoptimizer (sb-c::vop-optimize data-vector-ref-with-offset/simple-vector) (vop)
   (let ((next (vop-next vop)))
     (when (and next

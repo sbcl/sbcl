@@ -1189,18 +1189,18 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      ;; NAME is a cons of the array and index
      (destructuring-bind (array . index) (cell-error-name condition)
        (declare (ignorable index))
-       #+array-ubsan
+       #+ubsan
        (let* ((origin-pc
                (ash (sb-vm::vector-extra-data
                      (if (simple-vector-p array)
                          array
                          (sb-vm::vector-extra-data array)))
-                    -3)) ; XXX: array-ubsan magic
+                    -3)) ; XXX: ubsan magic
               (origin-code (sb-di::code-header-from-pc (int-sap origin-pc))))
          (let ((*print-array* nil))
            (format stream "Element ~D of array ~_~S ~_was not assigned a value.~%Origin=~X"
                    index array (or origin-code origin-pc))))
-       #-array-ubsan
+       #-ubsan
        ;; FOLD-INDEX-ADDRESSING could render INDEX wrong. There's no way to know.
        (let ((*print-array* nil))
          (format stream "Uninitialized element accessed in array ~S"

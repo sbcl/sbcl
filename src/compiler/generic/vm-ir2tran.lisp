@@ -329,8 +329,8 @@
     args dx
     t)
 (defoptimizer (allocate-vector stack-allocate-result)
-      ((#+array-ubsan poisoned type length words) node dx)
-    (declare (ignorable #+array-ubsan poisoned type length))
+      ((#+ubsan poisoned type length words) node dx)
+    (declare (ignorable #+ubsan poisoned type length))
     (and
      ;; Can't put unboxed data on the stack unless we scavenge it
      ;; conservatively.
@@ -349,8 +349,8 @@
                            `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
                                            sb-vm:vector-data-offset)))))))
 (defoptimizer (allocate-vector ltn-annotate)
-    ((#+array-ubsan poisoned type length words) call ltn-policy)
-  (declare (ignore #+array-ubsan poisoned type length words))
+    ((#+ubsan poisoned type length words) call ltn-policy)
+  (declare (ignore #+ubsan poisoned type length words))
   (vectorish-ltn-annotate-helper call ltn-policy
                                  (if (sb-c:msan-unpoison sb-c:*compilation*)
                                      'sb-vm::allocate-vector-on-stack+msan-unpoison

@@ -917,7 +917,7 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
     }
 }
 
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
 // If specialized vectors point to a vector of bits in their first
 // word after the header, they can't be relocated to unboxed pages.
 #define SPECIALIZED_VECTOR_PAGE_FLAG BOXED_PAGE_FLAG
@@ -926,7 +926,7 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 #endif
 
 static inline void check_shadow_bits(lispobj* v) {
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
     if (is_lisp_pointer(v[1])) {
         scavenge(v + 1, 1); // shadow bits
         if (vector_len((struct vector*)native_pointer(v[1])) < vector_len((struct vector*)v))
@@ -1729,8 +1729,8 @@ lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
     return 0; // oops, how did this happen?
 }
 
-#ifdef LISP_FEATURE_ARRAY_UBSAN
-// array-ubsan tracks memory origin by a not-exactly-gc-safe way
+#ifdef LISP_FEATURE_UBSAN
+// ubsan tracks memory origin by a not-exactly-gc-safe way
 // that kinda works, as long as gc_search_space() doesn't crash,
 // which it shouldn't if carefully visiting objects.
 #define SEARCH_SPACE_FOLLOWS_FORWARDING_POINTERS 1

@@ -608,10 +608,10 @@
                    ;; any more - it's like a two-arg variant of fixnump.
                    data-vector-ref-with-offset/simple-vector-c))))
       ;; Inhibit the optimization on simple-vector if we need to trap uninitialized reads.
-      ;; #+array-ubsan always inhibits, otherwise it's policy-based
+      ;; #+ubsan always inhibits, otherwise it's policy-based
       (when (and prev
                  (eq (vop-name prev) 'data-vector-ref-with-offset/simple-vector-c)
-                 #-array-ubsan (sb-c::policy (sb-c::vop-node vop) (= safety 3)))
+                 #-ubsan (sb-c::policy (sb-c::vop-node vop) (= safety 3)))
         (return-from vop-optimize-fixnump-optimizer nil))
       (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))

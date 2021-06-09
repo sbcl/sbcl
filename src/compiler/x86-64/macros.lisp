@@ -284,7 +284,7 @@
 (defmacro define-full-reffer+addend (name type offset lowtag scs el-type &optional translate)
   (flet ((trap (index-to-encode)
            (declare (ignorable index-to-encode))
-           #+array-ubsan
+           #+ubsan
            ;; It's OK that the cell is read twice when testing for a trap value.
            ;; The value should only change from trapping to non-trapping, so if we loaded
            ;; a trap, and then one instruction later the data is valid (due to being

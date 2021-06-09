@@ -207,7 +207,7 @@ void __mark_obj(lispobj pointer)
             if (header & markbit) return; // already marked
             *base |= markbit;
         }
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
         if (specialized_vector_widetag_p(widetag) && is_lisp_pointer(base[1]))
             gc_mark_obj(base[1]);
         else if (widetag == SIMPLE_VECTOR_WIDETAG && fixnump(base[1])) {
@@ -297,7 +297,7 @@ static void trace_object(lispobj* where)
     struct weak_pointer *weakptr;
     switch (widetag) {
     case SIMPLE_VECTOR_WIDETAG:
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
         if (is_lisp_pointer(where[1])) gc_mark_obj(where[1]);
 #endif
         // non-weak hashtable kv vectors are trivial in fullcgc. Keys don't move

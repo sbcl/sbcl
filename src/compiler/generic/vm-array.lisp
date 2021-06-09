@@ -217,7 +217,7 @@
 ;;; the pointer to the shadow bits.
 ;;; Alternatively we could place them in malloc()'ed memory
 ;;; but then we'd need a finalizer per array.
-#+array-ubsan
+#+ubsan
 (progn
 (export '(vector-extra-data))
 (defmacro vector-extra-data (vector)
@@ -226,7 +226,7 @@
   `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag))
 (defmacro unpoison (vector)
   `(set-vector-extra-data ,vector 0)))
-#-array-ubsan
+#-ubsan
 (defmacro unpoison (vector)
   (declare (ignore vector)))
 

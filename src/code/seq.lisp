@@ -933,7 +933,7 @@ many elements are copied."
                       :check-fill-pointer t)
       (declare (ignore start))
       (let* ((tag (%other-pointer-widetag vector))
-             (new-vector (sb-vm::allocate-vector-with-widetag #+array-ubsan nil
+             (new-vector (sb-vm::allocate-vector-with-widetag #+ubsan nil
                                                               tag length nil)))
         (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index 0 (1+ left-index))
@@ -1162,7 +1162,7 @@ many elements are copied."
     (declare (index length))
     (do-rest-arg ((seq) sequences)
       (incf length (length seq)))
-    (let ((result (sb-vm::allocate-vector-with-widetag #+array-ubsan nil
+    (let ((result (sb-vm::allocate-vector-with-widetag #+ubsan nil
                                                        widetag length nil))
           (setter (the function (svref %%data-vector-setters%% widetag)))
           (index 0))

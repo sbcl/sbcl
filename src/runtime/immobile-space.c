@@ -1233,7 +1233,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         if (limit[0] == SIMPLE_ARRAY_FIXNUM_WIDETAG) {
             gc_assert(vector_len((struct vector*)limit) == words);
         } else {
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
             limit[0] = ((uword_t)words << (32+N_FIXNUM_TAG_BITS)) | SIMPLE_ARRAY_FIXNUM_WIDETAG;
 #else
             limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;

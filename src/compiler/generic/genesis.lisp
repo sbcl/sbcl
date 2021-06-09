@@ -736,10 +736,10 @@
                    sb-vm:other-pointer-lowtag)
                   widetag length))
 (defun emplace-vector (des widetag length)
-  #+array-ubsan
+  #+ubsan
   (write-header-word des (logior (ash length (+ 32 sb-vm:n-fixnum-tag-bits))
                                  widetag))
-  #-array-ubsan
+  #-ubsan
   (progn (write-header-data+tag des 0 widetag)
          (write-wordindexed des sb-vm:vector-length-slot (make-fixnum-descriptor length)))
   des)
@@ -797,8 +797,8 @@
 
 (declaim (inline cold-vector-len))
 (defun cold-vector-len (vector)
-  #+array-ubsan (ash (read-bits-wordindexed vector 0) (- -32 sb-vm:n-fixnum-tag-bits))
-  #-array-ubsan (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
+  #+ubsan (ash (read-bits-wordindexed vector 0) (- -32 sb-vm:n-fixnum-tag-bits))
+  #-ubsan (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
 
 (macrolet ((string-data (string-descriptor)
              `(+ (descriptor-byte-offset ,string-descriptor)
@@ -3186,9 +3186,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                ;; is a signed int, but it isn't really; except that I made all C vars
                ;; signed to avoid comparison mismatch, and don't want to change back.
                (format t "static inline sword_t vector_len(struct vector* v) {")
-               #+array-ubsan (format t "  return v->header >> ~d; }~%"
+               #+ubsan (format t "  return v->header >> ~d; }~%"
                                      (+ 32 sb-vm:n-fixnum-tag-bits))
-               #-array-ubsan (format t "  return v->length_ >> ~d; }~%"
+               #-ubsan (format t "  return v->length_ >> ~d; }~%"
                                      sb-vm:n-fixnum-tag-bits))
              (when (member name '(cons vector symbol fdefn instance))
                (write-cast-operator name c-name lowtag *standard-output*)))

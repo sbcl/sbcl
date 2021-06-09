@@ -167,8 +167,8 @@
        (case ,value
          (:unbound (unbound-marker-bits))
          ((nil) (bug "Should not see SPLAT NIL"))
-         (t #+array-ubsan no-tls-value-marker-widetag
-            #-array-ubsan 0))))
+         (t #+ubsan no-tls-value-marker-widetag
+            #-ubsan 0))))
 
 ;;; This logic was formerly in ALLOCATE-VECTOR-ON-STACK.
 ;;; Choosing amongst 3 vops gets potentially better register allocation

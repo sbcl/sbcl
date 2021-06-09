@@ -1533,7 +1533,7 @@ We could try a few things to mitigate this:
                            (t (ldb (byte 32 0) m)))))))
       (legend t "Default: (~d) [not shown]" vanilla))))
 
-#+array-ubsan
+#+ubsan
 (defun find-poisoned-vectors (&aux result)
   (dolist (v (sb-vm:list-allocated-objects :all :type sb-vm:simple-vector-widetag)
              result)

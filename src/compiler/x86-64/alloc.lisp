@@ -388,8 +388,8 @@
              `(let ((len (if (sc-is ,len immediate) (fixnumize (tn-value ,len)) ,len))
                     (type (if (sc-is ,type immediate) (tn-value ,type) ,type)))
                 (storew* type ,vector-tn 0 ,lowtag ,zeroed)
-                #+array-ubsan (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
-                #-array-ubsan (storew* len ,vector-tn vector-length-slot
+                #+ubsan (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
+                #-ubsan (storew* len ,vector-tn vector-length-slot
                                        ,lowtag ,zeroed)))
            (want-shadow-bits ()
              `(and poisoned
@@ -419,19 +419,19 @@
                 (inst mov (ea (- 8 other-pointer-lowtag) ,vector) temp-reg-tn))))
 
   (define-vop (allocate-vector-on-heap)
-    #+array-ubsan (:info poisoned)
+    #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     ;; Result is live from the beginning, like a temp, because we use it as such
     ;; in 'calc-size-in-bytes'
     (:results (result :scs (descriptor-reg) :from :load))
-    (:arg-types #+array-ubsan (:constant t)
+    (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
-      #+array-ubsan
+      #+ubsan
       (when (want-shadow-bits)
         ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
         ;; which can use unbound-marker as a poison value on reads.
@@ -460,7 +460,7 @@
          (allocation nil size 0 node nil result)
          (put-header result 0 type length t)
          (inst or :byte result other-pointer-lowtag)))
-      #+array-ubsan
+      #+ubsan
       (cond ((want-shadow-bits)
              (inst pop temp-reg-tn) ; restore shadow bits
              (inst mov (object-slot-ea result 1 other-pointer-lowtag) temp-reg-tn))
@@ -468,20 +468,20 @@
              (store-originating-pc result)))))
 
   (define-vop (allocate-vector-on-stack)
-    #+array-ubsan (:info poisoned)
+    #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:vop-var vop)
-    (:arg-types #+array-ubsan (:constant t)
+    (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
-    #+array-ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
-    #+array-ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
-    #+array-ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
+    #+ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
+    #+ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
+    #+ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
     (:policy :fast-safe)
     (:generator 10
-      #+array-ubsan
+      #+ubsan
       (when (want-shadow-bits)
         ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
         ;; which can use unbound-marker as a poison value on reads.
@@ -502,7 +502,7 @@
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag
                           ;; If already aligned RSP, don't need to do it again.
-                          #+array-ubsan (want-shadow-bits))
+                          #+ubsan (want-shadow-bits))
         ;; NB: store the trailing null BEFORE storing the header,
         ;; in case the length in words is 0, which stores into the LENGTH slot
         ;; as if it were element -1 of data (which probably can't happen).
@@ -510,7 +510,7 @@
         ;; FIXME: It would be good to check for stack overflow here.
         (put-header result other-pointer-lowtag type length nil)
         )
-      #+array-ubsan
+      #+ubsan
       (cond ((want-shadow-bits)
              (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
                            result)
@@ -520,13 +520,13 @@
 
   #+linux ; unimplemented for others
   (define-vop (allocate-vector-on-stack+msan-unpoison)
-    #+array-ubsan (:info poisoned)
-    #+array-ubsan (:ignore poisoned)
+    #+ubsan (:info poisoned)
+    #+ubsan (:ignore poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
-    (:arg-types #+array-ubsan (:constant t)
+    (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     ;; This is a separate vop because it needs more temps.
     (:temporary (:sc any-reg :offset rcx-offset) rcx)

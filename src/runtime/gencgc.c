@@ -1874,7 +1874,7 @@ maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
     lispobj widetag = widetag_of(where);
     if (widetag == SIMPLE_VECTOR_WIDETAG)
         page_type_flag = SINGLE_OBJECT_FLAG | BOXED_PAGE_FLAG;
-#ifndef LISP_FEATURE_ARRAY_UBSAN
+#ifndef LISP_FEATURE_UBSAN
     else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
         page_type_flag = SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG;
 #endif
@@ -3050,7 +3050,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
             lose("Unhandled widetag %d at %p", widetag, where);
         } else if (leaf_obj_widetag_p(widetag)) {
-#ifdef LISP_FEATURE_ARRAY_UBSAN
+#ifdef LISP_FEATURE_UBSAN
             if (specialized_vector_widetag_p(widetag)) {
                 if (is_lisp_pointer(where[1])) {
                     struct vector* bits = (void*)native_pointer(where[1]);

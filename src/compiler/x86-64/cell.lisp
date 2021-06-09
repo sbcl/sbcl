@@ -13,18 +13,18 @@
 
 ;;;; data object ref/set stuff
 
-(defconstant vector-len-op-size #+array-ubsan :dword #-array-ubsan :qword)
+(defconstant vector-len-op-size #+ubsan :dword #-ubsan :qword)
 (defmacro vector-len-ea (v &optional (lowtag sb-vm:other-pointer-lowtag))
-  #+array-ubsan `(ea (- 4 ,lowtag) ,v) ; high 4 bytes of header
-  #-array-ubsan `(ea (- (ash vector-length-slot word-shift) ,lowtag) ,v))
+  #+ubsan `(ea (- 4 ,lowtag) ,v) ; high 4 bytes of header
+  #-ubsan `(ea (- (ash vector-length-slot word-shift) ,lowtag) ,v))
 
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
-  #-array-ubsan (:ignore name)
+  #-ubsan (:ignore name)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-   (cond #+array-ubsan
+   (cond #+ubsan
          ((member name '(sb-c::vector-length %array-fill-pointer)) ; half-sized slot
           (inst mov :dword result (vector-len-ea object)))
          (t
@@ -67,7 +67,7 @@
              (inst push object)
              (invoke-asm-routine 'call 'touch-gc-card vop)
              (gen-cell-set (object-slot-ea object offset lowtag) value)))
-          #+array-ubsan
+          #+ubsan
           ((equal name '(setf %array-fill-pointer)) ; half-sized slot
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
@@ -86,7 +86,7 @@
                  (if (sc-is value immediate)
                      (make-fixup (tn-value value) :layout)
                      value)))
-          #+array-ubsan
+          #+ubsan
           ((and (eq name 'make-array) (eql offset sb-vm:array-fill-pointer-slot))
            (inst mov :qword (object-slot-ea object 1 lowtag) nil-value)
            (inst mov :dword (vector-len-ea object)
