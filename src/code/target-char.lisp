@@ -203,7 +203,8 @@
                                           (incf index))
                                         ;; verify the validity of
                                         ;; :test 'eq on 64-bit
-                                        #+64-bit (aver (typep (apply #'pack-3-codepoints codepoints) 'fixnum))
+                                        #+64-bit (aver (sb-xc:typep (apply #'pack-3-codepoints codepoints)
+                                                                    'sb-xc:fixnum))
                                         (push (cons (apply #'pack-3-codepoints codepoints) key) table)))
                                 (aver (= (length table) n-entries))
                                 `(%stuff-hash-table
