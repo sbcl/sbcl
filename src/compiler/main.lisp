@@ -1894,7 +1894,7 @@ necessary, since type inference may take arbitrarily long to converge.")
      &key
 
      ;; ANSI options
-     (output-file (cfp-output-file-default input-file))
+     (output-file "" output-file-p)
      ;; FIXME: ANSI doesn't seem to say anything about
      ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
      ;; function..
@@ -1952,10 +1952,10 @@ returning its filename.
   :EMIT-CFASL
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
-  (let* ((fasl-output nil)
+  (let* ((output-file-pathname nil)
+         (fasl-output nil)
+         (cfasl-pathname nil)
          (cfasl-output nil)
-         (output-file-name nil)
-         (coutput-file-name nil)
          (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
@@ -1969,20 +1969,16 @@ returning its filename.
 
     (unwind-protect
         (progn
-          (when output-file
-            (setq output-file-name
-                  (compile-file-pathname input-file
-                                               :output-file output-file))
+          (unless (and output-file-p (eq output-file nil))
+            (setq output-file-pathname
+                  (if output-file-p
+                      (compile-file-pathname input-file :output-file output-file)
+                      (compile-file-pathname input-file)))
             (setq fasl-output
-                  (open-fasl-output output-file-name
-                                    (namestring input-pathname))))
+                  (open-fasl-output output-file-pathname (namestring input-pathname))))
           (when emit-cfasl
-            (setq coutput-file-name
-                  (make-pathname :type "cfasl"
-                                 :defaults output-file-name))
-            (setq cfasl-output
-                  (open-fasl-output coutput-file-name
-                                    (namestring input-pathname))))
+            (setq cfasl-pathname (make-pathname :type "cfasl" :defaults output-file-pathname))
+            (setq cfasl-output (open-fasl-output cfasl-pathname (namestring input-pathname))))
           (when trace-file
             (setf *compiler-trace-output*
                   (if (streamp trace-file)
@@ -2001,15 +1997,20 @@ returning its filename.
 
       (when fasl-output
         (close-fasl-output fasl-output abort-p)
-        (setq output-file-name
-              (pathname (fasl-output-stream fasl-output)))
+        ;; There was an assignment here
+        ;;   (setq fasl-pathname (pathname (fasl-output-stream fasl-output)))
+        ;; which seems pretty bogus, because we've computed the fasl-pathname,
+        ;; and should return exactly what was computed so that it 100% agrees
+        ;; with what COMPILE-FILE-PATHNAME said we would write into.
+        ;; A distorted variation of the name coming from the stream is just wrong,
+        ;; because do not support versioned pathnames.
         (when (and (not abort-p) *compile-verbose*)
-          (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-name))))
+          (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-pathname))))
 
       (when cfasl-output
         (close-fasl-output cfasl-output abort-p)
         (when (and (not abort-p) *compile-verbose*)
-          (compiler-mumble "; wrote ~A~%" (namestring coutput-file-name))))
+          (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname))))
 
       (when *compile-verbose*
         (print-compile-end-note source-info (not abort-p)))
@@ -2024,24 +2025,20 @@ returning its filename.
     ;; before the whole file has been processed, due to eg. a reader
     ;; error.
     (values (when (and (not abort-p) output-file)
-              ;; Hack around filesystem race condition...
-              (or (probe-file output-file-name) output-file-name))
+              ;; Again, more bogosity. Why do PROBE-FILE here
+              ;; when it achieves nothing other than to potentially disagree
+              ;; with what COMPILE-FILE-PATHNAME returned.
+              ;; I would guess that the intent of the spec was to not return
+              ;; pathnames with a wild version component, but it never anticipated
+              ;; that content-addressable storage would be a thing.
+              ;; Unfortunately there's no way to give lossless information here
+              ;; while remaining ANSI-compliant. So let's repurpose the secret
+              ;; *MERGE-PATHNAMES* option to return pathnames that don't suck.
+              (or (and *merge-pathnames* (probe-file output-file-pathname))
+                  output-file-pathname))
             warnings-p
             failure-p)))
 
-;;; a helper function for COMPILE-FILE-PATHNAME: the default for
-;;; the OUTPUT-FILE argument
-;;;
-;;; ANSI: The defaults for the OUTPUT-FILE are taken from the pathname
-;;; that results from merging the INPUT-FILE with the value of
-;;; *DEFAULT-PATHNAME-DEFAULTS*, except that the type component should
-;;; default to the appropriate implementation-defined default type for
-;;; compiled files.
-(defun cfp-output-file-default (input-file)
-  (let* ((defaults (merge-pathnames input-file *default-pathname-defaults*))
-         (retyped (make-pathname :type *fasl-file-type* :defaults defaults)))
-    retyped))
-
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
 ;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,
 ;;;   the result is a logical pathname. If INPUT-FILE is a logical
@@ -2051,15 +2048,87 @@ returning its filename.
 ;;; at the level of e.g. whether it returns logical pathname or a
 ;;; physical pathname. Patches to make it more correct are welcome.
 ;;; -- WHN 2000-12-09
-(defun compile-file-pathname (input-file
-                              &key
-                                (output-file nil output-file-p)
+;;;
+;;; Issues of logical-pathname handling aside, I checked some other lisps
+;;; to see what they do with the following two examples:
+;;;  (COMPILE-FILE "a/b/file.lisp :output-file "x/y/z/")
+;;;  (COMPILE-FILE "a/b/file.lisp :output-file "x/y/out")
+;;; and it turns out that they don't implement the spirit of the law,
+;;; forget about the letter of the law. The spirit (intent) is that regardless
+;;; of how pathnames are handled, COMPILE-FILE-PATHNAME should tell you exactly
+;;; what pathname the compiler would write into given the input and output to
+;;; COMPILE-FILE. But they can't even do that much correctly.
+;;; So forget about how merging "should" work - it's a crap shoot at best.
+
+;;; Clozure 1.10-r16196
+;;; -------------------
+;;; ? (COMPILE-FILE-PATHNAME "a/b/file.lisp" :output-file #p"x/y/z/")
+;;;  => #P"a/b/x/y/z/file.lx64fsl" ; ok, so it thinks it merges input and output dirs
+;;; let's confirm by actually compiling:
+;;; ? (COMPILE-FILE "a/b/file.lisp" :output-file #p"x/y/z/")
+;;; #P"/tmp/sbcl/x/y/z/file.lx64fsl" ; no, it didn't actually. it's what I want though
+;;;
+;;; ECL 16.1.3
+;;; ----------
+;;; (compile-file-pathname "a/b/file.lisp" :output-file #p"x/y/z/")
+;;; #P"x/y/z/" ; ok, maybe it will do additional defaulting to get the name and type?
+;;; (compile-file "a/b/file.lisp" :output-file #p"x/y/z/")
+;;; Internal error:
+;;;   ** Pathname without a physical namestring:
+;;; Nope, it won't default them. However:
+;;; (compile-file "a/b/file.lisp" :output-file #p"x/y/z/out")
+;;; => #P"/tmp/sbcl/x/y/z/out"
+;;; so it worked, but it failed to default the file type to '.fas'
+;;; which it would have if nothing were specified.
+;;;
+;;; ABCL 1.7.1
+;;; ----------
+;;; (compile-file-pathname "a/b/file.lisp" :output-file #p"x/y/z/")
+;;; #P"/tmp/sbcl/a/b/x/y/z/file.lisp" ; OK, so it says it merged input + output dirs
+;;; but it didn't stick on a pathname-type. However
+;;; (compile-file "a/b/file.lisp" :output-file #p"x/y/z/")
+;;; ; Compiling /tmp/sbcl/a/b/file.lisp ...
+;;; #<THREAD "interpreter" {E2B80EB}>: Debugger invoked on condition of type SIMPLE-ERROR
+;;;   Pathname has no namestring:
+;;; And now:
+;;; (compile-file "a/b/file.lisp" :output-file #p"x/y/z/out.abcl")
+;;; => #P"/tmp/sbcl/x/y/z/out.abcl" ; so it *didn't* actually merge dirs, which is fine
+;;;
+;;; But we try our best to give somewhat understandable semantics:
+;;; * strongly prefer that all fasls have a pathname-type
+;;;   whether or not the output was specified
+;;; * we can accept just a directory for the output (a namestring ending in "/"
+;;;   on Unix) and will take the pathname-name from the input
+;;; * we will never merge directories from the input to output
+;;;
+;;; It is unclear what should happen with
+;;; (compile-file "sys:contrib;foo.lisp" :output-file "obj")
+;;; Is "obj" on the logical host or the physical host?
+
+(defun compile-file-pathname (input-file &key (output-file nil output-file-p)
                               &allow-other-keys)
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
-  (if output-file-p
-      (merge-pathnames output-file (cfp-output-file-default input-file))
-      (cfp-output-file-default input-file)))
+  ;; ANSI: The defaults for the OUTPUT-FILE are taken from the pathname
+  ;; that results from merging the INPUT-FILE with the value of
+  ;; *DEFAULT-PATHNAME-DEFAULTS*, except that the type component should
+  ;; default to the appropriate implementation-defined default type for
+  ;; compiled files.
+   (let* ((input (pathname input-file))
+          (output (if output-file-p (pathname output-file)))
+          (host/dev/dir
+           (if (or (not output) (memq (pathname-directory output) '(nil :unspecific)))
+               input output)))
+     ;; Merging *D-P-D* here is ridiculous, because every pathname is eventually
+     ;; merged against it.
+     ;; Users can set it to #P"" around calling this to obtain a lossless answer.
+     (merge-pathnames
+      (flet ((choose (this else) (if (and this (neq this :unspecific)) this else)))
+        (make-pathname :host (pathname-host host/dev/dir)
+                       :device (pathname-device host/dev/dir)
+                       :directory (pathname-directory host/dev/dir)
+                       :name (choose (and output (pathname-name output)) (pathname-name input))
+                       :type (choose (and output (pathname-type output)) *fasl-file-type*))))))
 
 ;;; FIXME: find a better place for this.
 (defun always-boundp (name)

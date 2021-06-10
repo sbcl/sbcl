@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.5:
+  * minor incompatible change: COMPILE-FILE does not merge the input file's
+    pathname-directory into the output path if :OUTPUT-FILE was specified
+    and has a directory that is not :UNSPECIFIC.
+
 changes in sbcl-2.1.5 relative to sbcl-2.1.4:
   * minor incompatible change: on x86-64, the backend instruction encoders for
     movzx and for string opcodes have changed their semantics.
