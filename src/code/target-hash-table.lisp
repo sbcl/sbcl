@@ -1943,13 +1943,13 @@ table itself."
             (push (cons k v) result)))))
     result))
 
-;;; Stuff an association list into HASH-TABLE. Return the hash table,
-;;; so that we can use this for the *PRINT-READABLY* case in
-;;; PRINT-OBJECT (HASH-TABLE T) without having to worry about LET
-;;; forms and readable gensyms and stuff.
-(defun %stuff-hash-table (hash-table alist)
-  (dolist (x alist)
-    (setf (gethash (car x) hash-table) (cdr x)))
+;;; Stuff an association list, or a vector, into HASH-TABLE. Return the hash table,
+;;; so that we can use this for the *PRINT-READABLY* case in PRINT-OBJECT (HASH-TABLE T)
+;;; without having to worry about LET forms and readable gensyms and stuff.
+(defun %stuff-hash-table (hash-table data)
+  (if (vectorp data)
+      (dovector (x data) (setf (gethash (car x) hash-table) (cdr x)))
+      (dolist (x data) (setf (gethash (car x) hash-table) (cdr x))))
   hash-table)
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE

@@ -116,7 +116,7 @@
                                (push (cons key value) alist)))
                            `(%stuff-hash-table (make-hash-table #+64-bit :test #+64-bit #'eq
                                                                 :size ,(/ (length info) 3))
-                                               ',(nreverse alist))))
+                                               ,(nreverse (coerce alist 'vector)))))
 
                     ,@(let* ((unicode-table
                                  (make-array
@@ -209,7 +209,7 @@
                                 (aver (= (length table) n-entries))
                                 `(%stuff-hash-table
                                   (make-hash-table :size ,n-entries #+64-bit :test #+64-bit #'eq)
-                                  ',(nreverse table))))
+                                  ,(nreverse (coerce table 'vector)))))
 
                     ,@(with-open-file
                          (stream (file "ucd-names" "lisp-expr"))
@@ -275,13 +275,13 @@
                                      code->u1-name
                                      (sort (copy-seq u1-name->code) #'< :key #'car))
                                `((defconstant-eqx +unicode-char-name-database+
-                                     ',(convert-to-double-vector code->name) #'equalp)
+                                     ,(convert-to-double-vector code->name) #'equalp)
                                  (defconstant-eqx +unicode-name-char-database+
-                                     ',(convert-to-double-vector name->code t) #'equalp)
+                                     ,(convert-to-double-vector name->code t) #'equalp)
                                  (defconstant-eqx sb-unicode::+unicode-1-char-name-database+
-                                     ',(convert-to-double-vector code->u1-name) #'equalp)
+                                     ,(convert-to-double-vector code->u1-name) #'equalp)
                                  (defconstant-eqx +unicode-1-name-char-database+
-                                     ',(convert-to-double-vector u1-name->code t) #'equalp)
+                                     ,(convert-to-double-vector u1-name->code t) #'equalp)
                                  (defconstant-eqx sb-unicode::+unicode-character-name-huffman-tree+
                                      ',tree #'equal))))))))))))
 
