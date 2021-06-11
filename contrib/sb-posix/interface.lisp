@@ -443,14 +443,12 @@ not supported."
  (declaim (inline wait))
  (defun wait (&optional statusptr)
    (declare (type (or null (simple-array (signed-byte 32) (1))) statusptr))
-   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (sb-sys:with-pinned-objects (ptr)
-                 (alien-funcall
-                  (extern-alien "wait" (function pid-t (* int)))
-                  (sb-sys:vector-sap ptr)))))
-     (if (minusp pid)
-         (syscall-error 'wait)
-         (values pid (aref ptr 0))))))
+   (with-alien ((wait (function pid-t (* int)) :extern "wait")
+                (status int))
+     (let ((pid (alien-funcall wait (addr status))))
+       (when (minusp pid) (syscall-error 'wait))
+       (when statusptr (setf (aref statusptr 0) status))
+       (values pid status)))))
 
 #-win32
 (progn
@@ -460,15 +458,12 @@ not supported."
    (declare (type (sb-alien:alien pid-t) pid)
             (type (sb-alien:alien int) options)
             (type (or null (simple-array (signed-byte 32) (1))) statusptr))
-   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (sb-sys:with-pinned-objects (ptr)
-                 (alien-funcall
-                  (extern-alien "waitpid" (function pid-t
-                                                    pid-t (* int) int))
-                  pid (sb-sys:vector-sap ptr) options))))
-     (if (minusp pid)
-         (syscall-error 'waitpid)
-         (values pid (aref ptr 0)))))
+   (with-alien ((waitpid (function pid-t pid-t (* int) int) :extern "waitpid")
+                (status int))
+     (let ((pid (alien-funcall waitpid pid (addr status) options)))
+       (when (minusp pid) (syscall-error 'waitpid))
+       (when statusptr (setf (aref statusptr 0) status))
+       (values pid status))))
  ;; waitpid macros
  (define-call "wifexited" boolean never-fails (status int))
  (define-call "wexitstatus" int never-fails (status int))
@@ -665,16 +660,13 @@ not supported."
  (declaim (inline pipe))
  (defun pipe (&optional filedes2)
    (declare (type (or null (simple-array (signed-byte 32) (2))) filedes2))
-   (unless filedes2
-     (setq filedes2 (make-array 2 :element-type '(signed-byte 32))))
-   (let ((r (sb-sys:with-pinned-objects (filedes2)
-              (alien-funcall
-               ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
-               (extern-alien "pipe" (function int (* int)))
-               (sb-sys:vector-sap filedes2)))))
-     (when (minusp r)
-       (syscall-error 'pipe)))
-   (values (aref filedes2 0) (aref filedes2 1))))
+   (multiple-value-bind (fd0 fd1)
+       (with-alien ((pipe (function int (array int 2)) :extern "pipe")
+                    (fds (array int 2)))
+         (let ((r (alien-funcall pipe fds)))
+           (if (minusp r) (syscall-error 'pipe) (values (deref fds 0) (deref fds 1)))))
+     (when filedes2 (setf (aref filedes2 0) fd0 (aref filedes2 1) fd1))
+     (values fd0 fd1))))
 
 #-win32
 (define-protocol-class termios alien-termios ()
