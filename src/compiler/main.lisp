@@ -2096,7 +2096,9 @@ returning its filename.
 ;;;
 ;;; But we try our best to give somewhat understandable semantics:
 ;;; * strongly prefer that all fasls have a pathname-type
-;;;   whether or not the output was specified
+;;;   whether or not the output was specified. However, if you are sadistic
+;;;   (and/or enjoy being confusing to others), then :OUTPUT-FILE is permitted
+;;;   to have :UNSPECIFIC as the type, and it will lack the '.fasl' suffix.
 ;;; * we can accept just a directory for the output (a namestring ending in "/"
 ;;;   on Unix) and will take the pathname-name from the input
 ;;; * we will never merge directories from the input to output
@@ -2123,12 +2125,21 @@ returning its filename.
      ;; merged against it.
      ;; Users can set it to #P"" around calling this to obtain a lossless answer.
      (merge-pathnames
-      (flet ((choose (this else) (if (and this (neq this :unspecific)) this else)))
+      (flet ((pick (slot default &aux (specified (if output (funcall slot output))))
+               ;; :unspecific is left alone, "as if the field were 'filled'"
+               ;; (http://www.lispworks.com/documentation/HyperSpec/Body/19_bbbca.htm)
+               ;; which makes little to zero sense at all for the PATHNAME-NAME
+               ;; of a fasl file, but is allowable for its PATHNAME-TYPE.
+               (cond ((or (not specified)
+                          (and (eq specified :unspecific) (eq slot 'pathname-name)))
+                      default)
+                     (t
+                      specified))))
         (make-pathname :host (pathname-host host/dev/dir)
                        :device (pathname-device host/dev/dir)
                        :directory (pathname-directory host/dev/dir)
-                       :name (choose (and output (pathname-name output)) (pathname-name input))
-                       :type (choose (and output (pathname-type output)) *fasl-file-type*))))))
+                       :name (pick 'pathname-name (pathname-name input))
+                       :type (pick 'pathname-type *fasl-file-type*))))))
 
 ;;; FIXME: find a better place for this.
 (defun always-boundp (name)
