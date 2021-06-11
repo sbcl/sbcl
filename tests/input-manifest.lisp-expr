@@ -43,6 +43,7 @@
   "tests/data/wonky1.lisp"
   "tests/data/wonky2.lisp"
   "tests/data/wonky3.lisp"
+  "tests/data/wonky4.lisp"
   "src/code/primordial-extensions.lisp")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
@@ -53,7 +54,8 @@
   "tests/parallel-fasl-load-test.lisp"
   "tests/data/wonky1.lisp"
   "tests/data/wonky2.lisp"
-  "tests/data/wonky3.lisp")
+  "tests/data/wonky3.lisp"
+  "tests/data/wonky4.lisp")
  ("load.pure.lisp"
   "tests/data/wonky1.lisp")
  ("octets.pure.lisp"
