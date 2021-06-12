@@ -13,6 +13,21 @@
 
 (in-package "SB-IMPL")
 
+(macrolet ((def (name &rest args)
+             `(defun ,name ,args
+                (,name ,@args))))
+  (def word-logical-not x)
+  (def word-logical-and x y)
+  (def word-logical-or x y)
+  (def word-logical-xor x y)
+  (def word-logical-nor x y)
+  (def word-logical-eqv x y)
+  (def word-logical-nand x y)
+  (def word-logical-andc1 x y)
+  (def word-logical-andc2 x y)
+  (def word-logical-orc1 x y)
+  (def word-logical-orc2 x y))
+
 (macrolet ((def (name &optional (args '(x)))
              `(defun ,name ,args
                 (,@(if (listp name) `(funcall #',name) `(,name)) ,@args)))
@@ -47,6 +62,8 @@
     (def-accessor sap-ref-single)
     (def-accessor sap-ref-double))
   (def %byte-blt (src src-start dst dst-start dst-end))
+  (def shift-towards-start (number count))
+  (def shift-towards-end (number count))
   (def get-header-data)
   (def set-header-data (x val))
   (def widetag-of)
