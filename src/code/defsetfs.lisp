@@ -37,11 +37,6 @@
     (set-header-data vector (logand (get-header-data vector) (lognot bits)))
     (values)))
 
-;;; from debug-int.lisp
-(in-package "SB-DI")
-(defsetf debug-var-value %set-debug-var-value)
-(defsetf breakpoint-info %set-breakpoint-info)
-
 ;;; from bignum.lisp
 (in-package "SB-IMPL")
 (defsetf %bignum-ref %bignum-set)

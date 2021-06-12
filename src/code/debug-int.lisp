@@ -2516,7 +2516,7 @@ register."
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if
 ;;; it is an indirect value cell. This occurs when the variable is
 ;;; both closed over and set.
-(defun %set-debug-var-value (debug-var frame new-value)
+(defun (setf debug-var-value) (new-value debug-var frame)
   (aver (typep frame 'compiled-frame))
   (let ((old-value (access-compiled-debug-var-slot debug-var frame)))
     (if (indirect-value-cell-p old-value)
@@ -3290,11 +3290,12 @@ register."
 ;;; is SETF'able.
 (defun breakpoint-info (breakpoint)
   (breakpoint-%info breakpoint))
-(defun %set-breakpoint-info (breakpoint value)
+(defun (setf breakpoint-info) (value breakpoint)
   (setf (breakpoint-%info breakpoint) value)
   (let ((other (breakpoint-unknown-return-partner breakpoint)))
     (when other
-      (setf (breakpoint-%info other) value))))
+      (setf (breakpoint-%info other) value)))
+  value)
 
 ;;;; BREAKPOINT-ACTIVE-P and DELETE-BREAKPOINT
 
