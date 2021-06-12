@@ -21,7 +21,7 @@
   (defun shift-towards-start (number count)
     (declare (type word number) (fixnum count))
     (let ((count (ldb (byte (1- (integer-length n-word-bits)) 0) count)))
-      #+big-endian (logand (ash number count) most-postivie-word)
+      #+big-endian (logand (ash number count) most-positive-word)
       #+little-endian (ash number (- count))))
 
 ;;; Shift NUMBER by COUNT bits, adding zero bits at the "start" and
