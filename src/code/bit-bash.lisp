@@ -153,17 +153,10 @@
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
          (word-offset `(integer 0 ,(ceiling array-dimension-limit bytes-per-word)))
-         (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
          (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB-KERNEL")))
          (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
-         (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB-KERNEL")))
-         (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~D-COPY" bitsize) (find-package "SB-KERNEL")))
-         (array-copy-to-system-area-name
-          (intern (format nil "COPY-UB~D-TO-SYSTEM-AREA" bitsize) (find-package "SB-KERNEL")))
-         (system-area-copy-to-array-name
-          (intern (format nil "COPY-UB~D-FROM-SYSTEM-AREA" bitsize)
-                  (find-package "SB-KERNEL"))))
+         (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB-KERNEL"))))
     `(progn
       (declaim (inline ,constant-bash-name ,unary-bash-name))
       ;; Fill DST with VALUE starting at DST-OFFSET and continuing
@@ -523,35 +516,7 @@
              (,unary-bash-name src src-offset dst dst-offset length
                                #'%vector-raw-bits
                                #'%set-vector-raw-bits
-                               #'%vector-raw-bits)))
-
-         (defun ,system-area-copy-name (src src-offset dst dst-offset length)
-           (declare (type index src-offset dst-offset length))
-           (locally (declare (optimize (speed 3) (safety 1)))
-             (multiple-value-bind (src src-offset) (,fix-sap-and-offset-name src src-offset)
-               (declare (type system-area-pointer src))
-               (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name dst dst-offset)
-                 (declare (type system-area-pointer dst))
-                 (,unary-bash-name src src-offset dst dst-offset length
-                                   #'word-sap-ref #'%set-word-sap-ref
-                                   #'word-sap-ref)))))
-
-         (defun ,array-copy-to-system-area-name (src src-offset dst dst-offset length)
-           (declare (type index src-offset dst-offset length))
-           (locally (declare (optimize (speed 3) (safety 1)))
-             (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name  dst dst-offset)
-               (,unary-bash-name src src-offset dst dst-offset length
-                                 #'word-sap-ref #'%set-word-sap-ref
-                                 #'%vector-raw-bits))))
-
-         (defun ,system-area-copy-to-array-name (src src-offset dst dst-offset length)
-           (declare (type index src-offset dst-offset length))
-           (locally (declare (optimize (speed 3) (safety 1)))
-             (multiple-value-bind (src src-offset) (,fix-sap-and-offset-name src src-offset)
-               (,unary-bash-name src src-offset dst dst-offset length
-                                 #'%vector-raw-bits
-                                 #'%set-vector-raw-bits
-                                 #'word-sap-ref)))))))
+                               #'%vector-raw-bits))))))
 ) ; EVAL-WHEN
 
 (eval-when (:compile-toplevel)
