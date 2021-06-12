@@ -156,7 +156,6 @@
          (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
          (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB-KERNEL")))
-         (system-area-fill-name (intern (format nil "SYSTEM-AREA-UB~D-FILL" bitsize) (find-package "SB-KERNEL")))
          (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB-KERNEL")))
          (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~D-COPY" bitsize) (find-package "SB-KERNEL")))
@@ -233,15 +232,9 @@
         (,constant-bash-name dst dst-offset length value
                              #'%vector-raw-bits #'%set-vector-raw-bits)
         dst)
-      (defun ,system-area-fill-name (value dst dst-offset length)
-        (declare (type word value) (type index dst-offset length))
-        (declare (optimize (speed 3) (safety 1)))
-        (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name dst dst-offset)
-          (,constant-bash-name dst dst-offset length value
-                               #'word-sap-ref #'%set-word-sap-ref)))
 
-         ;; unary byte bashing (copying)
-         (defun ,unary-bash-name (src src-offset dst dst-offset length
+      ;; unary byte bashing (copying)
+      (defun ,unary-bash-name (src src-offset dst dst-offset length
                                       dst-ref-fn dst-set-fn src-ref-fn)
            (declare (type index src-offset dst-offset length)
                     (type function dst-ref-fn dst-set-fn src-ref-fn)

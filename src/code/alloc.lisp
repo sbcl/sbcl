@@ -378,9 +378,8 @@
      (setf (sap-ref-word (int-sap addr) 0) word0
            (sap-ref-word (int-sap addr) n-word-bytes) word1)
      ;; 0-fill the remainder of the object
-     (#+64-bit system-area-ub64-fill
-      #-64-bit system-area-ub32-fill
-      0 (int-sap addr) 2 (- (ash n-bytes (- word-shift)) 2))
+     (alien-funcall (extern-alien "memset" (function void system-area-pointer int unsigned))
+                    (sap+ (int-sap addr) (* 2 n-word-bytes)) 0 (- n-bytes (* 2 n-word-bytes)))
      ;; Only after making the new object can we reduce the size of the hole
      ;; that contained the new allocation (if it entailed chopping a hole
      ;; into parts). In this way, heap scans do not read junk.

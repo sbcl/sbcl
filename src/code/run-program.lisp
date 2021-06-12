@@ -543,7 +543,10 @@ status slot."
         ;; Copy string.
         (copy-ub8-to-system-area octets 0 string-sap 0 size)
         ;; NULL-terminate it
-        (system-area-ub8-fill 0 string-sap size 4)
+        ;; (As it says up top: "assume 4 byte is enough for everyone.")
+        (let ((sap (sap+ string-sap size)))
+          (setf (sap-ref-8 sap 0) 0 (sap-ref-8 sap 1) 0
+                (sap-ref-8 sap 2) 0 (sap-ref-8 sap 3) 0))
         ;; Put the pointer in the vector.
         (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
         ;; Advance string-sap for the next string.
