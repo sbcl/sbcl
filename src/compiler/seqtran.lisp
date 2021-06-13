@@ -1022,6 +1022,9 @@
 ;;; performance of, the functions implementing string streams
 ;;; (e.g. SB-IMPL::BASE-STRING-SOUT).
 (defun transform-replace-bashable (bash-function node)
+  ;; This is a little circuitous - we transform REPLACE into BASH-COPY
+  ;; and then possibly transform BASH-COPY into an unrolled loop.
+  ;; There ought to be a way to see if the BASH-COPY transform applies.
   `(let* ((len1 (length seq1))
           (len2 (length seq2))
           (end1 (or end1 len1))
@@ -1108,15 +1111,13 @@
 ;;; restrictive, but they do catch common cases, like allocating a (* 2
 ;;; N)-size buffer and blitting in the old N-size buffer in.
 
-(defun frob-bash-transform (src src-offset
-                            dst dst-offset
-                            length n-elems-per-word)
+(deftransform transform-bash-copy ((src src-offset dst dst-offset length)
+                                   * *
+                                   :defun-only t :info  n-bits-per-elem)
   (declare (ignore src dst length))
-  (let ((n-bits-per-elem (truncate sb-vm:n-word-bits n-elems-per-word)))
-    (multiple-value-bind (src-word src-elt)
-        (truncate (lvar-value src-offset) n-elems-per-word)
-      (multiple-value-bind (dst-word dst-elt)
-          (truncate (lvar-value dst-offset) n-elems-per-word)
+  (binding* ((n-elems-per-word (truncate sb-vm:n-word-bits n-bits-per-elem))
+             ((src-word src-elt) (truncate (lvar-value src-offset) n-elems-per-word))
+             ((dst-word dst-elt) (truncate (lvar-value dst-offset) n-elems-per-word)))
         ;; Avoid non-word aligned copies.
         (unless (and (zerop src-elt) (zerop dst-elt))
           (give-up-ir1-transform))
@@ -1124,56 +1125,34 @@
         ;; determining the direction of copying.
         (unless (= src-word dst-word)
           (give-up-ir1-transform))
-        `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word))))
+        `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word)))
+               (extra (mod length ,n-elems-per-word)))
            (declare (type index end))
            ;; Handle any bits at the end.
-           (when (logtest length (1- ,n-elems-per-word))
-             (let* ((extra (mod length ,n-elems-per-word))
-                    ;; FIXME: The shift amount on this ASH is
-                    ;; *always* negative, but the backend doesn't
-                    ;; have a NEGATIVE-FIXNUM primitive type, so we
-                    ;; wind up with a pile of code that tests the
-                    ;; sign of the shift count prior to shifting when
-                    ;; all we need is a simple negate and shift
-                    ;; right.  Yuck.
-                    (mask (ash most-positive-word
-                               (* (- extra ,n-elems-per-word)
-                                  ,n-bits-per-elem))))
-               (setf (%vector-raw-bits dst end)
-                     (logior
-                      (logandc2 (%vector-raw-bits dst end)
-                                (ash mask
-                                     ,(ecase *backend-byte-order*
-                                        (:little-endian 0)
-                                        (:big-endian `(* (- ,n-elems-per-word extra)
-                                                         ,n-bits-per-elem)))))
-                      (logand (%vector-raw-bits src end)
-                              (ash mask
-                                   ,(ecase *backend-byte-order*
-                                      (:little-endian 0)
-                                      (:big-endian `(* (- ,n-elems-per-word extra)
-                                                       ,n-bits-per-elem)))))))))
+           (unless (zerop extra)
+             ;; MASK selects just the bits that we want from the ending word of
+             ;; the source array. The number of bits to shift out is
+             ;;   (- n-word-bits (* extra n-bits-per-elem))
+             ;; which is equal mod n-word-bits to the expression below.
+             (let ((mask (shift-towards-start
+                          most-positive-word (* extra ,(- n-bits-per-elem)))))
+               (%set-vector-raw-bits
+                dst end (logior (logand (%vector-raw-bits src end) mask)
+                                (logandc2 (%vector-raw-bits dst end) mask)))))
            ;; Copy from the end to save a register.
-           (do ((i end (1- i)))
-               ((<= i ,src-word))
-             (setf (%vector-raw-bits dst (1- i))
-                   (%vector-raw-bits src (1- i))))
-           (values))))))
+           (do ((i (1- end) (1- i)))
+               ((< i ,src-word))
+             (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
+           (values))))
 
-#.
-(let ((arglist '((src src-offset dst dst-offset length)
-                 ((simple-unboxed-array (*)) (constant-arg index)
-                  (simple-unboxed-array (*)) (constant-arg index)
-                  index)
-                 *)))
-  (loop for i = 1 then (* i 2)
-     for name = (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
-     collect `(deftransform ,name ,arglist
-                (frob-bash-transform src src-offset
-                                     dst dst-offset length
-                                     ,(truncate sb-vm:n-word-bits i))) into forms
-     until (= i sb-vm:n-word-bits)
-     finally (return `(progn ,@forms))))
+(loop for i = 1 then (* i 2)
+      do (%deftransform (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
+                        nil
+                        '(function ((simple-unboxed-array (*)) (constant-arg index)
+                                    (simple-unboxed-array (*)) (constant-arg index)
+                                    index) *)
+                        (cons #'transform-bash-copy i))
+      until (= i sb-vm:n-word-bits))
 
 ;;; We expand copy loops inline in SUBSEQ and COPY-SEQ if we're copying
 ;;; arrays with elements of size >= the word size.  We do this because

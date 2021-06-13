@@ -13,26 +13,6 @@
 
 ;;;; support routines
 
-(eval-when (:compile-toplevel) ; these have vops for the target
-;;; Shift NUMBER by the low-order bits of COUNTOID, adding zero bits
-;;; at the "end" and removing bits from the "start". On big-endian
-;;; machines this is a left-shift and on little-endian machines this
-;;; is a right-shift.
-  (defun shift-towards-start (number count)
-    (declare (type word number) (fixnum count))
-    (let ((count (ldb (byte (1- (integer-length n-word-bits)) 0) count)))
-      #+big-endian (logand (ash number count) most-positive-word)
-      #+little-endian (ash number (- count))))
-
-;;; Shift NUMBER by COUNT bits, adding zero bits at the "start" and
-;;; removing bits from the "end". On big-endian machines this is a
-;;; right-shift and on little-endian machines this is a left-shift.
-  (defun shift-towards-end (number count)
-    (declare (type word number) (fixnum count))
-    (let ((count (ldb (byte (1- (integer-length n-word-bits)) 0) count)))
-      #+big-endian (ash number (- count))
-      #+little-endian (logand (ash number count) most-positive-word))))
-
 (declaim (inline start-mask end-mask))
 
 ;;; Produce a mask that contains 1's for the COUNT "start" bits and

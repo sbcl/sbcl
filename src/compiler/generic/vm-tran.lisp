@@ -506,9 +506,11 @@
                    (or (zerop remainder)
                        ;; - To examine 1 bit, shift over 63 bits, 0-filling on the other side
                        ;; - To examine 2 bits, shift over 62 bits, etc
+                       ;; SHIFT-TOWARDS-END accepts a negative shift COUNT which is
+                       ;; congruent to desired shift modulo the maximum shift.
                        (zerop (shift-towards-end (logxor (%vector-raw-bits x words)
                                                          (%vector-raw-bits y words))
-                                                 (- sb-vm:n-word-bits remainder))))))))))
+                                                 (- remainder))))))))))
 
 ;;; This transform has to deal with the fact that unused bits
 ;;; in the last data word of a simple-bit-vector can be random.
@@ -569,10 +571,7 @@
        (let ((bits (ash (mod len sb-vm:n-word-bytes) 3)))
          (when (plusp bits)
            (setf (%vector-raw-bits sequence words)
-                 ;; If we could standardize on SHIFT-TOWARDS-START treating the count
-                 ;; as masked by #b11111 (32-bit) or #b111111 (64-bit) then we could
-                 ;; more simply pass (- bits) as the count.
-                 (shift-towards-start value (- sb-vm:n-word-bits bits)))))
+                 (shift-towards-start value (- bits)))))
        sequence)))
 
 ;;;; %BYTE-BLT
