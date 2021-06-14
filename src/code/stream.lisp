@@ -550,44 +550,25 @@
   (declare (type ansi-stream stream)
            (type index numbytes start)
            (type (or (simple-array * (*)) system-area-pointer) buffer))
-  (let* ((in-buffer (ansi-stream-in-buffer stream))
-         (index (ansi-stream-in-index stream))
-         (num-buffered (- +ansi-stream-in-buffer-length+ index)))
-    (declare (fixnum index num-buffered))
-    (cond
-     ((not in-buffer)
-      (funcall (ansi-stream-n-bin stream)
-               stream
-               buffer
-               start
-               numbytes
-               eof-error-p))
-     ((<= numbytes num-buffered)
-      #+nil
-      (let ((copy-function (typecase buffer
-                             ((simple-array * (*)) #'ub8-bash-copy)
-                             (system-area-pointer #'copy-ub8-to-system-area))))
-        (funcall copy-function in-buffer index buffer start numbytes))
-      (%byte-blt in-buffer index
-                 buffer start (+ start numbytes))
-      (setf (ansi-stream-in-index stream) (+ index numbytes))
-      numbytes)
-     (t
-      (let ((end (+ start num-buffered)))
-        #+nil
-        (let ((copy-function (typecase buffer
-                             ((simple-array * (*)) #'ub8-bash-copy)
-                             (system-area-pointer #'copy-ub8-to-system-area))))
-          (funcall copy-function in-buffer index buffer start num-buffered))
-        (%byte-blt in-buffer index buffer start end)
-        (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-        (+ (funcall (ansi-stream-n-bin stream)
-                    stream
-                    buffer
-                    end
-                    (- numbytes num-buffered)
-                    eof-error-p)
-           num-buffered))))))
+  (let ((in-buffer (ansi-stream-in-buffer stream)))
+    (unless in-buffer
+      (return-from ansi-stream-read-n-bytes
+        (funcall (ansi-stream-n-bin stream) stream buffer start numbytes eof-error-p)))
+    (let* ((index (ansi-stream-in-index stream))
+           (num-buffered (- +ansi-stream-in-buffer-length+ index)))
+      ;; These bytes are of course actual bytes, i.e. 8-bit octets
+      ;; and not variable-length bytes.
+      (cond ((<= numbytes num-buffered)
+             (%byte-blt in-buffer index buffer start (+ start numbytes))
+             (setf (ansi-stream-in-index stream) (+ index numbytes))
+             numbytes)
+            (t
+             (let ((end (+ start num-buffered)))
+               (%byte-blt in-buffer index buffer start end)
+               (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+               (+ (funcall (ansi-stream-n-bin stream) stream buffer
+                           end (- numbytes num-buffered) eof-error-p)
+                  num-buffered)))))))
 
 ;;; the amount of space we leave at the start of the in-buffer for
 ;;; unreading
