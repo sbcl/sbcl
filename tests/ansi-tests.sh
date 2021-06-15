@@ -10,10 +10,11 @@ rm -fr sandbox/scratch
 ../../run-sbcl.sh --lose-on-corruption --disable-ldb \
                   --load gclload1.lsp --load gclload2.lsp \
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
+                  --eval '(in-package :cl-test)' \
                   --eval '(time (regression-test:do-tests))' \
                   --eval '(let* ((expected (list* "APROPOS-LIST.ERROR.2" "APROPOS.ERROR.2" "BOTH-CASE-P.2" "CHAR-DOWNCASE.2"
  "CHAR-UPCASE.2" "COMPILE-FILE.2"
- "DEFINE-COMPILER-MACRO.8" "DEFSETF.7A" "DESTRUCTURING-BIND.ERROR.10"
+ "DEFINE-COMPILER-MACRO.8" "DESTRUCTURING-BIND.ERROR.10"
  "EXP.ERROR.10" "EXP.ERROR.11" "EXP.ERROR.8"
  "EXP.ERROR.9" "EXPT.ERROR.10" "EXPT.ERROR.11" "EXPT.ERROR.8" "EXPT.ERROR.9"
  "FORMAT.A.29" "FORMAT.A.57" "FORMAT.A.58" "FORMAT.B.27" "FORMAT.B.28"
@@ -37,8 +38,7 @@ rm -fr sandbox/scratch
  "PRINT.BACKQUOTE.RANDOM.13" "PRINT.BACKQUOTE.RANDOM.14"
  "PRINT.BACKQUOTE.RANDOM.2" "PRINT.BACKQUOTE.RANDOM.3"
  "PRINT.BACKQUOTE.RANDOM.4" "PRINT.BACKQUOTE.RANDOM.5" "PROCLAIM.ERROR.7"
- "READTABLE-CASE.CASE-DOWNCASE" "READTABLE-CASE.CASE-INVERT"
- "READTABLE-CASE.CASE-PRESERVE" "READTABLE-CASE.CASE-UPCASE" "SHIFTF.7"
+ "SHIFTF.7"
  "SUBTYPEP-COMPLEX.8"
  "SUBTYPEP.EQL.1" "SUBTYPEP.EQL.2" "SUBTYPEP.MEMBER.17" "SUBTYPEP.MEMBER.18"
  "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
@@ -70,5 +70,5 @@ rm -fr sandbox/scratch
                          (diff2 (set-difference expected failing :test (function equal))))
    (cond ((or diff1 diff2)
            (format t "Difference ~@[added ~a~] ~@[removed ~a~]~%" diff1 diff2)
-           (exit :code 1))
-         ((exit))))'
+           (sb-ext:exit :code 1))
+         ((sb-ext:exit))))'
