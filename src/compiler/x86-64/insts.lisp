@@ -1307,7 +1307,7 @@
         ;; word index -1 from the origin label, and so on.
         (emit-ea segment
                  (rip-relative-ea (segment-origin segment) ; = word index 0
-                                  (- (tn-byte-OFFSET thing)
+                                  (- (tn-byte-offset thing)
                                      (component-header-length)))
                  reg :remaining-bytes remaining-bytes))))
     (ea

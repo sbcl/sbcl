@@ -34,6 +34,171 @@
 
 ;;; the actual bashers and common uses of same
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant min-bytes-c-call-threshold
+    ;; mostly just guessing here
+    #+(or x86 x86-64 ppc ppc64) 128
+    #-(or x86 x86-64 ppc ppc64) 256))
+
+;;; 1, 2, 4, and 8 bytes per element can be handled with memmove()
+;;; or, if it's easy enough, a loop over VECTOR-RAW-BITS.
+(defmacro define-byte-blt-copier
+    (bytes-per-element
+     &aux (bits-per-element (* bytes-per-element 8))
+          (vtype `(simple-array (unsigned-byte ,bits-per-element) (*)))
+          (elements-per-word (/ n-word-bytes bytes-per-element))
+          (always-call-out-p ; memmove() is _always_ asymptotically faster than this
+           ;; code, which can't make any use of vectorization that C libraries
+           ;; typically do. It's a question of the overhead of a C call.
+           `(>= nelements ,(/ min-bytes-c-call-threshold bytes-per-element))))
+  (flet ((backward-p ()
+           ;; Iterate backwards if there is overlap and byte transfer is toward higher
+           ;; addresses. Technically (> dst-start src-start) is a necessary
+           ;; but not sufficient condition for overlap, but it's fine.
+           '(and (eq src dst) (> dst-start src-start)))
+         (down ()
+           ;; We could reduce the number of loop variables by 1 by computing
+           ;; the distance between src-start and dst-start, and adding it in
+           ;; to each array reference. Probably it would be worse though.
+           '(do ((dst-index (the (or (eql -1) index) (+ dst-start nwords -1))
+                            (1- dst-index))
+                 (src-index (the (or (eql -1) index) (+ src-start nwords -1))
+                            (1- src-index)))
+                ((< dst-index dst-start))
+              (declare (type (or (eql -1) index) dst-index src-index))
+              ;; Assigning into SRC is right, because DST and SRC are the same array.
+              ;; We don't need "both" arrays to be in registers.
+              (%set-vector-raw-bits src dst-index
+               (%vector-raw-bits src (the index src-index)))))
+         (up ()
+           '(do ((dst-index dst-start (the index (1+ dst-index)))
+                 (src-index src-start (the index (1+ src-index))))
+                ((>= dst-index dst-end))
+              (%set-vector-raw-bits dst dst-index (%vector-raw-bits src src-index))))
+         (use-memmove ()
+           ;; %BYTE-BLT wants the end as an index, which it converts back to a count
+           ;; by subtracting the start. Regardless, the args are way too confusing,
+           ;; so let's go directly to memmove. Cribbed from (DEFTRANSFORM %BYTE-BLT)
+           `(with-pinned-objects (dst src)
+              (memmove (sap+ (vector-sap (the ,vtype dst))
+                             (the signed-word (* dst-start ,bytes-per-element)))
+                       (sap+ (vector-sap (the ,vtype src))
+                             (the signed-word (* src-start ,bytes-per-element)))
+                      (the word (* nelements ,bytes-per-element))))))
+    ;; The arguments are array element indices.
+    `(defun ,(intern (format nil "UB~D-BASH-COPY" bits-per-element)
+                     (find-package "SB-KERNEL"))
+         (src src-start dst dst-start nelements)
+      (declare (type index src-start dst-start nelements))
+      (locally
+         (declare (optimize (safety 0)
+                            (sb-c::alien-funcall-saves-fp-and-pc 0)))
+       ,(if (= bytes-per-element sb-vm:n-word-bytes)
+          `(if ,always-call-out-p
+               ,(use-memmove)
+               (let ((nwords nelements))
+                 (if ,(backward-p)
+                     ,(down)
+                     (let ((dst-end (the index (+ dst-start nelements))))
+                       ,(up)))))
+          `(let ((dst-subword (mod dst-start ,elements-per-word))
+                 (src-subword (mod src-start ,elements-per-word))
+                 (dst (truly-the ,vtype dst))
+                 (src (truly-the ,vtype src)))
+             (cond ((or ,always-call-out-p
+                        (/= dst-subword src-subword)) ; too complicated
+                    ,(use-memmove))
+                   (,(backward-p)
+                    ;; Using the primitive-type-specific data-vector-set,
+                    ;; process at most (1- ELEMENTS-PER-WORD) elements
+                    ;; until aligned to a word.
+                    (let ((dst-end (+ dst-start nelements))
+                          (src-end (+ src-start nelements))
+                          (original-nelements nelements))
+                      ,@(let (initial)
+                          (loop for i downfrom (- elements-per-word 1)
+                                repeat (1- elements-per-word)
+                                do (setq initial
+                                         ;; Test NELEMENTS first because it should be in a register
+                                         ;; from the preceding DECF.
+                                         `((when (and (/= nelements 0)
+                                                      (logtest dst-end ,(1- elements-per-word)))
+                                             (data-vector-set dst (1- dst-end)
+                                                              (data-vector-ref src (- src-end ,i)))
+                                             (decf (the index dst-end))
+                                             (decf (the index nelements))
+                                             ,@initial))))
+                          initial)
+                      (decf src-end (the (mod 8) (- original-nelements nelements)))
+                      ;; Now DST-END and SRC-END are element indices that start a word.
+                      ;; Scan backwards by whole words.
+                      (let ((nwords (truncate nelements ,elements-per-word)))
+                        (when (plusp nwords)
+                          ;; Convert to word indices
+                          (let* ((dst-start (- (truncate dst-end ,elements-per-word) nwords))
+                                 (src-start (- (truncate src-end ,elements-per-word) nwords)))
+                            ,(down))
+                          (decf (the index dst-end) (* nwords ,elements-per-word))
+                          (decf (the index src-end) (* nwords ,elements-per-word))
+                          (decf nelements (* nwords ,elements-per-word))))
+                      ;; If there are elements remaining after the last fill word copied,
+                      ;; process element by element.
+                      ,@(let (final)
+                          (loop for i from (1- elements-per-word) downto 1
+                                do (setq final
+                                         `((unless (= nelements 0)
+                                             (data-vector-set
+                                              dst (- dst-end ,i)
+                                              (data-vector-ref src (- src-end ,i)))
+                                             ,@(unless (= i (1- elements-per-word))
+                                                 '((decf (the index nelements))))
+                                             ,@final))))
+                        final)))
+                   (t
+                    ;; Same as above
+                    (let ((original-nelements nelements))
+                      ,@(let (initial)
+                          (loop for i downfrom (- elements-per-word 2)
+                                repeat (1- elements-per-word)
+                                do (setq initial
+                                         `((when (and (/= nelements 0)
+                                                      (logtest dst-start ,(1- elements-per-word)))
+                                             (data-vector-set
+                                              dst dst-start
+                                              (data-vector-ref src (+ src-start ,i)))
+                                             (incf (the index dst-start))
+                                             (decf (the index nelements))
+                                             ,@initial))))
+                          initial)
+                      (incf (the index src-start) (- original-nelements nelements)))
+                    (let ((nwords (truncate nelements ,elements-per-word)))
+                      (when (plusp nwords)
+                        (let* ((src-start (truncate src-start ,elements-per-word))
+                               (dst-start (truncate dst-start ,elements-per-word))
+                               (dst-end (the index (+ dst-start nwords))))
+                          ,(up))
+                        (incf dst-start (* nwords ,elements-per-word))
+                        (incf src-start (* nwords ,elements-per-word))
+                        (decf nelements (* nwords ,elements-per-word))))
+                    ;; Same as above
+                    ,@(let (final)
+                        (loop for i from (- elements-per-word 2) downto 0
+                              do (setq final
+                                       `((unless (= nelements 0)
+                                           (data-vector-set
+                                            dst (+ dst-start ,i)
+                                            (data-vector-ref src (+ src-start ,i)))
+                                           ,@(unless (= i (- elements-per-word 2))
+                                               '((decf (the index nelements))))
+                                           ,@final))))
+                        final)))))
+       (values)))))
+
+(define-byte-blt-copier 1)
+(define-byte-blt-copier 2)
+(define-byte-blt-copier 4)
+#+64-bit (define-byte-blt-copier 8)
+
 ;;; We cheat a little bit by using TRULY-THE in the copying function to
 ;;; force the compiler to generate good code in the (= BITSIZE
 ;;; N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
@@ -47,7 +212,7 @@
          (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB-KERNEL"))))
     `(progn
-      (declaim (inline ,constant-bash-name ,unary-bash-name))
+      (declaim (inline ,constant-bash-name))
       ;; Fill DST with VALUE starting at DST-OFFSET and continuing
       ;; for LENGTH bytes (however bytes are defined).
       (defun ,constant-bash-name (dst dst-offset length value)
@@ -112,8 +277,10 @@
         (,constant-bash-name dst dst-offset length value)
         dst)
 
-      ;; unary byte bashing (copying)
-      (defun ,unary-bash-name (src src-offset dst dst-offset length)
+      ;; Copying. Never use this for 8, 16, 32, 64
+      ,@(when (member bitsize '(1 2 4))
+       `((declaim (inline ,unary-bash-name))
+         (defun ,unary-bash-name (src src-offset dst dst-offset length)
            (declare (type index src-offset dst-offset length))
            (multiple-value-bind (dst-word-offset dst-byte-offset)
                (floor dst-offset ,bytes-per-word)
@@ -396,7 +563,7 @@
          (defun ,array-copy-name (src src-offset dst dst-offset length)
            (declare (type index src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
-             (,unary-bash-name src src-offset dst dst-offset length))))))
+             (,unary-bash-name src src-offset dst dst-offset length))))))))
 
 ;;; We would normally do this with a MACROLET, but then we run into
 ;;; problems with the lexical environment being too hairy for the
