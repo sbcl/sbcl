@@ -23,10 +23,10 @@
   system-area-pointer)
 
 (declaim (inline memmove))
-(define-alien-routine ("memmove" memmove) void
+(define-alien-routine ("memmove" memmove) void ; BUG: technically returns void*
   (dest (* char))
   (src (* char))
-  (n unsigned-int))
+  (n unsigned))
 
 (defun copy-ub8-to-system-area (src src-offset dst dst-offset length)
   (with-pinned-objects (src)
