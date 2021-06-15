@@ -141,7 +141,7 @@
                           (decf (the index dst-end) (* nwords ,elements-per-word))
                           (decf (the index src-end) (* nwords ,elements-per-word))
                           (decf nelements (* nwords ,elements-per-word))))
-                      ;; If there are elements remaining after the last fill word copied,
+                      ;; If there are elements remaining after the last full word copied,
                       ;; process element by element.
                       ,@(let (final)
                           (loop for i from (1- elements-per-word) downto 1

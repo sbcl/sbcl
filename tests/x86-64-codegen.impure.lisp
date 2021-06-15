@@ -999,9 +999,9 @@ sb-vm::(define-vop (cl-user::test)
                                 thereis (search telltale line)))))))
 
 (with-test (:name :bash-copiers-byte-or-larger)
-  (dolist (f '(sb-kernel::new-ub8-bash-copy
-               sb-kernel::new-ub16-bash-copy
-               sb-kernel::new-ub32-bash-copy
-               sb-kernel::new-ub64-bash-copy))
+  (dolist (f '(sb-kernel::ub8-bash-copy
+               sb-kernel::ub16-bash-copy
+               sb-kernel::ub32-bash-copy
+               sb-kernel::ub64-bash-copy))
     ;; Should not call anything
     (assert (not (ctu:find-code-constants (symbol-function f))))))
