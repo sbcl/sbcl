@@ -269,8 +269,9 @@
 ;;;; Grabbing the kind of file when we have a native-namestring.
 (defun native-file-kind (namestring &optional resolve-symlinks)
   #+win32 (declare (ignore resolve-symlinks))
+  #+win32 (nth-value 1 (sb-win32::native-probe-file-name namestring))
+  #-win32
   (multiple-value-bind (existsp errno ino mode)
-      #-win32
       ;; Note that when resolve-symlinks is true, we'll return NIL if
       ;; there are circular and dangling symlinks anywhere in the
       ;; path. That's different than what our TRUENAME does; this is
@@ -278,15 +279,12 @@
       (if resolve-symlinks
           (sb-unix:unix-stat namestring)
           (sb-unix:unix-lstat namestring))
-      #+win32
-      (sb-unix:unix-stat namestring)
     (declare (ignore errno ino))
     (when existsp
       (let ((ifmt (logand mode sb-unix:s-ifmt)))
        (case ifmt
          (#.sb-unix:s-ifreg :file)
          (#.sb-unix:s-ifdir :directory)
-         #-win32
          (#.sb-unix:s-iflnk :symlink)
          (t :special))))))
 
