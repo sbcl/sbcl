@@ -26,7 +26,7 @@
 (define-alien-routine ("memmove" memmove) void ; BUG: technically returns void*
   (dest (* char))
   (src (* char))
-  (n unsigned))
+  (n sb-unix::size-t))
 
 (defun copy-ub8-to-system-area (src src-offset dst dst-offset length)
   (with-pinned-objects (src)
