@@ -666,17 +666,18 @@
       ;; (and (eq spec 'character) (= bits 32))
       ))
 
-(declaim (inline calc-nwords-form))
-(defun calc-nwords-form (saetp const-length
+(defun calc-nwords-form (saetp length-var
+                         &optional (const-length
+                                    (if (integerp length-var) length-var))
                          &aux (n-bits (sb-vm:saetp-n-bits saetp))
                               (n-pad-elements (sb-vm:saetp-n-pad-elements saetp)))
   (when const-length
     (return-from calc-nwords-form
       (if (typep const-length 'index)
-          (ceiling (* (+ const-length n-pad-elements) n-bits) sb-vm:n-word-bits))))
+          (values (ceiling (* (+ const-length n-pad-elements) n-bits) sb-vm:n-word-bits)))))
   (let ((padded-length-form (if (zerop n-pad-elements)
-                                '%length
-                                `(+ %length ,n-pad-elements))))
+                                length-var
+                                `(+ ,length-var ,n-pad-elements))))
     (cond ((= n-bits 0) 0)
           ((= n-bits sb-vm:n-word-bits) padded-length-form)
           ((> n-bits sb-vm:n-word-bits) ; e.g. double-float on 32-bit
@@ -742,7 +743,10 @@
 (defun transform-make-array-vector (length element-type initial-element
                                     initial-contents call
                                     &key adjustable fill-pointer
+                                         (poisoned
+                                          (not (or initial-contents initial-element)))
                                     &aux c-length)
+  (declare (ignorable poisoned))
   (when (and initial-contents initial-element)
     (abort-ir1-transform "Both ~S and ~S specified."
                          :initial-contents :initial-element))
@@ -780,12 +784,13 @@
                        (give-up-ir1-transform))
                       (t
                        (find-saetp-by-ctype elt-ctype))))
-         (n-words-form (or (calc-nwords-form saetp c-length) (give-up-ir1-transform)))
+         (n-words-form (or (calc-nwords-form saetp '%length c-length)
+                           (give-up-ir1-transform)))
          (default-initial-element (sb-vm:saetp-initial-element-default saetp))
          (data-alloc-form
           `(truly-the
             (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
-            (allocate-vector #+ubsan ,(not (or initial-contents initial-element))
+            (allocate-vector #+ubsan ,poisoned
                              ,(sb-vm:saetp-typecode saetp) %length nwords))))
 
     (flet ((eliminate-keywords ()
@@ -918,7 +923,9 @@
                                 ;; otherwise, reading an element can't cause an invalid bit pattern
                                 ;; to be observed, but the bits could be random.
                                 ;; KLUDGE: backward-compatibile 0-fill
-                                `(sb-vm::splat ,data-alloc-form nwords 0)))))))
+                                data-alloc-form
+                                ;`(sb-vm::splat ,data-alloc-form nwords 0)
+                                ))))))
 
             ;; Case (3) - constant :INITIAL-CONTENTS and LENGTH
             ((and c-length

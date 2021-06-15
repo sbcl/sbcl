@@ -823,6 +823,8 @@ the current thread are replaced with dummy objects which can safely escape."
                 (*current-level-in-print* 0)
                 (*package* original-package)
                 (*print-pretty* original-print-pretty)
+                ;; Assume the worst: any array may contain poison values
+                #+ubsan (*print-array* nil)
                 ;; Clear the circularity machinery to try to to reduce the
                 ;; pain from sharing the circularity table across all
                 ;; streams; if these are not rebound here, then setting

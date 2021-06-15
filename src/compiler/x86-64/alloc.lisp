@@ -391,8 +391,10 @@
                 #+ubsan (inst mov :dword (vector-len-ea ,vector-tn ,lowtag) len)
                 #-ubsan (storew* len ,vector-tn vector-length-slot
                                        ,lowtag ,zeroed)))
-           (want-shadow-bits ()
+           (require-shadow-bits ()
              `(and poisoned
+                   (sb-c::policy node (> sb-c::aref-poison-detect 0))
+                   (if (sc-is length immediate) (> (tn-value length) 0) :maybe)
                    (if (sc-is type immediate)
                        (/= (tn-value type) simple-vector-widetag)
                        :maybe)))
@@ -409,14 +411,15 @@
                      (inst shr :dword ,reg 8) ; divide by 128 and untag as one operation
                      (inst shl :dword ,reg 4) ; multiply by 16 bytes per dualword
                      ,reg)))
-           (store-originating-pc (vector)
-             ;; Put the current program-counter into the length slot of the shadow bits
-             ;; so that we can ascribe blame to the array's creator.
-             `(let ((here (gen-label)))
-                (emit-label here)
-                (inst lea temp-reg-tn (rip-relative-ea here))
-                (inst shl temp-reg-tn 4)
-                (inst mov (ea (- 8 other-pointer-lowtag) ,vector) temp-reg-tn))))
+           (alloc-origin-tracker (tn lowtag)
+             `(let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
+                ;; store CONS-CAR-SLOT
+                (inst mov :qword (ea (- ,lowtag) ,tn) (make-fixup nil :pc-offset-as-fixnum))
+                (inst lea temp-reg-tn (rip-relative-ea origin :code))
+                ;; store CONS-CDR-SLOT
+                (inst mov (ea (- 8 ,lowtag) ,tn) temp-reg-tn)
+                ;; OR in a list-pointer tag if it was 0
+                ,(if (eq lowtag 0) `(inst or :byte ,tn list-pointer-lowtag)))))
 
   (define-vop (allocate-vector-on-heap)
     #+ubsan (:info poisoned)
@@ -428,29 +431,34 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
+    #+ubsan (:temporary (:sc unsigned-reg) shadow)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
       #+ubsan
-      (when (want-shadow-bits)
-        ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
-        ;; which can use unbound-marker as a poison value on reads.
+      (when (require-shadow-bits)
+        (zeroize shadow)
+        ;; allocate a shadow vector unless this vector is simple-vector-T,
+        ;; which can use unbound-marker as a poison value
         (when (sc-is type unsigned-reg)
           (inst cmp :byte type simple-vector-widetag)
-          (inst push 0)
           (inst jmp :e NO-SHADOW-BITS))
-        ;; It would be possible to do this and the array proper
-        ;; in a single pseudo-atomic section, but I don't care to do that.
-        (let ((nbytes (calc-shadow-bits-size result)))
+        (when (sc-is length any-reg) ; empty array needs no shadow bits
+          (inst test :dword length length)
+          (inst jmp :z NO-SHADOW-BITS))
+        (let ((nbytes (calc-shadow-bits-size shadow)))
           (pseudo-atomic ()
-            ;; Allocate the bits into RESULT
-            (allocation nil nbytes 0 node nil result)
-            (inst mov :byte (ea result) simple-bit-vector-widetag)
-            (inst mov :dword (vector-len-ea result 0)
+            ;; Allocate a cons into RESULT temporarily to store the code and offset
+            (allocation nil (* cons-size n-word-bytes) 0 node nil result)
+            (alloc-origin-tracker result 0)
+            ;; Allocate the shadow bits into SHADOW
+            (allocation nil nbytes 0 node nil shadow)
+            (inst mov :byte (ea shadow) simple-bit-vector-widetag)
+            (inst mov :dword (vector-len-ea shadow 0)
                   (if (sc-is length immediate) (fixnumize (tn-value length)) length))
-            (inst or :byte result other-pointer-lowtag)))
-        (store-originating-pc result)
-        (inst push result)) ; save the pointer to the shadow bits
+            ;; Store RESULT (the cons) into the extra slot of SHADOW
+            (storew result shadow vector-length-slot 0)
+            (inst or :byte shadow other-pointer-lowtag))))
       NO-SHADOW-BITS
       ;; The LET generates instructions that needn't be pseudoatomic
       ;; so don't move it inside.
@@ -459,21 +467,34 @@
         (pseudo-atomic ()
          (allocation nil size 0 node nil result)
          (put-header result 0 type length t)
-         (inst or :byte result other-pointer-lowtag)))
-      #+ubsan
-      (cond ((want-shadow-bits)
-             (inst pop temp-reg-tn) ; restore shadow bits
-             (inst mov (object-slot-ea result 1 other-pointer-lowtag) temp-reg-tn))
-            (poisoned ; uninitialized SIMPLE-VECTOR
-             (store-originating-pc result)))))
+         (inst or :byte result other-pointer-lowtag)
+         ;; Don't leave PA section until shadow bits are assigned,
+         ;; so that GC can decide whether the result can be
+         ;; relocated to an unbxoxed vs boxed page.
+         #+ubsan
+         (cond ((require-shadow-bits)
+                ;; slight bug - if this was ":maybe" and then the vector is
+                ;; simple-vector but compile-time-unknown, this will take the jump
+                ;; to NO-SHADOW-BITS and then store a 0 without storing the PC.
+                ;; But that's OK because it can be compile-time-unknown only if
+                ;; called from %MAKE-ARRAY and a few other places which try to
+                ;; insert the origin location their own by looking up the caller
+                ;; of the current frame.
+                (storew shadow result vector-length-slot other-pointer-lowtag))
+               (poisoned ; uninitialized SIMPLE-VECTOR
+                (allocation nil (* cons-size n-word-bytes) 0 node nil shadow)
+                (alloc-origin-tracker shadow 0)
+                ;; Store the cons into the spare slot of result
+                (storew shadow result vector-length-slot other-pointer-lowtag)))))))
 
-  (define-vop (allocate-vector-on-stack)
+ (define-vop (allocate-vector-on-stack)
     #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:vop-var vop)
+    (:node-var node)
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     #+ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
@@ -482,41 +503,48 @@
     (:policy :fast-safe)
     (:generator 10
       #+ubsan
-      (when (want-shadow-bits)
-        ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
-        ;; which can use unbound-marker as a poison value on reads.
-        (when (sc-is type unsigned-reg) (bug "vector-on-stack: unknown type"))
-        (zeroize rax)
-        (let ((nbytes (calc-shadow-bits-size rcx)))
-          (stack-allocation rdi nbytes 0)
-          (when (sc-is length immediate) (inst mov rcx nbytes)))
-        (inst rep)
-        (inst stos :byte) ; RAX was zeroed
-        (inst lea rax (ea other-pointer-lowtag rsp-tn))
-        (inst mov :dword (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
-        (inst mov :dword (vector-len-ea rax)
-              (if (sc-is length immediate) (fixnumize (tn-value length)) length))
-        (store-originating-pc rax))
+      (cond
+        ((require-shadow-bits)
+         ;; allocate a vector of "written" bits unless the vector is simple-vector-T,
+         ;; which can use unbound-marker as a poison value on reads.
+         (when (sc-is type unsigned-reg) (bug "vector-on-stack: unknown type"))
+         (zeroize rax)
+         ;; Allocate a cons into RESULT temporarily to store the code and offset
+         (stack-allocation result (* cons-size n-word-bytes) list-pointer-lowtag)
+         (alloc-origin-tracker result list-pointer-lowtag)
+         (let ((nbytes (calc-shadow-bits-size rcx)))
+           (stack-allocation rdi nbytes 0 t)
+           (when (sc-is length immediate) (inst mov rcx nbytes)))
+         (inst rep)
+         (inst stos :byte) ; RAX was zeroed
+         (inst lea rax (ea other-pointer-lowtag rsp-tn))
+         (inst mov :byte (ea (- other-pointer-lowtag) rax) simple-bit-vector-widetag)
+         (inst mov :dword (vector-len-ea rax)
+               (if (sc-is length immediate) (fixnumize (tn-value length)) length))
+         ;; Store the origin in the shadow vector
+         (storew result rax vector-length-slot other-pointer-lowtag))
+        (poisoned
+         ;; Allocate a cons into RAX to store the code and offset
+         (stack-allocation rax (* cons-size n-word-bytes) list-pointer-lowtag)
+         (alloc-origin-tracker rax list-pointer-lowtag))
+        (t
+         ;; Always need tostore something in the spare slot, otherwise it could
+         ;; have a random value that looks like a pointer to shadow bits.
+         (zeroize rax)))
       (let ((size (calc-size-in-bytes words result)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag
                           ;; If already aligned RSP, don't need to do it again.
-                          #+ubsan (want-shadow-bits))
+                          #+ubsan (require-shadow-bits))
         ;; NB: store the trailing null BEFORE storing the header,
         ;; in case the length in words is 0, which stores into the LENGTH slot
         ;; as if it were element -1 of data (which probably can't happen).
         (store-string-trailing-null result type length words)
         ;; FIXME: It would be good to check for stack overflow here.
-        (put-header result other-pointer-lowtag type length nil)
-        )
+        (put-header result other-pointer-lowtag type length nil))
       #+ubsan
-      (cond ((want-shadow-bits)
-             (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
-                           result)
-                   rax))
-            (poisoned ; uninitialized SIMPLE-VECTOR
-             (store-originating-pc result)))))
+      (storew rax result vector-length-slot other-pointer-lowtag)))
 
   #+linux ; unimplemented for others
   (define-vop (allocate-vector-on-stack+msan-unpoison)

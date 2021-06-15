@@ -208,16 +208,10 @@ void __mark_obj(lispobj pointer)
             *base |= markbit;
         }
 #ifdef LISP_FEATURE_UBSAN
-        if (specialized_vector_widetag_p(widetag) && is_lisp_pointer(base[1]))
-            gc_mark_obj(base[1]);
-        else if (widetag == SIMPLE_VECTOR_WIDETAG && fixnump(base[1])) {
-            char *origin_pc = (char*)(base[1]>>4);
-            lispobj* code = component_ptr_from_pc(origin_pc);
-            if (code) gc_mark_obj(make_lispobj(code, OTHER_POINTER_LOWTAG));
-            /* else lose("can't find code containing %p (vector=%p)", origin_pc, base); */
-        }
-#endif
+        if (leaf_obj_widetag_p(widetag) && !specialized_vector_widetag_p(widetag)) return;
+#else
         if (leaf_obj_widetag_p(widetag)) return;
+#endif
     } else {
         uword_t key = compute_page_key(pointer);
         int index = compute_dword_number(pointer);
@@ -297,14 +291,14 @@ static void trace_object(lispobj* where)
     struct weak_pointer *weakptr;
     switch (widetag) {
     case SIMPLE_VECTOR_WIDETAG:
-#ifdef LISP_FEATURE_UBSAN
-        if (is_lisp_pointer(where[1])) gc_mark_obj(where[1]);
-#endif
         // non-weak hashtable kv vectors are trivial in fullcgc. Keys don't move
         // so the table will not need rehash as a result of gc.
         // Ergo, those may be treated just like ordinary simple vectors.
         // However, weakness remains as a special case.
         if (vector_flagp(header, VectorWeak)) {
+#ifdef LISP_FEATURE_UBSAN
+            gc_mark_obj(where[1]); // non-weak slot
+#endif
             if (!vector_flagp(header, VectorHashing)) {
                 add_to_weak_vector_list(where, header);
                 return;
@@ -368,6 +362,9 @@ static void trace_object(lispobj* where)
             add_to_weak_pointer_chain(weakptr);
         return;
     default:
+#ifdef LISP_FEATURE_UBSAN
+        if (specialized_vector_widetag_p(widetag)) gc_mark_obj(where[1]);
+#endif
         if (leaf_obj_widetag_p(widetag)) return;
     }
     for(i=scan_from; i<scan_to; ++i)

@@ -1319,6 +1319,7 @@ NOTE: This interface is experimental and subject to change."
   (macrolet ((true (sym)
                `(and (boundp ',sym) ,sym)))
     (let ((*print-readably* nil)
+          #+ubsan (*print-array* nil)
           (*print-level* (or (true *print-level*) 6))
           (*print-length* (or (true *print-length*) 12))
           #-sb-xc-host (*print-vector-length* (or (true *print-vector-length*) 200)))

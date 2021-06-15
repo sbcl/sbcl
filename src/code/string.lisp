@@ -443,8 +443,8 @@ new string COUNT long filled with the fill character."
   (declare (explicit-check))
   (cond ((eq element-type 'character)
          (let ((c (if iep (the character initial-element)))
-               (s (make-string count :element-type 'character)))
-           (when c (sb-vm::unpoison s) (fill s c))
+               (s (alloc-string character count)))
+           (when c (fill s c))
            s))
          ((or (eq element-type 'base-char)
               (eq element-type 'standard-char)
@@ -453,8 +453,8 @@ new string COUNT long filled with the fill character."
               ;; So that would be 8 bits per character, not 32 bits per character.
               (eq element-type nil))
           (let ((c (if iep (the base-char initial-element)))
-                (s (make-string count :element-type 'base-char)))
-            (when c (sb-vm::unpoison s) (fill s c))
+                (s (alloc-string base-char count)))
+            (when c (fill s c))
             s))
          (t
           (multiple-value-bind (widetag n-bits-shift)

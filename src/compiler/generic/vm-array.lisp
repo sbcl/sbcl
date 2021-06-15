@@ -217,18 +217,13 @@
 ;;; the pointer to the shadow bits.
 ;;; Alternatively we could place them in malloc()'ed memory
 ;;; but then we'd need a finalizer per array.
-#+ubsan
+#+(and ubsan (not sb-xc-host))
 (progn
 (export '(vector-extra-data))
 (defmacro vector-extra-data (vector)
   `(%primitive slot ,vector 'length 1 other-pointer-lowtag))
 (defmacro set-vector-extra-data (vector data)
-  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag))
-(defmacro unpoison (vector)
-  `(set-vector-extra-data ,vector 0)))
-#-ubsan
-(defmacro unpoison (vector)
-  (declare (ignore vector)))
+  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag)))
 
 ;;; Return T if arrays with the given WIDETAG may contain random data
 ;;; initially unless expressly initialized.

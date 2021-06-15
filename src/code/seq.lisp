@@ -501,6 +501,7 @@
                     (end end)
                     :check-fill-pointer t
                     :force-inline t)
+    #+ubsan (aver-unpoisoned data start end)
     (vector-subseq-dispatch data start end)))
 
 (defun list-subseq* (sequence start end)
@@ -1129,8 +1130,11 @@ many elements are copied."
                 (let ((length 0))
                   (declare (index length))
                   (do-rest-arg ((seq) sequences)
+                    #+ubsan (aver-unpoisoned seq 0 (length seq))
                     (incf length (length seq)))
-                  (let ((result (make-array length :element-type ',element-type))
+                  (let ((result ,(if (eq element-type 't)
+                                     '(make-array length)
+                                     `(alloc-string ,element-type length)))
                         (start 0))
                     (declare (index start))
                     (do-rest-arg ((seq) sequences)
@@ -3043,3 +3047,4 @@ many elements are copied."
               (frob 0 initial-contents)
               (frob (1+ axis) content))))
     array))
+

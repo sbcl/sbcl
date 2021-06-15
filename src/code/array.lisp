@@ -493,10 +493,16 @@
                    (t
                     ;; store the function which bears responsibility for creation of this
                     ;; array in case we need to blame it for not initializing.
-                    (set-vector-extra-data (if (= widetag simple-vector-widetag) ; no shadow bits.
-                                               vector ; use the LENGTH slot directly
-                                               (vector-extra-data vector))
-                                           (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: magic
+                    (let* ((return-pc (sap-ref-word (current-fp) n-word-bytes))
+                           (code (sb-di::code-header-from-pc return-pc))
+                           (loc (if code
+                                    (cons (- return-pc (get-lisp-obj-address code)) code)
+                                    '(0 . :unknown))))
+                      (when (plusp dimension-0)
+                        (set-vector-extra-data (if (= widetag simple-vector-widetag) ; no shadow bits.
+                                                   vector ; use the LENGTH slot directly
+                                                   (vector-extra-data vector))
+                                               loc)))
                     (cond ((= widetag simple-vector-widetag)
                            (fill vector (%make-lisp-obj no-tls-value-marker-widetag)))
                           ((array-may-contain-random-bits-p widetag)

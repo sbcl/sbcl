@@ -16,6 +16,9 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
+;;; For efficiency, ensure that RANDOM-STATEs contain unpoisoned arrays.
+;;; (The code is correct without runtime instrumentation)
+(declaim (optimize (sb-c::aref-poison-detect 0)))
 
 ;;;; Constants
 (defconstant mt19937-n 624)

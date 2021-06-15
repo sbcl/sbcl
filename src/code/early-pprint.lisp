@@ -109,6 +109,8 @@
 
 (defconstant default-line-length 80)
 
+(defmacro make-buffer (n) `(sb-impl::alloc-string character ,n))
+
 ;; We're allowed to DXify the pretty-stream used by PPRINT-LOGICAL-BLOCK.
 ;;   "pprint-logical-block and the pretty printing stream it creates have
 ;;    dynamic extent. The consequences are undefined if, outside of this
@@ -135,7 +137,7 @@
   (char-out-oneshot-hook nil :type (or null function))
   ;; A simple string holding all the text that has been output but not yet
   ;; printed.
-  (buffer (make-string initial-buffer-size) :type (simple-array character (*)))
+  (buffer (make-buffer initial-buffer-size) :type (simple-array character (*)))
   ;; The index into BUFFER where more text should be put.
   (buffer-fill-pointer 0 :type index)
   ;; Whenever we output stuff from the buffer, we shift the remaining noise
@@ -166,12 +168,12 @@
   ;; Buffer holding the per-line prefix active at the buffer start.
   ;; Indentation is included in this. The length of this is stored
   ;; in the logical block stack.
-  (prefix (make-string initial-buffer-size) :type (simple-array character (*)))
+  (prefix (make-buffer initial-buffer-size) :type (simple-array character (*)))
   ;; Buffer holding the total remaining suffix active at the buffer start.
   ;; The characters are right-justified in the buffer to make it easier
   ;; to output the buffer. The length is stored in the logical block
   ;; stack.
-  (suffix (make-string initial-buffer-size) :type (simple-array character (*)))
+  (suffix (make-buffer initial-buffer-size) :type (simple-array character (*)))
   ;; Queue of pending operations. When empty, HEAD=TAIL=NIL. Otherwise,
   ;; TAIL holds the first (oldest) cons and HEAD holds the last (newest)
   ;; cons. Adding things to the queue is basically (setf (cdr head) (list

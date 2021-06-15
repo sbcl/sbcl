@@ -19,6 +19,7 @@
 ;;; (including not only the final construction of the core file, but
 ;;; also the preliminary steps like e.g. building the cross-compiler
 ;;; and running the cross-compiler to produce target FASL files).
+(setq sb-ext:*evaluator-mode* :compile)
 (defpackage "SB-COLD" (:use "CL"))
 
 (in-package "SB-COLD")

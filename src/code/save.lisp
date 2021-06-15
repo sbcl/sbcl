@@ -366,7 +366,7 @@ sufficiently motivated to do lengthy fixes."
 ;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
 ;;; exhaustion (due to inhibited GC), so this takes several passes.
 (defun coalesce-ctypes (&optional verbose)
-  (declare (optimize (sb-c::aref-trapping 0)))
+  (declare (optimize (sb-c::aref-poison-detect 0)))
   (let* ((table (make-hash-table :test 'equal))
          interned-ctypes
          referencing-objects)

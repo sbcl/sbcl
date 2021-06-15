@@ -332,6 +332,9 @@ void create_main_lisp_thread(lispobj function) {
 #ifdef COLLECT_GC_STATS
     atexit(summarize_gc_stats);
 #endif
+#ifdef LISP_FEATURE_UBSAN
+    SYMBOL(UBSAN_ENABLE)->value = 2; // KLUDGE
+#endif
     /* WIN32 has a special stack arrangement, calling
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */

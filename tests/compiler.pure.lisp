@@ -3835,7 +3835,7 @@
   (flet ((make-lambda (n)
            `(lambda (x)
               (declare (optimize (speed 3) (space 0)))
-              (concatenate 'string x ,(make-string n)))))
+              (concatenate 'string x ,(make-string n :initial-element #\nul)))))
     (let* ((l0 (make-lambda 1))
            (l1 (make-lambda 10))
            (l2 (make-lambda 100))

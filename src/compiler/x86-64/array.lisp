@@ -16,48 +16,56 @@
 ;; field of an EA can't contain 64 bit values.
 (sb-xc:deftype low-index () '(signed-byte 29))
 
+(macrolet ((bit-op (op)
+             `(progn
+                (inst mov temp (object-slot-ea array 1 other-pointer-lowtag))
+                ;; See if the ancillary slot holds a bit-vector and not
+                ;; a fixnum or list.
+                ;; A list will denote the stack trace at the creation site
+                ;; rather than shadow bits. A fixnum for PC recording
+                ;; is left-shifted so as not to overlap any lowtag bit.
+                (inst test :byte temp #b1000)
+                (inst jmp :z ok)
+                (if (or (fixnump index) (sc-is index immediate))
+                  (multiple-value-bind (dword-index bit)
+                      (floor (if (fixnump index) index (tn-value index)) 32)
+                    (inst ,@op :dword (ea (bit-base dword-index) temp) bit))
+                  (sc-case index
+                   ((signed-reg unsigned-reg)
+                    (inst ,@op (ea (bit-base 0) temp) index))
+                   (t
+                    (aver (sc-is index any-reg))
+                    (inst shr :dword index 1) ; untag it
+                    (inst ,@op (ea (bit-base 0) temp) index)
+                    ;; re-tag without affecting CPU flags
+                    (inst lea :dword index (ea index index))))))))
+
 (defun unpoison-element (array index &optional (addend 0))
   #-ubsan (declare (ignore array index addend))
   #+ubsan
-  (let ((no-bits (gen-label)))
+  (let ((ok (gen-label))
+        (temp temp-reg-tn))
     (aver (= addend 0))
-    (inst mov temp-reg-tn (object-slot-ea array 1 other-pointer-lowtag))
-    ;; See if the ancillary slot holds a bit-vector and not a list.
-    ;; A list will denote the stack trace at the creation site
-    ;; rather than shadow bits.
-    (inst test :byte temp-reg-tn #b1000)
-    (inst jmp :z no-bits)
-    (flet ((constant-index (index)
-             (multiple-value-bind (dword-index bit) (floor index 32) dword-index bit
-               (inst bts :lock :dword (ea (bit-base dword-index) temp-reg-tn) bit))))
-      (if (integerp index)
-          (constant-index index)
-          (sc-case index
-           (immediate (constant-index (tn-value index)))
-           ((signed-reg unsigned-reg)
-            (inst bts :lock (ea (bit-base 0) temp-reg-tn) index))
-           (t
-            (aver (sc-is index any-reg))
-            (inst shr :dword index 1) ; untag it
-            (inst bts :lock (ea (bit-base 0) temp-reg-tn) index)
-            (inst shl :dword index 1)))))
-    (emit-label no-bits)))
+    (bit-op (bts :lock))
+    (emit-label ok)))
 
-(defun test-poisoned (vop temp array index &optional (addend 0))
-  (declare (ignore vop temp array index addend))
-  #+nil
-  (unless (sb-c::policy (sb-c::vop-node vop) (= safety 0))
-    (let ((ok (gen-label)))
-      (when (integerp index) (setq index (emit-constant index)))
-      (inst mov temp (object-slot-ea object 1 other-pointer-lowtag)) ; shadow bits
-      (inst test :byte temp temp)
-      (inst jmp :z ok) ; no shadow bits
-      (if (and (eql addend 0) (eql (tn-sc index unsigned-reg)))
-          (inst bt (ea (bit-base 0) temp) index)
-          (error "Unhandled SCs in test-poisoned"))
-      (inst jmp :nc (generate-error-code vop 'uninitialized-element-error
-                                         object index addend))
-      (emit-label ok))))
+(defun test-poison-bit (vop temp array index &optional (addend 0))
+  #-ubsan (declare (ignore vop temp array index addend))
+  #+ubsan
+  (when (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-poison-detect 0))
+    (aver (= addend 0))
+    (let ((ok (gen-label)) (fail (gen-label)))
+      (bit-op (bt)) ; no :LOCK here
+      (inst jmp :nc fail)
+      (emit-label ok)
+      (assemble (:elsewhere)
+        (emit-label fail)
+        (inst test :byte (static-symbol-value-ea '*ubsan-enable*) 2)
+        (inst jmp :z ok) ; bypass the error
+        (generate-error-code vop 'uninitialized-element-error
+                             array
+                             (if (integerp index) (emit-constant index) index))
+        (inst jmp ok))))))
 
 ;;;; allocator for the array header
 
@@ -290,6 +298,7 @@
   ;; for pretty much any general type-unknown AREF.
   ;; (:note "inline array access")
   (:translate data-vector-ref-with-offset)
+  (:vop-var vop)
   (:policy :fast-safe))
 (define-vop (dvset)
   ;; (:note "inline array store")
@@ -475,6 +484,7 @@
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 3
+    (test-poison-bit vop temp-reg-tn object index)
     ;; using 32-bit operand size might elide the REX prefix on mov + shift
     (multiple-value-bind (dword-index bit) (floor index 32)
       (inst mov :dword result (ea (bit-base dword-index) object))
@@ -491,14 +501,10 @@
   (:info addend)
   (:ignore addend)
   (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
-  ;; SIGNED-REG has a smaller SC number than UNSIGNED-REG so it encodes shorter
-  ;; in the error trap
-  (:temporary (:sc signed-reg :offset #.(tn-offset temp-reg-tn)) temp)
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:vop-var vop)
   (:generator 4
-    (progn temp)
+    (test-poison-bit vop temp-reg-tn object index)
     (inst bt (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                  object) index)
     (inst sbb :dword result result)
@@ -519,6 +525,7 @@
          (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg :offset rcx-offset) ecx)
          (:generator 20
+           (test-poison-bit vop temp-reg-tn object index)
            (move ecx index)
            (inst shr ecx ,bit-shift)
            (inst mov result
@@ -543,6 +550,7 @@
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
          (:generator 15
+           (test-poison-bit vop temp-reg-tn object index)
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
              (loadw result object (+ word vector-data-offset)
                     other-pointer-lowtag)
@@ -665,6 +673,7 @@
      (:results (value :scs (single-reg)))
      (:result-types single-float)
      (:generator 5
+      (test-poison-bit vop temp-reg-tn object index)
       ,@(if use-temp
             '((move dword-index index)
               (inst shr dword-index (1+ (- n-fixnum-tag-bits word-shift)))
@@ -681,6 +690,7 @@
   (:results (value :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
+   (test-poison-bit vop temp-reg-tn object index)
    (inst movss value (float-ref-ea object index addend 4))))
 
 #.
@@ -728,6 +738,7 @@
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 7
+   (test-poison-bit vop temp-reg-tn object index)
    (inst movsd value (float-ref-ea object index addend 8
                                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
@@ -740,6 +751,7 @@
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 6
+   (test-poison-bit vop temp-reg-tn object index)
    (inst movsd value (float-ref-ea object index addend 8))))
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float dvset)
@@ -781,6 +793,7 @@
   (:results (value :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 5
+    (test-poison-bit vop temp-reg-tn object index)
     (inst movq value (float-ref-ea object index addend 8
                                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
@@ -793,6 +806,7 @@
   (:results (value :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 4
+    (test-poison-bit vop temp-reg-tn object index)
     (inst movq value (float-ref-ea object index addend 8))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-single-float dvset)
@@ -832,6 +846,7 @@
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 7
+    (test-poison-bit vop temp-reg-tn object index)
     (inst movapd value (float-ref-ea object index addend 16
                                               :scale (ash 2 (- word-shift n-fixnum-tag-bits))))))
 
@@ -844,6 +859,7 @@
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 6
+    (test-poison-bit vop temp-reg-tn object index)
     (inst movapd value (float-ref-ea object index addend 16))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-double-float dvset)
@@ -904,7 +920,12 @@
                                                          ,n-bytes vector-data-offset)))
            (:results (value :scs ,scs))
            (:result-types ,type)
-           (:generator 5 (inst ,mov-inst ',opcode-modifier value ,ea-expr)))
+           (:args-var args)
+           (:generator 5
+             ;; If the arg is a constant vector then it can't have poison elements.
+             (unless (sc-is (tn-ref-tn args) constant)
+               (test-poison-bit vop temp-reg-tn object index))
+             (inst ,mov-inst ',opcode-modifier value ,ea-expr)))
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype "-C") dvref)
            (:args (object :scs (descriptor-reg)))
            (:info index addend)
@@ -913,7 +934,12 @@
                                                          ,n-bytes vector-data-offset)))
            (:results (value :scs ,scs))
            (:result-types ,type)
-           (:generator 4 (inst ,mov-inst ',opcode-modifier value ,ea-expr-const)))
+           (:args-var args)
+           (:generator 4
+             ;; If the arg is a constant vector then it can't have poison elements.
+             (unless (sc-is (tn-ref-tn args) constant)
+               (test-poison-bit vop temp-reg-tn object index))
+             (inst ,mov-inst ',opcode-modifier value ,ea-expr-const)))
          ;; FIXME: these all need to accept immediate SC for the value
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype) dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))

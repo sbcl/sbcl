@@ -310,8 +310,10 @@
          ;; Uncompressed
          (let ((result (make-array (length input) :element-type '(unsigned-byte 8))))
            (ub8-bash-copy input 0 result 0 (length input))
+           (sb-vm::aver-unpoisoned result)
            result))
         ((> (length input) +max-lz-size+)
+         (sb-vm::aver-unpoisoned input)
          input)
         (t
          (let* ((length (length input))
@@ -348,4 +350,5 @@
                                   (copy offset 3))))
                            (t
                             (vector-push-extend byte output))))))
+           (sb-vm::aver-unpoisoned (%array-data output) 0 (fill-pointer output))
            (%shrink-vector (%array-data output) (fill-pointer output)))))))

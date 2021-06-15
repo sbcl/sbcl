@@ -1163,6 +1163,9 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             {
             struct vector* v = (void*)obj;
             sword_t len = vector_len(v);
+#ifdef LISP_FEATURE_UBSAN
+            RECURSE(v->length_);
+#endif
             for(i=0; i<len; ++i) RECURSE(v->data[i]);
             }
             break;
@@ -1204,6 +1207,11 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             RECURSE(fdefn_callee_lispobj((struct fdefn*)obj));
             break;
         default:
+#ifdef LISP_FEATURE_UBSAN
+            if (specialized_vector_widetag_p(widetag_of(obj)))
+                RECURSE(((struct vector*)obj)->length_);
+#endif
+
             if (!leaf_obj_widetag_p(widetag_of(obj))) {
                 int size = sizetab[widetag_of(obj)](obj);
                 for(i=1; i<size; ++i) RECURSE(obj[i]);

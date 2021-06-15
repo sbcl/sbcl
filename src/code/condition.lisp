@@ -1185,27 +1185,26 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition uninitialized-element-error (cell-error) ()
   (:report
-   (lambda (condition stream)
+   (lambda (condition stream &aux (*print-array* nil))
      ;; NAME is a cons of the array and index
      (destructuring-bind (array . index) (cell-error-name condition)
        (declare (ignorable index))
        #+ubsan
-       (let* ((origin-pc
-               (ash (sb-vm::vector-extra-data
-                     (if (simple-vector-p array)
-                         array
-                         (sb-vm::vector-extra-data array)))
-                    -3)) ; XXX: ubsan magic
-              (origin-code (sb-di::code-header-from-pc (int-sap origin-pc))))
-         (let ((*print-array* nil))
-           (format stream "Element ~D of array ~_~S ~_was not assigned a value.~%Origin=~X"
-                   index array (or origin-code origin-pc))))
+       (let ((data (sb-vm::vector-extra-data
+                    (if (simple-vector-p array) ; origin is in the extra slot
+                        array
+                        (sb-vm::vector-extra-data array))))) ; else the extra slot of the shadow array
+         (if (consp data)
+             (destructuring-bind (pc-offset . codeblob) data
+               (format stream "Element ~D of array ~_~S ~_was not assigned a value.~%Origin=~A + #x~x"
+                       index array codeblob pc-offset))
+             (format stream "Element ~D of array ~_~S ~_was not assigned a value."
+                     index array)))
        #-ubsan
        ;; FOLD-INDEX-ADDRESSING could render INDEX wrong. There's no way to know.
        (let ((*print-array* nil))
          (format stream "Uninitialized element accessed in array ~S"
                  array))))))
-
 
 ;;; We signal this one for SEQUENCE operations, but INVALID-ARRAY-INDEX-ERROR
 ;;; for arrays. Might it be better to use the above condition for operations

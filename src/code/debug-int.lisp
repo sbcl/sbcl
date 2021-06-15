@@ -1841,7 +1841,8 @@ register."
                          (setf prev-live
                                (sb-c:read-packed-bit-vector live-set-len blocks i)))
                         (t
-                         (make-array (* live-set-len 8) :element-type 'bit))))
+                         (make-array (* live-set-len 8) :element-type 'bit
+                                     :initial-element 0))))
                 (step-info
                   (if (logtest sb-c::compiled-code-location-stepping flags)
                       (sb-c:read-var-string blocks i)

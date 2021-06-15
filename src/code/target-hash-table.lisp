@@ -11,6 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
+(declaim (optimize (sb-c::aref-poison-detect 0)))
 
 ;;;; utilities
 

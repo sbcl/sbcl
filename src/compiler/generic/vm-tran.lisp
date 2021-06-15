@@ -449,12 +449,14 @@
              (error "Argument and/or result bit arrays are not the same length:~
                          ~%  ~S~%  ~S  ~%  ~S"
                     bit-array-1 bit-array-2 result-bit-array))))
+     #+ubsan (progn (aver-unpoisoned bit-array-1 0 length)
+                    (aver-unpoisoned bit-array-2 0 length))
      (dotimes (index (ceiling length sb-vm:n-word-bits))
        (declare (optimize (speed 3) (safety 0)) (type index index))
        (setf (%vector-raw-bits result-bit-array index)
              (,wordfun (%vector-raw-bits bit-array-1 index)
                        (%vector-raw-bits bit-array-2 index))))
-     result-bit-array))
+     (sb-vm:%unpoison result-bit-array)))
 
 (flet ((policy-test (node) (policy node (>= speed space))))
 (macrolet ((def (bitfun wordfun)
@@ -486,11 +488,12 @@
                      ~%  ~S~%  ~S"
                     bit-array result-bit-array))))
     (let ((length (vector-length result-bit-array)))
+      #+ubsan (aver-unpoisoned bit-array 0 length)
       (dotimes (index (ceiling length sb-vm:n-word-bits))
         (declare (optimize (speed 3) (safety 0)) (type index index))
         (setf (%vector-raw-bits result-bit-array index)
               (word-logical-not (%vector-raw-bits bit-array index))))
-      result-bit-array)))
+      (sb-vm:%unpoison result-bit-array))))
 
 ;;; This transform has to deal with the fact that unused bits
 ;;; in the last data word of a simple-bit-vector can be random.
@@ -499,6 +502,8 @@
   `(let ((length (vector-length x)))
      (and (= (vector-length y) length)
           (let ((words (floor length sb-vm:n-word-bits)))
+            #+ubsan (progn (aver-unpoisoned x 0 length)
+                           (aver-unpoisoned y 0 length))
             (and (dotimes (i words t)
                    (unless (= (%vector-raw-bits x i) (%vector-raw-bits y i))
                      (return nil)))
@@ -542,7 +547,7 @@
        (declare (optimize (speed 3) (safety 0))
                 (type index index))
        (setf (%vector-raw-bits sequence index) value))
-     sequence))
+     (sb-vm:%unpoison sequence)))
 
 (deftransform fill ((sequence item) (simple-base-string t) *
                                     :policy (>= speed space))
@@ -572,7 +577,7 @@
          (when (plusp bits)
            (setf (%vector-raw-bits sequence words)
                  (shift-towards-start value (- bits)))))
-       sequence)))
+       (sb-vm:%unpoison sequence))))
 
 ;;;; %BYTE-BLT
 

@@ -1159,7 +1159,6 @@ We could try a few things to mitigate this:
 ;;; code-components are considered to reference their embedded
 ;;; simple-funs for this purpose; if THIS is a simple-fun, it is ignored.
 (defun references-p (this that)
-  (declare (optimize (sb-c::aref-trapping 0)))
   (macrolet ((test (x) `(when (eq ,x that) (go win))))
     (tagbody
        (do-referenced-object (this test)
@@ -1363,8 +1362,8 @@ We could try a few things to mitigate this:
 (defun !ensure-genesis-code/data-separation ()
   #+gencgc
   (let* ((n-bits (+ next-free-page 10))
-         (code-bits (make-array n-bits :element-type 'bit))
-         (data-bits (make-array n-bits :element-type 'bit))
+         (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
+         (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (total-code-size 0))
     (map-allocated-objects
      (lambda (obj type size)
@@ -1538,7 +1537,6 @@ We could try a few things to mitigate this:
   (dolist (v (sb-vm:list-allocated-objects :all :type sb-vm:simple-vector-widetag)
              result)
     (when (dotimes (i (length v))
-            (declare (optimize (sb-c::aref-trapping 0)))
             (let ((val (svref v i)))
               (when (= (get-lisp-obj-address val) no-tls-value-marker-widetag)
                 (return t))))

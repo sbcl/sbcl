@@ -15,7 +15,9 @@
 
 (test-util:with-test (:name :basic-cpuid)
   (flet ((to-ascii (bits)
-           (let ((s (make-array 4 :element-type 'base-char)))
+           (let ((s (make-array 4 :element-type 'base-char
+                                ;; storing via SAP-REF doesn't update the shadow bits if #+ubsan
+                                  :initial-element #\space)))
              (setf (sap-ref-32 (vector-sap s) 0) bits)
              s)))
     (multiple-value-bind (a b c d)

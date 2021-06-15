@@ -217,6 +217,7 @@
       ;; for LENGTH bytes (however bytes are defined).
       (defun ,constant-bash-name (dst dst-offset length value)
         (declare (type word value) (type index dst-offset length))
+        #+ubsan (unpoison-range dst dst-offset (+ dst-offset length))
         (multiple-value-bind (dst-word-offset dst-byte-offset)
             (floor dst-offset ,bytes-per-word)
           (declare (type ,word-offset dst-word-offset)
@@ -562,6 +563,22 @@
          ;; common uses for unary-byte-bashing
          (defun ,array-copy-name (src src-offset dst dst-offset length)
            (declare (type index src-offset dst-offset length))
+           #+ubsan
+           (let ((src-bits-per-element
+                  (ash 1 (aref %%simple-array-n-bits-shifts%% (%other-pointer-widetag src))))
+                 (dst-bits-per-element
+                  (ash 1 (aref %%simple-array-n-bits-shifts%% (%other-pointer-widetag dst)))))
+             (if (= src-bits-per-element ,bitsize)
+                 (aver-unpoisoned src src-offset (+ src-offset length))
+                 (error "unhandled bit-bash: bitsize ~d and src ~s" ,bitsize src))
+             (cond ((= dst-bits-per-element ,bitsize)
+                    (unpoison-range dst dst-offset (+ dst-offset length)))
+                   ((< ,bitsize dst-bits-per-element)
+                    (aver (zerop dst-offset))
+                    (aver (zerop (mod (* ,bitsize length) dst-bits-per-element)))
+                    (unpoison-range dst 0 (floor  (* ,bitsize length) dst-bits-per-element)))
+                   (t
+                    (error "unhandled bit-bash: bitsize ~d and dst ~s" ,bitsize dst))))
            (locally (declare (optimize (speed 3) (safety 1)))
              (,unary-bash-name src src-offset dst dst-offset length))))))))
 
@@ -823,3 +840,40 @@
 (clear-info :function :inlinep '%bit-position/1)
 
 (run-bit-position-assertions)
+
+;;; If a sanitizer error happens, we can disable it while backtracing
+;;; which avoids an infinite cycle of false positives.
+(defparameter sb-vm::*ubsan-enable* 0)
+(defun aver-unpoisoned (seq &optional (start 0) (end nil))
+  (unless (or (typep seq '(or list simple-vector)) ; simple-vector uses a distinct value in the cell
+              (= sb-vm::*ubsan-enable* 0))
+    (aver (typep seq '(simple-array * (*))))
+    (let* ((data (truly-the (simple-array * (*)) seq))
+           (bits (sb-vm::vector-extra-data data)))
+      (when (typep bits 'simple-bit-vector)
+        (when (null end) (setq end (length data)))
+        (unless (<= 0 start end (length bits))
+          (error "Poison check: bad indices"))
+        (let ((i (position 0 bits :start start :end end)))
+          (when i
+            (setq sb-vm::*ubsan-enable* 0)
+            (error "Sequence operation can't read element ~D of ~S created by ~S"
+                   i data
+                   (vector-extra-data (vector-extra-data seq)))))))))
+
+(defun unpoison-range (vector start end)
+  (unless (typep vector '(array t (*)))
+    (with-array-data ((data vector) (start start) (end end))
+      (let ((shadow (vector-extra-data data)))
+        (when (simple-bit-vector-p shadow)
+          (if (and (= start 0) (= end (sb-c::vector-length shadow)))
+              (%unpoison data)
+              (fill shadow 1 :start start :end end)))))))
+
+(defun any-poison (vector start end)
+  (if (typep vector '(array t (*)))
+      (break "not done yet")
+      (with-array-data ((data vector) (start start) (end end))
+        (let ((shadow (vector-extra-data data)))
+          (and (simple-bit-vector-p shadow)
+               (find 0 shadow :start start :end end))))))

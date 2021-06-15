@@ -292,11 +292,12 @@
                   (map-into (locally
                                 #-sb-xc-host
                                 (declare (muffle-conditions array-initial-element-mismatch))
+                             (sb-vm:%unpoison
                               (make-sequence result-type
                                              ,(if (cdr seq-args)
                                                   `(min ,@(loop for arg in seq-args
                                                                 collect `(length ,arg)))
-                                                  `(length ,(car seq-args)))))
+                                                  `(length ,(car seq-args))))))
                             fun ,@seq-args))))
             (t
              (let* ((all-seqs (cons seq seqs))
@@ -325,7 +326,7 @@
 ;;; MAP-INTO
 (defmacro mapper-from-typecode (typecode)
   #+sb-xc-host
-  `(svref ,(let ((a (make-array 256)))
+  `(svref ,(let ((a (make-array 256 :initial-element nil)))
              (dovector (info sb-vm:*specialized-array-element-type-properties* a)
                (setf (aref a (sb-vm:saetp-typecode info))
                      (package-symbolicate "SB-IMPL" "VECTOR-MAP-INTO/"
@@ -1035,7 +1036,12 @@
              (sequence-bounding-indices-bad-error seq1 start1 end1))
            (unless (<= 0 start2 end2 len2)
              (sequence-bounding-indices-bad-error seq2 start2 end2))))
+;;     ,@(when (policy node (/= sb-c::aref-poison-detect 0))
+;;         ;; Do *NOT* scan the entire length implied by end2-start2
+;;         '((aver-unpoisoned seq2 start2 (+ start2 replace-len))))
      (,bash-function seq2 start2 seq1 start1 replace-len)
+;;     ,@(when (policy node (/= sb-c::aref-poison-detect 0))
+;;         '((sb-vm::unpoison-range seq1 start1 end1)))
      seq1))
 (defun transform-replace (same-types-p node)
   `(let* ((len1 (length seq1))
@@ -1048,6 +1054,8 @@
              (sequence-bounding-indices-bad-error seq1 start1 end1))
            (unless (<= 0 start2 end2 len2)
              (sequence-bounding-indices-bad-error seq2 start2 end2))))
+     ,@(when (policy node (/= sb-c::aref-poison-detect 0))
+         '((aver-unpoisoned seq2 start2 end2)))
      ,(flet ((down ()
                '(do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1)) (1- i))
                      (j (truly-the (or (eql -1) index) (+ start2 replace-len -1)) (1- j)))
@@ -1069,6 +1077,8 @@
         (if same-types-p ; source and destination sequences could be EQ
             `(if (and (eq seq1 seq2) (> start1 start2)) ,(down) ,(up))
             (up)))
+     ,@(when (policy node (/= sb-c::aref-poison-detect 0))
+         '((sb-vm::unpoison-range seq1 start1 end1)))
      seq1))
 
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
@@ -1089,7 +1099,7 @@
                node)
               (transform-replace t node)))
         (give-up-ir1-transform))))
-#+sb-unicode
+#+(and sb-unicode (not ubsan))
 (progn
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
                        (simple-base-string simple-character-string &rest t) simple-base-string
@@ -1145,6 +1155,7 @@
              (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
            (values))))
 
+#-ubsan
 (loop for i = 1 then (* i 2)
       do (%deftransform (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
                         nil
@@ -1308,8 +1319,18 @@
             ,@(when (policy node (/= insert-array-bounds-checks 0))
                 '((unless (<= 0 start end length)
                     (sequence-bounding-indices-bad-error seq start end))))
+            ,@(when (policy node (/= aref-poison-detect 0))
+                '((aver-unpoisoned seq start end)))
             (let* ((size (- end start))
-                   (result (make-array size :element-type ',element-type)))
+                   (result
+                    #-ubsan
+                    (make-array size :element-type ',element-type)
+                    #+ubsan
+                    ,(let ((saetp (find-saetp element-type)))
+                       `(truly-the
+                         (simple-array ,element-type (*))
+                         (allocate-vector nil ,(sb-vm:saetp-typecode saetp)
+                                          size ,(calc-nwords-form saetp 'size))))))
               ,(maybe-expand-copy-loop-inline 'seq (if (constant-lvar-p start)
                                                        (lvar-value start)
                                                        'start)
@@ -1703,7 +1724,8 @@
 
 (defun string-concatenate-transform (node type lvars)
   (let ((vars (make-gensym-list (length lvars))))
-    (if (policy node (<= speed space))
+    (if (or (policy node (<= speed space))
+            #+ubsan t) ; never inline
         ;; Out-of-line
         (let ((constants-to-string
                 ;; Strings are handled more efficiently by

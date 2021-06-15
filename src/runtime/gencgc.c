@@ -2925,6 +2925,23 @@ static boolean __attribute__((unused)) card_protected_p(void* addr)
     lose("card_protected_p(%p)", addr);
 }
 
+static void check_ubsan_data(lispobj* where)
+{
+#ifdef LISP_FEATURE_UBSAN
+    struct vector* v = (void*)where;
+    lispobj shadow = v->length_;
+    if (listp(shadow)) {
+        // TODO: check something
+    } else if (other_pointer_p(shadow)) {
+        struct vector* bits = (void*)native_pointer(shadow);
+        if (header_widetag(bits->header) != SIMPLE_BIT_VECTOR_WIDETAG)
+            lose("bad shadow bits for %p", where);
+        // due to shrink-vector, the source vector can be larger
+        gc_assert(vector_len(bits) >= vector_len((struct vector*)where));
+    }
+#endif
+}
+
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
@@ -3051,15 +3068,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             lose("Unhandled widetag %d at %p", widetag, where);
         } else if (leaf_obj_widetag_p(widetag)) {
 #ifdef LISP_FEATURE_UBSAN
-            if (specialized_vector_widetag_p(widetag)) {
-                if (is_lisp_pointer(where[1])) {
-                    struct vector* bits = (void*)native_pointer(where[1]);
-                    if (header_widetag(bits->header) != SIMPLE_BIT_VECTOR_WIDETAG)
-                      lose("bad shadow bits for %p", where);
-                    gc_assert(header_widetag(bits->header) == SIMPLE_BIT_VECTOR_WIDETAG);
-                    gc_assert(vector_len(bits) >= vector_len((struct vector*)where));
-                }
-            }
+            if (specialized_vector_widetag_p(widetag)) check_ubsan_data(where);
 #endif
             count = sizetab[widetag](where);
             if (strict_containment && gencgc_verbose
@@ -3069,6 +3078,9 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         } else switch(widetag) {
                 /* boxed or partially boxed objects */
                 lispobj layout_word;
+            case SIMPLE_VECTOR_WIDETAG:
+                check_ubsan_data(where);
+                break;
             case FUNCALLABLE_INSTANCE_WIDETAG:
             case INSTANCE_WIDETAG:
                 layout_word = layout_of(where);
@@ -3166,7 +3178,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 state->vaddr = 0;
                 count = ALIGN_UP(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
-            }
+        }
     }
 }
 static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {

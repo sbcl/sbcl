@@ -335,11 +335,12 @@
 (define-fop 100 :not-host (fop-base-string ((:operands length)))
   (logically-readonlyize
    (read-base-string-as-bytes (fasl-input-stream)
-                              (make-string length :element-type 'base-char))))
+                              (sb-impl::alloc-string base-char length))))
 
 (define-fop 101 :not-host (fop-character-string ((:operands length)))
   (logically-readonlyize
-   (read-char-string-as-varints (fasl-input-stream) (make-string length))))
+   (read-char-string-as-varints (fasl-input-stream)
+                                (sb-impl::alloc-string character length))))
 
 (define-fop 92 (fop-vector ((:operands size)))
   (if (zerop size)

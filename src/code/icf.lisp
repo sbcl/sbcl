@@ -25,7 +25,7 @@
 
 ;;; Return T if any pointers were replaced in a code object.
 (defun apply-forwarding-map (map print &aux any-change)
-  (declare (optimize (sb-c::aref-trapping 0)))
+  (declare (optimize (sb-c::aref-poison-detect 0)))
   (when print
     (let ((*print-pretty* nil))
       (dohash ((k v) map)

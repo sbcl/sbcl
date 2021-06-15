@@ -6,7 +6,8 @@ and a secondary value, the number of characters consumed."
   (flet ((strtod/base-string (chars offset)
            (declare (simple-base-string chars))
            ;; On x86, dx arrays are quicker to make than aliens.
-           (sb-int:dx-let ((end (make-array 1 :element-type 'sb-ext:word)))
+           (sb-int:dx-let ((end (make-array 1 :element-type 'sb-ext:word
+                                 #+ubsan :initial-element #+ubsan 0)))
              (sb-sys:with-pinned-objects (chars)
                (let* ((base (sb-sys:sap+ (sb-sys:vector-sap chars) offset))
                       (answer

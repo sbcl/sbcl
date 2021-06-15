@@ -40,7 +40,7 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
   circularity in particular) when printing?")
 (defparameter *print-case* :upcase
   "What case should the printer should use default?")
-(defparameter *print-array* t
+(defparameter *print-array* #+ubsan nil #-ubsan t
   "Should the contents of arrays be printed?")
 (defparameter *print-gensym* t
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
@@ -197,7 +197,7 @@ variable: an unreadable object representing the error is printed instead.")
               (sb-pretty::with-pretty-stream (stream)
                 (funcall fun stream object)))
            (let ((buffer-size (approx-chars-in-repr object)))
-             (let* ((string (make-string buffer-size :element-type 'base-char))
+             (let* ((string (alloc-string base-char buffer-size))
                     (stream (%make-finite-base-string-output-stream string)))
                (declare (inline %make-finite-base-string-output-stream))
                (declare (truly-dynamic-extent stream))
@@ -911,7 +911,13 @@ variable: an unreadable object representing the error is printed instead.")
     (if (and (not (array-element-type array)) *print-readably* *read-eval*)
         (format stream "#.(~S '~D :ELEMENT-TYPE ~S)"
                 'make-array (array-dimensions array) nil)
-        (print-unreadable-object (array stream :type t :identity t)))))
+        #+ubsan
+        (let ((shadowp (and (typep array '(simple-array * (*)))
+                            (simple-vector-p (sb-vm::vector-extra-data array)))))
+          (if shadowp
+              (print-unreadable-object (array stream :type t :identity t)
+                (write-string "+shadow" stream))
+              (print-unreadable-object (array stream :type t :identity t)))))))
 
 ;;; Convert an array into a list that can be used with MAKE-ARRAY's
 ;;; :INITIAL-CONTENTS keyword argument.

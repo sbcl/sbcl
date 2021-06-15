@@ -124,7 +124,10 @@ where a is the intended low-order byte and d the high-order byte."
 
 (defmacro make-ub32-vector (length &rest args)
   #+lw-int32 `(sys:make-simple-int32-vector ,length ,@args)
-  #-lw-int32 `(make-array ,length :element-type 'ub32 ,@args))
+  #-lw-int32 `(make-array ,length :element-type 'ub32
+                          ,@(unless (member :initial-element args)
+                              '(:initial-element 0))
+                          ,@args))
 
 (defmacro ub32-aref (vector index)
   #+lw-int32

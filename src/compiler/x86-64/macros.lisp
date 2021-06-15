@@ -162,6 +162,8 @@
       (emit-error-break vop
                         (case error-code ; should be named ERROR-SYMBOL really
                           (invalid-arg-count-error invalid-arg-count-trap)
+                          ;; Allow proceeding past uninitialized-element
+                          (uninitialized-element-error cerror-trap)
                           (t error-trap))
                         (error-number-or-lose error-code)
                         values)
@@ -291,13 +293,34 @@
            ;; stored in another thread), then it's a false positive that is indicative
            ;; of a race. A false negative (failure to signal on a trap value) can not
            ;; occur unless unsafely using REPLACE into this vector.
-           (when (memq name '(data-vector-ref-with-offset/simple-vector
-                              data-vector-ref-with-offset/simple-vector-c))
-             `((when (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-trapping 0))
-                 (inst cmp :byte ea no-tls-value-marker-widetag)
-                 (inst jmp :e (generate-error-code
-                               vop 'uninitialized-element-error object
-                               ,index-to-encode)))))))
+           (when (eq translate 'data-vector-ref-with-offset)
+             (ecase type
+               (simple-vector
+                `((when (and (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-poison-detect 0))
+                             (not (sc-is (tn-ref-tn args) constant)))
+                    (let ((ok (gen-label)) (fail (gen-label)))
+                      (inst cmp :byte ea no-tls-value-marker-widetag)
+                      (inst jmp :e fail)
+                      (emit-label ok)
+                      (assemble (:elsewhere)
+                        (emit-label fail)
+                        (inst test :byte (static-symbol-value-ea '*ubsan-enable*) 2)
+                        (inst jmp :z ok) ; bypass the error
+                        (generate-error-code vop 'uninitialized-element-error object
+                                             ,index-to-encode)
+                        (inst jmp ok))))))
+               ((simple-array-unsigned-byte-64
+                 simple-array-signed-byte-64
+                 ;; TODO: these three types can avoid using shadow bits by robbing one bit
+                 ;; as the poison indicator. To access would require a load, bit-test,
+                 ;; and branch. If the poison bit is as it should be, then all is well.
+                 ;; Something similar could be done for (unsigned-byte 7) and other weird
+                 ;; sizes, but I don't think they are important.
+                 simple-array-unsigned-byte-63
+                 simple-array-fixnum
+                 simple-array-unsigned-fixnum)
+                `((unless (sc-is (tn-ref-tn args) constant)
+                    (test-poison-bit vop temp-reg-tn object index addend))))))))
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
@@ -311,6 +334,7 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:vop-var vop)
+       (:args-var args)
        (:generator 3
          (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))))
@@ -331,6 +355,7 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:vop-var vop)
+       (:args-var args)
        (:generator 2
          (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
            ,@(trap '(emit-constant (+ index addend)))

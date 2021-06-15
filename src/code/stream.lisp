@@ -300,7 +300,7 @@
                  (prog1 (fast-read-char-refill stream nil)
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
                (build-result (pos n-more-chars)
-                 (let ((res (make-string (+ chunks-total-length n-more-chars)))
+                 (let ((res (alloc-string character (+ chunks-total-length n-more-chars)))
                        (start1 chunks-total-length))
                    (declare (type index start1))
                    (when (>= pos 0)
@@ -546,6 +546,26 @@
              (read-end (stream-read-sequence stream buffer start end)))
         (eof-or-lose stream (and eof-error-p (< read-end end)) (- read-end start)))))
 
+(macrolet ((unpoison (result-expr)
+             #-ubsan result-expr
+             #+ubsan
+             `(let ((count ,result-expr))
+                (when (and (not (system-area-pointer-p buffer))
+                           (simple-bit-vector-p (sb-vm::vector-extra-data buffer)))
+                  (let ((bits-per-elt (ash 1 (aref sb-vm::%%simple-array-n-bits-shifts%%
+                                                   (%other-pointer-widetag buffer)))))
+                    (multiple-value-bind (first-elt remainder)
+                        (truncate (* start 8) bits-per-elt)
+                      ;; START is a byte index. Check that it makes sense.
+                      ;; It would be strange if the array were (UNSIGNED-BYTE 16)
+                      ;; and START were 1.
+                      (aver (zerop remainder))
+                      (multiple-value-bind (n-elts remainder)
+                          (truncate (* count 8) bits-per-elt)
+                        ;; Disallow partial elements
+                        (aver (zerop remainder))
+                        (sb-vm::unpoison-range buffer first-elt (+ first-elt n-elts))))))
+                count)))
 (defun ansi-stream-read-n-bytes (stream buffer start numbytes eof-error-p)
   (declare (type ansi-stream stream)
            (type index numbytes start)
@@ -558,6 +578,7 @@
            (num-buffered (- +ansi-stream-in-buffer-length+ index)))
       ;; These bytes are of course actual bytes, i.e. 8-bit octets
       ;; and not variable-length bytes.
+      (unpoison
       (cond ((<= numbytes num-buffered)
              (%byte-blt in-buffer index buffer start (+ start numbytes))
              (setf (ansi-stream-in-index stream) (+ index numbytes))
@@ -568,7 +589,8 @@
                (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
                (+ (funcall (ansi-stream-n-bin stream) stream buffer
                            end (- numbytes num-buffered) eof-error-p)
-                  num-buffered)))))))
+                  num-buffered))))))))
+) ; end MACROLET
 
 ;;; the amount of space we leave at the start of the in-buffer for
 ;;; unreading
@@ -1496,11 +1518,11 @@
 ;;; avoiding parsing of the specified element-type at runtime.
 (defun %make-base-string-ostream ()
   (%init-string-output-stream (%allocate-string-ostream)
-                              (make-array 63 :element-type 'base-char) ; 2w + 64b
+                              (alloc-string base-char 63) ; 2w + 64b
                               nil))
 (defun %make-character-string-ostream ()
   (%init-string-output-stream (%allocate-string-ostream)
-                              (make-array 32 :element-type 'character) ; 2w + 128b
+                              (alloc-string character 32) ; 2w + 128b
                               nil))
 
 (defun make-string-output-stream (&key (element-type 'character))
@@ -1547,8 +1569,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
             ;; more than FIXNUM characters are being written to the
             ;; stream, and do something about it.
             (if (member (string-output-stream-element-type stream) '(base-char nil))
-                (make-array size :element-type 'base-char)
-                (make-array size :element-type 'character)))))
+                (alloc-string base-char size)
+                (alloc-string character size)))))
 
 ;;; Moves to the end of the next segment or the current one if there are
 ;;; no more segments. Returns true as long as there are next segments.
@@ -1591,6 +1613,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defun string-sout (stream string start end)
   (declare (explicit-check string)
            (type index start end))
+  #+ubsan (aver-unpoisoned string start end)
   (let* ((full-length (- end start))
          (length full-length)
          (buffer (string-output-stream-buffer stream))
@@ -1729,8 +1752,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
          ;; Also, how it impacts setting FILE-POSITION on a string stream is unclear.
          ;; (See https://bugs.launchpad.net/sbcl/+bug/1839040)
          (result (if base-string-p
-                     (make-string length :element-type 'base-char)
-                     (make-string length))))
+                     (alloc-string base-char length)
+                     (alloc-string character length))))
 
     (setf (string-output-stream-index stream) 0
           (string-output-stream-index-cache stream) 0
@@ -2287,10 +2310,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type index start)
            (type sequence-end end)
            (values index))
+(let ((answer
   (stream-api-dispatch (stream)
     :simple (error "Unimplemented") ; gets redefined
     :native (ansi-stream-read-sequence seq stream start end)
-    :gray (stream-read-sequence stream seq start end)))
+    :gray (stream-read-sequence stream seq start end))))
+  (when (sb-vm::any-poison seq 0 answer) (error "read-sequence failed to unpoison ~s" seq))
+  answer))
 
 (declaim (maybe-inline read-sequence/read-function))
 (defun read-sequence/read-function (seq stream start %end
@@ -2349,15 +2375,23 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
         ((and (ansi-stream-p stream)
               (ansi-stream-cin-buffer stream)
               (typep seq 'simple-string))
-         (ansi-stream-read-string-from-frc-buffer seq stream start %end))
+         (let ((answer
+                (ansi-stream-read-string-from-frc-buffer seq stream start %end)))
+           (when (sb-vm::any-poison seq 0 answer) (error "read-string-from-frc-buffer failed to unpoison ~s" seq))
+           answer))
         ((typep seq 'vector)
          (with-array-data ((data seq) (offset-start start) (offset-end end)
                            :check-fill-pointer t)
            (if (and (ansi-stream-p stream)
                     (compatible-vector-and-stream-element-types-p data stream))
-               (read-vector/fast data offset-start)
+               (let ((answer (read-vector/fast data offset-start)))
+                 (when (sb-vm::any-poison seq 0 answer) (error "read-vector/fast failed to unpoison ~s" seq))
+                 answer)
+               (let ((answer
                (read-vector (compute-read-function (array-element-type data))
-                            data offset-start offset-end))))
+                            data offset-start offset-end)))
+                 (when (sb-vm::any-poison seq 0 answer) (error "read-vector failed to unpoison ~s" seq))
+                 answer))))
         (t
          (read-generic-sequence (compute-read-function nil)))))))
 

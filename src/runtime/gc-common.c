@@ -918,25 +918,24 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 }
 
 #ifdef LISP_FEATURE_UBSAN
-// If specialized vectors point to a vector of bits in their first
-// word after the header, they can't be relocated to unboxed pages.
-#define SPECIALIZED_VECTOR_PAGE_FLAG BOXED_PAGE_FLAG
+// If a specialized vector point to a vector of shadow bits
+// then it can't be relocated to an unboxed page.
+#define SPECIALIZED_VECTOR_PAGE_FLAG(x) \
+  (VECTOR(x)->length_ ? BOXED_PAGE_FLAG : UNBOXED_PAGE_FLAG)
 #else
-#define SPECIALIZED_VECTOR_PAGE_FLAG UNBOXED_PAGE_FLAG
+#define SPECIALIZED_VECTOR_PAGE_FLAG(x) UNBOXED_PAGE_FLAG
 #endif
 
-static inline void check_shadow_bits(lispobj* v) {
+static inline void trace_vector_extra(lispobj* v) {
 #ifdef LISP_FEATURE_UBSAN
-    if (is_lisp_pointer(v[1])) {
-        scavenge(v + 1, 1); // shadow bits
-        if (vector_len((struct vector*)native_pointer(v[1])) < vector_len((struct vector*)v))
-          lose("messed up shadow bits for %p\n", v);
-    } else if (v[1]) {
-        char *origin_pc = (char*)(v[1]>>4);
-        lispobj* code = component_ptr_from_pc(origin_pc);
-        if (code) scavenge((lispobj*)&code, 1);
-        /* else if (widetag_of(v)==SIMPLE_VECTOR_WIDETAG)
-           lose("can't find code containing %p (vector=%p)", origin_pc, v); */
+    lispobj bitv = v[1];
+    if (is_lisp_pointer(bitv)) {
+        scavenge(v + 1, 1); // shadow bits or origin
+        bitv = v[1];
+        if (lowtag_of(bitv) == OTHER_POINTER_LOWTAG)
+            if (vector_len((struct vector*)native_pointer(bitv))
+                < vector_len((struct vector*)v))
+                lose("messed up shadow bits for %p\n", v);
     }
 #endif
 }
@@ -944,7 +943,7 @@ static inline void check_shadow_bits(lispobj* v) {
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
   static sword_t __attribute__((unused)) scav_##name(\
       lispobj *where, lispobj __attribute__((unused)) header) { \
-    check_shadow_bits(where); \
+    trace_vector_extra(where); \
     sword_t length = vector_len(((struct vector*)where)); \
     return ALIGN_UP(nwords + 2, 2); \
   } \
@@ -952,7 +951,7 @@ static inline void check_shadow_bits(lispobj* v) {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = vector_len(VECTOR(object)); \
     return copy_large_object(object, ALIGN_UP(nwords + 2, 2), \
-                             SPECIALIZED_VECTOR_PAGE_FLAG); \
+                             SPECIALIZED_VECTOR_PAGE_FLAG(object)); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
     sword_t length = vector_len(((struct vector*)where)); \
@@ -1395,7 +1394,7 @@ scav_vector_t(lispobj *where, lispobj header)
 {
     sword_t length = vector_len((struct vector*)where);
 
-    check_shadow_bits(where);
+    trace_vector_extra(where);
     /* SB-VM:VECTOR-HASHING-FLAG is set for all hash tables in the
      * Lisp HASH-TABLE code to indicate need for special GC support.
      * But note that if the vector is a hashing vector that is neither
@@ -1729,14 +1728,7 @@ lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
     return 0; // oops, how did this happen?
 }
 
-#ifdef LISP_FEATURE_UBSAN
-// ubsan tracks memory origin by a not-exactly-gc-safe way
-// that kinda works, as long as gc_search_space() doesn't crash,
-// which it shouldn't if carefully visiting objects.
-#define SEARCH_SPACE_FOLLOWS_FORWARDING_POINTERS 1
-#else
 #define SEARCH_SPACE_FOLLOWS_FORWARDING_POINTERS 0
-#endif
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success, or NULL on failure. */
 lispobj *

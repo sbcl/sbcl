@@ -1073,6 +1073,8 @@ Users Manual for details about the PROCESS structure.
                                      ~2I~_~A~:>"
                       (strerror errno)))
                     (t
+                     ;; SB-UNIX:UNIX-READ can't unpoison, as it takes a SAP, not the vector
+                     #+ubsan (sb-vm::unpoison-range buf read-end  (+ read-end count))
                      (incf read-end count)
                      (funcall copy-fun))))))))
     (push handler *handlers-installed*)))

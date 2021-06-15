@@ -730,8 +730,8 @@
   (declare (type component component))
   (let* ((gtn-count (1+ (ir2-component-global-tn-counter
                          (component-info component))))
-         (saves (make-array gtn-count :element-type 'bit))
-         (restores (make-array gtn-count :element-type 'bit))
+         (saves (make-array gtn-count :element-type 'bit :initial-element 0))
+         (restores (make-array gtn-count :element-type 'bit :initial-element 0))
          (block (ir2-block-prev (block-info (component-tail component))))
          (head (block-info (component-head component))))
     (loop

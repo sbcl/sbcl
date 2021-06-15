@@ -1823,10 +1823,12 @@
           (cond (character-stream-p
                  (setf (ansi-stream-cin-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
+                                   #+ubsan :initial-element #+ubsan (code-char 0)
                                    :element-type 'character)))
                 ((equal target-type '(unsigned-byte 8))
                  (setf (ansi-stream-in-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
+                                   #+ubsan :initial-element #+ubsan 0
                                    :element-type '(unsigned-byte 8))))))))
 
     (when output-p

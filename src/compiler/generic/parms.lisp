@@ -202,6 +202,8 @@
 
     #-sb-thread *stepping*
 
+    #+ubsan *ubsan-enable*
+
     ;; threading support
     #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
 

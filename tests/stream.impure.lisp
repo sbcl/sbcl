@@ -814,6 +814,7 @@
                       (n-bin #'mock-fd-stream-n-bin-fun)
                       (cin-buffer
                        (make-array sb-impl::+ansi-stream-in-buffer-length+
+                                   :initial-element #\nul
                                    :element-type 'character))))
   buffer-chain)
 

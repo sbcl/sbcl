@@ -450,7 +450,8 @@
   ;; floats do NOT satisfy "our" NUMBERP. But we want this to fail, not succeed.
   (validate-args object)
   (when (or (arrayp object) (listp object))
-    (when (or (member type '(vector simple-vector simple-string simple-base-string list))
+    (when (or (member type '(vector simple-vector string simple-string
+                             simple-base-string list))
               (equal type '(simple-array character (*))))
       (return-from coerce (cl:coerce object type))) ; string or unspecialized array
     (let ((et (ecase (car type)

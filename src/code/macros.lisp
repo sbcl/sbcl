@@ -1826,14 +1826,14 @@ symbol-case giving up: case=((V U) (F))
                           (neq ctype *empty-type*))))
               ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
               ;; "The default initial element #\Nul is not a STANDARD-CHAR."
-              'make-array ; hooray! it's known be a valid string type
+             `(alloc-string ,(constant-form-value element-type) 31)
               ;; Force a runtime STRINGP check unless futher transforms
               ;; deduce a known type. You'll get "could not stack allocate"
               ;; perhaps, but that's acceptable.
-              'make-string)))
+             `(make-string 31 :element-type ,element-type))))
     ;; A full call to MAKE-STRING-OUTPUT-STREAM uses a larger initial buffer
     ;; if BASE-CHAR but I really don't care to think about that here.
-    `(,string-let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+    `(,string-let ((,initial-buffer ,string-ctor))
        (dx-let ((,dummy (%allocate-string-ostream)))
          (let ((,var (%init-string-output-stream ,dummy ,initial-buffer
                                                  ,wild-result-type)))
@@ -2299,3 +2299,25 @@ Works on all CASable places."
 #-64-bit (sb-xc:defmacro layout-depthoid (x) `(wrapper-depthoid ,x))
 (sb-xc:defmacro layout-flags (x) `(wrapper-flags ,x))
 )
+
+(sb-xc:defmacro alloc-string (element-type length)
+  #-ubsan `(make-array ,length :element-type ',element-type)
+  #+ubsan ; Allocate an uninitialized string without shadow bits
+  (let ((saetp (sb-c::find-saetp element-type)))
+    (aver saetp) ; can't handle STANDARD-CHAR or other weirdness here
+    `(truly-the (simple-array ,element-type (*))
+                (allocate-vector nil ,(sb-vm:saetp-typecode saetp)
+                                 ,length ,(sb-c::calc-nwords-form saetp length)))))
+
+(sb-xc:defmacro sb-vm:%unpoison (vector &optional element)
+  (declare (ignorable element))
+  #-ubsan vector
+  #+ubsan
+  `(let ((v ,vector))
+     ,(if element ; unpoison 1 element
+          `(let ((bits (%primitive sb-vm::slot ,vector 'extra 1 sb-vm:other-pointer-lowtag)))
+             (when (simple-bit-vector-p bits)
+               (setf (sbit bits ,element) 1)))
+          ;; unpoison the entire vector
+          `(%primitive sb-vm::set-slot v 0 'extra 1 sb-vm:other-pointer-lowtag))
+     v))

@@ -972,6 +972,17 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 void
 interrupt_internal_error(os_context_t *context, boolean continuable)
 {
+#ifdef LISP_FEATURE_UBSAN // avoid an infinite chain of sanitizer errors
+    unsigned char* pc = (void*)*os_context_pc_addr(context);
+    if (*pc == trap_Cerror && pc[1] == UNINITIALIZED_ELEMENT_ERROR) {
+        fprintf(stderr, "ubsan error @ %p. bytes @ pc:", pc);
+        int i;
+        for(i=-1;i<5;++i) fprintf(stderr, " %02x", pc[i]);
+        fputc('\n',stderr);
+        SYMBOL(UBSAN_ENABLE)->value = 0;
+    }
+#endif
+
     DX_ALLOC_SAP(context_sap, context);
 
     fake_foreign_function_call(context);

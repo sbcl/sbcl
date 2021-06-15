@@ -617,7 +617,7 @@ standard Lisp readtable when NIL."
   (let* ((b *read-buffer*)
          (string (token-buf-string b)))
     (setf (token-buf-string b)
-          (replace (make-string (* 2 (length string))) string))))
+          (replace (alloc-string character (* 2 (length string))) string))))
 
 ;; Retun the next character from the buffered token, or NIL.
 (declaim (maybe-inline token-buf-getchar))
@@ -985,10 +985,11 @@ standard Lisp readtable when NIL."
           ""
           (let* ((sum (loop for buf in chain sum (length buf)))
                  (result
-                  (make-array (+ sum ptr)
-                              :element-type (if only-base-chars
-                                                (%readtable-string-preference rt)
-                                                'character))))
+                  (sb-vm:%unpoison
+                   (make-array (+ sum ptr)
+                               :element-type (if only-base-chars
+                                                 (%readtable-string-preference rt)
+                                                 'character)))))
             (setq ptr sum)
             ;; Now work backwards from the end
             (replace result buf :start1 ptr)

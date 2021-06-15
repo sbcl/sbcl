@@ -517,7 +517,10 @@
         (write-string "foo" ouf))
       (let ((fd (sb-posix:open (merge-pathnames "read-test.txt" *test-directory*) sb-posix:o-rdonly)))
         (unwind-protect
-             (let ((buf (make-array 10 :element-type '(unsigned-byte 8))))
+             ;; There is no way to know which lisp array to unpoison in the READ
+             ;; function because it only has a SAP, not the tagged pointer.
+             (let ((buf (make-array 10 :element-type '(unsigned-byte 8)
+                                    #+ubsan :initial-element #+ubsan 0)))
                (values
                 (sb-posix:read fd (sb-sys:vector-sap buf) 10)
                 (code-char (aref buf 0))

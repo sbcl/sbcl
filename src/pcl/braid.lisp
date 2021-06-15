@@ -56,7 +56,8 @@
   (let* ((hash (if name
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
                    (sb-impl::quasi-random-address-based-hash
-                    (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
+                    (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)
+                                                 :initial-element 0))
                     most-positive-fixnum)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and immobile-code)

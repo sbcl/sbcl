@@ -21,7 +21,7 @@
                              simple-string)
                      (#\space (make-string 11 :initial-element #\space) string)
                      (#\* (make-string 11 :initial-element #\*))
-                     (#\null (make-string 11))
+                     #-ubsan (#\null (make-string 11)) ; exploits undefined behavior
                      (#\null (make-string 11 :initial-element #\null))
                      (#\x (make-string 11 :initial-element #\x))
                      ;; And the other tweaks made when fixing bug 126 didn't

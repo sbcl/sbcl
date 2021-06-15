@@ -172,7 +172,7 @@
                       (+ suffix-length
                          (floor (* additional 5) 4)))))
             (setf total-suffix
-                  (replace (make-string new-total-suffix-len) total-suffix
+                  (replace (make-buffer new-total-suffix-len) total-suffix
                            :start1 (- new-total-suffix-len suffix-length)
                            :start2 (- total-suffix-len suffix-length)))
             (setf total-suffix-len new-total-suffix-len)
@@ -192,7 +192,7 @@
          (column (max minimum column)))
     (when (> column prefix-len)
       (setf prefix
-            (replace (make-string (max (* prefix-len 2)
+            (replace (make-buffer (max (* prefix-len 2)
                                        (+ prefix-len
                                           (floor (* (- column prefix-len) 5)
                                                  4))))
@@ -384,7 +384,7 @@
           (let ((new-length (max (* length 2)
                                  (+ fill-ptr
                                     (floor (* additional 5) 4)))))
-            (setf new-buffer (make-string new-length))
+            (setf new-buffer (make-buffer new-length))
             (setf (pretty-stream-buffer stream) new-buffer)))
         (setf (pretty-stream-buffer-fill-pointer stream) new-fill-ptr)
         (decf (pretty-stream-buffer-offset stream) additional)
@@ -418,7 +418,7 @@
            (let* ((new-length (max (* length 2)
                                    (+ length
                                       (floor (* want 5) 4))))
-                  (new-buffer (make-string new-length)))
+                  (new-buffer (make-buffer new-length)))
              (setf (pretty-stream-buffer stream) new-buffer)
              (replace new-buffer buffer :end1 fill-ptr)
              (- new-length fill-ptr))))))
@@ -560,7 +560,7 @@
              (buffer-length (length buffer)))
         (when (> new-fill-ptr buffer-length)
           (setf new-buffer
-                (make-string (max (* buffer-length 2)
+                (make-buffer (max (* buffer-length 2)
                                   (+ buffer-length
                                      (floor (* (- new-fill-ptr buffer-length)
                                                5)

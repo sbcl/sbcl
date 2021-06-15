@@ -11,6 +11,9 @@
 
 (in-package "SB-IMPL")
 
+;;; For efficiency, ensure that C-STRING-TO-STRING returns unpoisoned strings.
+;;; (The code is correct without runtime instrumentation)
+(declaim (optimize (sb-c::aref-poison-detect 0)))
 
 ;;; ASCII
 

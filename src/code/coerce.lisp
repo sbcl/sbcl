@@ -17,11 +17,16 @@
                 ,@(when explicit-check `((declare (explicit-check))))
                 (do* ((index 0 (1+ index))
                       (length (length object))
-                      (result ,constructor)
+                      ;; there's currently no good way advise make-sequence
+                      ;; never to allocate poison bits, so they have to
+                      ;; be removed after-the-fact.
+                      (result #+ubsan (sb-vm:%unpoison ,constructor)
+                              #-ubsan ,constructor)
                       (in-object object))
                      ((>= index length) result)
                   (declare (fixnum length index))
                   (declare (type vector result))
+                  ;; FIXME: use optimized setter for vectors
                   (setf (,access result index)
                         ,(ecase src-type
                            (list '(pop in-object))

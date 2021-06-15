@@ -3511,7 +3511,7 @@ used for a COMPLEX component.~:@>"
            (integer-range (low high)
              (make-numeric-type :class 'integer :complexp :real
                                 :enumerable t :low low :high high)))
-    (let ((array (make-array (* 32 5)))
+    (let ((array (make-array (* 32 5) :initial-element nil))
           (index 0))
       ;; Index 31 is available to store *WILD-TYPE*
       ;; because there are fewer than 32 array widetags.

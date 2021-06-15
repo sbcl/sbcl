@@ -1029,11 +1029,18 @@
 ;;;; fixup emitters
 
 (defun emit-absolute-fixup (segment fixup &optional quad-p)
-  (note-fixup segment (if quad-p :absolute64 :absolute) fixup)
   (let ((offset (fixup-offset fixup)))
-    (if quad-p
-        (emit-qword segment offset)
-        (emit-signed-dword segment offset))))
+    (cond ((eq (fixup-flavor fixup) :pc-offset-as-fixnum)
+           ;; This is like the "." symbol in native assembler syntax-
+           ;; resolved at assembly time.
+           (emit-back-patch segment 4
+                            (lambda (segment posn)
+                              (emit-signed-dword segment (fixnumize posn)))))
+          (t
+           (note-fixup segment (if quad-p :absolute64 :absolute) fixup)
+           (if quad-p
+               (emit-qword segment offset)
+               (emit-signed-dword segment offset))))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)

@@ -59,7 +59,7 @@
   ;; It used to be an adjustable array, but we now do the array size
   ;; management manually for performance reasons (as of 2006-05-13 hairy
   ;; array operations are rather slow compared to simple ones).
-  (buffer (make-array 100 :element-type 'assembly-unit)
+  (buffer (make-array 100 :element-type 'assembly-unit :initial-element 0)
           :type (simple-array assembly-unit 1))
   (encoder-state)
   ;; whether or not to run the scheduler. Note: if the instruction
@@ -177,7 +177,7 @@
         ;; roughly double the vector length: that way growing the array
         ;; to size N conses only O(N) bytes in total.
         (setf new-buffer-size (* 2 new-buffer-size)))
-      (let ((new-buffer (make-array new-buffer-size
+      (let ((new-buffer (make-array new-buffer-size :initial-element 0
                                     :element-type '(unsigned-byte 8))))
         (replace new-buffer buffer)
         (setf (segment-buffer segment) new-buffer)))
