@@ -55,7 +55,7 @@ Patches requiring more widespread discussion and feedback should be
 sent to the sbcl-devel mailing list.
 
 If you have any questions, feel free to ask them on sbcl-devel,
-or the IRC channel #sbcl@freenode.net.
+or the IRC channel #sbcl@irc.libera.chat.
 
 Coding Style
 ============
