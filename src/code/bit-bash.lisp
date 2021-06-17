@@ -40,6 +40,25 @@
     #+(or x86 x86-64 ppc ppc64) 128
     #-(or x86 x86-64 ppc ppc64) 256))
 
+(defmacro verify-src/dst-bits-per-elt (source destination expect-bits-per-element)
+  (declare (ignorable source destination expect-bits-per-element))
+  #+sb-devel
+  `(let ((src-bits-per-element
+          (ash 1 (aref %%simple-array-n-bits-shifts%%
+                       (%other-pointer-widetag ,source))))
+         (dst-bits-per-element
+          (ash 1 (aref %%simple-array-n-bits-shifts%%
+                       (%other-pointer-widetag ,destination)))))
+    (when (or (/= src-bits-per-element ,expect-bits-per-element)
+              (/= dst-bits-per-element ,expect-bits-per-element))
+      ;; Why enforce this: because since the arrays are lisp objects
+      ;; maybe we can be clever "somehow" (I'm not sure how)
+      ;; and/or maybe we have to unpoison the memory for #+ubsan.
+      ;; Whereas BYTE-BLT takes SAPs (and/or arrays) and so it has to
+      ;; be more strictly like memmove(). Because it is exactly that.
+      (error "Misuse of bash-copy: bits-per-elt=~D but src=~d and dst=~d"
+             ,expect-bits-per-element src-bits-per-element dst-bits-per-element))))
+
 ;;; 1, 2, 4, and 8 bytes per element can be handled with memmove()
 ;;; or, if it's easy enough, a loop over VECTOR-RAW-BITS.
 (defmacro define-byte-blt-copier
@@ -90,6 +109,7 @@
                      (find-package "SB-KERNEL"))
          (src src-start dst dst-start nelements)
       (declare (type index src-start dst-start nelements))
+      (verify-src/dst-bits-per-elt src dst ,bits-per-element)
       (locally
          (declare (optimize (safety 0)
                             (sb-c::alien-funcall-saves-fp-and-pc 0)))
@@ -282,6 +302,7 @@
        `((declaim (inline ,unary-bash-name))
          (defun ,unary-bash-name (src src-offset dst dst-offset length)
            (declare (type index src-offset dst-offset length))
+           (verify-src/dst-bits-per-elt src dst ,bitsize)
            (multiple-value-bind (dst-word-offset dst-byte-offset)
                (floor dst-offset ,bytes-per-word)
              (declare (type ,word-offset dst-word-offset)

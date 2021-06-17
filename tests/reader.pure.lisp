@@ -338,7 +338,7 @@
       (set-syntax-from-char #\! #\! rt)
       (assert (eq '!! (maybe-bang))))))
 
-(with-test (:name :read-in-package-syntax)
+(with-test (:name :read-in-package-syntax :skipped-on :sb-devel)
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
   (assert (equal '(cl-user::yes-this-is-sbcl)
@@ -424,7 +424,7 @@
 
 ;;; The WITH-FAST-READ-BYTE macro accidentally left the package lock
 ;;; of FAST-READ-BYTE disabled during its body.
-(with-test (:name :fast-read-byte-package-lock)
+(with-test (:name :fast-read-byte-package-lock :skipped-on :sb-devel)
   (let ((fun
          ;; Suppress the compiler output to avoid noise when running the
          ;; test. (There are a warning and an error about the package

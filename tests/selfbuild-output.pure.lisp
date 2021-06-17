@@ -11,3 +11,10 @@
     (loop for i from sb-vm:code-constants-offset below (sb-kernel:code-header-words code)
           thereis (eq (sb-kernel:code-header-ref code i)
                       sb-unicode::+character-misc-database+))))
+
+(with-test (:name :byte-bash-copier-mixup :skipped-on (:not :sb-devel))
+  (let ((a (make-array 20 :element-type '(unsigned-byte 8)
+                          :initial-element 0))
+        (b (make-array 5 :element-type '(unsigned-byte 32))))
+    ;; Can't mix-and-match array element types.
+    (assert-error (sb-kernel:ub8-bash-copy a 0 b 0 5))))

@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+sb-devel (sb-ext:exit :code 104) ; packages are not locked for devs
+
 (load "compiler-test-util.lisp")
 
 ;;;; Our little labrats and a few utilities

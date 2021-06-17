@@ -1145,6 +1145,8 @@
              (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
            (values))))
 
+;;; Detect misuse with sb-devel. "Misuse" means mismatched array element types
+#-sb-devel
 (loop for i = 1 then (* i 2)
       do (%deftransform (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
                         nil
