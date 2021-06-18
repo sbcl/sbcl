@@ -807,7 +807,7 @@ line break."
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
   (let* ((orig (or table *initial-pprint-dispatch-table*))
-         (new (make-pprint-dispatch-table (copy-list (pp-dispatch-entries orig))
+         (new (make-pprint-dispatch-table (copy-seq (pp-dispatch-entries orig))
                                           (pp-dispatch-number-matchable-p orig)
                                           (pp-dispatch-only-initial-entries orig))))
     (hash-table-replace (pp-dispatch-cons-entries new) (pp-dispatch-cons-entries orig))
@@ -842,13 +842,13 @@ line break."
                    (and (consp object)
                         (sb-impl::gethash/eql (car object) (pp-dispatch-cons-entries table) nil))))
               (cond ((not cons-entry)
-                     (dolist (entry (pp-dispatch-entries table) nil)
+                     (dovector (entry (pp-dispatch-entries table) nil)
                        (when (funcall (pprint-dispatch-entry-test-fn entry) object)
                          (return entry))))
                     ((pp-dispatch-only-initial-entries table)
                      cons-entry)
                     (t
-                     (dolist (entry (pp-dispatch-entries table) cons-entry)
+                     (dovector (entry (pp-dispatch-entries table) cons-entry)
                        (when (entry< entry cons-entry)
                          (return cons-entry))
                        (when (funcall (pprint-dispatch-entry-test-fn entry) object)
@@ -922,16 +922,16 @@ line break."
                 (remhash key hashtable))))
         (setf (pp-dispatch-only-initial-entries table) nil
               (pp-dispatch-entries table)
-              (let ((list (delete type (pp-dispatch-entries table)
-                                  :key #'pprint-dispatch-entry-type
-                                  :test #'equal)))
+              (let ((old (remove type (pp-dispatch-entries table)
+                                 :key #'pprint-dispatch-entry-type
+                                 :test #'equal)))
                 (if function
                     ;; ENTRY< is T if lower in priority, which should sort to
                     ;; the end, but MERGE's predicate wants T for the (a,b) pair
                     ;; if 'a' should go in front of 'b', so swap them.
                     ;; (COMPLEMENT #'entry<) is unstable wrt insertion order.
-                    (merge 'list list (list entry) (lambda (a b) (entry< b a)))
-                    list)))))
+                    (merge 'vector old (list entry) (lambda (a b) (entry< b a)))
+                    old)))))
   nil)
 
 ;;;; standard pretty-printing routines
@@ -1486,34 +1486,52 @@ line break."
           (t
            (incf (car state))))))
 
+;;; Warm bootup is slightly less brittle if we can avoid first having to run
+;;; the compiler to make some predicates for the initial PPD type specifiers.
+;;; In particular I'm trying to eradicate a bunch of PARSE-UNKNOWN conditions
+;;; that occur, e.g. installing (AND ARRAY (NOT (OR STRING BIT-VECTOR)))
+;;; entails (compile nil '(typep sb-pretty::object <that-type>))
+;;; -> (sb-c::find-free-fun typep)
+;;; -> (sb-kernel:specifier-type (function (t (or cons symbol sb-kernel:classoid class) ...)))
+;;; -> (sb-kernel::parse-args-types ...)
+;;; -> (sb-kernel::%parse-type CLASS)
+;;; where the type specifier for CLASS is as yet unknown
+(defmacro initial-entry (specifier handler priority &optional predicate)
+  `(make-pprint-dispatch-entry
+    ',specifier ,priority #',handler
+    ,(or predicate
+         `(named-lambda ,(format nil "~A-P" handler) (x)
+            ,(sb-c::source-transform-typep 'x specifier)))))
+
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
   ;; Kludge: We set *STANDARD-PP-D-TABLE* to a new table even though
   ;; it's going to be set to a copy of *INITIAL-PP-D-T* below because
   ;; it's used in WITH-STANDARD-IO-SYNTAX, and condition reportery
   ;; possibly performed in the following extent may use W-S-IO-SYNTAX.
-  (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table nil nil nil))
+  (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table #() nil nil))
   (setf *initial-pprint-dispatch-table* nil)
-  (let ((*print-pprint-dispatch* (make-pprint-dispatch-table nil nil nil)))
-    (/show0 "doing SET-PPRINT-DISPATCH for regular types")
-    ;; * PLEASE NOTE : If you change these definitions, then you may need to adjust
-    ;; the computation of POSSIBLY-MATCHABLE in PPRINT-DISPATCH.
-    ;;
-    ;; Assign a lower priority than for the cons entries below, making
-    ;; fewer type tests when dispatching.
-    (set-pprint-dispatch '(and array (not (or string bit-vector))) 'pprint-array -1)
-    ;; MACRO-FUNCTION must have effectively higher priority than FBOUNDP.
-    ;; The implementation happens to check identical priorities in the order added,
-    ;; but that's unspecified behavior.  Both must be _strictly_ lower than the
-    ;; default cons entries though.
-    (set-pprint-dispatch '(cons (and symbol (satisfies macro-function)))
-                         'pprint-macro-call -1)
-    (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
-                         'pprint-fun-call -1)
-    (set-pprint-dispatch '(cons symbol)
-                         'pprint-data-list -2)
-    (set-pprint-dispatch 'cons 'pprint-fill -2)
-    (set-pprint-dispatch 'sb-impl::comma 'pprint-unquoting-comma -3)
+  (let* ((initial-entries
+          (vector
+           ;; * PLEASE NOTE : If you change these definitions, then you may need to adjust
+           ;; the computation of POSSIBLY-MATCHABLE in PPRINT-DISPATCH.
+           ;;
+           ;; Assign a lower priority than for the cons entries below, making
+           ;; fewer type tests when dispatching.
+           (initial-entry (and array (not (or string bit-vector)))
+                          pprint-array -1)
+           ;; MACRO-FUNCTION must have effectively higher priority than FBOUNDP.
+           ;; The implementation happens to check identical priorities in the order added,
+           ;; but that's unspecified behavior.  Both must be _strictly_ lower than the
+           ;; default cons entries though.
+           (initial-entry (cons (and symbol (satisfies macro-function)))
+                          pprint-macro-call -1)
+           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-fun-call -1)
+           (initial-entry (cons symbol) pprint-data-list -2)
+           (initial-entry cons pprint-fill -2 #'consp)
+           (initial-entry sb-impl::comma pprint-unquoting-comma -3 #'comma-p)))
+         (*print-pprint-dispatch*
+          (make-pprint-dispatch-table initial-entries nil nil)))
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
     (dolist (magic-form '((lambda pprint-lambda)

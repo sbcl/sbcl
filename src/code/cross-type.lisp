@@ -241,6 +241,10 @@
                 ;; Keep in sync with KEYWORDP test in src/code/target-type
                 (cond ((eq predicate 'keywordp)
                        (test-keywordp))
+                      ;; These are needed in order to compile the predicates
+                      ;; for the initial pprint dispatch table.
+                      ((and (eq obj nil) (member predicate '(fboundp macro-function)))
+                       (values nil t))
                       ((acceptable-cross-typep-pred predicate caller)
                        (values (funcall predicate obj) t))
                       (t

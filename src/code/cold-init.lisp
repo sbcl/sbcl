@@ -98,7 +98,7 @@
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
   (show-and-call !package-cold-init)
-  (setq *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table nil nil nil))
+  (setq *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table #() nil nil))
   ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
   (setf (symbol-function 'choose-symbol-out-fun)
         (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))

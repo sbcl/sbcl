@@ -130,7 +130,7 @@
 
 (defglobal *editcore-ppd*
   ;; copy no entries for macros/special-operators (flet, etc)
-  (let ((ppd (sb-pretty::make-pprint-dispatch-table nil nil nil)))
+  (let ((ppd (sb-pretty::make-pprint-dispatch-table #() nil nil)))
     (set-pprint-dispatch 'string
                          ;; Write strings without string quotes
                          (lambda (stream string) (write-string string stream))
