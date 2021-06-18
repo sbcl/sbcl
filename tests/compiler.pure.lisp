@@ -2911,7 +2911,7 @@
                               (when x (setf args x))
                               (ctu:compiler-derived-type args)))))
                42)
-    (assert (equal '(or cons null integer) type))
+    (assert (equal '(or list integer) type))
     (assert derivedp)))
 
 (with-test (:name (compile base-char typep :elimination))

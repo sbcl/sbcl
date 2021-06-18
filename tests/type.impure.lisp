@@ -887,8 +887,8 @@
     (let ((result (sb-kernel:type-specifier
                    (sb-kernel:specifier-type
                     `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))))
-      (assert (or (equal result '(or cons null (array * (1 1 1))))
-                  (equal result '(or null cons (array * (1 1 1)))))))
+      (assert (or (equal result '(or list (array * (1 1 1))))
+                  (equal result '(or (array * (1 1 1)) list)))))
 
     ;; And unions of unions of distinct array types should reduce.
     (assert

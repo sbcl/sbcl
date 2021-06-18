@@ -21,6 +21,19 @@
 
 (in-package "BEFORE-XC-TESTS")
 
+;;; Assert that some of the type specifiers which we claim have unique internal
+;;; representations do, and that parsing does not rely critically on
+;;; memoization performed in SPECIFIER-TYPE, which is only a best effort
+;;; to produce the EQ model object given an EQUAL specifier.
+(dolist (type sb-kernel::*special-union-types*)
+  (dolist (constituent-type (union-type-types (specifier-type type)))
+    (let ((specifier (type-specifier constituent-type)))
+      (drop-all-hash-caches)
+      (let ((parse (specifier-type specifier)))
+        (drop-all-hash-caches)
+        (let ((reparse (specifier-type specifier)))
+          (aver (eq parse reparse)))))))
+
 (assert (type= (specifier-type '(and fixnum (satisfies foo)))
                (specifier-type '(and (satisfies foo) fixnum))))
 (assert (type= (specifier-type '(member 1 2 3))
@@ -418,8 +431,9 @@
              sb-vm::fp-complex-double-zero-sc-number)))
 
 ;;; Unparse a union of (up to) 3 things depending on :sb-unicode as 2 things.
-(assert (equal (type-specifier (specifier-type '(or string null)))
-               '(or #+sb-unicode string #-sb-unicode base-string null)))
+(assert (sb-kernel::brute-force-type-specifier-equalp
+         (type-specifier (specifier-type '(or string null)))
+         '(or #+sb-unicode string #-sb-unicode base-string null)))
 
 (multiple-value-bind (result exactp)
     (sb-vm::primitive-type (specifier-type 'list))

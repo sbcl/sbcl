@@ -676,6 +676,17 @@
   (assert (eq (make-numeric-type :class 'integer :low '(4) :high '(5))
               *empty-type*)))
 
+(with-test (:name :prettier-union-types :skipped-on (not :sb-unicode))
+  ;; (OR STRING BIGNUM) used to unparse as
+  ;; (OR (VECTOR CHARACTER) BASE-STRING (INTEGER * -4611686018427387905)
+  ;;     (INTEGER 4611686018427387904)) etc
+  (dolist (other '(float real bignum))
+    (let* ((spec `(or string ,other))
+           (parse (sb-kernel:specifier-type spec))
+           (unparse (sb-kernel:type-specifier parse)))
+      (assert (or (equal unparse `(or string ,other))
+                  (equal unparse `(or ,other string)))))))
+
 (with-test (:name :unparse-string)
   (assert (equal (type-specifier (specifier-type '(string 10)))
                  '(#+sb-unicode string #-sb-unicode base-string 10)))

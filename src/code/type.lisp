@@ -4446,51 +4446,100 @@ used for a COMPLEX component.~:@>"
       (determine type))
     types))
 
-(defun unparse-string-type (ctype string-type)
-  (let ((string-ctype (specifier-type string-type)))
-    (and (union-type-p ctype)
-         (csubtypep ctype string-ctype)
-         (let ((types (copy-list (union-type-types string-ctype))))
-           (and (loop for type in (union-type-types ctype)
-                      for matching = (and (array-type-p type)
-                                          (neq (array-type-complexp type) t)
-                                          (find type types
-                                                :test #'csubtypep))
-                      always matching
-                      do (setf types (delete matching types)))
-                (null types)))
-         (let ((dimensions (ctype-array-dimensions ctype)))
-           (cond ((and (singleton-p dimensions)
-                       (integerp (car dimensions)))
-                  `(,string-type ,@dimensions)))))))
+;;; Union unparsing involves looking for certain important type atoms in our
+;;; internal representation - a/k/a "interned types" - those which have a unique
+;;; object that models them; and then deciding whether some conjunction of
+;;; particular atoms unparses to a prettier symbolic type.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *special-union-types*
+    ;; This is order-sensitive. Prefer to recognize SEQUENCE
+    ;; and extract 4 components (NULL,CONS,VECTOR,EXTENDED-SEQUENCE)
+    ;; before considering LIST and extracting 2, etc.
+    '(sequence list real float complex bignum)))
 
-;;; The LIST, FLOAT and REAL types have special names.  Other union
-;;; types just get mechanically unparsed.
 (define-type-method (union :unparse) (type)
-  (declare (type ctype type))
-  (cond
-    ((type= type (specifier-type 'list)) 'list)
-    ((type= type (specifier-type 'float)) 'float)
-    ((type= type (specifier-type 'real)) 'real)
-    ((type= type (specifier-type 'sequence)) 'sequence)
-    ((type= type (specifier-type 'bignum)) 'bignum)
-    ((type= type (specifier-type 'simple-string)) 'simple-string)
-    ((type= type (specifier-type 'string)) 'string)
-    ;; In the absence of Unicode, STRING is not a union.
-    #+sb-unicode ((unparse-string-type type 'simple-string))
-    #+sb-unicode ((unparse-string-type type 'string))
-    ((type= type (specifier-type 'complex)) 'complex)
-    (t
-     ;; If NULL is in the union, and deleting it reduces the union to either an atom
-     ;; or a list whose head is [SIMPLE-]STRING, then return (OR X NULL).
-     ;; This simplifies (OR FLOAT NULL) and other things in the above exceptions.
-     (let ((type-without-null
-            (when (find (specifier-type 'null) (union-type-types type))
-              (type-specifier (type-difference type (specifier-type 'null))))))
-       (if (or (and (atom type-without-null) type-without-null)
-               (typep type-without-null '(cons (member string simple-string))))
-           `(or ,type-without-null null)
-           `(or ,@(mapcar #'type-specifier (union-type-types type))))))))
+  ;; This logic diverges between +/- sb-xc-host because the machinery
+  ;; to parse types is obviously not usable here during make-host-1,
+  ;; so the macro has to generate code that is lazier about parsing.
+  (collect ((recognized))
+    (let ((remainder (copy-list (union-type-types type))))
+      #+sb-xc-host
+      ;; Try to recognize each special type in order.
+      ;; Don't use SUBTYPEP here; compare atoms instead. We're not trying
+      ;; to answer complicated questions - only see whether the argument TYPE
+      ;; contains (at least) each of the exact same things in SPECIAL.
+      (dolist (special *special-union-types*)
+        (let ((parts (union-type-types (specifier-type special))))
+          (when (every (lambda (part) (memq part remainder)) parts)
+            ;; Remove the parts from the remainder
+            (dolist (part parts) (setq remainder (delq1 part remainder)))
+            (recognized special)))) ; add to the output
+      #-sb-xc-host
+      (macrolet
+          ((generator ()
+             (let* ((constituent-types
+                     (mapcar (lambda (type-specifier)
+                               (union-type-types (specifier-type type-specifier)))
+                             *special-union-types*))
+                    ;; Get the set of atoms that we need to pick out
+                    (atoms (remove-duplicates (apply #'append constituent-types))))
+               (labels ((atom->bit (atom) (ash 1 (position atom atoms)))
+                        (compute-mask (parts) (apply #'+ (mapcar #'atom->bit parts))))
+                 `(let ((bits 0))
+                    (dolist (part remainder)
+                      (setq bits
+                            (logior bits
+                                    (cond ,@(mapcar (lambda (atom)
+                                                      `((eq part ,atom) ,(atom->bit atom)))
+                                                    atoms)
+                                          (t 0)))))
+                    ;; Now we have a bitmask of all the interesting type atoms in the
+                    ;; compound type. Try to match sets of bits, and remember it is
+                    ;; possible to match more than one set,
+                    ;; e.g. (OR STRING FLOAT BIGNUM) matches 3 pairs of bits.
+                    ,@(mapcar (lambda (name parts &aux (mask (compute-mask parts)))
+                                `(when (= (logand bits ,mask) ,mask) ; is all of these
+                                   (setq bits (logand bits ,(lognot mask))) ; Subtract the bits
+                                   ,@(mapcar (lambda (atom)
+                                               `(setq remainder (delq1 ,atom remainder)))
+                                             parts)
+                                   (recognized ',name))) ; add to the output
+                              *special-union-types* constituent-types))))))
+        (generator))
+      ;; See if we can pair any two constituent types that resolve to
+      ;; ({STRING|SIMPLE-STRING|non-SIMPLE-STRING} n).
+      ;; Repeat until there are no more pairs. This is a kludge.
+      #+sb-unicode
+      (loop for tail on remainder
+            do (let* ((x (car tail))
+                      (peer
+                       (and (array-type-p x) ; If X is a CHARACTER vector
+                            (eq (array-type-element-type x) (specifier-type 'character))
+                            (singleton-p (array-type-dimensions x))
+                            ;; And can be matched with a BASE-CHAR vector
+                            (member-if (lambda (y)
+                                         (and (array-type-p y)
+                                              (eq (array-type-element-type y)
+                                                  (specifier-type 'base-char))
+                                              (eq (array-type-complexp y)
+                                                  (array-type-complexp x))
+                                              (equal (array-type-dimensions y)
+                                                     (array-type-dimensions x))))
+                                       (cdr tail)))))
+                 (when peer ; then together they comprise a subtype of STRING
+                   (let* ((dim (car (array-type-dimensions x)))
+                          (string-type
+                           (if (array-type-complexp x)
+                               (if (eq dim '*) 'string `(string ,dim))
+                               (if (eq dim '*) 'simple-string `(simple-string ,dim)))))
+                     (recognized (if (eq (array-type-complexp x) 't)
+                                     `(and ,string-type (not simple-array))
+                                     string-type)))
+                   (rplaca tail nil) ; We'll delete these list elements later
+                   (rplaca peer nil))))
+      (let ((list (nconc (recognized)
+                         (mapcar #'type-specifier (delete nil remainder)))))
+        (if (cdr list) `(or ,@list) (car list))))))
 
 ;;; Two union types are equal if they are each subtypes of each
 ;;; other. We need to be this clever because our complex subtypep
@@ -5480,3 +5529,24 @@ used for a COMPLEX component.~:@>"
    over under))
 
 (!defun-from-collected-cold-init-forms !type-cold-init)
+
+;;; This decides if two type expressions are equal ignoring the order of terms
+;;; in AND and OR. It doesn't decide equivalence, but it's good enough
+;;; to do some sanity checking in type.before-xc and genesis.
+(defun brute-force-type-specifier-equalp (a b)
+  (labels ((compare (a b)
+             (if (symbolp a)
+                 (eq a b)
+                 (or (equal a b)
+                     (and (listp b)
+                          (eq (car a) (car b))
+                          (case (car a)
+                            ((and or)
+                             (order-insensitive-equal (cdr a) (cdr b)))
+                            ((not)
+                             (compare (cadr a) (cadr b))))))))
+           (order-insensitive-equal (a b)
+             (and (= (length a) (length b))
+                  (every (lambda (elt) (member elt b :test #'compare)) a)
+                  (every (lambda (elt) (member elt a :test #'compare)) b))))
+    (compare a b)))
