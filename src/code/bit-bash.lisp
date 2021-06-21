@@ -42,7 +42,7 @@
 
 (defmacro verify-src/dst-bits-per-elt (source destination expect-bits-per-element)
   (declare (ignorable source destination expect-bits-per-element))
-  #+sb-devel
+  #+(and sb-devel (not sb-devel-no-errors))
   `(let ((src-bits-per-element
           (ash 1 (aref %%simple-array-n-bits-shifts%%
                        (%other-pointer-widetag ,source))))
