@@ -394,6 +394,7 @@ starting from `offset' into the given 16 word MD5 block."
            (type simple-string buffer)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)
                      #+lw-int32 (float 0) #+lw-int32 (hcl:fixnum-safety 0)))
+  (declare (ignorable block buffer offset))
   #+(and :cmu :little-endian)
   (kernel:bit-bash-copy
    buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
