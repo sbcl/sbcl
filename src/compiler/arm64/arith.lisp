@@ -61,6 +61,22 @@
   (:generator 3
     (inst neg res x)))
 
+(define-modular-fun %negate-mod64 (x) %negate :untagged nil 64)
+(define-vop (%negate-mod64)
+  (:translate %negate-mod64)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :target r))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 3
+    (inst neg r x)))
+
+(define-modular-fun %negate-modfx (x) %negate :tagged t #.(- n-word-bits
+                                                             n-fixnum-tag-bits))
+(define-vop (%negate-modfx fast-negate/fixnum)
+  (:translate %negate-modfx))
+
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:args (x :scs (any-reg)))
   (:arg-types tagged-num)
