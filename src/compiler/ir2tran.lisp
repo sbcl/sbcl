@@ -2036,53 +2036,61 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 ;;;; n-argument functions
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-convert) ((&rest args) node block)
-                (cond #+gencgc
-                      ((>= (length args)
-                           (/ sb-vm:large-object-size
-                              (* sb-vm:n-word-bytes 2)))
-                       ;; The VOPs will try to allocate all space at once
-                       ;; And it'll end up in large objects, and no conses
-                       ;; are welcome there.
-                       (ir2-convert-full-call node block))
-                      (t
-                       (let* ((scs
-                               (operand-parse-scs
-                                (vop-parse-more-args
-                                 (gethash 'list *backend-parsed-vops*))))
-                              (allow-const
-                               ;; Make sure the backend allows both of IMMEDIATE
-                               ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
-                               (and (member 'sb-vm::constant scs)
-                                    (member 'sb-vm::immediate scs)
-                                    ;; FIXME: this is terribly wrong that in high debug
-                                    ;; settings we can't allow constants at the IR2 level.
-                                    ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
-                                    ;; constants are allowed. Somehow we're affecting
-                                    ;; semantics. It's baffling.
-                                    (policy node (< debug 3))))
-                              (refs (reference-tn-list
-                                     (loop for arg in args
-                                           for tn = (make-normal-tn *backend-t-primitive-type*)
-                                           do
-                                           (cond ((and allow-const (constant-lvar-p arg))
-                                                  (setq tn (emit-constant (lvar-value arg))))
-                                                 (t
-                                                  (emit-move node block (lvar-tn node block arg) tn)))
-                                           collect tn)
-                                     nil))
-                              (lvar (node-lvar node))
-                              (res (lvar-result-tns
-                                    lvar (list (specifier-type 'list)))))
-                         (when (and lvar (lvar-dynamic-extent lvar))
-                           (vop current-stack-pointer node block
-                                (ir2-lvar-stack-pointer (lvar-info lvar))))
-                         (vop* ,name node block (refs) ((first res) nil)
-                               (length args))
-                         (move-lvar-result node block res lvar)))))))
-  (def list)
-  (def list*))
+(defoptimizer (list* ir2-convert) ((&rest args) node block)
+  ;; FIXME: I think this #+gencgc test is no longer neeeded.
+  ;; Git rev 2a562e61 and following fixed that problem,
+  ;; at least for allocation of &REST lists.
+  ;; Is it still broken for LIST* and LIST ? I doubt it.
+  (cond #+gencgc
+        ((>= (length args)
+             (/ sb-vm:large-object-size
+                (* sb-vm:n-word-bytes 2)))
+         ;; The VOPs will try to allocate all space at once
+         ;; And it'll end up in large objects, and no conses
+         ;; are welcome there.
+         (ir2-convert-full-call node block))
+        (t
+         (let* ((scs (operand-parse-scs
+                      (vop-parse-more-args
+                       (gethash 'list* *backend-parsed-vops*))))
+                (allow-const
+                 ;; Make sure the backend allows both of IMMEDIATE
+                 ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
+                 (and (member 'sb-vm::constant scs)
+                      (member 'sb-vm::immediate scs)
+                      ;; FIXME: this is terribly wrong that in high debug
+                      ;; settings we can't allow constants at the IR2 level.
+                      ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
+                      ;; constants are allowed. Somehow we're affecting
+                      ;; semantics. It's baffling.
+                      (policy node (< debug 3))))
+                (refs (reference-tn-list
+                       (loop for arg in args
+                          for tn = (make-normal-tn *backend-t-primitive-type*)
+                          do (cond ((and allow-const (constant-lvar-p arg))
+                                    (setq tn (emit-constant (lvar-value arg))))
+                                   (t
+                                    (emit-move node block (lvar-tn node block arg) tn)))
+                          collect tn)
+                       nil))
+                (lvar (node-lvar node))
+                (res (lvar-result-tns lvar (list (specifier-type 'list)))))
+           (when (and lvar (lvar-dynamic-extent lvar))
+             (vop current-stack-pointer node block
+                  (ir2-lvar-stack-pointer (lvar-info lvar))))
+           (let* ((fun (lvar-fun-name (combination-fun node)))
+                  (star (ecase fun
+                          ((list) nil)
+                          ;; I think CONS won't appear here (yet)
+                          ((list* cons) t))))
+             (if star
+                 (aver (cdr args))
+                 (aver args))
+             (vop* list* node block (refs) ((first res) nil)
+                   (let ((nargs (length args))) (if star (1- nargs) nargs))
+                   star)
+             (move-lvar-result node block res lvar))))))
+(setf (fun-info-ir2-convert (fun-info-or-lose 'list)) #'list*-ir2-convert-optimizer)
 
 
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)

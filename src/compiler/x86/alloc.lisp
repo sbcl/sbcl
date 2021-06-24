@@ -186,24 +186,15 @@
               result-tn 0 other-pointer-lowtag)))
 
 ;;;; CONS, LIST and LIST*
-(define-vop (list-or-list*)
+(define-vop (list*)
   (:args (things :more t))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
-  (:info num)
+  (:info cons-cells star)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :safe)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           ;; (move result nil-value)
-           (inst mov result nil-value))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((store-car (tn list &optional (slot cons-car-slot))
+    (macrolet ((store-car (tn list &optional (slot cons-car-slot))
                   `(let ((reg
                           (sc-case ,tn
                             ((any-reg descriptor-reg) ,tn)
@@ -211,9 +202,8 @@
                              (move temp ,tn)
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
-             (let ((cons-cells (if star (1- num) num))
-                   (stack-allocate-p (node-stack-allocate-p node)))
-               (pseudo-atomic (:elide-if stack-allocate-p)
+      (let ((stack-allocate-p (node-stack-allocate-p node)))
+        (pseudo-atomic (:elide-if stack-allocate-p)
                 (allocation 'list (* (pad-data-block cons-size) cons-cells)
                             list-pointer-lowtag node stack-allocate-p res)
                 (move ptr res)
@@ -231,13 +221,7 @@
                        (storew nil-value ptr cons-cdr-slot
                                list-pointer-lowtag)))
                 (aver (null (tn-ref-across things)))))
-             (move result res))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
+      (move result res))))
 
 ;;;; special-purpose inline allocators
 

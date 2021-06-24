@@ -229,24 +229,15 @@
              (inst or :byte result-tn other-pointer-lowtag))))))
 
 ;;;; CONS, LIST and LIST*
-(define-vop (list-or-list*)
+(define-vop (list*)
   (:args (things :more t :scs (descriptor-reg constant immediate)))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
-  (:info num)
+  (:info cons-cells star)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :safe)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           ;; (move result nil-value)
-           (inst mov result nil-value))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((store-slot (tn list &optional (slot cons-car-slot)
+    (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
                                                (lowtag list-pointer-lowtag))
                   `(let ((reg
                           ;; FIXME: single-float gets placed in the boxed header
@@ -258,12 +249,11 @@
                             (t
                              (encode-value-if-immediate ,tn)))))
                      (storew* reg ,list ,slot ,lowtag (not stack-allocate-p)))))
-             (let* ((cons-cells (if star (1- num) num))
-                    (stack-allocate-p (node-stack-allocate-p node))
-                    (size (* (pad-data-block cons-size) cons-cells)))
-               (unless stack-allocate-p
-                 (instrument-alloc size node))
-               (pseudo-atomic (:elide-if stack-allocate-p)
+      (let ((stack-allocate-p (node-stack-allocate-p node))
+            (size (* (pad-data-block cons-size) cons-cells)))
+        (unless stack-allocate-p
+          (instrument-alloc size node))
+        (pseudo-atomic (:elide-if stack-allocate-p)
                 (allocation 'list size (if (= cons-cells 2) 0 list-pointer-lowtag)
                             node stack-allocate-p res)
                 (multiple-value-bind (last-base-reg lowtag car cdr)
@@ -300,13 +290,7 @@
                              (inst lea result (ea list-pointer-lowtag res))))
                         (t
                          (move result res)))))))
-           (aver (null (tn-ref-across things)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
+    (aver (null (tn-ref-across things)))))
 
 ;;;; special-purpose inline allocators
 
