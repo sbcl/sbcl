@@ -34,6 +34,13 @@ lispobj* atomic_bump_static_space_free_ptr(int nbytes)
     } while (1);
 }
 
+#ifndef LISP_FEATURE_DARWIN
+void memset_pattern_word(uword_t* destination, uword_t word, sword_t nelements)
+{
+    while (nelements--) *destination++ = word;
+}
+#endif
+
 // Work space for the deterministic allocation profiler.
 // Only supported on x86-64, but the variables are always referenced
 // to reduce preprocessor conditionalization.

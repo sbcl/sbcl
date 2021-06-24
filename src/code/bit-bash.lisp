@@ -219,6 +219,319 @@
 (define-byte-blt-copier 4)
 #+64-bit (define-byte-blt-copier 8)
 
+#+x86-64
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +fill-bytes-per-chunk+ 128))
+#+x86-64
+(eval-when (:compile-toplevel)
+(define-vop (memset-pattern-word)
+  (:args (sap :scs (sap-reg) :target rdi)
+         (word :scs (unsigned-reg) :target rax)
+         (count :scs (unsigned-reg) :target rcx))
+  (:temporary (:sc any-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc any-reg :offset rax-offset :from (:argument 1)) rax)
+  (:temporary (:sc any-reg :offset rcx-offset :from (:argument 2)) rcx)
+  (:generator 10
+   (move rdi sap)
+   (move rax word)
+   (move rcx count)
+   (inst rep) (inst stos :qword)))
+(define-vop (memset-block-sse)
+  (:args (base :scs (sap-reg) :target sap)
+         (word :scs (unsigned-reg))
+         (nbytes :scs (unsigned-reg) :target index))
+  (:temporary (:sc sap-reg :from (:argument 0)) sap)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) index)
+  (:temporary (:sc sse-reg) xmm)  
+  (:generator 10
+   (move sap base)
+   (inst movq xmm word)
+   (inst punpcklqdq xmm xmm)
+   (move index nbytes)
+   (inst add sap index)
+   (inst neg index)
+   (emit-alignment 4 :long-nop)
+   LOOP (loop for disp from 0 by 16 until (= disp +fill-bytes-per-chunk+)
+              do (inst movdqa (ea disp sap index) xmm))
+   (inst add index +fill-bytes-per-chunk+)
+   (inst jmp :ne LOOP)))
+(define-vop (memset-block-avx)
+  (:args (base :scs (sap-reg) :target sap)
+         (word :scs (unsigned-reg))
+         (nbytes :scs (unsigned-reg) :target index))
+  (:temporary (:sc sap-reg :from (:argument 0)) sap)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) index)
+  (:temporary (:sc avx2-reg) ymm)
+  (:generator 10
+   (move sap base)
+   (inst movq ymm word)
+   (inst vbroadcastsd ymm ymm)
+   (move index nbytes)
+   (inst add sap index)
+   (inst neg index)
+   (emit-alignment 4 :long-nop)
+   LOOP (loop for disp from 0 by 32 until (= disp +fill-bytes-per-chunk+)
+              do (inst vmovntpd (ea disp sap index) ymm))
+   (inst add index +fill-bytes-per-chunk+)
+   (inst jmp :ne loop)))
+;; thread:barrier is defined to do nothing for store barriers!
+;; (Because in general you don't need it)
+(define-vop (sfence)
+  (:policy :fast-safe)
+  (:generator 1 (inst sfence)))
+)
+
+;;; Arrays of ({SIGNED|UNSIGNED}-BYTE 8) can by directly handled by memset().
+;;; There's no reason to suppose that memset() is not the optimal way
+;;; to fill bytes. Despite the overhead of a foreign call, it outperforms
+;;; anything else I tried on x86-64, even for small values of NELEMENTS.
+;;; For other architectures - ymmv, and since they lack either absolute or
+;;; comparative benchmarks, I make no claims to performance there.
+;;;
+;;; Note that there are some tricks that can be done without
+;;; a call to memset, for a slight win. e.g. here are two simple tricks:
+;;;
+;;; 1) if unaligned stores are allowed and 'size' is between 4 and 8 bytes,
+;;;    then store an 'int' as *dest and at *((char*)dest + 4 - size).
+;;;    So for 6 bytes you do:
+;;;     +-------------------------------+
+;;;     | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+;;;       ^ first store
+;;;               ^ second store
+;;;    and as you can see, this correctly stores into bytes 0 through 5.
+;;;    It writes the overlapping bytes twice, which is perfectly fine
+;;;    because the pattern word is the same.
+;;;    We can scale this trick to other array-element sizes.
+;;; 2) At larger sizes when storing full words, and without using unaligned stores,
+;;;    but where we need to store some initial number of words to reach a required
+;;;    alignment boundary - say a 32-byte boundary, we don't have to _conditionally_
+;;;    store exactly the number of words needed to reach that boundary, i.e. 0 to 4 words.
+;;;    Instead we can _unconditionally_ always 4 words (removing some branching)
+;;;    and then just align up the start of the bulk operation.
+;;;    As above, some words may be written twice.
+
+(defun sb-kernel::ub8-fill (array start nelements word)
+  (declare (type word word))
+  (declare (type #-64-bit index #+64-bit (unsigned-byte 59) start nelements))
+  (declare (optimize (safety 0)
+                     (sb-c::alien-funcall-saves-fp-and-pc 0)))
+  (with-alien ((memset (function void system-area-pointer unsigned sb-unix::size-t)
+                       :extern "memset"))
+    (with-pinned-objects (array)
+      (alien-funcall memset (sap+ (vector-sap array) start)
+                     (logand word #xff)
+                     nelements)))
+  array)
+  
+;;; Half-lispword is easily expressed in terms of lispword:
+;;;  1. peel off one element at the start, or don't.
+;;;  2. fill (FLOOR COUNT 2) lispwords.
+;;;  3. finish with an odd element, or don't.
+;;; If the FILL is more than a small number of words, call WORD-FILL,
+;;; otherwise use (SETF SAP-REF-WORD). This is cheaper than %SET-VECTOR-RAW-BITS,
+;;; because the latter lacks the fold-index-address optimization.
+(defun #+64-bit sb-kernel::ub32-fill #-64-bit sb-kernel::ub16-fill (array start nelements word)
+  (declare (type word word))
+  (declare (type #-64-bit index #+64-bit (unsigned-byte 59) start nelements))
+  (declare (optimize (safety 0)))
+  (let ((array (truly-the (simple-array (unsigned-byte #.(/ n-word-bits 2)) (*))
+                          array))
+        (element (logand word #.(ldb (byte (/ n-word-bits 2) 0) most-positive-word))))
+    (when (and (oddp start) (/= nelements 0))
+      (setf (aref array start) element)
+      (incf start)
+      (decf nelements))
+    (let ((nwords (ash nelements -1)))
+      (if (> nwords 6)
+          ;; For x86-64 we should could try to inline a "REP STOSD"
+          ;; thus avoiding a call. But even the call is outperforming
+          ;; what we did before with vector-raw-bits.
+          (sb-kernel::word-fill array (ash start -1) nwords word)
+          (macrolet ((unroll ()
+                       (labels ((more (i)
+                                  (when (< i 6)
+                                    `(unless (zerop nwords)
+                                       (setf (sap-ref-word sap ,(ash i word-shift)) word)
+                                       (decf nwords)
+                                       ,(more (1+ i))))))
+                         (more 0))))
+            ;; Because START is an even number, START/2 is a word boundary
+            (with-pinned-objects (array)
+              (let ((sap (sap+ (vector-sap array) (* start (/ n-word-bytes 2)))))
+                (unroll))))))
+    (when (oddp nelements)
+      (setf (aref array (+ start nelements -1)) element)))
+  array)
+
+;;; For #-64-bit, this is exactly the same as half-lispword, defined just above.
+#+64-bit
+(defun sb-kernel::ub16-fill (array start nelements word)
+  (declare (type word word))
+  (declare (type #-64-bit index #+64-bit (unsigned-byte 59) start nelements))
+  (declare (optimize (safety 0)))
+  (let ((array (truly-the (simple-array (unsigned-byte 16) (*)) array))
+        (element (logand word #xFFFF)))
+    ;; Peel off up to 3 elements. This could be done using at most 2 stores.
+    ;; We lack vops which could do that without misrepresenting the array type.
+    (when (and (/= nelements 0) (logtest start #b11))
+      (setf (aref array start) element)
+      (incf start)
+      (when (and (/= (decf nelements) 0) (logtest start #b11))
+        (setf (aref array start) element)
+        (incf start)
+        (when (and (/= (decf nelements) 0) (logtest start #b11))
+          (setf (aref array start) element)
+          (incf start)          
+          (decf nelements))))
+    (let ((nwords (ash nelements -2)))
+      (if (> nwords 6)
+          (sb-kernel::word-fill array (ash start -2) nwords word)
+          (macrolet ((unroll ()
+                       (labels ((more (i)
+                                  (when (< i 6)
+                                    `(unless (zerop nwords)
+                                       (setf (sap-ref-word sap ,(ash i word-shift)) word)
+                                       (decf nwords)
+                                       ,(more (1+ i))))))
+                             (more 0))))
+            (with-pinned-objects (array)
+              (let ((sap (sap+ (vector-sap array) (* start 2))) ; 2 bytes per elt
+                    (nwords nwords))
+                (unroll)))))
+      (incf start (ash nwords 2))
+      (decf nelements (ash nwords 2)))
+    ;; There are at most 3 elements left over. Again this "should"
+    ;; need only 2 stores at most, but what'ya gonna do...
+    (when (/= nelements 0)
+      (setf (aref array start) element)
+      (when (/= (decf nelements) 0)
+        (setf (aref array (1+ start)) element)
+        (when (/= (decf nelements) 0)
+          (setf (aref array (+ start 2)) element)))))
+  array)
+
+;;; Arrays of word-sized elements should use word-sized stores.
+;;; Unfortunately only macOS has a native API for that.
+(defun sb-kernel::word-fill (array start nelements word)
+  (declare (type word word))
+  (declare (type #-64-bit index #+64-bit (unsigned-byte 59) start nelements))
+  (declare (optimize (safety 0)
+                     (sb-c::alien-funcall-saves-fp-and-pc 0)))
+  ;; When block compiling, I don't know if type information can flow
+  ;; in reverse, which would cause callers to think that ARRAY is
+  ;; whatever type we say it is here. So don't say it's UB64.
+  (let ((array (truly-the (simple-unboxed-array (*)) array)))
+    ;; - If < 32 words, either use a loop or an unrolled loop.
+    ;; - If >= 32 words:
+    ;;  - on x86-64 use a vop that implements REP STOSB which generally outperforms
+    ;;    except the setup cost outweighs the loop cost.
+    ;;    (I'm unconcerned about CPUs that lack enhanced-repeat-move-string)
+    ;;  - otherwise use memset_pattern which is native on macOS
+    ;;    and emulated elsewhere
+    (macrolet ((unroll ()
+                 ;; This slightly strange way of referencing off the end
+                 ;; of the sequence of stores causes the stores to be performed
+                 ;; in forward order, which, all other things being equal,
+                 ;; should be slightly more favorable to the memory
+                 ;; than doing them backwards.
+                 ;; If indexing off the start, then the multiway branch would
+                 ;; select one of the following entry points,
+                 ;; which requires that stores be performed in reverse:
+                 ;;      L32: store @ start + 31
+                 ;;      L31: store @ start + 30
+                 ;;      ...
+                 ;;      L2: store @ start + 1
+                 ;;      L1: store @ start + 0
+                 ;;      L0: return
+                 `(let ((end (truly-the index (+ start nelements)))
+                        (array (truly-the (simple-array (unsigned-byte 64) (*))
+                                          array)))
+                    (tagbody
+                    ;; The IR2 block order is determined by the order of the
+                    ;; clauses in the CASE, even after conversion to multiway-branch.
+                    ;; If the CASE is emitted in a bad order, then each statement
+                    ;; in the tagbody ends in an unconditional jump to the next.
+                    ;; This is an unfortunate interaction.
+                       (case nelements
+                         ,@(loop for i from 31 downto 0
+                                 collect `(,i (go ,i))))
+                       ,@(loop for i from 31 downto 1
+                               append `(,i (setf (aref array (+ end ,(- i))) word)))
+                       0))))
+      (if (< nelements 32)
+          (unroll)
+          (with-pinned-objects (array)          
+            #+x86-64
+            (cond ((<= nelements 2048) ; 2K elts * 8 = 16KiB
+                   ;; Technically we should check for presence of enhanced-repeat-move-string
+                   ;; but I don't have a CPU that doesn't have it. So I can't measure
+                   ;; what it costs to not have it.
+                   (%primitive memset-pattern-word
+                               (sap+ (vector-sap array) (ash start word-shift))
+                               word nelements))
+                  (t
+                   ;; If more than 16K bytes to fill, the behavior of REP STOS seems
+                   ;; severely degraded. It might have been done that way purposely, because
+                   ;; allegedly the microcoded instruction is uninterruptible, and it would not
+                   ;; be ideal to have long-running uninterruptible instructions.
+                   (when (oddp start)
+                     (%set-vector-raw-bits array start word)
+                     (incf start)
+                     (decf nelements))
+                   ;; Now we're at least 16-byte aligned,
+                   ;; but VMOVNTDQ demands 32-byte alignment
+                   (when (logtest (sap-int (sap+ (vector-sap array) (ash start word-shift)))
+                                  #b10000)
+                     (%set-vector-raw-bits array start word)
+                     (%set-vector-raw-bits array (1+ start) word)
+                     (incf start 2)
+                     (decf nelements 2))
+                   ;; Store 128 bytes per loop iteration, which is 16 words.
+                   ;; It takes 4 stores using VMOVNTDQ or 8 stores using MOVNTDQ.
+                   (let ((nchunks (floor nelements (/ +fill-bytes-per-chunk+ n-word-bytes))))
+                     ;; VMOVNTDQ is supported if avx_supported,
+                     ;; but it is faster than MOVDQA only if avx2_supported,
+                     ;; at least in my testing.
+                     ;; And unfortunately the SFENCE at the end can take away all
+                     ;; the performance that is otherwise gained.
+                     (if nil ; (/= 0 (extern-alien "avx2_supported" int))
+                         (%primitive memset-block-avx
+                                     (sap+ (vector-sap array) (ash start word-shift))
+                                     word
+                                     (truly-the word (* nchunks +fill-bytes-per-chunk+)))
+                         (%primitive memset-block-sse
+                                     (sap+ (vector-sap array) (ash start word-shift))
+                                     word
+                                     (truly-the word (* nchunks +fill-bytes-per-chunk+))))
+                     (let ((nwords (* nchunks (/ +fill-bytes-per-chunk+ n-word-bytes))))
+                       (incf start nwords)
+                       (decf nelements nwords))
+                     (loop (when (zerop nelements) (return))
+                           (%set-vector-raw-bits array start word)
+                           (incf start)
+                           (decf nelements))
+                     #+nil (%primitive sfence))))
+            #-x86-64
+            (let ((data (sap+ (vector-sap array) (ash start word-shift))))
+              #+darwin ; use the builtin, and pass WORD by reference
+              (with-alien ((pattern unsigned)
+                           (memset-pattern
+                            (function void system-area-pointer (* unsigned)
+                                      unsigned)
+                            :extern #+64-bit "memset_pattern8"
+                                    #-64-bit "memset_pattern4"))
+                (setq pattern word)
+                (alien-funcall memset-pattern data (addr pattern)
+                               (truly-the word (ash nelements word-shift))))
+              #-darwin ; pass WORD by value; it's our own function, why not.
+              (with-alien ((memset-pattern
+                            (function void system-area-pointer unsigned unsigned)
+                            :extern #+64-bit "memset_pattern_word"))
+                (alien-funcall memset-pattern data word nelements)))))))
+  array)
+(setf (symbol-function #+64-bit 'sb-kernel::ub64-fill #-64-bit 'sb-kernel::ub32-fill)
+      #'sb-kernel::word-fill)
+
 ;;; We cheat a little bit by using TRULY-THE in the copying function to
 ;;; force the compiler to generate good code in the (= BITSIZE
 ;;; N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
@@ -336,8 +649,7 @@
                                         (shift-towards-end
                                           (%vector-raw-bits src (1+ src-word-offset))
                                           (* (- src-byte-offset) ,bitsize)))))))))
-                    ,@(unless (= bytes-per-word 1)
-                       `((t
+                    (t
                           ;; We are only writing some portion of the destination word.
                           ;; We still don't know whether we need one or two source words.
                           (let ((mask (shift-towards-end (start-mask (* length ,bitsize))
@@ -377,7 +689,7 @@
                             (declare (type word mask orig value))
                             (%set-vector-raw-bits dst dst-word-offset
                                      (word-logical-or (word-logical-and value mask)
-                                                      (word-logical-andc2 orig mask)))))))))
+                                                      (word-logical-andc2 orig mask)))))))
                  ((= src-byte-offset dst-byte-offset)
                   ;; The source and destination are aligned, so shifting
                   ;; is unnecessary.  But we have to pick the direction
@@ -392,8 +704,7 @@
                       (cond
                         ((<= dst-offset src-offset)
                          ;; We need to loop from left to right.
-                         ,@(unless (= bytes-per-word 1)
-                            `((unless (zerop dst-byte-offset)
+                         (unless (zerop dst-byte-offset)
                                 ;; We are only writing part of the first word, so mask
                                 ;; off the bytes we want to preserve.
                                 (let ((mask (end-mask (* (- dst-byte-offset) ,bitsize)))
@@ -404,23 +715,17 @@
                                            (word-logical-or (word-logical-and value mask)
                                                             (word-logical-andc2 orig mask))))
                                 (incf src-word-offset)
-                                (incf dst-word-offset))))
+                                (incf dst-word-offset))
                          ;; Copy the interior words.
-                         (let ((end ,(if (= bytes-per-word 1)
-                                         `(truly-the ,word-offset
-                                           (+ dst-word-offset interior))
-                                         `(+ dst-word-offset interior))))
+                         (let ((end (+ dst-word-offset interior)))
                            (declare (type ,word-offset end))
                            (do ()
                                ((>= dst-word-offset end))
                              (%set-vector-raw-bits dst dst-word-offset
                                       (%vector-raw-bits src src-word-offset))
-                             ,(if (= bytes-per-word 1)
-                                  `(setf src-word-offset (truly-the ,word-offset (+ src-word-offset 1)))
-                                  `(incf src-word-offset))
+                             (incf src-word-offset)
                              (incf dst-word-offset)))
-                         ,@(unless (= bytes-per-word 1)
-                            `((unless (zerop final-bytes)
+                         (unless (zerop final-bytes)
                                 ;; We are only writing part of the last word.
                                 (let ((mask (start-mask (* final-bytes ,bitsize)))
                                       (orig (%vector-raw-bits dst dst-word-offset))
@@ -428,26 +733,19 @@
                                   (declare (type word mask orig value))
                                   (%set-vector-raw-bits dst dst-word-offset
                                            (word-logical-or (word-logical-and value mask)
-                                                            (word-logical-andc2 orig mask))))))))
+                                                            (word-logical-andc2 orig mask))))))
                         (t
                          ;; We need to loop from right to left.
-                         ,(if (= bytes-per-word 1)
-                              `(setf dst-word-offset (truly-the ,word-offset
-                                                      (+ dst-word-offset words)))
-                              `(incf dst-word-offset words))
-                         ,(if (= bytes-per-word 1)
-                              `(setf src-word-offset (truly-the ,word-offset
-                                                      (+ src-word-offset words)))
-                              `(incf src-word-offset words))
-                         ,@(unless (= bytes-per-word 1)
-                            `((unless (zerop final-bytes)
+                         (incf dst-word-offset words)
+                         (incf src-word-offset words)
+                         (unless (zerop final-bytes)
                                 (let ((mask (start-mask (* final-bytes ,bitsize)))
                                       (orig (%vector-raw-bits dst dst-word-offset))
                                       (value (%vector-raw-bits src src-word-offset)))
                                   (declare (type word mask orig value))
                                   (%set-vector-raw-bits dst dst-word-offset
                                            (word-logical-or (word-logical-and value mask)
-                                                            (word-logical-andc2 orig mask)))))))
+                                                            (word-logical-andc2 orig mask)))))
                          (let ((end (- dst-word-offset interior)))
                            (do ()
                                ((<= dst-word-offset end))
@@ -455,8 +753,7 @@
                              (decf dst-word-offset)
                              (%set-vector-raw-bits dst dst-word-offset
                                       (%vector-raw-bits src src-word-offset))))
-                         ,@(unless (= bytes-per-word 1)
-                            `((unless (zerop dst-byte-offset)
+                         (unless (zerop dst-byte-offset)
                                 ;; We are only writing part of the last word.
                                 (decf src-word-offset)
                                 (decf dst-word-offset)
@@ -466,7 +763,7 @@
                                   (declare (type word mask orig value))
                                   (%set-vector-raw-bits dst dst-word-offset
                                            (word-logical-or (word-logical-and value mask)
-                                                            (word-logical-andc2 orig mask))))))))))))
+                                                            (word-logical-andc2 orig mask))))))))))
                  (t
                   ;; Source and destination are not aligned.
                   (multiple-value-bind (words final-bytes)
@@ -489,8 +786,7 @@
                                     (setf next (%vector-raw-bits src
                                                         (incf src-word-offset)))))
                              (declare (inline get-next-src))
-                             ,@(unless (= bytes-per-word 1)
-                                `((unless (zerop dst-byte-offset)
+                             (unless (zerop dst-byte-offset)
                                     (when (> src-byte-offset dst-byte-offset)
                                       (get-next-src))
                                     (let ((mask (end-mask (* (- dst-byte-offset) ,bitsize)))
@@ -501,7 +797,7 @@
                                       (%set-vector-raw-bits dst dst-word-offset
                                                (word-logical-or (word-logical-and value mask)
                                                                 (word-logical-andc2 orig mask))))
-                                    (incf dst-word-offset))))
+                                    (incf dst-word-offset))
                              (let ((end (+ dst-word-offset interior)))
                                (declare (type ,word-offset end))
                                (do ()
@@ -513,8 +809,7 @@
                                    (declare (type word value))
                                    (%set-vector-raw-bits dst dst-word-offset value)
                                    (incf dst-word-offset))))
-                             ,@(unless (= bytes-per-word 1)
-                                `((unless (zerop final-bytes)
+                             (unless (zerop final-bytes)
                                     (let ((value
                                            (if (> (+ final-bytes src-shift) ,bytes-per-word)
                                                (progn
@@ -528,7 +823,7 @@
                                       (declare (type word mask orig value))
                                       (%set-vector-raw-bits dst dst-word-offset
                                                (word-logical-or (word-logical-and value mask)
-                                                                (word-logical-andc2 orig mask))))))))))
+                                                                (word-logical-andc2 orig mask))))))))
                         (t
                          ;; We need to loop from right to left.
                          (incf dst-word-offset words)
@@ -540,8 +835,7 @@
                                     (setf next prev)
                                     (setf prev (%vector-raw-bits src (decf src-word-offset)))))
                              (declare (inline get-next-src))
-                             ,@(unless (= bytes-per-word 1)
-                                `((unless (zerop final-bytes)
+                             (unless (zerop final-bytes)
                                     (when (> final-bytes (- ,bytes-per-word src-shift))
                                       (get-next-src))
                                     (let ((value (word-logical-or
@@ -552,7 +846,7 @@
                                       (declare (type word mask orig value))
                                       (%set-vector-raw-bits dst dst-word-offset
                                                (word-logical-or (word-logical-and value mask)
-                                                                (word-logical-andc2 orig mask)))))))
+                                                                (word-logical-andc2 orig mask)))))
                              (decf dst-word-offset)
                              (let ((end (- dst-word-offset interior)))
                                (do ()
@@ -564,8 +858,7 @@
                                    (declare (type word value))
                                    (%set-vector-raw-bits dst dst-word-offset value)
                                    (decf dst-word-offset))))
-                             ,@(unless (= bytes-per-word 1)
-                                `((unless (zerop dst-byte-offset)
+                             (unless (zerop dst-byte-offset)
                                     (if (> src-byte-offset dst-byte-offset)
                                         (get-next-src)
                                         (setf next prev prev 0))
@@ -577,7 +870,7 @@
                                       (declare (type word mask orig value))
                                       (%set-vector-raw-bits dst dst-word-offset
                                               (word-logical-or (word-logical-and value mask)
-                                                               (word-logical-andc2 orig mask)))))))))))))))))
+                                                               (word-logical-andc2 orig mask)))))))))))))))
            (values))
 
          ;; common uses for unary-byte-bashing

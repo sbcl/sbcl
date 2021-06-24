@@ -71,6 +71,14 @@
 
 ;;;; hooks into the type system
 
+;;; Typically the use-case for UNBOXED-ARRAY is in foreign APIs
+;;; where we want to be certain that the array being pass around
+;;; has the bit nature, and is not SIMPLE-VECTOR.
+;;; Vector NIL has no data, so surely there is no use-case for it
+;;; being simple-unboxed-array. Unfortunately, removing it causes
+;;; TYPEP on simple-unboxed-array to emit more code, presumably
+;;; because the widetag intrudes into the "good" range.
+;;; I suspect we can rearrange widetags to fix that.
 (sb-xc:deftype unboxed-array (&optional dims)
   (cons 'or (mapcar (lambda (type) `(array ,type ,dims))
                     '#.(delete t (map 'list 'sb-vm:saetp-specifier

@@ -386,6 +386,43 @@
             (sb-c::delete-vop next)
             new))))))
 
+;;; Try to fold a preceding FAST-+-C/FIXNUM=>FIXNUM into this vop
+;;; because FOLD-INDEX-ADDRESSING is incapable of doing that
+;;; if it can't prove that the result of the +/- is positive-fixnum.
+;;; (We should just delete the IR1 thing entirely, and always do it in IR2)
+(defoptimizer (sb-c::vop-optimize data-vector-set-with-offset/simple-array-unsigned-byte-64) (vop)
+  (let ((add (sb-c::vop-prev vop)))
+    (when (and add (eq (vop-name add) 'move))
+      (let* ((move add)
+             (add (sb-c::vop-prev move)))
+        (when (and add
+                   (eq (vop-name add) 'fast-+-c/fixnum=>fixnum)
+                   (eq (vop-block add) (vop-block vop))
+                   ;; The ADD must go nowhere but the MOVE.
+                   (sb-c::very-temporary-p (sb-c::tn-ref-tn (sb-c::vop-results add)))
+                   (eq (sb-c::tn-ref-tn (sb-c::vop-results add))
+                       (sb-c::tn-ref-tn (sb-c::vop-args move)))
+                   ;; The MOVE must go nowhere but the data-vector-set's second arg
+                   (sb-c::very-temporary-p
+                    (sb-c::tn-ref-tn (sb-c::vop-results move)))
+                   (eq (sb-c::tn-ref-tn (sb-c::vop-results move))
+                       (sb-c::tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))))
+          (let* ((args (sb-c::reference-tn-list
+                       (list (tn-ref-tn (sb-c::vop-args vop)) ; array
+                             (tn-ref-tn (sb-c::vop-args add)) ; index
+                             (tn-ref-tn (tn-ref-across ; value
+                                         (tn-ref-across (sb-c::vop-args vop)))))
+                       nil))
+                 (new (sb-c::emit-and-insert-vop
+                       (sb-c::vop-node vop) (vop-block vop) (sb-c::vop-info vop)
+                       args nil add
+                       (list (+ (car (vop-codegen-info vop))
+                                (car (vop-codegen-info add)))))))
+            (sb-c::delete-vop add)
+            (sb-c::delete-vop move)
+            (sb-c::delete-vop vop)
+            new))))))
+
 (define-vop (svref-with-addend+if-eq)
    (:args (object :scs (descriptor-reg))
           (index :scs (any-reg))

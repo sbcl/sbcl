@@ -619,7 +619,7 @@
  #+sb-eval
  ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
 
- ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
+ ("src/code/bit-bash"    :not-host :block-compile)
 
  #-(or x86 x86-64)
  ("src/compiler/generic/sanctify" :not-host)
