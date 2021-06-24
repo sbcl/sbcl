@@ -52,7 +52,7 @@
 #-sparc
 (defun run-tests ()
   (proclaim '(sb-ext:muffle-conditions style-warning))
-  (sb-sprof:with-profiling (:max-samples 100 :report :flat :loop t :show-progress t)
+  (sb-sprof:with-profiling (:max-samples 50 :report :flat :loop t :show-progress t)
     ;; Notice that "./foo.fasl" writes into this directory, whereas simply "foo.fasl"
     ;; would write into "../../src/code/"
     ;; Notice also that our file I/O routines are so crappy that 15% of the test
