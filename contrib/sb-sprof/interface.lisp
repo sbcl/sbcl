@@ -87,7 +87,7 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
                 ,(if loop
                      `(let (,values)
                         (loop ; Uh, shouldn't this be a trailing test, not a leading test?
-                          (when (>= trace-count max-traces)
+                          (when (>= trace-count trace-limit)
                             (return))
                           (show-progress "~&===> ~d of ~d samples taken.~%"
                                          trace-count trace-limit)

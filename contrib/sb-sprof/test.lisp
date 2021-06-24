@@ -43,12 +43,30 @@
           while (< (get-universal-time) target)
           do (consalot))))
 
+;; This has been failing on Sparc/SunOS for a while,
+;; having nothing to do with the rewrite of sprof's
+;; data collector into C. Maybe it works on Linux
+;; but the less fuss about Sparc, the better.
+#+sparc (defun run-tests () t)
+
+#-sparc
 (defun run-tests ()
-  ;; This has been failing on Sparc/SunOS for a while,
-  ;; having nothing to do with the rewrite of sprof's
-  ;; data collector into C. Maybe it works on Linux
-  ;; but the less fuss about Sparc, the better.
-  #-sparc
+  (sb-sprof:with-profiling (:max-samples 100 :report :flat :loop t :show-progress t)
+    ;; Notice that "./foo.fasl" writes into this directory, whereas simply "foo.fasl"
+    ;; would write into "../../src/code/"
+    ;; Notice also that our file I/O routines are so crappy that 31% of the test
+    ;; is spent in lseek, and 16% in write. Just wow!
+    ;;            Self        Total        Cumul
+    ;;   Nr  Count     %  Count     %  Count     %    Calls  Function
+    ;; ------------------------------------------------------------------------
+    ;;    1     31  31.0     31  31.0     31  31.0        -  foreign function __lseek
+    ;;    2     16  16.0     16  16.0     47  47.0        -  foreign function write
+    ;;    3      5   5.0      5   5.0     52  52.0        -  foreign function __pthread_sigmask
+    ;;    4      3   3.0      3   3.0     55  55.0        -  foreign function _platform_bzero$VARIANT$Haswell
+    ;;    5      2   2.0      4   4.0     57  57.0        -  SB-IMPL::GROW-HASH-TABLE
+    ;;
+    (compile-file "../../src/code/misc-aliens" :output-file "./foo.fasl" :print nil))
+  (delete-file "foo.fasl")
   (let ((*standard-output* (make-broadcast-stream)))
     (test)
     (consing-test)
