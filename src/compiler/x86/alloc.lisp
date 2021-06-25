@@ -168,7 +168,7 @@
      (allocation-inline type alloc-tn size))
     (t
      (allocation-notinline type alloc-tn size)))
-  (when (and lowtag (not dynamic-extent))
+  (when (and lowtag (/= lowtag 0) (not dynamic-extent))
     ;; This is dumb, it should be an ADD or an OR, but a better solution
     ;; would be to pass lowtag into the allocation-inline function so that
     ;; for a fixed size we don't emit code such as "SUB r, 8 ; ADD r, 3".
