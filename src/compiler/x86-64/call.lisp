@@ -1317,7 +1317,7 @@
        (allocation 'list rcx 0 node stack-allocate-p dst)
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
-       (inst shr :dword ecx (1+ word-shift)) ; convert bytes to number of cells
+       (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
        ;; The rightmost arguments are at lower addresses.
        ;; Start by indexing the last argument
        (inst neg rcx) ; :QWORD because it's a signed number

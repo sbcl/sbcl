@@ -2081,7 +2081,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (let* ((fun (lvar-fun-name (combination-fun node)))
                   (star (ecase fun
                           ((list) nil)
-                          ;; I think CONS won't appear here (yet)
                           ((list* cons) t))))
              (if star
                  (aver (cdr args))
@@ -2090,6 +2089,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                    (let ((nargs (length args))) (if star (1- nargs) nargs))
                    star)
              (move-lvar-result node block res lvar))))))
+(setf (fun-info-ir2-convert (fun-info-or-lose 'cons)) #'list*-ir2-convert-optimizer)
 (setf (fun-info-ir2-convert (fun-info-or-lose 'list)) #'list*-ir2-convert-optimizer)
 
 

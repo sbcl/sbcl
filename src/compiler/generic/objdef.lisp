@@ -33,8 +33,7 @@
 ;;;; the primitive objects themselves
 
 (define-primitive-object (cons :type cons
-                               :lowtag list-pointer-lowtag
-                               :alloc-trans cons)
+                               :lowtag list-pointer-lowtag)
   (car :ref-trans car :set-trans %rplaca :init :arg
        :cas-trans %compare-and-swap-car)
   (cdr :ref-trans cdr :set-trans %rplacd :init :arg

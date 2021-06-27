@@ -242,7 +242,7 @@
          (nbytes :scs (unsigned-reg) :target index))
   (:temporary (:sc sap-reg :from (:argument 0)) sap)
   (:temporary (:sc unsigned-reg :from (:argument 2)) index)
-  (:temporary (:sc sse-reg) xmm)  
+  (:temporary (:sc sse-reg) xmm)
   (:generator 10
    (move sap base)
    (inst movq xmm word)
@@ -322,7 +322,7 @@
                      (logand word #xff)
                      nelements)))
   array)
-  
+
 ;;; Half-lispword is easily expressed in terms of lispword:
 ;;;  1. peel off one element at the start, or don't.
 ;;;  2. fill (FLOOR COUNT 2) lispwords.
@@ -381,7 +381,7 @@
         (incf start)
         (when (and (/= (decf nelements) 0) (logtest start #b11))
           (setf (aref array start) element)
-          (incf start)          
+          (incf start)
           (decf nelements))))
     (let ((nwords (ash nelements -2)))
       (if (> nwords 6)
@@ -444,8 +444,7 @@
                  ;;      L1: store @ start + 0
                  ;;      L0: return
                  `(let ((end (truly-the index (+ start nelements)))
-                        (array (truly-the (simple-array (unsigned-byte 64) (*))
-                                          array)))
+                        (array (truly-the (simple-array word (*)) array)))
                     (tagbody
                     ;; The IR2 block order is determined by the order of the
                     ;; clauses in the CASE, even after conversion to multiway-branch.
@@ -460,7 +459,7 @@
                        0))))
       (if (< nelements 32)
           (unroll)
-          (with-pinned-objects (array)          
+          (with-pinned-objects (array)
             #+x86-64
             (cond ((<= nelements 2048) ; 2K elts * 8 = 16KiB
                    ;; Technically we should check for presence of enhanced-repeat-move-string
@@ -524,10 +523,10 @@
                 (alien-funcall memset-pattern data (addr pattern)
                                (truly-the word (ash nelements word-shift))))
               #-darwin ; pass WORD by value; it's our own function, why not.
-              (with-alien ((memset-pattern
+              (with-alien ((memset-pattern-word
                             (function void system-area-pointer unsigned unsigned)
-                            :extern #+64-bit "memset_pattern_word"))
-                (alien-funcall memset-pattern data word nelements)))))))
+                            :extern))
+                (alien-funcall memset-pattern-word data word nelements)))))))
   array)
 (setf (symbol-function #+64-bit 'sb-kernel::ub64-fill #-64-bit 'sb-kernel::ub32-fill)
       #'sb-kernel::word-fill)

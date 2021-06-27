@@ -254,10 +254,12 @@
         (unless stack-allocate-p
           (instrument-alloc size node))
         (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation 'list size (if (= cons-cells 2) 0 list-pointer-lowtag)
+                (allocation 'list size (if (<= cons-cells 2) 0 list-pointer-lowtag)
                             node stack-allocate-p res)
                 (multiple-value-bind (last-base-reg lowtag car cdr)
                     (cond
+                      ((= cons-cells 1)
+                       (values res 0 cons-car-slot cons-cdr-slot))
                       ((= cons-cells 2)
                        ;; Note that this does not use the 'ptr' register at all.
                        ;; It would require a different vop to free that register up.
@@ -266,8 +268,6 @@
                        (inst lea temp (ea (+ (* cons-size n-word-bytes) list-pointer-lowtag) res))
                        (store-slot temp res cons-cdr-slot 0)
                        (values res 0 (+ cons-size cons-car-slot) (+ cons-size cons-cdr-slot)))
-                      ;; 1 cons IR1-transforms to CONS which IR2-converts as FIXED-ALLOC.
-                      ((= cons-cells 1) (bug "Why?")) ; shoulda been CONS
                       (t
                        (move ptr res)
                        (dotimes (i (1- cons-cells))
@@ -284,7 +284,7 @@
                         (t
                          (storew* nil-value last-base-reg cdr lowtag
                                   (not stack-allocate-p))))
-                  (cond ((= cons-cells 2)
+                  (cond ((<= cons-cells 2)
                          (if (location= result res)
                              (inst or :byte result list-pointer-lowtag)
                              (inst lea result (ea list-pointer-lowtag res))))
