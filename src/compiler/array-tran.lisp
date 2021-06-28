@@ -1114,29 +1114,33 @@
                           *
                           :node call)
   (block make-array
-    ;; If lvar-use of DIMS is a call to LIST, then it must mean that LIST
-    ;; was declared notinline - because if it weren't, then it would have been
-    ;; source-transformed into CONS - which gives us reason NOT to optimize
-    ;; this call to MAKE-ARRAY. So look for CONS instead of LIST,
-    ;; which means that LIST was *not* declared notinline.
-    (when (and (lvar-matches dims :fun-names '(cons) :arg-count 2)
-               (let ((cdr (second (combination-args (lvar-uses dims)))))
-                 (and (constant-lvar-p cdr) (null (lvar-value cdr)))))
-      (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
-             (dummy (cadr args)))
-        (flush-dest dummy)
+    (binding* ((dimension-0
+                ;; I don't know if it's worth introducing transforms for
+                ;;   (LIST* x NIL) -> (LIST X)
+                ;;   (CONS x NIL) -> (LIST X)
+                ;; just to avoid having to test for this rather silly-looking scenario
+                ;; where a rank 1 array has its dimension spelled using CONS or LIST*.
+                (cond ((and (lvar-matches dims :fun-names '(cons list*) :arg-count 2)
+                            (let ((cdr (second (combination-args (lvar-uses dims)))))
+                              (and (constant-lvar-p cdr) (null (lvar-value cdr)))))
+                       (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS | LIST*
+                              (dummy (cadr args)))
+                         (flush-dest dummy)
+                         (setf (combination-args call) (delete dummy (combination-args call)))
+                         (car args)))
+                      ((lvar-matches dims :fun-names '(list) :arg-count 1)
+                       (car (splice-fun-args dims :any 1))))
+                :exit-if-null))
         ;; Don't want (list (list x)) to become a valid dimension specifier.
-        (assert-lvar-type (car args) (specifier-type 'index)
-                          (%coerce-to-policy call))
-        (setf (combination-args call) (delete dummy (combination-args call)))
+        (assert-lvar-type dimension-0 (specifier-type 'index) (%coerce-to-policy call))
         (return-from make-array
-          (transform-make-array-vector (car args)
+          (transform-make-array-vector dimension-0
                                        element-type
                                        initial-element
                                        initial-contents
                                        call
                                        :adjustable adjustable
-                                       :fill-pointer fill-pointer))))
+                                       :fill-pointer fill-pointer)))
     (unless (constant-lvar-p dims)
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))
