@@ -5,57 +5,67 @@
 
 (in-package "SB-VM")
 
-;;; It is arbitrary whether each of the next 4 routines is named ALLOC-something,
-;;; exporting an additional entry named CONS-something, versus being named CONS-something
-;;; and exporting ALLOC-something.  It just depends on which of those you would like
-;;; to have to set and clear the low bit to match ALLOC-DISPATCH.
-;;; Think of "cons" as meaning the generic sense of "consing", not as actually
-;;; allocating conses, because fixed-sized non-cons object allocation may enter
-;;; through the cons entry point. Cons cells *must* use that entry point.
-(define-assembly-routine (alloc->rnn (:export cons->rnn)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->RNN
+(define-assembly-routine (alloc->rnn) ()
   (with-registers-preserved (c xmm)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
+    (inst call (make-fixup "alloc" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 #+avx2
-(define-assembly-routine (alloc->rnn.avx2 (:export cons->rnn.avx2)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->RNN.AVX2
+(define-assembly-routine (alloc->rnn.ymmsave) ()
   (with-registers-preserved (c ymm)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
+    (inst call (make-fixup "alloc" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (alloc->r11 (:export cons->r11) (:return-style :none)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->R11
+(define-assembly-routine (alloc->r11 (:return-style :none)) ()
   (with-registers-preserved (c xmm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
+    (inst call (make-fixup "alloc" :foreign))
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
 
 #+avx2
-(define-assembly-routine (alloc->r11.avx2 (:export cons->r11.avx2) (:return-style :none)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->R11.AVX2
+(define-assembly-routine (alloc->r11.ymmsave (:return-style :none)) ()
   (with-registers-preserved (c ymm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
+    (inst call (make-fixup "alloc" :foreign))
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
 
-(define-assembly-routine (alloc-dispatch (:return-style :none)) ()
-  ;; If RDI has a 0 in the low bit, then we're allocating cons cells.
-  ;; A 1 bit signifies anything other than cons cells, and is equivalent
-  ;; to "could this object consume large-object pages" in gencgc.
-  (inst test :byte rdi-tn 1)
-  (inst jmp :z (make-fixup "alloc_list" :foreign))
-  (inst xor :byte rdi-tn 1) ; clear the bit
-  (inst jmp  (make-fixup "alloc" :foreign)))
+(define-assembly-routine (make-list (:return-style :none)) ()
+  (with-registers-preserved (c xmm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "make_list" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+
+#+avx2
+(define-assembly-routine (make-list.ymmsave (:return-style :none)) ()
+  (with-registers-preserved (c ymm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "make_list" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+
+(define-assembly-routine (listify-rest-arg (:return-style :none)) ()
+  (with-registers-preserved (c xmm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "listify_rest_arg" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+
+#+avx2
+(define-assembly-routine (listify-rest-arg.ymmsave (:return-style :none)) ()
+  (with-registers-preserved (c ymm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "listify_rest_arg" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.

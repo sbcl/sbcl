@@ -2037,17 +2037,27 @@ not stack-allocated LVAR ~S." source-lvar)))))
 ;;;; n-argument functions
 
 (defoptimizer (list* ir2-convert) ((&rest args) node block)
-  ;; FIXME: I think this #+gencgc test is no longer neeeded.
-  ;; Git rev 2a562e61 and following fixed that problem,
-  ;; at least for allocation of &REST lists.
-  ;; Is it still broken for LIST* and LIST ? I doubt it.
-  (cond #+gencgc
-        ((>= (length args)
-             (/ sb-vm:large-object-size
-                (* sb-vm:n-word-bytes 2)))
-         ;; The VOPs will try to allocate all space at once
-         ;; And it'll end up in large objects, and no conses
-         ;; are welcome there.
+  (let* ((fun (lvar-fun-name (combination-fun node)))
+         (star (ecase fun
+                 ((list) nil)
+                 ((list* cons) t)))
+         (n-cons-cells
+          (let ((nargs (length args))) (if star (1- nargs) nargs))))
+    (if star (aver (cdr args)) (aver args))
+    (cond
+        #+gencgc
+        ((>= n-cons-cells (/ sb-vm:gencgc-card-bytes (* sb-vm:n-word-bytes 2)))
+         ;; The LIST* vop should never receive a number of arguments
+         ;; so large that the allocation size exceeds one GC page.
+         ;; And exactly 1 page is unlikely to succeed as an inline allocation,
+         ;; so don't even bother trying it.
+         ;; Code that has a statically observable call to LIST with so many args
+         ;; should not be using a list in the first place!
+         ;; If we do decide to emit as a full call, it's pretty crappy, because
+         ;; we move all N args to the stack. It would probably be better
+         ;; to call make_list(n) and then CDR down the list assigning into
+         ;; each cell, which certainly seems like it would entail no more work
+         ;; than moving every argument into a passing location.
          (ir2-convert-full-call node block))
         (t
          (let* ((scs (operand-parse-scs
@@ -2078,17 +2088,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (when (and lvar (lvar-dynamic-extent lvar))
              (vop current-stack-pointer node block
                   (ir2-lvar-stack-pointer (lvar-info lvar))))
-           (let* ((fun (lvar-fun-name (combination-fun node)))
-                  (star (ecase fun
-                          ((list) nil)
-                          ((list* cons) t))))
-             (if star
-                 (aver (cdr args))
-                 (aver args))
-             (vop* list* node block (refs) ((first res) nil)
-                   (let ((nargs (length args))) (if star (1- nargs) nargs))
-                   star)
-             (move-lvar-result node block res lvar))))))
+           (vop* list* node block (refs) ((first res) nil) n-cons-cells star)
+           (move-lvar-result node block res lvar))))))
 (setf (fun-info-ir2-convert (fun-info-or-lose 'cons)) #'list*-ir2-convert-optimizer)
 (setf (fun-info-ir2-convert (fun-info-or-lose 'list)) #'list*-ir2-convert-optimizer)
 

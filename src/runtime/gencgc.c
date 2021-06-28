@@ -4446,7 +4446,13 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
         // That's actually most of them, but I haven't tested that they're right.
         // e.g. x86 forgoes inline allocation depending on policy,
         // and git revision 05047647 tweaked the edge case for PPC.
-        gc_assert(page_type_flag == CODE_PAGE_TYPE);
+        // And this assertion is actually no longer true - large lists
+        // can be broken into smaller requests, and the initial request is
+        // is for all the space in the currently open thread-local region.
+        // To make this hold again, the first chunk of conses in
+        // make_list() and listify_rest_arg() will have to be picked off
+        // using a pointer bump. I didn't want to complicate them yet.
+        // gc_assert(page_type_flag == CODE_PAGE_TYPE);
 #endif
         return(new_obj);        /* yup */
     }
@@ -4549,6 +4555,83 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #endif
 DEFINE_LISP_ENTRYPOINT(alloc, BOXED_PAGE_FLAG)
 DEFINE_LISP_ENTRYPOINT(alloc_list, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
+
+/* Make a list that couldn't be inline-allocated. Break it up into contiguous
+ * blocks of conses not to exceed one GC card each.
+ * A planned refinement to this will try to use a distinct page type for conses
+ * and limit the maximum number of cells allocated in one batch so that each page
+ * of conses has room for a number of extra bits per cons for GC purposes.
+ * The latter constraint requires that we be able to NCONC several allocations.
+ * (The extra bits will all be together at the start or end of each cons type page)
+ * For now it suffices to have this distinguished entry point.
+ * This could possibly have been a Lisp function with a small assembler routine
+ * to save/restore all registers around it (allocation vops musn't affect program state)
+ */
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nbytes) {
+    // Technically this overflow handler could probably allow garbage collection
+    // between each separate allocation. For now the entire thing is pseudo-atomic.
+    struct thread *self = get_sb_vm_thread();
+    struct alloc_region *r = MY_REGION;
+    int available = (char*)r->end_addr - (char*)r->free_pointer;
+    gc_assert(nbytes > (sword_t)available);
+    if (available == 0) available = GENCGC_CARD_BYTES;
+    lispobj result, *tail = &result;
+    do {
+        int request = (nbytes > available ? available : nbytes);
+        struct cons* c = (void*)lisp_alloc(MY_REGION, request, BOXED_PAGE_FLAG, self);
+        *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
+        int ncells = request >> (1+WORD_SHIFT);
+        nbytes -= N_WORD_BYTES * 2 * ncells;
+        struct cons* limit = c + ncells;
+        while (c < limit) {
+            c->car = element; c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            ++c;
+        }
+        tail = &((c-1)->cdr);
+        available = GENCGC_CARD_BYTES;
+    } while (nbytes);
+    *tail = NIL;
+    return result;
+}
+/* Convert a &MORE context to a list. */
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, sword_t nbytes) {
+    // same comment as above in make_list() applies about the scope of pseudo-atomic
+    struct thread *self = get_sb_vm_thread();
+    struct alloc_region *r = MY_REGION;
+    int available = (char*)r->end_addr - (char*)r->free_pointer;
+    gc_assert(nbytes > (sword_t)available);
+    if (available == 0) available = GENCGC_CARD_BYTES;
+    lispobj result, *tail = &result;
+    do {
+        int request = (nbytes > available ? available : nbytes);
+        struct cons* c = (void*)lisp_alloc(MY_REGION, request, BOXED_PAGE_FLAG, self);
+        *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
+        int ncells = request >> (1+WORD_SHIFT);
+        nbytes -= N_WORD_BYTES * 2 * ncells;
+        // Process 4 items at a time
+        int n_unrolled_iterations = ncells >> 2;
+        struct cons* limit = c + n_unrolled_iterations*4;
+        while (c < limit) {
+            // FIXME: Context has architecture-dependent direction
+            c[0].car = context[ 0]; c[0].cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            c[1].car = context[-1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
+            c[2].car = context[-2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
+            c[3].car = context[-3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
+            c += 4;
+            context -= 4;
+        }
+        ncells -= n_unrolled_iterations*4;
+        while (ncells--) {
+            c->car = *context--;
+            c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            c++;
+        }
+        tail = &((c-1)->cdr);
+        available = GENCGC_CARD_BYTES;
+    } while (nbytes);
+    *tail = NIL;
+    return result;
+}
 
 #ifdef LISP_FEATURE_SPARC
 void boxed_region_rollback(sword_t size)

@@ -59,44 +59,31 @@
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
 ;;; Call an allocator trampoline and get the result in the proper register.
-;;; There are 2x2x2 choices of trampoline:
-;;;  - invoke alloc() or alloc_list() in C
+;;; There are 2x2 choices of trampoline:
 ;;;  - place result into R11, or leave it on the stack
 ;;;  - preserve YMM registers around the call, or don't
-;;; Rather than have 8 different DEFINE-ASSEMBLY-ROUTINEs, there are only 4,
-;;; and each has 2 entry points. The earlier entry adds 1 more instruction
-;;; to set the non-cons bit (the first of the binary choices mentioned above).
-;;; Most of the time, the inline allocation sequence wants to use the trampoline
-;;; that returns a result in TEMP-REG-TN (R11) which saves one move and
-;;; clears the size argument from the stack in the RET instruction.
-;;; If the result is returned on the stack, then we pop it below.
 (defun %alloc-tramp (type node result-tn size lowtag)
-  (let ((consp (eq type 'list))
-        (to-r11 (location= result-tn r11-tn)))
-    (when (typep size 'integer)
-      (aver (= (align-up size (* 2 n-word-bytes)) size))
-      (when (neq type 'list)
-        (incf size) ; the low bit means we're allocating a non-cons object
-        ;; Jump into the cons entry point which saves one instruction because why not.
-        (setq consp t)))
-    (cond ((typep size '(and integer (not (signed-byte 32))))
-           ;; MOV accepts large immediate operands, PUSH does not
-           (inst mov result-tn size)
-           (inst push result-tn))
-          (t
-           (inst push size)))
-    (invoke-asm-routine
-     'call
-     (cond #+avx2
-           ((avx-registers-used-p)
-            (if to-r11
-                (if consp 'cons->r11.avx2 'alloc->r11.avx2)
-                (if consp 'cons->rnn.avx2 'alloc->rnn.avx2)))
-           (t
-            (if to-r11
-                (if consp 'cons->r11 'alloc->r11)
-                (if consp 'cons->rnn 'alloc->rnn))))
-     node)
+  (declare (ignorable type))
+  (when (typep size 'integer)
+    (aver (= (align-up size (* 2 n-word-bytes)) size)))
+  (cond ((typep size '(and integer (not (signed-byte 32))))
+         ;; MOV accepts large immediate operands, PUSH does not
+         (inst mov result-tn size)
+         (inst push result-tn))
+        (t
+         (inst push size)))
+  ;; Most of the time, the inline allocation sequence wants to use the trampoline
+  ;; that returns a result in TEMP-REG-TN (R11) which saves one move and
+  ;; clears the size argument from the stack in the RET instruction.
+  ;; If the result is returned on the stack, then we pop it below.
+  (let ((to-r11 (location= result-tn r11-tn)))
+    (invoke-asm-routine 'call
+                        (cond #+avx2
+                              ((avx-registers-used-p)
+                               (if to-r11 'alloc->r11.ymmsave 'alloc->rnn.ymmsave))
+                              (t
+                               (if to-r11 'alloc->r11 'alloc->rnn)))
+                        node)
     (unless to-r11
       (inst pop result-tn)))
   (unless (eql lowtag 0)
@@ -145,27 +132,24 @@
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. how to allocate it: policy and how to invoke the trampoline
 ;;; 3. where to put the result
-(defun allocation (type size lowtag node dynamic-extent alloc-tn)
+(defun allocation (type size lowtag node dynamic-extent alloc-tn &optional slow-path)
   (when dynamic-extent
     (stack-allocation alloc-tn size lowtag)
     (return-from allocation (values)))
+  ;; Otherwise do the normal inline allocation thing
   (aver (and (not (location= alloc-tn temp-reg-tn))
              (or (integerp size) (not (location= size temp-reg-tn)))))
-
   (aver (not (sb-assem::assembling-to-elsewhere-p)))
-  ;; Otherwise do the normal inline allocation thing
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
         ;; thread->alloc_region.free_pointer
-        (free-pointer
-         #+sb-thread (thread-slot-ea thread-alloc-region-slot)
-         #-sb-thread (ea boxed-region))
+        (free-pointer #+sb-thread (thread-slot-ea thread-alloc-region-slot)
+                      #-sb-thread (ea boxed-region))
         ;; thread->alloc_region.end_addr
-        (end-addr
-         #+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
-         #-sb-thread (ea (+ boxed-region n-word-bytes))))
+        (end-addr #+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
+                  #-sb-thread (ea (+ boxed-region n-word-bytes))))
 
-    (cond ((typep size `(integer , large-object-size))
+    (cond ((typep size `(integer ,large-object-size))
            ;; large objects will never be made in a per-thread region
            (%alloc-tramp type node alloc-tn size lowtag))
           ((eql lowtag 0)
@@ -187,8 +171,11 @@
                                 temp-reg-tn)
                                (t
                                 size))))
-               (%alloc-tramp type node alloc-tn size 0))
-             (inst jmp DONE)))
+               (cond (slow-path
+                      (funcall slow-path))
+                     (t
+                      (%alloc-tramp type node alloc-tn size 0)
+                      (inst jmp DONE))))))
           (t
            (inst mov temp-reg-tn free-pointer)
            (cond ((integerp size)
@@ -204,13 +191,15 @@
            (tagify alloc-tn temp-reg-tn lowtag)
            (assemble (:elsewhere)
              (emit-label NOT-INLINE)
-             (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
-                    (inst sub alloc-tn temp-reg-tn)
-                    (%alloc-tramp type node temp-reg-tn alloc-tn 0))
-                   (t ; SIZE is intact
-                    (%alloc-tramp type node temp-reg-tn size 0)))
-             (inst jmp DONE))))
-    (values)))
+             (cond (slow-path
+                    (funcall slow-path))
+                   (t
+                    (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
+                           (inst sub alloc-tn temp-reg-tn)
+                           (%alloc-tramp type node temp-reg-tn alloc-tn 0))
+                          (t ; SIZE is intact
+                           (%alloc-tramp type node temp-reg-tn size 0)))
+                    (inst jmp DONE))))))))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
@@ -254,7 +243,7 @@
         (unless stack-allocate-p
           (instrument-alloc size node))
         (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation 'list size (if (<= cons-cells 2) 0 list-pointer-lowtag)
+                (allocation nil size (if (<= cons-cells 2) 0 list-pointer-lowtag)
                             node stack-allocate-p res)
                 (multiple-value-bind (last-base-reg lowtag car cdr)
                     (cond
@@ -544,7 +533,7 @@
                     (t
                      (inst mov result nil-value)
                      (inst test ,length ,length)
-                     (inst jmp :z done)
+                     (inst jmp :z OUT)
                      (inst lea ,answer
                            (ea nil ,length
                                (ash 1 (1+ (- word-shift n-fixnum-tag-bits)))))
@@ -567,7 +556,7 @@
     (:policy :fast-safe)
     (:temporary (:sc descriptor-reg) tail next limit)
     (:generator 20
-      (let ((size (calc-size-in-bytes length next))
+      (let ((size (calc-size-in-bytes length next)) ; jumps to OUT if 0 length
             (loop (gen-label)))
         (stack-allocation result size list-pointer-lowtag)
         (compute-end)
@@ -581,7 +570,7 @@
         (inst cmp next limit)
         (inst jmp :ne loop)
         (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
-      done))
+      OUT))
 
   (define-vop (allocate-list-on-heap)
     (:args (length :scs (any-reg immediate))
@@ -594,28 +583,55 @@
     (:node-var node)
     (:temporary (:sc descriptor-reg) tail next limit)
     (:generator 20
-      (let ((size (calc-size-in-bytes length next))
+      (let ((size (calc-size-in-bytes length next)) ; jumps to OUT if 0 length
             (entry (gen-label))
             (loop (gen-label))
+            (pa-done (gen-label))
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
+        ;; FIXME: Probably not recognizable to aprof if large constant size.
         (instrument-alloc size node)
-        (pseudo-atomic ()
-         (allocation 'list size list-pointer-lowtag node nil result)
-         (compute-end)
-         (inst mov next result)
-         (inst jmp entry)
-         (emit-label LOOP)
-         (storew next tail cons-cdr-slot list-pointer-lowtag)
-         (emit-label ENTRY)
-         (inst mov tail next)
-         (inst add next (* 2 n-word-bytes))
-         (unless no-init ; don't bother writing zeros in the CARs
-           (storew element tail cons-car-slot list-pointer-lowtag))
-         (inst cmp next limit)
-         (inst jmp :ne loop))
-        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
-      done)))
+        ;; If the size is constant and least LARGE-OBJECT-SIZE, then ALLOCATION
+        ;; never attempts a pointer bump but instead will just call C; nor will it
+        ;; use the provided fallback. In such a case we should invoke the fallback
+        ;; right away and forgo emitting anything to initialize the list.
+        ;; [Users creating such huge lists should rethink their design choices!]
+        (flet ((fallback ()
+                 ;; Push C call args right-to-left
+                 (inst push (if (integerp size) (constantize size) size))
+                 (inst push (if (sc-is element immediate) (tn-value element) element))
+                 (invoke-asm-routine 'call
+                                     (cond #+avx2
+                                           ((avx-registers-used-p) 'make-list.ymmsave)
+                                           (t 'make-list))
+                                     node)
+                 (inst pop result)))
+          (pseudo-atomic ()
+           ;; We'll call out for the smaller of one GC page or LARGE-OBJECT-SIZE.
+           ;; As ordinarily configured, LARGE-OBJECT-SIZE is much larger than one page.
+           ;; It doesn't matter whether we try inline at exactly gencgc-card-bytes,
+           ;; but it's unlikely to succeed, so don't.
+           (cond
+             ((typep size `(integer ,(min gencgc-card-bytes large-object-size)))
+              (fallback))
+             (t
+              (allocation 'list size list-pointer-lowtag node nil result
+                          (lambda () (fallback) (inst jmp pa-done)))
+              (compute-end)
+              (inst mov next result)
+              (inst jmp entry)
+              (emit-label LOOP)
+              (storew next tail cons-cdr-slot list-pointer-lowtag)
+              (emit-label ENTRY)
+              (inst mov tail next)
+              (inst add next (* 2 n-word-bytes))
+              (unless no-init ; don't bother writing zeros in the CARs
+                (storew element tail cons-car-slot list-pointer-lowtag))
+              (inst cmp next limit)
+              (inst jmp :ne loop)
+              (storew nil-value tail cons-cdr-slot list-pointer-lowtag)
+              (emit-label PA-DONE))))))
+      OUT)))
 
 #-immobile-space
 (define-vop (make-fdefn)

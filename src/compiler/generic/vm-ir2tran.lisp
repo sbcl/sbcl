@@ -376,10 +376,10 @@
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
     (declare (ignore dx))
-    (not (null args)))
+    (not (null args))) ; FIXME: can this be T now that we IR1-transform 0 args to NIL
   (defoptimizer (list* stack-allocate-result) ((&rest args) node dx)
     (declare (ignore dx))
-    (not (null (rest args))))
+    (not (null (rest args)))) ; FIXME: similarly can this be T now?
   (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args) node dx)
     (declare (ignore args dx))
     t))

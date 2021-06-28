@@ -1301,6 +1301,7 @@
   (:node-var node)
   (:generator 20
     (let ((loop (gen-label))
+          (pa-done (gen-label))
           (done (gen-label))
           (stack-allocate-p (node-stack-allocate-p node)))
       ;; Compute the number of bytes to allocate
@@ -1314,7 +1315,18 @@
       (unless stack-allocate-p (instrument-alloc rcx node))
       (pseudo-atomic (:elide-if stack-allocate-p)
        ;; Produce an untagged pointer into DST
-       (allocation 'list rcx 0 node stack-allocate-p dst)
+       (allocation 'list rcx 0 node stack-allocate-p dst
+                   (lambda ()
+                     ;; Push C call arguments right-to-left
+                     (inst push rcx)
+                     (inst push context)
+                     (invoke-asm-routine 'call
+                                         (cond #+avx2
+                                               ((avx-registers-used-p) 'listify-rest-arg.ymmsave)
+                                               (t 'listify-rest-arg))
+                                         node)
+                     (inst pop result)
+                     (inst jmp pa-done)))
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
@@ -1335,7 +1347,8 @@
        (inst mov result dst) ; preserve the value to put in the CDR of the preceding cons
        (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
        (inst inc rcx) ; :QWORD because it's a signed number
-       (inst jmp :nz loop))
+       (inst jmp :nz loop)
+       (emit-label pa-done))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
