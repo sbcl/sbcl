@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.5:
+changes in sbcl-2.1.6 relative to sbcl-2.1.5:
   * minor incompatible change: COMPILE-FILE does not merge the input file's
     pathname-directory into the output path if :OUTPUT-FILE was specified
     and has a directory that is not :UNSPECIFIC.
