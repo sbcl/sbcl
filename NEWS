@@ -4,6 +4,18 @@ changes relative to sbcl-2.1.5:
   * minor incompatible change: COMPILE-FILE does not merge the input file's
     pathname-directory into the output path if :OUTPUT-FILE was specified
     and has a directory that is not :UNSPECIFIC.
+  * platform support:
+    ** improvements to unwind code generation on arm64.
+    ** on x86-64, accept three operands for vshufpd.  (reported by Bela
+       Pecsek)
+    ** on x86-64, improvements to use of popcount
+    ** improve exception handling on 64-bit Windows.  (thanks to Luis Borges
+       de Oliveira)
+  * bug fix: allow use of macros with improper argument list.  (lp#1929623,
+    thanks to Sean Maher)
+  * bug fix: COERCE no longer attempts to guess what the user meant if they
+    provide a type specifier of a union of types other than STRING.
+    (lp#1929614)
   * bug fix: print a single trailing zero after the decimal point for FORMAT
     ~E if there are no digits remaining to be printed and the width allows it.
     (lp#883520)
