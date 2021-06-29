@@ -2060,9 +2060,14 @@ not stack-allocated LVAR ~S." source-lvar)))))
          ;; than moving every argument into a passing location.
          (ir2-convert-full-call node block))
         (t
-         (let* ((scs (operand-parse-scs
+         ;; CONS is not the most mnemonic name for allocating 2 cons cells,
+         ;; but I don't want to complicate this more than necessary.
+         ;; Just remember that LIST* is the more general vop.
+         (let* ((vopname #+x86-64 (if (<= n-cons-cells 2) 'cons 'list*)
+                         #-x86-64 'list*)
+                (scs (operand-parse-scs
                       (vop-parse-more-args
-                       (gethash 'list* *backend-parsed-vops*))))
+                       (gethash vopname *backend-parsed-vops*))))
                 (allow-const
                  ;; Make sure the backend allows both of IMMEDIATE
                  ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
@@ -2088,7 +2093,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (when (and lvar (lvar-dynamic-extent lvar))
              (vop current-stack-pointer node block
                   (ir2-lvar-stack-pointer (lvar-info lvar))))
-           (vop* list* node block (refs) ((first res) nil) n-cons-cells star)
+           ;; VOP* requires a literal name, thus this CASE expression
+           (case vopname
+             #+x86-64 (cons (vop* cons node block (refs) ((first res) nil) n-cons-cells star))
+             (list* (vop* list* node block (refs) ((first res) nil) n-cons-cells star)))
            (move-lvar-result node block res lvar))))))
 (setf (fun-info-ir2-convert (fun-info-or-lose 'cons)) #'list*-ir2-convert-optimizer)
 (setf (fun-info-ir2-convert (fun-info-or-lose 'list)) #'list*-ir2-convert-optimizer)

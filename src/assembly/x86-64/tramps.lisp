@@ -33,6 +33,19 @@
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
 
+(define-assembly-routine (list*) ()
+  (with-registers-preserved (c xmm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst call (make-fixup "alloc_list" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result
+
+#+avx2
+(define-assembly-routine (list*.ymmsave) ()
+  (with-registers-preserved (c ymm)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst call (make-fixup "alloc_list" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result
+
 (define-assembly-routine (make-list (:return-style :none)) ()
   (with-registers-preserved (c xmm)
     (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg

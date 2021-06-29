@@ -59,11 +59,12 @@
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
 ;;; Call an allocator trampoline and get the result in the proper register.
-;;; There are 2x2 choices of trampoline:
+;;; For lists there are 2 choices of trampoline:
+;;;  - preserve YMM registers around the call, or don't
+;;; For everything else there are 2x2 choices of trampoline:
 ;;;  - place result into R11, or leave it on the stack
 ;;;  - preserve YMM registers around the call, or don't
 (defun %alloc-tramp (type node result-tn size lowtag)
-  (declare (ignorable type))
   (when (typep size 'integer)
     (aver (= (align-up size (* 2 n-word-bytes)) size)))
   (cond ((typep size '(and integer (not (signed-byte 32))))
@@ -76,15 +77,17 @@
   ;; that returns a result in TEMP-REG-TN (R11) which saves one move and
   ;; clears the size argument from the stack in the RET instruction.
   ;; If the result is returned on the stack, then we pop it below.
-  (let ((to-r11 (location= result-tn r11-tn)))
-    (invoke-asm-routine 'call
-                        (cond #+avx2
-                              ((avx-registers-used-p)
-                               (if to-r11 'alloc->r11.ymmsave 'alloc->rnn.ymmsave))
-                              (t
-                               (if to-r11 'alloc->r11 'alloc->rnn)))
-                        node)
-    (unless to-r11
+  (let* ((to-r11 (location= result-tn r11-tn))
+         (entrypoint
+          (if (eq type 'list)
+              (cond #+avx2 ((avx-registers-used-p) 'list*.ymmsave)
+                    (t 'list*))
+              (cond #+avx2 ((avx-registers-used-p)
+                            (if to-r11 'alloc->r11.ymmsave 'alloc->rnn.ymmsave))
+                    (t
+                     (if to-r11 'alloc->r11 'alloc->rnn))))))
+    (invoke-asm-routine 'call entrypoint node)
+    (when (or (eq type 'list) (not to-r11))
       (inst pop result-tn)))
   (unless (eql lowtag 0)
     (inst or :byte result-tn lowtag)))
@@ -150,6 +153,7 @@
                   #-sb-thread (ea (+ boxed-region n-word-bytes))))
 
     (cond ((typep size `(integer ,large-object-size))
+           (aver (neq type 'list))
            ;; large objects will never be made in a per-thread region
            (%alloc-tramp type node alloc-tn size lowtag))
           ((eql lowtag 0)
@@ -218,16 +222,24 @@
              (inst or :byte result-tn other-pointer-lowtag))))))
 
 ;;;; CONS, LIST and LIST*
-(define-vop (list*)
+(define-vop (cons) ; need only 1 declared temp, and can make 1 or 2 conses
   (:args (things :more t :scs (descriptor-reg constant immediate)))
-  (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
   (:info cons-cells star)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
-  (:generator 0
-    (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
-                                               (lowtag list-pointer-lowtag))
+  (:generator 0 (generate-list* node cons-cells star things result res nil)))
+(define-vop (list*) ; need 2 declared temps, make any number of conses
+  (:args (things :more t :scs (descriptor-reg constant immediate)))
+  (:temporary (:sc unsigned-reg) ptr)
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
+  (:info cons-cells star)
+  (:results (result :scs (descriptor-reg)))
+  (:node-var node)
+  (:generator 0 (generate-list* node cons-cells star things result res ptr)))
+(defun generate-list* (node cons-cells star things result res ptr)
+  (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
+                                            (lowtag list-pointer-lowtag))
                   `(let ((reg
                           ;; FIXME: single-float gets placed in the boxed header
                           ;; rather than just doing an immediate store.
@@ -238,20 +250,19 @@
                             (t
                              (encode-value-if-immediate ,tn)))))
                      (storew* reg ,list ,slot ,lowtag (not stack-allocate-p)))))
-      (let ((stack-allocate-p (node-stack-allocate-p node))
-            (size (* (pad-data-block cons-size) cons-cells)))
-        (unless stack-allocate-p
-          (instrument-alloc size node))
-        (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation nil size (if (<= cons-cells 2) 0 list-pointer-lowtag)
-                            node stack-allocate-p res)
-                (multiple-value-bind (last-base-reg lowtag car cdr)
-                    (cond
-                      ((= cons-cells 1)
+    (let ((stack-allocate-p (node-stack-allocate-p node))
+          (temp temp-reg-tn)
+          (size (* (pad-data-block cons-size) cons-cells)))
+      (unless stack-allocate-p
+        (instrument-alloc size node))
+      (pseudo-atomic (:elide-if stack-allocate-p)
+        (aver (not (location= res temp-reg-tn)))
+        (allocation 'list size (if (<= cons-cells 2) 0 list-pointer-lowtag)
+                    node stack-allocate-p res)
+        (multiple-value-bind (last-base-reg lowtag car cdr)
+            (cond     ((= cons-cells 1)
                        (values res 0 cons-car-slot cons-cdr-slot))
                       ((= cons-cells 2)
-                       ;; Note that this does not use the 'ptr' register at all.
-                       ;; It would require a different vop to free that register up.
                        (store-slot (tn-ref-tn things) res cons-car-slot 0)
                        (setf things (tn-ref-across things))
                        (inst lea temp (ea (+ (* cons-size n-word-bytes) list-pointer-lowtag) res))
@@ -279,7 +290,7 @@
                              (inst lea result (ea list-pointer-lowtag res))))
                         (t
                          (move result res)))))))
-    (aver (null (tn-ref-across things)))))
+    (aver (null (tn-ref-across things))))
 
 ;;;; special-purpose inline allocators
 
