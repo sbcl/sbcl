@@ -1866,10 +1866,10 @@ necessary, since type inference may take arbitrarily long to converge.")
     #+sb-xc-host
     (compiler-mumble "~&; ~Aing file ~S:~%"
                      (if sb-cold::*compile-for-effect-only* "load" "x-compil")
-                     (namestring (file-info-truename file-info)))
+                     (namestring (file-info-pathname file-info)))
     #-sb-xc-host
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
-                     (namestring (file-info-truename file-info))
+                     (namestring (file-info-pathname file-info))
                      (format-universal-time nil
                                             (file-info-write-date file-info)
                                             :style :government

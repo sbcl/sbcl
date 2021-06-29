@@ -15,6 +15,29 @@
 
 use_test_subdirectory
 
+# It's unclear why the majority of these tests are written in shall script when
+# many look as though they would be perfectly happy as lisp tests.
+# This test, on the other hand, would have a tough time as a lisp test,
+# because it needs to make a symlink which would either mean calling run-program
+# or using alien-funcall on symlink(). Shell is easier.
+mkdir -p inscrutable/f00
+echo '(defun zook (x) (declare (integer x)) (length x))' > inscrutable/f00/f00_xyz_bad
+ln -s inscrutable/f00/f00_xyz_bad good.lisp
+run_sbcl --eval '(compile-file "good.lisp" :verbose t)' --quit >stdout.out 2>stderr.out
+egrep -q 'compiling file ".+good' stdout.out
+stdout_ok=$?
+egrep -q 'file:.+good' stderr.out
+stderr_ok=$?
+rm -r good.* stdout.out stderr.out inscrutable
+if [ $stdout_ok = 0 -a $stderr_ok = 0 ] ; then
+    echo "untruenames: PASS"
+else
+    echo "untruenames: FAIL"
+    exit $EXIT_LOSE
+fi
+
+## FIXME: all these tests need to be more silent. Too much noise to parse
+
 tmpfilename="$TEST_FILESTEM.lisp"
 
 # This should fail, as type inference should show that the call to FOO
