@@ -357,14 +357,29 @@
 (defun source-transform-hairy-typep (object type)
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
-    (cond ((unknown-type-p type)
+    (cond ((and (unknown-type-p type)
+                (symbolp spec)
+                (eq (info :type :kind spec) :forthcoming-defclass-type))
+           ;; Knowing that it was DEFCLASSed is enough to emit a CLASSOID-CELL-TYPEP test.
+           ;; Combinators involving this - e.g. (OR A-NEW-CLASS OTHER-CLASS) -
+           ;; are handled correctly, because we don't punt on everything in the expression
+           ;; as soon as any unknown is present.
+           `(classoid-cell-typep ,(find-classoid-cell spec :create t) ,object))
+          ((unknown-type-p type)
            #+sb-xc-host
            (warn "can't open-code test of unknown type ~S"
                  (type-specifier type))
-           #-sb-xc-host
-           (when (policy *lexenv* (> speed inhibit-warnings))
-             (compiler-notify "can't open-code test of unknown type ~S"
-                              (type-specifier type)))
+           ;; This is not a policy-based decision to notify here,
+           ;; because it is _ALWAYS_ questionable style imho to refer to unknown types.
+           ;; Unfortunately, people love to suppress COMPILER-NOTE because SBCL produces
+           ;; far too many of those for low-level things like untagged-SAP-to-tagged-SAP.
+           ;; So we could opt to STYLE-WARN, which is, in this case, perhaps more severe
+           ;; than we'd like?
+           ;; I guess we're just going to have to say that if you've muffled too may
+           ;; kinds of NOTEs, that's on you.
+           #-sb-xc-host (compiler-notify 'unknown-typep-note
+                                         :format-control "can't open-code test of unknown type ~S"
+                                         :format-arguments (list (type-specifier type)))
            `(let ((object ,object)
                   (cache (load-time-value (cons #'sb-kernel::cached-typep ',spec)
                                           t)))

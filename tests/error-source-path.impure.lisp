@@ -277,4 +277,5 @@
 (with-test (:name (:source-path typep :invalid-type-specifier))
   (assert-condition-source-paths
    (typep 1 'undefined-type)
-   (2)))
+   ;; both the style-warning and the note count
+   (2) (2)))
