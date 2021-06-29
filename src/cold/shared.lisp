@@ -427,7 +427,7 @@
              (,flags (rest ,stem-and-flags)))
          ,@body))))
 
-;;; Given a STEM, remap the path component "/target/" to a suitable
+;;; Given a STEM, remap the path component "/{arch}/" to a suitable
 ;;; target directory.
 (defun stem-remap-target (stem)
   (flet ((try-replacing (this that)
@@ -437,13 +437,13 @@
                             (subseq stem 0 (1+ position))
                             (string-downcase that)
                             (subseq stem (+ position (length this) -1)))))))
-    (or (try-replacing "/target/" (target-platform-keyword))
+    (or (try-replacing "/{arch}/" (target-platform-keyword))
         (try-replacing "/asm-target/" (backend-assembler-target-name))
         stem)))
 (compile 'stem-remap-target)
 
 ;;; Determine the source path for a stem by remapping from the abstract name
-;;; if it contains "/target/" and appending a ".lisp" suffix.
+;;; if it contains "/{arch}/" and appending a ".lisp" suffix.
 ;;; Assume that STEM is source-tree-relative unless it starts with "output/"
 ;;; in which case it could be elsewhere, if you prefer to keep the sources
 ;;; devoid of compilation artifacts. (The production of out-of-tree artifacts

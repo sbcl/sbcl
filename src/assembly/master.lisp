@@ -3,8 +3,8 @@
         (load (merge-pathnames (stem-remap-target x)
                                (make-pathname :type "lisp"))
               :verbose nil :print nil))
-      '("src/assembly/target/tramps"
-        "src/assembly/target/assem-rtns"
-        "src/assembly/target/array"
-        "src/assembly/target/arith"
-        "src/assembly/target/alloc"))
+      '("src/assembly/{arch}/tramps"
+        "src/assembly/{arch}/assem-rtns"
+        "src/assembly/{arch}/array"
+        "src/assembly/{arch}/arith"
+        "src/assembly/{arch}/alloc"))

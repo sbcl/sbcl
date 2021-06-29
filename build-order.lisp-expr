@@ -110,7 +110,7 @@
  ;; for various constants e.g. SB-XC:MOST-POSITIVE-FIXNUM and
  ;; SB-VM:N-LOWTAG-BITS, needed by "early-objdef" and others.
  ("src/compiler/generic/parms" :c-headers)
- ("src/compiler/target/parms" :c-headers)
+ ("src/compiler/{arch}/parms" :c-headers)
  ("src/compiler/generic/early-vm" :c-headers)
  ("src/compiler/generic/early-objdef" :c-headers)
 
@@ -231,7 +231,7 @@
  ("src/compiler/generic/core") ; for CORE-OBJECT-P, needed by x86-64/vm
 
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
- ("src/compiler/target/vm" :c-headers)
+ ("src/compiler/{arch}/vm" :c-headers)
 
  ("src/code/alieneval" :c-headers)
  ;; "src/code/toplevel.lisp" is the first to need this. It's generated
@@ -412,23 +412,20 @@
 
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/asm-target/insts")
- #+avx2
- ("src/compiler/target/avx2-insts")
- ("src/compiler/target/macros")
+ #+avx2 ("src/compiler/{arch}/avx2-insts")
+ ("src/compiler/{arch}/macros")
 
- ("src/assembly/target/support")
+ ("src/assembly/{arch}/support")
 
- ("src/compiler/target/move")
- ("src/compiler/target/float")
- #+sb-simd-pack
- ("src/compiler/target/simd-pack")
-  #+sb-simd-pack-256
- ("src/compiler/target/simd-pack-256")
- ("src/compiler/target/sap")
- ("src/compiler/target/system")
- ("src/compiler/target/char")
- ("src/compiler/target/memory")
- ("src/compiler/target/arith"
+ ("src/compiler/{arch}/move")
+ ("src/compiler/{arch}/float")
+ #+sb-simd-pack ("src/compiler/{arch}/simd-pack")
+ #+sb-simd-pack-256 ("src/compiler/{arch}/simd-pack-256")
+ ("src/compiler/{arch}/sap")
+ ("src/compiler/{arch}/system")
+ ("src/compiler/{arch}/char")
+ ("src/compiler/{arch}/memory")
+ ("src/compiler/{arch}/arith"
   ;; KLUDGE: for ppc and sparc this appears to be necessary, as it
   ;; used to be for array VOPs for X86 until ca. 0.8.5.24 when CSR's
   ;; patch for that architecture was finally committed
@@ -447,7 +444,7 @@
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
   #+(or ppc ppc64) :ignore-failure-p)
- ("src/compiler/target/pred")
+ ("src/compiler/{arch}/pred")
 
  ;; this file defines the INTERVAL struct which is also used in 'srctran'
  ("src/compiler/float-tran")
@@ -456,22 +453,22 @@
  ("src/compiler/srctran")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/generic/type-vops")
- ("src/compiler/target/type-vops")
+ ("src/compiler/{arch}/type-vops")
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
  ("src/code/cross-modular"  :not-target)
 
- ("src/compiler/target/subprim")
- ("src/compiler/target/debug")
- ("src/compiler/target/c-call")
- ("src/compiler/target/cell")
- ("src/compiler/target/values")
- ("src/compiler/target/alloc")
- ("src/compiler/target/call")
- ("src/compiler/target/nlx")
+ ("src/compiler/{arch}/subprim")
+ ("src/compiler/{arch}/debug")
+ ("src/compiler/{arch}/c-call")
+ ("src/compiler/{arch}/cell")
+ ("src/compiler/{arch}/values")
+ ("src/compiler/{arch}/alloc")
+ ("src/compiler/{arch}/call")
+ ("src/compiler/{arch}/nlx")
  ("src/compiler/generic/late-nlx")
- ("src/compiler/target/show")
- ("src/compiler/target/array")
+ ("src/compiler/{arch}/show")
+ ("src/compiler/{arch}/array")
  ("src/compiler/generic/type-error")
  ("src/compiler/physenvanal")
 
@@ -480,10 +477,10 @@
  ;; different suffix / "file type" for the :assem versions to make
  ;; sure we don't scribble over anything we shouldn't.
 
- ("src/assembly/target/assem-rtns")
- ("src/assembly/target/array")
- ("src/assembly/target/arith")
- ("src/assembly/target/alloc")
+ ("src/assembly/{arch}/assem-rtns")
+ ("src/assembly/{arch}/array")
+ ("src/assembly/{arch}/arith")
+ ("src/assembly/{arch}/alloc")
  ;; assembly files are all loaded by genesis before any compiled files.
  ("src/assembly/master" :assem :not-host)
 
@@ -580,10 +577,8 @@
 
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host)
- #-win32
- ("src/code/unix-pathname"     :not-host)
- #+win32
- ("src/code/win32-pathname"    :not-host)
+ #-win32 ("src/code/unix-pathname"     :not-host)
+ #+win32 ("src/code/win32-pathname"    :not-host)
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
 
  ("src/code/target-misc"       :not-host) ; dribble-stream, used by "save"
@@ -606,23 +601,19 @@
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/asm-target/target-insts" :not-host)
- #+avx2
- ("src/compiler/target/target-avx2-insts" :not-host)
+ #+avx2 ("src/compiler/{arch}/target-avx2-insts" :not-host)
 
  ("src/code/debug" :not-host)
 
  ("src/code/octets" :not-host)
  ("src/code/external-formats/enc-basic" :not-host)
- #+sb-unicode
- ("src/code/external-formats/enc-ucs" :not-host) ; win32 needs this
+ #+sb-unicode ("src/code/external-formats/enc-ucs" :not-host) ; win32 needs this
 
- #+sb-eval
- ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
+ #+sb-eval ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
 
- ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
+ ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/{arch}/arith
 
- #-(or x86 x86-64)
- ("src/compiler/generic/sanctify" :not-host)
+ #-(or x86 x86-64) ("src/compiler/generic/sanctify" :not-host)
 
  ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
 

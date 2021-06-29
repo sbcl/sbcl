@@ -530,7 +530,7 @@
   ;; the register uninitialized.  On those platforms, we use an
   ;; alien-rep of the full register width when checking for purposes
   ;; of return values and override the naturalize method to perform
-  ;; the sign extension (in compiler/target/c-call.lisp).
+  ;; the sign extension (in compiler/{arch}/c-call.lisp).
   (ecase context
     ((:normal #-(or x86 x86-64) :result)
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)

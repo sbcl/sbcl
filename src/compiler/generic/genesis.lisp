@@ -2860,6 +2860,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (format t "#define LISP_FEATURE_~A~%" target-feature-name))
   (terpri)
   ;; and miscellaneous constants
+  (format t "#define SBCL_TARGET_ARCHITECTURE_STRING ~S~%"
+          (substitute #\_ #\- (string-downcase (sb-cold::target-platform-keyword))))
   (format t "#define SBCL_VERSION_STRING ~S~%"
             (sb-xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)

@@ -345,7 +345,7 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
                  "of separate memory mappings was exceeded. To fix the problem, either increase\n"
                  "the maximum with e.g. 'echo 262144 > /proc/sys/vm/max_map_count' or recompile\n"
                  "SBCL with a larger value for GENCGC-CARD-BYTES in\n"
-                 "'src/compiler/target/parms.lisp'.");
+                 "'src/compiler/"SBCL_TARGET_ARCHITECTURE_STRING"/parms.lisp'.");
         } else {
             perror("mprotect");
         }

@@ -120,7 +120,7 @@ extern os_vm_address_t undefined_alien_address;
  *   #include "x86-validate.h"
  *   #endif
  * and so forth. In SBCL, the memory map data are defined at the Lisp
- * level (compiler/target/parms.lisp) and stuffed into the sbcl.h file
+ * level (compiler/{arch}/parms.lisp) and stuffed into the sbcl.h file
  * created by GENESIS, so there's no longer a need for an
  * architecture-dependent header file of memory map data.
  */
