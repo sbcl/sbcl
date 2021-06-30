@@ -23,15 +23,17 @@ use_test_subdirectory
 mkdir -p inscrutable/f00
 echo '(defun zook (x) (declare (integer x)) (length x))' > inscrutable/f00/f00_xyz_bad
 ln -s inscrutable/f00/f00_xyz_bad good.lisp
-run_sbcl --eval '(compile-file "good.lisp" :verbose t)' --quit >stdout.out 2>stderr.out
-egrep -q 'compiling file ".+good' stdout.out
+run_sbcl --eval '(setq *default-pathname-defaults* #P"")' \
+  --eval '(compile-file "good.lisp" :verbose t)' --quit >stdout.out 2>stderr.out
+egrep -q 'compiling file ".*good' stdout.out
 stdout_ok=$?
 egrep -q 'file:.+good' stderr.out
 stderr_ok=$?
-rm -r good.* stdout.out stderr.out inscrutable
 if [ $stdout_ok = 0 -a $stderr_ok = 0 ] ; then
+    rm -r good.* stdout.out stderr.out inscrutable
     echo "untruenames: PASS"
 else
+    cat stdout.out stderr.out
     echo "untruenames: FAIL"
     exit $EXIT_LOSE
 fi
