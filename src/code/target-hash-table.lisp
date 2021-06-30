@@ -1964,31 +1964,44 @@ table itself."
                    (and test (eq (third (assoc test *user-hash-table-tests*))
                                  (hash-table-hash-fun hash-table))))
            `(make-hash-table
-             :test             ',test
-             :size             ',(hash-table-size             hash-table)
-             :rehash-size      ',(hash-table-rehash-size      hash-table)
-             :rehash-threshold ',(hash-table-rehash-threshold hash-table)
-             :synchronized     ',(hash-table-synchronized-p   hash-table)
-             :weakness         ',(hash-table-weakness         hash-table)))))
+             ,@(loop for (key accessor default)
+                     in
+                     (load-time-value
+                      `((:test ,#'hash-table-test eql)
+                        (:size ,#'hash-table-size ,+min-hash-table-size+)
+                        (:rehash-size ,#'hash-table-rehash-size ,default-rehash-size)
+                        (:rehash-threshold ,#'hash-table-rehash-threshold $1.0)
+                        (:synchronized ,#'hash-table-synchronized-p nil)
+                        (:weakness ,#'hash-table-weakness nil)))
+                     for value = (funcall accessor hash-table)
+                     unless (eql value default)
+                     collect key
+                     and
+                     collect (if (self-evaluating-p value)
+                                 value
+                                 `',value))))))
 
 (defmethod print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
   (let ((ctor (and *print-readably* *read-eval* (%hash-table-ctor hash-table))))
     (cond
-        ((not ctor)
-         ;; Perhaps we should add :SYNCHRONIZED to the string?
-         (print-unreadable-object (hash-table stream :type t :identity t)
-           (format stream
-                   ":TEST ~S~@[ :HASH-FUNCTION ~S~] :COUNT ~S~@[ :WEAKNESS ~S~]"
-                   (or (hash-table-test hash-table) (hash-table-test-fun hash-table))
-                   (when (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
-                     (hash-table-hash-fun hash-table))
-                   (hash-table-count hash-table)
-                   (hash-table-weakness hash-table))))
-        (t
-         (write-string "#." stream)
-         (write `(%stuff-hash-table ,ctor ',(%hash-table-alist hash-table))
-                :stream stream)))))
+      ((not ctor)
+       ;; Perhaps we should add :SYNCHRONIZED to the string?
+       (print-unreadable-object (hash-table stream :type t :identity t)
+         (format stream
+                 ":TEST ~S~@[ :HASH-FUNCTION ~S~] :COUNT ~S~@[ :WEAKNESS ~S~]"
+                 (or (hash-table-test hash-table) (hash-table-test-fun hash-table))
+                 (when (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
+                   (hash-table-hash-fun hash-table))
+                 (hash-table-count hash-table)
+                 (hash-table-weakness hash-table))))
+      (t
+       (write-string "#." stream)
+       (let ((alist (%hash-table-alist hash-table)))
+         (write (if alist
+                    `(%stuff-hash-table ,ctor ',alist)
+                    ctor)
+                :stream stream))))))
 
 (defmethod make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))
