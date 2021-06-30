@@ -60,9 +60,7 @@
 
 (macrolet ((frob ()
              (flet ((file (name type)
-                      (let ((dir (sb-cold:prepend-genfile-path "output/")))
-                        (make-pathname :directory (pathname-directory (merge-pathnames dir))
-                                       :name name :type type)))
+                      (sb-cold:find-bootstrap-file (format nil "output/~A.~A" name type)))
                     (read-ub8-vector (pathname)
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))

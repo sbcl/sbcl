@@ -23,8 +23,7 @@
 
 (defstruct package-data name doc shadow export reexport import-from use)
 (export 'package-data)
-(dolist (data (with-open-file (f (merge-pathnames "../../package-data-list.lisp-expr"
-                                                  *load-pathname*))
+(dolist (data (with-open-file (f (merge-pathnames "package-data-list.lisp-expr" *load-pathname*))
                 (read f)))
   (labels ((flatten (tree)
              (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
@@ -43,7 +42,7 @@
     (when (sb-int:system-package-p (find-package name))
       (sb-ext:unlock-package package))))
 
-;;; Define this first to avoid a style-warning from 'shebang'
+;;; Restore target floating-point number syntax
 (defun read-target-float (stream char)
   (declare (ignore stream char))
   (values)) ; ignore the $ as if it weren't there

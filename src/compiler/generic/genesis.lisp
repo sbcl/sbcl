@@ -3563,7 +3563,7 @@ III. initially undefined function references (alphabetically):
 ;;; the "initial core file" because core files could be created later
 ;;; by executing SAVE-LISP in a running system, perhaps after we've
 ;;; added some functionality to the system.)
-(defun write-initial-core-file (filename verbose)
+(defun write-initial-core-file (filename build-id verbose)
 
   (when verbose
     (let ((*print-length* nil)
@@ -3588,7 +3588,8 @@ III. initially undefined function references (alphabetically):
       ;; plus a suffix identifying a certain configuration of the C compiler.
       (binding* ((build-id (concatenate
                             'string
-                            (with-open-file (s "output/build-id.inc") (read s))
+                            (or build-id
+                                (with-open-file (s "output/build-id.inc") (read s)))
                             (if (member :msan sb-xc:*features*) "-msan" "")))
                  ((nwords padding) (ceiling (length build-id) sb-vm:n-word-bytes)))
         (declare (type simple-string build-id))
@@ -3651,6 +3652,7 @@ III. initially undefined function references (alphabetically):
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
 (defun sb-cold:genesis (&key object-file-names tls-init
                              defstruct-descriptions
+                             build-id
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
@@ -3775,7 +3777,7 @@ III. initially undefined function references (alphabetically):
       ;; target of accidental leftover symbols, not that it wouldn't also be
       ;; a good idea to clean up package-data-list once in a while.
       (dolist (exported-name
-               (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))
+               (sb-cold:read-from-file "^common-lisp-exports.lisp-expr"))
         (cold-intern (intern exported-name *cl-package*) :access :external))
 
       ;; Make LOGICALLY-READONLYIZE no longer a no-op
@@ -3878,7 +3880,7 @@ III. initially undefined function references (alphabetically):
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
           (write-map stream)))
       (when core-file-name
-        (write-initial-core-file core-file-name verbose))
+        (write-initial-core-file core-file-name build-id verbose))
       (unless c-header-dir-name
         (return-from sb-cold:genesis))
       (let ((filename (format nil "~A/Makefile.features" c-header-dir-name)))

@@ -99,7 +99,7 @@
     ;; As each platform's build becomes warning-free,
     ;; it should be added to the list here to prevent regresssions.
     (when (and likely-suspicious
-               (featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
+               (target-featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
       (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen

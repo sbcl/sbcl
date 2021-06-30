@@ -97,6 +97,10 @@
           (sb-cold::exit-process 1)))))
   (format t "~&; Parallel build: Skipping fasl load~%"))
 
+;;; Read the version file once and once only,
+;;; or not at all if you've otherwise defined this.
+(defvar *target-sbcl-version* (read-from-file "version.lisp-expr"))
+
 ;;; Either load or compile-then-load the cross-compiler into the
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)

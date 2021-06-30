@@ -12,6 +12,7 @@ time $SBCL_XC_HOST <<EOF
 (load "src/cold/set-up-cold-packages.lisp")
 (load "tools-for-build/corefile.lisp")
 (in-package "SB-COLD")
+(defvar *target-sbcl-version* (read-from-file "version.lisp-expr"))
 (in-host-compilation-mode
  (lambda (&aux (sb-xc:*features* (cons :c-headers-only sb-xc:*features*)))
   (do-stems-and-flags (stem flags 1)

@@ -16,6 +16,5 @@
   "SBCL")
 
 (defun lisp-implementation-version ()
-  ;; Read the version file once and once only
-  #+sb-xc-host #.(sb-cold:read-from-file "version.lisp-expr")
+  #+sb-xc-host #.sb-cold:*target-sbcl-version*
   #-sb-xc-host #.(lisp-implementation-version))

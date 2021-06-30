@@ -127,8 +127,8 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
 ;;;     ((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
 ;;;     (declare (optimize (speed 0))))))
 ;;;
-(let ((sources (with-open-file (f (merge-pathnames "../../build-order.lisp-expr"
-                                                   *load-pathname*))
+(defvar *sbclroot* "")
+(let ((sources (with-open-file (f (merge-pathnames "build-order.lisp-expr" *load-pathname*))
                  (read f) ; skip over the make-host-{1,2} input files
                  (read f)))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
@@ -143,7 +143,8 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                            ;; a literal (when compiling in the LOAD step)
                            t))
                 (output
-                  (compile-file-pathname stem
+                  (compile-file-pathname
+                   (concatenate 'string *sbclroot* stem)
                    :output-file
                    (merge-pathnames
                     (concatenate
@@ -170,7 +171,8 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                                     (safety 2) (speed 2)
                                     (sb-c:insert-step-conditions 0)
                                     (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)))
-                        (compile-file stem :output-file output)))
+                        (compile-file (concatenate 'string *sbclroot* stem)
+                                      :output-file output)))
                      ((nil) output))
                   (cond ((not output-truename)
                          (error "COMPILE-FILE of ~S failed." stem))

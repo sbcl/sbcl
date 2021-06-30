@@ -23,7 +23,7 @@
 ;;; (i.e. do it in source code using #[-+]sb-xc-host).
 ;;; The target compiler will still get everything as usual.
 (let ((*features* (cons :sb-xc *features*)))
-  (load "src/cold/muffler.lisp"))
+  (load (sb-cold:find-bootstrap-file "^muffler")))
 
 ;;; Ordinarily the types carried around as "handled conditions" while compiling
 ;;; have been parsed into internal CTYPE objects. However, using parsed objects
