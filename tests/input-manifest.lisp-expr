@@ -65,6 +65,7 @@
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("signals.impure.lisp" "contrib/sb-posix.fasl")
  ("stream.impure.lisp" "contrib/sb-posix.fasl")
+ ("sprof.impure.lisp" "../contrib/sb-sprof/test.lisp")
  ("threads.impure.lisp"
   "tests/alloca.so"
   "tests/threads-foreign.so")

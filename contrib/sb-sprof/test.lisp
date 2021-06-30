@@ -49,10 +49,15 @@
 ;; but the less fuss about Sparc, the better.
 #+sparc (defun run-tests () t)
 
+(defvar *compiler-input* "graph")
+(defvar *compiler-output* "./foo.fasl")
+(defvar *sprof-loop-test-max-samples* 50)
+
 #-sparc
 (defun run-tests ()
   (proclaim '(sb-ext:muffle-conditions style-warning))
-  (sb-sprof:with-profiling (:max-samples 50 :report :flat :loop t :show-progress t)
+  (sb-sprof:with-profiling (:max-samples *sprof-loop-test-max-samples*
+                            :report :flat :loop t :show-progress t)
     ;; Notice that "./foo.fasl" writes into this directory, whereas simply "foo.fasl"
     ;; would write into "../../src/code/"
     ;; Notice also that our file I/O routines are so crappy that 15% of the test
@@ -65,17 +70,23 @@
     ;;    3      7   7.0      7   7.0     34  34.0        -  foreign function __pthread_sigmask
 
     ;;
-    (compile-file "graph" :output-file "./foo.fasl" :print nil))
-  (delete-file "foo.fasl")
+    (compile-file *compiler-input* :output-file *compiler-output* :print nil))
+  (delete-file *compiler-output*)
   (let ((*standard-output* (make-broadcast-stream)))
     (test)
     (consing-test)
+    ;; This test shows that STOP-SAMPLING and START-SAMPLING on a thread do something.
+    ;; Based on rev b6bf65d9 it would seem that the API got broken a little.
+    ;; The thread doesn't do a whole lot, which is fine for what it is.
     #+sb-thread
     (let* ((sem (sb-thread:make-semaphore))
-           (some-thread (sb-thread:make-thread #'sb-thread:wait-on-semaphore :arguments sem)))
+           (some-thread (sb-thread:make-thread #'sb-thread:wait-on-semaphore :arguments sem
+                                               :name "donothing")))
       (sb-sprof:stop-sampling some-thread)
       (sb-sprof:start-sampling some-thread)
-      (sb-thread:signal-semaphore sem))
+      (sb-thread:signal-semaphore sem)
+      ;; Join because when run by run-tests.sh, it's an error to have random leftover threads
+      (sb-thread:join-thread some-thread))
     ;; For debugging purposes, print output for visual inspection to see where
     ;; the allocation sequence gets hit.
     ;; It can be interrupted even inside pseudo-atomic now.

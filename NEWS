@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.5:
+  * minor incompatible change: SB-SPROF:START-PROFILING no longer silently
+    does nothing if the clock is already running. It instead stop and restarts
+    with the newly provided options, and warns.
+
 changes in sbcl-2.1.6 relative to sbcl-2.1.5:
   * minor incompatible change: COMPILE-FILE does not merge the input file's
     pathname-directory into the output path if :OUTPUT-FILE was specified

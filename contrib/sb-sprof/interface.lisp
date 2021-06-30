@@ -140,62 +140,67 @@ The following keyword args are recognized:
      when doing :CPU profiling. If you see empty call graphs, or are obviously
      missing several samples from certain threads, you may be falling afoul
      of this."
+  ;; Starting the clock with an interval of zero or negative is meaningless.
+  ;; If, by 0, you mean STOP-PROFILING then you should use STOP-PROFILING.
+  (declare (type (real (0)) sample-interval))
   (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
   (when max-depth (warn "MAX-DEPTH is ignored"))
   #-gencgc
   (when (eq mode :alloc)
     (error "Allocation profiling is only supported for builds using the generational garbage collector."))
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
-  (unless *profiling*
-    (multiple-value-bind (secs usecs)
-        (multiple-value-bind (secs rest)
-            (truncate sample-interval)
-          (values secs (truncate (* rest 1000000))))
-      ;; I'm 99% sure that unconditionally assigning *SAMPLES* is a bug,
-      ;; because doing it makes the RESET function (and the :RESET keyword
-      ;; to WITH-PROFILING) meaningless - what's the difference between
-      ;; resetting and not resetting if either way causes all previously
-      ;; acquired traces to disappear? My intuition would have been that
-      ;; start/stop/start/stop should leave *SAMPLES* holding a union of all
-      ;; traces captured by both "on" periods, whereas with a RESET in between
-      ;; it would not. But they behave identically, because this is a reset.
-      (setf *samples* (make-samples mode sample-interval))
-      (setf trace-limit max-samples trace-count 0)
-      (enable-call-counting)
-      #+sb-thread (setf sb-thread::*profiled-threads* threads)
-      ;; Each existing threads' sprof-enable slot needs to reflect the desired set.
-      (sb-thread::avltree-filter
-       (lambda (node &aux (thread (sb-thread::avlnode-data node)))
-         (if (or (eq threads :all) (memq thread threads))
-             (start-sampling thread)
-             (stop-sampling thread)))
-       sb-thread::*all-threads*)
-      ;; The signal handler is entirely in C now. install_handler() uses the argument
-      ;; as a boolean flag. -1 means "install", 0 means "uninstall" which we don't do.
-      (unless (eq mode :alloc)
-        (with-alien ((%sigaction (function void int signed) :extern "install_handler"))
-          (alien-funcall %sigaction sb-unix:sigprof -1)))
-      ;; Keep all code live no matter if apparently unreferenced
-      (setf (extern-alien "sb_sprof_enabled" int) 1)
-      (flet (#+sb-thread
-             (map-threads (function &aux (threads sb-thread::*profiled-threads*))
-               (if (listp threads)
-                   (mapc function threads)
-                   (named-let visit ((node sb-thread::*all-threads*))
-                     (awhen (sb-thread::avlnode-left node) (visit it))
-                     (awhen (sb-thread::avlnode-right node) (visit it))
-                     (let ((thread (sb-thread::avlnode-data node)))
-                       (when (and (= (sb-thread::thread-%visible thread) 1)
-                                  (neq thread *timer*))
-                         (funcall function thread)))))))
-       (ecase mode
-        (:alloc
-         (setq enable-alloc-profiler 1))
-        (:cpu
-         (unix-setitimer :profile secs usecs secs usecs))
-        (:time
-         #+sb-thread
-         (sb-thread::start-thread
+  (when *profiling*
+    (warn "START-PROFILING will STOP-PROFILING first before applying new parameters")
+    (stop-profiling))
+  ;; I'm 99% sure that unconditionally assigning *SAMPLES* is a bug,
+  ;; because doing it makes the RESET function (and the :RESET keyword
+  ;; to WITH-PROFILING) meaningless - what's the difference between
+  ;; resetting and not resetting if either way causes all previously
+  ;; acquired traces to disappear? My intuition would have been that
+  ;; start/stop/start/stop should leave *SAMPLES* holding a union of all
+  ;; traces captured by both "on" periods, whereas with a RESET in between
+  ;; it would not. But they behave identically, because this is a reset.
+  (setf *samples* (make-samples mode sample-interval))
+  (setf trace-limit max-samples trace-count 0)
+  (enable-call-counting)
+  #+sb-thread (setf sb-thread::*profiled-threads* threads)
+  ;; Each existing threads' sprof-enable slot needs to reflect the desired set.
+  (sb-thread::avltree-filter
+   (lambda (node &aux (thread (sb-thread::avlnode-data node)))
+     (if (or (eq threads :all) (memq thread threads))
+         (start-sampling thread)
+         (stop-sampling thread)))
+   sb-thread::*all-threads*)
+  ;; The signal handler is entirely in C now. install_handler() uses the argument
+  ;; as a boolean flag. -1 means "install", 0 means "uninstall" which we don't do.
+  ;; Statistical allocation profiling is not signal-based- instead, whenever a C call
+  ;; occurs to handle thread-local allocation region overflow, a trace is recorded.
+  (unless (eq mode :alloc)
+    (with-alien ((%sigaction (function void int signed) :extern "install_handler"))
+      (alien-funcall %sigaction sb-unix:sigprof -1)))
+  ;; Keep all code live no matter if apparently unreferenced
+  (setf (extern-alien "sb_sprof_enabled" int) 1)
+  (ecase mode
+    (:alloc
+     (setq enable-alloc-profiler 1))
+    (:cpu
+     (multiple-value-bind (secs usecs)
+         (multiple-value-bind (secs rest) (truncate sample-interval)
+           (values secs (truncate (* rest 1000000))))
+       (unix-setitimer :profile secs usecs secs usecs)))
+    (:time
+     #+sb-thread
+     (flet ((map-threads (function &aux (threads sb-thread::*profiled-threads*))
+              (if (listp threads)
+                  (mapc function threads)
+                  (named-let visit ((node sb-thread::*all-threads*))
+                    (awhen (sb-thread::avlnode-left node) (visit it))
+                    (awhen (sb-thread::avlnode-right node) (visit it))
+                    (let ((thread (sb-thread::avlnode-data node)))
+                      (when (and (= (sb-thread::thread-%visible thread) 1)
+                                 (neq thread *timer*))
+                        (funcall function thread)))))))
+       (sb-thread::start-thread
           (setf *timer* (sb-thread::%make-thread "SPROF timer" nil (sb-thread:make-semaphore)))
           (lambda ()
             (loop (unless *timer* (return))
@@ -206,14 +211,12 @@ The following keyword args are recognized:
                        (unless (= c-thread 0)
                          (sb-unix:pthread-kill (sb-thread::thread-os-thread thread)
                                                sb-unix:sigprof)))))))
-          nil)
-         #-sb-thread
-         (schedule-timer
-          (setf *timer* (make-timer (lambda () (unix-kill 0 sb-unix:sigprof))
-                                    :name "SPROF timer"))
-          sample-interval :repeat-interval sample-interval))))
-      (setq *profiling* mode)))
-  (values))
+          nil))
+     #-sb-thread
+     (schedule-timer (setf *timer* (make-timer (lambda () (unix-kill 0 sb-unix:sigprof))
+                                               :name "SPROF timer"))
+                     sample-interval :repeat-interval sample-interval)))
+  (setq *profiling* mode))
 
 (defun stop-profiling ()
   "Stop profiling if profiling."
