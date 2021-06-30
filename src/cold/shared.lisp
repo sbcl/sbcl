@@ -280,7 +280,7 @@
         (when (target-featurep '(:and :sb-thread (:not :win32)))
           (push :pauseless-threadstart sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or :darwin :openbsd)))
-          (push :os-thread-stack target-feature-list))
+          (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
           ;; 0xCE is a perfectly good 32-bit instruction,
           ;; unlike on x86-64 where it is illegal. It's therefore
