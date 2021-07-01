@@ -3462,8 +3462,8 @@ void maybe_pin_code(lispobj addr) {
     if (page < 0) return;
     if (not_condemned_p(page)) return;
 
-    struct code* code = (struct code*)component_ptr_from_pc((char *)addr);
-    if(code) {
+    struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
+    if (code) {
         pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
     }
 }
