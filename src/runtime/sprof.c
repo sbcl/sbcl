@@ -473,7 +473,8 @@ static void diagnose_failure(struct thread* thread) {
     // but if multithreaded, each thread could allocate a buffer and grow it an
     // arbitrary number of times. The automatic disable tries to avoid an explosion
     // in memory consumption.
-    if (((struct sprof_data*)thread->sprof_data)->capacity == CAPACITY_MAX) {
+    struct sprof_data* data = (void*)thread->sprof_data;
+    if (data && data->capacity == CAPACITY_MAX) {
         // disable the profiler in this thread
         thread->state_word.sprof_enable = 0;
 #ifdef LISP_FEATURE_SB_THREAD
