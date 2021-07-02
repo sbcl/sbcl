@@ -1131,15 +1131,11 @@ handle_access_violation(os_context_t *ctx,
 #endif
 
     /* dynamic space */
-    if (DYNAMIC_SPACE_START <= (lispobj)fault_address &&
-        (lispobj)fault_address < (DYNAMIC_SPACE_START + dynamic_space_size)) {
-        MEMORY_BASIC_INFORMATION mem_info;
-        if (AVERLAX(VirtualQuery(fault_address, &mem_info, sizeof mem_info)) &&
-            mem_info.State == MEM_RESERVE) {
-            os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
-                             os_vm_page_size);
-            return 0;
-        }
+    page_index_t page = find_page_index(fault_address);
+    if (page != -1 && !page_table[page].write_protected) {
+        os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
+                         os_vm_page_size);
+        return 0;
     }
     if (gencgc_handle_wp_violation(fault_address)) {
         return 0;
