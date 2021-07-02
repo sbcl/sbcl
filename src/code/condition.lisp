@@ -966,7 +966,7 @@
                      (constant-modified-fun-name c)
                      (constant-modified-values c))))
   (:default-initargs :references '((:ansi-cl :special-operator quote)
-                                   (:ansi-cl :section (3 2 2 3)))))
+                                   (:ansi-cl :section (3 7 1)))))
 
 (define-condition macro-arg-modified (constant-modified)
   ((variable :initform nil :initarg :variable :reader macro-arg-modified-variable))
