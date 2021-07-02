@@ -157,3 +157,10 @@
                             (coerce x '(or (array (signed-byte 8) (*))
                                            (array (unsigned-byte 8) (*))))))))
     (assert-error (funcall fun '(1 2 1)))))
+
+(with-test (:name :coerce-array)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (coerce a 'array))
+    ((#(1)) #(1) :test #'equalp)))

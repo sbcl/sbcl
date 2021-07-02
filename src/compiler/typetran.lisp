@@ -1273,7 +1273,8 @@
                            (neq (array-type-complexp tspec) t) ; :MAYBE and NIL are good
                            (not (contains-unknown-type-p (array-type-element-type tspec)))
                            ;; just for requesting (array nil (*)), you lose
-                           (neq (array-type-specialized-element-type tspec) *empty-type*)))
+                           (neq (array-type-specialized-element-type tspec) *empty-type*)
+                           (consp (array-type-dimensions tspec))))
                   (values tspec
                           (source-transform-array-typep 'x tspec)
                           (car (array-type-dimensions tspec))
