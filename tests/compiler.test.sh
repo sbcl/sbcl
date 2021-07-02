@@ -15,7 +15,7 @@
 
 use_test_subdirectory
 
-# It's unclear why the majority of these tests are written in shall script when
+# It's unclear why the majority of these tests are written in shell script when
 # many look as though they would be perfectly happy as lisp tests.
 # This test, on the other hand, would have a tough time as a lisp test,
 # because it needs to make a symlink which would either mean calling run-program
