@@ -939,7 +939,6 @@ void* os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
 
 void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
     AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
-    AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
 void
