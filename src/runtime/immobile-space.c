@@ -1396,6 +1396,7 @@ search_immobile_space(void *pointer)
         // a root for scavenging. It resembles READ-ONLY space in that regard.
         if (page_attributes_valid && page_index >= FIXEDOBJ_RESERVED_PAGES) {
             int spacing = fixedobj_page_obj_align(page_index);
+            if (spacing == 0) return NULL;
             int index = ((char*)pointer - page_base) / spacing;
             lispobj *obj = (void*)(page_base + spacing * index);
             char* end;
