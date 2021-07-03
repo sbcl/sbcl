@@ -1443,23 +1443,18 @@ symbol-case giving up: case=((V U) (F))
                       errorp proceedp expected-type)
   (when proceedp ; CCASE or CTYPECASE
     (return-from case-body-aux
-      (let ((block (gensym))
-            (again (gensym)))
-        `(let ((,keyform-value ,keyform))
-           (block ,block
-             (tagbody
-                ,again
-                (return-from
-                 ,block
-                  (cond ,@(nreverse clauses)
-                        (t
-                         (setf ,keyform-value
-                               (setf ,keyform
-                                     (case-body-error
-                                      ',name ',keyform ,keyform-value
-                                      ',expected-type ',keys)))
-                         (go ,again))))))))))
-
+      ;; It is not a requirement to evaluate subforms of KEYFORM once only, but it often
+      ;; reduces code size to do so, as the update form will take advantage of typechecks
+      ;; already performed. (Nor is it _required_ to re-evaluate subforms)
+      (binding* ((switch (make-symbol "SWITCH"))
+                 (retry
+                  ;; TODO: consider using the union type simplifier algorithm here
+                  `(case-body-error ',name ',keyform ,keyform-value ',expected-type ',keys))
+                 ((vars vals stores writer reader) (get-setf-expansion keyform)))
+        `(let* ,(mapcar #'list vars vals)
+           (named-let ,switch ((,keyform-value ,reader))
+             (cond ,@(nreverse clauses)
+                   (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))))
   (let ((implement-as name)
         (original-keys keys))
     (when (member name '(typecase etypecase))
