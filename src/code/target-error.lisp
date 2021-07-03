@@ -299,7 +299,7 @@ with that condition (or with no condition) will be returned."
   (error 'case-failure
          :name 'etypecase
          :datum value
-         :expected-type `(or ,@keys)
+         :expected-type (if (symbolp keys) keys `(or ,@keys))
          :possibilities keys))
 
 (defun ecase-failure (value keys)

@@ -1515,10 +1515,33 @@ symbol-case giving up: case=((V U) (F))
        (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
        (cond ,@(nreverse clauses)
              ,@(when errorp
-                 `((t (,(ecase name
-                          (etypecase 'etypecase-failure)
-                          (ecase 'ecase-failure))
-                       ,keyform-value ',original-keys))))))))
+                 `((t ,(ecase name
+                         (etypecase
+                          `(etypecase-failure
+                            ,keyform-value ,(etypecase-error-spec original-keys)))
+                         (ecase
+                          `(ecase-failure ,keyform-value ',original-keys))))))))))
+
+;;; ETYPECASE over clauses that form a "simpler" type specifier should use that,
+;;; e.g. partitions of INTEGER:
+;;;  (etypecase ((integer * -1) ...) ((eql 0) ...) ((integer 1 *) ...))
+;;;  (etypecase (fixnum ...) (bignum ...))
+(defun etypecase-error-spec (types)
+  (when (cdr types) ; no sense in doing this for a single type
+    (let ((parsed (mapcar #'sb-c::careful-specifier-type types)))
+      (when (every (lambda (x) (and x (not (contains-unknown-type-p x))))
+                   parsed)
+        (let* ((union (apply #'type-union parsed))
+               (unparsed (type-specifier union)))
+          ;; If the type-union of the types is a simpler expression than (OR ...),
+          ;; then return the simpler one. CTYPECASE could do this also, but doesn't.
+          ;; http://www.lispworks.com/documentation/HyperSpec/Body/m_tpcase.htm#etypecase
+          ;;   "If no normal-clause matches, a non-correctable error of type type-error
+          ;;    is signaled. The offending datum is the test-key and the expected type
+          ;;    is /type equivalent/ to (or type1 type2 ...)"
+          (when (symbolp unparsed)
+            (return-from etypecase-error-spec `',unparsed))))))
+  `',types)
 
 (sb-xc:defmacro case (keyform &body cases)
   "CASE Keyform {({(Key*) | Key} Form*)}*

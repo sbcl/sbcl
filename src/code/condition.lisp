@@ -634,8 +634,8 @@
   ((datum :reader type-error-datum :initarg :datum)
    (expected-type :reader type-error-expected-type :initarg :expected-type)
    (context :initform nil :reader type-error-context :initarg :context))
-  (:report
-   (lambda (condition stream)
+  (:report report-general-type-error))
+(defun report-general-type-error (condition stream)
      (let ((type (type-error-expected-type condition)))
        (format stream  "~@<The value ~
                       ~@:_~2@T~S ~
@@ -645,7 +645,7 @@
                (type-error-datum condition)
                type
                (decode-type-error-context (type-error-context condition)
-                                          type))))))
+                                          type))))
 
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())
@@ -1941,15 +1941,20 @@ the restart does not exist."))
 
 (define-condition case-failure (type-error)
   ((name :reader case-failure-name :initarg :name)
+   ;; This is an internal symbol of SB-KERNEL, so I can't imagine that anyone
+   ;; expects an invariant that it be a list.
    (possibilities :reader case-failure-possibilities :initarg :possibilities))
   (:report
    (lambda (condition stream)
-     (let ((*print-escape* t))
-       (format stream "~@<~S fell through ~S expression.~@[ ~
+     (let ((possibilities (case-failure-possibilities condition)))
+       (if (symbolp possibilities)
+           (report-general-type-error condition stream)
+           (let ((*print-escape* t))
+             (format stream "~@<~S fell through ~S expression.~@[ ~
                       ~:_Wanted one of (~/pprint-fill/).~]~:>"
-               (type-error-datum condition)
-               (case-failure-name condition)
-               (case-failure-possibilities condition))))))
+                     (type-error-datum condition)
+                     (case-failure-name condition)
+                     (case-failure-possibilities condition))))))))
 
 (define-condition compiled-program-error (program-error)
   ((message :initarg :message :reader program-error-message)

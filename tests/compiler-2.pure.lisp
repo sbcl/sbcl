@@ -3219,3 +3219,11 @@
          (the integer (block nil
                         (return))))))
    (() nil)))
+
+;;; EXPLICIT-CHECK + ETYPECASE should not produce a error message
+;;; which reveals whether type-checking on entry to a standard function
+;;; was performed this way or that way.
+(with-test (:name :etypecase-error-simplify)
+  (let ((x (nth-value 1 (ignore-errors (logcount (opaque-identity #\a)))))
+        (y (nth-value 1 (ignore-errors (oddp (opaque-identity #\a))))))
+    (assert (string= (princ-to-string x) (princ-to-string y)))))
