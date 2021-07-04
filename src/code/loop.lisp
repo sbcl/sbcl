@@ -94,7 +94,8 @@
     ((head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
     `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
-       (declare (truly-dynamic-extent ,head-var))
+       (declare (truly-dynamic-extent ,head-var)
+                ,@(and user-head-var `((list ,user-head-var))))
        ,@body)))
 
 (sb-xc:defmacro loop-collect-rplacd
@@ -140,13 +141,13 @@
         (when user-head-var
           (setq answer
                 `(progn ,answer
-                        (setq ,user-head-var (cdr ,head-var)))))
+                        (setq ,user-head-var (sb-ext:truly-the list (cdr ,head-var))))))
         answer))))
 
 (sb-xc:defmacro loop-collect-answer (head-var
-                                                   &optional user-head-var)
-  (or user-head-var
-      `(cdr ,head-var)))
+                                     &optional user-head-var)
+  `(sb-ext:truly-the list ,(or user-head-var
+                               `(cdr ,head-var))))
 
 ;;;; maximization technology
 

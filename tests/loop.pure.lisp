@@ -454,6 +454,7 @@
                  for (a b) = (multiple-value-list (floor i 5))
                  sum (+ a b))))
     (ctu:assert-no-consing (f 1000))))
+
 (with-test (:name :destructuring-m-v-list-with-nil)
   (assert (equal-mod-gensyms
            (macroexpand-1 '(sb-loop::loop-desetq (x nil z) (multiple-value-list (foo))))
@@ -461,3 +462,20 @@
              (declare (ignore g2))
              (sb-loop::loop-desetq x g1)
              (sb-loop::loop-desetq z g3)))))
+
+(with-test (:name :collect-list-type)
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (l)
+                     (loop for x in l
+                           collect x into m
+                           finally (return m))))))
+          '(values list &optional)))
+  (assert
+   (equal (third (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   '(lambda (l)
+                     (loop for x in l
+                           collect x)))))
+          '(values list &optional))))
