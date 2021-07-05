@@ -1043,7 +1043,7 @@ implementation it is ~S." *!default-package-use-list*)
          (return package)))
      (bug "never")))
 
-(flet ((remove-names (package name-table)
+(flet ((remove-names (package name-table keep-primary-name)
          ;; An INFO-HASHTABLE does not support REMHASH. We can simulate it
          ;; by changing the value to :DELETED.
          ;; (NIL would be preferable, but INFO-GETHASH does not return
@@ -1054,6 +1054,7 @@ implementation it is ~S." *!default-package-use-list*)
          (dx-let ((names (cons (package-name package)
                                (package-nicknames package)))
                   (i 0))
+           (when keep-primary-name (pop names))
            (dolist (name names)
              ;; Aver that the following SETF doesn't insert a new <k,v> pair.
              (aver (info-gethash name name-table))
@@ -1109,10 +1110,21 @@ implementation it is ~S." *!default-package-use-list*)
            (unless (eq package (find-package package-designator))
              (go :restart))
            ;; Do the renaming.
-           (remove-names package table)
-           (%register-package table name package)
+           ;; As a special case, do not allow the package to transiently disappear
+           ;; if PACKAGE-NAME is unchanged. This avoids glitches with build systems
+           ;; which try to operate on subcomponents in parallel, where one of the
+           ;; built subcomponents needs to add nicknames to an existing package.
+           ;; We could be clever here as well by not removing nicknames that
+           ;; will ultimately be re-added, but that didn't seem as critical.
+           (let ((keep-primary-name (string= name (package-%name package))))
+             (remove-names package table keep-primary-name)
+             (unless keep-primary-name
+               (%register-package table name package)))
            (setf (package-%name package) name
                  (package-%nicknames package) ()))
+         ;; Adding each nickname acquires and releases the table lock,
+         ;; because it's potentially interactive (on failure) and therefore
+         ;; not ideal to hold the lock for the entire duration.
          (%enter-new-nicknames package nicks))
        (atomic-incf *package-names-cookie*)
        (return package))))
@@ -1162,7 +1174,7 @@ implementation it is ~S." *!default-package-use-list*)
                   (do-symbols (sym package)
                     (unintern sym package))
                   (with-package-names (table)
-                    (remove-names package table)
+                    (remove-names package table nil)
                     (setf (package-%name package) nil
                           ;; Setting PACKAGE-%NAME to NIL is required in order to
                           ;; make PACKAGE-NAME return NIL for a deleted package as
