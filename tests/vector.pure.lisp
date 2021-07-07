@@ -69,3 +69,7 @@
                                 (setf (fill-pointer x) 0)))
             (make-array 2 :adjustable t))
    type-error))
+
+(with-test (:name :concatenate-to-vector)
+  (assert (sb-kernel:%concatenate-to-vector sb-vm:simple-bit-vector-widetag
+                                           '(1 1) '(1 0))))

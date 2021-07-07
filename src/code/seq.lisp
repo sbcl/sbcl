@@ -1169,10 +1169,11 @@ many elements are copied."
     (declare (index length))
     (do-rest-arg ((seq) sequences)
       (incf length (length seq)))
-    (let ((result (sb-vm::allocate-vector-with-widetag #+ubsan nil
-                                                       widetag length nil))
-          (setter (the function (svref %%data-vector-setters%% widetag)))
-          (index 0))
+    (let* ((n-bits-shift (aref sb-vm::%%simple-array-n-bits-shifts%% widetag))
+           (result (sb-vm::allocate-vector-with-widetag
+                    #+ubsan nil widetag length n-bits-shift))
+           (setter (the function (svref %%data-vector-setters%% widetag)))
+           (index 0))
       (declare (index index))
       (do-rest-arg ((seq) sequences)
         (sb-sequence:dosequence (e seq)
