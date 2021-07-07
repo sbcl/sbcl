@@ -190,6 +190,12 @@
                      (sb-c::%type-check-error/c
                       ,sequence 'sb-kernel::object-not-sequence-error nil)))))))
 
+(defmacro make-vector-like (vector length poison)
+  (declare (ignorable poison))
+  `(let ((type (array-underlying-widetag ,vector)))
+     (sb-vm::allocate-vector-with-widetag
+      #+ubsan ,poison type ,length (aref sb-vm::%%simple-array-n-bits-shifts%% type))))
+
 ;;; Like SEQ-DISPATCH-CHECKING, but also assert that OTHER-FORM produces
 ;;; a sequence. This assumes that the containing function declares its
 ;;; result to be explicitly checked,
@@ -203,7 +209,7 @@
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
   `(seq-dispatch ,sequence
      (make-list ,length)
-     (make-vector-like ,sequence ,length)
+     (make-vector-like ,sequence ,length t)
      (sb-sequence:make-sequence-like ,sequence ,length)))
 
 (defun bad-sequence-type-error (type-spec)
@@ -933,8 +939,9 @@ many elements are copied."
                       :check-fill-pointer t)
       (declare (ignore start))
       (let* ((tag (%other-pointer-widetag vector))
-             (new-vector (sb-vm::allocate-vector-with-widetag #+ubsan nil
-                                                              tag length nil)))
+             (new-vector (sb-vm::allocate-vector-with-widetag
+                          #+ubsan nil tag length
+                          (aref sb-vm::%%simple-array-n-bits-shifts%% tag))))
         (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index 0 (1+ left-index))
                     (right-index end))
@@ -2214,7 +2221,7 @@ many elements are copied."
                            start end count key test test-not old)
   (declare (fixnum start count end incrementer right)
            (type (or null function) key))
-  (let* ((result (make-vector-like sequence length))
+  (let* ((result (make-vector-like sequence length nil))
          (getter (the function (svref %%data-vector-reffers%%
                                       (%other-pointer-widetag sequence))))
          (setter (the function (svref %%data-vector-setters%%

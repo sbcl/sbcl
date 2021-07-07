@@ -349,14 +349,12 @@
                   (1- (integer-length n-word-bits)))))
     (ash (+ length mask) shift)))
 
-;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into bits
-;;; or NIL, %%simple-array-n-bits-shifts%% will be used in that case.
+;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into array-size-in-bits,
+;;; i.e. log(2,bits-per-elt)
 (defun allocate-vector-with-widetag (#+ubsan poisoned widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
-  (let* ((n-bits-shift (or n-bits-shift
-                           (aref %%simple-array-n-bits-shifts%% widetag)))
-             ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
+  (let* (    ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
              ;; but a single case involving it now.
          (full-length (+ length (if (= widetag simple-base-string-widetag) 1 0)))
          ;; Be careful not to allocate backing storage for element type NIL.
@@ -397,15 +395,6 @@
       (if (= 0 result)
           (recurse (%array-data x))
           (truly-the (integer 128 255) result))))))
-
-;;; One use of this is for %make-sequence-like which should pass
-;;; poisoned = T to the allocator, the other use is for vector-substitute*
-;;; which should pass poisoned = NIL.
-;;; Since we can't do both, just use NIL, and if you screw up
-;;; by your sequence without writing, ... oh well.
-(defun sb-impl::make-vector-like (vector length)
-  (allocate-vector-with-widetag #+ubsan nil
-                                (array-underlying-widetag vector) length nil))
 
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
 ;; returning the two initialization arguments needed for DATA-VECTOR-FROM-INITS.
@@ -525,9 +514,8 @@
                        ;; It avoids the REDUCE lambda being called with no args.
                        dimension-0))
                   (data (or displaced-to
-                            (data-vector-from-inits
-                             dimensions total-size nil widetag n-bits
-                             initialize initial-data)))
+                            (data-vector-from-inits dimensions total-size widetag n-bits
+                                                    initialize initial-data)))
                   (array (make-array-header
                           (cond ((= array-rank 1)
                                  (%complex-vector-widetag widetag))
@@ -633,22 +621,13 @@ of specialized arrays is supported."
       (jit-memcpy (vector-sap vector) (vector-sap initial-contents) length))
     vector))
 
-;;; DATA-VECTOR-FROM-INITS returns a simple vector that has the
+;;; DATA-VECTOR-FROM-INITS returns a simple rank-1 array that has the
 ;;; specified array characteristics. Dimensions is only used to pass
 ;;; to FILL-DATA-VECTOR for error checking on the structure of
 ;;; initial-contents.
-(defun data-vector-from-inits (dimensions total-size
-                               element-type widetag n-bits
-                               initialize initial-data)
-    ;; FIXME: element-type can be NIL when widetag is non-nil,
-    ;; and FILL will check the type, although the error will be not as nice.
-    ;; (cond (typep initial-element element-type)
-    ;;   (error "~S cannot be used to initialize an array of type ~S."
-    ;;          initial-element element-type))
-  (let ((data (if widetag
-                  (allocate-vector-with-widetag #+ubsan nil
-                                                widetag total-size n-bits)
-                  (make-array total-size :element-type element-type))))
+(defun data-vector-from-inits (dimensions total-size widetag n-bits initialize initial-data)
+  (declare (fixnum widetag n-bits)) ; really just that they're non-nil
+  (let ((data (allocate-vector-with-widetag #+ubsan (not initialize) widetag total-size n-bits)))
     (ecase initialize
      (:initial-element
       (fill (the vector data) initial-data))
@@ -1270,7 +1249,8 @@ of specialized arrays is supported."
               (validate-array-initargs initial-element-p initial-element
                                        initial-contents-p initial-contents
                                        displaced-to))
-             (widetag (array-underlying-widetag array)))
+             (widetag (array-underlying-widetag array))
+             (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag)))
     (cond ((and element-type-p
                 (/= (%vector-widetag-and-n-bits-shift element-type)
                     widetag))
@@ -1291,9 +1271,8 @@ of specialized arrays is supported."
            (let* ((array-size (if (listp dimensions)
                                   (apply #'* dimensions)
                                   dimensions))
-                  (array-data (data-vector-from-inits
-                               dimensions array-size element-type nil nil
-                               initialize initial-data)))
+                  (array-data (data-vector-from-inits dimensions array-size widetag n-bits-shift
+                                                      initialize initial-data)))
              (cond ((adjustable-array-p array)
                     (set-array-header array array-data array-size
                                       (get-new-fill-pointer array array-size
@@ -1301,8 +1280,7 @@ of specialized arrays is supported."
                                       0 dimensions nil nil))
                    ((array-header-p array)
                     ;; simple multidimensional or single dimensional array
-                    (%make-array dimensions widetag
-                                 (aref %%simple-array-n-bits-shifts%% widetag)
+                    (%make-array dimensions widetag n-bits-shift
                                  :initial-contents initial-contents))
                    (t
                     array-data))))
@@ -1329,8 +1307,7 @@ of specialized arrays is supported."
                                                            fill-pointer)
                                      displacement dimensions t nil)
                    ;; simple multidimensional or single dimensional array
-                   (%make-array dimensions widetag
-                                (aref %%simple-array-n-bits-shifts%% widetag)
+                   (%make-array dimensions widetag n-bits-shift
                                 :displaced-to displaced-to
                                 :displaced-index-offset
                                 displaced-index-offset))))
@@ -1347,10 +1324,9 @@ of specialized arrays is supported."
                                  (%array-displaced-p array))
                             (< old-length new-length))
                         (setf new-data
-                              (data-vector-from-inits
-                               dimensions new-length element-type
-                               (%other-pointer-widetag old-data) nil
-                               initialize initial-data))
+                              (data-vector-from-inits dimensions new-length
+                                                      (%other-pointer-widetag old-data)
+                                                      n-bits-shift initialize initial-data))
                         ;; Provide :END1 to avoid full call to LENGTH
                         ;; inside REPLACE.
                         (replace new-data old-data
@@ -1375,12 +1351,11 @@ of specialized arrays is supported."
                                             (%array-displaced-p array))
                                        (> new-length old-length)
                                        (not (adjustable-array-p array)))
-                                   (data-vector-from-inits
-                                    dimensions new-length
-                                    element-type
-                                    (%other-pointer-widetag old-data) nil
-                                    (if initial-element-p :initial-element)
-                                    initial-element)
+                                   (data-vector-from-inits dimensions new-length
+                                                           (%other-pointer-widetag old-data)
+                                                           n-bits-shift
+                                                           (if initial-element-p :initial-element)
+                                                           initial-element)
                                    old-data)))
                  (if (or (zerop old-length) (zerop new-length))
                      (when initial-element-p (fill new-data initial-element))
