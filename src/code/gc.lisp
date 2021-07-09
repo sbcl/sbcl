@@ -374,7 +374,7 @@ Note: currently changes to this value are lost when saving core."
   (extern-alien "bytes_consed_between_gcs" os-vm-size-t))
 
 (defun (setf bytes-consed-between-gcs) (val)
-  (declare (type index val))
+  (declare (type (and fixnum unsigned-byte) val))
   (setf (extern-alien "bytes_consed_between_gcs" os-vm-size-t)
         val))
 
