@@ -1229,54 +1229,75 @@ of specialized arrays is supported."
 
 ;;;; ADJUST-ARRAY
 
+(macrolet ((widetag-to-element-type-vector ()
+             (let ((a (make-array 32 :initial-element 0)))
+               (dovector (saetp *specialized-array-element-type-properties* a)
+                 (let ((tag (saetp-typecode saetp)))
+                   (setf (aref a (ash (- tag #x80) -2)) (saetp-specifier saetp)))))))
+
 (defun adjust-array (array dimensions &key
                            (element-type (array-element-type array) element-type-p)
                            (initial-element nil initial-element-p)
                            (initial-contents nil initial-contents-p)
                            fill-pointer
-                           displaced-to displaced-index-offset)
+                           displaced-to displaced-index-offset
+                           &aux (array-rank (array-rank array)))
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (when (invalid-array-p array)
     (invalid-array-error array))
-  (binding* ((dimensions-rank (if (listp dimensions)
-                                  (length dimensions)
-                                  1))
-             (array-rank (array-rank array))
-             (()
-              (unless (= dimensions-rank array-rank)
-                (error "The number of dimensions not equal to rank of array.")))
-             ((initialize initial-data)
-              (validate-array-initargs initial-element-p initial-element
-                                       initial-contents-p initial-contents
-                                       displaced-to))
-             (widetag (array-underlying-widetag array))
-             (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag)))
-    (cond ((and element-type-p
-                (/= (%vector-widetag-and-n-bits-shift element-type)
-                    widetag))
-           (error "The new element type, ~
-                   ~/sb-impl:print-type-specifier/, is incompatible ~
-                   with old type, ~/sb-impl:print-type-specifier/."
-                  element-type (array-element-type array)))
-          ((and fill-pointer (/= array-rank 1))
-           (error "Only vectors can have fill pointers."))
-          ((and fill-pointer (not (array-has-fill-pointer-p array)))
-           ;; This case always struck me as odd. It seems like it might mean
-           ;; that the user asks that the array gain a fill-pointer if it didn't
-           ;; have one, yet CLHS is clear that the argument array must have a
-           ;; fill-pointer or else signal a type-error.
-           (fill-pointer-error array)))
+  (let ((new-rank (if (listp dimensions) (length dimensions) 1)))
+    (unless (= array-rank new-rank)
+      (error "Expected ~D new dimension~:P for array, but received ~D." array-rank new-rank)))
+  (when (and displaced-index-offset (null displaced-to))
+    (error "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+  (binding*
+      ((new-total-size
+        (the index (if (listp dimensions) (apply #'* dimensions) dimensions)))
+       (widetag
+        (let ((widetag (array-underlying-widetag array)))
+          (if (or (not element-type-p)
+                  ;; Quick pass if ELEMENT-TYPE is same as the element type based on widetag
+                  (equal element-type (svref (widetag-to-element-type-vector)
+                                             (ash (- widetag #x80) -2)))
+                  (= (%vector-widetag-and-n-bits-shift element-type) widetag))
+              widetag
+              (error "The new element type, ~/sb-impl:print-type-specifier/, is incompatible ~
+                      with old type, ~/sb-impl:print-type-specifier/."
+                     element-type (array-element-type array)))))
+       (new-fill-pointer
+        (cond (fill-pointer
+               (unless (array-has-fill-pointer-p array)
+                 (if (/= array-rank 1)
+                     (error "Only vectors can have fill pointers.")
+                     ;; I believe the sentence saying that this is an error pre-dates the removal
+                     ;; of the restriction of calling ADJUST-ARRAY only on arrays that
+                     ;; are actually adjustable. Making a new array should always work,
+                     ;; so I think this may be a bug in the spec.
+                     (fill-pointer-error array)))
+               (cond ((eq fill-pointer t) new-total-size)
+                     ((<= fill-pointer new-total-size) fill-pointer)
+                     (t (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
+                                than the new size of the vector (~S)"
+                               fill-pointer new-total-size))))
+              ((array-has-fill-pointer-p array)
+               ;; "consequences are unspecified if array is adjusted to a size smaller than its fill pointer"
+               (let ((old-fill-pointer (%array-fill-pointer array)))
+                 (when (< new-total-size old-fill-pointer)
+                   (error "can't adjust vector ~S to a size (~S) smaller than ~
+                           its current fill pointer (~S)"
+                          array new-total-size old-fill-pointer))
+                 old-fill-pointer))))
+       ((initialize initial-data)
+        (validate-array-initargs initial-element-p initial-element
+                                 initial-contents-p initial-contents
+                                 displaced-to))
+       (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag)))
     (cond (initial-contents-p
              ;; array former contents replaced by INITIAL-CONTENTS
-           (let* ((array-size (if (listp dimensions)
-                                  (apply #'* dimensions)
-                                  dimensions))
-                  (array-data (data-vector-from-inits dimensions array-size widetag n-bits-shift
+           (let* ((array-data (data-vector-from-inits dimensions new-total-size widetag n-bits-shift
                                                       initialize initial-data)))
              (cond ((adjustable-array-p array)
-                    (set-array-header array array-data array-size
-                                      (get-new-fill-pointer array array-size
-                                                            fill-pointer)
+                    (set-array-header array array-data new-total-size new-fill-pointer
                                       0 dimensions nil nil))
                    ((array-header-p array)
                     ;; simple multidimensional or single dimensional array
@@ -1292,19 +1313,12 @@ of specialized arrays is supported."
                         ~/sb-impl:print-type-specifier/ into another ~
                         of type ~/sb-impl:print-type-specifier/"
                       element-type (array-element-type displaced-to)))
-             (let ((displacement (or displaced-index-offset 0))
-                   (array-size  (if (listp dimensions)
-                                    (apply #'* dimensions)
-                                    dimensions)))
-               (declare (fixnum displacement array-size))
-               (if (< (the fixnum (array-total-size displaced-to))
-                      (the fixnum (+ displacement array-size)))
+             (let ((displacement (or displaced-index-offset 0)))
+               (if (< (array-total-size displaced-to) (+ displacement new-total-size))
                    (error "The :DISPLACED-TO array is too small."))
                (if (adjustable-array-p array)
                    ;; None of the original contents appear in adjusted array.
-                   (set-array-header array displaced-to array-size
-                                     (get-new-fill-pointer array array-size
-                                                           fill-pointer)
+                   (set-array-header array displaced-to new-total-size new-fill-pointer
                                      displacement dimensions t nil)
                    ;; simple multidimensional or single dimensional array
                    (%make-array dimensions widetag n-bits-shift
@@ -1313,87 +1327,50 @@ of specialized arrays is supported."
                                 displaced-index-offset))))
           ((= array-rank 1)
              (let ((old-length (array-total-size array))
-                   (new-length (if (listp dimensions)
-                                   (car dimensions)
-                                   dimensions))
                    new-data)
-               (declare (fixnum old-length new-length))
-               (with-array-data ((old-data array) (old-start)
-                                 (old-end old-length))
+               (with-array-data ((old-data array) (old-start) (old-end old-length))
                  (cond ((or (and (array-header-p array)
                                  (%array-displaced-p array))
-                            (< old-length new-length))
+                            (< old-length new-total-size))
                         (setf new-data
-                              (data-vector-from-inits dimensions new-length
-                                                      (%other-pointer-widetag old-data)
+                              (data-vector-from-inits dimensions new-total-size widetag
                                                       n-bits-shift initialize initial-data))
                         ;; Provide :END1 to avoid full call to LENGTH
                         ;; inside REPLACE.
                         (replace new-data old-data
-                                 :end1 new-length
+                                 :end1 new-total-size
                                  :start2 old-start :end2 old-end))
                        (t (setf new-data
-                                (shrink-vector old-data new-length))))
+                                (shrink-vector old-data new-total-size))))
                  (if (adjustable-array-p array)
-                     (set-array-header array new-data new-length
-                                       (get-new-fill-pointer array new-length
-                                                             fill-pointer)
+                     (set-array-header array new-data new-total-size new-fill-pointer
                                        0 dimensions nil nil)
                      new-data))))
           (t
-           (let ((old-length (%array-available-elements array))
-                 (new-length (apply #'* dimensions)))
-             (declare (fixnum old-length new-length))
-             (with-array-data ((old-data array) (old-start)
-                               (old-end old-length))
+           (let ((old-total-size (%array-available-elements array)))
+             (with-array-data ((old-data array) (old-start) (old-end old-total-size))
                (declare (ignore old-end))
                (let ((new-data (if (or (and (array-header-p array)
                                             (%array-displaced-p array))
-                                       (> new-length old-length)
+                                       (> new-total-size old-total-size)
                                        (not (adjustable-array-p array)))
-                                   (data-vector-from-inits dimensions new-length
-                                                           (%other-pointer-widetag old-data)
-                                                           n-bits-shift
-                                                           (if initial-element-p :initial-element)
-                                                           initial-element)
+                                   (data-vector-from-inits dimensions new-total-size widetag
+                                                           n-bits-shift initialize initial-data)
                                    old-data)))
-                 (if (or (zerop old-length) (zerop new-length))
+                 (if (or (zerop old-total-size) (zerop new-total-size))
                      (when initial-element-p (fill new-data initial-element))
                      (zap-array-data old-data (array-dimensions array)
                                      old-start
-                                     new-data dimensions new-length
+                                     new-data dimensions new-total-size
                                      element-type initial-element
                                      initial-element-p))
                  (if (adjustable-array-p array)
-                     (set-array-header array new-data new-length
+                     (set-array-header array new-data new-total-size
                                        nil 0 dimensions nil nil)
-                     (let ((new-array
-                             (make-array-header
-                              simple-array-widetag array-rank)))
-                       (set-array-header new-array new-data new-length
+                     (let ((new-array (make-array-header simple-array-widetag array-rank)))
+                       (set-array-header new-array new-data new-total-size
                                          nil 0 dimensions nil t))))))))))
-
-
-(defun get-new-fill-pointer (old-array new-array-size fill-pointer)
-  (declare (fixnum new-array-size))
-  (typecase fill-pointer
-    (null
-     ;; "The consequences are unspecified if array is adjusted to a
-     ;;  size smaller than its fill pointer ..."
-     (when (array-has-fill-pointer-p old-array)
-       (when (> (%array-fill-pointer old-array) new-array-size)
-         (error "cannot ADJUST-ARRAY an array (~S) to a size (~S) that is ~
-                     smaller than its fill pointer (~S)"
-                old-array new-array-size (fill-pointer old-array)))
-       (%array-fill-pointer old-array)))
-    ((eql t)
-     new-array-size)
-    (fixnum
-     (when (> fill-pointer new-array-size)
-       (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
-                   than the new length of the vector (~S)"
-              fill-pointer new-array-size))
-     fill-pointer)))
+)
 
 ;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
 ;;; which must be less than or equal to its current length. This can
