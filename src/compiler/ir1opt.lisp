@@ -974,6 +974,13 @@
   (when (and (null (node-lvar node))
              (ir1-attributep (fun-info-attributes info) important-result)
              (neq (combination-info node) :important-result-discarded))
+    (when (lvar-fun-is (combination-fun node) '(adjust-array))
+      (let ((type (lvar-type (car (combination-args node)))))
+        ;; - if the array is simple, then result is important
+        ;; - if non-simple, then result is not important
+        ;; - if not enough information, then don't warn
+        (when (or (not (array-type-p type)) (array-type-complexp type)) ; T or :MAYBE
+          (return-from check-important-result))))
     (let ((*compiler-error-context* node))
       (setf (combination-info node) :important-result-discarded)
       (compiler-style-warn

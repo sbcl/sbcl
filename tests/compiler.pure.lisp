@@ -5688,6 +5688,19 @@
           (assert (search "NINTERSECTION"
                           (princ-to-string c))))))
 
+(with-test (:name :adjust-array-semi-important-result)
+  (macrolet ((try (type assert-what)
+               `(multiple-value-bind (fun failure warnings style-warnings)
+                    (checked-compile '(lambda (v)
+                                        (declare (,type v))
+                                        (adjust-array v (* (length v) 2))
+                                        (bit v 0))
+                                     :allow-style-warnings t)
+                  (declare (ignore fun failure warnings))
+                  (assert ,assert-what))))
+    (try simple-bit-vector style-warnings)
+    (try bit-vector (not style-warnings))))
+
 (with-test (:name :destroyed-constant-warning)
   (multiple-value-bind (fun failure warnings)
       (checked-compile '(lambda ()

@@ -1193,15 +1193,15 @@
 (defknown vector-pop ((modifying complex-vector)) t ())
 
 ;;; FIXME: complicated MODIFYING
-;;; Also, an important-result warning could be provided if the array
-;;; is known to be not expressly adjustable.
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
          (:initial-element t) (:initial-contents t)
          (:fill-pointer (or index boolean))
          (:displaced-to (or array null))
          (:displaced-index-offset index))
-  array ())
+  ;; This is a special case in CHECK-IMPORTANT-RESULT because it is not
+  ;; necessary to use the result if the array is adjustable.
+  array (important-result))
 ;  :derive-type 'result-type-arg1) Not even close...
 
 ;;;; from the "Strings" chapter:
