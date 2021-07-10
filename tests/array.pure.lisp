@@ -656,3 +656,6 @@
         (declare (vector a))
         (map-into a #'identity a)))
    ((0) #() :test #'equalp)))
+
+(with-test (:name :displaced-index-offset-disallow-nil)
+  (assert-error (eval '(make-array 4 :displaced-index-offset nil))))
