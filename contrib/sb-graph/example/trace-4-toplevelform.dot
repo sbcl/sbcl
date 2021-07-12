@@ -1,0 +1,128 @@
+digraph {
+"{0} COMPONENT [TOPLEVEL]: ''top level form''" -> "{1} CBLOCK [4546777747233824097]"[label="head"];
+"{0} COMPONENT [TOPLEVEL]: ''top level form''" -> "{2} CBLOCK [293033905737092273]"[label="tail"];
+"{1} CBLOCK [4546777747233824097]" -> "{0} COMPONENT [TOPLEVEL]: ''top level form''"[label="component"];
+"{1} CBLOCK [4546777747233824097]" -> "{3} CBLOCK [2374185086335330572]"[label="succ[# 0]"];
+"{3} CBLOCK [2374185086335330572]" -> "{0} COMPONENT [TOPLEVEL]: ''top level form''"[label="component"];
+"{3} CBLOCK [2374185086335330572]" -> "{2} CBLOCK [293033905737092273]"[label="succ[# 0]"];
+"{3} CBLOCK [2374185086335330572]" -> "{1} CBLOCK [4546777747233824097]"[label="pred[# 0]"];
+"{3} CBLOCK [2374185086335330572]" -> "{4} BIND [2124840765505938481]"[label="start[ctran: BLOCK-START]"color="blue"];
+"{2} CBLOCK [293033905737092273]" -> "{0} COMPONENT [TOPLEVEL]: ''top level form''"[label="component"];
+"{2} CBLOCK [293033905737092273]" -> "{3} CBLOCK [2374185086335330572]"[label="pred[# 0]"];
+"{4} BIND [2124840765505938481]" -> "{5} CLAMBDA [3240387953118118454]:
+%debug-name: (TOP-LEVEL-FORM
+              (%DEFUN 'BAR
+                      (NAMED-LAMBDA BAR
+                          (B C D)
+                        (DECLARE (TOP-LEVEL-FORM))
+                        (BLOCK BAR (* # D)))))
+source-name: .ANONYMOUS.
+kind: TOPLEVEL"[label="lambda"];
+"{4} BIND [2124840765505938481]" -> "{6} REF [1909866941284971615]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>"[label="next[ctran: INSIDE-BLOCK]"color="green"];
+"{4} BIND [2124840765505938481]" -> "{4} BIND [2124840765505938481]"[label="prev[ctran: BLOCK-START]"color="red"];
+"{5} CLAMBDA [3240387953118118454]:
+%debug-name: (TOP-LEVEL-FORM
+              (%DEFUN 'BAR
+                      (NAMED-LAMBDA BAR
+                          (B C D)
+                        (DECLARE (TOP-LEVEL-FORM))
+                        (BLOCK BAR (* # D)))))
+source-name: .ANONYMOUS.
+kind: TOPLEVEL" -> "{5} CLAMBDA [3240387953118118454]:
+%debug-name: (TOP-LEVEL-FORM
+              (%DEFUN 'BAR
+                      (NAMED-LAMBDA BAR
+                          (B C D)
+                        (DECLARE (TOP-LEVEL-FORM))
+                        (BLOCK BAR (* # D)))))
+source-name: .ANONYMOUS.
+kind: TOPLEVEL"[label="home"];
+"{6} REF [1909866941284971615]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{7} NOT SUPPORTED YET:
+ #<GLOBAL-VAR
+   :%SOURCE-NAME SB-IMPL::%DEFUN
+   :TYPE #<SB-KERNEL:BUILT-IN-CLASSOID FUNCTION (read-only)>
+   :DEFINED-TYPE #<SB-KERNEL:FUN-TYPE (FUNCTION (T FUNCTION &OPTIONAL T T)
+                                       (VALUES (OR SYMBOL CONS) &OPTIONAL))>
+   :WHERE-FROM :DEFINED
+   :KIND :GLOBAL-FUNCTION {1001D6DA43}>"[label="leaf"];
+"{6} REF [1909866941284971615]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{8} REF [784168789779171862]:
+derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>"[label="next[ctran: INSIDE-BLOCK]"color="blue"];
+"{6} REF [1909866941284971615]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{9} LVAR [2701418418247132151]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL"[label="lvar"];
+"{8} REF [784168789779171862]:
+derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>" -> "{A} CONSTANT [1255380336112371100]:
+value: BAR"[label="leaf"];
+"{8} REF [784168789779171862]:
+derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>" -> "{B} NOT SUPPORTED YET:
+ #<ENCLOSE
+   :FUNS (#<SB-C::CLAMBDA
+            :%SOURCE-NAME BAR
+            :%DEBUG-NAME NIL
+            :KIND NIL
+            :TYPE #<SB-KERNEL:FUN-TYPE (FUNCTION (T T T)
+                                        (VALUES NUMBER &OPTIONAL))>
+            :WHERE-FROM :DEFINED
+            :VARS (B C D) {1002A2D803}>) {1002A2ED73}>"[label="next[ctran: INSIDE-BLOCK]"color="blue"];
+"{8} REF [784168789779171862]:
+derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>" -> "{C} LVAR [2400416095386229337]:
+%derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>
+dynamic-extent: NIL"[label="lvar"];
+"{C} LVAR [2400416095386229337]:
+%derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>
+dynamic-extent: NIL" -> "{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL"[label="dest"color="brown"];
+"{C} LVAR [2400416095386229337]:
+%derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>
+dynamic-extent: NIL" -> "{8} REF [784168789779171862]:
+derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>"[label="uses"];
+"{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL" -> "{9} LVAR [2701418418247132151]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL"[label="fun"];
+"{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL" -> "{C} LVAR [2400416095386229337]:
+%derived-type: #<VALUES-TYPE (VALUES (MEMBER BAR) &OPTIONAL)>
+dynamic-extent: NIL"[label="args[# 0]"];
+"{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL" -> "{E} LVAR [2458505184304471429]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL"[label="args[# 1]"];
+"{9} LVAR [2701418418247132151]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL" -> "{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL"[label="dest"color="brown"];
+"{9} LVAR [2701418418247132151]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL" -> "{6} REF [1909866941284971615]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>"[label="uses"];
+"{E} LVAR [2458505184304471429]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL" -> "{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL"[label="dest"color="brown"];
+"{E} LVAR [2458505184304471429]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL" -> "{F} REF [4329924708167232172]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>"[label="uses"];
+"{F} REF [4329924708167232172]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{10} NOT SUPPORTED YET:
+ #<FUNCTIONAL :%SOURCE-NAME BAR :%DEBUG-NAME NIL {1002BF5203}>"[label="leaf"];
+"{F} REF [4329924708167232172]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{D} COMBINATION [2858390395914678261]:
+kind: FULL
+info: FULL"[label="next[ctran: INSIDE-BLOCK]"color="blue"];
+"{F} REF [4329924708167232172]:
+derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>" -> "{E} LVAR [2458505184304471429]:
+%derived-type: #<VALUES-TYPE (VALUES FUNCTION &OPTIONAL)>
+dynamic-extent: NIL"[label="lvar"];
+}
