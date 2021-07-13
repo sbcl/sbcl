@@ -1722,7 +1722,8 @@
                           (offset (sb-c:sc+offset-offset sc+offset)))
                      (when (>= offset length)
                        (setf locations (adjust-array locations
-                                                     (max (* 2 length) (1+ offset)))
+                                                     (max (* 2 length) (1+ offset))
+                                                     :initial-element nil)
                              (location-group-locations group) locations))
                      (let ((already-there (aref locations offset)))
                        (cond ((null already-there)
