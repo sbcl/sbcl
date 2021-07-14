@@ -1642,6 +1642,17 @@ function to be removed without further warning."
 ;;; macro. CONCATENATE-FORMAT-P returns true, so then we want to know whether the
 ;;; result is a base-string which entails calling SB-KERNEL:SIMPLE-BASE-STRING-P
 ;;; which has no definition in the cross-compiler. (We could add one of course)
+
+;;; Bit array operations are allowed to leave arbitrary values in the
+;;; trailing bits of the result. Examples:
+;;; * (format t "~b~%" (%vector-raw-bits (bit-not #*1001) 0))
+;;;   1111111111111111111111111111111111111111111111111111111111110110
+;;; * (format t "~b~%" (%vector-raw-bits (bit-nor #*1001 #*1010) 0))
+;;;   1111111111111111111111111111111111111111111111111111111111110010
+;;; But because reading is more common than writing, it seems that a better
+;;; technique might be to enforce an invariant that the last word contain 0
+;;; in all unused bits so that EQUAL and SXHASH become far simpler.
+
 (macrolet ((def-bit-array-op (name function)
   `(defun ,name (bit-array-1 bit-array-2 &optional result-bit-array)
      ,(format nil

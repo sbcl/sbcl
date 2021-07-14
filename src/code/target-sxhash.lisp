@@ -199,27 +199,22 @@
            (mix-chunk (word)
              `(setq result (word-mix ,word result)))
            (mix-remaining (word)
-             ;; N-BITS-REMAINING is between 1 inclusive and N-WORD-BITS exclusive
-             (let ((mask
-                    #+little-endian ; if all except 1 bit remain, right-shift by 1, etc
-                    `(ash most-positive-word (- n-bits-remaining sb-vm:n-word-bits))
-                    #+big-endian ; same, except left-shift (modularly)
-                    `(logand most-positive-word
-                             (ash most-positive-word
-                                  (- sb-vm:n-word-bits n-bits-remaining)))))
-               `(setq result (word-mix (logand ,word ,mask) result)))))
+             ;; In the current implementation of bit operations, they may leave random
+             ;; bits in an ignored suffix of bits, hence the need for a masking operation.
+             ;; (See examples above DEF-BIT-ARRAY-OP)
+             ;; N-BITS-REMAINING is between 1 inclusive and N-WORD-BITS exclusive.
+             ;; Produce a mask of 1s spanning the remaining bits, which would be
+             ;; (- n-word-bits n-bits-remaining) and logically AND it with word.
+             ;; The mask is equal mod N-WORD-BITS to (- n-bits-remaining).
+             ;; SHIFT-TOWARDS-START clips the shift count explicitly if the CPU doesn't.
+             `(mix-chunk (logand (shift-towards-start most-positive-word
+                                                      (- n-bits-remaining))
+                                 ,word))))
 (defun %sxhash-simple-bit-vector (x)
   (with-hash (result (length (truly-the simple-bit-vector x)))
     (multiple-value-bind (n-full-words n-bits-remaining) (floor (length x) sb-vm:n-word-bits)
       (dotimes (i n-full-words) (mix-chunk (%vector-raw-bits x i)))
       (when (plusp n-bits-remaining)
-        ;; FIXME: Do we really have to mask off bits of the final word?
-        ;; I don't think so, given that remaining bits are invariantly zero.
-        ;; Maybe this has to do with stack-allocated vectors?
-        ;; Either that, or it anticipates a change wherein we do not always
-        ;; prezero unboxed vectors unless :INITIAL-ELEMENT was specified.
-        ;; (i.e. you'd get random bytes, and so the only known good bits/bytes
-        ;; would appear where you had performed a SETF on them)
         (mix-remaining (%vector-raw-bits x n-full-words))))
     (logand result sb-xc:most-positive-fixnum)))
 (defun %sxhash-bit-vector (bit-vector)
