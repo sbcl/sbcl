@@ -734,21 +734,18 @@
                       ((= index1 end1))
                     (declare (fixnum index1 index2))
                     ,@body)))
-      (cond ((= tag1 tag2 sb-vm:simple-vector-widetag)
-             (copy
-              (setf (svref vector1 index1) (svref vector2 index2))))
-            ;; TODO: can do the same with small specialized arrays
-            ((and (= tag1 tag2)
-                  (word-specialized-vector-tag-p tag1))
-             (copy
-              (setf (%vector-raw-bits vector1 index1)
-                    (%vector-raw-bits vector2 index2))))
-            (t
-             (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
-                   (setter (the function (svref %%data-vector-setters%% tag1))))
-               (copy
-                (funcall setter vector1 index1
-                         (funcall getter vector2 index2))))))))
+      (when (= tag1 tag2)
+        (when (= tag1 sb-vm:simple-vector-widetag)
+          (copy (setf (svref vector1 index1) (svref vector2 index2)))
+          (return-from vector-replace vector1))
+        (let ((copier (sb-vm::blt-copier-for-widetag tag1)))
+          (when (functionp copier)
+            ;; VECTOR1 = destination, VECTOR2 = source, but copier wants FROM, TO
+            (funcall copier vector2 start2 vector1 start1 (- end1 start1))
+            (return-from vector-replace vector1))))
+      (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
+            (setter (the function (svref %%data-vector-setters%% tag1))))
+        (copy (funcall setter vector1 index1 (funcall getter vector2 index2))))))
   vector1)
 
 ;;; If we are copying around in the same vector, be careful not to copy the

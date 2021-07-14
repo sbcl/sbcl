@@ -733,6 +733,17 @@ of specialized arrays is supported."
                ,@decls
                (tagbody ,@forms))))))))
 
+;;; We need this constant to be dumped in such a way that genesis can directly
+;;; compute the symbol-value in cold load, and not defer the reference until
+;;; *!cold-toplevels* are evaluated. That's because GROW-HASH-TABLE calls REPLACE
+;;; which calls VECTOR-REPLACE which tries to reference the array of functions,
+;;; which had better not be deferred, or all hell breaks loose. It's actually
+;;; tricky to call any function in any file that has its toplevel forms evaluated
+;;; later than the current file, because you don't generally know whether code
+;;; blobs in that other file have had their L-T-V fixups patched in.
+(defconstant-eqx +blt-copier-for-widetag+ #.(make-array 32 :initial-element nil)
+  #'equalp)
+
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
            (define (accessor-name slow-accessor-name accessor-getter
@@ -844,6 +855,7 @@ of specialized arrays is supported."
                         collect `(setf (svref ,symbol ,widetag)
                                        (,deffer ,saetp ,check-form))))))
   (defun !hairy-data-vector-reffer-init ()
+    (!blt-copiers-cold-init +blt-copier-for-widetag+)
     (define-reffers %%data-vector-reffers%% define-reffer
       (progn)
       #'slow-hairy-data-vector-ref)
@@ -1163,33 +1175,19 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-;;; Widetags of FROM and TO should be equal
-(defun copy-vector-data (from to start end n-bits-shift)
-  (declare (vector from to)
-           (index start end)
-           ((integer 0 7) n-bits-shift))
-  (let ((from-length (length from)))
-    (cond ((simple-vector-p from)
-           (replace (truly-the simple-vector to)
-                    (truly-the simple-vector from)
-                    :start2 start :end2 end))
-          ;; Vector sizes are double-word aligned and have zeros in
-          ;; the extra word so it's safe to copy when the boundaries
-          ;; are matching the whole vector.
-          ;; A more generic routine is left for another time, even if
-          ;; only handling aligned data since it will avoid consing
-          ;; floats or word bignums.
-          ((and (= start 0)
-                (= end from-length))
-           (loop for i below (vector-length-in-words from-length n-bits-shift)
-                 do (setf
-                     (%vector-raw-bits to i)
-                     (%vector-raw-bits from i))))
-          (t
-           (replace to
-                    from
-                    :start2 start :end2 end)))
-    to))
+(defun !blt-copiers-cold-init (array)
+  (macrolet ((init ()
+               `(progn
+                  ,@(loop for saetp across *specialized-array-element-type-properties*
+                          when (and (not (member (saetp-specifier saetp) '(t nil)))
+                                    (<= (saetp-n-bits saetp) n-word-bits))
+                            collect `(setf (svref array ,(ash (- (saetp-typecode saetp) 128) -2))
+                                           #',(intern (format nil "UB~D-BASH-COPY"
+                                                              (saetp-n-bits saetp))
+                                                      "SB-KERNEL"))))))
+      (init)))
+
+(defmacro blt-copier-for-widetag (x) `(aref +blt-copier-for-widetag+ (ash (- ,x 128) -2)))
 
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
@@ -1207,10 +1205,18 @@ of specialized arrays is supported."
       (let* ((widetag (%other-pointer-widetag old-data))
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
-              ;; vector is partially poisoned, which we can't represent
+              ;; FIXME: mark prefix of shadow bits assigned, suffix unassigned
               (allocate-vector-with-widetag #+ubsan nil
                                             widetag new-length n-bits-shift)))
-        (copy-vector-data old-data new-data old-start old-end n-bits-shift)
+        ;; Copy the data
+        (if (= widetag simple-vector-widetag) ; the most common case
+            (replace (truly-the simple-vector new-data) ; transformed
+                     (truly-the simple-vector old-data)
+                     :start2 old-start :end2 old-end)
+            (let ((copier (blt-copier-for-widetag widetag)))
+              (if (functionp copier)
+                  (funcall copier old-data old-start new-data 0 old-length)
+                  (replace new-data old-data :start2 old-start :end2 old-end))))
         (setf (%array-data vector) new-data
               (%array-available-elements vector) new-length
               (%array-fill-pointer vector) fill-pointer
