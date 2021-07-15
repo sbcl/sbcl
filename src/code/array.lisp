@@ -1303,50 +1303,54 @@ of specialized arrays is supported."
         (check-make-array-initargs t element-type new-total-size))
        (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag)))
 
-    (when displaced-to ; super easy - just repoint ARRAY to new data
-      (return-from adjust-array
-        (if (adjustable-array-p array)
-            (set-array-header array displaced-to new-total-size new-fill-pointer
-                              displaced-index-offset dimensions t nil)
-            (%make-array dimensions widetag n-bits-shift
-                         :displaced-to displaced-to
-                         :displaced-index-offset displaced-index-offset))))
-
-    (cond (contents-p
-             ;; array former contents replaced by INITIAL-CONTENTS
-           (let* ((array-data (data-vector-from-inits dimensions new-total-size widetag n-bits-shift
-                                                      initialize initial-data)))
-             (cond ((adjustable-array-p array)
-                    (set-array-header array array-data new-total-size new-fill-pointer
-                                      0 dimensions nil nil))
-                   ((array-header-p array)
-                    ;; simple multidimensional or single dimensional array
-                    (%make-array dimensions widetag n-bits-shift
-                                 :initial-contents initial-contents))
-                   (t
-                    array-data))))
-          ((= rank 1)
-             (let ((old-length (array-total-size array))
-                   new-data)
-               (with-array-data ((old-data array) (old-start) (old-end old-length))
-                 (cond ((or (and (array-header-p array)
-                                 (%array-displaced-p array))
-                            (< old-length new-total-size))
-                        (setf new-data
-                              (data-vector-from-inits dimensions new-total-size widetag
-                                                      n-bits-shift initialize initial-data))
-                        ;; Provide :END1 to avoid full call to LENGTH
-                        ;; inside REPLACE.
-                        (replace new-data old-data
-                                 :end1 new-total-size
-                                 :start2 old-start :end2 old-end))
-                       (t (setf new-data
-                                (shrink-vector old-data new-total-size))))
-                 (if (adjustable-array-p array)
-                     (set-array-header array new-data new-total-size new-fill-pointer
-                                       0 dimensions nil nil)
-                     new-data))))
-          (t
+    (cond
+      (displaced-to ; super easy - just repoint ARRAY to new data
+       (if (adjustable-array-p array)
+           (set-array-header array displaced-to new-total-size new-fill-pointer
+                             displaced-index-offset dimensions t nil)
+           (%make-array dimensions widetag n-bits-shift
+                        :displaced-to displaced-to
+                        :displaced-index-offset displaced-index-offset)))
+      (contents-p ; array former contents replaced by INITIAL-CONTENTS
+       (let ((array-data (data-vector-from-inits dimensions new-total-size widetag n-bits-shift
+                                                 initialize initial-data)))
+         (cond ((adjustable-array-p array)
+                (set-array-header array array-data new-total-size new-fill-pointer
+                                  0 dimensions nil nil))
+               ((array-header-p array)
+                ;; simple multidimensional array.
+                ;; fill-pointer vectors satisfy ADJUSTABLE-ARRAY-P (in SBCL, that is)
+                ;; and therefore are handled by the first stanza of the cond.
+                (%make-array dimensions widetag n-bits-shift
+                             :initial-contents initial-contents))
+               (t
+                array-data))))
+      ((= rank 1)
+       (let ((old-length (array-total-size array)))
+         ;; Because ADJUST-ARRAY has to ignore any fill-pointer when
+         ;; copying from the old data, we can't just pass ARRAY as the
+         ;; second argument of REPLACE.
+         (with-array-data ((old-data array) (old-start) (old-end old-length))
+           (let ((new-data
+                  (if (and (= new-total-size old-length)
+                           (not (and (array-header-p array) (%array-displaced-p array))))
+                      ;; if total size is unchanged, and it was not a displaced array,
+                      ;; then this array owns the data and can retain it.
+                      old-data
+                      (let ((data (allocate-vector-with-widetag #+ubsan t
+                                                                widetag new-total-size
+                                                                n-bits-shift)))
+                        (replace data old-data
+                                 :start1 0 :end1 new-total-size
+                                 :start2 old-start :end2 old-end)
+                        (when (and element-p (> new-total-size old-length))
+                          (fill data initial-element :start old-length))
+                        data))))
+             (if (adjustable-array-p array)
+                 (set-array-header array new-data new-total-size new-fill-pointer
+                                   0 dimensions nil nil)
+                 new-data)))))
+      (t
            (let ((old-total-size (%array-available-elements array)))
              (with-array-data ((old-data array) (old-start) (old-end old-total-size))
                (declare (ignore old-end))

@@ -233,9 +233,11 @@
     (() 4 :test (lambda (values expected)
                   (= (length (first values)) (first expected))))))
 
+;;; I have no idea how this is testing adjust-array with an initial-element !
 (with-test (:name (make-array adjust-array :initial-element))
   (let ((x (make-array nil :initial-element 'foo)))
-    (adjust-array x nil)
+    ;; make the result look used
+    (opaque-identity (adjust-array x nil))
     (assert (eql (aref x) 'foo))))
 
 ;;; BUG 315: "no bounds check for access to displaced array"
@@ -303,7 +305,8 @@
               (handler-case
                   (let ((array (make-array 12)))
                     (assert (not (array-has-fill-pointer-p array)))
-                    (adjust-array array 12 :fill-pointer t)
+                    ;; make the result look used
+                    (opaque-identity (adjust-array array 12 :fill-pointer t))
                     array)
                 (type-error ()
                   :good)))))
@@ -659,3 +662,11 @@
 
 (with-test (:name :displaced-index-offset-disallow-nil)
   (assert-error (eval '(make-array 4 :displaced-index-offset nil))))
+
+(with-test (:name :adjust-array-copies-above-fill-pointer)
+  (let ((a (make-array 4 :fill-pointer 2 :initial-contents '(a b c d))))
+    (let ((b (adjust-array a 6 :initial-element 'e)))
+      (assert (eq (aref b 2) 'c))
+      (assert (eq (aref b 3) 'd))
+      (assert (eq (aref b 4) 'e))
+      (assert (eq (aref b 5) 'e)))))
