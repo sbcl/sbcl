@@ -3112,3 +3112,19 @@
    "(lambda () (entry-info-type-func))"
    :load t))
 
+(with-test (:name :block-inline-then-notinline)
+  (ctu:file-compile
+   `((in-package :cl-user)
+     (declaim (inline block-inline-foo))
+     (defun block-inline-foo (a b)
+       (+ a b))
+     (defun bar-with-foo-inline (a b c)
+       (* c (block-inline-foo a b)))
+
+     (declaim (notinline block-inline-foo))
+     (defun bar-with-foo-call (a b c)
+       (* c (block-inline-foo a b))))
+   :block-compile t
+   :load t)
+  (assert (not (ctu:find-named-callees (symbol-function 'bar-with-foo-inline))))
+  (assert (ctu:find-named-callees (symbol-function 'bar-with-foo-call))))

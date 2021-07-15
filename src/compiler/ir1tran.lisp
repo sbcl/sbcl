@@ -265,7 +265,17 @@
   (or (let ((old-free-fun (gethash name free-funs)))
         (when old-free-fun
           (clear-invalid-functionals old-free-fun)
-          old-free-fun))
+          (when (or (not (defined-fun-p old-free-fun))
+                    (not (block-compile *compilation*))
+                    ;; When block-compiling, it is the case that we
+                    ;; could proclaim an inline, define some things,
+                    ;; then proclaim a notinline, and in the case that
+                    ;; the function's :inlinep info changes, the
+                    ;; old-free-fun is stale and we should make a new
+                    ;; one.
+                    (eq (info :function :inlinep name)
+                        (defined-fun-inlinep old-free-fun)))
+            old-free-fun)))
       (let ((kind (info :function :kind name)))
         (ecase kind
           ((:macro :special-form)
