@@ -427,7 +427,7 @@
   ;; There was a comment implying that this should be TYPE-ERROR
   ;; but I don't see that as a spec requirement.
   `(error "Can't supply a value for :FILL-POINTER (~S) that is larger ~
-           than the~A size of the vector (~S)" ,actual ,max ,adjective))
+           than the~A size of the vector (~S)" ,actual ,adjective ,max))
 
 (declaim (inline %save-displaced-array-backpointer))
 (defun %save-displaced-array-backpointer (array data)
