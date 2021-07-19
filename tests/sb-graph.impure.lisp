@@ -1,4 +1,6 @@
 (require 'sb-graph)
+(require 'sb-posix)
+(require 'uiop)
 
 ;;; These are tests for the sb-graph contrib module. Due to the nature
 ;;; of the features creating a bunch of files, I relocated the tests
@@ -8,14 +10,21 @@
   `(compile-forms-as-file-with-tracing ',forms))
 (defun compile-forms-as-file-with-tracing (forms)
   (declare (type list forms))
-  (with-scratch-file (lisp "lisp")
-    (with-open-file (f lisp :direction :output)
-      (dolist (form forms)
-        (prin1 form f)))
-    (let* ((fasl (scratch-file-name "fasl"))
-           (trace (scratch-file-name "trace"))
-           (res (progn (compile-file lisp :output-file fasl :trace-file trace) t)))
-      fasl)))
+  (let* ((sb-c::*compile-trace-targets* (cons :sb-graph sb-c::*compile-trace-targets*))
+         (dir (pathname (concatenate 'string (scratch-file-name) "/"))))
+    (sb-posix:mkdir dir #b111111111)
+    (let ((lisp (merge-pathnames (pathname-name (pathname (scratch-file-name "lisp")))
+                                 dir))
+          (trace (merge-pathnames (pathname-name (pathname (scratch-file-name "trace")))
+                                  dir))
+          (fasl (merge-pathnames (pathname-name (pathname (scratch-file-name "fasl")))
+                                 dir)))
+      (with-open-file (f lisp :direction :output)
+        (dolist (form forms)
+          (prin1 form f)))
+      (let ((res (progn (compile-file lisp :output-file fasl :trace-file trace) t)))
+        (uiop:delete-directory-tree (pathname dir) :validate t)
+        res))))
 
 (with-test (:name :compile-some-forms-with-graphing
             :skipped-on (:not :sb-devel))

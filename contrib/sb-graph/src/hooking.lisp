@@ -56,7 +56,8 @@
 
 (hook sb-c::ir2-convert (component)
   (disable-hook sb-c::ir2-convert)
-  (when (streamp sb-c::*compiler-trace-output*)
+  (when (and (streamp sb-c::*compiler-trace-output*)
+             (find :sb-graph sb-c::*compile-trace-targets*))
     (let* ((pn (pathname sb-c::*compiler-trace-output*))
            (out-pn (make-pathname
                     :host (pathname-host pn)
@@ -69,7 +70,9 @@
                                               (cond
                                                 ((symbolp cn) (symbol-name cn))
                                                 ((stringp cn) cn)
-                                                ((listp cn) (format nil "~{~a~}" cn))
+                                                ((listp cn) (if (eq (car cn) 'top-level-form)
+                                                                "TOP-LEVEL-FORM"
+                                                                (format nil "~{~a~}" cn)))
                                                 (t "")))
                                           when (or (alpha-char-p char)
                                                    (digit-char-p char)

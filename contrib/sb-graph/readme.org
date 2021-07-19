@@ -14,14 +14,16 @@
 
    Because of the way it hooks in the compiler, you shouldn't actually
    have to do anything after loading it except turning on trace output
-   of the compiler (SBCL). This can be done by calling ~(compile-file
-   "file" :trace-file t)~. After compilation is done, alongside the
-   normal trace file, SBCL is hooked into writing a series of .dot
-   files, which contain the graphviz DOT representation of all the
-   components compiled. If you set ~*compile-progress*~ to ~T~, it
-   will print out progress information, and will tell you when and
-   where it writes out the graphviz files.
-
+   of the compiler (SBCL), and adding ~:sb-graph~ to
+   ~sb-c::*compile-trace-targets*~. Turning on the tracing can be done
+   by calling ~(compile-file "file" :trace-file t)~, and adding
+   ~:sb-graph~ to ~sb-c::*compile-trace-targets*~ can be done however
+   you want. After compilation is done, alongside the normal trace
+   file, SBCL is hooked into writing a series of .dot files, which
+   contain the graphviz DOT representation of all the components
+   compiled. If you set ~*compile-progress*~ to ~T~, it will print out
+   progress information, and will tell you when and where it writes
+   out the graphviz files.
 
 ** How do I use the system interactively?
    If you ran into a compiler error, and want to graph the
