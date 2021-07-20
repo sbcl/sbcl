@@ -190,6 +190,9 @@
               (hash (word-mix (length x) widetag)))
          (declare (word hash))
          (dotimes (i n-data-words (logand hash most-positive-fixnum))
+           ;; FIXME: the last word of {1,2,4}-bit-per-element vectors
+           ;; needs to be masked. At worst, this fails to coalesce
+           ;; similar vectors, so it's not fatal.
            (setq hash (word-mix hash (%vector-raw-bits x i))))))
       (character (char-code x))
       (t 0))))

@@ -161,3 +161,37 @@
           for i from 0
           do (setf (sb-sys:sap-ref-8 addr i) byte))
     (sb-disassem:disassemble-memory addr 7 :stream (make-broadcast-stream))))
+
+;;; Assert that %SHRINK-VECTOR clears the inaccessible tail of {1,2,4}-bit-per-element
+;;; vectors.
+;;; This would not bother GC on little-endian machines too much, but it could
+;;; have been bad for big-endian. Consider the final word of a simple-bit-vector
+;;; where that word is all 1s but has only 1 relevant bit (using a 32-bit word):
+;;;   FFFFFFFF
+;;;   ^------- FILL can touch the leftmost bit and only that.
+;;; So after the FILL it would be
+;;;   7FFFFFFF
+;;; which is the putative header word of some object that physicaly abuts
+;;; the end of the shrunken vector. This value is not a valid header or cons.
+;;; Little-endian would clear bits in other other direction,
+;;; so in the same scenario the word would be
+;;;   FFFFFFFE
+;;; which is an "other immediate" value, so it's not harmful.
+(with-test (:name :%shrink-bit-vector)
+  (let* ((nwords 4)
+         (old-size (1+ (* nwords sb-vm:n-word-bits)))
+         (bv1 (make-array old-size :element-type 'bit :initial-element 1))
+         (bv2 (make-array old-size :element-type 'bit :initial-element 0))
+         (bv3 (bit-nor bv1 bv2)))
+    (fill bv3 1)
+    ;; All words of BV3 have have all bits on, even though only 1 bit of
+    ;; the final word is relevant.
+    (sb-sys:with-pinned-objects (bv3)
+      (dotimes (i (1+ nwords))
+        (assert (= (sb-kernel:%vector-raw-bits bv3 i) sb-ext:most-positive-word))))
+    ;; (sb-vm:hexdump bv3 8)
+    ;; This call to %shrink-vector would zeroize indices 30 through (1- old-size)
+    ;; while leaving the inaccessible bits of word index 4 containing nonzero values.
+    (sb-vm::%shrink-vector bv3 30)
+    ;; Word index 4 should be entirely zero
+    (assert (= (sb-kernel:%vector-raw-bits bv3 nwords) 0))))

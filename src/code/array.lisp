@@ -1381,36 +1381,45 @@ of specialized arrays is supported."
 ;;; dangerous to do so: shrinking the size of an object (as viewed by
 ;;; the gc) makes bounds checking unreliable in the face of interrupts
 ;;; or multi-threading. Call it only on provably local vectors.
-(defun %shrink-vector (vector new-length)
+;;; FIXME: while this is a correct approach, there is a better way- rather than
+;;; turning the suffix into a sequence of (0 . 0) conses, we can make it into
+;;; a vector of SB-VM:WORD by writing a length and header (in that order).
+;;; A minor complication is with SIMPLE-BASE-STRING and its implicit null.
+;;; i.e. it may be necessary to zeroize one byte (or word) that is not currently zero,
+;;; and then skip a word (or two) to begin the next physical object.
+(defun %shrink-vector (vector new-length &aux (old-length (length vector)))
   (declare (vector vector))
   (unless (array-header-p vector)
-    (macrolet ((frob (name &rest things)
-                 `(etypecase ,name
-                    ((simple-array nil (*)) (error 'nil-array-accessed-error))
-                    ,@(mapcar (lambda (thing)
-                                (destructuring-bind (type-spec fill-value)
-                                    thing
-                                  `(,type-spec
-                                    (fill (truly-the ,type-spec ,name)
-                                          ,fill-value
-                                          :start new-length))))
-                              things))))
-      ;; Set the 'tail' of the vector to the appropriate type of zero,
-      ;; "because in some cases we'll scavenge larger areas in one go,
-      ;; like groups of pages that had triggered the write barrier, or
-      ;; the whole static space" according to jsnell.
-      #.`(frob vector
-          ,@(map 'list
-                 (lambda (saetp)
-                   `((simple-array ,(saetp-specifier saetp) (*))
-                     ,(if (or (eq (saetp-specifier saetp) 'character)
-                              #+sb-unicode
-                              (eq (saetp-specifier saetp) 'base-char))
-                          '(code-char 0)
-                          (saetp-initial-element-default saetp))))
-                 (remove-if-not
-                  #'saetp-specifier
-                  *specialized-array-element-type-properties*)))))
+    ;; Zero out the 'tail' of the vector so that GC doesn't croak on random bytes.
+    (typecase vector
+      (simple-vector (fill vector 0 :start new-length))
+      ((simple-array nil (*)) nil) ; no payload: do nothing
+      (t
+       (multiple-value-bind (start-byte count)
+           (let ((bits-per-elt (ash 1 (aref %%simple-array-n-bits-shifts%%
+                                            (%other-pointer-widetag vector)))))
+             (if (>= bits-per-elt 8)
+                 (let ((bytes-per-elt (/ bits-per-elt 8)))
+                   (values (* new-length bytes-per-elt)
+                           ;; I think we can assume that any "hidden" word is zero.
+                           (* (- old-length new-length) bytes-per-elt)))
+                 ;; When fewer than 8 bits per element, carefully zeroize words beyond the final
+                 ;; word at the new length. There was a bug resulting in that not happening,
+                 ;; because FILL affects only the in-bounds elements from the new (smaller)
+                 ;; length to the old (larger) length, not figuring that bits beyond the old
+                 ;; logical length up to the physical length have no requirement to be zero.
+                 ;; See the %shrink-bit-vector test in bit-vector.impure.
+                 (let* ((elts-per-word (/ n-word-bits bits-per-elt))
+                        (old-word-index (floor (1- old-length) elts-per-word))
+                        (new-word-index (floor (1- new-length) elts-per-word)))
+                   (if (> old-word-index new-word-index)
+                       (values (* (1+ new-word-index) n-word-bytes)
+                               (* (- old-word-index new-word-index) n-word-bytes))
+                       (values 0 0)))))
+         (with-alien ((memset (function void system-area-pointer unsigned unsigned)
+                              :extern))
+           (with-pinned-objects (vector)
+             (alien-funcall memset (sap+ (vector-sap vector) start-byte) 0 count)))))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)
