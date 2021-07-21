@@ -3128,3 +3128,16 @@
    :load t)
   (assert (not (ctu:find-named-callees (symbol-function 'bar-with-foo-inline))))
   (assert (ctu:find-named-callees (symbol-function 'bar-with-foo-call))))
+
+(with-test (:name :block-defpackage-then-load-fasl)
+  (ctu:file-compile
+   `((defpackage block-defpackage (:use :cl :cl-user))
+
+     (in-package :block-defpackage)
+
+     (defstruct (struct-foo (:conc-name "FOO-"))
+       (bar 0 :type number)
+       (baz nil :type list)))
+   :block-compile t
+   :before-load (lambda () (delete-package :block-defpackage))
+   :load t))

@@ -1037,13 +1037,16 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (and #-sb-xc-host
-               (policy *policy*
-                   ;; FOP-compiled code is harder to debug.
-                   (or (< debug 2)
-                       (> space debug)))
-               (not (eq (block-compile *compilation*) t))
-               (fopcompilable-p form expand))
+      (if (or (and (eq (block-compile *compilation*) t)
+                   (listp form)
+                   (eq (car form) 'sb-impl::%defpackage))
+              (and #-sb-xc-host
+                   (policy *policy*
+                       ;; FOP-compiled code is harder to debug.
+                       (or (< debug 2)
+                           (> space debug)))
+                   (not (eq (block-compile *compilation*) t))
+                   (fopcompilable-p form expand)))
           (let ((*fopcompile-label-counter* 0))
             (fopcompile form path nil expand))
           (let ((*lexenv* (make-lexenv
