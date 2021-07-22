@@ -176,7 +176,7 @@
   result)
 
 ;;; Check for potentially bad format-control strings
-(defun !scan-format-control-strings ()
+(defun scan-format-control-strings ()
   (labels ((possibly-ungood-package-reference (string)
              ;; We want to see nothing SB-package-like at all
              (or (search "sb-" string :test #'char-equal)
@@ -210,12 +210,6 @@
 Please check that all strings which were not recognizable to the compiler
 (as the first argument to WARN, etc.) are wrapped in SB-FORMAT:TOKENS"))
       wps)))
-
-(progn
-  ;; See the giant comment at the bottom of this file
-  ;; concerning the need for this GC.
-  (gc :full t)
-  (!scan-format-control-strings))
 
 ;;; Either set some more package docstrings, or remove any and all docstrings
 ;;; that snuck in (as can happen with any file compiled in warm load)
@@ -474,6 +468,8 @@ Please check that all strings which were not recognizable to the compiler
     (format t "~28t (~5@d) |       (~5@d) = (~d)~%"
             sum-delta-ext sum-delta-int
             (+ sum-delta-ext sum-delta-int))))
+
+(scan-format-control-strings)
 
 ;;; Lock internal packages
 #-(and sb-devel
