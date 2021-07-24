@@ -29,12 +29,14 @@
 (with-test (:name :compile-some-forms-with-graphing
             :skipped-on (:not :sb-devel))
   (with-graph
-      (defpackage :sb-graph
+      (defpackage :sb-graph-test
         (:shadow :stream)
         (:use :cl :cl-user)
         (:export :hook :disable-hook :enable-hook :unhook :hook-enabled
          :make-graph :make-and-dfs :save-graph :graph :render-graph :expand-codename
          :interactively-graph :output :expand :dfs-add))
+
+    (in-package :sb-graph-test)
 
     (defmacro hook (fun lambda-list &body body)
       (let ((ll (gensym))
