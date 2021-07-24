@@ -62,6 +62,7 @@
   "tests/data/compile-file-pos-utf16be.lisp")
  ("redblack.pure.lisp" "tests/bbtree-test-util.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
+ ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")
  ("signals.impure.lisp" "contrib/sb-posix.fasl")
  ("stream.impure.lisp" "contrib/sb-posix.fasl")
  ("sprof.impure.lisp" "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
