@@ -366,13 +366,14 @@
   (let* ((value (* 4 value))
          (seg (dstate-segment dstate))
          (code (seg-code seg)))
-    (or (and code
-             (note-code-constant (sb-disassem::segment-offs-to-code-offs
-                                  (+ (dstate-cur-offs dstate) value) seg)
-                                 dstate))
-        (let* ((addr (+ (dstate-cur-addr dstate) value))
-               (value (sap-ref-word (int-sap addr) 0)))
-          (maybe-note-assembler-routine value nil dstate)))))
+    (when code
+      (or (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                               (+ (dstate-cur-offs dstate) value) seg)
+                              dstate)
+          (let ((addr (+ (dstate-cur-addr dstate) value)))
+            (and (sb-disassem::points-to-code-constant-p addr code)
+                 (maybe-note-assembler-routine (sap-ref-word (int-sap addr) 0)
+                                               nil dstate)))))))
 
 ;;;; special magic to support decoding internal-error and related traps
 (defun snarf-error-junk (sap offset trap-number &optional length-only)
