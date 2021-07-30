@@ -8,7 +8,7 @@
   :serial t
   :components ((:file "gmp"))
   :perform (load-op :after (o c) (provide 'sb-gmp))
-  :in-order-to ((test (test-op "sb-gmp/tests"))))
+  :in-order-to ((test-op (test-op "sb-gmp/tests"))))
 
 (defsystem "sb-gmp/tests"
   :depends-on ("sb-rt" "sb-gmp")
