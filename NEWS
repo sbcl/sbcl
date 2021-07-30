@@ -18,8 +18,6 @@ changes in sbcl-2.1.7 relative to sbcl-2.1.6:
     ** make the disassembler annotations slightly more robust on arm64.
     ** release space back to the Operating System on Windows.
     ** improve the test for whether pages need to be committed on Windows.
-    ** fix a bug in the use of the VPCMPEQD opcode on x86-64.  (lp#1928516,
-       thanks to Marco Heisig)
   * optimization: the type of (LOOP ... COLLECT ...), and the type of COLLECT
     INTO variables, is derived as LIST.  (lp#1934577, reported by SATO
     shinichi)
@@ -54,7 +52,7 @@ changes in sbcl-2.1.5 relative to sbcl-2.1.4:
        addresses.  (lp#1925808, reported by Shinmera on #sbcl, thanks also to
        3b)
     ** bug fix: on x86-64, loading all-1s into an AVX2 register no longer
-       causes an error.  (thanks to Marco Heisig)
+       causes an error.  (lp#1928516, thanks to Marco Heisig)
     ** bug fix: on arm64, improve disassembly of ADD with constant 0 as MOV
     ** enhancement: on arm64, support debugger commands RETURN-FROM-FRAME and
        RESTART-FRAME more efficiently.
