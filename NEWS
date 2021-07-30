@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.6:
+changes in sbcl-2.1.7 relative to sbcl-2.1.6:
   * incompatible change: on certain platforms (currently just x86-64),
     dynamic-extent arrays specialized on character and numeric types and
     created without either :INITIAL-ELEMENT or :INITIAL-CONTENTS will reflect
