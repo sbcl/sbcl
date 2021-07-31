@@ -723,6 +723,10 @@
 
 ;;;; REPLACE
 (defun vector-replace (vector1 vector2 start1 start2 end1 diff)
+  ;; FIXME: this argument convention is bad in (at least) two ways:
+  ;; - Callers should not be permitted to specify -1 as any of the bounds.
+  ;; - This function should take a COUNT, not END1 to delimit the copy.
+  ;; But I guess we have to deal with -1 since historically it worked.
   (declare ((or (eql -1) index) start1 start2 end1)
            (optimize (sb-c::insert-array-bounds-checks 0))
            ((integer -1 1) diff))
@@ -741,7 +745,10 @@
         (let ((copier (sb-vm::blt-copier-for-widetag tag1)))
           (when (functionp copier)
             ;; VECTOR1 = destination, VECTOR2 = source, but copier wants FROM, TO
-            (funcall copier vector2 start2 vector1 start1 (- end1 start1))
+            (let ((count (- end1 start1)))
+              ;; The bounds have to be valid if count is nonzero.
+              (unless (eql count 0)
+                (funcall copier vector2 start2 vector1 start1 count)))
             (return-from vector-replace vector1))))
       (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
             (setter (the function (svref %%data-vector-setters%% tag1))))
