@@ -285,7 +285,7 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         }
     }
 #else
-    if (gc_managed_addr_p(pc) && component_ptr_from_pc((void*)pc)) {
+    if (gc_managed_heap_space_p(pc) && component_ptr_from_pc((void*)pc)) {
         // If the PC was in lisp code, then the frame register is probably correct,
         // and so it's probably the case that 'frame->saved_lra' is a tagged PC
         // in the caller. Unfortunately it is not 100% reliable in a signal handler,

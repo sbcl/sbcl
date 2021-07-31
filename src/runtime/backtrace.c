@@ -606,7 +606,7 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
 static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
 {
   struct code* code;
-  if (gc_managed_addr_p((uword_t)pc) &&
+  if (gc_managed_heap_space_p((uword_t)pc) &&
       (code = (void*)component_ptr_from_pc(pc)) != 0) {
       struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
       if (df) {
