@@ -442,60 +442,90 @@
 ;;;; bignum operations
 
 (defknown %allocate-bignum (bignum-length) bignum
-  (flushable))
+  (flushable always-translatable))
 
 (defknown %bignum-length (bignum) bignum-length
-  (foldable flushable))
+  (foldable flushable always-translatable))
 
+;;; Change the length of bignum to be newlen. Newlen must be the same or
+;;; smaller than the old length, and any elements beyond newlen must be zeroed.
+;;; FIXME: should not return a value
 (defknown %bignum-set-length (bignum bignum-length) bignum
-  ())
+  (always-translatable))
 
 (defknown %bignum-ref (bignum bignum-index) bignum-element-type
-  (flushable))
+  (flushable always-translatable))
 #+(or x86 x86-64)
 (defknown %bignum-ref-with-offset (bignum fixnum (signed-byte 24))
   bignum-element-type (flushable always-translatable))
 
-(defknown %bignum-set (bignum bignum-index bignum-element-type) (values) ())
+(defknown %bignum-set (bignum bignum-index bignum-element-type) (values)
+  (always-translatable))
 
+;;; Return T if digit is positive, or NIL if negative.
 (defknown %digit-0-or-plusp (bignum-element-type) boolean
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
+;;; %ADD-WITH-CARRY returns a bignum digit and a carry resulting from adding
+;;; together a, b, and an incoming carry.
+;;; %SUBTRACT-WITH-BOROW returns a bignum digit and a borrow resulting from
+;;; subtracting b from a, and subtracting a possible incoming borrow.
 (defknown (%add-with-carry %subtract-with-borrow)
           (bignum-element-type bignum-element-type (mod 2))
   (values bignum-element-type (mod 2))
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
+;;; This multiplies x-digit and y-digit, producing high and low digits
+;;; manifesting the result. Then it adds the low digit, res-digit, and
+;;; carry-in-digit. Any carries (note, you still have to add two digits
+;;; at a time possibly producing two carries) from adding these three
+;;; digits get added to the high digit from the multiply, producing the
+;;; next carry digit.  Res-digit is optional since two uses of this
+;;; primitive multiplies a single digit bignum by a multiple digit
+;;; bignum, and in this situation there is no need for a result buffer
+;;; accumulating partial results which is where the res-digit comes
+;;; from.
 (defknown %multiply-and-add
           (bignum-element-type bignum-element-type bignum-element-type
                                &optional bignum-element-type)
   (values bignum-element-type bignum-element-type)
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
+;;; Multiply two digit-size numbers, returning a 2*digit-size result
+;;; split into two digit-size quantities.
 (defknown %multiply (bignum-element-type bignum-element-type)
   (values bignum-element-type bignum-element-type)
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
 (defknown %lognot (bignum-element-type) bignum-element-type
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
 (defknown (%logand %logior %logxor) (bignum-element-type bignum-element-type)
   bignum-element-type
   (foldable flushable movable))
 
 (defknown %fixnum-to-digit (fixnum) bignum-element-type
-  (foldable flushable movable))
+  (foldable flushable movable #-(or arm arm64) always-translatable))
 
+;;; This takes three digits and returns the FLOOR'ed result of
+;;; dividing the first two as a 2*digit-size integer by the third.
 (defknown %bigfloor (bignum-element-type bignum-element-type bignum-element-type)
   (values bignum-element-type bignum-element-type)
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
+;;; Convert the input, a BIGNUM-ELEMENT-TYPE, to a signed word.
+;;; FIXME: considering that both the input and output have N-WORD-BITS significant bits,
+;;; this is really a bad name for the operation.
 (defknown %fixnum-digit-with-correct-sign (bignum-element-type) sb-vm:signed-word
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
+;;; %ASHR- take a digit-size quantity and shift it to the left,
+;;; returning a digit-size quantity.
+;;; %ASHR- Do an arithmetic shift right of data even though bignum-element-type is
+;;; unsigned.
 (defknown (%ashl %ashr %digit-logical-shift-right)
           (bignum-element-type (mod #.sb-vm:n-word-bits)) bignum-element-type
-  (foldable flushable movable))
+  (foldable flushable movable always-translatable))
 
 ;;;; bit-bashing routines
 

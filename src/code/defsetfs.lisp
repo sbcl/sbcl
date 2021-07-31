@@ -37,9 +37,7 @@
     (set-header-data vector (logand (get-header-data vector) (lognot bits)))
     (values)))
 
-;;; from bignum.lisp
 (in-package "SB-IMPL")
-(defsetf %bignum-ref %bignum-set)
 
 (declaim (inline (setf %funcallable-instance-info)))
 (defun (setf %funcallable-instance-info) (value instance index)

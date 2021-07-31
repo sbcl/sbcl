@@ -109,83 +109,16 @@
 
 (defconstant all-ones-digit most-positive-word)
 
-;;;; internal inline routines
-
-;;; %ALLOCATE-BIGNUM must zero all elements.
-(defun %allocate-bignum (length)
-  (declare (type bignum-length length))
-  (%allocate-bignum length))
-
-;;; Extract the length of the bignum.
-(defun %bignum-length (bignum)
-  (declare (type bignum bignum))
-  (%bignum-length bignum))
-
-;;; %BIGNUM-REF needs to access bignums as obviously as possible, and it needs
-;;; to be able to return the digit somewhere no one looks for real objects.
-(defun %bignum-ref (bignum i)
-  (declare (type bignum bignum)
-           (type bignum-index i))
-  (%bignum-ref bignum i))
-(defun %bignum-set (bignum i value)
-  (declare (type bignum bignum)
-           (type bignum-index i)
-           (type bignum-element-type value))
-  (%bignum-set bignum i value))
-
-;;; Return T if digit is positive, or NIL if negative.
-(defun %digit-0-or-plusp (digit)
-  (declare (type bignum-element-type digit))
-  (not (logbitp (1- digit-size) digit)))
-
 (declaim (inline %bignum-0-or-plusp))
 (defun %bignum-0-or-plusp (bignum len)
   (declare (type bignum bignum)
            (type bignum-length len))
   (%digit-0-or-plusp (%bignum-ref bignum (1- len))))
 
-;;; This should be in assembler, and should not cons intermediate
-;;; results. It returns a bignum digit and a carry resulting from adding
-;;; together a, b, and an incoming carry.
-(defun %add-with-carry (a b carry)
-  (declare (type bignum-element-type a b)
-           (type (mod 2) carry))
-  (%add-with-carry a b carry))
-
-;;; This should be in assembler, and should not cons intermediate
-;;; results. It returns a bignum digit and a borrow resulting from
-;;; subtracting b from a, and subtracting a possible incoming borrow.
-;;;
-;;; We really do:  a - b - 1 + borrow, where borrow is either 0 or 1.
-(defun %subtract-with-borrow (a b borrow)
-  (declare (type bignum-element-type a b)
-           (type (mod 2) borrow))
-  (%subtract-with-borrow a b borrow))
-
-;;; Multiply two digit-size numbers, returning a 2*digit-size result
-;;; split into two digit-size quantities.
-(defun %multiply (x y)
-  (declare (type bignum-element-type x y))
-  (%multiply x y))
-
-;;; This multiplies x-digit and y-digit, producing high and low digits
-;;; manifesting the result. Then it adds the low digit, res-digit, and
-;;; carry-in-digit. Any carries (note, you still have to add two digits
-;;; at a time possibly producing two carries) from adding these three
-;;; digits get added to the high digit from the multiply, producing the
-;;; next carry digit.  Res-digit is optional since two uses of this
-;;; primitive multiplies a single digit bignum by a multiple digit
-;;; bignum, and in this situation there is no need for a result buffer
-;;; accumulating partial results which is where the res-digit comes
-;;; from.
-(defun %multiply-and-add (x-digit y-digit carry-in-digit
-                          &optional (res-digit 0))
-  (declare (type bignum-element-type x-digit y-digit res-digit carry-in-digit))
-  (%multiply-and-add x-digit y-digit carry-in-digit res-digit))
-
-(defun %lognot (digit)
-  (declare (type bignum-element-type digit))
-  (%lognot digit))
+(declaim (inline bignum-plus-p))
+(defun bignum-plus-p (bignum)
+  (declare (type bignum bignum))
+  (%bignum-0-or-plusp bignum (%bignum-length bignum)))
 
 ;;; Each of these does the digit-size unsigned op.
 (declaim (inline %logand %logior %logxor))
@@ -201,48 +134,11 @@
 
 ;;; This takes a fixnum and sets it up as an unsigned digit-size
 ;;; quantity.
+;;; The stub function is needed for constant-folding, or where vops don't exist
 (defun %fixnum-to-digit (x)
   (declare (fixnum x))
-  (logand x (1- (ash 1 digit-size))))
-
-;;; This takes three digits and returns the FLOOR'ed result of
-;;; dividing the first two as a 2*digit-size integer by the third.
-(defun %bigfloor (a b c)
-  (%bigfloor a b c))
-
-;;; Convert the digit to a regular integer assuming that the digit is signed.
-(defun %fixnum-digit-with-correct-sign (digit)
-  (declare (type bignum-element-type digit))
-  (if (logbitp (1- digit-size) digit)
-      (logior digit (ash -1 digit-size))
-      digit))
-
-;;; Do an arithmetic shift right of data even though bignum-element-type is
-;;; unsigned.
-(defun %ashr (data count)
-  (declare (type bignum-element-type data)
-           (type (mod #.sb-vm:n-word-bits) count))
-  (%ashr data count))
-
-;;; This takes a digit-size quantity and shifts it to the left,
-;;; returning a digit-size quantity.
-(defun %ashl (data count)
-  (declare (type bignum-element-type data)
-           (type (mod #.sb-vm:n-word-bits) count))
-  (%ashl data count))
-
-;;; Do an unsigned (logical) right shift of a digit by Count.
-(defun %digit-logical-shift-right (data count)
-  (declare (type bignum-element-type data)
-           (type (mod #.sb-vm:n-word-bits) count))
-  (%digit-logical-shift-right data count))
-
-;;; Change the length of bignum to be newlen. Newlen must be the same or
-;;; smaller than the old length, and any elements beyond newlen must be zeroed.
-(defun %bignum-set-length (bignum newlen)
-  (declare (type bignum bignum)
-           (type bignum-length newlen))
-  (%bignum-set-length bignum newlen))
+  #+(or arm arm64) (logand x (1- (ash 1 digit-size))) ; missing the vops
+  #-(or arm arm64) (%fixnum-to-digit x))
 
 ;;; This returns 0 or "-1" depending on whether the bignum is positive. This
 ;;; is suitable for infinite sign extension to complete additions,
@@ -254,10 +150,10 @@
            (type bignum-length len))
   (%ashr (%bignum-ref bignum (1- len)) (1- digit-size)))
 
-(declaim (inline bignum-plus-p))
-(defun bignum-plus-p (bignum)
-  (declare (type bignum bignum))
-  (%bignum-0-or-plusp bignum (%bignum-length bignum)))
+(declaim (inline (setf %bignum-ref)))
+(defun (setf %bignum-ref) (val bignum index)
+  (%bignum-set bignum index val) ; valueless
+  val)
 
 (declaim (optimize (speed 3) (safety 0)))
 
@@ -616,6 +512,12 @@
 
 ;;; Find D and N such that (LOGAND ALL-ONES-DIGIT (- (* D X) (* N Y))) is 0,
 ;;; (< 0 N LOWER-ONES-DIGIT) and (< 0 (ABS D) LOWER-ONES-DIGIT).
+;;; TODO: something in here violates type assertions when (SAFETY 0)
+;;; is removed. So apparently we're relying on "lying to the compiler"
+;;; to obtain the desired assembly code.  It would be nice not to do that,
+;;; but instead have code which is both correct and efficient,
+;;; presumably by adding in some explicit modular math as required.
+;;; Failures were triggered by 'float.impure' and 'print.impure' tests.
 (defun reduced-ratio-mod (x y)
   (let* ((c (bmod x y))
          (n1 c)
