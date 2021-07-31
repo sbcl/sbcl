@@ -124,7 +124,9 @@
 
 (defmethod open-stream-p ((stream ansi-stream))
   ;; CLHS 21.1.4 lets us not worry about synonym streams here.
-  (not (eq (ansi-stream-in stream) #'closed-flame)))
+  (let ((in (ansi-stream-in stream)))
+    (not (or (eq in (load-time-value #'closed-flame t))
+             (eq in (load-time-value #'closed-flame-saved t))))))
 
 (defmethod stream-element-type ((stream ansi-stream))
   (call-ansi-stream-misc stream :element-type))
