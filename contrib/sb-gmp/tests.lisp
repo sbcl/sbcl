@@ -3,8 +3,10 @@
 
 (in-package "SB-GMP-TESTS")
 
-(defparameter *state* (make-gmp-rstate))
-(rand-seed *state* 1234)
+#+sb-gmp
+(progn
+  (defparameter *state* (make-gmp-rstate))
+  (rand-seed *state* 1234))
 
 (defmacro defgenerator (name arguments &body body)
   `(defun ,name ,arguments
