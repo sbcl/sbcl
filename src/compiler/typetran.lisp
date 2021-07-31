@@ -1236,7 +1236,9 @@
        (if (types-equal-or-intersect value-type (specifier-type 'float))
            `(the ,tval (if (floatp x)
                            x
-                           (%single-float x)))
+                           (let ((r (the* (real :silent-conflict t) x)))
+                             (declare (muffle-conditions code-deletion-note))
+                             (sb-kernel:%single-float r))))
            `(the ,tval (%single-float x))))
       ((csubtypep tspec (specifier-type 'complex))
        (multiple-value-bind (part-type result-type)

@@ -718,3 +718,9 @@
   (test-single-floats 10000)
   (test-double-floats 10000))
 )
+
+;; lp#1920931
+(with-test (:name :coerce-to-float-no-warning)
+  (let ((f (checked-compile '(lambda (y) (coerce (sqrt y) 'float)))))
+    (assert (floatp (funcall f 3)))
+    (assert-error (funcall f #c(1 2)))))
