@@ -1107,7 +1107,11 @@
       (dolist (elt list1)
         (unless (funcall member-test elt list2 key test)
           (push elt result)))
-      (dx-flet ((test (x y) (funcall (truly-the function test) y x)))
+      (dx-flet ((test (x y)
+                      ;; This local function is never called if TEST is NIL,
+                      ;; but the compiler doesn't know that, suppress the warning.
+                      (funcall (the* (function :truly t :silent-conflict t) test)
+                               y x)))
         (dolist (elt list2)
           (unless (funcall member-test elt list1 key #'test)
             (push elt result)))))

@@ -3227,3 +3227,10 @@
   (let ((x (nth-value 1 (ignore-errors (logcount (opaque-identity #\a)))))
         (y (nth-value 1 (ignore-errors (oddp (opaque-identity #\a))))))
     (assert (string= (princ-to-string x) (princ-to-string y)))))
+
+(with-test (:name :set-exclusive-or-inlined)
+  (checked-compile-and-assert
+   ()
+   `(lambda (set1 set2)
+      (declare (inline set-exclusive-or))
+      (set-exclusive-or set1 set2))))
