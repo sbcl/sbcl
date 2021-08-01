@@ -515,40 +515,39 @@
     (move result null-tn)
     (inst cbz count DONE)
 
-    ;; We need to do this atomically.
-    (pseudo-atomic (pa-flag :sync nil)
-      ;; Allocate a cons (2 words) for each item.
-      (let* ((dx-p (node-stack-allocate-p node))
-             (size (cond (dx-p
-                          (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
-                         (t
-                          (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
-                          temp))))
-        (allocation 'list size list-pointer-lowtag dst
-                    :flag-tn pa-flag
-                    :stack-allocate-p dx-p
-                    :lip lip))
-      (move result dst)
+    (let ((dx-p (node-stack-allocate-p node)))
+      (pseudo-atomic (pa-flag :sync nil :elide dx-p)
+        ;; Allocate a cons (2 words) for each item.
+        (let ((size (cond (dx-p
+                           (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
+                          (t
+                           (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
+                           temp))))
+          (allocation 'list size list-pointer-lowtag dst
+                      :flag-tn pa-flag
+                      :stack-allocate-p dx-p
+                      :lip lip))
+        (move result dst)
 
-      (inst b ENTER)
+        (inst b ENTER)
 
-      ;; Compute the next cons and store it in the current one.
-      LOOP
-      (inst add dst dst (* 2 n-word-bytes))
-      (storew dst dst -1 list-pointer-lowtag)
+        ;; Compute the next cons and store it in the current one.
+        LOOP
+        (inst add dst dst (* 2 n-word-bytes))
+        (storew dst dst -1 list-pointer-lowtag)
 
-      ;; Grab one value.
-      ENTER
-      (inst ldr temp (@ context n-word-bytes :post-index))
+        ;; Grab one value.
+        ENTER
+        (inst ldr temp (@ context n-word-bytes :post-index))
 
-      ;; Dec count, and if != zero, go back for more.
-      (inst subs count count (fixnumize 1))
-      ;; Store the value into the car of the current cons.
-      (storew temp dst 0 list-pointer-lowtag)
-      (inst b :gt LOOP)
+        ;; Dec count, and if != zero, go back for more.
+        (inst subs count count (fixnumize 1))
+        ;; Store the value into the car of the current cons.
+        (storew temp dst 0 list-pointer-lowtag)
+        (inst b :gt LOOP)
 
-      ;; NIL out the last cons.
-      (storew null-tn dst 1 list-pointer-lowtag))
+        ;; NIL out the last cons.
+        (storew null-tn dst 1 list-pointer-lowtag)))
     DONE))
 
 ;;; Return the location and size of the more arg glob created by

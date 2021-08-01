@@ -39,11 +39,12 @@
                         (load-stack-tn temp ,tn)
                         temp)))))
              (let* ((cons-cells (if star (1- num) num))
-                    (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag :sync nil)
+                    (alloc (* (pad-data-block cons-size) cons-cells))
+                    (dx (node-stack-allocate-p node)))
+               (pseudo-atomic (pa-flag :sync nil :elide dx)
                  (allocation 'list alloc list-pointer-lowtag res
                              :flag-tn pa-flag
-                             :stack-allocate-p (node-stack-allocate-p node)
+                             :stack-allocate-p dx
                              :lip lip)
                  (move ptr res)
                  (dotimes (i (1- cons-cells))

@@ -255,7 +255,8 @@
               (type-code type-code) (size size) (lowtag lowtag)
               (stack-allocate-p stack-allocate-p)
               (lip lip))
-    `(pseudo-atomic (,flag-tn :sync ,type-code)
+    `(pseudo-atomic (,flag-tn :sync ,type-code
+                     :elide ,stack-allocate-p)
        (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
@@ -299,40 +300,42 @@
                            other-pointer-lowtag)))))
 
 ;;; handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
+(defmacro pseudo-atomic ((flag-tn &key elide (sync t)) &body forms)
   (declare (ignorable sync))
   #+sb-safepoint
   `(progn ,@forms (emit-safepoint))
   #-sb-safepoint
   `(progn
-     (without-scheduling ()
-       #-sb-thread
-       (store-symbol-value csp-tn *pseudo-atomic-atomic*)
-       #+sb-thread
-       (inst str (32-bit-reg null-tn)
-             (@ thread-tn
-                (* n-word-bytes thread-pseudo-atomic-bits-slot))))
+     (unless ,elide
+       (without-scheduling ()
+         #-sb-thread
+         (store-symbol-value csp-tn *pseudo-atomic-atomic*)
+         #+sb-thread
+         (inst str (32-bit-reg null-tn)
+               (@ thread-tn
+                  (* n-word-bytes thread-pseudo-atomic-bits-slot)))))
      (assemble ()
        ,@forms)
-     (without-scheduling ()
-       #-sb-thread
-       (progn
-         (store-symbol-value null-tn *pseudo-atomic-atomic*)
-         (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*))
-       #+sb-thread
-       (progn
-         (when ,sync
-           (inst dmb))
-         (inst str (32-bit-reg zr-tn)
-               (@ thread-tn
-                  (* n-word-bytes thread-pseudo-atomic-bits-slot)))
-         (inst ldr (32-bit-reg ,flag-tn)
-               (@ thread-tn
-                  (+ (* n-word-bytes thread-pseudo-atomic-bits-slot) 4))))
-       (let ((not-interrputed (gen-label)))
-         (inst cbz ,flag-tn not-interrputed)
-         (inst brk pending-interrupt-trap)
-         (emit-label not-interrputed)))))
+     (unless ,elide
+       (without-scheduling ()
+         #-sb-thread
+         (progn
+           (store-symbol-value null-tn *pseudo-atomic-atomic*)
+           (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*))
+         #+sb-thread
+         (progn
+           (when ,sync
+            (inst dmb))
+           (inst str (32-bit-reg zr-tn)
+                 (@ thread-tn
+                    (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+           (inst ldr (32-bit-reg ,flag-tn)
+                 (@ thread-tn
+                    (+ (* n-word-bytes thread-pseudo-atomic-bits-slot) 4))))
+         (let ((not-interrputed (gen-label)))
+           (inst cbz ,flag-tn not-interrputed)
+           (inst brk pending-interrupt-trap)
+           (emit-label not-interrputed))))))
 
 ;;;; memory accessor vop generators
 
