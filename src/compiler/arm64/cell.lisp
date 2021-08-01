@@ -100,18 +100,42 @@
 
   (define-vop (symbol-value checked-cell-ref)
     (:translate symeval)
+    (:args (symbol :scs (descriptor-reg) :to :save
+                   :load-if (not (and (sc-is symbol constant)
+                                      (or (symbol-always-has-tls-value-p (tn-value symbol))
+                                          (symbol-always-has-tls-index-p (tn-value symbol)))))))
+    (:args-var symbol-tn-ref)
     (:temporary (:sc any-reg) tls-index)
     (:variant-vars check-boundp)
     (:variant t)
     (:generator 9
-      (inst ldr (32-bit-reg tls-index) (tls-index-of object))
-      (inst ldr value (@ thread-tn tls-index))
-      (inst cmp value no-tls-value-marker-widetag)
-      (inst b :ne LOCAL)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      LOCAL
+      (let* ((known-symbol-p (sc-is symbol constant))
+             (known-symbol (and known-symbol-p (tn-value symbol)))
+             (fixup (and known-symbol
+                         (make-fixup known-symbol :symbol-tls-index))))
+        (cond
+          ((symbol-always-has-tls-value-p known-symbol)
+           (inst ldr value (@ thread-tn fixup)))
+          (t
+           (cond
+             (known-symbol              ; e.g. CL:*PRINT-BASE*
+              ;; Known nonzero TLS index, but possibly no per-thread value.
+              ;; The TLS value and global value can be loaded independently.
+              (inst ldr value (@ thread-tn fixup)))
+             (t
+              (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
+              (inst ldr value (@ thread-tn tls-index))))
+
+           (assemble ()
+             (inst cmp value no-tls-value-marker-widetag)
+             (inst b :ne LOCAL)
+             (when known-symbol
+               (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
+             (loadw value symbol symbol-value-slot other-pointer-lowtag)
+             LOCAL))))
+
       (when check-boundp
-        (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
+        (let ((err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
           (inst cmp value unbound-marker-widetag)
           (inst b :eq err-lab)))))
 
@@ -332,7 +356,12 @@
 (progn
   (define-vop (dynbind)
     (:args (value :scs (any-reg descriptor-reg) :to :save)
-           (symbol :scs (descriptor-reg)))
+           (symbol :scs (descriptor-reg)
+                   :load-if (not (and (sc-is symbol constant)
+                                      (or (symbol-always-has-tls-value-p (tn-value symbol))
+                                           (symbol-always-has-tls-index-p (tn-value symbol))
+                                          )))
+                   ))
     (:temporary (:sc descriptor-reg) value-temp)
     (:temporary (:sc descriptor-reg :offset r0-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
@@ -342,19 +371,29 @@
     (:temporary (:scs (any-reg)) bsp)
      (:generator 5
       (load-binding-stack-pointer bsp)
-      (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
       (inst add bsp bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp)
-      (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
-      (move alloc-tls-symbol symbol)
-      (load-inline-constant value-temp '(:fixup alloc-tls-index :assembly-routine) lip)
-      (inst blr value-temp)
-      TLS-INDEX-VALID
-
-      (inst ldr value-temp (@ thread-tn tls-index))
-      (inst stp value-temp tls-index (@ bsp (* (- binding-value-slot binding-size)
-                                               n-word-bytes)))
-      (inst str value (@ thread-tn tls-index))))
+      (let* ((known-symbol-p (sc-is symbol constant))
+             (known-symbol (and known-symbol-p (tn-value symbol)))
+             (tls-index-reg tls-index)
+             (tls-index (if known-symbol
+                            (make-fixup known-symbol :symbol-tls-index)
+                            tls-index)))
+        (assemble ()
+          (cond (known-symbol
+                 (inst movz tls-index-reg tls-index))
+                (t
+                 (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
+                 (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
+                 (move alloc-tls-symbol symbol)
+                 (load-inline-constant value-temp '(:fixup alloc-tls-index :assembly-routine) lip)
+                 (inst blr value-temp)))
+          TLS-INDEX-VALID
+          (inst ldr value-temp (@ thread-tn tls-index))
+          (inst stp value-temp tls-index-reg
+                (@ bsp (* (- binding-value-slot binding-size)
+                          n-word-bytes)))
+          (inst str value (@ thread-tn tls-index))))))
 
   (define-vop (unbind-n)
     (:info symbols)

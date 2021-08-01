@@ -322,15 +322,29 @@
     #+sb-thread
     (#.sb-vm::thread-offset
      (let* ((thread-slots
-             (load-time-value
-              (primitive-object-slots (primitive-object 'sb-vm::thread))
-              t))
-            (slot (find (ash offset (- word-shift)) thread-slots
-                        :key #'slot-offset)))
-       (when slot
-         (note (lambda (stream)
-                 (format stream "thread.~(~A~)" (slot-name slot)))
-               dstate))))))
+              (load-time-value
+               (primitive-object-slots (primitive-object 'sb-vm::thread))
+               t))
+            (slot (find (ash offset (- word-shift)) thread-slots :key #'slot-offset)))
+       (if slot
+           (note (lambda (stream)
+                   (format stream "thread.~(~A~)" (slot-name slot)))
+                 dstate)
+           (flet ((guess-symbol (predicate)
+                    (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
+                               (header-n-words (code-header-words code-header)))
+                      (loop for word-num from code-constants-offset below header-n-words
+                            for obj = (code-header-ref code-header word-num)
+                            when (and (symbolp obj) (funcall predicate obj))
+                            do (return obj)))))
+             (let ((symbol (or (guess-symbol
+                                (lambda (s) (= (symbol-tls-index s) offset)))
+                               ;; static symbols aren't in the code header
+                               (find offset +static-symbols+
+                                     :key #'symbol-tls-index))))
+               (when symbol
+                 (note (lambda (stream) (format stream "tls: ~S" symbol))
+                       dstate)))))))))
 
 (defun find-value-from-previos-inst (register dstate)
   ;; Needs to be MOVZ REGISTER, imm, LSL #0

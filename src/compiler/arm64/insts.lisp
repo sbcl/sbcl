@@ -977,7 +977,14 @@
   (:printer move-wide ((op #b10)))
   (:emitter
    (aver (not (ldb-test (byte 4 0) shift)))
-   (emit-move-wide segment +64-bit-size+ #b10 (/ shift 16) imm (tn-offset rd))))
+   (emit-move-wide segment +64-bit-size+ #b10 (/ shift 16)
+                   (cond ((and (fixup-p imm)
+                               (eq (fixup-flavor imm) :symbol-tls-index))
+                          (note-fixup segment :move-wide imm)
+                          0)
+                         (t
+                          imm))
+                   (tn-offset rd))))
 
 (define-instruction movk (segment rd imm &optional (shift 0))
   (:printer move-wide ((op #b11)))
@@ -1319,14 +1326,21 @@
                             size)
                     size))
          (dst (tn-offset dst)))
-    (cond ((and (typep offset 'unsigned-byte)
-                (not (ldb-test (byte scale 0) offset))
-                (typep (ash offset (- scale)) '(unsigned-byte 12))
+    (cond ((and (or
+                 (and (fixup-p offset)
+                      (eq (fixup-flavor offset) :symbol-tls-index))
+                 (and (typep offset 'unsigned-byte)
+                      (not (ldb-test (byte scale 0) offset))
+                      (typep (ash offset (- scale)) '(unsigned-byte 12))))
                 (register-p base)
                 (eq mode :offset))
            (emit-ldr-str-unsigned-imm segment size
                                       v opc
-                                      (ash offset (- scale))
+                                      (cond ((fixup-p offset)
+                                             (note-fixup segment :ldr-str offset)
+                                             0)
+                                            (t
+                                             (ash offset (- scale))))
                                       (tn-offset base)
                                       dst))
           ((and (eq mode :offset)
@@ -2851,7 +2865,14 @@
              (ash (- value (+ (sap-int sap) offset)) -2)))
       (:uncond-branch
        (setf (ldb (byte 26 0) (sb-vm::sap-ref-32-jit sap offset))
-             (ash (- value (+ (sap-int sap) offset)) -2)))))
+             (ash (- value (+ (sap-int sap) offset)) -2)))
+      (:ldr-str
+       (setf (ldb (byte 12 10) (sb-vm::sap-ref-32-jit sap offset))
+             (ash (the (unsigned-byte #.(+ 12 word-shift)) value)
+                  (- word-shift))))
+      (:move-wide
+       (setf (ldb (byte 16 5) (sb-vm::sap-ref-32-jit sap offset))
+             (the (unsigned-byte 16) value)))))
   nil)
 
 ;;; Even though non darwin-jit arm64 targets can store directly in the
