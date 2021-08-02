@@ -505,7 +505,15 @@
          (sb (sb-name (sc-sb sc)))
          (offset (tn-offset tn)))
     (ecase sb
-      (registers (reg-name (tn-reg tn)))
+      (registers
+       (concatenate 'string
+                    (reg-name (tn-reg tn))
+                    (case (sc-name (tn-sc tn))
+                      (descriptor-reg "(d)")
+                      (any-reg "(a)")
+                      (unsigned-reg "(u)")
+                      (signed-reg "(s)")
+                      (t "(?)"))))
       (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
