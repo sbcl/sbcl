@@ -512,12 +512,6 @@
 
 ;;; Find D and N such that (LOGAND ALL-ONES-DIGIT (- (* D X) (* N Y))) is 0,
 ;;; (< 0 N LOWER-ONES-DIGIT) and (< 0 (ABS D) LOWER-ONES-DIGIT).
-;;; TODO: something in here violates type assertions when (SAFETY 0)
-;;; is removed. So apparently we're relying on "lying to the compiler"
-;;; to obtain the desired assembly code.  It would be nice not to do that,
-;;; but instead have code which is both correct and efficient,
-;;; presumably by adding in some explicit modular math as required.
-;;; Failures were triggered by 'float.impure' and 'print.impure' tests.
 (defun reduced-ratio-mod (x y)
   (let* ((c (bmod x y))
          (n1 c)
@@ -526,10 +520,10 @@
          (d2 (modularly -1)))
     (declare (type word n1 d1 n2 d2))
     (loop while (> n2 (expt 2 (truncate digit-size 2))) do
-          (loop for i of-type (mod #.sb-vm:n-word-bits)
+          (loop for i of-type fixnum
                 downfrom (- (integer-length n1) (integer-length n2))
                 while (>= n1 n2) do
-                (when (>= n1 (modularly (ash n2 i)))
+                (when (>= n1 (modularly (ash n2 (truly-the (mod #.sb-vm:n-word-bits) i))))
                   (psetf n1 (modularly (- n1 (modularly (ash n2 i))))
                          d1 (modularly (- d1 (modularly (ash d2 i)))))))
           (psetf n1 n2
