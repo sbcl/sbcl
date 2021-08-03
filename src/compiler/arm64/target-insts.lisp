@@ -328,7 +328,7 @@
             (slot (find (ash offset (- word-shift)) thread-slots :key #'slot-offset)))
        (if slot
            (note (lambda (stream)
-                   (format stream "thread.~(~A~)" (slot-name slot)))
+                   (format stream "~(~A~)" (slot-name slot)))
                  dstate)
            (flet ((guess-symbol (predicate)
                     (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
@@ -374,6 +374,23 @@
                             (decode-scaled-immediate value)
                             value)
                         dstate))))
+
+(defun annotate-ldr-str-pair (value stream dstate)
+  (declare (ignore stream))
+  (destructuring-bind (reg offset) value
+    (case reg
+      #+sb-thread
+      (#.sb-vm::thread-offset
+       (let* ((thread-slots
+                (load-time-value
+                 (primitive-object-slots (primitive-object 'sb-vm::thread))
+                 t))
+              (slot1 (find offset thread-slots :key #'slot-offset))
+              (slot2 (find (1+ offset) thread-slots :key #'slot-offset)))
+         (if slot1
+             (note (lambda (stream)
+                     (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2)))
+                   dstate)))))))
 
 (defun annotate-ldr-literal (value stream dstate)
   (declare (ignore stream))

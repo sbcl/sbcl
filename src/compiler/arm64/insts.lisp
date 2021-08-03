@@ -117,6 +117,7 @@
   (define-arg-type cond :printer #'print-cond)
 
   (define-arg-type ldr-str-annotation :printer #'annotate-ldr-str-imm)
+  (define-arg-type ldr-str-pair-annotation :printer #'annotate-ldr-str-pair)
 
   (define-arg-type ldr-str-reg-annotation :printer #'annotate-ldr-str-reg)
   (define-arg-type ldr-literal-annotation :printer #'annotate-ldr-literal :sign-extend t)
@@ -1441,7 +1442,7 @@
 
 (define-instruction-format
     (ldr-str-pair 32
-     :default-printer '(:name :tab rt ", " rt2 ", [" rn pair-imm-writeback)
+     :default-printer '(:name :tab rt ", " rt2 ", [" rn pair-imm-writeback ldr-str-annotation)
      :include ldr-str)
   (size :field (byte 2 30))
   (op2 :value #b101)
@@ -1451,7 +1452,8 @@
   (pair-imm-writeback :fields (list (byte 2 23) (byte 2 30) (byte 7 15) (byte 1 26))
                       :type 'pair-imm-writeback)
   (rt2 :fields (list (byte 2 30) (byte 5 10)) :type 'reg-float-reg)
-  (rt :fields (list (byte 2 30) (byte 5 0))))
+  (rt :fields (list (byte 2 30) (byte 5 0)))
+  (ldr-str-annotation :fields (list (byte 5 5) (byte 7 15)) :type 'ldr-str-pair-annotation))
 
 (defun ldp-stp-offset-p (offset size)
   (multiple-value-bind (quot rem) (truncate offset (ecase size
