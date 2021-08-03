@@ -1039,7 +1039,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (when (and form (or (symbolp form) (consp form)))
       (if (or (and (eq (block-compile *compilation*) t)
                    (listp form)
-                   (eq (car form) 'sb-impl::%defpackage))
+                   (find (car form) '(sb-impl::%defpackage sb-impl::%defconstant))
+                   (fopcompilable-p form expand))
               (and #-sb-xc-host
                    (policy *policy*
                        ;; FOP-compiled code is harder to debug.
