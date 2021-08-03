@@ -585,12 +585,17 @@
         (dolist (y arrays)
           (assert (equalp x y)))))))
 
+;; lp#1938598
 (with-test (:name :vector-replace-self)
+  ;; example 1
   (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
+    (declare (notinline replace))
     (vector-push-extend #\_ string)
-    ;; I'd probably like to change REPLACE not to call VECTOR-REPLACE
-    ;; with START1 or START2 being -1, but for the time being, accept it
-    ;; when there is nothing to copy, as in when END1 - START1 is 0.
-    (sb-impl::vector-replace "_" "_" 0 -1 0 -1)
     ;; also test it indirectly
-    (replace string string :start1 1 :start2 0)))
+    (replace string string :start1 1 :start2 0))
+  ;; example 2
+  (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
+    (declare (notinline replace))
+    (loop for char across "tset" do (vector-push-extend char string))
+    (replace string string :start2 1 :start1 2)
+    (assert (string= string "tsse"))))
