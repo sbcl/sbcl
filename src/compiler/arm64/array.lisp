@@ -346,10 +346,10 @@
                          ;; LOGIOR in the new value (shifted appropriatly).
                          (sc-case value
                            (immediate
-                            (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits)))))
+                            (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits))))
+                            (inst lsl temp temp shift))
                            (unsigned-reg
-                            (inst and temp value ,(1- (ash 1 bits)))))
-                         (inst lsl temp temp shift)
+                            (inst lsl temp value shift)))
                          (inst orr old old temp))
                        ;; Write the altered word back to the array.
                        (inst str old (@ lip
