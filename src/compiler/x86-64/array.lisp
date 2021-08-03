@@ -439,7 +439,9 @@
          (inst mov word index)
          (inst shr word (integer-length (1- n-word-bits)))
          (inst mov temp (ea (bit-base 0) bv word n-word-bytes))
-         (inst* inst temp index)
+         (if (functionp inst)
+             (funcall inst)
+             (inst* inst temp index))
          (inst mov (ea (bit-base 0) bv word n-word-bytes) temp))))
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector)
@@ -456,19 +458,21 @@
   (:ignore addend)
   (:generator 6
     (unpoison-element bv index)
-    (when (sc-is value immediate)
-      (ecase (tn-value value)
-        (1 (emit-sbit-op 'bts bv index word temp))
-        (0 (emit-sbit-op 'btr bv index word temp)))
-      (return-from data-vector-set-with-offset/simple-bit-vector))
-    (inst test :byte value
-          (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
-    (inst jmp :z ZERO)
-    (emit-sbit-op 'bts bv index word temp)
-    (inst jmp OUT)
-    ZERO
-    (emit-sbit-op 'btr bv index word temp)
-    OUT))
+    (if (sc-is value immediate)
+        (ecase (tn-value value)
+          (1 (emit-sbit-op 'bts bv index word temp))
+          (0 (emit-sbit-op 'btr bv index word temp)))
+        (emit-sbit-op (lambda ()
+                        (assemble ()
+                          (inst test :byte value
+                                (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
+                          (inst jmp :z ZERO)
+                          (inst bts temp index)
+                          (inst jmp OUT)
+                          ZERO
+                          (inst btr temp index)
+                          OUT))
+                      bv index word temp))))
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector/c-index)
   (:translate data-vector-set-with-offset)
