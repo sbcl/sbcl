@@ -190,17 +190,9 @@
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
-        (move result-tn csp-tn)
-        (inst tst result-tn lowtag-mask)
-        (inst b :eq ALIGNED)
-        (inst add result-tn result-tn n-word-bytes)
-        ALIGNED
+        (inst add result-tn csp-tn lowtag-mask)
+        (inst and result-tn result-tn (lognot lowtag-mask))
         (inst add csp-tn result-tn (add-sub-immediate size))
-        ;; :ne is from TST above, this needs to be done after the
-        ;; stack pointer has been stored.
-        (inst b :eq ALIGNED2)
-        (storew zr-tn result-tn -1 0)
-        ALIGNED2
         (when lowtag
           (inst add result-tn result-tn lowtag)))
       #-gencgc
