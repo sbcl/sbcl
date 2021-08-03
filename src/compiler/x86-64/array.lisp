@@ -424,18 +424,25 @@
 (defun bit-base (dword-index)
   (+ (* dword-index 4)
      (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
-(defun emit-sbit-op (inst bv index)
-  (cond ((sc-is index immediate)
-         (setq index (tn-value index))
+
+(defun emit-sbit-op (inst bv index &optional word bit temp)
+  (cond ((integerp index)
          (multiple-value-bind (dword-index bit) (floor index 32)
            (let ((disp (bit-base dword-index)))
              (cond ((typep disp '(signed-byte 32))
                     (inst* inst :dword (ea disp bv) bit))
-                   (t ; excessive index, really?
+                   (t                   ; excessive index, really?
                     (inst mov temp-reg-tn index)
                     (inst* inst (ea (bit-base 0) bv) temp-reg-tn))))))
         (t
-         (inst* inst (ea (bit-base 0) bv) index))))
+         ;; mem/reg BT[SR] are really slow.
+         (inst mov word index)
+         (inst shr word (integer-length (1- n-word-bits)))
+         (inst mov temp (ea (bit-base 0) bv word 8))
+         (inst mov bit index)
+         (inst and bit (1- n-word-bits))
+         (inst* inst temp bit)
+         (inst mov (ea (bit-base 0) bv word 8) temp))))
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector)
   (:translate data-vector-set-with-offset)
@@ -443,18 +450,45 @@
   ;; Arg order is (VECTOR INDEX ADDEND VALUE)
   (:arg-types simple-bit-vector positive-fixnum (:constant (eql 0)) positive-fixnum)
   (:args (bv :scs (descriptor-reg))
-         (index :scs (unsigned-reg immediate))
+         (index :scs (unsigned-reg))
          (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
-                      signed-stack unsigned-stack)))
+                                signed-stack unsigned-stack)))
+  (:temporary (:sc unsigned-reg) word bit temp)
   (:info addend)
   (:ignore addend)
   (:generator 6
     (unpoison-element bv index)
     (when (sc-is value immediate)
       (ecase (tn-value value)
+        (1 (emit-sbit-op 'bts bv index word bit temp))
+        (0 (emit-sbit-op 'btr bv index word bit temp)))
+      (return-from data-vector-set-with-offset/simple-bit-vector))
+    (inst test :byte value
+          (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
+    (inst jmp :z ZERO)
+    (emit-sbit-op 'bts bv index word bit temp)
+    (inst jmp OUT)
+    ZERO
+    (emit-sbit-op 'btr bv index word bit temp)
+    OUT))
+
+(define-vop (data-vector-set-with-offset/simple-bit-vector/c-index)
+  (:translate data-vector-set-with-offset)
+  (:policy :fast-safe)
+  ;; Arg order is (VECTOR INDEX ADDEND VALUE)
+  (:arg-types simple-bit-vector (:constant fixnum) (:constant (eql 0)) positive-fixnum)
+  (:args (bv :scs (descriptor-reg))
+         (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
+                                signed-stack unsigned-stack)))
+  (:info index addend)
+  (:ignore addend)
+  (:generator 5
+    (unpoison-element bv index)
+    (when (sc-is value immediate)
+      (ecase (tn-value value)
         (1 (emit-sbit-op 'bts bv index))
         (0 (emit-sbit-op 'btr bv index)))
-      (return-from data-vector-set-with-offset/simple-bit-vector))
+      (return-from data-vector-set-with-offset/simple-bit-vector/c-index))
     (inst test :byte value
           (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
     (inst jmp :z ZERO)
@@ -475,15 +509,15 @@
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 3
-    ;; using 32-bit operand size might elide the REX prefix on mov + shift
-    (multiple-value-bind (dword-index bit) (floor index 32)
-      (inst mov :dword result (ea (bit-base dword-index) object))
-      (let ((right-shift (- bit n-fixnum-tag-bits)))
-        (cond ((plusp right-shift)
-               (inst shr :dword result right-shift))
-              ((minusp right-shift) ; = left shift
-               (inst shl :dword result (- right-shift))))))
-    (inst and :dword result (fixnumize 1))))
+              ;; using 32-bit operand size might elide the REX prefix on mov + shift
+              (multiple-value-bind (dword-index bit) (floor index 32)
+                (inst mov :dword result (ea (bit-base dword-index) object))
+                (let ((right-shift (- bit n-fixnum-tag-bits)))
+                  (cond ((plusp right-shift)
+                         (inst shr :dword result right-shift))
+                        ((minusp right-shift) ; = left shift
+                         (inst shl :dword result (- right-shift))))))
+              (inst and :dword result (fixnumize 1))))
 
 (define-vop (data-vector-ref-with-offset/simple-bit-vector dvref)
   (:args (object :scs (descriptor-reg))
@@ -493,14 +527,19 @@
   (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
   ;; SIGNED-REG has a smaller SC number than UNSIGNED-REG so it encodes shorter
   ;; in the error trap
-  (:temporary (:sc signed-reg :offset #.(tn-offset temp-reg-tn)) temp)
+  (:temporary (:sc unsigned-reg) index-temp temp)
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:vop-var vop)
   (:generator 4
-    (progn temp)
-    (inst bt (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-                 object) index)
+    ;; mem/reg BT are really slow.
+    (inst mov index-temp index)
+    (inst shr index-temp (integer-length (1- n-word-bits)))
+    (inst mov temp (ea (bit-base 0) object index-temp 8))
+    (inst mov index-temp index)
+    (inst and index-temp (1- n-word-bits))
+    (inst bt temp index-temp)
+
     (inst sbb :dword result result)
     (inst and :dword result (fixnumize 1))))
 
