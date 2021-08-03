@@ -339,50 +339,38 @@
 
 ;;;; BIGNUM-REPLACE and WITH-BIGNUM-BUFFERS
 
-(defmacro bignum-replace (dest src
-                                &key
-                                (start1 '0)
-                                end1
-                                (start2 '0)
-                                end2
-                                from-end)
-  (once-only ((n-dest dest)
-              (n-src src))
-    (with-unique-names (n-start1 n-end1 n-start2 n-end2 i1 i2)
-      (let ((end1 (or end1 `(%bignum-length ,n-dest)))
-            (end2 (or end2 `(%bignum-length ,n-src))))
-        (if from-end
-            `(let ((,n-start1 ,start1)
-                   (,n-start2 ,start2))
-              (do ((,i1 (1- ,end1) (1- ,i1))
-                   (,i2 (1- ,end2) (1- ,i2)))
-                  ((or (< ,i1 ,n-start1) (< ,i2 ,n-start2)))
-                (declare (fixnum ,i1 ,i2))
-                (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))
-            (if (eql start1 start2)
-                `(let ((,n-end1 (min ,end1 ,end2)))
-                  (do ((,i1 ,start1 (1+ ,i1)))
-                      ((>= ,i1 ,n-end1))
-                    (declare (type bignum-index ,i1))
-                    (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i1))))
-                `(let ((,n-end1 ,end1)
-                       (,n-end2 ,end2))
-                  (do ((,i1 ,start1 (1+ ,i1))
-                       (,i2 ,start2 (1+ ,i2)))
-                      ((or (>= ,i1 ,n-end1) (>= ,i2 ,n-end2)))
-                    (declare (type bignum-index ,i1 ,i2))
-                    (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))))))))
+(defmacro bignum-replace (dest src &key (start1 0) (end1 `(%bignum-length ,dest))
+                                        (start2 0) (end2 `(%bignum-length ,src)))
+  (flet ((@ (obj index)
+           `(sap+ (sap+ (int-sap (get-lisp-obj-address ,obj)) (ash ,index sb-vm:word-shift))
+                  (- (ash sb-vm:bignum-digits-offset sb-vm:word-shift)
+                     sb-vm:lowtag-mask))))
+    `(let ((count ,(if (and (eql start1 0) (eql start2 0))
+                       `(min ,end1 ,end2)
+                       `(min (- ,end1 ,start1) (- ,end2 ,start2)))))
+       (cond ((= count 2) ; COUNT is almost always 2
+              (setf (%bignum-ref ,dest ,start1) (%bignum-ref ,src ,start2)
+                    (%bignum-ref ,dest (1+ ,start1)) (%bignum-ref ,src (1+ ,start2))))
+             ((= count 1)
+              (setf (%bignum-ref ,dest ,start1) (%bignum-ref ,src ,start2)))
+             ((> count 0)
+              (with-alien ((replace (function system-area-pointer system-area-pointer
+                                     system-area-pointer sb-unix::size-t)
+                           :extern ,(if (eq dest src) "memmove" "memcpy")))
+                (with-pinned-objects (,dest ,src)
+                  (alien-funcall replace ,(@ dest start1) ,(@ src start2)
+                                 (ash count sb-vm:word-shift)))))))))
 
 (defmacro with-bignum-buffers (specs &body body)
   "WITH-BIGNUM-BUFFERS ({(var size [init])}*) Form*"
   (collect ((binds) (inits))
     (dolist (spec specs)
       (let ((name (first spec))
-            (size (second spec)))
+            (size (second spec))
+            (init (third spec)))
         (binds `(,name (%allocate-bignum ,size)))
-        (let ((init (third spec)))
-          (when init
-            (inits `(bignum-replace ,name ,init))))))
+        (when init
+          (inits `(bignum-replace ,name ,init)))))
     `(let* ,(binds)
        ,@(inits)
        ,@body)))
@@ -951,8 +939,7 @@
   (let* ((res-len (+ bignum-len digits))
          (res (%allocate-bignum res-len)))
     (declare (type bignum-length res-len))
-    (bignum-replace res bignum :start1 digits :end1 res-len :end2 bignum-len
-                    :from-end t)
+    (bignum-replace res bignum :start1 digits :end1 res-len :end2 bignum-len)
     res))
 
 ;;; BIGNUM-TRUNCATE uses this to store into a bignum buffer by supplying res.
