@@ -728,7 +728,7 @@
 ;;; Bounding indices were checked for validity by DEFINE-SEQUENCE-TRAVERSER.
 (defmacro vector-replace-from-vector ()
   `(locally
-     (declare (optimize (safety 0)))       
+     (declare (optimize (safety 0)))
      (let ((nelts (min (- target-end target-start)
                        (- source-end source-start))))
        (when (plusp nelts)

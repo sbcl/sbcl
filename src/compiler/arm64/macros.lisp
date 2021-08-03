@@ -361,10 +361,14 @@
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate))
-            (value :scs ,scs))
+            (value :scs ,scs
+                   :load-if (not (and (sc-is value immediate)
+                                      (eql (tn-value value) 0)))))
      (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:generator 2
+       (when (sc-is value immediate)
+         (setf value zr-tn))
        (sc-case index
          (immediate
           (inst str value (@ object (load-store-offset
@@ -424,10 +428,14 @@
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg unsigned-reg immediate))
-            (value :scs ,scs))
+            (value :scs ,scs
+                   :load-if (not (and (sc-is value immediate)
+                                      (eql (tn-value value) 0)))))
      (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:generator 5
+       (when (sc-is value immediate)
+         (setf value zr-tn))
        ,@(multiple-value-bind (op shift)
              (ecase size
                (:byte
