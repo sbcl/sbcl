@@ -425,7 +425,7 @@
   (+ (* dword-index 4)
      (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
 
-(defun emit-sbit-op (inst bv index &optional word bit temp)
+(defun emit-sbit-op (inst bv index &optional word temp)
   (cond ((integerp index)
          (multiple-value-bind (dword-index bit) (floor index 32)
            (let ((disp (bit-base dword-index)))
@@ -438,11 +438,9 @@
          ;; mem/reg BT[SR] are really slow.
          (inst mov word index)
          (inst shr word (integer-length (1- n-word-bits)))
-         (inst mov temp (ea (bit-base 0) bv word 8))
-         (inst mov bit index)
-         (inst and bit (1- n-word-bits))
-         (inst* inst temp bit)
-         (inst mov (ea (bit-base 0) bv word 8) temp))))
+         (inst mov temp (ea (bit-base 0) bv word n-word-bytes))
+         (inst* inst temp index)
+         (inst mov (ea (bit-base 0) bv word n-word-bytes) temp))))
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector)
   (:translate data-vector-set-with-offset)
@@ -453,23 +451,23 @@
          (index :scs (unsigned-reg))
          (value :scs (immediate any-reg signed-reg unsigned-reg control-stack
                                 signed-stack unsigned-stack)))
-  (:temporary (:sc unsigned-reg) word bit temp)
+  (:temporary (:sc unsigned-reg) word temp)
   (:info addend)
   (:ignore addend)
   (:generator 6
     (unpoison-element bv index)
     (when (sc-is value immediate)
       (ecase (tn-value value)
-        (1 (emit-sbit-op 'bts bv index word bit temp))
-        (0 (emit-sbit-op 'btr bv index word bit temp)))
+        (1 (emit-sbit-op 'bts bv index word temp))
+        (0 (emit-sbit-op 'btr bv index word temp)))
       (return-from data-vector-set-with-offset/simple-bit-vector))
     (inst test :byte value
           (if (sc-is value control-stack signed-stack unsigned-stack) #xff value))
     (inst jmp :z ZERO)
-    (emit-sbit-op 'bts bv index word bit temp)
+    (emit-sbit-op 'bts bv index word temp)
     (inst jmp OUT)
     ZERO
-    (emit-sbit-op 'btr bv index word bit temp)
+    (emit-sbit-op 'btr bv index word temp)
     OUT))
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector/c-index)
@@ -525,21 +523,16 @@
   (:info addend)
   (:ignore addend)
   (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
-  ;; SIGNED-REG has a smaller SC number than UNSIGNED-REG so it encodes shorter
-  ;; in the error trap
-  (:temporary (:sc unsigned-reg) index-temp temp)
+  (:temporary (:sc unsigned-reg) word temp)
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:vop-var vop)
   (:generator 4
-    ;; mem/reg BT are really slow.
-    (inst mov index-temp index)
-    (inst shr index-temp (integer-length (1- n-word-bits)))
-    (inst mov temp (ea (bit-base 0) object index-temp 8))
-    (inst mov index-temp index)
-    (inst and index-temp (1- n-word-bits))
-    (inst bt temp index-temp)
-
+    ;; mem/reg BT is really slow.
+    (inst mov word index)
+    (inst shr word (integer-length (1- n-word-bits)))
+    (inst mov temp (ea (bit-base 0) object word n-word-bytes))
+    (inst bt temp index)
     (inst sbb :dword result result)
     (inst and :dword result (fixnumize 1))))
 
