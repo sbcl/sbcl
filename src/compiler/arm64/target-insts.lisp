@@ -387,10 +387,12 @@
                  t))
               (slot1 (find offset thread-slots :key #'slot-offset))
               (slot2 (find (1+ offset) thread-slots :key #'slot-offset)))
-         (if slot1
-             (note (lambda (stream)
-                     (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2)))
-                   dstate)))))))
+         (when slot1 
+           (note (lambda (stream)
+                   (if (eq (slot-name slot1) 'sb-vm::alloc-region)
+                       (format stream "alloc-region.{free-pointer, end-addr}")
+                       (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2))))
+                 dstate)))))))
 
 (defun annotate-ldr-literal (value stream dstate)
   (declare (ignore stream))
