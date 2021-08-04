@@ -1900,15 +1900,14 @@ necessary, since type inference may take arbitrarily long to converge.")
 
      ;; ANSI options
      (output-file "" output-file-p)
-     ;; FIXME: ANSI doesn't seem to say anything about
-     ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
-     ;; function..
+     ;; We rebind the specials despite such behavior not being mentioned
+     ;; in CLHS. Several other lisp implementations do this as well.
      ((:verbose *compile-verbose*) *compile-verbose*)
      ((:print *compile-print*) *compile-print*)
-     ((:progress *compile-progress*) *compile-progress*)
      (external-format :default)
 
      ;; extensions
+     ((:progress *compile-progress*) *compile-progress*)
      (trace-file nil)
      ((:block-compile *block-compile-argument*)
       *block-compile-default*)
@@ -1974,13 +1973,12 @@ returning its filename.
 
     (unwind-protect
         (progn
-          (unless (and output-file-p (eq output-file nil))
-            (setq output-file-pathname
-                  (if output-file-p
-                      (compile-file-pathname input-file :output-file output-file)
-                      (compile-file-pathname input-file)))
-            (setq fasl-output
-                  (open-fasl-output output-file-pathname (namestring input-pathname))))
+          ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
+          ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
+          (setq output-file-pathname
+                (compile-file-pathname input-file (when output-file-p :output-file) output-file)
+                fasl-output (open-fasl-output output-file-pathname
+                                              (namestring input-pathname)))
           (when emit-cfasl
             (setq cfasl-pathname (make-pathname :type "cfasl" :defaults output-file-pathname))
             (setq cfasl-output (open-fasl-output cfasl-pathname (namestring input-pathname))))

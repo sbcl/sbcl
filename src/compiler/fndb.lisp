@@ -1677,16 +1677,13 @@
    &key
 
    ;; ANSI options
-   (:output-file (or pathname-designator
-                     null
-                     ;; FIXME: This last case is a non-ANSI hack.
-                     (member t)))
+   (:output-file pathname-designator)
    (:verbose t)
    (:print t)
    (:external-format external-format-designator)
-   (:progress t)
 
    ;; extensions
+   (:progress t)
    (:trace-file t)
    (:block-compile t)
    (:entry-points list)
