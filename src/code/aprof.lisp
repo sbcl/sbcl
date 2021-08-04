@@ -636,12 +636,12 @@
 ;;; cons profiling.
 ;;; STREAM is where to report, defaulting to *standard-output*.
 ;;; The convention is that of map-segment-instructions, meaning NIL is a sink.
-(defun aprof-run (fun &key (stream *standard-output*))
+(defun aprof-run (fun &key (stream *standard-output*) arguments)
   (aprof-reset)
   (patch-fixups)
   (let (nbytes)
     (unwind-protect
-         (progn (aprof-start) (funcall fun))
+         (progn (aprof-start) (apply fun (sb-int:ensure-list arguments)))
       (aprof-stop)
       (setq nbytes (aprof-show :stream stream))
       (when stream (terpri stream)))

@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and x86-64 sb-thread) (sb-ext:exit :code 104) ;; not implemented elsewhere
+#-(and x86-64 sb-thread (not win32)) (sb-ext:exit :code 104) ;; not implemented elsewhere
 
 (defstruct fruitbasket x y z)
 (with-test (:name :aprof-smoketest-struct
@@ -28,8 +28,7 @@
                (* 50 (+ (sb-ext:primitive-object-size (make-fruitbasket))
                         (* 2 sb-vm:n-word-bytes))))))) ; cons cells
 
-(with-test (:name :aprof-smoketest-non-constant-size-vector
-            :broken-on :win32)
+(with-test (:name :aprof-smoketest-non-constant-size-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
@@ -42,8 +41,7 @@
 ;;; The profiler's disassembler expected to see a store at alloc-ptr
 ;;; or that + n-word-bytes, when in fact the code might write to 1 byte
 ;;; positioned anywhere in the word after the object header.
-(with-test (:name :aprof-smoketest-bit-vector
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-bit-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
@@ -54,8 +52,7 @@
     (assert (= nbytes (sb-ext:primitive-object-size
                        (make-array (* 128 16) :element-type 'bit))))))
 
-(with-test (:name :aprof-smoketest-large-vector
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
              (checked-compile
@@ -79,8 +76,7 @@ sb-vm::
        (storew* (fixnumize words) result vector-length-slot 0 t)
        (inst or :byte result other-pointer-lowtag)))))
 
-(with-test (:name :aprof-smoketest-large-vector-to-upper-register
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-large-vector-to-upper-register)
   (let ((nbytes
          (sb-aprof:aprof-run
              (checked-compile
@@ -100,7 +96,6 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
-#-win32
 (import '(sb-vm::temp-reg-tn sb-vm::thread-base-tn
           sb-vm::thread-alloc-region-slot
           sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
@@ -115,7 +110,6 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (values (make-this-struct) (make-that-struct)))
 (compile 'make-structs)
-#-win32
 (with-test (:name :aprof-instance :skipped-on (not :immobile-space))
   (let (seen-this seen-that)
     (dolist (line (split-string
@@ -126,12 +120,12 @@ sb-vm::
       (when (search "THAT-STRUCT" line) (setq seen-that t)))
     (assert (and seen-this seen-that))))
 
-#-win32
 (with-test (:name :aprof-brutal-test)
   (with-scratch-file (fasl "fasl")
     ;; Just compile anything that exercises the compiler.
     ;; This is only useful if the compiler was compiled with cons profiling.
-    (sb-aprof:aprof-run (lambda () (compile-file "../src/code/shaketree"
-                                                 :output-file fasl
-                                                 :print nil :verbose nil))
-                        :stream (make-broadcast-stream))))
+    (sb-aprof:aprof-run #'compile-file
+                        :stream (make-broadcast-stream)
+                        :arguments `("../src/code/shaketree"
+                                     :output-file ,fasl
+                                     :print nil :verbose nil))))
