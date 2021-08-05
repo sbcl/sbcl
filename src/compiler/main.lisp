@@ -898,8 +898,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;   This gives the effect of rebinding around each file.
 ;;; which doesn't seem to be true now. Check to make sure that if
 ;;; such rebinding is necessary, it's still done somewhere.
-;;; FIXME: We will want to have a way to process multiple files again
-;;; for the sake of block compilation.
 (defun get-source-stream (info)
   (declare (type source-info info))
   (or (source-info-stream info)
@@ -1956,6 +1954,23 @@ returning its filename.
   :EMIT-CFASL
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
+  (%compile-files (list input-file) external-format output-file-p output-file
+                  trace-file emit-cfasl))
+
+(defun compile-files
+    (inputs &key (output-file "" output-file-p)
+                 ((:verbose *compile-verbose*) *compile-verbose*)
+                 ((:print *compile-print*) *compile-print*)
+                 (external-format :default)
+                 ((:progress *compile-progress*) *compile-progress*)
+                 (trace-file nil)
+                 ((:block-compile *block-compile-argument*) *block-compile-default*)
+                 ((:entry-points *entry-points-argument*) nil)
+                 (emit-cfasl *emit-cfasl*))
+  (%compile-files inputs external-format output-file-p output-file trace-file emit-cfasl))
+
+(defun %compile-files (inputs external-format output-file-p output-file
+                       trace-file emit-cfasl)
   (let* ((output-file-pathname nil)
          (fasl-output nil)
          (cfasl-pathname nil)
@@ -1963,10 +1978,13 @@ returning its filename.
          (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
-         (input-pathname (verify-source-file input-file))
-         (source-info
-          (make-file-source-info input-pathname external-format
-                                 #-sb-xc-host t)) ; can't track, no SBCL streams
+         (input-pathname (verify-source-file (car inputs)))
+         (source-infos
+          (mapcar (lambda (file)
+                    (make-file-source-info (verify-source-file file)
+                                           external-format
+                                           #-sb-xc-host t)) ; can't track, no SBCL streams
+                  inputs))
          (*last-message-count* (list* 0 nil nil))
          (*last-error-context* nil)
          (*compiler-trace-output* nil)) ; might be modified below
@@ -1976,7 +1994,8 @@ returning its filename.
           ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
           ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
           (setq output-file-pathname
-                (compile-file-pathname input-file (when output-file-p :output-file) output-file)
+                (compile-file-pathname (car inputs)
+                                       (when output-file-p :output-file) output-file)
                 fasl-output (open-fasl-output output-file-pathname
                                               (namestring input-pathname)))
           (when emit-cfasl
@@ -1993,10 +2012,15 @@ returning its filename.
                             :if-exists :supersede :direction :output))))
 
           (let ((*compile-object* fasl-output))
-            (setf (values abort-p warnings-p failure-p)
-                  (sub-compile-file source-info cfasl-output))))
+            (setf abort-p nil failure-p nil)
+            (dolist (source-info source-infos)
+              (multiple-value-bind (sub-abort-p sub-warnings-p sub-failure-p)
+                  (sub-compile-file source-info cfasl-output)
+                (setf abort-p (or abort-p sub-abort-p)
+                      warnings-p (or warnings-p sub-warnings-p)
+                      failure-p (or failure-p sub-failure-p))))))
 
-      (close-source-info source-info)
+      (mapc #'close-source-info source-infos)
 
       (when fasl-output
         (close-fasl-output fasl-output abort-p)
@@ -2016,7 +2040,8 @@ returning its filename.
           (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname))))
 
       (when *compile-verbose*
-        (print-compile-end-note source-info (not abort-p)))
+        (dolist (source-info source-infos)
+          (print-compile-end-note source-info (not abort-p))))
 
       ;; Don't nuke stdout if you use :trace-file *standard-output*
       (when (and trace-file (not (streamp trace-file)))
