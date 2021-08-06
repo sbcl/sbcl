@@ -1058,7 +1058,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             ;; delimit the current component here.
             (case (car form)
               ((sb-impl::%defpackage sb-impl::%defconstant)
-               (finish-block-compilation)))
+               (delimit-block-compilation)))
             nil)))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
@@ -1707,6 +1707,13 @@ necessary, since type inference may take arbitrarily long to converge.")
       ;; to restore it to the user default.
       (setf (block-compile compilation) *block-compile-argument*)
       (setf (entry-points compilation) nil))))
+
+(defun delimit-block-compilation ()
+  (let ((compilation *compilation*))
+    (when (block-compile compilation)
+      (when (toplevel-lambdas compilation)
+        (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil)
+        (setf (toplevel-lambdas compilation) nil)))))
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()
