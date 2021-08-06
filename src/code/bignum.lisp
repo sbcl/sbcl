@@ -107,7 +107,8 @@
 
 (defconstant digit-size sb-vm:n-word-bits)
 
-(defconstant all-ones-digit most-positive-word)
+(eval-when (:compile-toplevel)
+(defconstant all-ones-digit most-positive-word))
 
 (declaim (inline %bignum-0-or-plusp))
 (defun %bignum-0-or-plusp (bignum len)
@@ -157,6 +158,50 @@
 
 (declaim (optimize (speed 3) (safety 0)))
 
+;;;; general utilities
+
+;;; Internal in-place operations use this to fixup remaining digits in the
+;;; incoming data, such as in-place shifting. This is basically the same as
+;;; the first form in %NORMALIZE-BIGNUM, but we return the length of the buffer
+;;; instead of shrinking the bignum.
+(declaim (maybe-inline %normalize-bignum-buffer))
+(defun %normalize-bignum-buffer (result len)
+  (declare (type bignum result)
+           (type bignum-length len))
+  (unless (= len 1)
+    (do ((next-digit (%bignum-ref result (- len 2))
+                     (%bignum-ref result (- len 2)))
+         (sign-digit (%bignum-ref result (1- len)) next-digit))
+        ((not (zerop (logxor sign-digit (%ashr next-digit (1- digit-size))))))
+      (decf len)
+      (setf (%bignum-ref result len) 0)
+      (when (= len 1) (return))))
+  len)
+
+;;; This drops the last digit if it is unnecessary sign information. It repeats
+;;; this as needed, possibly ending with a fixnum. If the resulting length from
+;;; shrinking is one, see whether our one word is a fixnum. Shift the possible
+;;; fixnum bits completely out of the word, and compare this with shifting the
+;;; sign bit all the way through. If the bits are all 1's or 0's in both words,
+;;; then there are just sign bits between the fixnum bits and the sign bit. If
+;;; we do have a fixnum, shift it over for the two low-tag bits.
+(defun %normalize-bignum (result len)
+  (declare (type bignum result)
+           (type bignum-length len)
+           (muffle-conditions compiler-note)
+           #-sb-fluid (inline %normalize-bignum-buffer))
+  (let ((newlen (%normalize-bignum-buffer result len)))
+    (declare (type bignum-length newlen))
+    (unless (= newlen len)
+      (%bignum-set-length result newlen))
+    (if (= newlen 1)
+        (let ((digit (%bignum-ref result 0)))
+          (if (= (%ashr digit sb-vm:n-positive-fixnum-bits)
+                 (%ashr digit (1- digit-size)))
+              (%fixnum-digit-with-correct-sign digit)
+              result))
+        result)))
+
 ;;;; addition
 
 (defun add-bignums (a b)
@@ -384,7 +429,7 @@
   #+sb-bignum-assertions `(assert ,@args))
   ;; We'll be doing a lot of modular arithmetic.
 (defmacro modularly (form)
-  `(logand all-ones-digit ,form))
+  `(logand #.all-ones-digit ,form))
 
 ;;; I'm not sure why I need this FTYPE declaration.  Compiled by the
 ;;; target compiler, it can deduce the return type fine, but without
@@ -788,7 +833,12 @@
             (%add-with-carry (%lognot (%sign-digit x len-x)) 0 carry)))
     (if fully-normalize
         (%normalize-bignum res len-res)
-        (%mostly-normalize-bignum res len-res))))
+        ;; This drops the last digit if it is unnecessary sign information. It
+        ;; repeats this as needed, possibly ending with a fixnum magnitude but never
+        ;; returning a fixnum.
+        (locally (declare (inline %normalize-bignum-buffer))
+          (%bignum-set-length res (%normalize-bignum-buffer res len-res))
+          res))))
 
 ;;; This assumes bignum is positive; that is, the result of negating it will
 ;;; stay in the provided allocated bignum.
@@ -1557,7 +1607,7 @@
          (bignum-truncate-guess (y1 y2 x-i x-i-1 x-i-2)
            (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
            (let ((guess (if (= x-i y1)
-                            all-ones-digit
+                            #.all-ones-digit
                             (%bigfloor x-i x-i-1 y1))))
              (declare (type bignum-element-type guess))
              (loop
@@ -1789,64 +1839,6 @@
                         rem
                         (%normalize-bignum rem (%bignum-length rem))))))))))
 
-;;;; general utilities
-
-;;; Internal in-place operations use this to fixup remaining digits in the
-;;; incoming data, such as in-place shifting. This is basically the same as
-;;; the first form in %NORMALIZE-BIGNUM, but we return the length of the buffer
-;;; instead of shrinking the bignum.
-(declaim (maybe-inline %normalize-bignum-buffer))
-(defun %normalize-bignum-buffer (result len)
-  (declare (type bignum result)
-           (type bignum-length len))
-  (unless (= len 1)
-    (do ((next-digit (%bignum-ref result (- len 2))
-                     (%bignum-ref result (- len 2)))
-         (sign-digit (%bignum-ref result (1- len)) next-digit))
-        ((not (zerop (logxor sign-digit (%ashr next-digit (1- digit-size))))))
-        (decf len)
-        (setf (%bignum-ref result len) 0)
-        (when (= len 1)
-              (return))))
-  len)
-
-;;; This drops the last digit if it is unnecessary sign information. It repeats
-;;; this as needed, possibly ending with a fixnum. If the resulting length from
-;;; shrinking is one, see whether our one word is a fixnum. Shift the possible
-;;; fixnum bits completely out of the word, and compare this with shifting the
-;;; sign bit all the way through. If the bits are all 1's or 0's in both words,
-;;; then there are just sign bits between the fixnum bits and the sign bit. If
-;;; we do have a fixnum, shift it over for the two low-tag bits.
-(defun %normalize-bignum (result len)
-  (declare (type bignum result)
-           (type bignum-length len)
-           (muffle-conditions compiler-note)
-           #-sb-fluid (inline %normalize-bignum-buffer))
-  (let ((newlen (%normalize-bignum-buffer result len)))
-    (declare (type bignum-length newlen))
-    (unless (= newlen len)
-      (%bignum-set-length result newlen))
-    (if (= newlen 1)
-        (let ((digit (%bignum-ref result 0)))
-          (if (= (%ashr digit sb-vm:n-positive-fixnum-bits)
-                 (%ashr digit (1- digit-size)))
-              (%fixnum-digit-with-correct-sign digit)
-              result))
-        result)))
-
-;;; This drops the last digit if it is unnecessary sign information. It
-;;; repeats this as needed, possibly ending with a fixnum magnitude but never
-;;; returning a fixnum.
-(defun %mostly-normalize-bignum (result len)
-  (declare (type bignum result)
-           (type bignum-length len)
-           #-sb-fluid (inline %normalize-bignum-buffer))
-  (let ((newlen (%normalize-bignum-buffer result len)))
-    (declare (type bignum-length newlen))
-    (unless (= newlen len)
-      (%bignum-set-length result newlen))
-    result))
-
 ;;;; hashing
 
 ;;; the bignum case of the SXHASH function
@@ -1888,3 +1880,22 @@
           (return-from bignum-lower-bits-zero-p nil)))
       (zerop (logand (1- (ash 1 n-bits-partial-digit))
                      (%bignum-ref bignum n-full-digits))))))
+
+#|
+(let (code-components)
+  (do-symbols (s 'sb-bignum)
+    (when (and (fboundp s)
+               (eq (symbol-package s) (find-package "SB-BIGNUM")))
+      (pushnew (sb-kernel:fun-code-header (symbol-function s)) code-components)))
+  (let ((tot-size 0) (tot-consts 0))
+    (dolist (code code-components)
+      (let ((nconsts (sb-kernel:code-header-words code))
+            (size (sb-ext:primitive-object-size code)))
+        (incf tot-size size)
+        (incf tot-consts nconsts)
+        (format t "~5d ~3d ~a~%" size nconsts code)))
+    (format t "~5d ~3d~%" tot-size tot-consts)))
+; => 32208 565 ; without block-compile
+; => 30672 351 ; with block-compile in normal self-build
+; => 30432 305 ; block-compile post-build
+|#
