@@ -215,35 +215,33 @@
          ;; This should pick off the most frequently-occurring things first.
          ;; CONS and INSTANCE of course top the list.
          (typecase object
-           (cons 2)
+           (list (if object 2 sizeof-nil-in-words))
            (instance (1+ (instance-length object)))
            (function
             (when (= (%fun-pointer-widetag object) simple-fun-widetag)
               (return-from primitive-object-size
                 (code-object-size (fun-code-header (truly-the simple-fun object)))))
             (1+ (get-closure-length object)))
+           ;; Must be an OTHER pointer now
            (code-component
             (return-from primitive-object-size (code-object-size object)))
-           ;; Most everything else is an OTHER pointer, except for NIL.
-           ;; Arrays (especially strings and simple-vector) and symbols tend to be the
-           ;; next-most-common heap object, for which we need the ROOM-INFO.
+           (fdefn 4) ; constant length not stored in the header
+           ((satisfies array-header-p)
+            (+ array-dimensions-offset (array-rank object)))
+           ((simple-array nil (*)) 2) ; no payload
+           (bignum
+            ;; 64-bit machines might want to store the bignum length in the upper 4
+            ;; bytes of the header which would simplify %bignum-set-length.
+            (1+ (sb-bignum:%bignum-length object)))
            (t
             (let ((room-info (aref *room-info* (%other-pointer-widetag object))))
-              (cond ((typep room-info 'specialized-array-element-type-properties)
-                     (let ((n-data-octets (vector-n-data-octets object room-info)))
-                       (+ (ceiling n-data-octets n-word-bytes) ; N data words
-                          vector-data-offset)))
-                    (t
-                     (typecase object
-                       (fdefn 4) ; constant length not stored in the header
-                       ((satisfies array-header-p)
-                        (+ array-dimensions-offset (array-rank object)))
-                       ((simple-array nil (*)) 2) ; no payload
-                       (null sizeof-nil-in-words)
-                       (t
-                        ;; GET-HEADER-DATA works for everything that's left
-                        (1+ (logand (get-header-data object)
-                                    (room-info-mask room-info))))))))))))
+              (if (typep room-info 'specialized-array-element-type-properties)
+                  (let ((n-data-octets (vector-n-data-octets object room-info)))
+                    (+ (ceiling n-data-octets n-word-bytes) ; N data words
+                       vector-data-offset))
+                  ;; GET-HEADER-DATA works for everything that's left
+                  (1+ (logand (get-header-data object)
+                              (room-info-mask room-info)))))))))
         (* (align-up words 2) n-word-bytes)))
 
 ;;; Macros not needed after this file (and avoids a redefinition warning this way)
