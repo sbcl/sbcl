@@ -30,6 +30,22 @@
    :before-load (lambda () (delete-package :block-defpackage))
    :load t))
 
+(defvar *x*)
+(defvar *y*)
+
+(with-test (:name :block-defpackage-top-level-form-order)
+  (ctu:file-compile
+   `((setq *x* (find-package "BLOCk-DEFPACKAGE"))
+
+     (defpackage block-defpackage (:use :cl :cl-user))
+
+     (setq *y* (find-package "BLOCK-DEFPACKAGE")))
+   :block-compile t
+   :before-load (lambda () (delete-package :block-defpackage))
+   :load t)
+  (assert (eq *x* nil))
+  (assert *y*))
+
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
    ;; test a non-EQL-comparable constant, so that uses of it need symbol-value
@@ -41,14 +57,11 @@
    :before-load (lambda () (unintern (find-symbol "TESTCONSTANT")))
    :load t))
 
-(with-test (:name :block-defconstant-hairy-then-load-known-bug
-                  :fails-on :sbcl)
+(with-test (:name :block-defconstant-hairy-then-load-fasl)
   (ctu:file-compile
-   ;; this non-EQL-comparable constant has a value that is not fopcompilable,
-   ;; so unfortunately it can not be referenced in code within the file.
    `((sb-int:defconstant-eqx testconstant2
-         (let (testconstant2)
-           (dotimes (i 5 testconstant2) (push i testconstant2)))
+         (let (list)
+           (dotimes (i 5 list) (push i list)))
        #'equal)
      (defun bar ()
        (loop for i in testconstant2 collect i)))

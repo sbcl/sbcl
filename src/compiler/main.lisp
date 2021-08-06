@@ -1035,17 +1035,13 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (or (and (eq (block-compile *compilation*) t)
-                   (listp form)
-                   (find (car form) '(sb-impl::%defpackage sb-impl::%defconstant))
-                   (fopcompilable-p form expand))
-              (and #-sb-xc-host
-                   (policy *policy*
-                       ;; FOP-compiled code is harder to debug.
-                       (or (< debug 2)
-                           (> space debug)))
-                   (not (eq (block-compile *compilation*) t))
-                   (fopcompilable-p form expand)))
+      (if (and #-sb-xc-host
+               (policy *policy*
+                   ;; FOP-compiled code is harder to debug.
+                   (or (< debug 2)
+                       (> space debug)))
+               (not (eq (block-compile *compilation*) t))
+               (fopcompilable-p form expand))
           (let ((*fopcompile-label-counter* 0))
             (fopcompile form path nil expand))
           (let ((*lexenv* (make-lexenv
@@ -1056,6 +1052,13 @@ necessary, since type inference may take arbitrarily long to converge.")
             (if (eq (block-compile *compilation*) t)
                 (push tll (toplevel-lambdas *compilation*))
                 (compile-toplevel (list tll) nil))
+            ;; DEFPACKAGE and DEFCONSTANT have load-time effects that
+            ;; must occur before code components referencing the
+            ;; packages and constants they define are loaded, so we
+            ;; delimit the current component here.
+            (case (car form)
+              ((sb-impl::%defpackage sb-impl::%defconstant)
+               (finish-block-compilation)))
             nil)))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
