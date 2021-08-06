@@ -35,7 +35,7 @@
 
 (with-test (:name :block-defpackage-top-level-form-order)
   (ctu:file-compile
-   `((setq *x* (find-package "BLOCk-DEFPACKAGE"))
+   `((setq *x* (find-package "BLOCK-DEFPACKAGE"))
 
      (defpackage block-defpackage (:use :cl :cl-user))
 
