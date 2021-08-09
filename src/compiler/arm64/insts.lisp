@@ -1907,9 +1907,77 @@
                                             (ldb (byte 5 0) bit)
                                             (ash (- (label-position label) posn) -2)
                                             (tn-offset rt))))))
+
+(define-instruction tbnz* (segment rt bit label)
+  (:emitter
+   (aver (label-p label))
+   (check-type bit (integer 0 63))
+   (labels ((compute-delta (position &optional magic-value)
+              (- (label-position label
+                                 (when magic-value position)
+                                 magic-value)
+                 position))
+            (multi-instruction-emitter (segment position)
+              (declare (ignore position))
+              (assemble (segment)
+                (inst tst rt (ash 1 bit))
+                (inst b :ne label)))
+            (one-instruction-emitter (segment posn)
+              (emit-test-branch-imm segment
+                                    (ldb (byte 1 5) bit)
+                                    1
+                                    (ldb (byte 5 0) bit)
+                                    (ash (- (label-position label) posn) -2)
+                                    (tn-offset rt)))
+            (multi-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
+              (let ((delta (compute-delta posn magic-value)))
+                (when (typep delta '(signed-byte 14))
+                  (emit-back-patch segment 4
+                                   #'one-instruction-emitter)
+                  t))))
+     (emit-chooser
+      segment 8 2
+      #'multi-instruction-maybe-shrink
+      #'multi-instruction-emitter))))
+
+(define-instruction tbz* (segment rt bit label)
+  (:emitter
+   (aver (label-p label))
+   (check-type bit (integer 0 63))
+   (labels ((compute-delta (position &optional magic-value)
+              (- (label-position label
+                                 (when magic-value position)
+                                 magic-value)
+                 position))
+            (multi-instruction-emitter (segment position)
+              (declare (ignore position))
+              (assemble (segment)
+                (inst tst rt (ash 1 bit))
+                (inst b :eq label)))
+            (one-instruction-emitter (segment posn)
+              (emit-test-branch-imm segment
+                                    (ldb (byte 1 5) bit)
+                                    0
+                                    (ldb (byte 5 0) bit)
+                                    (ash (- (label-position label) posn) -2)
+                                    (tn-offset rt)))
+            (multi-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
+              (let ((delta (compute-delta posn magic-value)))
+                (when (typep delta '(signed-byte 14))
+                  (emit-back-patch segment 4
+                                   #'one-instruction-emitter)
+                  t))))
+     (emit-chooser
+      segment 8 2
+      #'multi-instruction-maybe-shrink
+      #'multi-instruction-emitter))))
+
+
 ;;;
 (def-emitter exception
-  (#b11010100 8 24)
+    (#b11010100 8 24)
   (opc 3 21)
   (imm 16 5)
   (#b000 3 2)

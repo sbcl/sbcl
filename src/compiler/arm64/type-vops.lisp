@@ -14,14 +14,16 @@
 (defun %test-fixnum (value temp target not-p)
   (declare (ignore temp))
   (assemble ()
-    (inst tst value fixnum-tag-mask)
-    (inst b (if not-p :ne :eq) target)))
+    #.(assert (= fixnum-tag-mask 1))
+    (if not-p
+        (inst tbnz* value 0 target)
+        (inst tbz* value 0 target))))
 
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate
                                            headers &key value-tn-ref)
   (let ((drop-through (gen-label)))
-    (inst tst value fixnum-tag-mask)
-    (inst b :eq (if not-p drop-through target))
+    #.(assert (= fixnum-tag-mask 1))
+    (inst tbz* value 0 (if not-p drop-through target))
     (%test-immediate-and-headers value temp target not-p immediate headers
                                  :drop-through drop-through
                                  :value-tn-ref value-tn-ref)))
@@ -41,8 +43,8 @@
                                  &key value-tn-ref)
   (let ((drop-through (gen-label)))
     (assemble ()
-      (inst ands temp value fixnum-tag-mask)
-      (inst b :eq (if not-p drop-through target)))
+      #.(assert (= fixnum-tag-mask 1))
+      (inst tbz* value 0 (if not-p drop-through target)))
     (%test-headers value temp target not-p nil headers
                    :drop-through drop-through
                    :value-tn-ref value-tn-ref)))
@@ -190,10 +192,9 @@
 
          ;; positive implies (unsigned-byte 64).
          (emit-label fixnum)
-         (inst cmp temp 0)
          (if not-p
-             (inst b :lt target)
-             (inst b :ge target))))
+             (inst tbnz* temp (1- n-word-bits) target)
+             (inst tbz* temp (1- n-word-bits) target))))
      (values))
    NOT-TARGET))
 
@@ -285,12 +286,7 @@
   (:generator 5
     (let ((fixnum-hi (fixnumize hi)))
       #.(assert (= fixnum-tag-mask 1))
-      (cond (not-p
-             (inst tst value fixnum-tag-mask)
-             ;; TBNZ can't jump as far as B.
-             (inst b :ne target))
-            (t
-             (inst tbnz value 0 skip)))
+      (inst tbnz* value 0 (if not-p target skip))
       (inst cmp value fixnum-hi)
       (inst b (if not-p
                   :hi
@@ -308,12 +304,7 @@
   (:policy :fast-safe)
   (:generator 6
     #.(assert (= fixnum-tag-mask 1))
-    (cond (not-p
-           (inst tst value fixnum-tag-mask)
-           ;; TBNZ can't jump as far as B.
-           (inst b :ne target))
-          (t
-           (inst tbnz value 0 skip)))
+    (inst tbnz* value 0 (if not-p target skip))
     (let ((condition (if not-p :hi :ls)))
       (load-immediate-word temp (fixnumize hi))
       (inst cmp value temp)
