@@ -3009,3 +3009,25 @@
                            (list value (1- n-word-bits) label))))
               (delete-stmt next)
               next-next)))))))
+
+(defpattern "tst one bit + branch" ((ands) (b)) (stmt next)
+  (let ((next-next (stmt-next next)))
+    (when (and (not (stmt-labels next))
+               next-next
+               (neq (stmt-mnemonic next-next) 'b))
+      (destructuring-bind (target value mask) (stmt-operands stmt)
+        (when (and (integerp mask)
+                   (= (logcount mask) 1)
+                   (eq target zr-tn))
+          (destructuring-bind (flag label) (stmt-operands next)
+            (when (case flag
+                    (:eq
+                     (setf (stmt-mnemonic stmt) 'tbz
+                           (stmt-operands stmt)
+                           (list value (1- (integer-length mask)) label)))
+                    (:ne
+                     (setf (stmt-mnemonic stmt) 'tbnz
+                           (stmt-operands stmt)
+                           (list value (1- (integer-length mask)) label))))
+              (delete-stmt next)
+              next-next)))))))
