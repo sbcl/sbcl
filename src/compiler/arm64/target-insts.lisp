@@ -317,8 +317,9 @@
   (case register
     (#.sb-vm::null-offset
      (let ((offset (+ sb-vm:nil-value offset)))
-       (maybe-note-static-symbol (logior offset other-pointer-lowtag)
-                                              dstate)))
+       (or (maybe-note-static-symbol (logior offset other-pointer-lowtag)
+                                     dstate)
+           (maybe-note-assembler-routine offset nil dstate))))
     #+sb-thread
     (#.sb-vm::thread-offset
      (let* ((thread-slots
