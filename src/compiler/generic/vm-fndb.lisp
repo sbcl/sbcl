@@ -158,11 +158,11 @@
 (defknown (function-header-word) (function) sb-vm:word (flushable))
 (defknown (instance-header-word) (instance) sb-vm:word (flushable))
 
-;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
-    (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) t)
+    (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (values))
 ;;; Like SET-HEADER-DATA, but instead of writing the entire header,
 ;;; LOGIOR of the specified value into the "data" portion of the word.
+;;; Returns the first argument, *not* the modified header data.
 (defknown logior-header-bits (t (unsigned-byte 16)) t
     (#+x86-64 always-translatable))
 ;;; ASSIGN-VECTOR-FLAGSS assign all and only the flags byte.
@@ -449,8 +449,7 @@
 
 ;;; Change the length of bignum to be newlen. Newlen must be the same or
 ;;; smaller than the old length, and any elements beyond newlen must be zeroed.
-;;; FIXME: should not return a value
-(defknown %bignum-set-length (bignum bignum-length) bignum
+(defknown %bignum-set-length (bignum bignum-length) (values)
   (always-translatable))
 
 (defknown %bignum-ref (bignum bignum-index) bignum-element-type

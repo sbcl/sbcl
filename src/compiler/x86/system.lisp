@@ -110,18 +110,15 @@
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg) :target res :to (:result 0))
+  (:args (x :scs (descriptor-reg) :to :eval)
          (data :scs (any-reg) :target eax))
   (:arg-types * positive-fixnum)
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from (:argument 1) :to (:result 0)) eax)
+  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 1)) eax)
   (:generator 6
     (move eax data)
-    (inst shl eax (- n-widetag-bits 2))
+    (inst shl eax (- n-widetag-bits n-fixnum-tag-bits))
     (load-type al-tn x (- other-pointer-lowtag))
-    (storew eax x 0 other-pointer-lowtag)
-    (move res x)))
+    (storew eax x 0 other-pointer-lowtag)))
 
 (define-vop (test-header-bit)
   (:translate test-header-bit)

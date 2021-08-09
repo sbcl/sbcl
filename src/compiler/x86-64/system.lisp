@@ -184,19 +184,17 @@
 (define-vop ()
   (:translate set-header-data)
   (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg) :target res :to (:result 0))
+  (:args (x :scs (descriptor-reg) :to :eval)
          (data :scs (any-reg) :target temp))
   (:arg-types * positive-fixnum)
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :from (:argument 1) :to (:result 0)) temp)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) temp)
   (:generator 6
     (move temp data)
     (inst shl temp (- n-widetag-bits n-fixnum-tag-bits))
     ;; merge in the widetag. We should really preserve bit 63 as well
     ;; which could be a GC mark bit, but it's not concurrent at the moment.
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
-    (storew temp x 0 other-pointer-lowtag)
-    (move res x)))
+    (storew temp x 0 other-pointer-lowtag)))
 (define-vop (logior-header-bits)
   (:translate logior-header-bits)
   (:policy :fast-safe)
