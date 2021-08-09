@@ -346,20 +346,6 @@
 
 ;;; Shifting
 
-(define-vop (fast-ash-left-c/fixnum=>fixnum)
-  (:translate ash)
-  (:policy :fast-safe)
-  (:args (number :scs (any-reg) :target result))
-  (:info amount)
-  (:arg-types tagged-num (:constant unsigned-byte))
-  (:results (result :scs (any-reg)))
-  (:result-types tagged-num)
-  (:note "inline ASH")
-  (:generator 1
-    (if (< amount 64)
-        (inst lsl result number amount)
-        (inst mov result 0))))
-
 (define-vop (fast-ash-right-c/fixnum=>fixnum)
   (:translate ash)
   (:policy :fast-safe)
@@ -456,34 +442,48 @@
   (:translate ash)
   (:variant :unsigned))
 
-(macrolet ((def (name sc-type type result-type cost)
-             `(define-vop (,name)
-                (:note "inline ASH")
-                (:translate ash)
-                (:args (number :scs (,sc-type))
-                       (amount :scs (signed-reg unsigned-reg)))
-                ;; For modular variants
-                (:variant-vars cut)
-                (:arg-types ,type positive-fixnum)
-                (:results (result :scs (,result-type)))
-                (:result-types ,type)
-                (:policy :fast-safe)
-                (:generator ,cost
-                  (cond (cut
-                         (inst cmp amount n-word-bits)
-                         (cond ((location= amount result)
-                                (inst csel tmp-tn number zr-tn :lt)
-                                (inst lsl result tmp-tn amount))
-                               (t
-                                (inst csel result number zr-tn :lt)
-                                (inst lsl result result amount))))
-                        (t
-                         (inst lsl result number amount)))))))
+(macrolet ((def (name name-c sc-type type result-type cost)
+             `(progn
+                (define-vop (,name)
+                  (:note "inline ASH")
+                  (:translate ash)
+                  (:args (number :scs (,sc-type))
+                         (amount :scs (signed-reg unsigned-reg)))
+                  ;; For modular variants
+                  (:variant-vars cut)
+                  (:arg-types ,type positive-fixnum)
+                  (:results (result :scs (,result-type)))
+                  (:result-types ,type)
+                  (:policy :fast-safe)
+                  (:generator ,cost
+                    (cond (cut
+                           (inst cmp amount n-word-bits)
+                           (cond ((location= amount result)
+                                  (inst csel tmp-tn number zr-tn :lt)
+                                  (inst lsl result tmp-tn amount))
+                                 (t
+                                  (inst csel result number zr-tn :lt)
+                                  (inst lsl result result amount))))
+                          (t
+                           (inst lsl result number amount)))))
+                (define-vop (,name-c)
+                  (:note "inline ASH")
+                  (:translate ash)
+                  (:args (number :scs (,sc-type)))
+                  (:info amount)
+                  (:arg-types ,type (:constant unsigned-byte))
+                  (:results (result :scs (,result-type)))
+                  (:result-types ,type)
+                  (:policy :fast-safe)
+                  (:generator ,(1- cost)
+                              (if (< amount 64)
+                                  (inst lsl result number amount)
+                                  (inst mov result 0)))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
-  (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
-  (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
-  (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+  (def fast-ash-left/fixnum=>fixnum fast-ash-left-c/fixnum=>fixnum any-reg tagged-num any-reg 2)
+  (def fast-ash-left/signed=>signed fast-ash-left-c/signed=>signed signed-reg signed-num signed-reg 3)
+  (def fast-ash-left/unsigned=>unsigned fast-ash-left-c/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
@@ -541,6 +541,10 @@
 (define-vop (fast-ash-left-mod64/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned)
   (:variant t)
+  (:translate ash-left-mod64))
+
+(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
+             fast-ash-left-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
