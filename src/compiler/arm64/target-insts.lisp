@@ -101,7 +101,7 @@
 (defun print-test-branch-immediate (value stream dstate)
   (declare (ignore dstate))
   (format stream "#~D"
-          (dpb (car value) (byte 1 5) (car value))))
+          (dpb (car value) (byte 1 5) (cadr value))))
 
 (defun decode-scaled-immediate (value)
   (destructuring-bind (size opc value simd) value

@@ -359,7 +359,7 @@
                    (funcall gen vop)))))))
 
     (when *do-instcombine-pass*
-      #+x86-64
+      #+(or arm64 x86-64)
       (sb-assem::combine-instructions (asmstream-code-section asmstream)))
 
     (emit (asmstream-data-section asmstream)
