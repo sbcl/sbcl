@@ -132,9 +132,6 @@ generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 /* Should we do a pre-scan of the heap before it's GCed? */
 boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
 
-/* Should we check that newly allocated regions are zero filled? */
-boolean gencgc_zero_check = 0;
-
 /* If defined, free pages are read-protected to ensure that nothing
  * accesses them.
  */
@@ -978,18 +975,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         }
     }
 #endif
-
-    /* we can do this after releasing free_pages_lock */
-    if (gencgc_zero_check) {
-        lispobj *p;
-        for (p = alloc_region->start_addr;
-             (void*)p < alloc_region->end_addr; p++) {
-            if (*p != 0) {
-                lose("The new region is not zero at %p (start=%p, end=%p).",
-                     p, alloc_region->start_addr, alloc_region->end_addr);
-            }
-        }
-    }
 }
 
 /* The new_object structure holds the page, byte offset, and size of
