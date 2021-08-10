@@ -1056,9 +1056,10 @@ necessary, since type inference may take arbitrarily long to converge.")
             ;; must occur before code components referencing the
             ;; packages and constants they define are loaded, so we
             ;; delimit the current component here.
-            (case (car form)
-              ((sb-impl::%defpackage sb-impl::%defconstant)
-               (delimit-block-compilation)))
+            (when (consp form)
+              (case (car form)
+                ((sb-impl::%defpackage sb-impl::%defconstant)
+                 (delimit-block-compilation))))
             nil)))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
