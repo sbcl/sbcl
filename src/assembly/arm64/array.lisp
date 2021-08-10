@@ -63,16 +63,15 @@
     (inst lsl words words (- word-shift n-fixnum-tag-bits))
     (inst add words words (* (1+ vector-data-offset) n-word-bytes))
     (inst and words words (bic-mask lowtag-mask)) ; double-word align
-    (allocation nil words nil result :stack-allocate-p t)
+    (allocation nil words other-pointer-lowtag result :stack-allocate-p t)
 
-    (inst stp temp length (@ result))
+    (inst stp temp length (@ tmp-tn))
     ;; Zero fill
     (assemble ()
       ;; The header word has already been set, skip it.
-      (inst add temp result (* n-word-bytes 2))
-      (inst add words result words)
+      (inst add temp tmp-tn (* n-word-bytes 2))
+      (inst add words tmp-tn words)
       LOOP
       (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
       (inst cmp temp words)
-      (inst b :lt LOOP))
-    (inst orr result result other-pointer-lowtag)))
+      (inst b :lt LOOP))))

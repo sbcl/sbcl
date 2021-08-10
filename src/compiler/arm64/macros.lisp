@@ -172,14 +172,13 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (type alloc-tn size back-label return-in-tmp lip)
-  (unless (eq size tmp-tn)
-    (inst mov tmp-tn size))
+(defun allocation-tramp (type alloc-tn size back-label lip)
+  (if (integerp size)
+      (load-immediate-word tmp-tn size)
+      (inst mov tmp-tn size))
   (let ((asm-routine (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp)))
     (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine) lip))
   (inst blr alloc-tn)
-  (unless return-in-tmp
-    (move alloc-tn tmp-tn))
   (inst b back-label))
 
 ;;; Leaves the untagged pointer in TMP-TN,
@@ -192,14 +191,10 @@
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
-        (let ((result (if lowtag
-                          tmp-tn
-                          result-tn)))
-          (inst add result csp-tn lowtag-mask)
-          (inst and result result (lognot lowtag-mask))
-          (inst add csp-tn result (add-sub-immediate size))
-          (when lowtag
-            (inst add result-tn result lowtag))))
+        (inst add tmp-tn csp-tn lowtag-mask)
+        (inst and tmp-tn tmp-tn (lognot lowtag-mask))
+        (inst add csp-tn tmp-tn (add-sub-immediate size result-tn))
+        (inst add result-tn tmp-tn lowtag))
       #-gencgc
       (progn
         (load-symbol-value flag-tn *allocation-pointer*)
@@ -215,27 +210,21 @@
           (load-immediate-word flag-tn boxed-region)
           (inst ldp result-tn flag-tn (@ flag-tn 0)))
         #+sb-thread
-        (inst ldp result-tn flag-tn (@ thread-tn (* n-word-bytes thread-alloc-region-slot)))
-        (setf size (add-sub-immediate size))
-        (inst add result-tn result-tn size)
+        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-alloc-region-slot)))
+        (inst add result-tn tmp-tn (add-sub-immediate size result-tn))
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
         #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- boxed-region nil-value))))
         #+sb-thread (storew result-tn thread-tn thread-alloc-region-slot)
-        ;; alloc_tramp uses tmp-tn for returning the result,
-        ;; save on a move when possible
-        (inst sub (if lowtag tmp-tn result-tn) result-tn size)
+
         (emit-label BACK-FROM-ALLOC)
-        (when lowtag
-          (inst add result-tn tmp-tn lowtag))
+        (inst add result-tn tmp-tn lowtag)
         (assemble (:elsewhere)
           (emit-label ALLOC)
           (allocation-tramp type
                             result-tn
                             size
                             BACK-FROM-ALLOC
-                            ;; see the comment above aboout alloc_tramp
-                            lowtag
                             lip)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
