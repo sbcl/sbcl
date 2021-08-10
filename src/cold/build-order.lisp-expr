@@ -337,7 +337,7 @@
  ("src/code/foreign"         :not-host)
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
- ("src/code/bignum"          :not-host :block-compile)
+ ("src/code/bignum"          :not-host #-bignum-assertions :block-compile)
  ("src/code/number-dispatch" :not-host)
  ("src/code/float-inf-nan"   :not-host)
  ("src/code/numbers"         :not-host)

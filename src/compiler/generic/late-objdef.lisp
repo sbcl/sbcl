@@ -41,7 +41,7 @@
   (lambda (entry)
     (cons (symbol-value (symbolicate (car entry) "-WIDETAG"))
           (cdr entry)))
-  `((bignum "unboxed" "bignum" "bignum")
+  `((bignum "bignum")
     (ratio "boxed" "ratio_or_complex" "boxed")
     (single-float ,(or #+64-bit "immediate" "unboxed"))
     (double-float "unboxed")
@@ -140,7 +140,7 @@
             min (ldb (byte 32 32) bits))
     ;; Union in the bits for other unboxed object types.
     (dolist (entry *scav/trans/size*)
-      (when (string= (second entry) "unboxed")
+      (when (member (second entry) '("bignum" "unboxed") :test 'string=)
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
     (format stream "static inline int leaf_obj_widetag_p(unsigned char widetag) {~%")
     #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)

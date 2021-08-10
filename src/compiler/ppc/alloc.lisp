@@ -180,6 +180,9 @@
           (t
            (inst addi header header (+ (ash -2 (length-field-shift type)) type))
            (inst clrrwi bytes bytes n-lowtag-bits)))
+    #+bignum-assertions
+    (when (= type bignum-widetag)
+      (inst slwi bytes bytes 1)) ; use 2x the space
     (pseudo-atomic (pa-flag)
       (allocation nil bytes lowtag result :temp-tn temp :flag-tn pa-flag)
       (storew header result 0 lowtag))))

@@ -40,7 +40,7 @@
   `(sb-vm::%%make-symbol (logior-header-bits ,string ,sb-vm:+vector-shareable+)))
 
 ;;; We don't want to clutter the bignum code.
-#+(or x86 x86-64)
+#+(and (or x86 x86-64) (not bignum-assertions))
 (define-source-transform sb-bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on

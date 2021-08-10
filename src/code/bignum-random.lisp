@@ -43,6 +43,9 @@
   (let* ((n-total-bits (+ 1 n-random-chunk-bits bit-count)) ; sign bit
          (length (ceiling n-total-bits digit-size))
          (bignum (%allocate-bignum length)))
+    ;; DO NOT ASSUME THAT %ALLOCATE-BIGNUM PREZEROS
+    ;; [See example in MAKE-RANDOM-BIGNUM]
+    (setf (%bignum-ref bignum (1- length)) 0)
     (multiple-value-bind (n-random-digits n-random-bits)
         (floor bit-count digit-size)
       (declare (type bignum-length n-random-digits))
@@ -72,6 +75,11 @@
          (length (ceiling n-total-bits digit-size))
          (bignum (%allocate-bignum length)))
     (declare (type bignum-length length))
+    ;; DO NOT ASSUME THAT %ALLOCATE-BIGNUM PREZEROS
+    ;; Consider: n-bits = 64 -> n-total-bits = 65 -> length = 2
+    ;; and n-digits = 1, n-bits-partial-digit = 0
+    ;; so DOTIMES executes exactly once, leaving the final word untouched.
+    (setf (%bignum-ref bignum (1- length)) 0)
     (multiple-value-bind (n-digits n-bits-partial-digit)
         (floor n-bits digit-size)
       (declare (type bignum-length n-digits))

@@ -110,6 +110,113 @@
 (eval-when (:compile-toplevel)
 (defconstant all-ones-digit most-positive-word))
 
+#+bignum-assertions
+(progn
+(declaim (notinline %allocate-bignum))
+(defmacro with-bignum-shadow-bits ((bits object &optional length) &body body)
+  `(let ((b ,object))
+     (with-pinned-objects (b)
+       (let ((,bits
+              (sb-sys:sap+ (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address b))
+                                        (- sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
+                           ;; shadow bits always start on a double-lispword boundary,
+                           ;; so ensure that payload length looks like an odd number.
+                           (ash (logior ,(or length `(%bignum-length b)) 1)
+                                sb-vm:word-shift))))
+         ,@body))))
+
+(defun %allocate-bignum (length)
+  (declare (type bignum-length length))
+  (declare (inline %allocate-bignum))
+  (let ((bignum (%allocate-bignum length))) ; call the low-level allocator
+    (multiple-value-bind (nwords nbits) (floor length sb-vm:n-word-bits)
+      (with-bignum-shadow-bits (bit-base bignum length)
+        (dotimes (i nwords)
+          (setf (sap-ref-word bit-base 0) sb-ext:most-positive-word
+                bit-base (sap+ bit-base sb-vm:n-word-bytes)))
+        (when (plusp nbits)
+          (setf (sap-ref-word bit-base 0)
+                (#+little-endian shift-towards-start
+                 #+big-endian shift-towards-end sb-ext:most-positive-word
+                 (- nbits))))))
+    (dotimes (i length)
+      (%%bignum-set bignum i (logior #+64-bit #xc0fefe0000 i)))
+    ;; If there is a padding word, then write junk in it, so we can assert that whenever
+    ;; bignum-set-length is used, the padding word (if present) was cleared.
+    (when (evenp length) (%%bignum-set bignum length #xdeadbeef))
+    bignum))
+
+(defun index-out-of-bounds (bignum i)
+  (error "out-of-bounds bignum set @ ~x[~d], len=~d~%"
+         (get-lisp-obj-address bignum) i (%bignum-length bignum)))
+
+(declaim (inline %bignum-set))
+(defun %bignum-set (bignum i value)
+  (declare (type bignum bignum)
+           (type bignum-index i)
+           (type bignum-element-type value))
+  (cond ((< i (%bignum-length bignum))
+         (with-bignum-shadow-bits (bit-base bignum)
+           (multiple-value-bind (word-index bit-index) (floor i sb-vm:n-word-bits)
+             (let ((sap (sap+ bit-base (* word-index sb-vm:n-word-bytes))))
+               (setf (sap-ref-word sap 0)
+                     (logandc2 (sap-ref-word sap 0) (ash 1 bit-index))))))
+         (%%bignum-set bignum i value))
+        (t
+         (index-out-of-bounds bignum i)))
+  (values))
+
+(defun bignum-ref-trap (bignum i)
+  ;; This error might happen too early in cold-init to report it normally
+  (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned))
+                 (vector-sap #.(format nil "Element %d of bignum %p was never written~%"))
+                 i (get-lisp-obj-address bignum))
+  (alien-funcall (extern-alien "ldb_monitor" (function void)))
+  0)
+
+(declaim (inline %bignum-ref))
+(defun %bignum-ref (bignum i)
+  (declare (type bignum bignum)
+           (type bignum-index i))
+  ;; We don't need to check %BIGNUM-LENGTH because the shadow bit won't be on
+  ;; presuming that we only care to detct "small" off-by-1 errors,
+  ;; and not egregious buffer overrun errors.
+  (multiple-value-bind (word-index bit-index) (floor i sb-vm:n-word-bits)
+    (with-bignum-shadow-bits (bit-base bignum)
+      (let ((sap (sap+ bit-base (* word-index sb-vm:n-word-bytes))))
+        (if (logbitp bit-index (sap-ref-word sap 0)) ; word was never assigned
+            (truly-the sb-vm:word (bignum-ref-trap bignum i))
+            (sap-ref-word (int-sap (get-lisp-obj-address bignum))
+                          (- (ash (+ i sb-vm:bignum-digits-offset) sb-vm:word-shift)
+                             sb-vm:other-pointer-lowtag)))))))
+
+(defun aver-zeroed-from-index (bignum index)
+  (with-pinned-objects (bignum)
+    (let* ((physical-start (sap+ (int-sap (get-lisp-obj-address bignum))
+                                 (- sb-vm:other-pointer-lowtag)))
+           (physlen-bytes (ash (+ (* (%bignum-length bignum) 2) 2) sb-vm:word-shift))
+           (physical-end (sap+ physical-start physlen-bytes))
+           (word-ptr (sap+ physical-start (ash (1+ index) sb-vm:word-shift))))
+      (loop while (sb-sys:sap< word-ptr physical-end)
+            do (unless (= (sap-ref-word word-ptr 0) 0)
+                 (alien-funcall (extern-alien "printf"
+                                              (function void system-area-pointer unsigned unsigned))
+                                (vector-sap #.(format nil "set-length %p,%d not properly zeroed~%"))
+                                (get-lisp-obj-address bignum) index)
+                 (alien-funcall (extern-alien "ldb_monitor" (function void))))
+               (setq word-ptr (sap+ word-ptr 8))))))
+)
+
+;;; DO NOT ASSUME THAT LOW-LEVEL ALLOCATOR PREZEROES THE MEMORY
+(defmacro alloc-zeroing (length)
+  `(let* ((l ,length) (new (%allocate-bignum l)))
+     (dotimes (i l new)
+       (setf (%bignum-ref new i) 0))))
+(defmacro alloc-zeroing-below (length end)
+  `(let ((new (%allocate-bignum ,length)))
+     (dotimes (i ,end new)
+       (setf (%bignum-ref new i) 0))))
+
 (declaim (inline %bignum-0-or-plusp))
 (defun %bignum-0-or-plusp (bignum len)
   (declare (type bignum bignum)
@@ -178,6 +285,15 @@
       (when (= len 1) (return))))
   len)
 
+;; Prior to calling %bignum-set-length we have to ensure that if the physical length
+;; decreases, then final word that may never have been written does not contain junk.
+(defmacro clear-padding-word (bignum oldlen newlen)
+  (declare (ignorable newlen))
+  `(progn
+     (when (evenp ,oldlen)
+       (#+bignum-assertions %%bignum-set #-bignum-assertions %bignum-set ,bignum ,oldlen 0))
+     #+bignum-assertions (aver-zeroed-from-index ,bignum ,newlen)))
+
 ;;; This drops the last digit if it is unnecessary sign information. It repeats
 ;;; this as needed, possibly ending with a fixnum. If the resulting length from
 ;;; shrinking is one, see whether our one word is a fixnum. Shift the possible
@@ -190,9 +306,13 @@
            (type bignum-length len)
            (muffle-conditions compiler-note)
            #-sb-fluid (inline %normalize-bignum-buffer))
+  #+bignum-assertions (aver (= (%bignum-length result) len))
   (let ((newlen (%normalize-bignum-buffer result len)))
     (declare (type bignum-length newlen))
     (unless (= newlen len)
+      ;; If the old length was even, then there is a word which was never accessed
+      ;; and may contains random bits. Clear it to avoid a crash in GC.
+      (clear-padding-word result len newlen)
       (%bignum-set-length result newlen))
     (if (= newlen 1)
         (let ((digit (%bignum-ref result 0)))
@@ -313,7 +433,7 @@
          (len-a (%bignum-length a))
          (len-b (%bignum-length b))
          (len-res (+ len-a len-b))
-         (res (%allocate-bignum len-res))
+         (res (alloc-zeroing len-res))
          (negate-res (not (eq a-plusp b-plusp))))
     (declare (type bignum-length len-a len-b len-res))
     (dotimes (i len-a)
@@ -384,6 +504,7 @@
 
 ;;;; BIGNUM-REPLACE and WITH-BIGNUM-BUFFERS
 
+#-bignum-assertions
 (defmacro bignum-replace (dest src &key (start1 0) (end1 `(%bignum-length ,dest))
                                         (start2 0) (end2 `(%bignum-length ,src)))
   (flet ((@ (obj index)
@@ -405,6 +526,20 @@
                 (with-pinned-objects (,dest ,src)
                   (alien-funcall replace ,(@ dest start1) ,(@ src start2)
                                  (ash count sb-vm:word-shift)))))))))
+#+bignum-assertions
+(progn
+(defmacro bignum-replace (dest src &key (start1 '0) (end1 `(%bignum-length ,dest))
+                                        (start2 '0) (end2 `(%bignum-length ,src)))
+  `(bignum-replace-impl ,dest ,start1 ,end1
+                        ,src ,start2 ,end2))
+
+(defun bignum-replace-impl (dest start1 end1 src start2 end2)
+  (do ((i1 start1 (1+ i1))
+       (i2 start2 (1+ i2)))
+      ((or (>= i1 end1)
+           (>= i2 end2)))
+    (declare (type bignum-index i1 i2))
+    (%bignum-set dest i1 (%bignum-ref src i2)))))
 
 (defmacro with-bignum-buffers (specs &body body)
   "WITH-BIGNUM-BUFFERS ({(var size [init])}*) Form*"
@@ -425,8 +560,8 @@
   ;; The asserts in the GCD implementation are way too expensive to
   ;; check in normal use, and are disabled here.
 (defmacro gcd-assert (&rest args)
-  (declare (ignore args))
-  #+sb-bignum-assertions `(assert ,@args))
+  (declare (ignorable args))
+  #+bignum-assertions `(assert ,@args))
   ;; We'll be doing a lot of modular arithmetic.
 (defmacro modularly (form)
   `(logand #.all-ones-digit ,form))
@@ -675,7 +810,12 @@
                                  (- (copy-bignum tmp1 tmp1-len)
                                     (copy-bignum tmp2 tmp2-len)))))
               (bignum-abs-buffer u u-len)
-              (gcd-assert (zerop (modularly u)))))
+              ;; This assertion is strange, because we're trying to assert on
+              ;; the least significant word of U, but MODULARLY might do a full call
+              ;; to TWO-ARG-LOGAND, and it it does, that fails, because not all
+              ;; words of U are set. And rightly so- they're set only below U-LEN.
+              #+ppc (gcd-assert (zerop (modularly (copy-bignum u u-len))))
+              #-ppc (gcd-assert (zerop (modularly u)))))
         (setf u-len (make-gcd-bignum-odd u u-len))
         (rotatef u v)
         (rotatef u-len v-len))
@@ -837,7 +977,9 @@
         ;; repeats this as needed, possibly ending with a fixnum magnitude but never
         ;; returning a fixnum.
         (locally (declare (inline %normalize-bignum-buffer))
-          (%bignum-set-length res (%normalize-bignum-buffer res len-res))
+          (let ((newlen (%normalize-bignum-buffer res len-res)))
+            (clear-padding-word res len-res newlen)
+            (%bignum-set-length res newlen))
           res))))
 
 ;;; This assumes bignum is positive; that is, the result of negating it will
@@ -987,7 +1129,7 @@
 (defun bignum-ashift-left-digits (bignum bignum-len digits)
   (declare (type bignum-length bignum-len digits))
   (let* ((res-len (+ bignum-len digits))
-         (res (%allocate-bignum res-len)))
+         (res (alloc-zeroing-below res-len digits)))
     (declare (type bignum-length res-len))
     (bignum-replace res bignum :start1 digits :end1 res-len :end2 bignum-len)
     res))
@@ -1007,7 +1149,7 @@
            (type (mod #.digit-size) n-bits))
   (let* ((remaining-bits (- digit-size n-bits))
          (res-len-1 (1- res-len))
-         (res (or res (%allocate-bignum res-len))))
+         (res (or res (alloc-zeroing-below res-len digits))))
     (declare (type bignum-length res-len res-len-1))
     (do ((i 0 (1+ i))
          (j (1+ digits) (1+ j)))
@@ -1044,12 +1186,12 @@
                             (/= left-half 0)))
            (length (+ right-zero-digits
                       (if left-half-p 2 1)))
-           (result (%allocate-bignum length)))
+           (result (alloc-zeroing-below length right-zero-digits)))
       (setf (%bignum-ref result right-zero-digits) right-half)
       (when left-half-p
         (setf (%bignum-ref result (1+ right-zero-digits))
               (ldb (byte digit-size 0) left-half)))
-            result)))
+      result)))
 
 ;;;; relational operators
 
@@ -1660,6 +1802,8 @@
              (declare (type bignum-length len-q)
                       (type bignum-index k i i-1 i-2 low-x-digit)
                       (type bignum-element-type y1 y2))
+             ;; DO NOT ASSUME THAT %ALLOCATE-BIGNUM PREZEROS
+             (setf (%bignum-ref q len-q) 0)
              (loop
                  (setf (%bignum-ref q k)
                        (try-bignum-truncate-guess
@@ -1801,8 +1945,10 @@
                      (values 0 res)))
                   (t
                    (let ((len-x+1 (1+ len-x)))
-                     (setf truncate-x (%allocate-bignum len-x+1))
-                     (setf truncate-y (%allocate-bignum (1+ len-y)))
+                     ;; TODO: someone who understands this algorithm could probably figure out
+                     ;; whether these allocations can prezero fewer words.
+                     (setf truncate-x (alloc-zeroing len-x+1))
+                     (setf truncate-y (alloc-zeroing (1+ len-y)))
                      (let ((y-shift (shift-y-for-truncate y)))
                        (shift-and-store-truncate-buffers x len-x y
                                                          len-y y-shift)

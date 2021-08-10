@@ -617,6 +617,7 @@ static void print_fun_or_otherptr(lispobj obj)
 
     switch (type) {
     case BIGNUM_WIDETAG:
+        count &= 0x7fffff;
         ptr += count;
         NEWLINE_OR_RETURN;
         printf("0x");

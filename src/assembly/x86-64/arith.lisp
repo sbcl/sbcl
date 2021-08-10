@@ -50,10 +50,11 @@
 
 #+sb-assembling
 (defun return-single-word-bignum (dest alloc-tn source)
-  (instrument-alloc 16 nil)
-  (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag)))
+  (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag))
+        (nbytes #+bignum-assertions 32 #-bignum-assertions 16))
+    (instrument-alloc nbytes nil)
     (pseudo-atomic ()
-      (allocation nil 16 0 nil nil alloc-tn)
+      (allocation nil nbytes 0 nil nil alloc-tn)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)
       (if (eq dest alloc-tn)
@@ -447,8 +448,22 @@
   (inst mov rcx (ea (- other-pointer-lowtag) rdi))
   (inst shl rcx 1)
   (inst shr rcx (1+ n-widetag-bits))
-  (inst jmp :z epilogue) ; zero payload length, can this happen?
+  #+bignum-assertions
+  (progn (inst mov temp-reg-tn rcx)
+         (inst or temp-reg-tn 1))
   compare-loop
+  #+bignum-assertions
+  (let ((ok1 (gen-label)) (ok2 (gen-label)))
+    (inst dec rcx)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rsi temp-reg-tn 8) rcx)
+    (inst jmp :nc ok1)
+    (inst break halt-trap)
+    (emit-label ok1)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rdi temp-reg-tn 8) rcx)
+    (inst jmp :nc ok2)
+    (inst break halt-trap)
+    (emit-label ok2)
+    (inst inc rcx))
   (inst mov rax (ea (- other-pointer-lowtag) rsi rcx 8))
   (inst cmp rax (ea (- other-pointer-lowtag) rdi rcx 8))
   (inst jmp :ne epilogue)
@@ -527,8 +542,6 @@
   (inst cmp rcx (ea (- other-pointer-lowtag) y))
   (inst jmp :ne done)
   (inst shr rcx n-widetag-bits)
-  ;; can you have 0 payload words? Probably not, but let's be safe here.
-  (inst jmp :z done)
   loop
   (inst mov rax (ea (- other-pointer-lowtag) x rcx 8))
   (inst cmp rax (ea (- other-pointer-lowtag) y rcx 8))

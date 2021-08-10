@@ -212,12 +212,14 @@
              (inst jmp DONE))))
     (values)))
 
-;;; Allocate an other-pointer object of fixed SIZE with a single word
+;;; Allocate an other-pointer object of fixed NWORDS with a single-word
 ;;; header having the specified WIDETAG value. The result is placed in
-;;; RESULT-TN.
-(defun alloc-other (result-tn widetag size node &optional stack-allocate-p
-                    &aux (bytes (pad-data-block size)))
-  (let ((header (compute-object-header size widetag)))
+;;; RESULT-TN.  NWORDS counts the header word.
+(defun alloc-other (result-tn widetag nwords node &optional stack-allocate-p
+                    &aux (bytes (pad-data-block nwords)))
+  (let ((header (compute-object-header nwords widetag)))
+    #+bignum-assertions
+    (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (cond (stack-allocate-p
            (allocation nil bytes other-pointer-lowtag node t result-tn)
            (storew header result-tn 0 other-pointer-lowtag))
@@ -708,6 +710,8 @@
   (:generator 50
    (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
           (bytes (pad-data-block words)))
+    #+bignum-assertions
+    (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
     (unless stack-allocate-p
       (instrument-alloc bytes node))
@@ -760,10 +764,12 @@
       (inst lea operand-size header                    ; (w-1 << 8) | type
             (ea (+ (ash -2 (length-field-shift type)) type) header))
       (inst and operand-size bytes (lognot lowtag-mask)))
-      (cond (stack-allocate-p
+   #+bignum-assertions
+   (when (= type bignum-widetag) (inst shl :dword bytes 1)) ; use 2x the space
+   (cond (stack-allocate-p
              (stack-allocation result bytes lowtag)
              (storew header result 0 lowtag))
-            (t
+         (t
              (instrument-alloc bytes node)
              (pseudo-atomic ()
               (allocation nil bytes lowtag node nil result)

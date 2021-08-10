@@ -255,7 +255,10 @@
              (align-csp ,temp-tn)
              (inst ori ,result-tn csp-tn ,lowtag)
              (inst addi csp-tn csp-tn (pad-data-block ,size)))
-         (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
+         (allocation nil
+                     (* (pad-data-block ,size)
+                        #+bignum-assertions (if (eql ,type-code bignum-widetag) 2 1))
+                     ,lowtag ,result-tn
                      :temp-tn ,temp-tn
                      :flag-tn ,flag-tn))
        (when ,type-code

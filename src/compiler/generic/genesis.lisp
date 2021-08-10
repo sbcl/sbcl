@@ -828,26 +828,35 @@ core and return a descriptor to it."
 
 ;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
 ;;; least to most significant regardless of machine endianness.
-(defun integer-bits-to-core (descriptor int nwords &optional (offset 0))
+(defun integer-bits-to-core (int descriptor start nwords)
   (declare (fixnum nwords))
-  (do ((index 1 (1+ index))
+  (do ((index 0 (1+ index))
        (remainder int (ash remainder (- sb-vm:n-word-bits))))
-      ((> index nwords)
+      ((>= index nwords)
        (unless (zerop (integer-length remainder))
          (error "Nonzero remainder after writing ~D using ~D words" int nwords)))
     (write-wordindexed/raw descriptor
-                           (+ index offset)
+                           (+ start index)
                            (logand remainder sb-ext:most-positive-word))))
 
 (defun bignum-to-core (n)
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb-vm:n-word-bits))
-         (handle (allocate-otherptr *dynamic* (1+ words) sb-vm:bignum-widetag)))
-    (integer-bits-to-core handle n words)
+         (handle
+          #-bignum-assertions (allocate-otherptr *dynamic* (1+ words) sb-vm:bignum-widetag)
+          #+bignum-assertions
+          (let* ((aligned-words (1+ (logior words 1))) ; round to odd, slap on a header
+                 (physical-words (* aligned-words 2))
+                 (handle (allocate-otherptr *dynamic* physical-words sb-vm:bignum-widetag)))
+            ;; rewrite the header to indicate the logical size
+            (write-wordindexed/raw handle 0 (logior (ash words 8) sb-vm:bignum-widetag))
+            handle)))
+    (integer-bits-to-core n handle sb-vm:bignum-digits-offset words)
+    (assert (= (bignum-from-core handle) n))
     handle))
 
 (defun bignum-from-core (descriptor)
-  (let ((n-words (get-header-data descriptor))
+  (let ((n-words (logand (get-header-data descriptor) #x7fffff))
         (val 0))
     (dotimes (i n-words val)
       (let ((bits (read-bits-wordindexed descriptor
@@ -1305,7 +1314,7 @@ core and return a descriptor to it."
                    (incf byte-offset 4)))
         (setf (bvref-s32 (descriptor-mem result) byte-offset) this-id)))
 
-    (integer-bits-to-core result bitmap bitmap-words fixed-words)
+    (integer-bits-to-core bitmap result (1+ fixed-words) bitmap-words)
 
     result))
 

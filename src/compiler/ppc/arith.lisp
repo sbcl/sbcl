@@ -1003,6 +1003,7 @@
   (:translate sb-bignum:%bignum-set-length)
   (:policy :fast-safe))
 
+#-bignum-assertions
 (define-vop (bignum-ref word-index-ref)
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate sb-bignum:%bignum-ref)
@@ -1011,7 +1012,8 @@
 
 (define-vop (bignum-set word-index-set-nr)
   (:variant bignum-digits-offset other-pointer-lowtag)
-  (:translate sb-bignum:%bignum-set)
+  (:translate #+bignum-assertions sb-bignum:%%bignum-set
+              #-bignum-assertions sb-bignum:%bignum-set)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate zero))
          (value :scs (unsigned-reg)))

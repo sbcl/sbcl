@@ -805,15 +805,32 @@ scav_funinstance(lispobj *where, lispobj header)
 /* Bignums use the high bit as the mark, and all remaining bits
  * excluding the 8 widetag bits to convey the size.
  * To size it, shift out the high bit, the shift right by an extra bit,
- * round to odd, and add 1 for the header. */
-static inline sword_t size_bignum(lispobj *where) {
-    return 1 + ((*where << 1 >> (1+N_WIDETAG_BITS)) | 1);
+ * round to odd, and add 1 for the header.
+ *
+ * If assertions are enabled, the number of words taken up is double
+ * what it would ordinarily be, which is a gross overstatement of the
+ * the number of words actually needed for sanity-check bits,
+ * i.e. ALIGN_UP(CEILING(nwords,N_WORD_BITS),2)
+ * but the allocator is simplified by just doubling the space,
+ * and it doesn't matter because this is only for testing */
+static inline int bignum_nwords(lispobj header) {
+#ifdef LISP_FEATURE_BIGNUM_ASSERTIONS
+    int ndigits = ((unsigned int)header >> 8) & 0x7fffff;
+    return 2 * ndigits + 2;
+#else
+    return 1 + ((header << 1 >> (1+N_WIDETAG_BITS)) | 1);
+#endif
 }
-
+static inline sword_t size_bignum(lispobj *where) {
+    return bignum_nwords(*where);
+}
+static sword_t scav_bignum(lispobj __attribute__((unused)) *where, lispobj header) {
+    return bignum_nwords(header);
+}
 static lispobj trans_bignum(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-    return copy_large_object(object, size_bignum(native_pointer(object)),
+    return copy_large_object(object, bignum_nwords(*native_pointer(object)),
                              UNBOXED_PAGE_FLAG);
 }
 

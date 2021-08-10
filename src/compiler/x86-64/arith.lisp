@@ -1478,6 +1478,11 @@ constant shift greater than word length")))
   (define-conditional-vop < :l :b :ge :ae)
   (define-conditional-vop > :g :a :le :be))
 
+(declaim (inline load-bignum-length))
+(defun load-bignum-length (input output)
+  (loadw output input 0 other-pointer-lowtag)
+  (inst shr output n-widetag-bits))
+
 (define-vop (fast-if->-zero)
   (:args (x :scs (descriptor-reg)))
   (:arg-types integer (:constant (integer 0 0)))
@@ -1498,8 +1503,7 @@ constant shift greater than word length")))
       (inst jmp (if not-p :le :g) target)
       (inst jmp DONE))
     BIGNUM
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst shr temp n-widetag-bits)
+    (load-bignum-length x temp)
     (inst cmp :qword
           (ea (- (+ (* bignum-digits-offset n-word-bytes))
                  other-pointer-lowtag
@@ -1525,8 +1529,7 @@ constant shift greater than word length")))
       (move temp x)
       (generate-fixnum-test temp)
       (inst jmp :z TEST))
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst shr temp n-widetag-bits)
+    (load-bignum-length x temp)
     (inst mov temp (ea (- (* bignum-digits-offset n-word-bytes)
                           other-pointer-lowtag
                           n-word-bytes)
@@ -1850,13 +1853,17 @@ constant shift greater than word length")))
   (:translate sb-bignum:%bignum-set-length)
   (:policy :fast-safe))
 
+#-bignum-assertions ; %BIGNUM-ref is an inline function if compiling with assertions
 (define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb-bignum:%bignum-ref)
+#-bignum-assertions ; does not get called if compiling with assertions
 (define-full-reffer+addend bignum-ref-with-offset * bignum-digits-offset
   other-pointer-lowtag (unsigned-reg) unsigned-num
   sb-bignum:%bignum-ref-with-offset)
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb-bignum:%bignum-set)
+  (unsigned-reg) unsigned-num
+  #+bignum-assertions sb-bignum:%%bignum-set
+  #-bignum-assertions sb-bignum:%bignum-set)
 
 (define-vop (digit-0-or-plus)
   (:translate sb-bignum:%digit-0-or-plusp)

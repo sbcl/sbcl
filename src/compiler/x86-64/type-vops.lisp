@@ -275,6 +275,9 @@
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
+(defmacro bignum-header-for-length (n)
+  (logior (ash n n-widetag-bits) bignum-widetag))
+
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
   (:generator 45
@@ -295,8 +298,7 @@
            (inst and :byte temp lowtag-mask)
            (inst cmp :byte temp other-pointer-lowtag)))
       (inst jmp :ne nope)
-      (inst cmp :qword (ea (- other-pointer-lowtag) value)
-            (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst cmp :qword (ea (- other-pointer-lowtag) value) (bignum-header-for-length 1))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
@@ -325,11 +327,11 @@
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
-        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst cmp temp (bignum-header-for-length 1))
         (inst jmp :e single-word)
         ;; If it's other than two, we can't be an (unsigned-byte 64)
         ;: Leave TEMP holding 0 in the affirmative case.
-        (inst sub temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst sub temp (bignum-header-for-length 2))
         (inst jmp :ne nope)
         ;; Compare the second digit to zero (in TEMP).
         (inst cmp (object-slot-ea value (1+ bignum-digits-offset) other-pointer-lowtag)

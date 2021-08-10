@@ -335,13 +335,19 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 ;;; Utility macros for GMP mpz variable and result declaration and
 ;;; incarnation of associated SBCL bignums
 
+(declaim (inline allocate-bignum))
+(defun allocate-bignum (size)
+  (let ((bignum (%allocate-bignum size)))
+    (dotimes (i size bignum)
+      (setf (%bignum-ref bignum i) 0))))
+
 (defmacro with-mpz-results (pairs &body body)
   (loop for (gres size) in pairs
         for res = (gensym "RESULT")
         collect `(when (> ,size sb-kernel:maximum-bignum-length)
                    (error "Size of result exceeds maxim bignum length")) into checks
         collect `(,gres (struct gmpint)) into declares
-        collect `(,res (%allocate-bignum ,size))
+        collect `(,res (allocate-bignum ,size))
           into resinits
         collect `(setf (slot ,gres 'mp_alloc) (%bignum-length ,res)
                        (slot ,gres 'mp_size) 0
@@ -400,7 +406,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
           into resinits
         collect `(when (> ,size (1- sb-kernel:maximum-bignum-length))
                    (error "Size of result exceeds maxim bignum length")) into checks
-        collect `(,res (%allocate-bignum (1+ ,size)))
+        collect `(,res (allocate-bignum (1+ ,size)))
           into resallocs
         collect `(setf ,res (if (minusp (slot ,gres 'mp_size)) ; check for negative result
                                 (- (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size))
@@ -771,8 +777,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                            (blength (denominator b)))
                       3)))
          (with-alien ((r (struct gmprat)))
-           (let ((num (%allocate-bignum size))
-                 (den (%allocate-bignum size)))
+           (let ((num (allocate-bignum size))
+                 (den (allocate-bignum size)))
              (sb-sys:with-pinned-objects (num den)
                (setf (slot (slot r 'mp_num) 'mp_size) 0
                      (slot (slot r 'mp_num) 'mp_alloc) size

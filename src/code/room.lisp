@@ -230,6 +230,9 @@
             (+ array-dimensions-offset (array-rank object)))
            ((simple-array nil (*)) 2) ; no payload
            (bignum
+            #+bignum-assertions
+            (+ (* (sb-bignum:%bignum-length object) 2) 2)
+            #-bignum-assertions
             ;; 64-bit machines might want to store the bignum length in the upper 4
             ;; bytes of the header which would simplify %bignum-set-length.
             (1+ (sb-bignum:%bignum-length object)))

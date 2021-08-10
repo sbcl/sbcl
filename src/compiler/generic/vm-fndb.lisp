@@ -442,7 +442,7 @@
 ;;;; bignum operations
 
 (defknown %allocate-bignum (bignum-length) bignum
-  (flushable always-translatable))
+  (flushable #-bignum-assertions always-translatable))
 
 (defknown %bignum-length (bignum) bignum-length
   (foldable flushable always-translatable))
@@ -453,13 +453,14 @@
   (always-translatable))
 
 (defknown %bignum-ref (bignum bignum-index) bignum-element-type
-  (flushable always-translatable))
+  (flushable #-bignum-assertions always-translatable))
 #+(or x86 x86-64)
 (defknown %bignum-ref-with-offset (bignum fixnum (signed-byte 24))
   bignum-element-type (flushable always-translatable))
 
-(defknown %bignum-set (bignum bignum-index bignum-element-type) (values)
-  (always-translatable))
+(defknown (%bignum-set #+bignum-assertions %%bignum-set) (bignum bignum-index bignum-element-type)
+  (values)
+  (#-bignum-assertions always-translatable))
 
 ;;; Return T if digit is positive, or NIL if negative.
 (defknown %digit-0-or-plusp (bignum-element-type) boolean

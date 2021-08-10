@@ -180,7 +180,9 @@
 ;;; RESULT-TN.
 (defun alloc-other (result-tn widetag size node &optional stack-allocate-p)
   (pseudo-atomic (:elide-if stack-allocate-p)
-      (allocation nil (pad-data-block size) other-pointer-lowtag
+      (allocation nil (* (pad-data-block size)
+                         #+bignum-assertions (if (eql widetag bignum-widetag) 2 1))
+                  other-pointer-lowtag
                   node stack-allocate-p result-tn)
       (storew (compute-object-header size widetag)
               result-tn 0 other-pointer-lowtag)))
@@ -411,7 +413,9 @@
           (aver (null type))
           (inst call (make-fixup dst :assembly-routine)))
         (pseudo-atomic (:elide-if stack-allocate-p)
-         (allocation nil (pad-data-block words) lowtag node stack-allocate-p result)
+         (let ((nbytes (* (pad-data-block words)
+                          #+bignum-assertions (if (eql type bignum-widetag) 2 1))))
+           (allocation nil nbytes lowtag node stack-allocate-p result))
          (when type
            (storew (compute-object-header words type)
                    result
@@ -436,6 +440,7 @@
           (make-ea :dword :base header
                           :disp (+ (ash -2 (length-field-shift type)) type)))
     (inst and bytes (lognot lowtag-mask))
+    #+bignum-assertions (when (eql type bignum-widetag) (inst shl bytes 1)) ; use 2x space
     (pseudo-atomic (:elide-if stack-allocate-p)
      (allocation nil bytes lowtag node stack-allocate-p result)
      (storew header result 0 lowtag))))
