@@ -274,6 +274,9 @@
          (index (atomic-incf *message-in-counter*)))
     (setf (aref *messages* index) data)))
 
+#+darwin
+(test-util::disable-profiling)
+
 ;;; This encounters the "backing off for retry" error if attempting
 ;;; to start too many threads.
 (defparameter *max-runnable-threads* #+x86-64 100 #-x86-64 5)
