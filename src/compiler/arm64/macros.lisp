@@ -182,19 +182,24 @@
     (move alloc-tn tmp-tn))
   (inst b back-label))
 
+;;; Leaves the untagged pointer in TMP-TN,
+;;; Allowing it to be used with STP later.
 (defun allocation (type size lowtag result-tn
-                      &key flag-tn
-                           stack-allocate-p
-                           (lip (if stack-allocate-p nil (missing-arg))))
+                   &key flag-tn
+                        stack-allocate-p
+                        (lip (if stack-allocate-p nil (missing-arg))))
   (declare (ignorable type lip))
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
-        (inst add result-tn csp-tn lowtag-mask)
-        (inst and result-tn result-tn (lognot lowtag-mask))
-        (inst add csp-tn result-tn (add-sub-immediate size))
-        (when lowtag
-          (inst add result-tn result-tn lowtag)))
+        (let ((result (if lowtag
+                          tmp-tn
+                          result-tn)))
+          (inst add result csp-tn lowtag-mask)
+          (inst and result result (lognot lowtag-mask))
+          (inst add csp-tn result (add-sub-immediate size))
+          (when lowtag
+            (inst add result-tn result lowtag))))
       #-gencgc
       (progn
         (load-symbol-value flag-tn *allocation-pointer*)
@@ -236,7 +241,8 @@
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p
-                                                 (lip (missing-arg)))
+                                                 (lip (missing-arg))
+                                                 (store-type-code t))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -255,7 +261,8 @@
                    :lip ,lip)
        (when ,type-code
          (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
-         (storew ,flag-tn ,result-tn 0 ,lowtag))
+         ,@(and store-type-code
+                `((storew ,flag-tn ,result-tn 0 ,lowtag))))
        ,@body)))
 
 ;;;; Error Code

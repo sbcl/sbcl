@@ -389,8 +389,12 @@
     (move x arg)
     (inst adds y x x)
     (inst b :vc DONE)
-    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset) :lip lip)
-      (storew x y bignum-digits-offset other-pointer-lowtag))
+    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset) :lip lip
+                            :store-type-code nil)
+      ;; TMP-TN has the untagged address coming from ALLOCATION
+      ;; that way STP can be used on an aligned address.
+      ;; PA-FLAG has the widetag computed by WITH-FIXED-ALLOCATION
+      (storew-pair pa-flag 0 x bignum-digits-offset tmp-tn))
     DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -433,18 +437,18 @@
     (inst b :eq DONE)
 
     (with-fixed-allocation
-        (y pa-flag bignum-widetag (+ 2 bignum-digits-offset) :lip lip)
+        (y pa-flag bignum-widetag (+ 2 bignum-digits-offset) :lip lip
+         :store-type-code nil)
       ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
       ;; leaves PA-FLAG containing the computed header value.  In our
       ;; case, configured for a 2-word bignum.  If the sign bit in the
       ;; value we're boxing is CLEAR, we need to shrink the bignum by
       ;; one word, hence the following:
-      (inst tst x x)
-      (inst b :mi STORE)
-      (inst sub pa-flag pa-flag #x100)
-      (storew pa-flag y 0 other-pointer-lowtag)
+      (inst tbnz x (1- n-word-bits) STORE)
+      (load-immediate-word pa-flag (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
       STORE
-      (storew x y bignum-digits-offset other-pointer-lowtag))
+      ;; See the comment in move-from-signed
+      (storew-pair pa-flag 0 x bignum-digits-offset tmp-tn))
     DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
