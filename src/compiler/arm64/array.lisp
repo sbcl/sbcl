@@ -118,6 +118,8 @@
              (cond ((integerp bound)
                     (inst cmp index bound)
                     (inst b :hs error))
+                   ((eql index 0)
+                    (inst cbz bound error))
                    (t
                     (inst cmp bound index)
                     (inst b :ls error))))))))
