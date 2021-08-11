@@ -210,37 +210,35 @@ char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 
 void skip_internal_error (os_context_t *context) {
     unsigned char *ptr = (unsigned char *)*os_context_pc_addr(context);
+
 #ifdef LISP_FEATURE_ARM64
-    // This code is broken. The program counter as received in *context
-    // points one instruction beyond the BRK opcode.
-    // I wrote a test vop that emits a cerror break thusly:
-    //
-    // ; 62C:       40A122D4         BRK #5386                       ; Cerror trap
-    // ; 630:       30               BYTE #X30                       ; R2
-    //
-    // and added a printf to see the instruction pointer here:
-    //   skip_internal_error: pc=0x1002441630
-    //
-    // which got a trap code of 0. This is due to the fact that DESCRIPTOR-REG
-    // is the lowest SC number, so the encoded SC+OFFSET of R2 is a small
-    // value, and therefore shifting right by 13 bits extracts a 0.
-    // Internal error number 0 has 0 arguments, so we skip nothing in the varint
-    // decoder loop, which is the right thing for the wrong reason.
-    uint32_t trap_instruction = *(uint32_t *)ptr;
-    unsigned char code = trap_instruction >> 13 & 0xFF;
-    ptr += 4;
-#else
+    uint32_t trap_instruction = *(uint32_t *)(ptr - 4);
+#endif
+
     unsigned char code = *ptr;
     ptr++; // skip the byte indicating the kind of trap
-#endif
+
     if (code > sizeof(internal_error_nargs)) {
         printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
     }
     int nargs = internal_error_nargs[code];
+
+#ifdef LISP_FEATURE_ARM64
+    /* See SB-VM::EMIT-ERROR-BREAK for the scheme */
+    unsigned char first_arg = trap_instruction >> 13 & 0xFF;
+    if (first_arg != 31 && nargs) {
+        nargs--;
+    }
+#endif
+
     int nbytes = 0;
     while (nargs--) read_var_integer(ptr, &nbytes);
     ptr += nbytes;
+#ifdef LISP_FEATURE_ARM64
+    ptr=PTR_ALIGN_UP(ptr, 4);
+#endif
     *((unsigned char **)os_context_pc_addr(context)) = ptr;
+
 }
 
 /* internal error handler for when the Lisp error system doesn't exist
@@ -248,97 +246,110 @@ void skip_internal_error (os_context_t *context) {
  * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
  * this'd require changes in a number of things like brief_print(..),
  * or I'd have changed it immediately.) */
+void describe_error_arg(os_context_t *context, int sc_number, int offset) {
+{
+    int ch;
+
+    printf("    SC: %d, Offset: %d", sc_number, offset);
+    switch (sc_number) {
+    case sc_AnyReg:
+    case sc_DescriptorReg:
+        putchar('\t');
+        brief_print(*os_context_register_addr(context, offset));
+        break;
+
+    case sc_CharacterReg:
+        ch = *os_context_register_addr(context, offset);
+#ifdef LISP_FEATURE_X86
+        if (offset&1)
+            ch = ch>>8;
+        ch = ch & 0xff;
+#endif
+        switch (ch) {
+        case '\n': printf("\t'\\n'\n"); break;
+        case '\b': printf("\t'\\b'\n"); break;
+        case '\t': printf("\t'\\t'\n"); break;
+        case '\r': printf("\t'\\r'\n"); break;
+        default:
+            if (ch < 32 || ch > 127)
+                printf("\\%03o", ch);
+            else
+                printf("\t'%c'\n", ch);
+            break;
+        }
+        break;
+    case sc_SapReg:
+#ifdef sc_WordPointerReg
+    case sc_WordPointerReg:
+#endif
+        printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
+        break;
+    case sc_SignedReg:
+        printf("\t%ld\n", (long) *os_context_register_addr(context, offset));
+        break;
+    case sc_UnsignedReg:
+        printf("\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
+        break;
+#ifdef sc_SingleFloatReg
+    case sc_SingleFloatReg:
+        printf("\t%g\n", *(float *)&context->sc_fpregs[offset]);
+        break;
+#endif
+#ifdef sc_DoubleFloatReg
+    case sc_DoubleFloatReg:
+        printf("\t%g\n", *(double *)&context->sc_fpregs[offset]);
+        break;
+#endif
+    case sc_Constant:
+        print_constant(context, offset);
+        break;
+    default:
+        printf("\t???\n");
+        break;
+    }
+}
+};
 void
 describe_internal_error(os_context_t *context)
 {
     unsigned char *ptr = arch_internal_error_arguments(context);
     char count;
-    int position, sc_and_offset, sc_number, offset, ch;
+    int position;
     void * pc = (void*)*os_context_pc_addr(context);
     unsigned char code;
 
 #ifdef LISP_FEATURE_ARM64
+    /* See SB-VM::EMIT-ERROR-BREAK for the scheme */
     uint32_t trap_instruction = *(uint32_t *)ptr;
-    code = trap_instruction >> 13 & 0xFF;
+    unsigned char trap = trap_instruction >> 5 & 0xFF;
     ptr += 4;
 #else
     unsigned char trap = *(ptr-1);
+#endif
+
     if (trap >= trap_Error) {
         code = trap - trap_Error;
     } else {
         code = *ptr;
         ptr++;
     }
-#endif
-
     if (code > sizeof(internal_error_nargs)) {
         printf("Unknown error code %d at %p\n", code, pc);
     }
     printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
+    count = internal_error_nargs[code];
 
-    for (count = internal_error_nargs[code], position = 0;
-         count > 0;
-         --count) {
-        sc_and_offset = read_var_integer(ptr, &position);
-        sc_number = sc_and_offset_sc_number(sc_and_offset);
-        offset = sc_and_offset_offset(sc_and_offset);
+#ifdef LISP_FEATURE_ARM64
+    unsigned char first_arg = trap_instruction >> 13 & 0xFF;
+    if (first_arg != 31) {
+        describe_error_arg(context, 0, first_arg);
+        count--;
+    }
+#endif
 
-        printf("    SC: %d, Offset: %d", sc_number, offset);
-        switch (sc_number) {
-        case sc_AnyReg:
-        case sc_DescriptorReg:
-            putchar('\t');
-            brief_print(*os_context_register_addr(context, offset));
-            break;
-
-        case sc_CharacterReg:
-            ch = *os_context_register_addr(context, offset);
-#ifdef LISP_FEATURE_X86
-            if (offset&1)
-                ch = ch>>8;
-            ch = ch & 0xff;
-#endif
-            switch (ch) {
-            case '\n': printf("\t'\\n'\n"); break;
-            case '\b': printf("\t'\\b'\n"); break;
-            case '\t': printf("\t'\\t'\n"); break;
-            case '\r': printf("\t'\\r'\n"); break;
-            default:
-                if (ch < 32 || ch > 127)
-                    printf("\\%03o", ch);
-                else
-                    printf("\t'%c'\n", ch);
-                break;
-            }
-            break;
-        case sc_SapReg:
-#ifdef sc_WordPointerReg
-        case sc_WordPointerReg:
-#endif
-            printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
-            break;
-        case sc_SignedReg:
-            printf("\t%ld\n", (long) *os_context_register_addr(context, offset));
-            break;
-        case sc_UnsignedReg:
-            printf("\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
-            break;
-#ifdef sc_SingleFloatReg
-        case sc_SingleFloatReg:
-            printf("\t%g\n", *(float *)&context->sc_fpregs[offset]);
-            break;
-#endif
-#ifdef sc_DoubleFloatReg
-        case sc_DoubleFloatReg:
-            printf("\t%g\n", *(double *)&context->sc_fpregs[offset]);
-            break;
-#endif
-        case sc_Constant:
-            print_constant(context, offset);
-            break;
-        default:
-            printf("\t???\n");
-            break;
-        }
+    for (position = 0; count > 0; --count) {
+        int sc_and_offset = read_var_integer(ptr, &position);
+        describe_error_arg(context, sc_and_offset_sc_number(sc_and_offset),
+                           sc_and_offset_offset(sc_and_offset));
     }
 }

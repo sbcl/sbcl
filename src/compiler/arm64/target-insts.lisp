@@ -410,24 +410,38 @@
                                                nil dstate)))))))
 
 ;;;; special magic to support decoding internal-error and related traps
+;;; See EMIT-ERROR-BREAK for the scheme
 (defun snarf-error-junk (sap offset trap-number &optional length-only)
-  (declare (ignore trap-number))
   (let* ((inst (sap-ref-32 sap (- offset 4)))
-         (error-number (ldb (byte 8 13) inst))
+         (error-number (cond
+                         ((>= trap-number sb-vm:error-trap)
+                          (prog1
+                              (- trap-number sb-vm:error-trap)
+                            (setf trap-number sb-vm:error-trap)))
+                         (t
+                          (prog1 (sap-ref-8 sap offset)
+                            (incf offset)))))
+         (first-arg (ldb (byte 8 13) inst))
          (length (sb-kernel::error-length error-number))
          (index offset))
     (declare (type sb-sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
+    (unless (or (= first-arg sb-vm::zr-offset)
+                (zerop length))
+      (decf length))
     (cond (length-only
            (loop repeat length do (sb-c:sap-read-var-integerf sap index))
            (values 0 (- index offset) nil nil))
           (t
            (collect ((sc+offsets)
                      (lengths))
+             (unless (= first-arg sb-vm::zr-offset)
+               (sc+offsets (make-sc+offset sb-vm:descriptor-reg-sc-number first-arg))
+               (lengths 0))
              (loop repeat length do
-                  (let ((old-index index))
-                    (sc+offsets (sb-c:sap-read-var-integerf sap index))
-                    (lengths (- index old-index))))
+                   (let ((old-index index))
+                     (sc+offsets (sb-c:sap-read-var-integerf sap index))
+                     (lengths (- index old-index))))
              (values error-number
                      (- index offset)
                      (sc+offsets)
@@ -437,7 +451,9 @@
   (declare (ignore inst chunk))
   (let ((code (ldb (byte 8 5) (current-instruction dstate))))
     (flet ((nt (x) (if stream (note x dstate))))
-      (case code
+      (case (if (> code error-trap)
+                error-trap
+                code)
         (#.halt-trap
          (nt "Halt trap"))
         (#.pending-interrupt-trap

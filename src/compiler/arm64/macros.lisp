@@ -255,16 +255,39 @@
        ,@body)))
 
 ;;;; Error Code
+;;;; BRK accepts a 16-bit immediate
+;;;; Encode the error kind in the first byte.
+;;;; If KIND is ERROR-TRAP, then add CODE to that first byte.
+;;;; Otherwise CODE goes into the byte following BRK.
+;;;; The arguments are normally encoded by ENCODE-INTERNAL-ERROR-ARGS,
+;;;; except for the first argument if it's a descriptor-reg or
+;;;; any-reg, then it goes into the second byte of the BRK instruction
+;;;; immediate.
+;;;; Otherwise that second byte is 31 (the ZR register).
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    ;; Encode both kind and code as an argument to BRK
-    (inst brk (dpb code (byte 8 8) kind))
-    ;; NARGS is implicitely assumed for invalid-arg-count
-    (unless (= kind invalid-arg-count-trap)
-      (encode-internal-error-args values)
-      (emit-alignment 2))))
+    (cond ((= kind invalid-arg-count-trap)
+           ;; NARGS is implicitly assumed for invalid-arg-count
+           (inst brk kind)
+           (return-from emit-error-break))
+          (t
+           (let ((first-value (car values)))
+             (inst brk (dpb (cond ((and (tn-p first-value)
+                                        (sc-is first-value descriptor-reg any-reg))
+                                   (pop values)
+                                   (tn-offset first-value))
+                                  (t
+                                   zr-offset))
+                            (byte 8 8)
+                            (if (= kind error-trap)
+                                (+ kind code)
+                                kind)))
+             (unless (= kind error-trap)
+               (inst byte code)))))
+    (encode-internal-error-args values)
+    (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*

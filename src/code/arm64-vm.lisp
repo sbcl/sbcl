@@ -53,16 +53,42 @@
 
 ;;; Given a (POSIX) signal context, extract the internal error
 ;;; arguments from the instruction stream.
+;;;
+;;; See EMIT-ERROR-BREAK for the scheme
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
          (instruction (sap-ref-32 pc 0))
-         (error-number (ldb (byte 8 13) instruction))
-         (trap-number (ldb (byte 8 5) instruction)))
+         (trap-number (ldb (byte 8 5) instruction))
+         (error-number (cond
+                         ((>= trap-number sb-vm:error-trap)
+                          (prog1
+                              (- trap-number sb-vm:error-trap)
+                            (setf trap-number sb-vm:error-trap)))
+                         (t
+                          (prog1 (sap-ref-8 pc 4)
+                            (setf pc (sap+ pc 1))))))
+         (first-arg (ldb (byte 8 13) instruction)))
     (declare (type system-area-pointer pc))
     (if (= trap-number invalid-arg-count-trap)
-        (values error-number '(#.arg-count-sc) trap-number)
-        (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number error-number))))
+        (values #.(error-number-or-lose 'invalid-arg-count-error)
+                '(#.arg-count-sc)
+                trap-number)
+        (let ((length (sb-kernel::error-length error-number)))
+          (declare (type (unsigned-byte 8) length))
+          (unless (or (= first-arg zr-offset)
+                      (zerop length))
+            (decf length))
+          (setf pc (sap+ pc 4))
+          (let ((args (loop repeat length
+                            with index = 0
+                            collect (sb-c:sap-read-var-integerf pc index))))
+            (values error-number
+                    (if (= first-arg zr-offset)
+                        args
+                        (cons (make-sc+offset sb-vm:descriptor-reg-sc-number first-arg)
+                              args))
+                    trap-number))))))
 
 ;;; Undo the effects of XEP-ALLOCATE-FRAME
 ;;; and point PC to FUNCTION

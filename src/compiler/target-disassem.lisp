@@ -2638,21 +2638,22 @@
            (type (or null stream) stream)
            (type disassem-state dstate))
   (multiple-value-bind (errnum adjust sc+offsets lengths error-byte)
-       (funcall error-parse-fun
-                (dstate-segment-sap dstate)
-                (dstate-next-offs dstate)
-                trap-number
-                (null stream))
+      (funcall error-parse-fun
+               (dstate-segment-sap dstate)
+               (dstate-next-offs dstate)
+               trap-number
+               (null stream))
     (when stream
        (setf (dstate-cur-offs dstate)
              (dstate-next-offs dstate))
        (flet ((emit-err-arg ()
                 (let ((num (pop lengths)))
-                  (print-notes-and-newline stream dstate)
-                  (print-current-address stream dstate)
-                  (print-inst num stream dstate)
-                  (print-bytes num stream dstate)
-                  (incf (dstate-cur-offs dstate) num)))
+                  (unless (zerop num)
+                    (print-notes-and-newline stream dstate)
+                    (print-current-address stream dstate)
+                    (print-inst num stream dstate)
+                    (print-bytes num stream dstate)
+                    (incf (dstate-cur-offs dstate) num))))
               (emit-note (note)
                 (when note
                   (note (string note) dstate))))
