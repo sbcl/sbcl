@@ -235,7 +235,16 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
 {
     int fail = 0;
     os_vm_address_t actual;
+#ifdef LISP_FEATURE_64_BIT
     actual = sbcl_mmap(addr, len,
+#else
+    /* FIXME: why does using sbcl_mmap cause failure here? I would guess that it can't
+     * pass 'offset' correctly if LARGEFILE is mandatory, which it isn't on 64-bit.
+     * Deadlock should be impossible this early in core loading, I suppose, hence
+     * on one hand I don't care; but on the other, it would be nice to not to see
+     * any use of a potentially hooked mmap() API within this file. */
+    actual = mmap(addr, len,
+#endif
                   // If mapping to a random address, then the assumption is
                   // that we're not going to execute the core; nor should we write to it.
                   // However, the addr=0 case is for 'editcore' which unfortunately _does_
