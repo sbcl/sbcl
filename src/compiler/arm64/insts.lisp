@@ -3017,7 +3017,7 @@
                (neq (stmt-mnemonic next-next) 'b))
       (destructuring-bind (target value mask) (stmt-operands stmt)
         (when (and (integerp mask)
-                   (= (logcount mask) 1)
+                   (= (logcount (ldb (byte n-word-bits 0) mask)) 1)
                    (eq target zr-tn))
           (destructuring-bind (flag label) (stmt-operands next)
             (when (case flag
