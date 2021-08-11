@@ -732,6 +732,81 @@ returns NIL each time."
       (declare (dynamic-extent #'cas))
       (%%wait-for #'cas stop-sec stop-usec)))))
 
+#+mutex-benchmarks
+(symbol-macrolet ((val (mutex-state mutex)))
+  (export '(wait-for-mutex-algorithm-2
+            wait-for-mutex-algorithm-3
+            wait-for-mutex-2-partial-inline
+            wait-for-mutex-3-partial-inline))
+  (declaim (sb-ext:maybe-inline %wait-for-mutex-algorithm-2
+                                %wait-for-mutex-algorithm-3))
+  (sb-ext:define-load-time-global *grab-mutex-calls-performed* 0)
+  ;; Like futex-wait but without garbage having to do with re-invoking
+  ;; a wake on account of async unwind while releasing the mutex.
+  (declaim (inline fast-futex-wait))
+  (defun fast-futex-wait (word-addr oldval to-sec to-usec)
+    (with-alien ((%wait (function int unsigned
+                                  #+freebsd unsigned #-freebsd (unsigned 32)
+                                  long unsigned-long)
+                        :extern "futex_wait"))
+      (alien-funcall %wait word-addr oldval to-sec to-usec)))
+
+  (defun %wait-for-mutex-algorithm-2 (mutex)
+    (incf *grab-mutex-calls-performed*)
+    (let* ((mutex (sb-ext:truly-the mutex mutex))
+           (c (sb-ext:cas val 0 1))) ; available -> taken
+      (unless (= c 0) ; Got it right off the bat?
+        (loop
+          ;; Mark it as contested, and sleep, unless it is now in state 0.
+          (when (or (eql c 2) (/= 0 (sb-ext:cas val 1 2)))
+            (with-pinned-objects (mutex)
+              (fast-futex-wait (mutex-state-address mutex) 2 -1 0)))
+          ;; Try to get it, still marking it as contested.
+          (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)))))) ; win
+  (defun %wait-for-mutex-algorithm-3 (mutex)
+    (incf *grab-mutex-calls-performed*)
+    (let* ((mutex (sb-ext:truly-the mutex mutex))
+           (c (sb-ext:cas val 0 1))) ; available -> taken
+      (unless (= c 0) ; Got it right off the bat?
+        (unless (= c 2)
+          (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2)))
+        (loop while (/= c 0)
+              do (with-pinned-objects (mutex)
+                   (fast-futex-wait (mutex-state-address mutex) 2 -1 0))
+                 (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2))))))
+
+  (defun wait-for-mutex-algorithm-2 (mutex)
+    (declare (inline %wait-for-mutex-algorithm-2))
+    (let ((mutex (sb-ext:truly-the mutex mutex)))
+      (%wait-for-mutex-algorithm-2 mutex)
+      (setf (mutex-%owner mutex) *current-thread*)))
+  ;; The improvement with algorithm 3 is fairly negligible.
+  ;; Code size is a little less. More improvement comes from doing the
+  ;; partial-inline algorithms which perform one CAS without a function call.
+  (defun wait-for-mutex-algorithm-3 (mutex)
+    (declare (inline %wait-for-mutex-algorithm-3))
+    (let ((mutex (sb-ext:truly-the mutex mutex)))
+      (%wait-for-mutex-algorithm-3 mutex)
+      (setf (mutex-%owner mutex) *current-thread*)))
+  (defmacro wait-for-mutex-2-partial-inline (mutex)
+    `(let ((m ,mutex))
+       (or (= (sb-ext:cas (mutex-state m) 0 1) 0) (%wait-for-mutex-algorithm-2 m))
+       (setf (mutex-%owner m) *current-thread*)))
+  (defmacro wait-for-mutex-3-partial-inline (mutex)
+    `(let ((m ,mutex))
+       (or (= (sb-ext:cas (mutex-state m) 0 1) 0) (%wait-for-mutex-algorithm-3 m))
+       (setf (mutex-%owner m) *current-thread*)))
+  ;; This is like RELEASE-MUTEX but without keyword arg parsing
+  ;; and all the different error modes.
+  (export 'fast-release-mutex)
+  (defun fast-release-mutex (mutex)
+    (let ((mutex (sb-ext:truly-the mutex mutex)))
+      (setf (mutex-%owner mutex) nil)
+      (unless (eql (sb-ext:atomic-decf (mutex-state mutex) 1) 1)
+        (setf (mutex-state mutex) 0)
+        (with-pinned-objects (mutex)
+          (futex-wake (mutex-state-address mutex) 1))))))
+
 #+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))

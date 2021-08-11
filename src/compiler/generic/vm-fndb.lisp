@@ -231,6 +231,7 @@
 #+riscv
 (defknown %raw-instance-cas/signed-word (instance index sb-vm:signed-word sb-vm:signed-word)
   sb-vm:signed-word ())
+(defknown %raw-instance-xchg/word (instance index sb-vm:word) sb-vm:word ())
 
 #.`(progn
      ,@(map 'list

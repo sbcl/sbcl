@@ -767,6 +767,27 @@
 (define-full-compare-and-swap %raw-instance-cas/word instance
   instance-slots-offset instance-pointer-lowtag
   (unsigned-reg) unsigned-num %raw-instance-cas/word)
+(define-vop ()
+  (:translate %raw-instance-xchg/word)
+  (:policy :fast-safe)
+  (:args (instance :scs (descriptor-reg))
+         (newval :scs (unsigned-reg immediate constant) :target result))
+  (:info index)
+  (:arg-types * (:constant integer) unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 3
+    ;; Use RESULT as the source of the exchange, unless doing so
+    ;; would clobber NEWVAL
+    (let ((source (if (location= result instance) temp-reg-tn result)))
+      (if (sc-is newval immediate)
+          (inst mov source (constantize (tn-value newval)))
+          (move source newval))
+      (inst xchg (ea (- (ash (+ instance-slots-offset index) word-shift)
+                        instance-pointer-lowtag) instance)
+            source)
+      (unless (eq source result)
+        (move result temp-reg-tn)))))
 
 ;;;; code object frobbing
 
