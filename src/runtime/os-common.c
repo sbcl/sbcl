@@ -81,8 +81,8 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
 }
 #endif
 
-#ifdef LISP_FEATURE_USE_SYS_MMAP
 #include "sys_mmap.inc"
+#ifdef LISP_FEATURE_USE_SYS_MMAP
 os_vm_address_t os_allocate(os_vm_size_t len) {
     void* answer = sbcl_mmap(0, len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
     if (answer == MAP_FAILED) return 0;
