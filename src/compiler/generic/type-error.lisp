@@ -116,17 +116,14 @@
   (def "FAILED-AVER"             sb-impl::%failed-aver        nil form))
 
 
-(defun emit-internal-error (kind code values &key trap-emitter
-                                                  (compact-error-trap t))
-  (let ((trap-number (if (and (eq kind error-trap)
-                              compact-error-trap)
+(defun emit-internal-error (kind code values &key trap-emitter)
+  (let ((trap-number (if (eq kind error-trap)
                          (+ kind code)
                          kind)))
     (if trap-emitter
         (funcall trap-emitter trap-number)
         (inst byte trap-number)))
-  (unless (and (eq kind error-trap)
-               compact-error-trap)
+  (unless (eq kind error-trap)
     (inst byte code))
   (encode-internal-error-args values))
 

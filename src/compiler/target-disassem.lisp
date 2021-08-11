@@ -2670,11 +2670,10 @@
 ;;; so can't easily share this code.
 ;;; But probably we should just add the conditionalization in here.
 #-arm64
-(defun snarf-error-junk (sap offset trap-number &optional length-only (compact-error-trap t))
+(defun snarf-error-junk (sap offset trap-number &optional length-only)
   (let* ((index offset)
          (error-byte t)
-         (error-number (cond ((and compact-error-trap
-                                   (>= trap-number sb-vm:error-trap))
+         (error-number (cond ((>= trap-number sb-vm:error-trap)
                               (setf error-byte nil)
                               (- trap-number sb-vm:error-trap))
                              (t
