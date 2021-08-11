@@ -295,10 +295,11 @@ void* load_core_bytes_jit(int fd, os_vm_offset_t offset, os_vm_address_t addr, o
 
     lseek(fd, offset, SEEK_SET);
 
-    char* buf = malloc(65536);
+    size_t n_bytes = 65536;
+    char* buf = malloc(n_bytes);
 
     while (len) {
-        count = read(fd, buf, len);
+        count = read(fd, buf, n_bytes);
 
         if (count <= -1) {
             perror("read");
