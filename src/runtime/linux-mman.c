@@ -7,6 +7,7 @@
 #include "globals.h"
 #include "os.h"
 #include "interr.h"
+#include "sys_mmap.inc"
 
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
@@ -21,7 +22,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
     if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
 #endif
-    actual = mmap(addr, len, protection, flags, -1, 0);
+    actual = sbcl_mmap(addr, len, protection, flags, -1, 0);
     if (actual == MAP_FAILED) {
         perror("mmap");
         return 0;               /* caller should check this */
@@ -48,7 +49,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (munmap(addr,len) == -1) {
+    if (sbcl_munmap(addr,len) == -1) {
         perror("munmap");
     }
 }
