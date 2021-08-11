@@ -1864,9 +1864,8 @@ symbol-case giving up: case=((V U) (F))
 ;;;;
 ;;;; SB-EXT:COMPARE-AND-SWAP is the public API for now.
 ;;;;
-;;;; Internally our interface has CAS, GET-CAS-EXPANSION, DEFINE-CAS-EXPANDER,
-;;;; DEFCAS, and #'(CAS ...) functions -- making things mostly isomorphic with
-;;;; SETF.
+;;;; Internally our interface has CAS, GET-CAS-EXPANSION,
+;;;; DEFCAS, and #'(CAS ...) functions.
 
 (defun expand-structure-slot-cas (info name place)
   (let* ((dd (car info))
@@ -2010,15 +2009,8 @@ EXPERIMENTAL: Interface subject to change."
             (,new-temp ,new))
        ,cas-form)))
 
-(sb-xc:defmacro define-cas-expander (accessor lambda-list &body body)
-  "Analogous to DEFINE-SETF-EXPANDER. Defines a CAS-expansion for ACCESSOR.
-BODY must return six values as specified in GET-CAS-EXPANSION.
-
-Note that the system provides no automatic atomicity for CAS expansion, nor
-can it verify that they are atomic: it is up to the implementor of a CAS
-expansion to ensure its atomicity.
-
-EXPERIMENTAL: Interface subject to change."
+;; don't use. pending complete removal
+(sb-xc:defmacro %def-cas-expander (accessor lambda-list &body body)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (setf (info :cas :expander ',accessor)
            ,(make-macro-lambda `(cas-expand ,accessor) lambda-list body
@@ -2046,7 +2038,7 @@ EXPERIMENTAL: Interface subject to change."
                          :accept (lambda-list-keyword-mask '(&optional &rest))
                          :context "a DEFCAS lambda-list")
     (declare (ignore llks))
-    `(define-cas-expander ,accessor ,lambda-list
+    `(%def-cas-expander ,accessor ,lambda-list
        ,@(when docstring (list docstring))
        ;; FIXME: if a &REST arg is present, this is really weird.
        (let ((temps (mapcar #'gensymify ',(append reqs opts rest)))
@@ -2083,8 +2075,7 @@ unspecified if there is an applicable method on either
 SB-MOP:SLOT-VALUE-USING-CLASS, (SETF SB-MOP:SLOT-VALUE-USING-CLASS), or
 SB-MOP:SLOT-BOUNDP-USING-CLASS.
 
-Additionally, the PLACE can be a anything for which a CAS-expansion has been
-specified using DEFCAS, DEFINE-CAS-EXPANDER, or for which a CAS-function has
+Additionally, the PLACE can be a anything for which a CAS-function has
 been defined. (See SB-EXT:CAS for more information.)
 "
   `(cas ,place ,old ,new))

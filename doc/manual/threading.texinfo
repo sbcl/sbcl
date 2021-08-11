@@ -126,7 +126,6 @@ using @code{get-cas-expansion}. See @code{atomic-update},
 this.
 
 @include macro-sb-ext-cas.texinfo
-@include macro-sb-ext-define-cas-expander.texinfo
 @include macro-sb-ext-defcas.texinfo
 @include fun-sb-ext-get-cas-expansion.texinfo
 

@@ -768,3 +768,19 @@
 ;; because %PRIMITIVE is not generally fopcompilable.
 (sb-c:define-source-transform make-unbound-marker ()
   `(sb-sys:%primitive make-unbound-marker))
+
+(deftransform (cas symbol-value) ((old new symbol))
+  (let ((cname (and (constant-lvar-p symbol) (lvar-value symbol))))
+    (case (and cname (info :variable :kind cname))
+      ((:special :global)
+       (let ((type (info :variable :type cname)))
+         `(truly-the ,type
+                     (%compare-and-swap-symbol-value ',cname old (the ,type new)))))
+      (t
+       `(progn
+          (about-to-modify-symbol-value symbol 'compare-and-swap new)
+          (%compare-and-swap-symbol-value symbol old new))))))
+
+(deftransform (cas svref) ((old new vector index))
+  '(let ((v (the simple-vector vector)))
+    (%compare-and-swap-svref v (check-bound v (length v) index) old new)))

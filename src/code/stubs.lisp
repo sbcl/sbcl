@@ -13,6 +13,11 @@
 
 (in-package "SB-IMPL")
 
+(defun (cas symbol-value) (old new symbol)
+  (cas (symbol-value symbol) old new))
+(defun (cas svref) (old new vector index)
+  (cas (svref vector index) old new))
+
 (macrolet ((def (name &rest args)
              `(defun ,name ,args
                 (,name ,@args))))

@@ -2077,6 +2077,10 @@
 (defknown sb-kernel::gc-safepoint () (values) ())
 
 ;;;; atomic ops
+;;; the CAS functions are transformed to something else rather than "translated".
+;;; either way, they should not be called.
+(defknown (cas svref) (t t simple-vector index) t (always-translatable))
+(defknown (cas symbol-value) (t t symbol) t (always-translatable))
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     ())
 (defknown (%compare-and-swap-symbol-value
