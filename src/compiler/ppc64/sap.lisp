@@ -139,7 +139,7 @@
              `(progn
                 ;; smaller-than-word atomics are not necessarily implemented in hardware.
                 ;; I found something about it regarding C compiler intrinsics:
-                ;; "__lqarx, __lharx, and __lbarx is valid only when -qarch is set to target POWER8™ processors."
+                ;; "__lqarx, __lharx, and __lbarx is valid only when -qarch is set to target POWER8 processors."
                 ;; https://www.ibm.com/docs/en/xl-c-aix/13.1.0?topic=functions-lqarx-ldarx-lwarx-lharx-lbarx
                 ;; and in fact they're not present on gcc110.fsffrance.org
                 ;; You're supposed to use lwarx, stwcx. in those cases,
