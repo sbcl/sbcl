@@ -1746,43 +1746,13 @@
                 (define-source-transform ,setter (a i v)
                   `(setf (aref (the ,',type ,a) ,i) ,v)))))
   (define-frob schar %scharset simple-string)
-  (define-frob char %charset string))
+  (define-frob char %charset string)
+  (define-frob svref %svset simple-vector))
 
 (defun the-unwild (type expr)
   (if (or (null type) (eq type *wild-type*)) expr `(the ,type ,expr)))
 (defun truly-the-unwild (type expr)
   (if (or (null type) (eq type *wild-type*)) expr `(truly-the ,type ,expr)))
-
-;;; We transform SVREF and %SVSET directly into DATA-VECTOR-REF/SET: this is
-;;; around 100 times faster than going through the general-purpose AREF
-;;; transform which ends up doing a lot of work -- and introducing many
-;;; intermediate lambdas, each meaning a new trip through the compiler -- to
-;;; get the same result.
-;;;
-;;; FIXME: [S]CHAR, and [S]BIT above would almost certainly benefit from a similar
-;;; treatment.
-(define-source-transform svref (vector index)
-  (let ((elt-type (let ((var (and (symbolp vector) (lexenv-find vector vars))))
-                    (when (lambda-var-p var)
-                      (declared-array-element-type (lambda-var-type var))))))
-    (with-unique-names (n-vector)
-      `(let ((,n-vector ,vector))
-         ,(the-unwild elt-type `(data-vector-ref
-                         (the simple-vector ,n-vector)
-                         (check-bound ,n-vector (length ,n-vector) ,index)))))))
-
-(define-source-transform %svset (vector index value)
-  (let ((elt-type (let ((var (and (symbolp vector) (lexenv-find vector vars))))
-                    (when (lambda-var-p var)
-                      (declared-array-element-type (lambda-var-type var))))))
-    `(let* ((%sv (the simple-vector
-                      (with-annotations
-                          (,(make-lvar-modified-annotation :caller '(setf svref)))
-                        ,vector)))
-            (%indx (check-bound %sv (length %sv) ,index))
-            (%val ,(the-unwild elt-type value)))
-       (data-vector-set %sv %indx %val)
-       %val)))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call

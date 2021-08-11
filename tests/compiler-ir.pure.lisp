@@ -66,6 +66,24 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
+(test-util:with-test (:name :bounds-check-svref)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (v i)
+                        (declare  (optimize (debug 2)))
+                        (incf (svref v i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
+
+(test-util:with-test (:name :bounds-check-svref)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (v i)
+                        (declare  (optimize (debug 2)))
+                        (incf (svref v i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
+
 (test-util:with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda ()
