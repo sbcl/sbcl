@@ -217,6 +217,23 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
            (setq value temp-reg-tn))))
   (inst mov size ea value))
 
+(defun emit-cas-sap-ref (size sap offset oldval newval result rax)
+  (multiple-value-bind (disp index)
+      (cond ((sc-is offset signed-reg)
+             (values 0 offset))
+            ((typep (tn-value offset) '(signed-byte 32))
+             (values (tn-value offset) nil))
+            (t
+             (inst mov temp-reg-tn (tn-value offset))
+             (values 0 temp-reg-tn)))
+    (cond ((sc-is oldval immediate constant)
+           (inst mov rax (tn-value oldval)))
+          ((not (location= oldval rax))
+           (inst mov (if (eq size :qword) :qword :dword) rax oldval)))
+    (inst cmpxchg size :lock (ea disp sap index) newval)
+    (unless (location= result rax)
+      (inst mov (if (eq size :qword) :qword :dword) result rax))))
+
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     ref-insn
@@ -234,6 +251,22 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                  size
                                  `(,size ,(if (eq ref-insn 'movzx) :dword :qword)))))
                `(progn
+                  ,@(when (member ref-name '(sap-ref-8 sap-ref-16 sap-ref-32 sap-ref-64
+                                             sap-ref-lispobj sap-ref-sap))
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs ,value-scs :target rax)
+                                 (newval :scs ,(remove 'immediate value-scs))
+                                 (sap :scs (sap-reg))
+                                 (offset :scs (signed-reg immediate)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:results (result :scs (,sc)))
+                          (:result-types ,type)
+                          (:temporary (:sc unsigned-reg :offset rax-offset
+                                       :from (:argument 0) :to :result) rax)
+                          (:generator 3
+                            (emit-cas-sap-ref ',size sap offset oldval newval result rax)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)

@@ -137,11 +137,52 @@
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &optional signed)
              `(progn
-                   (define-vop (,ref-name)
+                ;; smaller-than-word atomics are not necessarily implemented in hardware.
+                ;; I found something about it regarding C compiler intrinsics:
+                ;; "__lqarx, __lharx, and __lbarx is valid only when -qarch is set to target POWER8™ processors."
+                ;; https://www.ibm.com/docs/en/xl-c-aix/13.1.0?topic=functions-lqarx-ldarx-lwarx-lharx-lbarx
+                ;; and in fact they're not present on gcc110.fsffrance.org
+                ;; You're supposed to use lwarx, stwcx. in those cases,
+                ;; which I don't feel like doing.
+                ,@(when (member ref-name '(sap-ref-8 sap-ref-16
+                                           sap-ref-32 sap-ref-64
+                                           sap-ref-lispobj sap-ref-sap))
+                    (multiple-value-bind (load store)
+                        (ecase size
+                          (:byte  (values 'lbarx 'stbcx.))
+                          (:short (values 'lharx 'sthcx.))
+                          (:word  (values 'lwarx 'stwcx.))
+                          (:long  (values 'ldarx 'stdcx.)))
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs (,sc))
+                                 (newval :scs (,sc))
+                                 (sap :scs (sap-reg))
+                                 (offset :scs (signed-reg)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:results (result :scs (,sc) :from :load))
+                          (:result-types ,type)
+                          (:generator 5
+                           ;; sap-registers = non-descriptor-registers which does not include reg 0,
+                           ;; but make sure, because 0 as RA means the immediate value 0.
+                           (aver (/= (tn-offset sap) 0))
+                           (inst sync)
+                           LOOP
+                           (inst ,load result sap offset)
+                           ;; The load-and-reserve forms shorter than 'Doubleword' clear
+                           ;; all the remaining bits of the destination register,
+                           ;; so it's always OK to use a doubleword comparison.
+                           (inst cmpd result oldval)
+                           (inst bne EXIT)
+                           (inst ,store newval sap offset)
+                           (inst bne LOOP)
+                           EXIT
+                           (inst isync))))))
+                (define-vop (,ref-name)
                      (:translate ,ref-name)
                      (:policy :fast-safe)
-                     (:args (sap :scs (sap-reg))
-                      (offset :scs (signed-reg)))
+                     (:args (sap :scs (sap-reg)) (offset :scs (signed-reg)))
                      (:arg-types system-area-pointer signed-num)
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
@@ -158,7 +199,7 @@
                           '((inst extsb result result)))))
 ;;; FIXME: need to add a constraint on the offset alignment for doubleword
                    #+nil
-                   (define-vop (,(symbolicate ref-name "-C"))
+                (define-vop (,(symbolicate ref-name "-C"))
                      (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
@@ -176,7 +217,7 @@
                             result sap offset)
                       ,@(when (and (eq size :byte) signed)
                               '((inst extsb result result)))))
-                   (define-vop (,set-name)
+                (define-vop (,set-name)
                      (:translate ,set-name)
                      (:policy :fast-safe)
                      (:args (value :scs (,sc))
@@ -193,7 +234,7 @@
                                     (:double 'stfdx))
                             value sap offset)))
                    #+nil
-                   (define-vop (,(symbolicate set-name "-C"))
+                (define-vop (,(symbolicate set-name "-C"))
                      (:translate ,set-name)
                      (:policy :fast-safe)
                      (:args (value :scs (,sc))

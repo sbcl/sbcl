@@ -46,11 +46,9 @@
 (macrolet ((defsapref (fun value-type
                  &aux (setter (symbolicate "%SET-" fun))
                       (setter-translatable
-                       (if (or #+64-bit t
-                               (not (member value-type
-                                            '((unsigned-byte 64)
-                                              (signed-byte 64)) :test 'equal)))
-                           '(always-translatable))))
+                       (unless (member fun #-64-bit '(sap-ref-64 signed-sap-ref-64)
+                                           #+64-bit nil)
+                         '(always-translatable))))
              `(progn
                 ;; Callable definitions of these are are defined in src/code/stubs
                 (defknown ,fun (system-area-pointer fixnum) ,value-type
@@ -59,6 +57,10 @@
                     ,value-type ())
                 (defknown ,setter (,value-type system-area-pointer fixnum) (values)
                     (,@setter-translatable))
+                ,@(when (member fun '(sap-ref-8 sap-ref-16 sap-ref-32 #+64-bit sap-ref-64
+                                      sap-ref-sap sap-ref-lispobj))
+                    `((defknown (cas ,fun) (,value-type ,value-type system-area-pointer fixnum)
+                       ,value-type (always-translatable))))
                 ,@(when setter-translatable
                     ;; Unlike macros, source-transforms work on (funcall #'(setf name) ...)
                     ;; If this is a 64-bit sizes on a 32-bit machines,

@@ -513,6 +513,7 @@
                       (any-reg "(a)")
                       (unsigned-reg "(u)")
                       (signed-reg "(s)")
+                      (sap-reg "(p)")
                       (t "(?)"))))
       (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
