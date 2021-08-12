@@ -252,6 +252,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                  `(,size ,(if (eq ref-insn 'movzx) :dword :qword)))))
                `(progn
                   ,@(when (member ref-name '(sap-ref-8 sap-ref-16 sap-ref-32 sap-ref-64
+                                             signed-sap-ref-64
                                              sap-ref-lispobj sap-ref-sap))
                       `((define-vop (,(symbolicate "CAS-" ref-name))
                           (:translate (cas ,ref-name))
@@ -388,7 +389,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
           (inst lea sap (ea disp vector))))))
 
 ;;; Compare and swap
-(define-vop (signed-sap-cas-32)
+(define-vop (signed-sap-cas-32) ; FIXME: remove
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
          (offset :scs (signed-reg) :to (:eval 0))

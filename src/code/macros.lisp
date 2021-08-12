@@ -2002,6 +2002,14 @@ atomicity for CAS functions, nor can it verify that they are atomic: it is up
 to the implementor of a CAS function to ensure its atomicity.
 
 EXPERIMENTAL: Interface subject to change."
+  ;; It's not necessary that GET-CAS-EXPANSION work on defined alien vars.
+  ;; They're not generalized places in the sense that they could hold any object,
+  ;; so there's very little point to being more general.
+  ;; In particular, allowing ATOMIC-PUSH or ATOMIC-POP on them is wrong.
+  (awhen (and (symbolp place)
+              (eq (info :variable :kind place) :alien)
+              (sb-alien::cas-alien place old new))
+    (return-from cas it))
   (multiple-value-bind (temps place-args old-temp new-temp cas-form)
       (get-cas-expansion place env)
     `(let* (,@(mapcar #'list temps place-args)

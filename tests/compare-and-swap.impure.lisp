@@ -554,7 +554,7 @@
       1)))
 
 #+x86-64 ; missing symbol sb-vm::signed-sap-cas-32 otherwise
-(with-test (:name :cas-sap-ref
+(with-test (:name :cas-sap-ref ; FIXME: remove
             :skipped-on :interpreter)
   (let ((v (make-array 2 :element-type '(signed-byte 32)
                          :initial-element -1)))
@@ -627,9 +627,13 @@
         ;; because I made at least two mistakes in the x86-64 lispword-sized vop:
         ;;  1. it was using a :dword move where it should have used a :qword
         ;;  2. it was emitting constants as bignums instead of inline raw constants
-        (macrolet ((test (nbits newval
-                                &aux (ref (symbolicate "SAP-REF-" (write-to-string nbits)))
-                                     (init (ldb (byte nbits 0) most-positive-word)))
+        (macrolet ((test (signedp nbits newval
+                          &aux (ref (symbolicate
+                                     (if signedp "SIGNED-" "")
+                                     "SAP-REF-"
+                                     (write-to-string nbits)))
+                                     (init (if signedp -1
+                                               (ldb (byte nbits 0) most-positive-word))))
                      `(progn
                         ;; (format t "Testing ~a with initial bits ~x~%" ',ref ,init)
                         (setf (,ref sap 0) ,init)
@@ -639,10 +643,11 @@
                         (let ((old (cas (,ref sap 0) ,init ,newval)))
                           (assert (eql old ,init)) ; actual old
                           (assert (eql (,ref sap 0) ,newval)))))) ; should have changed
-          (test 64 #xdeadc0fefe00)
-          (test 32 #xbabab00e)
-          #-ppc64 (test 16 #xfafa) ; gets "illegal instruction" if unimplemented
-          #-ppc64 (test 8 #xbb)
+          (test nil 64 #xdeadc0fefe00)
+          (test t   64 most-negative-fixnum)
+          (test nil 32 #xbabab00e)
+          #-ppc64 (test nil 16 #xfafa) ; gets "illegal instruction" if unimplemented
+          #-ppc64 (test nil 8 #xbb)
           )
         ;; SAP-REF-SAP
         (setf (aref data 0) 0)
@@ -683,3 +688,15 @@
             (push (sb-thread:make-thread #'increment) threads))
           (mapc 'sb-thread:join-thread threads)
           (assert (= (sap-ref-32 sap 0) (* n-threads n-increments))))))))
+
+(define-alien-variable "small_generation_limit" (signed 8))
+#+(or x86-64 ppc64)
+(defun cas-an-alien-byte (x y) (cas small-generation-limit x y))
+(compile 'cas-an-alien-byte)
+(test-util:with-test (:name :cas-alien
+                            :skipped-on (not (and :sb-thread (or :ppc64 :x86-64))))
+  (assert (= small-generation-limit 1))
+  (assert (= (cas-an-alien-byte 0 5) 1))
+  (assert (= (cas-an-alien-byte 1 6) 1))
+  (assert (= small-generation-limit 6))
+  (setf small-generation-limit 1))

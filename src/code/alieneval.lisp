@@ -552,20 +552,23 @@
   (declare (ignore type))
   value)
 
+(defun alien-integer->sap-ref-fun (signed bits)
+  (if signed
+      (case bits
+        (8 'signed-sap-ref-8)
+        (16 'signed-sap-ref-16)
+        (32 'signed-sap-ref-32)
+        (64 'signed-sap-ref-64))
+      (case bits
+        (8 'sap-ref-8)
+        (16 'sap-ref-16)
+        (32 'sap-ref-32)
+        (64 'sap-ref-64))))
+  
 (define-alien-type-method (integer :extract-gen) (type sap offset)
   (declare (type alien-integer-type type))
-  (let ((ref-fun
-         (if (alien-integer-type-signed type)
-          (case (alien-integer-type-bits type)
-            (8 'signed-sap-ref-8)
-            (16 'signed-sap-ref-16)
-            (32 'signed-sap-ref-32)
-            (64 'signed-sap-ref-64))
-          (case (alien-integer-type-bits type)
-            (8 'sap-ref-8)
-            (16 'sap-ref-16)
-            (32 'sap-ref-32)
-            (64 'sap-ref-64)))))
+  (let ((ref-fun (alien-integer->sap-ref-fun (alien-integer-type-signed type)
+                                             (alien-integer-type-bits type))))
     (if ref-fun
         `(,ref-fun ,sap (/ ,offset sb-vm:n-byte-bits))
         (error "cannot extract ~W-bit integers"
@@ -1285,6 +1288,29 @@
             "~:[~;(forced to stack) ~]~S"
             (local-alien-info-force-to-memory-p info)
             (unparse-alien-type (local-alien-info-type info)))))
+
+(defun cas-alien (symbol old new)
+  (let ((info (info :variable :alien-info symbol)))
+    (when info
+      (let ((type (heap-alien-info-type info)))
+        (when (and (typep type 'alien-integer-type)
+                   (eq (alien-integer-type-class type) 'integer)
+                   (member (alien-integer-type-bits type)
+                           '(8 16 32 #+64-bit 64)))
+          (let ((signed (alien-integer-type-signed type))
+                (bits (alien-integer-type-bits type))
+                (sap-form `(foreign-symbol-sap ,(heap-alien-info-alien-name info) t)))
+            (cond ((and signed (< bits sb-vm:n-word-bits))
+                   (let ((mask (1- (ash 1 bits))))
+                     `(sb-vm::sign-extend
+                       (funcall #'(cas ,(alien-integer->sap-ref-fun nil bits))
+                                (logand (the (signed-byte ,bits) ,old) ,mask)
+                                (logand (the (signed-byte ,bits) ,new) ,mask)
+                                ,sap-form 0)
+                       ,bits)))
+                  (t
+                   `(funcall #'(cas ,(alien-integer->sap-ref-fun signed bits))
+                             ,old ,new ,sap-form 0)))))))))
 
 (in-package "SB-IMPL")
 

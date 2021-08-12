@@ -17,6 +17,17 @@
   (cas (symbol-value symbol) old new))
 (defun (cas svref) (old new vector index)
   (cas (svref vector index) old new))
+#+(or ppc64 x86-64)
+(macrolet ((def (name)
+             `(defun (cas ,name) (old new sap index)
+                (funcall #'(cas ,name) old new sap index))))
+  (def sb-sys:sap-ref-8)
+  (def sb-sys:sap-ref-16)
+  (def sb-sys:sap-ref-32)
+  (def sb-sys:sap-ref-64)
+  (def sb-sys:signed-sap-ref-64)
+  (def sb-sys:sap-ref-sap)
+  (def sb-sys:sap-ref-lispobj))
 
 (macrolet ((def (name &rest args)
              `(defun ,name ,args

@@ -57,7 +57,13 @@
                     ,value-type ())
                 (defknown ,setter (,value-type system-area-pointer fixnum) (values)
                     (,@setter-translatable))
-                ,@(when (member fun '(sap-ref-8 sap-ref-16 sap-ref-32 #+64-bit sap-ref-64
+                ;; word-sized integers can be treated as signed or unsigned for CAS,
+                ;; but sub-word will require an explicit sign-extension step,
+                ;; either in the vop or in Lisp.
+                ,@(when (member fun '(sap-ref-8 sap-ref-16
+                                      sap-ref-32 #-64-bit signed-sap-ref-32
+                                      #+64-bit sap-ref-64
+                                      #+64-bit signed-sap-ref-64
                                       sap-ref-sap sap-ref-lispobj))
                     `((defknown (cas ,fun) (,value-type ,value-type system-area-pointer fixnum)
                        ,value-type (always-translatable))))
