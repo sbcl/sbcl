@@ -341,8 +341,8 @@ process to continue normally."
   ;; re-disable ldb again.
   (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)
     (sb-debug::disable-debugger))
-  #+sb-thread (finalizer-thread-start)
-  (call-hooks "initialization" *init-hooks*))
+  (call-hooks "initialization" *init-hooks*)
+  #+sb-thread (finalizer-thread-start))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code
