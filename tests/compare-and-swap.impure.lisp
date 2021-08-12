@@ -692,6 +692,7 @@
 (define-alien-variable "small_generation_limit" (signed 8))
 #+(or x86-64 ppc64)
 (defun cas-an-alien-byte (x y) (cas small-generation-limit x y))
+#+(or x86-64 ppc64)
 (compile 'cas-an-alien-byte)
 (test-util:with-test (:name :cas-alien
                             :skipped-on (not (and :sb-thread (or :ppc64 :x86-64))))
