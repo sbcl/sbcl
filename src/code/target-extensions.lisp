@@ -55,7 +55,8 @@ Unused by SBCL itself: reserved for user and applications.")
 (define-load-time-global *init-hooks* nil
   "A list of function designators which are called in an unspecified
 order when a saved core image starts up, after the system itself has
-been initialized.
+been initialized, but before non-user threads such as the finalizer
+thread have been started.
 
 Unused by SBCL itself: reserved for user and applications.")
 
