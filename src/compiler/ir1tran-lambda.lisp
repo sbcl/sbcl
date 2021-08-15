@@ -1253,40 +1253,38 @@
 ;;; previous references.
 (defun get-defined-fun (name &optional (lambda-list nil lp))
   (proclaim-as-fun-name name)
-  (when #+sb-xc-host (not *compile-time-eval*)
-        #-sb-xc-host (boundp '*ir1-namespace*)
-    (let ((found (find-free-fun name "shouldn't happen! (defined-fun)"))
-          (free-funs (free-funs *ir1-namespace*)))
-      (note-name-defined name :function)
-      (cond ((not (defined-fun-p found))
-             ;; This assertion is wrong in block compilation mode, for
-             ;; instance
-             ;;
-             ;; (defun foo (x) (bar x))
-             ;; (declaim (inline bar))
-             ;; (defun bar (x) x)
-             (aver (or (block-compile *compilation*)
-                       (not (info :function :inlinep name))))
-             (let* ((where-from (leaf-where-from found))
-                    (res (make-defined-fun
-                          :%source-name name
-                          :where-from (if (eq where-from :declared)
-                                          :declared
-                                          :defined-here)
-                          :type (if (eq :declared where-from)
-                                    (leaf-type found)
-                                    (or (and lp
-                                             (ignore-errors
-                                              (ftype-from-lambda-list lambda-list)))
-                                        (specifier-type 'function))))))
-               (substitute-leaf res found)
-               (setf (gethash name free-funs) res)))
-            ;; If FREE-FUNS has a previously converted definition
-            ;; for this name, then blow it away and try again.
-            ((defined-fun-functionals found)
-             (remhash name free-funs)
-             (get-defined-fun name lambda-list))
-            (t found)))))
+  (let ((found (find-free-fun name "shouldn't happen! (defined-fun)"))
+        (free-funs (free-funs *ir1-namespace*)))
+    (note-name-defined name :function)
+    (cond ((not (defined-fun-p found))
+           ;; This assertion is wrong in block compilation mode, for
+           ;; instance
+           ;;
+           ;; (defun foo (x) (bar x))
+           ;; (declaim (inline bar))
+           ;; (defun bar (x) x)
+           (aver (or (block-compile *compilation*)
+                     (not (info :function :inlinep name))))
+           (let* ((where-from (leaf-where-from found))
+                  (res (make-defined-fun
+                        :%source-name name
+                        :where-from (if (eq where-from :declared)
+                                        :declared
+                                        :defined-here)
+                        :type (if (eq :declared where-from)
+                                  (leaf-type found)
+                                  (or (and lp
+                                           (ignore-errors
+                                            (ftype-from-lambda-list lambda-list)))
+                                      (specifier-type 'function))))))
+             (substitute-leaf res found)
+             (setf (gethash name free-funs) res)))
+          ;; If FREE-FUNS has a previously converted definition
+          ;; for this name, then blow it away and try again.
+          ((defined-fun-functionals found)
+           (remhash name free-funs)
+           (get-defined-fun name lambda-list))
+          (t found))))
 
 ;;; Check a new global function definition for consistency with
 ;;; previous declaration or definition, and assert argument/result
