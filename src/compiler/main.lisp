@@ -1052,13 +1052,12 @@ necessary, since type inference may take arbitrarily long to converge.")
             (if (eq (block-compile *compilation*) t)
                 (push tll (toplevel-lambdas *compilation*))
                 (compile-toplevel (list tll) nil))
-            ;; DEFPACKAGE and DEFCONSTANT have load-time effects that
-            ;; must occur before code components referencing the
-            ;; packages and constants they define are loaded, so we
-            ;; delimit the current component here.
             (when (consp form)
               (case (car form)
-                ((sb-impl::%defpackage sb-impl::%defconstant)
+                ;; DEFPACKAGE has load-time effects that must occur before
+                ;; code components referencing the packages they define
+                ;; are loaded, so we delimit the current component here.
+                ((sb-impl::%defpackage)
                  (delimit-block-compilation))))
             nil)))))
 
@@ -1408,7 +1407,18 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (process-toplevel-form expanded path compile-time-too))
                  (t
                   (when compile-time-too
-                    (eval-compile-toplevel (list form) path))
+                    (eval-compile-toplevel (list form) path)
+                    ;; Record the names of hairy defconstants when
+                    ;; block compiling.
+                    (when (and (eq (block-compile *compilation*) t)
+                               (listp form)
+                               (eq (first form) 'sb-impl::%defconstant))
+                      (let ((spec (second form)))
+                        (when (eq (first spec) 'quote)
+                          (let* ((name (second spec))
+                                 (value (symbol-value name)))
+                            (unless (typep value '(or fixnum symbol))
+                              (push name *hairy-defconstants*)))))))
                   (let (*top-level-form-p*)
                     (convert-and-maybe-compile form path)))))))))
 
@@ -1704,10 +1714,9 @@ necessary, since type inference may take arbitrarily long to converge.")
         (with-source-paths
             (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil))
         (setf (toplevel-lambdas compilation) nil))
-      ;; CMUCL always reverts this to :SPECIFIED. But we probably want
-      ;; to restore it to the user default.
-      (setf (block-compile compilation) *block-compile-argument*)
-      (setf (entry-points compilation) nil))))
+      (setf (block-compile compilation) :specified)
+      (setf (entry-points compilation) nil)
+      (setf *hairy-defconstants* nil))))
 
 (defun delimit-block-compilation ()
   (let ((compilation *compilation*))

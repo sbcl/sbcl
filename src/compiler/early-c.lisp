@@ -144,6 +144,11 @@ the stack without triggering overflow protection.")
 (declaim (type (member nil t :specified)
                *block-compile-default* *block-compile-argument*))
 
+;; Names seen which are defined to be hairy (i.e. non-EQ comparable)
+;; constants.
+(defvar *hairy-defconstants* '())
+(declaim (type list *hairy-defconstants*))
+
 ;;; This lock is seized in the compiler, and related areas -- like the
 ;;; classoid/layout/class system.
 #-sb-xc-host

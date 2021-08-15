@@ -1118,7 +1118,13 @@
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
-             (if (sb-c::leaf-has-source-name-p entry)
+             (if (and (sb-c::leaf-has-source-name-p entry)
+                      ;; We can't really reference constants defined
+                      ;; by name at load time in the same block
+                      ;; compilation unit, so dump it anonymously when
+                      ;; such a situation arises.
+                      (not (member (sb-c::leaf-source-name entry)
+                                   sb-c::*hairy-defconstants*)))
                  (dump-load-time-symbol-global-value entry fasl-output)
                  (dump-object (sb-c::constant-value entry) fasl-output)))
             (cons

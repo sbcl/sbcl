@@ -107,8 +107,7 @@
 
 (defconstant digit-size sb-vm:n-word-bits)
 
-(eval-when (:compile-toplevel)
-(defconstant all-ones-digit most-positive-word))
+(defconstant all-ones-digit most-positive-word)
 
 #+bignum-assertions
 (progn
@@ -564,7 +563,7 @@
   #+bignum-assertions `(assert ,@args))
   ;; We'll be doing a lot of modular arithmetic.
 (defmacro modularly (form)
-  `(logand #.all-ones-digit ,form))
+  `(logand all-ones-digit ,form))
 
 ;;; I'm not sure why I need this FTYPE declaration.  Compiled by the
 ;;; target compiler, it can deduce the return type fine, but without
@@ -1749,7 +1748,7 @@
          (bignum-truncate-guess (y1 y2 x-i x-i-1 x-i-2)
            (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
            (let ((guess (if (= x-i y1)
-                            #.all-ones-digit
+                            all-ones-digit
                             (%bigfloor x-i x-i-1 y1))))
              (declare (type bignum-element-type guess))
              (loop
@@ -2042,6 +2041,5 @@
         (format t "~5d ~3d ~a~%" size nconsts code)))
     (format t "~5d ~3d~%" tot-size tot-consts)))
 ; => 32208 565 ; without block-compile
-; => 30672 351 ; with block-compile in normal self-build
-; => 30432 305 ; block-compile post-build
+; => 23184 214 ; with block-compile in normal self-build
 |#
