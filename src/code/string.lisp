@@ -620,10 +620,12 @@ new string COUNT long filled with the fill character."
   ;; "Always" means that regardless of whether the user want
   ;; coalescing of strings used as literals in code compiled to memory,
   ;; the string is shareable.
-  (logior-header-bits (the (simple-array * 1) vector)
-                   (if always-shareable
-                       sb-vm:+vector-shareable+
-                       sb-vm:+vector-shareable-nonstd+)))
+  (when (eq (heap-allocated-p vector) :dynamic)
+    (logior-header-bits (the (simple-array * 1) vector)
+                        (if always-shareable
+                            sb-vm:+vector-shareable+
+                            sb-vm:+vector-shareable-nonstd+)))
+  vector)
 
 (clear-info :function :inlining-data 'nstring-upcase)
 (clear-info :function :inlinep 'nstring-upcase)

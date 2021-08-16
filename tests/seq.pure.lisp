@@ -603,3 +603,7 @@
 (with-test (:name :sort-vector-length-1)
   (let ((v (vector 5)))
     (ctu:assert-no-consing (stable-sort v #'<))))
+
+(with-test (:name (:no-consing-tiny-integers-to-string))
+  (ctu:assert-no-consing (dotimes (i 10)
+                           (opaque-identity (write-to-string i)))))
