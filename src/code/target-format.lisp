@@ -134,6 +134,14 @@
                     (tokenize-control-string string))))
           (interpret-directive-list stream tokens orig-args args)))))
 
+
+(!begin-collecting-cold-init-forms)
+(define-load-time-global *format-directive-interpreters* nil)
+(!cold-init-forms
+ (setq *format-directive-interpreters* (make-array 128 :initial-element nil)))
+(declaim (type (simple-vector 128)
+               *format-directive-interpreters*))
+
 (defun interpret-directive-list (stream directives orig-args args)
   (loop
    (unless directives
@@ -249,8 +257,6 @@
                           (princ-to-string arg)
                           "()")
                       mincol colinc minpad padchar atsignp))
-
-(!begin-collecting-cold-init-forms)
 
 (def-format-interpreter #\A (colonp atsignp params)
   (if params

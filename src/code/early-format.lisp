@@ -9,13 +9,9 @@
 
 (in-package "SB-FORMAT")
 
-(declaim (type (simple-vector 128)
-               *format-directive-expanders*
-               *format-directive-interpreters*))
 (defglobal *format-directive-expanders* (make-array 128 :initial-element nil))
-#-sb-xc-host
-(!define-load-time-global *format-directive-interpreters*
-  #.(sb-xc:make-array 128 :initial-element nil))
+(declaim (type (simple-vector 128)
+               *format-directive-expanders*))
 
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)

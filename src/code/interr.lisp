@@ -20,8 +20,8 @@
                `(progn
                   (defconstant n-internal-error-handlers ,n)
                   (declaim ((simple-vector ,n) **internal-error-handlers**))
-                  (!define-load-time-global **internal-error-handlers**
-                              ,(make-array n :initial-element 0))))))
+                  (define-load-time-global **internal-error-handlers**
+                      ,(make-array n :initial-element 0))))))
   (def-it))
 
 (defmacro deferr (name args &rest body)
