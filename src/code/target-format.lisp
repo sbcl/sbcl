@@ -178,21 +178,19 @@
                             char)))
         (directive '.directive) ; expose this var to the lambda. it's easiest
         (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
-    `(setf
-      (svref *format-directive-interpreters*
-             ;; Using the host's char-upcase should be fine here.
-             ;; (Do we even need to use it? Why not just spell the source code as desired?)
-             ,(char-code (char-upcase char)))
-      (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
-        (declare (ignorable stream orig-args args))
-        ,@(if lambda-list
-              `((let ,(mapcar (lambda (var)
-                                `(,var
-                                  (,(symbolicate "DIRECTIVE-" var) ,directive)))
-                              (butlast lambda-list))
-                  (values (progn ,@body) args)))
-              `((declare (ignore ,directive ,directives))
-                ,@body))))))
+    `(!cold-init-forms
+      (setf
+       (aref *format-directive-interpreters* ,(char-code (char-upcase char)))
+       (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
+         (declare (ignorable stream orig-args args))
+         ,@(if lambda-list
+               `((let ,(mapcar (lambda (var)
+                                 `(,var
+                                   (,(symbolicate "DIRECTIVE-" var) ,directive)))
+                               (butlast lambda-list))
+                   (values (progn ,@body) args)))
+               `((declare (ignore ,directive ,directives))
+                 ,@body)))))))
 
 (defmacro def-format-interpreter (char lambda-list &body body)
   (let ((directives (sb-xc:gensym "DIRECTIVES")))
@@ -251,6 +249,8 @@
                           (princ-to-string arg)
                           "()")
                       mincol colinc minpad padchar atsignp))
+
+(!begin-collecting-cold-init-forms)
 
 (def-format-interpreter #\A (colonp atsignp params)
   (if params
@@ -1241,3 +1241,5 @@
         interpret-bind-defaults interpret-format-integer next-arg
         %set-format-directive-expander)
       *!removable-symbols*)
+
+(!defun-from-collected-cold-init-forms !format-directives-init)

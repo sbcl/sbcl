@@ -68,6 +68,9 @@
                       *standard-output* *error-output*
                       *trace-output* *error-output*)
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
+  ;; This allows FORMAT to work, and can go as early needed for
+  ;; debugging.
+  (show-and-call sb-format::!format-directives-init)
   (unless (!c-runtime-noinform-p)
     ;; I'd like FORMAT to remain working in cold-init, where it does work,
     ;; hence the conditional.

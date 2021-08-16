@@ -190,13 +190,6 @@
                        (fopcompilable-p (third form)))
                   (and (eq function 'setf)
                        (fopcompilable-p (%macroexpand form *lexenv*)))
-                  (and (eq function 'sb-kernel:%svset)
-                       (destructuring-bind (thing index value) (cdr form)
-                         (and (symbolp thing)
-                              (integerp index)
-                              (eq (info :variable :kind thing) :global)
-                              (typep value
-                                     '(cons (member lambda function named-lambda))))))
                   (and (eq function 'setq)
                        (setq-fopcompilable-p (cdr form))))))))
 ) ; end FLET

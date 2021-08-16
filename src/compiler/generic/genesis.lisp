@@ -2505,10 +2505,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if args
           (case fun
-           (fdefinition
-            ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
-            (aver (and (singleton-p args) (symbolp (car args))))
-            (cold-symbol-function (car args)))
            (symbol-global-value (cold-symbol-value (first args)))
            (values-specifier-type
             (let* ((des (first args))
@@ -2537,7 +2533,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (cold-set (first args)
                        (let ((val (second args)))
                          (if (symbolp val) (cold-intern val) val))))
-            (%svset (apply 'cold-svset args))
             (t
              (error "Can't FOP-FUNCALL-FOR-EFFECT with function ~S in cold load" fun)))))))
 
