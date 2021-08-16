@@ -863,9 +863,9 @@ line break."
             :operation operation)))
 
 (defun defer-type-checker (entry)
-  (let ((saved-nonce sb-c::*type-cache-nonce*))
+  (let ((saved-nonce sb-kernel::*type-cache-nonce*))
     (lambda (obj)
-      (let ((nonce sb-c::*type-cache-nonce*))
+      (let ((nonce sb-kernel::*type-cache-nonce*))
         (if (eq nonce saved-nonce)
             nil
             (let ((ctype (specifier-type (pprint-dispatch-entry-type entry))))

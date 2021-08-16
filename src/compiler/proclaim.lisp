@@ -25,7 +25,7 @@
 (declaim (ftype (function ((or symbol cons) keyword) (values))
                 note-name-defined))
 (defun note-name-defined (name kind)
-  #-sb-xc-host (atomic-incf *type-cache-nonce*)
+  #-sb-xc-host (atomic-incf sb-kernel::*type-cache-nonce*)
   ;; We do this BOUNDP check because this function can be called when
   ;; not in a compilation unit (as when loading top level forms).
   (when (boundp '*undefined-warnings*)

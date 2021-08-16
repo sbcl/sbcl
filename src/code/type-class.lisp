@@ -42,31 +42,22 @@
          (make-array 32 :element-type 'bit :initial-element 0)))
 
 #+sb-xc
-(macrolet ((def ()
-             (let ((classes (make-array 32 :initial-element nil))
-                   ;; A curiosity observed with CLISP: if GENERATOR-STATE is not bound
-                   ;; to a variable, but instead inserted with read-time-eval
-                   ;; as "#.(sb-xc:make-array ...)" then DUMP-VECTOR fails to find the
-                   ;; array in SB-COLD::*ARRAY-TO-SPECIALIZATION* even though it's there.
-                   ;; Somehow between the read-time-eval and macroexpansion of DEF,
-                   ;; CLISP seems to copy the array. It's as if READ did not return the
-                   ;; object produced by "#." and I can't imagine how that's legal,
-                   ;; let alone possible.
-                   (generator-state
-                     (sb-xc:make-array 1 :element-type '(and fixnum unsigned-byte)
-                                         :initial-element 0)))
+(macrolet ((def (name init-form)
              `(progn
-                (declaim (type (simple-array (and fixnum unsigned-byte) (1))
-                               *ctype-hash-state*)
-                         (type (simple-vector 32) *type-classes*))
-                ;; Strictly speaking these array are immutable, as with all literals
-                ;; appearing in code. We mutate them anyway. Avoiding that minor infraction
-                ;; would require FOPCOMPILE to emit the MAKE-ARRAY expression to be executed
-                ;; in genesis; which is more of a project than I want to tackle.
-                (!define-load-time-global *ctype-hash-state* ,generator-state)
-                (!define-load-time-global *type-classes* ,classes)
-                (!cold-init-forms (fill *type-classes* (make-type-class :name :bogus)))))))
-  (def))
+                (define-load-time-global ,name ,init-form)
+                (!cold-init-forms (setq ,name ,init-form)))))
+  (declaim (type (simple-array (and fixnum unsigned-byte) (1))
+                 *ctype-hash-state*)
+           (type (simple-vector 32) *type-classes*)
+           (type fixnum *type-cache-nonce*))
+  (def *ctype-hash-state* (make-array 1 :element-type '(and fixnum unsigned-byte)
+                                        :initial-element 0))
+  (def *type-classes* (make-array 32 :initial-element nil))
+  ;; This is for "observers" who want to know if type names have been added.
+  ;; Rather than registering listeners, they can detect changes by comparing
+  ;; their stored nonce to the current nonce. Additionally the observers
+  ;; can detect whether function definitions have occurred.
+  (def *type-cache-nonce* 0))
 
 #-sb-xc-host
 (define-compiler-macro type-class-or-lose (&whole form name)

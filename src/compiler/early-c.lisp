@@ -156,14 +156,6 @@ the stack without triggering overflow protection.")
 
 ;;;; miscellaneous utilities
 
-;;; This is for "observers" who want to know if type names have been added.
-;;; Rather than registering listeners, they can detect changes by comparing
-;;; their stored nonce to the current nonce. Additionally the observers
-;;; can detect whether function definitions have occurred.
-#-sb-xc-host
-(progn (declaim (fixnum *type-cache-nonce*))
-       (!define-load-time-global *type-cache-nonce* 0))
-
 (defstruct (debug-name-marker (:print-function print-debug-name-marker)
                               (:copier nil)))
 (declaim (freeze-type debug-name-marker))
