@@ -77,4 +77,4 @@
    :before-load (lambda () (unintern (find-symbol "+TESTCONSTANT3+")))
    :load t)
   (assert (eq (sb-kernel::fun-code-header #'foo-before-defconstant)
-              (sb-kernel::fun-code-header #'bar-before-defconstant))))
+              (sb-kernel::fun-code-header #'bar-after-defconstant))))
