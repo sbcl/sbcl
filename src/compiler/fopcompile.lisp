@@ -185,7 +185,6 @@
               ;; Certain known functions have a special way of checking
               ;; their fopcompilability in the cross-compiler.
               (or (member function '(sb-pcl::!trivial-defmethod
-                                     sb-kernel::%defstruct
                                      sb-thread:make-mutex))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))

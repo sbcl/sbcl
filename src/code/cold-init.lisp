@@ -170,8 +170,6 @@
            (aver (typep object 'code-component))
            (aver (unbound-marker-p (code-header-ref object index)))
            (setf (code-header-ref object index) (svref *!load-time-values* value))))
-        ((cons (eql defstruct))
-         (apply 'sb-kernel::%defstruct (cdr toplevel-thing)))
         ((cons (eql :begin-file))
          (unless (!c-runtime-noinform-p) (print (cdr toplevel-thing))))
         (t

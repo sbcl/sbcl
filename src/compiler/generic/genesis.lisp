@@ -1109,8 +1109,6 @@ core and return a descriptor to it."
 ;;; to the host's COLD-LAYOUT proxy for that layout.
 (defvar *cold-layout-by-addr*)
 
-(defvar *known-structure-classoids*)
-
 ;;; Trivial methods [sic] require that we sort possible methods by the depthoid.
 ;;; Most of the objects printed in cold-init are ordered hierarchically in our
 ;;; type lattice; the major exceptions are ARRAY and VECTOR at depthoid -1.
@@ -2534,10 +2532,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (push fun *!cold-toplevels*)
           (case fun
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
-            (sb-kernel::%defstruct
-             (push args *known-structure-classoids*)
-             (push (apply #'cold-list (cold-intern 'defstruct) args)
-                   *!cold-toplevels*))
             ((sb-impl::%defconstant sb-impl::%defparameter)
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
@@ -3727,7 +3721,6 @@ III. initially undefined function references (alphabetically):
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)
-           (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
@@ -3800,19 +3793,11 @@ III. initially undefined function references (alphabetically):
 
       (sb-cold::check-no-new-cl-symbols)
 
-      (when *known-structure-classoids*
-        ;; Fill in LAYOUT-%INFO with each corresponding DEFSTRUCT-DESCRIPTION
-        ;; (Couldn't this be done sooner?)
-        (dolist (defstruct-args *known-structure-classoids*)
-          (let* ((dd (first defstruct-args))
-                 (layout (gethash (warm-symbol (read-slot dd :name)) *cold-layouts*)))
-            (write-slots (->wrapper (cold-layout-descriptor layout)) :%info dd)))
-        (when verbose
-          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/methods/other~%"
-                  (length *known-structure-classoids*)
-                  (length *!cold-defsymbols*)
-                  (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
-                  (length *!cold-toplevels*))))
+      (when verbose
+        (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/methods/other~%"
+                (length *!cold-defsymbols*)
+                (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
+                (length *!cold-toplevels*)))
 
       (dolist (symbol '(*!cold-defsymbols* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
