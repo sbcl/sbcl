@@ -3234,3 +3234,16 @@
    `(lambda (set1 set2)
       (declare (inline set-exclusive-or))
       (set-exclusive-or set1 set2))))
+
+(declaim (inline inline-deletion-note))
+(defun inline-deletion-note (x y)
+  (if y
+      10
+      x))
+
+(with-test (:name :inline-deletion-note)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   `(lambda (x)
+      (inline-deletion-note x t))
+   ((t) 10)))

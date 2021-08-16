@@ -564,7 +564,7 @@
         (16 'sap-ref-16)
         (32 'sap-ref-32)
         (64 'sap-ref-64))))
-  
+
 (define-alien-type-method (integer :extract-gen) (type sap offset)
   (declare (type alien-integer-type type))
   (let ((ref-fun (alien-integer->sap-ref-fun (alien-integer-type-signed type)

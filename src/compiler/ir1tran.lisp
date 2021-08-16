@@ -39,17 +39,24 @@
     (gethash form *source-paths*)))
 
 (defvar *transforming* nil)
+(defvar *inlining* nil)
 
 (defun ensure-source-path (form)
   (or (get-source-path form)
-      (if (and *transforming*
-               (not (memq 'transformed *current-path*)))
-          ;; Don't hide all the transformed paths, since we might want
-          ;; to look at the final form for error reporting.
-          (list* (simplify-source-path-form form)
-                 'transformed *current-path*)
-          (cons (simplify-source-path-form form)
-                *current-path*))))
+      (cond ((and *transforming*
+                  (not (memq 'transformed *current-path*)))
+             ;; Don't hide all the transformed paths, since we might want
+             ;; to look at the final form for error reporting.
+             (list* (simplify-source-path-form form)
+                    'transformed *current-path*))
+            ;; Avoids notes about inlined code leaking out
+            ((and *inlining*
+                  (not (memq 'inlined *current-path*)))
+             (list* (simplify-source-path-form form)
+                    'inlined *current-path*))
+            (t
+             (cons (simplify-source-path-form form)
+                   *current-path*)))))
 
 (defun simplify-source-path-form (form)
   (if (consp form)
