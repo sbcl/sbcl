@@ -545,23 +545,28 @@
               (make-fixup (tn-value layout) :layout)
               layout)))))
 
-;;; Return the DISP part of an EA based on MEM-OP, which is comprised
-;;; of a vop name and its codegen info.
-;;; Return NIL if the value can't be encoded in a machine instruction.
-(defun valid-memref-byte-disp (mem-op)
-  (ecase (car mem-op)
-    ((instance-index-ref-c
-      raw-instance-ref-c/word
-      raw-instance-ref-c/signed-word)
-     (destructuring-bind (index) (cdr mem-op)
+;;; Return the DISP part of an EA based on MEM-OP,
+;;; which is a memory access vop such as INSTANCE-REF.
+;;; Return NIL if the access can't be absorbed into a following instruction.
+(defun valid-memref-byte-disp (mem-op &aux (info (vop-codegen-info mem-op)))
+  (ecase (vop-name mem-op)
+    (instance-index-ref-c
+     ;; for historical reasons, this has a "-C" variant which takes an info arg
+     (destructuring-bind (index) info
        (- (ash (+ index instance-slots-offset) word-shift)
           instance-pointer-lowtag)))
+    ((%raw-instance-ref/word %raw-instance-ref/signed-word)
+     ;; raw slot vops accept an immediate TN, not a codegen arg
+     (let ((index (tn-ref-tn (tn-ref-across (sb-c::vop-args mem-op)))))
+       (when (sc-is index immediate)
+         (- (ash (+ (tn-value index) instance-slots-offset) word-shift)
+            instance-pointer-lowtag))))
     (slot
-     (destructuring-bind (name index lowtag) (cdr mem-op)
+     (destructuring-bind (name index lowtag) info
        (declare (ignore name))
        (- (ash index word-shift) lowtag)))
     (data-vector-ref-with-offset/simple-vector-c
-     (destructuring-bind (index offset) (cdr mem-op)
+     (destructuring-bind (index offset) info
        (let ((disp (- (ash (+ vector-data-offset index offset) word-shift)
                       other-pointer-lowtag)))
          (if (typep disp '(signed-byte 32)) disp))))))
@@ -620,8 +625,7 @@
         (let ((arg (sb-c::vop-args vop)))
           (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
                      (sb-c::very-temporary-p (tn-ref-tn arg)))
-            (binding* ((mem-op (cons (vop-name prev) (vop-codegen-info prev)))
-                       (disp (valid-memref-byte-disp mem-op) :exit-if-null)
+            (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
                        (arg-ref
                         (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
                        (new (sb-c::emit-and-insert-vop

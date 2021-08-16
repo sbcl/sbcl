@@ -1311,7 +1311,7 @@ constant shift greater than word length")))
 
 ;;; This works for tagged or untagged values, but the vop optimizer
 ;;; has to pre-adjust Y if tagged.
-(define-vop (logtest-instance-ref fast-conditional)
+(define-vop (logtest-memref fast-conditional)
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant integer))
   (:info y)
@@ -1325,7 +1325,7 @@ constant shift greater than word length")))
                      (dotimes (i ,(/ 64 bits))
                        (when (zerop (logandc2 y mask))
                          (inst test ,size (ea disp x) (ash y (* i ,(- bits))))
-                         (return-from logtest-instance-ref))
+                         (return-from logtest-memref))
                        (setq mask (ash mask ,bits))
                        (incf disp ,(/ bits 8))))))
        (try :byte   8)
@@ -1346,8 +1346,8 @@ constant shift greater than word length")))
   (unless (tn-ref-memory-access (sb-c::vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  ;; TODO: missing data-vector-ref/simple-vector-c
-                 vop '(raw-instance-ref-c/signed-word
-                       raw-instance-ref-c/word
+                 vop '(%raw-instance-ref/signed-word
+                       %raw-instance-ref/word
                        instance-index-ref-c
                        ;; This would only happen in unsafe code most likely,
                        ;; because CAR,CDR, etc would need to cast/assert the loaded
@@ -1363,21 +1363,24 @@ constant shift greater than word length")))
                        #-ubsan slot))))
       (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
-        (let ((arg (sb-c::vop-args vop)))
+        ;; If the memory ref produces a fixnum, the constant should be a fixnum
+        ;; so that we don't see cases such as in lp#1939897.
+        ;; In the absence of vop combining, MOVE-TO-WORD would be inserted
+        ;; between INSTANCE-INDEX-REF and LOGTEST, but it did not happen yet.
+        (let* ((arg (sb-c::vop-args vop))
+               (info-arg (car (vop-codegen-info vop)))
+               (constant (if (member (vop-name prev) '(instance-index-ref-c slot))
+                             (ash info-arg n-fixnum-tag-bits)
+                             info-arg)))
           (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
-                     (sb-c::very-temporary-p (tn-ref-tn arg)))
-            (binding* ((mem-op (cons (vop-name prev) (vop-codegen-info prev)))
-                       (disp (valid-memref-byte-disp mem-op) :exit-if-null)
-                       (arg-ref
-                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
-                       (codegen-info
-                        (if (eq (vop-name vop) 'fast-logtest-c/fixnum)
-                            (list (fixnumize (car (vop-codegen-info vop))))
-                            (vop-codegen-info vop)))
+                     (sb-c::very-temporary-p (tn-ref-tn arg))
+                     (typep constant '(or word signed-word)))
+            (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
+                       (arg-ref (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
                        (new (sb-c::emit-and-insert-vop
                              (sb-c::vop-node vop) (vop-block vop)
-                             (template-or-lose 'logtest-instance-ref)
-                             arg-ref nil prev codegen-info)))
+                             (template-or-lose 'logtest-memref)
+                             arg-ref nil prev (list constant))))
               (setf (tn-ref-memory-access arg-ref) `(:read . ,disp))
               (sb-c::delete-vop prev)
               (sb-c::delete-vop vop)
@@ -1433,6 +1436,17 @@ constant shift greater than word length")))
                         temp-reg-tn))))
       (inst bt word bit))))
 
+(defun change-tested-flag (vop from-flag to-flag)
+  (ecase (vop-name vop)
+    (branch-if
+     (let ((info (vop-codegen-info vop)))
+       (aver (equal (third info) (list from-flag)))
+       (setf (vop-codegen-info vop) (list (car info) (cadr info) (list to-flag)))))
+    (compute-from-flags
+     (let ((info (vop-codegen-info vop)))
+       (aver (equal (first info) (list from-flag)))
+       (setf (vop-codegen-info vop) (list (list to-flag)))))))
+     
 (define-vop (%logbitp/c fast-safe-arith-op)
   (:translate %logbitp)
   (:conditional :c)
@@ -1440,12 +1454,83 @@ constant shift greater than word length")))
   (:args (int :scs (signed-reg signed-stack unsigned-reg unsigned-stack
                     any-reg control-stack) :load-if nil))
   (:arg-types (:constant (mod 64)) untagged-num)
+  (:vop-var vop)
   (:generator 1
     (when (sc-is int any-reg control-stack)
-      ;; Adjust the index up by something.
+      ;; Acount for fixnum tag bit.
       ;; Reading beyond the sign bit is the same as reading the sign bit.
       (setf bit (min (1- n-word-bits) (+ bit n-fixnum-tag-bits))))
+    (let ((next (vop-next vop)))
+      (when (member (vop-name next) '(branch-if compute-from-flags))
+        (cond ((not (gpr-tn-p int)) ; is in memory, issue it as a TEST
+               ;; To test bit index 8: add 1 to the disp, and use immediate val 0x01
+               ;;             index 9: add 1 to the disp, and use immediate val 0x02
+               ;;             etc
+               ;; I'm not crazy about this approach, because we lose the connection
+               ;; to which TN we're reading.  There needs to be a way to emit the instruction
+               ;; as byte-within-stack-tn so that it is understood by other optimizations.
+               (binding* ((frame-disp  (frame-byte-offset (tn-offset int)))
+                          ((extra-disp bit-shift) (floor bit 8)))
+                 (inst test :byte (ea (+ frame-disp extra-disp) rbp-tn) (ash 1 bit-shift)))
+               (change-tested-flag next :c :ne)
+               (return-from %logbitp/c))
+              ((= bit 31) ; test the sign bit of the 32-bit register
+               (inst test :dword int int)
+               (change-tested-flag next :c :s)
+               (return-from %logbitp/c))
+              ((< bit 32)
+               (inst test (if (< bit 8) :byte :dword) int (ash 1 bit))
+               (change-tested-flag next :c :ne)
+               (return-from %logbitp/c)))))
     (inst bt (if (<= bit 31) :dword :qword) int bit)))
+
+(define-vop (%logbitp-memref fast-conditional)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types (:constant (mod 64)) *)
+  (:info bit)
+  (:args-var arg-ref)
+  (:vop-var vop)
+  (:conditional :ne)
+  (:generator 1
+    ;; This resembles the above case for TN being not in a GPR
+    (binding* ((slot-disp (cdr (tn-ref-memory-access arg-ref)))
+               ((extra-disp bit-shift) (floor bit 8)))
+      (inst test :byte (ea (+ slot-disp extra-disp) x) (ash 1 bit-shift)))))
+
+(defoptimizer (sb-c::vop-optimize %logbitp/c) (vop)
+  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+    (let ((prev (sb-c::previous-vop-is
+                 ;; TODO: missing data-vector-ref/simple-vector-c and SLOT
+                 vop '(%raw-instance-ref/signed-word
+                       %raw-instance-ref/word
+                       instance-index-ref-c))))
+      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (when (and prev (eq (vop-block prev) (vop-block vop)))
+        (let ((arg (sb-c::vop-args vop)))
+          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+                     (sb-c::very-temporary-p (tn-ref-tn arg))
+                     (vop-next vop)
+                     ;; Ensure we can change the tested flag from CF to ZF
+                     (member (vop-name (vop-next vop))
+                             '(branch-if compute-from-flags)))
+            (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
+                       (arg-ref
+                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                       (bit (car (vop-codegen-info vop)))
+                       (info
+                        (if (sb-c::previous-vop-is vop 'instance-index-ref-c) ; tagged slot
+                            ;; Reading beyond the sign bit is the same as reading the sign bit.
+                            (min (+ bit n-fixnum-tag-bits) (1- n-word-bits))
+                            bit))
+                       (new (sb-c::emit-and-insert-vop
+                             (sb-c::vop-node vop) (vop-block vop)
+                             (template-or-lose '%logbitp-memref)
+                             arg-ref nil prev (list info))))
+              (setf (tn-ref-memory-access arg-ref) `(:read . ,disp))
+              (change-tested-flag (vop-next vop) :c :ne)
+              (sb-c::delete-vop prev)
+              (sb-c::delete-vop vop)
+              new)))))))
 
 (defun emit-optimized-cmp (x y)
   (if (and (gpr-tn-p x) (eql y 0))

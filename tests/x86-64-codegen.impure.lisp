@@ -1005,3 +1005,42 @@ sb-vm::(define-vop (cl-user::test)
                sb-kernel::ub64-bash-copy))
     ;; Should not call anything
     (assert (not (ctu:find-code-constants (symbol-function f))))))
+
+(defstruct bitsy
+  (fix 0 :type fixnum)
+  (sw 0 :type sb-vm:signed-word))
+
+(defun s62 (x) (logtest (ash 1 62) (bitsy-fix x)))
+(compile 's62)
+(with-test (:name :lp-1939897)
+  (assert (not (s62 (make-bitsy :fix (ash 1 61))))))
+
+(defmacro try-logbitp-walking-bit-test
+    (slot-name initarg nbits most-negative-value)
+  `(let ((functions (make-array ,nbits)))
+     (flet ((bit-num-to-value (b)
+              (if (= b ,(1- nbits)) ,most-negative-value (ash 1 b))))
+       (loop for bit-index from 0 below ,nbits
+          do (setf (aref functions bit-index)
+                   (compile nil `(lambda (obj)
+                                  (values (logtest ,(bit-num-to-value bit-index)
+                                           (,',slot-name obj))
+                                   (logbitp ,bit-index (,',slot-name obj)))))))
+       (loop for set-bit-index from 0 below ,nbits
+          do (let ((struct (make-bitsy ,initarg
+                                       (bit-num-to-value set-bit-index))))
+               (loop for test-bit-index from 0 below ,nbits
+                  do (multiple-value-bind (value1 value2)
+                         (funcall (aref functions test-bit-index) struct)
+                       ;; The expressions should agree at each bit
+                       (assert (eq value1 value2))
+                       ;; And should give the right answer
+                       (if (= test-bit-index set-bit-index)
+                           (assert value1)
+                           (assert (not value1))))))))))
+
+(with-test (:name :logbitp-vs-logtest-exhaustive-test)
+  (try-logbitp-walking-bit-test bitsy-fix :fix 63
+                                most-negative-fixnum)
+  (try-logbitp-walking-bit-test bitsy-sw  :sw  64
+                                (sb-c::mask-signed-field 64 (ash 1 63))))
