@@ -201,7 +201,6 @@ tree structure resulting from the evaluation of EXPRESSION."
 (declaim (ftype (sfunction (symbol t &optional t t) null)
                 about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
-
 (defun %defconstant (name value source-location &optional (doc nil docp))
   #+sb-xc-host (declare (ignore doc docp))
   (unless (symbolp name)
@@ -259,6 +258,11 @@ tree structure resulting from the evaluation of EXPRESSION."
     (when docp
       (setf (documentation name 'variable) doc))
     (%set-symbol-value name value))
+  ;; Record the names of hairy defconstants when block compiling.
+  (when (and sb-c::*compile-time-eval*
+             (eq (sb-c::block-compile sb-c::*compilation*) t))
+    (unless (sb-xc:typep value '(or fixnum character symbol))
+      (push name sb-c::*hairy-defconstants*)))
   ;; Define the constant in the cross-compilation host, since the
   ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
   ;; which reference the constant.

@@ -48,8 +48,7 @@
 
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
-   ;; test a non-EQL-comparable constant, so that uses of it need symbol-value
-   ;; at load-time.
+   ;; test a non-EQL-comparable constant.
    `((defconstant testconstant '(1 2 3 4 5))
      (defun foo ()
        (loop for i in testconstant collect i)))
@@ -68,3 +67,14 @@
    :block-compile t
    :before-load (lambda () (unintern (find-symbol "TESTCONSTANT2")))
    :load t))
+
+(with-test (:name :block-defconstant-same-component)
+  (ctu:file-compile
+   `((defun foo-before-defconstant (x) x)
+     (defconstant +testconstant3+ '(1 2 3 4 5 6))
+     (defun bar-after-defconstant () (foo-before-defconstant +testconstant3+)))
+   :block-compile t
+   :before-load (lambda () (unintern (find-symbol "+TESTCONSTANT3+")))
+   :load t)
+  (assert (eq (sb-kernel::fun-code-header #'foo-before-defconstant)
+              (sb-kernel::fun-code-header #'bar-before-defconstant))))

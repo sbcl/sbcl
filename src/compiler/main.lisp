@@ -1407,18 +1407,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (process-toplevel-form expanded path compile-time-too))
                  (t
                   (when compile-time-too
-                    (eval-compile-toplevel (list form) path)
-                    ;; Record the names of hairy defconstants when
-                    ;; block compiling.
-                    (when (and (eq (block-compile *compilation*) t)
-                               (listp form)
-                               (eq (first form) 'sb-impl::%defconstant))
-                      (let ((spec (second form)))
-                        (when (eq (first spec) 'quote)
-                          (let* ((name (second spec))
-                                 (value (symbol-value name)))
-                            (unless (typep value '(or fixnum symbol))
-                              (push name *hairy-defconstants*)))))))
+                    (eval-compile-toplevel (list form) path))
                   (let (*top-level-form-p*)
                     (convert-and-maybe-compile form path)))))))))
 
