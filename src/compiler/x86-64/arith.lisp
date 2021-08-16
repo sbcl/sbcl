@@ -1446,7 +1446,7 @@ constant shift greater than word length")))
      (let ((info (vop-codegen-info vop)))
        (aver (equal (first info) (list from-flag)))
        (setf (vop-codegen-info vop) (list (list to-flag)))))))
-     
+
 (define-vop (%logbitp/c fast-safe-arith-op)
   (:translate %logbitp)
   (:conditional :c)
