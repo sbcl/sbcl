@@ -21,7 +21,7 @@
   (addr system-area-pointer)
   (bytes unsigned))
 
-(!define-load-time-global *allocator-mutex* (sb-thread:make-mutex :name "Allocator"))
+(define-load-time-global *allocator-mutex* (sb-thread:make-mutex :name "Allocator"))
 
 (defun allocate-static-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)

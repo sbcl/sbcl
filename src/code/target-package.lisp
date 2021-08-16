@@ -48,7 +48,7 @@
 ;;;; sufficient, though interaction between parallel intern and use-package
 ;;;; needs to be considered with some care.
 
-(!define-load-time-global *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
+(define-load-time-global *package-graph-lock* nil)
 
 (defmacro with-package-graph ((&key) &body forms)
   ;; FIXME: Since name conflicts can be signalled while holding the
@@ -1866,12 +1866,12 @@ PACKAGE."
 
 (defun pkg-name= (a b) (and (not (eql a 0)) (string= a b)))
 (defun !package-cold-init ()
+  (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
   (setf *package-names* (make-info-hashtable :comparator #'pkg-name=
-                                             :hash-function #'sxhash)
-        *package-nickname-ids*
-        (cons (make-info-hashtable :comparator #'pkg-name=
-                                   :hash-function #'sxhash)
-              1))
+                                             :hash-function #'sxhash))
+  (setf *package-nickname-ids* (cons (make-info-hashtable :comparator #'pkg-name=
+                                                          :hash-function #'sxhash)
+                                     1))
   (setf (sb-thread:mutex-name (info-env-mutex *package-names*)) "package names"
         (sb-thread:mutex-name (info-env-mutex (car *package-nickname-ids*)))
         "package nicknames")

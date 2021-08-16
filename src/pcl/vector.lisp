@@ -58,7 +58,7 @@
 
 ;;; ...and one lock to rule them. Lock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
-;;; -- and mostly this is already under the *world-lock*
+;;; -- and mostly this is already under the **world-lock**
 (define-load-time-global *pv-lock*
   (sb-thread:make-mutex :name "pv table index lock"))
 

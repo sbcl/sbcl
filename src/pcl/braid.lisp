@@ -694,7 +694,7 @@
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun %update-lisp-class-layout (class wrapper)
-  ;; Protected by *world-lock* in callers.
+  ;; Protected by **world-lock** in callers.
   (let ((classoid (wrapper-classoid wrapper)))
     (unless (eq (classoid-wrapper classoid) wrapper)
       (set-layout-inherits wrapper

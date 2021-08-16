@@ -149,18 +149,10 @@ the stack without triggering overflow protection.")
 (defvar *hairy-defconstants* '())
 (declaim (type list *hairy-defconstants*))
 
-;;; This lock is seized in the compiler, and related areas -- like the
-;;; classoid/layout/class system.
-#-sb-xc-host
-(!define-load-time-global **world-lock** (sb-thread:make-mutex :name "World Lock"))
-
 #-sb-xc-host
 (define-load-time-global *static-linker-lock*
     (sb-thread:make-mutex :name "static linker"))
 
-(defmacro with-world-lock (() &body body)
-  #+sb-xc-host `(progn ,@body)
-  #-sb-xc-host `(sb-thread:with-recursive-lock (**world-lock**) ,@body))
 
 ;;;; miscellaneous utilities
 

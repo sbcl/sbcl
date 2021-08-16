@@ -156,7 +156,7 @@
 ;;; but also pretty much not correct.
 (defun %invalidate-wrapper (owrapper state nwrapper)
   (aver (member state '(:flush :obsolete)))
-  #+sb-thread (aver (sb-thread:holding-mutex-p sb-c::**world-lock**))
+  #+sb-thread (aver (sb-thread:holding-mutex-p sb-kernel::**world-lock**))
   (let ((classoid (wrapper-classoid nwrapper))
         (new-previous ())
         (new-state (cons state nwrapper)))

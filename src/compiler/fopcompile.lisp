@@ -184,8 +184,7 @@
             (let ((function (car form)))
               ;; Certain known functions have a special way of checking
               ;; their fopcompilability in the cross-compiler.
-              (or (member function '(sb-pcl::!trivial-defmethod
-                                     sb-thread:make-mutex))
+              (or (member function '(sb-pcl::!trivial-defmethod))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))
                        (fopcompilable-p (third form)))

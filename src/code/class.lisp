@@ -57,6 +57,18 @@
      (unless (= actual expected) (bug "XC layout hash calculation failed")))
    (setf (gethash (car x) *forward-referenced-wrappers*) (cdr x))))
 
+;;; FIXME: This lock is only seized in the classoid/layout/class
+;;; system, and is now a misnomer.
+#-sb-xc-host
+(define-load-time-global **world-lock** nil)
+#-sb-xc-host
+(!cold-init-forms
+ (setq **world-lock** (sb-thread:make-mutex :name "World Lock")))
+
+(defmacro with-world-lock (() &body body)
+  #+sb-xc-host `(progn ,@body)
+  #-sb-xc-host `(sb-thread:with-recursive-lock (**world-lock**) ,@body))
+
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
 #+sb-xc-host

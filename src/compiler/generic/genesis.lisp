@@ -2514,11 +2514,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (let* ((des (first args))
                    (spec (if (descriptor-p des) (host-object-from-core des) des)))
               (ctype-to-core spec (funcall fun spec))))
-           (sb-thread:make-mutex
-            (aver (eq (car args) :name))
-            (write-slots (allocate-struct-of-type 'sb-thread:mutex)
-                         :name (cadr args)
-                         :%owner *nil-descriptor*))
            (t (error "Can't FOP-FUNCALL with function ~S in cold load." fun)))
           (let ((counter *load-time-value-counter*))
             (push (cold-list (cold-intern :load-time-value) fun
