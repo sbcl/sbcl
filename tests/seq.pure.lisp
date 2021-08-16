@@ -599,3 +599,7 @@
     (loop for char across "tset" do (vector-push-extend char string))
     (replace string string :start2 1 :start1 2)
     (assert (string= string "tsse"))))
+
+(with-test (:name :sort-vector-length-1)
+  (let ((v (vector 5)))
+    (ctu:assert-no-consing (stable-sort v #'<))))

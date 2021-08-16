@@ -325,14 +325,18 @@
            (type (or null function) key))
   (declare (explicit-check))
   (declare (dynamic-extent pred key))
-  (vector-merge-sort vector pred key svref))
+  (if (<= (length vector) 1) ; avoid consing
+      vector
+      (vector-merge-sort vector pred key svref)))
 
 (defun stable-sort-vector (vector pred key)
   (declare (type function pred)
            (type (or null function) key))
   (declare (explicit-check))
   (declare (dynamic-extent pred key))
-  (vector-merge-sort vector pred key aref))
+  (if (<= (length vector) 1) ; avoid consing
+      vector
+      (vector-merge-sort vector pred key aref)))
 
 ;;;; merging
 
