@@ -1054,9 +1054,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (compile-toplevel (list tll) nil))
             (when (consp form)
               (case (car form)
-                ;; DEFPACKAGE has load-time effects that must occur before
-                ;; code components referencing the packages they define
-                ;; are loaded, so we delimit the current component here.
+                ;; Block compilation can cause packages to be defined after
+                ;; they are referenced at load time, so we have to delimit the
+                ;; current block compilation.
                 ((sb-impl::%defpackage)
                  (delimit-block-compilation))))
             nil)))))

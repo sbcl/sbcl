@@ -1010,6 +1010,12 @@ implementation it is ~S." *!default-package-use-list*)
         "Clobber existing package."
         "A package named ~S already exists" name)
        (setf clobber t))
+     (when (and sb-c::*compile-time-eval*
+                (eq (sb-c::block-compile sb-c::*compilation*) t))
+       (style-warn "Package creation forms limit block compilation and ~
+       may cause failure with the use of specified entry ~
+       points. Consider moving the package creation form outside the ~
+       scope of a block compilation."))
      (with-package-graph ()
        ;; Check for race, signal the error outside the lock.
        (when (and (not clobber) (find-package name))
