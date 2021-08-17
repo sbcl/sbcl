@@ -52,17 +52,6 @@
                (makunbound '*!cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
 
-;;; !DEFINE-LOAD-TIME-GLOBAL avoids this anti-pattern:
-;;;    (!begin-collecting-cold-init-forms)
-;;;    (define-load-time-global *foo* nil)
-;;;    (!cold-init-forms (setq *foo* nil))
-;;;    (!defun-from-cold-init-forms !some-cold-init-fun)
-(defmacro !define-load-time-global (sym value &optional (doc nil doc-p))
-  `(progn (define-load-time-global ,sym ,value ,@(if doc-p (list doc)))
-          ;; The expansion of the DEFINE-L-T-G is too hairy to fopcompile,
-          ;; but SETQ is ok provided that the value form is ok.
-          #-sb-xc-host (setq ,sym ,value)))
-
 (defmacro !set-load-form-method (class-name usable-by &optional method)
   ;; If USABLE-BY is:
   ;;  :host   - the host compiler can execute this M-L-F method

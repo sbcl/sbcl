@@ -49,10 +49,6 @@
 (compile 'read-target-float)
 (set-macro-character #\$ #'read-target-float t)
 
-;; Restore !DEFINE-LOAD-TIME-GLOBAL macro
-(setf (macro-function 'sb-int::!define-load-time-global)
-      (macro-function 'sb-ext:define-load-time-global))
-
 (unless (fboundp 'sb-int:!cold-init-forms)
   (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms)))
 

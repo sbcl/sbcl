@@ -187,11 +187,7 @@
               (or (member function '(sb-pcl::!trivial-defmethod))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))
-                       (fopcompilable-p (third form)))
-                  (and (eq function 'setf)
-                       (fopcompilable-p (%macroexpand form *lexenv*)))
-                  (and (eq function 'setq)
-                       (setq-fopcompilable-p (cdr form))))))))
+                       (fopcompilable-p (third form))))))))
 ) ; end FLET
 
 (defun let-fopcompilable-p (operator args)

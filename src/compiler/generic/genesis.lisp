@@ -2528,11 +2528,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (cold-set name (if (symbolp val) (cold-intern val) val))
                (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)
                      *!cold-defsymbols*)))
-            (set
-             (aver (= (length args) 2))
-             (cold-set (first args)
-                       (let ((val (second args)))
-                         (if (symbolp val) (cold-intern val) val))))
             (t
              (error "Can't FOP-FUNCALL-FOR-EFFECT with function ~S in cold load" fun)))))))
 
