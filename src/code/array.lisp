@@ -1377,49 +1377,58 @@ of specialized arrays is supported."
 
 ;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
 ;;; which must be less than or equal to its current length. This can
-;;; be called on vectors without a fill pointer but it is extremely
-;;; dangerous to do so: shrinking the size of an object (as viewed by
-;;; the gc) makes bounds checking unreliable in the face of interrupts
-;;; or multi-threading. Call it only on provably local vectors.
-;;; FIXME: while this is a correct approach, there is a better way- rather than
-;;; turning the suffix into a sequence of (0 . 0) conses, we can make it into
-;;; a vector of SB-VM:WORD by writing a length and header (in that order).
-;;; A minor complication is with SIMPLE-BASE-STRING and its implicit null.
-;;; i.e. it may be necessary to zeroize one byte (or word) that is not currently zero,
-;;; and then skip a word (or two) to begin the next physical object.
-(defun %shrink-vector (vector new-length &aux (old-length (length vector)))
+;;; be called on vectors without a fill pointer but it is slightly
+;;; dangerous to do so: shrinking the size of an object accessible
+;;; to another thread could cause it to access an out-of-bounds element.
+;;; GC should generally be fine no matter what happens, because it either
+;;; reads the old length or the new length. If the old, and unboxed,
+;;; the whole vector is skipped; if simple-vector, then at worst it reads
+;;; the header word for a filler, which is a valid element (yup really!).
+;;; If it reads the new length, then the next object is filler.
+(defun %shrink-vector (vector new-length)
   (declare (vector vector))
-  (unless (array-header-p vector)
-    ;; Zero out the 'tail' of the vector so that GC doesn't croak on random bytes.
-    (typecase vector
-      (simple-vector (fill vector 0 :start new-length))
-      ((simple-array nil (*)) nil) ; no payload: do nothing
-      (t
-       (multiple-value-bind (start-byte count)
-           (let ((bits-per-elt (ash 1 (aref %%simple-array-n-bits-shifts%%
-                                            (%other-pointer-widetag vector)))))
-             (if (>= bits-per-elt 8)
-                 (let ((bytes-per-elt (/ bits-per-elt 8)))
-                   (values (* new-length bytes-per-elt)
-                           ;; I think we can assume that any "hidden" word is zero.
-                           (* (- old-length new-length) bytes-per-elt)))
-                 ;; When fewer than 8 bits per element, carefully zeroize words beyond the final
-                 ;; word at the new length. There was a bug resulting in that not happening,
-                 ;; because FILL affects only the in-bounds elements from the new (smaller)
-                 ;; length to the old (larger) length, not figuring that bits beyond the old
-                 ;; logical length up to the physical length have no requirement to be zero.
-                 ;; See the %shrink-bit-vector test in bit-vector.impure.
-                 (let* ((elts-per-word (/ n-word-bits bits-per-elt))
-                        (old-word-index (floor (1- old-length) elts-per-word))
-                        (new-word-index (floor (1- new-length) elts-per-word)))
-                   (if (> old-word-index new-word-index)
-                       (values (* (1+ new-word-index) n-word-bytes)
-                               (* (- old-word-index new-word-index) n-word-bytes))
-                       (values 0 0)))))
-         (with-alien ((memset (function void system-area-pointer unsigned unsigned)
-                              :extern))
-           (with-pinned-objects (vector)
-             (alien-funcall memset (sap+ (vector-sap vector) start-byte) 0 count)))))))
+  (unless (or (array-header-p vector) (typep vector '(simple-array nil (*))))
+    (let ((old-length (length vector))
+          (new-length new-length))
+      (when (simple-base-string-p vector)
+        ;; We can blindly store the hidden #\null at NEW-LENGTH, but it would
+        ;; appear to be an out-of-bounds access if the length is not
+        ;; changing at all. i.e. while it's safe to always do a store,
+        ;; the length check has to be skipped.
+        (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+          (setf (schar vector new-length) (code-char 0)))
+        ;; Now treat both the old and new lengths as if they include
+        ;; the byte that holds the implicit string terminator.
+        (incf old-length)
+        (incf new-length))
+      (let* ((n-bits-shift (aref %%simple-array-n-bits-shifts%%
+                                 (%other-pointer-widetag vector)))
+             (old-nwords (ceiling (ash old-length n-bits-shift) n-word-bits))
+             (new-nwords (ceiling (ash new-length n-bits-shift) n-word-bits)))
+        ;; If we want to impose a constraint that unused bytes above the
+        ;; new length and below the physical end are 0,
+        ;; then now would be the time to enforce that.
+        (when (< new-nwords old-nwords)
+          (with-pinned-objects (vector)
+            ;; VECTOR-SAP is only for unboxed vectors. Use the vop directly.
+            (let ((data (%primitive vector-sap vector)))
+              ;; There is no requirement to zeroize memory corresponding
+              ;; to unused array elements.
+              ;; However, it's slightly nicer if the padding word (if present) is 0.
+              (when (oddp new-nwords)
+                (setf (sap-ref-word data (ash new-nwords word-shift)) 0))
+              (let* ((aligned-old (align-up old-nwords 2))
+                     (aligned-new (align-up new-nwords 2)))
+                ;; Only if physically shrunk as determined by PRIMITIVE-OBJECT-SIZE
+                ;; will we need to (and have adequate room to) place a filler.
+                (when (< aligned-new aligned-old)
+                  (let ((diff (- aligned-old aligned-new)))
+                    ;; Certainly if the vector is unboxed it can't possibly matter
+                    ;; if GC sees this bit pattern prior to setting the new length;
+                    ;; but even for SIMPLE-VECTOR, it's OK, it turns out.
+                    (setf (sap-ref-word data (ash aligned-new word-shift))
+                          (logior (ash (1- diff) n-widetag-bits)
+                                  filler-widetag)))))))))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)
