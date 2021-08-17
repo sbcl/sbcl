@@ -639,6 +639,14 @@
 (defun %%ldb (integer size posn)
   (%ldb size posn integer))
 
+(deftransform %%ldb ((integer size posn) (unsigned-byte * (constant-arg (integer #.n-word-bits))) *
+                     :important nil)
+  0)
+
+(deftransform %%ldb ((integer size posn) ((integer * -1) * (constant-arg (integer #.n-word-bits))) *
+                     :important nil)
+  1)
+
 (defun %%dpb (newbyte size posn integer)
   (%dpb newbyte size posn integer))
 
@@ -652,7 +660,15 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:generator 2
-    (inst ubfm res x (1+ posn) (+ posn size))))
+    (cond ((<= (+ posn size) n-fixnum-bits)
+           (inst ubfm res x (1+ posn) (+ posn size)))
+          ((= size 1)
+           (inst lsr res x n-fixnum-bits))
+          (t
+           ;; Can't constrain two constant args to avoid this VOP and
+           ;; go to the signed variant, so do it manually.
+           (inst asr res x (1+ posn))
+           (inst and res res (ash most-positive-word (- size sb-vm:n-word-bits)))))))
 
 (define-vop (ldb-c)
   (:translate %%ldb)
@@ -664,7 +680,10 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:generator 3
-    (inst ubfm res x posn (+ posn size -1))))
+    (if (and (>= (+ posn size) n-word-bits)
+             (= size 1))
+        (inst lsr res x (1- n-word-bits))
+        (inst ubfm res x posn (+ posn size -1)))))
 
 (define-vop (dpb-c/fixnum)
   (:translate %%dpb)
