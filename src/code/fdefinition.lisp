@@ -16,7 +16,7 @@
 
 ;; This variable properly belongs in 'target-hash-table',
 ;; but it's compiled after this file is.
-(!define-load-time-global *user-hash-table-tests* nil)
+(define-load-time-global *user-hash-table-tests* nil)
 
 
 ;;;; fdefinition (fdefn) objects
@@ -401,13 +401,14 @@
     ;; with this.
     (when (and (symbolp name) (fboundp name))
       (let ((old (symbol-function name)))
-        (dolist (spec *user-hash-table-tests*)
-          (cond ((eq old (second spec))
-                 ;; test-function
-                 (setf (second spec) new-value))
-                ((eq old (third spec))
-                 ;; hash-function
-                 (setf (third spec) new-value))))))
+        (when (boundp '*setf-fdefinition-hook*)
+          (dolist (spec *user-hash-table-tests*)
+            (cond ((eq old (second spec))
+                   ;; test-function
+                   (setf (second spec) new-value))
+                  ((eq old (third spec))
+                   ;; hash-function
+                   (setf (third spec) new-value)))))))
 
     ;; FIXME: This is a good hook to have, but we should probably
     ;; reserve it for users.

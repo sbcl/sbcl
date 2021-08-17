@@ -88,7 +88,7 @@
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
 
   (!cold-init-hash-table-methods)
-  ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
+  ;; And now *CURRENT-THREAD*
   (sb-thread::init-main-thread)
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.

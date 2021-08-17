@@ -51,8 +51,7 @@
 (defun metaspace-sizeclass->nbytes (sizeclass)
   (* (aref chunk-size-classes sizeclass) n-word-bytes))
 
-(!define-load-time-global *metaspace-freelists*
-  #.(sb-xc:make-array 8 :element-type 'word :initial-element 0))
+(define-load-time-global *metaspace-freelists* (make-array 8 :element-type 'word :initial-element 0))
 (declaim (type (simple-array word (8)) *metaspace-freelists*))
 
 ;;; A completely empty slab is put back in this list for reuse,
