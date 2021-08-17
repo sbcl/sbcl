@@ -186,7 +186,7 @@
               ;; their fopcompilability in the cross-compiler.
               (or (member function '(sb-pcl::!trivial-defmethod))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
-                  (and (member function '(sb-impl::%defconstant sb-impl::%defparameter))
+                  (and (member function '(sb-impl::%defconstant))
                        (fopcompilable-p (third form))))))))
 ) ; end FLET
 

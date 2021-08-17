@@ -40,7 +40,7 @@
 ;;; and the symbol-global-value should never be used.
 ;;; (And in any case it is not really a special var)
 #+(and (or x86 x86-64) (not sb-thread))
-(defparameter *pseudo-atomic-bits* 0) ; initialized by genesis
+(defvar *pseudo-atomic-bits* 0)
 
 #+c-stack-is-control-stack
 (setf (info :variable :always-bound 'sb-c:*alien-stack-pointer*) :always-bound)
@@ -65,7 +65,7 @@
 
 (declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
-(defparameter *evaluator-mode* :compile ; initialized by genesis
+(defparameter *evaluator-mode* :compile
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")

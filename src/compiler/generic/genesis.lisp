@@ -2523,7 +2523,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (push fun *!cold-toplevels*)
           (case fun
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
-            ((sb-impl::%defconstant sb-impl::%defparameter)
+            ((sb-impl::%defconstant)
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
                (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)

@@ -164,23 +164,18 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb-kernel::!set-up-structure-object-class)
 
-  ;; Genesis is able to perform some of the work of DEFCONSTANT and
-  ;; DEFPARAMETER, but not all of it. It assigns symbol values, but can not
-  ;; manipulate globaldb. Therefore, a subtlety of these macros for bootstrap
-  ;; is that we see each DEFthing twice: once during cold-load and again here.
-  ;; Now it being the case that DEFPARAMETER implies variable assignment
-  ;; unconditionally, you may think it should assign. No! This was logically
-  ;; ONE use of the defining macro, but split into pieces as a consequence
-  ;; of the implementation.
+  ;; Genesis is able to perform some of the work of DEFCONSTANT, but
+  ;; not all of it. It assigns symbol values, but can not manipulate
+  ;; globaldb. Therefore, a subtlety of these macros for bootstrap is
+  ;; that we see each DEFthing twice: once during cold-load and again
+  ;; here.
   (setq sb-pcl::*!docstrings* nil) ; needed by %DEFCONSTANT
   (dolist (x *!cold-defsymbols*)
     (destructuring-bind (fun name source-loc . docstring) x
       (aver (boundp name)) ; it's a bug if genesis didn't initialize
       (ecase fun
         (%defconstant
-         (apply #'%defconstant name (symbol-value name) source-loc docstring))
-        (%defparameter ; use %DEFVAR which will not clobber
-         (apply #'%defvar name source-loc nil docstring)))))
+         (apply #'%defconstant name (symbol-value name) source-loc docstring)))))
 
   (unless (!c-runtime-noinform-p)
     #+(or x86 x86-64) (format t "[Length(TLFs)=~D]" (length *!cold-toplevels*))
