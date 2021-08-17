@@ -56,6 +56,10 @@
 
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
 
+(defun !format-cold-init ()
+  (sb-format::!late-format-init)
+  (sb-format::!format-directives-init))
+
 ;;; called when a cold system starts up
 (defun !cold-init (&aux (real-choose-symbol-out-fun #'choose-symbol-out-fun)
                         (real-failed-aver-fun #'%failed-aver))
@@ -68,7 +72,7 @@
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   ;; This allows FORMAT to work, and can go as early needed for
   ;; debugging.
-  (show-and-call sb-format::!format-directives-init)
+  (show-and-call !format-cold-init)
   (unless (!c-runtime-noinform-p)
     ;; I'd like FORMAT to remain working in cold-init, where it does work,
     ;; hence the conditional.

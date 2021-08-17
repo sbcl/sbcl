@@ -1581,3 +1581,7 @@
 
   (sb-c:define-source-transform write-to-string (object &rest keys)
     (expand 'write-to-string object keys)))
+
+#-sb-xc-host
+(defun !late-format-init ()
+  (setq sb-format::**tokenize-control-string-cache-vector** nil))

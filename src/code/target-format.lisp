@@ -1241,11 +1241,11 @@
             (t (args param)))))
       (apply symbol stream (next-arg) colonp atsignp (args)))))
 
+(!defun-from-collected-cold-init-forms !format-directives-init)
+
 (push '("SB-FORMAT"
         def-format-directive def-complex-format-directive
         def-format-interpreter def-complex-format-interpreter
         interpret-bind-defaults interpret-format-integer next-arg
         %set-format-directive-expander)
       *!removable-symbols*)
-
-(!defun-from-collected-cold-init-forms !format-directives-init)
