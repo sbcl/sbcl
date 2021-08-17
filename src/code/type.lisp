@@ -361,7 +361,7 @@
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
-(defparameter *unparse-fun-type-simplify* nil) ; initialized by genesis
+(defvar *unparse-fun-type-simplify* nil)
 
 (define-type-class function :enumerable nil :might-contain-other-types nil)
 

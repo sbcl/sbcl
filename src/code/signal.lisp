@@ -65,7 +65,7 @@
 ;;; would not cut it, as upon leaving WITHOUT-INTERRUPTS the pending
 ;;; handlers is run with stuff from the function in which this is
 ;;; still on the stack.
-(defparameter *unblock-deferrables-on-enabling-interrupts-p* nil)
+(defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (dolist (symbol '(*unblock-deferrables-on-enabling-interrupts-p*

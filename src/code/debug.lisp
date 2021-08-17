@@ -62,7 +62,7 @@ provide bindings for printer control variables.")
 ;;; If this is bound before the debugger is invoked, it is used as the stack
 ;;; top by the debugger. It can either be the first interesting frame, or the
 ;;; name of the last uninteresting frame.
-(defparameter *stack-top-hint* nil) ; initialized by genesis
+(defvar *stack-top-hint* nil)
 (defvar *current-frame* nil)
 (declaim (always-bound *stack-top-hint* *current-frame*))
 

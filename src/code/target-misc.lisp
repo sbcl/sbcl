@@ -16,7 +16,7 @@
 
 ;;; This is a tentative list of target features; many are removed later.
 ;;; :SB-XC is removed now, because it is plain wrong unless cross-compiling.
-(defparameter *features* '#.(remove :sb-xc sb-xc:*features*)
+(defvar *features* '#.(remove :sb-xc sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
 (defconstant !sbcl-architecture #.(sb-cold::target-platform-keyword))
@@ -251,7 +251,7 @@ version 1[.0.0...] or greater."
               (lisp-implementation-version)
               subversions))))
 
-(defparameter sb-pcl::*!docstrings* nil)
+(defvar sb-pcl::*!docstrings* nil)
 (defun (setf documentation) (string name doc-type)
   (declare (type (or null string) string))
   (push (list string name doc-type) sb-pcl::*!docstrings*)

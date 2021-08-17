@@ -16,7 +16,7 @@
 ;;; ANSI: "the floating-point format that is to be used when reading a
 ;;; floating-point number that has no exponent marker or that has e or
 ;;; E for an exponent marker"
-(defparameter *read-default-float-format* 'single-float)
+(defvar *read-default-float-format* 'single-float)
 
 (defvar *readtable*)
 

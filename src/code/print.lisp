@@ -13,50 +13,49 @@
 
 ;;;; exported printer control variables
 
-;; NB: all of the following are initialized during genesis
-(defparameter *print-readably* nil
+(defvar *print-readably* nil
   "If true, all objects will be printed readably. If readable printing
   is impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
-(defparameter *print-escape* t
+(defvar *print-escape* t
   "Should we print in a reasonably machine-readable way? (possibly
   overridden by *PRINT-READABLY*)")
-(defparameter *print-pretty* nil ; (set later when pretty-printer is initialized)
+(defvar *print-pretty* nil ; (set later when pretty-printer is initialized)
   "Should pretty printing be used?")
-(defparameter *print-base* 10.
+(defvar *print-base* 10.
   "The output base for RATIONALs (including integers).")
-(defparameter *print-radix* nil
+(defvar *print-radix* nil
   "Should base be verified when printing RATIONALs?")
-(defparameter *print-level* nil
+(defvar *print-level* nil
   "How many levels should be printed before abbreviating with \"#\"?")
-(defparameter *print-length* nil
+(defvar *print-length* nil
   "How many elements at any level should be printed before abbreviating
   with \"...\"?")
-(defparameter *print-vector-length* nil
+(defvar *print-vector-length* nil
   "Like *PRINT-LENGTH* but works on strings and bit-vectors.
 Does not affect the cases that are already controlled by *PRINT-LENGTH*")
-(defparameter *print-circle* nil
+(defvar *print-circle* nil
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
   circularity in particular) when printing?")
-(defparameter *print-case* :upcase
+(defvar *print-case* :upcase
   "What case should the printer should use default?")
-(defparameter *print-array* t
+(defvar *print-array* t
   "Should the contents of arrays be printed?")
-(defparameter *print-gensym* t
+(defvar *print-gensym* t
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
-(defparameter *print-lines* nil
+(defvar *print-lines* nil
   "The maximum number of lines to print per object.")
-(defparameter *print-right-margin* nil
+(defvar *print-right-margin* nil
   "The position of the right margin in ems (for pretty-printing).")
-(defparameter *print-miser-width* nil
+(defvar *print-miser-width* nil
   "If the remaining space between the current column and the right margin
    is less than this, then print using ``miser-style'' output. Miser
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*
-  (sb-pretty::make-pprint-dispatch-table #() nil nil) ; for type-correctness
+  (sb-pretty::make-pprint-dispatch-table #() nil nil)
   "The pprint-dispatch-table that controls how to pretty-print objects.")
-(defparameter *suppress-print-errors* nil
+(defvar *suppress-print-errors* nil
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 

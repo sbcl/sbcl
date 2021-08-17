@@ -182,7 +182,7 @@
 ;;; If non-nil, *GLOBALDB-OBSERVER*'s CAR is a bitmask over info numbers
 ;;; for which you'd like to call the function in the CDR whenever info
 ;;; of that number is queried.
-(defparameter *globaldb-observer* nil)
+(defvar *globaldb-observer* nil)
 (declaim (type (or (cons (unsigned-byte #.(ash 1 info-number-bits)) function)
                    null) *globaldb-observer*))
 #-sb-xc-host (declaim (always-bound *globaldb-observer*))
@@ -577,6 +577,7 @@
   (let ((h (make-info-hashtable)))
     (setf (sb-thread:mutex-name (info-env-mutex h)) "globaldb")
     (setq *info-environment* h))
+  (setq *globaldb-observer* nil)
   (setq *info-types* (make-array (ash 1 info-number-bits) :initial-element nil))
   (!info-type-cold-init))
 
