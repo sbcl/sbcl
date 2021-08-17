@@ -95,9 +95,9 @@
                    (note-code-constant offset dstate))))))
 
 (defparameter *float-reg-symbols*
-  (coerce
-   (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
-   'vector))
+  #.(coerce
+     (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
+     'vector))
 
 (define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
