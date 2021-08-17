@@ -38,8 +38,8 @@
   `(locally
        (declare (notinline (setf info)))
      ;; We don't error here on ALWAYS-BOUND variables as they may have
-     ;; variable reference initforms that are initialized until later
-     ;; in cold-init.
+     ;; variable reference initforms that aren't initialized until
+     ;; later in cold-init.
      (defvar ,name ,initform ,docstring)
      ;; :EXECUTE is for parallelized make-host-2 to see the compile-toplevel effect
      (eval-when (:compile-toplevel :execute)
