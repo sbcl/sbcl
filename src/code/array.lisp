@@ -1799,7 +1799,7 @@ function to be removed without further warning."
 
        ,@(ecase style
     (:call
-     `((!define-load-time-global ,table-name ,(sb-xc:make-array (1+ widetag-mask)))
+     `((define-load-time-global ,table-name ,(sb-xc:make-array (1+ widetag-mask)))
 
        ;; This SUBSTITUTE call happens ** after ** all the SETFs below it.
        ;; DEFGLOBAL's initial value is dumped by genesis as a vector filled

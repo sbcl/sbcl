@@ -15,7 +15,7 @@
 
 ;;; Has the type system been properly initialized? (I.e. is it OK to
 ;;; use it?)
-(!define-load-time-global *type-system-initialized* nil)
+(define-load-time-global *type-system-initialized* nil)
 
 (!begin-collecting-cold-init-forms)
 
@@ -1236,38 +1236,41 @@ between the ~A definition and the ~A definition"
 ;;; The read interceptor has to be disabled to avoid infinite recursion on CTYPEs
 (eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* nil))
 #-sb-xc-host
-(!define-load-time-global *builtin-classoids* '#.(compute-builtin-classoids))
+(define-load-time-global *builtin-classoids* nil)
+#-sb-xc-host
+(!cold-init-forms
+ (setq *builtin-classoids* '#.(compute-builtin-classoids)))
 (eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* t))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
 (!cold-init-forms
-  (dolist (x *builtin-classoids*)
-    #-sb-xc-host (/show0 "at head of loop over *BUILTIN-CLASSOIDS*")
-    (destructuring-bind
-        (name &key
-              (translation nil trans-p)
-              predicate
-              inherits
-              codes
-              state
-              depth
-              (length 0)
-              prototype-form
-              (hierarchical-p t) ; might be modified below
-              (direct-superclasses (if inherits
-                                     (list (car inherits))
-                                     '(t))))
-        x
-      (declare (ignorable codes state translation trans-p predicate))
-      ;; instance metatypes and T don't need a prototype, everything else does
-      (unless (or prototype-form depth (eq name 't))
-        (error "Missing prototype in ~S" x))
-      (let* ((pred-fn (if (fboundp predicate) (symbol-function predicate) #'error))
-             (inherits-list (if (eq name t)
-                                ()
-                                (cons t (reverse inherits))))
-             (classoid
+ (dolist (x *builtin-classoids*)
+   #-sb-xc-host (/show0 "at head of loop over *BUILTIN-CLASSOIDS*")
+   (destructuring-bind
+       (name &key
+               (translation nil trans-p)
+               predicate
+               inherits
+               codes
+               state
+               depth
+               (length 0)
+               prototype-form
+               (hierarchical-p t) ; might be modified below
+               (direct-superclasses (if inherits
+                                        (list (car inherits))
+                                        '(t))))
+       x
+     (declare (ignorable codes state translation trans-p predicate))
+     ;; instance metatypes and T don't need a prototype, everything else does
+     (unless (or prototype-form depth (eq name 't))
+       (error "Missing prototype in ~S" x))
+     (let* ((pred-fn (if (fboundp predicate) (symbol-function predicate) #'error))
+            (inherits-list (if (eq name t)
+                               ()
+                               (cons t (reverse inherits))))
+            (classoid
               (acond #-sb-xc-host ; genesis dumps some classoid literals
                      ((find-classoid name nil)
                       (%instance-set it (get-dsd-index built-in-classoid predicate)
@@ -1289,31 +1292,31 @@ between the ~A definition and the ~A definition"
                                  nil
                                  (mapcar #'find-classoid
                                          direct-superclasses))))))))
-        (setf (info :type :kind name) :primitive)
-        #+sb-xc-host
-        (unless trans-p
-          (setf (info :type :builtin name) classoid))
-        #-sb-xc-host (setf (info :type :builtin name) (or translation classoid))
-        (let* ((inherits-vector
+       (setf (info :type :kind name) :primitive)
+       #+sb-xc-host
+       (unless trans-p
+         (setf (info :type :builtin name) classoid))
+       #-sb-xc-host (setf (info :type :builtin name) (or translation classoid))
+       (let* ((inherits-vector
                 (map 'simple-vector
                      (lambda (x)
                        (let ((super-layout
-                              (classoid-wrapper (find-classoid x))))
+                               (classoid-wrapper (find-classoid x))))
                          (when (minusp (wrapper-depthoid super-layout))
                            (setf hierarchical-p nil))
                          super-layout))
                      inherits-list))
-               (depthoid (if hierarchical-p
-                             (or depth (length inherits-vector))
-                             -1)))
-          (register-layout (load-layout name
-                                        depthoid
-                                        inherits-vector
-                                        length
-                                        +layout-all-tagged+
-                                        0) ; flags
-                           :invalidate nil)))))
-  (/show0 "done with loop over *!BUILTIN-CLASSOIDS*"))
+              (depthoid (if hierarchical-p
+                            (or depth (length inherits-vector))
+                            -1)))
+         (register-layout (load-layout name
+                                       depthoid
+                                       inherits-vector
+                                       length
+                                       +layout-all-tagged+
+                                       0) ; flags
+                          :invalidate nil)))))
+ (/show0 "done with loop over *!BUILTIN-CLASSOIDS*"))
 
 ;;; Now that we have set up the class hierarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.

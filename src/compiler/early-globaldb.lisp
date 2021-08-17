@@ -46,9 +46,7 @@
 ;;; A map from info-number to its META-INFO object.
 ;;; The reverse mapping is obtained by reading the META-INFO.
 (declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
-(!define-load-time-global *info-types*
-            ;; Must be dumped as a literal for cold-load.
-            #.(make-array (ash 1 info-number-bits) :initial-element nil))
+(define-load-time-global *info-types* (make-array (ash 1 info-number-bits) :initial-element nil))
 
 (defstruct (meta-info
             (:constructor

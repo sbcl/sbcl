@@ -577,6 +577,7 @@
   (let ((h (make-info-hashtable)))
     (setf (sb-thread:mutex-name (info-env-mutex h)) "globaldb")
     (setq *info-environment* h))
+  (setq *info-types* (make-array (ash 1 info-number-bits) :initial-element nil))
   (!info-type-cold-init))
 
 ;; This is for the SB-INTROSPECT contrib module, and debugging.
