@@ -2734,7 +2734,9 @@
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1))))
 
-(!define-load-time-global *!cold-stderr-buf* " ")
+;;;; machinery to make string printing work early
+
+(define-load-time-global *!cold-stderr-buf* (make-string 1 :element-type 'base-char :initial-element #\Space))
 (declaim (type (simple-base-string 1) *!cold-stderr-buf*))
 
 (defun !make-cold-stderr-stream ()
@@ -2764,3 +2766,9 @@
              (stream-misc-case (operation :default nil)
                (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
                 (if (eql (char *!cold-stderr-buf* 0) #\newline) 0 1)))))))
+
+(defun !cold-stream-init ()
+  (setq *!cold-stderr-buf* (make-string 1 :element-type 'base-char :initial-element #\Space)
+        *error-output* (!make-cold-stderr-stream)
+        *standard-output* *error-output*
+        *trace-output* *error-output*))
