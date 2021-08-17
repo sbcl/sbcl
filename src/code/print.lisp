@@ -201,7 +201,7 @@ variable: an unreadable object representing the error is printed instead.")
          ;; read-only string.
          ;; TODO: need two sets of strings, for *print-radix* = {T,NIL}
          ((and (>= object 0)
-               (< object *print-base*))
+               (< object *print-base*)
                (not *print-radix*))
           (%make-lisp-obj
            (sap-int (sap+ (foreign-symbol-sap "strings_for_digits" t)
