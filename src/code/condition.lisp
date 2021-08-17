@@ -379,7 +379,7 @@
          t
          `(condition-slot-writer ,name))))
 
-(!define-load-time-global *define-condition-hooks* nil)
+(define-load-time-global *define-condition-hooks* nil)
 
 (defun %set-condition-report (name report)
   (setf (condition-classoid-report (find-classoid name))
@@ -435,8 +435,9 @@
                           (when (functionp (third (assoc initarg e-def-initargs)))
                             (return t))))
                 (push slot (condition-classoid-hairy-slots classoid)))))))
-       (dolist (fun *define-condition-hooks*)
-         (funcall fun classoid)))))
+       (when *type-system-initialized*
+         (dolist (fun *define-condition-hooks*)
+           (funcall fun classoid))))))
   name)
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)

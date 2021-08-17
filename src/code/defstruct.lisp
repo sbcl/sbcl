@@ -2106,7 +2106,6 @@ or they must be declared locally notinline at each call site.~@:>"
               :metaclass-constructor metaclass-constructor
               :dd-type dd-type)))
     `(progn
-       (assert (null (symbol-value '*defstruct-hooks*)))
        (eval-when (:compile-toplevel :load-toplevel :execute)
            (%compiler-defstruct ',dd ',(!inherits-for-structure dd))
            (when (eq (info :type :kind ',class-name) :defined)

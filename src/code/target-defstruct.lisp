@@ -231,7 +231,7 @@
 
 ;;; A list of hooks designating functions of one argument, the
 ;;; classoid, to be called when a defstruct is evaluated.
-(!define-load-time-global *defstruct-hooks* nil)
+(define-load-time-global *defstruct-hooks* nil)
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
@@ -279,8 +279,9 @@
                     (lambda (a b)
                       (sb-impl::instance-equalp* comparators a b)))))))
 
-    (dolist (fun *defstruct-hooks*)
-      (funcall fun classoid)))
+    (when *type-system-initialized*
+      (dolist (fun *defstruct-hooks*)
+        (funcall fun classoid))))
 
   (dd-name dd))
 

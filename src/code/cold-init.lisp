@@ -67,7 +67,6 @@
   (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
                       *trace-output* *error-output*)
-  (setq *type-system-initialized* nil)
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   ;; This allows FORMAT to work, and can go as early needed for
   ;; debugging.
