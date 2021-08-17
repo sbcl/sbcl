@@ -37,17 +37,10 @@
                     docstring)
   `(locally
        (declare (notinline (setf info)))
-     ;; This initial value expression is a mite confusing.
-     ;; Most thread-locals that we use are of the :ALWAYS-BOUNDP kind, and since the
-     ;; value is stuffed in the moment a thread is created, no value is ever needed here,
-     ;; because this value form is evaluated exactly once (in cold-init) and never again.
-     ;; But if not always bound, we have a problem: INIT-THREAD-LOCAL-STORAGE writes
-     ;; an unbound marker, which makes this DEFVAR want to compute something.
-     ;; But that "something" has to be the unbound marker.
-     (defvar ,name ,(if always-boundp
-                        `(error "~S had no value in cold-init" ',name)
-                        initform)
-             ,docstring)
+     ;; We don't error here on ALWAYS-BOUND variables as they may have
+     ;; variable reference initforms that are initialized until later
+     ;; in cold-init.
+     (defvar ,name ,initform ,docstring)
      ;; :EXECUTE is for parallelized make-host-2 to see the compile-toplevel effect
      (eval-when (:compile-toplevel :execute)
        (%define-thread-local ',name ',initform ',always-boundp))
@@ -83,7 +76,7 @@
 ;;; by RESTART-BIND.
 (define-thread-local *restart-clusters* nil)
 
-(!define-load-time-global sb-kernel::**initial-handler-clusters** '(nil))
+(define-load-time-global sb-kernel::**initial-handler-clusters** '(nil))
 ;;; a list of handlers maintained by HANDLER-BIND
 (define-thread-local *handler-clusters* sb-kernel::**initial-handler-clusters**)
 
