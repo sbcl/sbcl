@@ -42,24 +42,26 @@ use as a BLOCK name in the function in question."
     (symbol (values t name))
     (otherwise nil)))
 
+(define-function-name-syntax setf (name)
+  (let ((tail (cdr name)))
+    (when (and (consp tail) (null (cdr tail)))
+      (let ((fun (car tail)))
+        (typecase fun
+          ;; ordinary (SETF FOO) case
+          (symbol (values t fun))
+          ;; reasonable (SETF (QUUX BAZ)) case [but not (SETF (SETF
+          ;; FOO))]
+          (cons (unless (member (car fun) '(cas setf))
+                  (valid-function-name-p fun))))))))
+
 ;;; FBOUNDP wants to know what names are valid early on in COLD-INIT.
 (defun !function-names-init ()
   (setq *valid-fun-names-alist* nil)
-  (define-function-name-syntax setf (name)
-    (let ((tail (cdr name)))
-      (when (and (consp tail) (null (cdr tail)))
-        (let ((fun (car tail)))
-          (typecase fun
-            ;; ordinary (SETF FOO) case
-            (symbol (values t fun))
-            ;; reasonable (SETF (QUUX BAZ)) case [but not (SETF (SETF
-            ;; FOO))]
-            (cons (unless (member (car fun) '(cas setf))
-                    (valid-function-name-p fun))))))))
   ;; CAS and SETF names should have in common the aspect that
   ;; (CAS (CAS BAZ)), (SETF (CAS BAZ)), (CAS (SETF BAZ)) are not reasonable.
   ;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
   ;; so the name syntax is defined here instead of there.
+  (%define-fun-name-syntax 'setf #'%check-setf-fun-name)
   (%define-fun-name-syntax 'cas #'%check-setf-fun-name))
 
 #+sb-xc-host
