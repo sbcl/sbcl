@@ -566,6 +566,15 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
+
+  ;; allocation instrumenting
+  (total-bytes-allocated)
+  (slow-path-allocs)
+  (et-allocator-mutex-acq) ; elapsed times
+  (et-find-freeish-page)
+  (et-bzeroing)
+  (obj-size-histo :c-type "size_histogram" :length #.sb-vm:n-word-bits)
+
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
   (lisp-thread :pointer t :special sb-thread:*current-thread*))

@@ -59,28 +59,11 @@ The statistics:
                   (sb-sys:sap-ref-64 sap 16) ; worst
                   (sb-sys:sap-ref-64 sap 0)))))) ; runtime
 
-#|
-diff to apply:
---- a/src/compiler/main.lisp
-+++ b/src/compiler/main.lisp
-@@ -1649,7 +1649,7 @@ necessary, since type inference may take arbitrarily long to converge.")
-         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
-           (with-compilation-values
-             (with-compilation-unit ()
--              (with-world-lock ()
-+              (progn ; with-world-lock ()
-                 (setf (sb-fasl::fasl-output-source-info *compile-object*)
-                       (debug-source-for-info info))
-                 (with-ir1-namespace
-|#
-
 ;;; Exercise COMPILE-FILE in many threads, which is representative of a
 ;;; lispy workload.  Any suitable workload should do.
-;;; This test presumes that the world-lock has been removed from around
-;;; COMPILE-FILE, in order to allow concurrent progress in each thread.
 ;;; It would be better to have each thread doing a different kind of work,
 ;;; but I took the easy route.
-(defun benchmark (n-threads n-iter)
+(defun gc-benchmark (n-threads n-iter)
   (let (threads
         (running (make-array n-threads :initial-element t))
         (avg-gc-wait (make-array n-threads))
@@ -129,3 +112,132 @@ diff to apply:
       (let ((end (get-internal-real-time)))
         (format t "~&all done: ~fs~%"
                 (/ (- end start) internal-time-units-per-second))))))
+
+;;; run this with a 16GB dynamic space
+(defun allocator-benchmark (n-threads n-iter)
+  (let (threads (sem (make-semaphore)))
+    (flet ((work (arg)
+             (let ((out (format nil "/tmp/out~d.fasl" arg)))
+               (dotimes (i n-iter)
+                 (compile-file "src/compiler/node"
+                               :print nil :block-compile t :verbose nil
+                               :output-file out)
+                 (signal-semaphore sem))
+               (delete-file out))
+             (values (sb-vm::current-thread-offset-sap
+                      sb-vm::thread-et-allocator-mutex-acq-slot)
+                     (sb-vm::current-thread-offset-sap
+                      sb-vm::thread-et-find-freeish-page-slot)
+                     (sb-vm::current-thread-offset-sap
+                      sb-vm::thread-et-bzeroing-slot))))
+      (dotimes (i n-threads)
+        (push (make-thread #'work :name (format nil "worker~d" i) :arguments i)
+              threads)
+        (sleep .25))
+      (setq threads (nreverse threads))
+      (macrolet ((intmetric (slot)
+                   `(sap-ref-word sap (ash ,slot sb-vm:word-shift)))
+                 (floatmetric (slot)
+                   `(float (sap-ref-word sap (ash ,slot sb-vm:word-shift)))))
+        (let ((n-to-go (* n-threads n-iter)))
+          (loop
+            ;; Wait for any thread to be done with one COMPILE-FILE
+            (wait-on-semaphore sem)
+            (dolist (thread threads)
+              (with-deathlok (thread c-thread)
+                (unless (= c-thread 0)
+                  (let* ((sap (int-sap c-thread))
+                         (divisor (intmetric sb-vm::thread-slow-path-allocs-slot))
+                         (times
+                          (list (/ (floatmetric sb-vm::thread-et-allocator-mutex-acq-slot)
+                                   divisor)
+                                (/ (floatmetric sb-vm::thread-et-find-freeish-page-slot)
+                                   divisor)
+                                (/ (floatmetric sb-vm::thread-et-bzeroing-slot)
+                                   divisor))))
+                    (format t "~a: ~a~%" (thread-name thread) times)))))
+            (terpri)
+            (when (zerop (decf n-to-go)) (return))))))))
+
+#|
+typical results:
+(ALLOCATOR-BENCHMARK 1 5)
+  worker0: (330.69366 387.3285 6498.661)
+
+(ALLOCATOR-BENCHMARK 2 5)
+  worker0: (330.5141 267.6703 7333.836)
+  worker1: (228.58601 165.74622 6578.589)
+
+(ALLOCATOR-BENCHMARK 5 5)
+  worker0: (690.2581 425.22952 5876.69)
+  worker1: (710.41406 348.25806 6209.075)
+  worker2: (839.3615 454.86133 7612.185)
+  worker3: (885.43054 602.65674 10080.599)
+  worker4: (610.4866 262.36072 8558.833)
+
+(ALLOCATOR-BENCHMARK 10 5)
+  worker0: (1223.6002 430.6594 7850.7573)
+  worker1: (1330.8501 370.85773 6489.9937)
+  worker2: (1253.6841 505.19583 5270.5938)
+  worker3: (1490.959 715.54004 6404.7485)
+  worker4: (1285.563 418.3966 4903.252)
+  worker5: (1166.429 367.69632 4751.1025)
+  worker6: (1516.6385 703.275 5229.6743)
+  worker7: (1445.5946 435.18625 8682.394)
+  worker8: (1445.0297 392.44226 6706.816)
+  worker9: (1356.9069 461.00558 5664.2266)
+
+(ALLOCATOR-BENCHMARK 20 3)
+  worker0: (1556.1759 320.41278 7864.225)
+  worker1: (2484.3042 380.25073 6287.422)
+  worker2: (2330.8076 518.1103 6229.52)
+  worker3: (1892.3644 413.4363 6322.3574)
+  worker4: (2391.721 581.5211 5309.2114)
+  worker5: (3180.5654 1101.414 5779.844)
+  worker6: (2621.355 634.3344 4852.1455)
+  worker7: (2378.809 440.01437 4085.8718)
+  worker8: (2730.9878 432.23807 3691.8616)
+  worker9: (2128.9807 376.76605 6020.571)
+  worker10: (2715.6238 483.9466 7864.9487)
+  worker11: (2880.8203 445.12094 5770.294)
+  worker12: (3576.9197 767.5074 6190.4316)
+  worker13: (3010.8503 437.47897 6542.27)
+  worker14: (2961.2139 453.69385 6901.6504)
+  worker15: (3242.9263 513.6723 6050.3047)
+  worker16: (3760.2107 1017.8271 6511.578)
+  worker17: (3949.1416 794.4195 5975.102)
+  worker18: (3443.0042 444.75006 4557.97)
+  worker19: (3430.517 806.4593 3539.3176)
+
+(ALLOCATOR-BENCHMARK 30 2)
+  worker0: (3228.2756 465.13016 8892.34)
+  worker1: (3792.6448 770.495 7546.6333)
+  worker2: (3741.0088 856.29407 9156.665)
+  worker3: (3276.4631 410.84845 8926.436)
+  worker4: (3618.4817 409.49045 6198.2173)
+  worker5: (3677.3682 533.64966 6499.718)
+  worker6: (3326.2502 426.92972 6894.4204)
+  worker7: (4277.313 497.48938 8042.677)
+  worker8: (4424.929 515.2159 8480.562)
+  worker9: (4579.331 646.7453 7944.594)
+  worker10: (5665.9673 585.96246 9082.217)
+  worker11: (4093.323 536.14 8263.94)
+  worker12: (5716.6953 636.16815 6921.578)
+  worker13: (5787.886 771.44214 4725.5513)
+  worker14: (7163.328 1685.777 5396.888)
+  worker15: (5750.1753 584.4418 4869.9063)
+  worker16: (5826.1787 653.7092 3785.243)
+  worker17: (6162.1816 760.8072 3882.8232)
+  worker18: (5333.0513 477.8418 4006.6885)
+  worker19: (8481.007 597.1158 3250.377)
+  worker20: (9162.3125 2120.3945 5063.6616)
+  worker21: (5398.499 643.1221 11578.032)
+  worker22: (7045.36 1039.0885 5842.894)
+  worker23: (9666.884 543.9834 4494.3945)
+  worker24: (9476.041 770.6879 4494.854)
+  worker25: (4477.0054 348.83954 5587.9424)
+  worker26: (5616.502 469.45154 5180.7173)
+  worker27: (10800.295 481.92975 6047.9507)
+  worker28: (11228.471 606.4268 4192.347)
+  worker29: (19881.9 996.91534 157.6319)
+|#

@@ -902,6 +902,17 @@ static inline boolean region_closed_p(struct alloc_region* region) {
  * allocation call using the same pages, all the pages in the region
  * are allocated, although they will initially be empty.
  */
+
+#ifdef LISP_FEATURE_ALLOCATOR_METRICS
+#define INSTRUMENTING(expression, metric) { \
+    struct timespec t0, t1; clock_gettime(CLOCK_REALTIME, &t0); expression; \
+    clock_gettime(CLOCK_REALTIME, &t1); \
+    struct thread* th = get_sb_vm_thread(); \
+    th->metric += (t1.tv_sec - t0.tv_sec)*1000000000 + (t1.tv_nsec - t0.tv_nsec); }
+#else
+#define INSTRUMENTING(expression, metric) expression
+#endif
+
 static void
 gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_region)
 {
@@ -918,13 +929,16 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
 
     /* Check that the region is in a reset state. */
     gc_assert(region_closed_p(alloc_region));
-    ret = thread_mutex_lock(&free_pages_lock);
+    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
     gc_assert(ret == 0);
     first_page = alloc_start_page(page_type_flag, 0);
+
+    INSTRUMENTING(
     last_page = gc_find_freeish_pages(&first_page, nbytes,
                                       ((nbytes >= (sword_t)GENCGC_CARD_BYTES) ?
                                        SINGLE_OBJECT_FLAG : 0) | page_type_flag,
-                                      gc_alloc_generation);
+                                      gc_alloc_generation),
+    et_find_freeish_page);
 
     /* Set up the alloc_region. */
     alloc_region->last_page = last_page;
@@ -962,7 +976,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         first_page++;
     }
 
-    zero_dirty_pages(first_page, last_page, page_type_flag);
+    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type_flag), et_bzeroing);
 
 #ifdef LISP_FEATURE_DARWIN_JIT
     if (page_type_flag == CODE_PAGE_TYPE) {
@@ -1075,7 +1089,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type_flag)
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
     gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
 
-    int ret = thread_mutex_lock(&free_pages_lock);
+    int ret;
+    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
     gc_assert(ret == 0);
 
     // Mark the region as closed on its first page.
@@ -1165,7 +1180,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     page_index_t first_page, last_page;
     int ret;
 
-    ret = thread_mutex_lock(&free_pages_lock);
+    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
     gc_assert(ret == 0);
 
     first_page = alloc_start_page(page_type_flag, 1);
@@ -1178,9 +1193,11 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         first_page = alloc_region->last_page+1;
     }
 
+    INSTRUMENTING(
     last_page = gc_find_freeish_pages(&first_page, nbytes,
                                       SINGLE_OBJECT_FLAG | page_type_flag,
-                                      gc_alloc_generation);
+                                      gc_alloc_generation),
+    et_find_freeish_page);
 
     // FIXME: Should this be 1+last_page ?
     // (Doesn't matter too much since it'll be skipped on restart if unusable)
@@ -1195,7 +1212,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         page_table[page].gen = gc_alloc_generation;
     }
 
-    zero_dirty_pages(first_page, last_page, page_type_flag);
+    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type_flag), et_bzeroing);
 
     // Store a filler so that a linear heap walk does not try to examine
     // these pages cons-by-cons (or whatever they happen to look like).
@@ -4416,6 +4433,7 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
     gc_assert((((uword_t)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
 
+    ++thread->slow_path_allocs;
     if ((os_vm_size_t) nbytes > large_allocation)
         large_allocation = nbytes;
 

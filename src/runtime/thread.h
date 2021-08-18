@@ -28,6 +28,8 @@ struct thread_state_word {
 #endif
 };
 
+typedef lispobj size_histogram[N_WORD_BITS];
+
 #include "genesis/thread.h"
 #include "genesis/thread-instance.h"
 #include "genesis/fdefn.h"

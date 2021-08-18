@@ -91,6 +91,22 @@
 
 ;;; Insert allocation profiler instrumentation
 (defun instrument-alloc (size node)
+  #+allocator-metrics
+  (progn
+    (inst add :qword (thread-slot-ea thread-total-bytes-allocated-slot)
+          (cond ((typep size '(or (signed-byte 32))) size)
+                (t (inst mov temp-reg-tn size) temp-reg-tn)))
+    (cond ((tn-p size)
+           ;; the low 4 bins of the histogram can't be used,
+           ;; but I don't care. Math is hard.
+           (inst bsr temp-reg-tn size)
+           (inst inc :qword
+                 (ea (ash thread-obj-size-histo-slot word-shift)
+                     thread-base-tn temp-reg-tn 8)))
+          (t
+           (inst inc :qword
+                 (thread-slot-ea (+ thread-obj-size-histo-slot
+                                    (1- (integer-length size))))))))
   (when (policy node (> sb-c::instrument-consing 1))
     (let ((skip-instrumentation (gen-label)))
       (inst mov temp-reg-tn (thread-slot-ea thread-profile-data-slot))

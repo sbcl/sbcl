@@ -317,6 +317,7 @@ sufficiently motivated to do lengthy fixes."
                             :interactive-threads interactive
                             :other-threads other)))))
     (when err (error err))
+    #+allocator-metrics (setq sb-thread::*allocator-metrics* nil)
     (setq sb-thread::*sprof-data* nil))
   (tune-image-for-dump)
   (float-deinit)

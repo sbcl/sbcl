@@ -248,7 +248,7 @@
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
 (eval-when (:compile-toplevel :execute)
-  ;; Don't use a macro for this, because define-vop is weird.
+  ;; This is like a macro, but not a macro, because define-vop is weird.
   (defun bignum-from-reg (tn signedp)
     (flet ((make-vector ()
              (map 'vector
