@@ -334,7 +334,8 @@
                 (y (fixnumize y))
                 (min (min x y))
                 (delta (abs (- x y)))
-                (ea (ea min nil res delta)))
+                ;; [RES+RES+n] encodes more compactly than [RES*2+n]
+                (ea (if (= delta 2) (ea min res res) (ea min nil res delta))))
            (when (eql x min)
              (setq flag (negate-condition flag)))
            (inst set flag res)
