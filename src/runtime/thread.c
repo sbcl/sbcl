@@ -850,10 +850,6 @@ callback_wrapper_trampoline(
 
 struct thread *
 alloc_thread_struct(void* spaces, lispobj start_routine) {
-#ifdef LISP_FEATURE_SB_THREAD
-    unsigned int i;
-#endif
-
     /* May as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed. SPACES must be appropriately aligned, since the GC
@@ -883,7 +879,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     // Refer to the ASCII art in the block comment above
     struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE
                                 + THREAD_HEADER_SLOTS*N_WORD_BYTES);
-    __attribute((unused)) lispobj* tls = (lispobj*)th;
+
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     // Out of caution I'm supposing that the last thread to use this memory
     // might have left this page as read-only. Could it? I have no idea.
@@ -891,11 +887,13 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-    for(i = 0; i < (unsigned int)(dynamic_values_bytes/N_WORD_BYTES); i++)
-        tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
-    th->lisp_thread = 0; // force it to be always-thread-local, of course
+    memset(th, 0, sizeof *th);
+    lispobj* ptr = (lispobj*)(th + 1);
+    lispobj* end = (lispobj*)((char*)th + dynamic_values_bytes);
+    while (ptr < end) *ptr++ = NO_TLS_VALUE_MARKER_WIDETAG;
     th->tls_size = dynamic_values_bytes;
 #endif
+    __attribute((unused)) lispobj* tls = (lispobj*)th;
 #ifdef THREAD_T_NIL_CONSTANTS_SLOT
     tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | T;
 #endif
@@ -1049,6 +1047,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->no_tls_value_marker = start_routine;
 
 #if defined(LISP_FEATURE_WIN32)
+    int i;
     for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
         thread_private_events(th,i) = CreateEvent(NULL,FALSE,FALSE,NULL);
     thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
