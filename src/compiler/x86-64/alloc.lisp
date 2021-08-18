@@ -37,14 +37,9 @@
   (tagify alloc-tn rsp-tn lowtag)
   (values))
 
-;;; For assemfile
-#+(and avx2 sb-xc-host)
-(defvar *avx-registers-used-p* nil)
-
-#+avx2
+#+nil ; was #+avx2
 (defun avx-registers-used-p ()
-  (or #+sb-xc-host *avx-registers-used-p*
-      (when (and #+sb-xc-host (boundp '*component-being-compiled*))
+  (or (when (and #+sb-xc-host (boundp '*component-being-compiled*))
         (let ((comp (component-info *component-being-compiled*)))
           (or (sb-c::ir2-component-avx2-used-p comp)
               (flet ((used-p (tn)
@@ -59,11 +54,10 @@
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
 ;;; Call an allocator trampoline and get the result in the proper register.
-;;; There are 2x2x2 choices of trampoline:
+;;; There are 2x2 choices of trampoline:
 ;;;  - invoke alloc() or alloc_list() in C
 ;;;  - place result into R11, or leave it on the stack
-;;;  - preserve YMM registers around the call, or don't
-;;; Rather than have 8 different DEFINE-ASSEMBLY-ROUTINEs, there are only 4,
+;;; Rather than have 4 different DEFINE-ASSEMBLY-ROUTINEs, there are only 2,
 ;;; and each has 2 entry points. The earlier entry adds 1 more instruction
 ;;; to set the non-cons bit (the first of the binary choices mentioned above).
 ;;; Most of the time, the inline allocation sequence wants to use the trampoline
@@ -85,18 +79,11 @@
            (inst push result-tn))
           (t
            (inst push size)))
-    (invoke-asm-routine
-     'call
-     (cond #+avx2
-           ((avx-registers-used-p)
-            (if to-r11
-                (if consp 'cons->r11.avx2 'alloc->r11.avx2)
-                (if consp 'cons->rnn.avx2 'alloc->rnn.avx2)))
-           (t
-            (if to-r11
-                (if consp 'cons->r11 'alloc->r11)
-                (if consp 'cons->rnn 'alloc->rnn))))
-     node)
+    (invoke-asm-routine 'call
+                        (if to-r11
+                            (if consp 'cons->r11 'alloc->r11)
+                            (if consp 'cons->rnn 'alloc->rnn))
+                        node)
     (unless to-r11
       (inst pop result-tn)))
   (unless (eql lowtag 0)

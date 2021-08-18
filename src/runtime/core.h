@@ -50,7 +50,7 @@ extern os_vm_offset_t search_for_embedded_core(char *filename,
  * against a runtime with patches which add new C code) */
 extern unsigned char build_id[];
 
-char* get_asm_routine_by_name(const char* name);
+char* get_asm_routine_by_name(const char* name, int*);
 
 // By setting this to 0, all objects begin life in the nursery, and nothing
 // is pseudo-static. As such, any bugs due to code movement are likely to

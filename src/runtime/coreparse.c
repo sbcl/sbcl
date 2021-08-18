@@ -1090,7 +1090,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 #include "genesis/hash-table.h"
 #include "genesis/vector.h"
 #include "genesis/cons.h"
-char* get_asm_routine_by_name(const char* name)
+char* get_asm_routine_by_name(const char* name, int *index)
 {
     struct code* code = (struct code*)asm_routines_start;
     lispobj ht = CONS(code->debug_info)->car;
@@ -1103,18 +1103,24 @@ char* get_asm_routine_by_name(const char* name)
         for (i=2 ; i < vector_len(table) ; i += 2)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
-                && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
-                return code_text_start(code) + fixnum_value(CONS(table->data[i+1])->car);
+                && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data))) {
+                lispobj value = table->data[i+1];
+                // value = (start-address . (end-address . index))
+                if (index)
+                  *index = fixnum_value(CONS(CONS(value)->cdr)->cdr); // take cddr
+                return code_text_start(code) + fixnum_value(CONS(value)->car);
+            }
         // Something is wrong if we have a hashtable but find nothing.
         fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",
                 name);
     }
+    if (index) *index = 0;
     return NULL;
 }
 
 void asm_routine_poke(const char* routine, int offset, char byte)
 {
-    char *address = get_asm_routine_by_name(routine);
+    char *address = get_asm_routine_by_name(routine, 0);
     if (address)
         address[offset] = byte;
 }

@@ -54,23 +54,12 @@
        (inst ret)))
     ((:none :full-call-no-return))))
 
-(defmacro with-registers-preserved ((convention fpr-size &key except) &body body)
+(defmacro with-registers-preserved ((convention &key except) &body body)
   ;: Convention:
   ;;   C    = save GPRs that C call can change
   ;;   Lisp = save GPRs that lisp call can change
-  (multiple-value-bind (mnemonic fpr-align getter)
-      (ecase fpr-size
-        (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
-        (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
-    (flet ((fpr-save/restore (operation)
-             (loop for regno below 16
-                   collect
-                   (ecase operation
-                     (push
-                      `(inst ,mnemonic (ea ,(* regno fpr-align) rsp-tn) (,getter ,regno)))
-                     (pop
-                      `(inst ,mnemonic (,getter ,regno) (ea ,(* regno fpr-align) rsp-tn))))))
-           (gpr-save/restore (operation except)
+  (let ((fpr-align 32))
+    (flet ((gpr-save/restore (operation except)
              (declare (type (member push pop) operation))
              (let ((registers (ecase convention
                                (c '#1=(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn))
@@ -88,10 +77,26 @@
        (inst mov rbp-tn rsp-tn)
        (inst and rsp-tn ,(- fpr-align))
        (inst sub rsp-tn ,(* 16 fpr-align))
-       ,@(fpr-save/restore 'push)
+       ;; Using rip-relative call indirect makes shrinkwrapped cores work
+       ;; with no modification whatsoever to editcore.
+       ;; It wouldn't work straightforwardly using a call indirect
+       ;; with an absolute EA.
+       ;; KLUDGE: index of FPR-SAVE is 4
+       ;; (inst call (ea (make-fixup 'fpr-save :assembly-routine*)))
+       (inst call (ea (make-fixup nil :code-object
+                                  (+ (ash code-constants-offset word-shift)
+                                     (* 4 sb-vm:n-word-bytes)
+                                     (- other-pointer-lowtag)))
+                      rip-tn))
        ,@(gpr-save/restore 'push except)
        ,@body
        ,@(gpr-save/restore 'pop except)
-       ,@(fpr-save/restore 'pop)
+       ;; KLUDGE: index of FPR-RESTORE is 6
+       ;; (inst call (ea (make-fixup 'fpr-restore :assembly-routine*)))
+       (inst call (ea (make-fixup nil :code-object
+                                  (+ (ash code-constants-offset word-shift)
+                                     (* 6 sb-vm:n-word-bytes)
+                                     (- other-pointer-lowtag)))
+                      rip-tn))
        (inst mov rsp-tn rbp-tn)
        (inst pop rbp-tn)))))

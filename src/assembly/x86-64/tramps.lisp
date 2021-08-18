@@ -5,6 +5,33 @@
 
 (in-package "SB-VM")
 
+(macrolet ((do-fprs (operation fpr-size)
+             (multiple-value-bind (mnemonic fpr-align getter)
+                 (ecase fpr-size
+                   (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
+                   (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
+               `(progn
+                  ,@(loop for regno below 16
+                       collect
+                         (ecase operation
+                           (push
+                            `(inst ,mnemonic (ea ,(+ 8 (* regno fpr-align)) rsp-tn)
+                                   (,getter ,regno)))
+                           (pop
+                            `(inst ,mnemonic (,getter ,regno)
+                                   (ea ,(+ 8 (* regno fpr-align)) rsp-tn)))))))))
+  ;; Caller will have allocated 512 bytes above the stack-pointer
+  ;; prior to the CALL. Use that as the save area.
+  (define-assembly-routine (save-ymm) () (do-fprs push ymm))
+  (define-assembly-routine (restore-ymm) () (do-fprs pop ymm))
+  ;; As above, but only 256 bytes of the save area are needed, the rest goes to waste.
+  (define-assembly-routine (save-xmm (:export fpr-save)) ()
+    fpr-save ; KLUDGE: this is element 4 of the entry point vector
+    (do-fprs push xmm))
+  (define-assembly-routine (restore-xmm (:export fpr-restore)) ()
+    fpr-restore ; KLUDGE: this is element 6 of the entry point vector
+    (do-fprs pop xmm)))
+
 ;;; It is arbitrary whether each of the next 4 routines is named ALLOC-something,
 ;;; exporting an additional entry named CONS-something, versus being named CONS-something
 ;;; and exporting ALLOC-something.  It just depends on which of those you would like
@@ -15,16 +42,7 @@
 (define-assembly-routine (alloc->rnn (:export cons->rnn)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->RNN
-  (with-registers-preserved (c xmm)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
-    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
-
-#+avx2
-(define-assembly-routine (alloc->rnn.avx2 (:export cons->rnn.avx2)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->RNN.AVX2
-  (with-registers-preserved (c ymm)
+  (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
@@ -32,17 +50,7 @@
 (define-assembly-routine (alloc->r11 (:export cons->r11) (:return-style :none)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->R11
-  (with-registers-preserved (c xmm :except r11-tn)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
-    (inst mov r11-tn rax-tn))
-  (inst ret 8)) ; pop argument
-
-#+avx2
-(define-assembly-routine (alloc->r11.avx2 (:export cons->r11.avx2) (:return-style :none)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->R11.AVX2
-  (with-registers-preserved (c ymm :except r11-tn)
+  (with-registers-preserved (c :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov r11-tn rax-tn))
@@ -61,12 +69,12 @@
 ;;; The C support routine's argument is the return PC.
 ;;; FIXME: we're missing routines that preserve YMM. I guess nobody cares.
 (define-assembly-routine (enable-alloc-counter) ()
-  (with-registers-preserved (c xmm)
+  (with-registers-preserved (c)
     (inst lea rdi-tn (ea 8 rbp-tn))
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
-  (with-registers-preserved (c xmm)
+  (with-registers-preserved (c)
     (inst lea rdi-tn (ea 8 rbp-tn))
     (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
 
@@ -135,17 +143,7 @@
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
-  #+avx2
-  (progn
-    (test-cpu-feature cpu-has-ymm-registers)
-    (inst jmp :z call-preserving-xmm-only)
-    (with-registers-preserved (lisp ymm :except r11-tn)
-      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-      (call-static-fun 'ensure-symbol-hash 1)
-      (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
-    (inst ret))
-  call-preserving-xmm-only
-  (with-registers-preserved (lisp xmm :except r11-tn)
+  (with-registers-preserved (lisp :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
@@ -153,33 +151,13 @@
 (define-assembly-routine (sb-impl::install-hash-table-lock
                           (:return-style :raw))
   ()
-  #+avx2
-  (progn
-    (test-cpu-feature cpu-has-ymm-registers)
-    (inst jmp :z call-preserving-xmm-only)
-    (with-registers-preserved (lisp ymm :except r11-tn)
-      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-      (call-static-fun 'sb-impl::install-hash-table-lock 1)
-      (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
-    (inst ret))
-  call-preserving-xmm-only
-  (with-registers-preserved (lisp xmm :except r11-tn)
+  (with-registers-preserved (lisp :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'sb-impl::install-hash-table-lock 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
 
 (define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
-  #+avx2
-  (progn
-    (test-cpu-feature cpu-has-ymm-registers)
-    (inst jmp :z call-preserving-xmm-only)
-    (with-registers-preserved (lisp ymm :except r11-tn)
-      (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-      (call-static-fun 'update-object-layout 1)
-      (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
-    (inst ret)) ; Caller pops the result
-  call-preserving-xmm-only
-  (with-registers-preserved (lisp xmm :except r11-tn)
+  (with-registers-preserved (lisp :except r11-tn)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'update-object-layout 1)
     (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc

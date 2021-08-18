@@ -17,44 +17,34 @@
 ;;;; fixnum cases inline.
 #+sb-assembling
 (macrolet
-    ((signed (reg avx)
-       `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg
-                                                (if avx "-AVX2" "")))
+    ((signed (reg)
+       `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
-          (let (#+avx2
-                (*avx-registers-used-p* ,avx))
-            (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil))
+          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag)))
-     (unsigned (reg avx)
-       `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg
-                                                (if avx "-AVX2" "")))
+     (unsigned (reg)
+       `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst ror number (1+ n-fixnum-tag-bits)) ; restore unrotated value
           (inst push number)
           (inst test number number)     ; rotates do not update SF
           (inst jmp :ns one-word-bignum)
-          (let (#+avx2
-                (*avx-registers-used-p* ,avx))
-            ;; Two word bignum
-            (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil))
+          ;; Two word bignum
+          (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil)
           (popw number bignum-digits-offset other-pointer-lowtag)
           (inst ret)
           ONE-WORD-BIGNUM
           (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag)))
-     (define (op &optional avx)
+     (define (op)
        ;; Don't include r11 or r13 since those are temp and thread-base respectively
        `(progn
           ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
                                r8 r9 r10 r12 r14 r15)
-                  collect `(,op ,reg ,avx)))))
+                  collect `(,op ,reg)))))
   (define signed)
-  (define unsigned)
-  #+avx2
-  (define signed t)
-  #+avx2
-  (define unsigned t))
+  (define unsigned))
 
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
