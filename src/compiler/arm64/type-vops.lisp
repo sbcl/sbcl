@@ -166,12 +166,13 @@
              (values not-target target)
              (values target not-target))
        (assemble ()
-         ;; Is it a fixnum?
-         (move temp value)
+         ;; Move to a temporary and mask off the lowtag,
+         ;; but leave the sign bit for testing for positive fixnums.
+         ;; When using 32-bit registers that bit will not be visible.
+         (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask))
          (%test-fixnum temp nil fixnum nil)
-
-         ;; If not, is it an other pointer?
-         (test-type value temp nope t (other-pointer-lowtag))
+         (inst cmp (32-bit-reg temp) other-pointer-lowtag)
+         (inst b :ne nope)
          ;; Get the header.
          (loadw temp value 0 other-pointer-lowtag)
          ;; Is it one?
