@@ -3778,7 +3778,7 @@ III. initially undefined function references (alphabetically):
 
       (sb-cold::check-no-new-cl-symbols)
 
-      (when verbose
+      (when (and verbose core-file-name)
         (format t "~&; SB-Loader: (~D~@{+~D~}) vars/methods/other~%"
                 (length *!cold-defsymbols*)
                 (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
