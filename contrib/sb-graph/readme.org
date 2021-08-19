@@ -59,6 +59,10 @@
     If you passed a filename to ~interactively-graph~, this function
     will then write the render to file automatically.
 
+*** ~(unexpand codename)~
+    Removes the node tied to the codename from the table, meaning that
+    it won't get its neighbours traversed when graph rendering is done.
+
 *** ~(get-node codename)~
     Returns the object tied to ~codename~ from the current interactive
     graph.
@@ -71,11 +75,15 @@
     Does the same thing as ~output~, but without using
     ~interactively-graph~.
 
-*** ~(expand-graph-codename graph codename)~
+*** ~(expand-codename graph codename)~
     Given a graph and codename, put the node tied to ~codename~ into
     the ~dfs-table~ of the graph.
 
     Does the same thing as ~expand~, but without using
+    ~interactively-graph~.
+
+*** ~(unexpand-codename graph codename)~
+    Does the same thing as ~unexpand~, but without using
     ~interactively-graph~.
 
 *** ~(get-node-from-codename graph codename)~

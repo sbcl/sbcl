@@ -41,6 +41,10 @@
                  (dfs-table graph))
         t))
 
+(defmethod unexpand-codename (graph codename)
+   (remhash (gethash codename (codename-table graph))
+                  (dfs-table graph)))
+
 (defun get-node-from-codename (graph codename)
   (gethash codename (codename-table graph)))
 
@@ -70,6 +74,11 @@
 
   (defun expand (codename)
     (expand-codename curr-graph codename)
+    (when curr-file
+      (output)))
+
+  (defun unexpand (codename)
+    (unexpand-codename curr-graph codename)
     (when curr-file
       (output)))
 
@@ -165,65 +174,55 @@ is replaced with replacement."
 ;; inside the graph nodes
 
 (defmethod display ((c sb-c::component))
-  (format nil "COMPONENT [~A]: '~S'"
+  (format nil "COMPONENT: '~S'"
           (sb-c::component-kind c)
           (sb-c::component-name c)))
 
 ;; The sxhash is required to not end up with a single CBLOCK node
 (defmethod display ((b sb-c::cblock))
-  (format nil "CBLOCK [~A]"
-          (sxhash b)))
+  (format nil "CBLOCK"))
 
 (defmethod display ((ctran sb-c::ctran))
   (error "Trying to display a CTRAN, this shouldn't happen"))
 
 (defmethod display ((cl sb-c::clambda))
-  (format nil "CLAMBDA [~A]:~%%debug-name: ~A~%source-name: ~A~%kind: ~A"
-          (sxhash cl)
+  (format nil "CLAMBDA:~%%debug-name: ~A~%source-name: ~A~%kind: ~A"
           (sb-c::lambda-%debug-name cl)
           (sb-c::lambda-%source-name cl)
           (sb-c::lambda-kind cl)))
 
 (defmethod display ((cr sb-c::creturn))
-  (format nil "CRETURN [~A]:~%result-type: ~A"
-          (sxhash cr)
+  (format nil "CRETURN:~%result-type: ~A"
           (sb-c::return-result-type cr)))
 
 (defmethod display ((bind sb-c::bind))
-  (format nil "BIND [~A]"
-          (sxhash bind)))
+  (format nil "BIND"))
 
 (defmethod display ((ref sb-c::ref))
-  (format nil "REF [~A]:~%derived-type: ~A"
-          (sxhash ref)
+  (format nil "REF:~%derived-type: ~A"
           (sb-c::ref-derived-type ref)))
 
 (defmethod display ((comb sb-c::combination))
-  (format nil "COMBINATION [~A]:~%kind: ~A~%info: ~A"
-          (sxhash comb)
+  (format nil "COMBINATION:~%kind: ~A~%info: ~A"
           (sb-c::combination-kind comb)
           (sb-c::combination-info comb)))
 
 (defmethod display ((lvar sb-c::lvar))
-  (format nil "LVAR [~A]:~%%derived-type: ~A~%dynamic-extent: ~A"
-          (sxhash lvar)
+  (format nil "LVAR:~%%derived-type: ~A~%dynamic-extent: ~A"
           (sb-c::lvar-%derived-type lvar)
           (sb-c::lvar-dynamic-extent lvar)))
 
 (defmethod display ((const sb-c::constant))
-  (format nil "CONSTANT [~A]:~%value: ~A"
-          (sxhash const)
+  (format nil "CONSTANT:~%value: ~A"
           (sb-c::constant-value const)))
 
 (defmethod display ((lamvar sb-c::lambda-var))
-  (format nil "LAMBDA-VAR [~A]:~%arg-info: ~A~%flags: ~A"
-          (sxhash lamvar)
+  (format nil "LAMBDA-VAR:~%arg-info: ~A~%flags: ~A"
           (sb-c::lambda-var-arg-info lamvar)
           (sb-c::lambda-var-flags lamvar)))
 
 (defmethod display ((entry sb-c::entry))
-  (format nil "ENTRY [~A]:~%"
-          (sxhash entry)))
+  (format nil "ENTRY"))
 
 (defmethod display (obj)
   (format nil "NOT SUPPORTED YET:~% ~A" obj))
