@@ -385,14 +385,12 @@
   (:note "integer to untagged word coercion")
   (:generator 4
     #.(assert (= fixnum-tag-mask 1))
-    (inst tbnz x 0 BIGNUM)
     (sc-case y
       (signed-reg
        (inst asr y x n-fixnum-tag-bits))
       (unsigned-reg
        (inst lsr y x n-fixnum-tag-bits)))
-    (inst b DONE)
-    BIGNUM
+    (inst tbz x 0 DONE)
     (loadw y x bignum-digits-offset other-pointer-lowtag)
     DONE))
 
