@@ -1697,10 +1697,6 @@ size_lose(lispobj *where)
          (void*)where, widetag_of(where));
     return 1; /* bogus return value to satisfy static type checking */
 }
-boolean valid_widetag_p(unsigned char widetag) {
-    return sizetab[widetag] != size_lose;
-}
-
 
 /*
  * initialization

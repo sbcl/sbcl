@@ -161,6 +161,4 @@ extern int simple_fun_index(struct code*, struct simple_fun*);
 
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
 
-boolean valid_widetag_p(unsigned char widetag);
-
 #endif /* _GC_INTERNAL_H_ */

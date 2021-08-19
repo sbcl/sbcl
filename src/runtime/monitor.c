@@ -101,6 +101,11 @@ visible(unsigned char c)
         return c;
 }
 
+static boolean valid_widetag_p(unsigned char widetag) {
+    // TODO: ensure that widetag is defined (not "unused") and is for a headered object
+    // (i.e. is not CHARACTER_WIDETAG and not some other things)
+    return other_immediate_lowtag_p(widetag);
+}
 static int NO_SANITIZE_MEMORY
 dump_cmd(char **ptr)
 {
