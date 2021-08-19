@@ -50,11 +50,11 @@
                          `((inst mov ,scratch-tn
                                  (make-ea :dword :disp +win32-tib-arbitrary-field-offset+)
                                  :fs)
-                           (inst sub ,reg (make-ea :dword :disp (ash thread-alloc-region-slot 2)
+                           (inst sub ,reg (make-ea :dword :disp (ash thread-boxed-tlab-slot 2)
                                                           :base ,scratch-tn))))
                        #-win32
                        `(#+sb-thread (inst sub ,reg
-                                           (make-ea :dword :disp (ash thread-alloc-region-slot 2))
+                                           (make-ea :dword :disp (ash thread-boxed-tlab-slot 2))
                                            :fs)
                          #-sb-thread (inst sub ,reg
                                            (make-ea :dword :disp boxed-region))))))

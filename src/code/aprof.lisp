@@ -144,11 +144,11 @@
                                ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn)))
   #'equal)
 (defconstant-eqx region-ptr
-    `(ea ,(ash sb-vm::thread-alloc-region-slot sb-vm:word-shift)
+    `(ea ,(ash sb-vm::thread-boxed-tlab-slot sb-vm:word-shift)
          ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn)))
   #'equal)
 (defconstant-eqx region-end
-    `(ea ,(ash (1+ sb-vm::thread-alloc-region-slot) sb-vm:word-shift)
+    `(ea ,(ash (1+ sb-vm::thread-boxed-tlab-slot) sb-vm:word-shift)
          ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn)))
   #'equal)
 

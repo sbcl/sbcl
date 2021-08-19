@@ -210,12 +210,12 @@
           (load-immediate-word flag-tn boxed-region)
           (inst ldp result-tn flag-tn (@ flag-tn 0)))
         #+sb-thread
-        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-alloc-region-slot)))
+        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-boxed-tlab-slot)))
         (inst add result-tn tmp-tn (add-sub-immediate size result-tn))
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
         #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- boxed-region nil-value))))
-        #+sb-thread (storew result-tn thread-tn thread-alloc-region-slot)
+        #+sb-thread (storew result-tn thread-tn thread-boxed-tlab-slot)
 
         (emit-label BACK-FROM-ALLOC)
         (inst add result-tn tmp-tn lowtag)

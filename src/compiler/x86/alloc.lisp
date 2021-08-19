@@ -75,20 +75,20 @@
          #+(and sb-thread win32) (scratch-tn (pop scratch-tns))
          #+(and sb-thread win32) (swap-tn (pop scratch-tns))
          (free-pointer
-           ;; thread->alloc_region.free_pointer
+           ;; thread->boxed_tlab.free_pointer
            (make-ea :dword
                     :base (or #+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    #+sb-thread (* n-word-bytes thread-boxed-tlab-slot)
                     #-sb-thread boxed-region))
          (end-addr
-            ;; thread->alloc_region.end_addr
+            ;; thread->boxed_tlab.end_addr
            (make-ea :dword
                     :base (or #+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                    #+sb-thread (* n-word-bytes (1+ thread-boxed-tlab-slot))
                     #-sb-thread (+ boxed-region n-word-bytes))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))

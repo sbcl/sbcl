@@ -628,19 +628,19 @@ and
   #-sb-thread
   (loadw reg null-tn 0 (- nil-value boxed-region))
   #+sb-thread
-  (loadw reg thread-base-tn thread-alloc-region-slot))
+  (loadw reg thread-base-tn thread-boxed-tlab-slot))
 
 (defun load-alloc-end-addr (reg)
   #-sb-thread
   (loadw reg null-tn 1 (- nil-value boxed-region))
   #+sb-thread
-  (loadw reg thread-base-tn (+ thread-alloc-region-slot 1)))
+  (loadw reg thread-base-tn (+ thread-boxed-tlab-slot 1)))
 
 (defun store-alloc-free-pointer (reg)
   #-sb-thread
   (storew reg null-tn 0 (- nil-value boxed-region))
   #+sb-thread
-  (storew reg thread-base-tn thread-alloc-region-slot))
+  (storew reg thread-base-tn thread-boxed-tlab-slot))
 
 ;;; This is the main mechanism for allocating memory in the lisp heap.
 ;;;

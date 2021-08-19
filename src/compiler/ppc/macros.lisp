@@ -189,7 +189,7 @@
               ((region-base-tn field-offset)
                #-sb-thread (values null-tn (- boxed-region nil-value))
                #+sb-thread (values thread-base-tn
-                                   (* thread-alloc-region-slot n-word-bytes))))
+                                   (* thread-boxed-tlab-slot n-word-bytes))))
 
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)

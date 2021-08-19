@@ -27,7 +27,7 @@
   (let ((word
          ;; threads imply gencgc. use the per-thread alloc region pointer
          #+sb-thread
-         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-alloc-region-slot))
+         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-boxed-tlab-slot))
          #+(and (not sb-thread) cheneygc)
          (sap-int (dynamic-space-free-pointer))
          ;; dynamic-space-free-pointer increments only when a page is full.

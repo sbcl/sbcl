@@ -157,18 +157,13 @@
 
   (aver (not (sb-assem::assembling-to-elsewhere-p)))
   ;; Otherwise do the normal inline allocation thing
-  (let ((NOT-INLINE (gen-label))
-        (DONE (gen-label))
-        ;; thread->alloc_region.free_pointer
-        (free-pointer
-         #+sb-thread (thread-slot-ea thread-alloc-region-slot)
-         #-sb-thread (ea boxed-region))
-        ;; thread->alloc_region.end_addr
-        (end-addr
-         #+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
-         #-sb-thread (ea (+ boxed-region n-word-bytes))))
-
-    (cond ((typep size `(integer , large-object-size))
+  (let* ((NOT-INLINE (gen-label))
+         (DONE (gen-label))
+         (free-pointer #+sb-thread (thread-slot-ea thread-boxed-tlab-slot)
+                       #-sb-thread (ea boxed-region))
+         (end-addr
+          (ea (+ n-word-bytes (ea-disp free-pointer)) (ea-base free-pointer))))
+    (cond ((typep size `(integer ,large-object-size))
            ;; large objects will never be made in a per-thread region
            (%alloc-tramp type node alloc-tn size lowtag))
           ((eql lowtag 0)

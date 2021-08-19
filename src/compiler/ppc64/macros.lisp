@@ -192,7 +192,7 @@
                                    ;; skip over the array header
                                    (* 2 n-word-bytes))
                #+sb-thread (values thread-base-tn
-                                   (* thread-alloc-region-slot n-word-bytes))))
+                                   (* thread-boxed-tlab-slot n-word-bytes))))
 
     ;; use a spare register because of the usual problem that lw & sw only allow
     ;; displacements that are a multiple of 4. Otherwise NULL-TN would do.

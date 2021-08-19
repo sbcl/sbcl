@@ -512,15 +512,16 @@ during backtrace.
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   (stepping)
+  ;; Deterministic consing profile recording area.
+  (profile-data :c-type "uword_t *" :pointer t)
+  ;; Thread-local allocation buffers
+  #+gencgc (boxed-tlab :c-type "struct alloc_region" :length 4)
+  #+gencgc (unboxed-tlab :c-type "struct alloc_region" :length 4)
+  ;; END of slots to keep near the beginning.
+
   (dynspace-addr)
   (dynspace-card-count)
   (dynspace-pte-base)
-  ;; Deterministic consing profile recording area.
-  (profile-data :c-type "uword_t *" :pointer t)
-  ;; Lisp needs only the first two fields of the alloc_region, so it's OK if the
-  ;; final 2 fields have offsets >= 128 from the base of the thread structure.
-  #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
-  ;; END of slots to keep near the beginning.
 
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.

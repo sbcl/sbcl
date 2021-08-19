@@ -103,7 +103,8 @@
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-base-tn
 (eval-when (:compile-toplevel)
-  (aver (<= (1+ thread-alloc-region-slot) 15)))
+  (aver (<= (1+ thread-boxed-tlab-slot) 15))
+  (aver (<= (1+ thread-unboxed-tlab-slot) 15)))
 
 (defun thread-slot-ea (slot-index)
   (ea (ash slot-index word-shift) thread-base-tn))

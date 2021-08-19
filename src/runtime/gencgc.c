@@ -4142,7 +4142,8 @@ collect_garbage(generation_index_t last_gen)
 #endif
     struct thread *th;
     for_each_thread(th) {
-        ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
+        ensure_region_closed(&th->boxed_tlab, BOXED_PAGE_FLAG);
+        ensure_region_closed(&th->unboxed_tlab, UNBOXED_PAGE_FLAG);
     }
     gc_close_all_regions();
 
@@ -4530,33 +4531,24 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-# define MY_REGION &self->alloc_region
+# define TLAB(x) x
 #else
-# define MY_REGION SINGLE_THREAD_BOXED_REGION
+# define TLAB(x) SINGLE_THREAD_BOXED_REGION
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-# define DEFINE_LISP_ENTRYPOINT(name, page_type) \
-   lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
+#define DEFINE_LISP_ENTRYPOINT(name, tlab, page_type) \
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = get_sb_vm_thread(); \
-    lispobj *result = lisp_alloc(MY_REGION, nbytes, page_type, self); \
-    return result; \
-   }
-#else
-# define DEFINE_LISP_ENTRYPOINT(name, page_type) \
-   NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
-    struct thread *self = get_sb_vm_thread(); \
-    gc_assert(get_pseudo_atomic_atomic(self)); \
-    return lisp_alloc(MY_REGION, nbytes, page_type, self); \
-   }
-#endif
-DEFINE_LISP_ENTRYPOINT(alloc, BOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc_list, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
+    return lisp_alloc(TLAB(tlab), nbytes, page_type, self); }
+
+DEFINE_LISP_ENTRYPOINT(alloc_unboxed, &self->unboxed_tlab, UNBOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc, &self->boxed_tlab, BOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc_list, &self->boxed_tlab, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
 
 #ifdef LISP_FEATURE_SPARC
 void boxed_region_rollback(sword_t size)
 {
-    struct alloc_region *region = MY_REGION;
+    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
     gc_assert(region->free_pointer > region->end_addr);
     region->free_pointer = (char*)region->free_pointer - size;
     gc_assert(region->free_pointer >= region->start_addr
