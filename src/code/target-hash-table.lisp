@@ -268,6 +268,7 @@ Examples:
 ;;; and at maximum load the table will have a load factor of 87.5%
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant kv-pairs-overhead-slots 3))
+(defconstant bad-next-value #xfefefefe)
 ;;; This constant is referenced via its name in cold load, so it needs to
 ;;; be evaluable in the host.
 (defconstant +min-hash-table-rehash-threshold+ #.(sb-xc:float 1/16 $1.0))
@@ -507,7 +508,11 @@ Examples:
            ;; between don't-care and 0-fill)
            (next-vector (if defaultp
                             #.(sb-xc:make-array 0 :element-type '(unsigned-byte 32))
-                            (make-array (1+ size) :element-type 'hash-table-index)))
+                            (make-array (1+ size) :element-type 'hash-table-index
+                                        ;; For testing, preload huge values for all 'next' elements
+                                        ;; so that we generate an error if any is inadvertently read
+                                        ;; above the high-water-mark for the k/v vector.
+                                        #+sb-devel :initial-element #+sb-devel bad-next-value)))
            (table-kind (ht-flags-kind flags))
            (userfunp (logtest flags hash-table-userfun-flag))
            ;; same here - don't care about initial contents
@@ -656,7 +661,9 @@ multiple threads accessing the same hash-table without locking."
                                        :element-type 'hash-table-index
                                        :initial-element 0))
          (new-kv-vector (%alloc-kv-pairs new-size))
-         (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index))
+         (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index
+                                      ;; for robustness testing, as explained in %MAKE-HASH-TABLE
+                                      #+sb-devel :initial-element #+sb-devel bad-next-value))
          (new-hash-vector
            (when old-hash-vector
              (make-array (1+ new-size) :element-type 'hash-table-index))))
@@ -874,7 +881,8 @@ multiple threads accessing the same hash-table without locking."
            (index-vector (make-array bucket-count :element-type 'hash-table-index
                                      :initial-element 0))
            (kv-vector (%alloc-kv-pairs size))
-           (next-vector (make-array (1+ size) :element-type 'hash-table-index))
+           (next-vector (make-array (1+ size) :element-type 'hash-table-index
+                                    #+sb-devel :initial-element #+sb-devel bad-next-value))
            (hash-vector (when (hash-table-hash-vector table)
                           (make-array (1+ size) :element-type 'hash-table-index))))
       (setf (kv-vector-supplement kv-vector) (or hash-vector
