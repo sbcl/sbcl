@@ -177,9 +177,7 @@
                                  collect (1+ (random 4000))))
            (test-list (sort (delete-duplicates random-numbers) #'<))
            (packed-int (sb-c::pack-code-fixup-locs test-list nil))
-           (result (make-array 1 :element-type 'sb-ext:word)))
-      ;; The packer intrinsically self-checks the packing
-      ;; so we don't need to assert anything about that.
+           (result (make-array 1 :element-type '(unsigned-byte 32))))
       (sb-sys:with-pinned-objects (packed-int result)
         ;; Now exercise the C unpacker.
         ;; This hack of allocating 4 longs is terrible, but whatever.
