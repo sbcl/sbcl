@@ -931,7 +931,7 @@
                                         /unsigned -c/unsigned)
                         for cost in '(4 3 6 5 6 5)
                         for arg-types in '(nil
-                                           (fixnum
+                                           (tagged-num
                                             (:constant
                                              (satisfies fixnum-encode-logical-immediate)))
                                            nil
