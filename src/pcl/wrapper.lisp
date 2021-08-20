@@ -1,4 +1,4 @@
-;;;; Bits and pieces of the wrapper machninery. This used to live in cache.lisp,
+;;;; Bits and pieces of the wrapper machinery. This used to live in cache.lisp,
 ;;;; but doesn't really logically belong there.
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -111,7 +111,7 @@
 
 ;;; The portable code inherited from the ancient PCL sources used an extremely
 ;;; clever mechanism to store a mapping from new layouts ("wrappers") to old.
-;;; Old layouts point to new in a straighforward way - via the INVALID slot -
+;;; Old layouts point to new in a straightforward way - via the INVALID slot -
 ;;; but the invalidation logic wants backpointers from new to old as well.
 ;;; It arranges so that if the following state exists:
 ;;;   layout_A -> (:flush layout_B)
@@ -128,12 +128,12 @@
 ;;; improves anything, as it merely performs work eagerly that could have
 ;;; been performed lazily. (PCL generally prefers lazy updates.)
 ;;;
-;;; Anyway the extreme cleverness (and premature optimization, imho), was almost,
+;;; Anyway the extreme cleverness (and premature optimization, IMHO), was almost,
 ;;; but not quite, clever enough - it leaked three conses per redefinition,
 ;;; which it pretty much had to in order to remain portable.
 ;;; We can at least replicate it in a way that doesn't leak conses,
 ;;; or at least theoretically doesn't. A likely scenario is that old caches may
-;;; never get adquately flushed to drop all references to obsolete layouts.
+;;; never get adequately flushed to drop all references to obsolete layouts.
 ;;; If you call a GF once and not again, it won't flush; thus causing a retained
 ;;; old layout no matter what else is done.
 ;;;
@@ -150,7 +150,7 @@
 ;;; The bug is that it was possible for an observer to see (:FLUSH new-thing)
 ;;; in an older layout when it should actually have seen (:OBSOLETE newer-thing).
 ;;; On the other hand, it's still possible for an observer to see the
-;;; wrong value in the INVALID slot itself. i.e. if it reads the slot
+;;; wrong value in the INVALID slot itself. I.e. if it reads the slot
 ;;; before %invalidate-wrapper performs the transitivity operation,
 ;;; hence the possibility that this optimization is not only premature,
 ;;; but also pretty much not correct.
