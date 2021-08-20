@@ -480,7 +480,9 @@
               (found-allow-p nil))
 
           (temps #-stack-grows-downward-not-upward
-                 `(,n-index (1- ,n-count))
+                 `(,n-index (+ ,n-count ,(if (vop-existsp :translate %more-keyword-pair)
+                                             0
+                                             -1)))
                  #+stack-grows-downward-not-upward
                  `(,n-index (- (1- ,n-count)))
                  #-stack-grows-downward-not-upward n-value-temp
@@ -536,7 +538,9 @@
                        (setq ,n-lose ,n-key))))
 
             (body
-             `(when (oddp ,n-count)
+             `(when (oddp ,(if (vop-existsp :translate %more-keyword-pair)
+                               n-index
+                               n-count))
                 (%odd-key-args-error)))
 
             (body
@@ -544,12 +548,19 @@
              `(locally
                 (declare (optimize (safety 0)))
                 (loop
-                  (when (minusp ,n-index) (return))
-                  (setf ,n-value-temp (%more-arg ,n-context ,n-index))
-                  (decf ,n-index)
-                  (setq ,n-key (%more-arg ,n-context ,n-index))
-                  (decf ,n-index)
-                  (case ,n-key ,@(tests))))
+                 ,@(cond ((vop-existsp :translate %more-keyword-pair)
+                          `((when (zerop ,n-index) (return))
+                            (decf ,n-index 2)
+                            (multiple-value-bind (key value)
+                                (%more-keyword-pair ,n-context ,n-index)
+                              (setf ,n-value-temp value ,n-key key))))
+                         (t
+                          `((when (minusp ,n-index) (return))
+                            (setf ,n-value-temp (%more-arg ,n-context ,n-index))
+                            (decf ,n-index)
+                            (setq ,n-key (%more-arg ,n-context ,n-index))
+                            (decf ,n-index))))
+                 (case ,n-key ,@(tests))))
              #+stack-grows-downward-not-upward
              `(locally (declare (optimize (safety 0)))
                 (loop

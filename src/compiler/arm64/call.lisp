@@ -472,6 +472,20 @@
        (inst add temp context (lsl index (- word-shift n-fixnum-tag-bits)))
        (loadw value temp)))))
 
+(define-vop ()
+  (:translate sb-c::%more-keyword-pair)
+  (:policy :fast-safe)
+  (:args (context :scs (descriptor-reg))
+         (index :scs (any-reg)))
+  (:arg-types * tagged-num)
+  (:temporary (:scs (any-reg)) temp)
+  (:results (keyword :scs (descriptor-reg any-reg))
+            (value :scs (descriptor-reg any-reg)))
+  (:result-types * *)
+  (:generator 5
+    (inst add temp context (lsl index (- word-shift n-fixnum-tag-bits)))
+    (inst ldp keyword value (@ temp))))
+
 (define-vop (more-arg-or-nil)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
