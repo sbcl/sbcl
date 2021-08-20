@@ -429,18 +429,21 @@
         DO-REGS
         (when (< fixed register-arg-count)
           ;; Now we have to deposit any more args that showed up in registers.
-          (inst subs count nargs-tn (fixnumize fixed))
+          (inst subs count nargs-tn (+ (fixnumize fixed)
+                                       (fixnumize 1)))
+          (inst b :lt DONE)
           (do ((i fixed (1+ i)))
               ((>= i register-arg-count))
-            ;; Don't deposit any more than there are.
-            (inst b :eq DONE)
-            (unless (= i (1- register-arg-count))
-              (inst subs count count (fixnumize 1)))
             ;; Store it into the space reserved to it, by displacement
             ;; from the frame pointer.
             (storew (nth i *register-arg-tns*)
-                    cfp-tn (+ (sb-allocated-size 'control-stack)
-                              (- i fixed)))))
+                cfp-tn (+ (sb-allocated-size 'control-stack)
+                          (- i fixed)))
+            (unless (= i (1- register-arg-count))
+              (unless (= i fixed)
+                (inst subs count count (fixnumize 1)))
+              ;; Don't deposit any more than there are.
+              (inst b :eq DONE))))
         DONE
 
         ;; Now that we're done with the &MORE args, we can set up the
