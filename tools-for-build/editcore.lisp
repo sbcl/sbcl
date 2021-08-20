@@ -472,7 +472,8 @@
            :linkage-bounds linkage-bounds
            :linkage-entry-size linkage-entry-size
            :linkage-symbols linkage-symbols
-           :linkage-symbol-usedp (make-array (length linkage-symbols) :element-type 'bit)
+           :linkage-symbol-usedp (make-array (length linkage-symbols) :element-type 'bit
+                                             :initial-element 0)
            :enable-pie enable-pie)))
     (let ((package-table
            (symbol-global-value
@@ -1253,7 +1254,7 @@
     (addend (signed 64))))
 
 (defun make-elf64-sym (name info)
-  (let ((a (make-array 24 :element-type '(unsigned-byte 8))))
+  (let ((a (make-array 24 :element-type '(unsigned-byte 8) :initial-element 0)))
     (with-pinned-objects (a)
       (setf (sap-ref-32 (vector-sap a) 0) name
             (sap-ref-8 (vector-sap a) 4) info))
