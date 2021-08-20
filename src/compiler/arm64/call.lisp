@@ -434,7 +434,8 @@
               ((>= i register-arg-count))
             ;; Don't deposit any more than there are.
             (inst b :eq DONE)
-            (inst subs count count (fixnumize 1))
+            (unless (= i (1- register-arg-count))
+              (inst subs count count (fixnumize 1)))
             ;; Store it into the space reserved to it, by displacement
             ;; from the frame pointer.
             (storew (nth i *register-arg-tns*)
