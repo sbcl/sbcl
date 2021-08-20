@@ -546,8 +546,8 @@
 
 (with-test (:name :array-equalp-non-consing
                   :skipped-on :interpreter)
-  (let ((a (make-array 1000 :element-type 'double-float))
-        (b (make-array 1000 :element-type 'double-float)))
+  (let ((a (make-array 1000 :element-type 'double-float :initial-element 0d0))
+        (b (make-array 1000 :element-type 'double-float :initial-element 0d0)))
     (ctu:assert-no-consing (equalp a b))))
 
 (with-test (:name (search :array-equalp-numerics))

@@ -47,7 +47,7 @@
            (ensure-roundtrip-latin :latin9))
 
          (ensure-roundtrip-utf8 ()
-           (let ((string (make-string char-code-limit)))
+           (let ((string (make-string char-code-limit :initial-element #\nul)))
              (dotimes (i char-code-limit)
                (unless (<= #xd800 i #xdfff)
                  (setf (char string i) (code-char i))))

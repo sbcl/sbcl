@@ -156,10 +156,10 @@
                  '(1 2 0))))
 
 (with-test (:name (print array *print-readably* :element-type))
-  (dolist (array (list (make-array '(1 0 1))
+  (dolist (array (list (make-array '(1 0 1) :initial-element 0)
                        (make-array 0 :element-type nil)
-                       (make-array 1 :element-type 'base-char)
-                       (make-array 1 :element-type 'character)))
+                       (make-array 1 :element-type 'base-char :initial-element #\nul)
+                       (make-array 1 :element-type 'character :initial-element #\nul)))
     (assert (multiple-value-bind (result error)
                 (read-from-string
                  (write-to-string array :readably t))

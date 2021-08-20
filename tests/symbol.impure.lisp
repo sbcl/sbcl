@@ -17,7 +17,8 @@
 (with-test (:name :defvar-type-error)
   (assert (eq :ok
               (handler-case
-                  (eval `(defvar *foo* (make-array 10 :element-type '(unsigned-byte 60))))
+                  (eval `(defvar *foo* (make-array 10 :element-type '(unsigned-byte 60)
+                                                   :initial-element 0)))
                 (type-error (e)
                   (when (and (typep e 'type-error)
                              (equal '(simple-array fixnum (*))

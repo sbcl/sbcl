@@ -42,7 +42,7 @@
     (assert (search "an ARRAY of T" result))
     (assert (search "dimensions are ()" result)))
 
-  (let ((array (make-array '() :element-type 'fixnum)))
+  (let ((array (make-array '() :element-type 'fixnum :initial-element 0)))
     (assert (search "an ARRAY of FIXNUM" (test-inspect array))))
 
   (let ((array (let ((a (make-array () :initial-element 0)))

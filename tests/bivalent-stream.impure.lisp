@@ -45,6 +45,8 @@
             expected ~S.~@:>"
            write-call read-call result expected)))
 
+(defun zero-string (n) (make-string n :initial-element #\nul))
+
 (defvar *read/write-sequence-pairs*
   `(;; List source and destination sequence.
     ((65)       ()         ,(list 0)        ()         1 (#\A))
@@ -94,12 +96,12 @@
     (#(#\B)     ()         ,(cvector #\_ #\_) (:end 1)   1 #(#\B #\_))
     (#(#\B)     ()         ,(cvector #\_ #\_) (:start 1) 2 #(#\_ #\B))
     ;; String destination sequence.
-    (#(65)      ()         ,(make-string 1)   ()         1 "A")
-    (#(#\B)     ()         ,(make-string 1)   ()         1 "B")
-    (#(66 #\C)  ()         ,(make-string 2)   ()         2 "BC")
-    (#(#\B 67)  ()         ,(make-string 2)   ()         2 "BC")
-    (#(#\B)     ()         ,(make-string 2)   (:end 1)   1 ,(coerce '(#\B #\Nul) 'string))
-    (#(#\B)     ()         ,(make-string 2)   (:start 1) 2 ,(coerce '(#\Nul #\B) 'string))))
+    (#(65)      ()         ,(zero-string 1)   ()         1 "A")
+    (#(#\B)     ()         ,(zero-string 1)   ()         1 "B")
+    (#(66 #\C)  ()         ,(zero-string 2)   ()         2 "BC")
+    (#(#\B 67)  ()         ,(zero-string 2)   ()         2 "BC")
+    (#(#\B)     ()         ,(zero-string 2)   (:end 1)   1 ,(coerce '(#\B #\Nul) 'string))
+    (#(#\B)     ()         ,(zero-string 2)   (:start 1) 2 ,(coerce '(#\Nul #\B) 'string))))
 
 (defun do-writes (stream pairs)
   (loop :for (sequence args) :in pairs

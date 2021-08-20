@@ -268,8 +268,8 @@
 #+gencgc
 (defun ensure-code/data-separation ()
   (let* ((n-bits (+ sb-vm:next-free-page 10))
-         (code-bits (make-array n-bits :element-type 'bit))
-         (data-bits (make-array n-bits :element-type 'bit))
+         (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
+         (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (total-code-size 0))
     (sb-vm:map-allocated-objects
      (lambda (obj type size)

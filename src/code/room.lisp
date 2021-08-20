@@ -1275,7 +1275,8 @@ We could try a few things to mitigate this:
                                 &aux (n-code-bytes 0)
                                      (total-pages next-free-page)
                                      (pages
-                                      (make-array total-pages :element-type 'bit)))
+                                      (make-array total-pages :element-type 'bit
+                                                  :initial-element 0)))
   (flet ((dump-page (page-num)
            (format stream "~&Page ~D~%" page-num)
            (let ((where (+ dynamic-space-start (* page-num gencgc-card-bytes)))
@@ -1364,8 +1365,8 @@ We could try a few things to mitigate this:
 (defun !ensure-genesis-code/data-separation ()
   #+gencgc
   (let* ((n-bits (+ next-free-page 10))
-         (code-bits (make-array n-bits :element-type 'bit))
-         (data-bits (make-array n-bits :element-type 'bit))
+         (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
+         (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (total-code-size 0))
     (map-allocated-objects
      (lambda (obj type size)

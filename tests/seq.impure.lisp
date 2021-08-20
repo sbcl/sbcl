@@ -1218,7 +1218,8 @@
 
 (defun random-test-bit-position (n)
   (loop repeat n
-        do (let* ((vector (make-array (+ 2 (random 5000)) :element-type 'bit))
+        do (let* ((vector (make-array (+ 2 (random 5000)) :element-type 'bit
+                                      :initial-element 0))
                   (offset (random (1- (length vector))))
                   (size (1+ (random (- (length vector) offset))))
                   (disp (make-array size :element-type 'bit :displaced-to vector

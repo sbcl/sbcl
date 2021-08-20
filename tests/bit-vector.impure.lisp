@@ -41,9 +41,9 @@
   ;; SPACE)
   (locally
       (declare (optimize (speed 3) (space 1)))
-    (let ((bv1 (make-array 5 :element-type 'bit))
-          (bv2 (make-array 0 :element-type 'bit))
-          (bv3 (make-array 68 :element-type 'bit)))
+    (let ((bv1 (make-array 5 :element-type 'bit :initial-element 0))
+          (bv2 (make-array 0 :element-type 'bit :initial-element 0))
+          (bv3 (make-array 68 :element-type 'bit :initial-element 0)))
       (declare (type simple-bit-vector bv1 bv2 bv3))
       (setf (sbit bv3 42) 1)
       ;; bitvector smaller than the word size

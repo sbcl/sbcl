@@ -418,7 +418,8 @@
                 (sb-int:simple-reader-error () :win))
               :win)))
 
-(with-test (:name :sharp-star-default-fill :skipped-on :big-endian)
+(with-test (:name :sharp-star-default-fill :skipped-on :sbcl)
+  ;; can't assert anything about bits beyond the supplied ones
   (let ((bv (opaque-identity #*11)))
     (assert (= (sb-kernel:%vector-raw-bits bv 0) 3))))
 
