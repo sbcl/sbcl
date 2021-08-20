@@ -368,8 +368,6 @@
                                   :sc (sc-or-lose 'any-reg)
                                   :offset nfp-offset))
           (delta (- (sb-allocated-size 'control-stack) fixed)))
-      ;; And we use ASSEMBLE here so that we get "implcit labels"
-      ;; rather than having to use GEN-LABEL and EMIT-LABEL.
       (assemble ()
         ;; Compute the end of the fixed stack frame (start of the MORE
         ;; arg area) into RESULT.
@@ -429,21 +427,20 @@
         DO-REGS
         (when (< fixed register-arg-count)
           ;; Now we have to deposit any more args that showed up in registers.
-          (inst subs count nargs-tn (+ (fixnumize fixed)
-                                       (fixnumize 1)))
-          (inst b :lt DONE)
-          (do ((i fixed (1+ i)))
-              ((>= i register-arg-count))
-            ;; Store it into the space reserved to it, by displacement
-            ;; from the frame pointer.
-            (storew (nth i *register-arg-tns*)
-                cfp-tn (+ (sb-allocated-size 'control-stack)
-                          (- i fixed)))
-            (unless (= i (1- register-arg-count))
-              (unless (= i fixed)
-                (inst subs count count (fixnumize 1)))
-              ;; Don't deposit any more than there are.
-              (inst b :eq DONE))))
+          (loop with i = fixed
+                for offset = (+ delta i)
+                do
+                (cond ((and (< (1+ i) register-arg-count)
+                            (ldp-stp-offset-p (* offset n-word-bytes) n-word-bits))
+                       (inst stp
+                             (nth i *register-arg-tns*)
+                             (nth (1+ i) *register-arg-tns*)
+                             (@ cfp-tn (* offset n-word-bytes)))
+                       (incf i 2))
+                      (t
+                       (storew (nth i *register-arg-tns*) cfp-tn offset)
+                       (incf i)))
+                while (< i register-arg-count)))
         DONE
 
         ;; Now that we're done with the &MORE args, we can set up the
