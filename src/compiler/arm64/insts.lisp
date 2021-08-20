@@ -2981,11 +2981,15 @@
        (inst* segment 'load-constant vector vector-offset)
        (inst* segment 'strb sb-vm::null-tn addr)))))
 
+(defun conditional-branch-p (stmt)
+  (and (eq (stmt-mnemonic stmt) 'b)
+       (= (length (stmt-operands stmt)) 2)))
+
 (defpattern "cmp 0 + branch" ((subs) (b)) (stmt next)
   (let ((next-next (stmt-next next)))
     (when (and (not (stmt-labels next))
                next-next
-               (neq (stmt-mnemonic next-next) 'b))
+               (not (conditional-branch-p next-next)))
       (destructuring-bind (target value cmp) (stmt-operands stmt)
         (when (and (eql cmp 0)
                    (eq target zr-tn))
@@ -3014,7 +3018,7 @@
   (let ((next-next (stmt-next next)))
     (when (and (not (stmt-labels next))
                next-next
-               (neq (stmt-mnemonic next-next) 'b))
+               (not (conditional-branch-p next-next)))
       (destructuring-bind (target value mask) (stmt-operands stmt)
         (when (and (integerp mask)
                    (= (logcount (ldb (byte n-word-bits 0) mask)) 1)
