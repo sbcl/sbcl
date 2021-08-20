@@ -203,7 +203,7 @@
 #+sb-thread
 (test-util:with-test (:name :info-vector-concurrency)
   (let ((s (gensym))
-        (a (make-array 1 :element-type 'sb-ext:word)))
+        (a (make-array 1 :element-type 'sb-ext:word :initial-element 0)))
     (let* ((aux-keys '(0 a b c d e f g h nil i j k l m n o p setf q r s))
            (info-types (loop for i from 1 below 64 collect i))
            (work (test-util:shuffle (coerce (crossprod aux-keys info-types) 'vector)))
@@ -336,7 +336,8 @@
     (let ((tally (make-array n-threads :initial-element 0)))
       (info-maphash
        (lambda (key id-list)
-         (let ((scoreboard (make-array (/ n-threads 2) :element-type 'bit)))
+         (let ((scoreboard (make-array (/ n-threads 2) :element-type 'bit
+                                       :initial-element 0)))
            (dolist (thread-id id-list)
              (let ((group-id (floor thread-id 2)))
                ;; assert no duplicate for a peer group
@@ -568,7 +569,7 @@
   (flet ((run (names)
            (declare (simple-vector names))
            (let* ((n (length names))
-                  (counts (make-array n :element-type 'sb-ext:word))
+                  (counts (make-array n :element-type 'sb-ext:word :initial-element 0))
                   (threads))
              (dotimes (i 15)
                (push (sb-thread:make-thread
