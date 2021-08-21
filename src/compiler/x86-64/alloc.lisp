@@ -53,6 +53,16 @@
                 (used-p (sb-c::ir2-component-normal-tns comp))
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
+(defun alloc-unboxed-p (type)
+  (case type
+    ((unboxed-array
+      #.bignum-widetag
+      #.sap-widetag
+      #.double-float-widetag
+      #.complex-single-float-widetag
+      #.complex-double-float-widetag)
+     t)))
+
 ;;; Call an allocator trampoline and get the result in the proper register.
 ;;; There are 2x2 choices of trampoline:
 ;;;  - invoke alloc() or alloc_list() in C
@@ -90,19 +100,37 @@
     (inst or :byte result-tn lowtag)))
 
 ;;; Insert allocation profiler instrumentation
-(defun instrument-alloc (size node)
+(eval-when (:compile-toplevel)
+  (aver (= thread-tot-bytes-alloc-unboxed-slot
+           (1+ thread-tot-bytes-alloc-boxed-slot))))
+
+(defun instrument-alloc (type size node)
+  (declare (ignorable type))
   #+allocator-metrics
-  (progn
-    (inst add :qword (thread-slot-ea thread-total-bytes-allocated-slot)
-          (cond ((typep size '(or (signed-byte 32))) size)
-                (t (inst mov temp-reg-tn size) temp-reg-tn)))
+  (let ((size-temp (not (typep size '(or (signed-byte 32) tn)))))
+    (cond ((tn-p type) ; from ALLOCATE-VECTOR-ON-HEAP
+           ;; Constant huge size + unknown type can't occur.
+           (aver (not size-temp))
+           (inst cmp :byte type simple-vector-widetag)
+           (inst set :ne temp-reg-tn)
+           (inst and :dword temp-reg-tn 1)
+           (inst add :qword
+                 (ea (ash thread-tot-bytes-alloc-boxed-slot word-shift)
+                     thread-base-tn temp-reg-tn 8)
+                 size))
+          (t
+           (inst add :qword
+                 (thread-slot-ea (if (alloc-unboxed-p type)
+                                     thread-tot-bytes-alloc-unboxed-slot
+                                     thread-tot-bytes-alloc-boxed-slot))
+                 (cond (size-temp (inst mov temp-reg-tn size) temp-reg-tn)
+                       (t size)))))
     (cond ((tn-p size)
-           ;; the low 4 bins of the histogram can't be used,
+           ;; the first 4 bins of the histogram can't be used,
            ;; but I don't care. Math is hard.
            (inst bsr temp-reg-tn size)
-           (inst inc :qword
-                 (ea (ash thread-obj-size-histo-slot word-shift)
-                     thread-base-tn temp-reg-tn 8)))
+           (inst inc :qword (ea (ash thread-obj-size-histo-slot word-shift)
+                                thread-base-tn temp-reg-tn 8)))
           (t
            (inst inc :qword
                  (thread-slot-ea (+ thread-obj-size-histo-slot
@@ -149,13 +177,13 @@
 ;;; 2. how to allocate it: policy and how to invoke the trampoline
 ;;; 3. where to put the result
 (defun allocation (type size lowtag node dynamic-extent alloc-tn)
+  (aver (not (sb-assem::assembling-to-elsewhere-p)))
   (when dynamic-extent
     (stack-allocation alloc-tn size lowtag)
     (return-from allocation (values)))
   (aver (and (not (location= alloc-tn temp-reg-tn))
              (or (integerp size) (not (location= size temp-reg-tn)))))
 
-  (aver (not (sb-assem::assembling-to-elsewhere-p)))
   ;; Otherwise do the normal inline allocation thing
   (let* ((NOT-INLINE (gen-label))
          (DONE (gen-label))
@@ -222,7 +250,7 @@
            (allocation nil bytes other-pointer-lowtag node t result-tn)
            (storew header result-tn 0 other-pointer-lowtag))
           (t
-           (instrument-alloc bytes node)
+           (instrument-alloc widetag bytes node)
            (pseudo-atomic ()
              (allocation nil bytes 0 node nil result-tn)
              (storew* header result-tn 0 0 t)
@@ -262,7 +290,7 @@
                     (stack-allocate-p (node-stack-allocate-p node))
                     (size (* (pad-data-block cons-size) cons-cells)))
                (unless stack-allocate-p
-                 (instrument-alloc size node))
+                 (instrument-alloc 'list size node))
                (pseudo-atomic (:elide-if stack-allocate-p)
                 (allocation 'list size (if (= cons-cells 2) 0 list-pointer-lowtag)
                             node stack-allocate-p res)
@@ -455,7 +483,12 @@
       ;; The LET generates instructions that needn't be pseudoatomic
       ;; so don't move it inside.
       (let ((size (calc-size-in-bytes words result)))
-        (instrument-alloc size node)
+        (instrument-alloc (if (sc-is type immediate)
+                              (case (tn-value type)
+                                (#.simple-vector-widetag 'simple-vector)
+                                (t 'unboxed-array))
+                              type)
+                          size node)
         (pseudo-atomic ()
          (allocation nil size 0 node nil result)
          (put-header result 0 type length t)
@@ -615,7 +648,7 @@
             (loop (gen-label))
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
-        (instrument-alloc size node)
+        (instrument-alloc 'list size node)
         (pseudo-atomic ()
          (allocation 'list size list-pointer-lowtag node nil result)
          (compute-end)
@@ -658,7 +691,7 @@
           (bytes (pad-data-block words))
           (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
      (unless stack-allocate-p
-       (instrument-alloc bytes node))
+       (instrument-alloc closure-widetag bytes node))
      (pseudo-atomic (:elide-if stack-allocate-p)
        (allocation nil bytes fun-pointer-lowtag node stack-allocate-p result)
        (storew* #-immobile-space header ; write the widetag and size
@@ -712,7 +745,7 @@
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
     (unless stack-allocate-p
-      (instrument-alloc bytes node))
+      (instrument-alloc type bytes node))
     (pseudo-atomic (:elide-if stack-allocate-p)
       ;; If storing a header word, defer ORing in the lowtag until after
       ;; the header is written so that displacement can be 0.
@@ -768,7 +801,7 @@
              (stack-allocation result bytes lowtag)
              (storew header result 0 lowtag))
          (t
-             (instrument-alloc bytes node)
+             (instrument-alloc type bytes node)
              (pseudo-atomic ()
               (allocation nil bytes lowtag node nil result)
               (storew header result 0 lowtag))))))

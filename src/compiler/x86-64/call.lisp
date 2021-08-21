@@ -1297,7 +1297,7 @@
       (inst jmp :z done)
       (inst lea dst (ea nil rcx (ash 2 (- word-shift n-fixnum-tag-bits))))
       (unless stack-allocate-p
-        (instrument-alloc dst node))
+        (instrument-alloc 'list dst node))
       (pseudo-atomic (:elide-if stack-allocate-p)
        (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
        ;; Set up the result.

@@ -82,7 +82,7 @@
     (inst shl :dword header array-rank-byte-pos)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
-    (instrument-alloc bytes node)
+    (instrument-alloc nil bytes node)
     (pseudo-atomic ()
      (allocation nil bytes 0 node nil result)
      (storew header result 0 0)

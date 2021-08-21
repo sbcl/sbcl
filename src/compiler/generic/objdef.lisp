@@ -569,7 +569,8 @@ during backtrace.
   (mach-port-name :c-type "mach_port_name_t")
 
   ;; allocation instrumenting
-  (total-bytes-allocated)
+  (tot-bytes-alloc-boxed)
+  (tot-bytes-alloc-unboxed)
   (slow-path-allocs)
   (et-allocator-mutex-acq) ; elapsed times
   (et-find-freeish-page)

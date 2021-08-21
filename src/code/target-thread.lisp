@@ -2636,12 +2636,8 @@ mechanism for inter-thread communication."
                (sum (a b)
                  (cond ((null a) b)
                        ((null b) a)
-                       (t (list (+ (first a) (first b))
-                                (vector-sum (second a) (second b))
-                                (+ (third a) (third b))
-                                (+ (fourth a) (fourth b))
-                                (+ (fifth a) (fifth b))
-                                (+ (sixth a) (sixth b)))))))
+                       (t (cons (vector-sum (car a) (car b))
+                                (mapcar #'+ (cdr a) (cdr b)))))))
         (reduce #'sum
                 ;; what about the finalizer thread?
                 (mapcar 'allocator-histogram (list-all-threads))))
@@ -2651,10 +2647,10 @@ mechanism for inter-thread communication."
             (declare (notinline position)) ; style-warning for some reason
             (dotimes (i sb-vm:n-word-bits)
               (setf (aref a i) (histogram-value c-thread i)))
-            (list (metric c-thread sb-vm::thread-total-bytes-allocated-slot)
-                  ;; discard uninteresting entries
-                  (subseq a sb-vm:n-lowtag-bits
+            (list (subseq a sb-vm:n-lowtag-bits ; discard uninteresting entries
                           (1+ (position 0 a :from-end t :test #'/=)))
+                  (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot)
+                  (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot)
                   (metric c-thread sb-vm::thread-slow-path-allocs-slot)
                   (metric c-thread sb-vm::thread-et-allocator-mutex-acq-slot)
                   (metric c-thread sb-vm::thread-et-find-freeish-page-slot)
@@ -2663,11 +2659,14 @@ mechanism for inter-thread communication."
 (defun reset-allocator-histogram (&optional (thread *current-thread*))
   (with-deathlok (thread c-thread)
     (unless (= c-thread 0)
+      (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
+            (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0
+            (metric c-thread sb-vm::thread-slow-path-allocs-slot) 0)
       (dotimes (i sb-vm:n-word-bits)
         (setf (histogram-value c-thread i) 0)))))
 
 (defun print-allocator-histogram (&optional (thread *current-thread*))
-  (destructuring-bind (total-bytes bins n-slow-path lock find clear)
+  (destructuring-bind (bins tot-bytes-boxed tot-bytes-unboxed n-slow-path lock find clear)
       (allocator-histogram thread)
     (let ((total-objects (reduce #'+ bins))
           (size (* 4 sb-vm:n-word-bytes)) ; "<=" this size is the smallest bin
@@ -2681,9 +2680,8 @@ mechanism for inter-thread communication."
                     (format nil "< 2^~d" (1- (integer-length size))))
                 count (/ cumulative total-objects))
         (setq size (* size 2)))
-      (format t "Total: ~D bytes, ~D objects, ~,2,2f% fast path~%"
-              total-bytes
-              total-objects
+      (format t "Total: ~D+~D bytes, ~D objects, ~,2,2f% fast path~%"
+              tot-bytes-boxed tot-bytes-unboxed total-objects
               (/ (- total-objects n-slow-path) total-objects))
       (format t "Times (sec): lock=~,,-9f find=~,,-9f clear=~,,-9f~%"
               lock find clear)))))
