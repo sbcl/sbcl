@@ -69,7 +69,7 @@ sb-vm::
   (:generator 1
     (let* ((bytes large-object-size) ; payload + header total
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
-      (instrument-alloc bytes node)
+      (instrument-alloc nil bytes node)
       (pseudo-atomic ()
        (allocation nil bytes 0 node nil result)
        (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
