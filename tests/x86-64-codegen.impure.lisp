@@ -1044,3 +1044,10 @@ sb-vm::(define-vop (cl-user::test)
                                 most-negative-fixnum)
   (try-logbitp-walking-bit-test bitsy-sw  :sw  64
                                 (sb-c::mask-signed-field 64 (ash 1 63))))
+
+(with-test (:name :shr+shr-combiner)
+  (let* ((f (compile nil '(lambda (x) (ash (truncate (truly-the sb-vm:word x) 2) -1))))
+         (lines (disassembly-lines f)))
+    (assert
+     (loop for line in lines
+           thereis (and (search "SHR " line) (search ", 2" line))))))

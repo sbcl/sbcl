@@ -3584,6 +3584,30 @@
       (delete-stmt stmt)
       next)))
 
+;;; "SAR x, imm1" + "SAR x, imm2" -> "SAR x, (imm1 + imm2)"
+;;; if imm1 and imm2 are constants and the sum is less than 64.
+;;; The checks on size1 and size2 may be more restrictive than needed.
+(defpattern "sar + sar -> sar" ((sar shr shl) (sar shr shl)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (flet ((compatible (first second)
+             (or (eq first second)
+                 ;; SHR followed by SAR is ok because the SHR will shift in
+                 ;; at least one 0 bit, and the SAR becomes equivalent to SHR.
+                 (and (eq first 'shr) (eq second 'sar)))))
+      (when (and (compatible (stmt-mnemonic stmt) (stmt-mnemonic next))
+                 (location= dst1 dst2)
+                 (eq size1 size2)
+                 (member size2 '(:dword :qword))
+                 (fixnump src1)
+                 (fixnump src2)
+                 (typep (+ src1 src2) `(mod ,(if (eq size1 :dword) 32 64))))
+      (setf (stmt-operands next)
+            `(,(encode-size-prefix size2) ,dst2 ,(+ src1 src2)))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next))))
+
 ;;; In "{AND,OR,...} reg, src ; TEST reg, reg ; {JMP,SET} {:z,:nz,:s,:ns}"
 ;;; the TEST is unnecessary since ALU operations set the Z and S flags.
 ;;; Per the processor manual, TEST clears OF and CF, so presumably
