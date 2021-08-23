@@ -688,73 +688,74 @@
 
 
 ;;;; Shifting
+(macrolet ((encodable-as-lea ()
+             `(and (gpr-tn-p number) (gpr-tn-p result)
+                   (not (location= number result))
+                   (member amount '(1 2 3))))
+           (generate-lea ()
+             `(case amount
+                (1 (inst lea result (ea number number)))
+                (2 (inst lea result (ea nil number 4)))
+                (3 (inst lea result (ea nil number 8)))))
+           (with-shift-operands (&body body)
+             ;; If the initial "MOVE result number" is a legal instruction,
+             ;; then we're OK; otherwise use the temp reg to do the shift.
+             `(multiple-value-bind (save result)
+                  (if (or (location= number result) (gpr-tn-p number) (gpr-tn-p result))
+                      (values nil result)
+                      (values result temp-reg-tn))
+                (move result number)
+                ,@body
+                (when save (inst mov save result)))))
+
 (define-vop (fast-ash-c/fixnum=>fixnum)
   (:translate ash)
   (:policy :fast-safe)
-  (:args (number :scs (any-reg) :target result
-                 :load-if (not (and (sc-is number any-reg control-stack)
-                                    (sc-is result any-reg control-stack)
-                                    (location= number result)))))
+  (:args (number :scs (any-reg control-stack) :target result))
   (:info amount)
   (:arg-types tagged-num (:constant integer))
-  (:results (result :scs (any-reg)
-                    :load-if (not (and (sc-is number control-stack)
-                                       (sc-is result control-stack)
-                                       (location= number result)))))
+  (:results (result :scs (any-reg control-stack)))
   (:result-types tagged-num)
   (:note "inline ASH")
   (:variant nil)
   (:variant-vars modularp)
   (:generator 2
-    (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (ea number number)))
-          ((and (= amount 2) (not (location= number result)))
-           (inst lea result (ea nil number 4)))
-          ((and (= amount 3) (not (location= number result)))
-           (inst lea result (ea nil number 8)))
+    (cond ((= amount 0) (bug "shifting by 0"))
+          ((>= amount 64) ; shifting left (zero fill)
+           (unless modularp
+             (bug "Impossible: fixnum ASH left exceeds word length"))
+           (zeroize result))
+          ((encodable-as-lea) (generate-lea))
           (t
-           (move result number)
-           (cond ((< -64 amount 64)
-                  ;; this code is used both in ASH and ASH-MODFX, so
-                  ;; be careful
-                  (if (plusp amount)
-                      (inst shl result amount)
-                      (progn
-                        (inst sar result (- amount))
-                        (inst and result (lognot fixnum-tag-mask)))))
-                 ;; shifting left (zero fill)
-                 ((plusp amount)
-                  (unless modularp
-                    (aver (not "Impossible: fixnum ASH should not be called with
-constant shift greater than word length")))
-                  (if (sc-is result any-reg)
-                      (zeroize result)
-                      (inst mov result 0)))
-                 ;; shifting right (sign fill)
-                 (t (inst sar result 63)
-                    (inst and result (lognot fixnum-tag-mask))))))))
+           (with-shift-operands
+            (cond ((< -64 amount 64)
+                   ;; this code is used both in ASH and ASH-MODFX, so
+                   ;; be careful
+                   (if (plusp amount)
+                       (inst shl result amount)
+                       (progn
+                         (inst sar result (- amount))
+                         (inst and result (lognot fixnum-tag-mask)))))
+                  ;; shifting right (sign fill)
+                  (t (move result number)
+                     (inst sar result 63)
+                     (inst and result (lognot fixnum-tag-mask)))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)
-  (:args (number :scs (any-reg) :target result
-                 :load-if (not (and (sc-is number control-stack)
-                                    (sc-is result control-stack)
-                                    (location= number result))))
+  (:args (number :scs (any-reg control-stack) :target result)
          (amount :scs (unsigned-reg) :target ecx))
   (:arg-types tagged-num positive-fixnum)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:results (result :scs (any-reg) :from (:argument 0)
-                    :load-if (not (and (sc-is number control-stack)
-                                       (sc-is result control-stack)
-                                       (location= number result)))))
+  (:results (result :scs (any-reg control-stack) :from (:argument 0)))
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 3
-    (move result number)
-    (move ecx amount)
-    ;; The result-type ensures us that this shift will not overflow.
-    (inst shl result :cl)))
+    (with-shift-operands
+     (move ecx amount)
+     ;; The result-type ensures us that this shift will not overflow.
+     (inst shl result :cl))))
 
 (define-vop (fast-ash-left/fixnum-unbounded=>fixnum
              fast-ash-left/fixnum=>fixnum)
@@ -771,105 +772,67 @@ constant shift greater than word length")))
 (define-vop (fast-ash-c/signed=>signed)
   (:translate ash)
   (:policy :fast-safe)
-  (:args (number :scs (signed-reg) :target result
-                 :load-if (not (and (sc-is number signed-stack)
-                                    (sc-is result signed-stack)
-                                    (location= number result)))))
+  (:args (number :scs (signed-reg signed-stack) :target result))
   (:info amount)
   (:arg-types signed-num (:constant integer))
-  (:results (result :scs (signed-reg)
-                    :load-if (not (and (sc-is number signed-stack)
-                                       (sc-is result signed-stack)
-                                       (location= number result)))))
+  (:results (result :scs (signed-reg signed-stack)))
   (:result-types signed-num)
   (:note "inline ASH")
   (:generator 3
-    (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (ea number number)))
-          ((and (= amount 2) (not (location= number result)))
-           (inst lea result (ea nil number 4)))
-          ((and (= amount 3) (not (location= number result)))
-           (inst lea result (ea nil number 8)))
+    (cond ((encodable-as-lea) (generate-lea))
           (t
-           (move result number)
-           (cond ((plusp amount) (inst shl result amount))
-                 (t (inst sar result (min 63 (- amount)))))))))
+           (with-shift-operands
+            (cond ((plusp amount) (inst shl result amount))
+                  (t (inst sar result (min 63 (- amount))))))))))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
   (:translate ash)
   (:policy :fast-safe)
-  (:args (number :scs (unsigned-reg) :target result
-                 :load-if (not (and (sc-is number unsigned-stack)
-                                    (sc-is result unsigned-stack)
-                                    (location= number result)))))
+  (:args (number :scs (unsigned-reg unsigned-stack) :target result))
   (:info amount)
   (:arg-types unsigned-num (:constant integer))
-  (:results (result :scs (unsigned-reg)
-                    :load-if (not (and (sc-is number unsigned-stack)
-                                       (sc-is result unsigned-stack)
-                                       (location= number result)))))
+  (:results (result :scs (unsigned-reg unsigned-stack)))
   (:result-types unsigned-num)
   (:note "inline ASH")
   (:generator 3
-    (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (ea number number)))
-          ((and (= amount 2) (not (location= number result)))
-           (inst lea result (ea nil number 4)))
-          ((and (= amount 3) (not (location= number result)))
-           (inst lea result (ea nil number 8)))
+    (cond ((= amount 0) (bug "shifting by 0"))
+          ((not (< -64 amount 64)) (zeroize result))
+          ((encodable-as-lea) (generate-lea))
           (t
-           (move result number)
-           (cond ((< -64 amount 64) ;; XXXX
-                  ;; this code is used both in ASH and ASH-MOD64, so
-                  ;; be careful
+           (with-shift-operands
                   (if (plusp amount)
                       (inst shl result amount)
-                      (inst shr result (- amount))))
-                 (t (if (sc-is result unsigned-reg)
-                        (zeroize result)
-                        (inst mov result 0))))))))
+                      (inst shr result (- amount))))))))
 
 (define-vop (fast-ash-left/signed=>signed)
   (:translate ash)
-  (:args (number :scs (signed-reg) :target result
-                 :load-if (not (and (sc-is number signed-stack)
-                                    (sc-is result signed-stack)
-                                    (location= number result))))
+  (:args (number :scs (signed-reg signed-stack) :target result)
          (amount :scs (unsigned-reg) :target ecx))
   (:arg-types signed-num positive-fixnum)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:results (result :scs (signed-reg) :from (:argument 0)
-                    :load-if (not (and (sc-is number signed-stack)
-                                       (sc-is result signed-stack)
-                                       (location= number result)))))
+  (:results (result :scs (signed-reg signed-stack) :from (:argument 0)))
   (:result-types signed-num)
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
-    (move result number)
-    (move ecx amount)
-    (inst shl result :cl)))
+    (with-shift-operands
+     (move ecx amount)
+     (inst shl result :cl))))
 
 (define-vop (fast-ash-left/unsigned=>unsigned)
   (:translate ash)
-  (:args (number :scs (unsigned-reg) :target result
-                 :load-if (not (and (sc-is number unsigned-stack)
-                                    (sc-is result unsigned-stack)
-                                    (location= number result))))
+  (:args (number :scs (unsigned-reg unsigned-stack) :target result)
          (amount :scs (unsigned-reg) :target ecx))
   (:arg-types unsigned-num positive-fixnum)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:results (result :scs (unsigned-reg) :from (:argument 0)
-                    :load-if (not (and (sc-is number unsigned-stack)
-                                       (sc-is result unsigned-stack)
-                                       (location= number result)))))
+  (:results (result :scs (unsigned-reg unsigned-stack) :from (:argument 0)))
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
-    (move result number)
-    (move ecx amount)
-    (inst shl result :cl)))
+    (with-shift-operands
+     (move ecx amount)
+     (inst shl result :cl))))
 
 (define-vop (fast-ash-left/unsigned-unbounded=>unsigned
              fast-ash-left/unsigned=>unsigned)
@@ -945,45 +908,46 @@ constant shift greater than word length")))
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
   (:policy :fast-safe)
-  (:args (number :scs (unsigned-reg) :target result)
+  (:args (number :scs (unsigned-reg unsigned-stack) :target result)
          (amount :scs (unsigned-reg) :target rcx))
   (:arg-types unsigned-num unsigned-num)
-  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:results (result :scs (unsigned-reg unsigned-stack) :from (:argument 0)))
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
-    (move result number)
-    (move rcx amount)
-    (inst shr result :cl)))
+    (with-shift-operands
+     (move rcx amount)
+     (inst shr result :cl))))
 
 (define-vop (fast-%ash/right/signed)
   (:translate %ash/right)
   (:policy :fast-safe)
-  (:args (number :scs (signed-reg) :target result)
+  (:args (number :scs (signed-reg signed-stack) :target result)
          (amount :scs (unsigned-reg) :target rcx))
   (:arg-types signed-num unsigned-num)
-  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:results (result :scs (signed-reg signed-stack) :from (:argument 0)))
   (:result-types signed-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
-    (move result number)
-    (move rcx amount)
-    (inst sar result :cl)))
+    (with-shift-operands
+     (move rcx amount)
+     (inst sar result :cl))))
 
 (define-vop (fast-%ash/right/fixnum)
   (:translate %ash/right)
   (:policy :fast-safe)
-  (:args (number :scs (any-reg) :target result)
+  (:args (number :scs (any-reg control-stack) :target result)
          (amount :scs (unsigned-reg) :target rcx))
   (:arg-types tagged-num unsigned-num)
-  (:results (result :scs (any-reg) :from (:argument 0)))
+  (:results (result :scs (any-reg control-stack) :from (:argument 0)))
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 3
-    (move result number)
-    (move rcx amount)
-    (inst sar result :cl)
-    (inst and result (lognot fixnum-tag-mask))))
+    (with-shift-operands
+     (move rcx amount)
+     (inst sar result :cl)
+     (inst and result (lognot fixnum-tag-mask)))))
+) ; end MACROLET
 
 (in-package "SB-C")
 
