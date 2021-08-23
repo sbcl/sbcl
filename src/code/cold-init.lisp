@@ -68,7 +68,8 @@
   (/show0 "entering !COLD-INIT")
   (!readtable-cold-init)
   (setq *print-length* 6 *print-level* 3)
-  (show-and-call sb-impl::!cold-stream-init)
+  (/show0 "cold-initializing streams")
+  (sb-impl::!cold-stream-init)
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   ;; This allows FORMAT to work, and can go as early needed for
   ;; debugging.
