@@ -192,22 +192,10 @@ variable: an unreadable object representing the error is printed instead.")
     (integer
      (multiple-value-bind (fun pretty)
          (and *print-pretty* (pprint-dispatch object))
-       (cond
-         (pretty
+       (if pretty
            (%with-output-to-string (stream)
               (sb-pretty::with-pretty-stream (stream)
-                (funcall fun stream object))))
-         ;; Positive integer strictly less than base, return a hardcoded
-         ;; read-only string.
-         ;; TODO: need two sets of strings, for *print-radix* = {T,NIL}
-         ((and (>= object 0)
-               (< object *print-base*)
-               (not *print-radix*))
-          (%make-lisp-obj
-           (sap-int (sap+ (foreign-symbol-sap "strings_for_digits" t)
-                          (+ (* 4 sb-vm:n-word-bytes (truly-the (mod 36) object))
-                             sb-vm:other-pointer-lowtag)))))
-         (t
+                (funcall fun stream object)))
            (let ((buffer-size (approx-chars-in-repr object)))
              (let* ((string (make-string buffer-size :element-type 'base-char))
                     (stream (%make-finite-base-string-output-stream string)))
@@ -215,7 +203,7 @@ variable: an unreadable object representing the error is printed instead.")
                (declare (truly-dynamic-extent stream))
                (output-integer object stream *print-base* *print-radix*)
                (%shrink-vector string
-                               (finite-base-string-output-stream-pointer stream))))))))
+                               (finite-base-string-output-stream-pointer stream)))))))
     ;; Could do something for other numeric types, symbols, ...
     (t
      (%with-output-to-string (stream)
