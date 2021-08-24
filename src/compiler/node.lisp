@@ -883,8 +883,9 @@
   (leaf-%source-name leaf))
 
 ;;; The CONSTANT structure is used to represent known constant values.
-;;; When compiling to a file, named named and anonymous constants with the
-;;; same value will not necessarily share the same leaf.
+;;; If NAME is not null, then it is the name of the named constant
+;;; which this leaf corresponds to, otherwise this is an anonymous
+;;; constant.
 (defstruct (constant (:constructor make-constant (value
                                                   &optional
                                                   (type (ctype-of value))
