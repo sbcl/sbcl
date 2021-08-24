@@ -123,7 +123,6 @@
 
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
 
-  (!cold-init-hash-table-methods)
   ;; And now *CURRENT-THREAD*
   (sb-thread::init-main-thread)
 

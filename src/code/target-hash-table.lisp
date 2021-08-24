@@ -1552,8 +1552,8 @@ nnnn 1_    any       linear scan
 ;;; because insertion can not co-occur with any other operation,
 ;;; unlike GETHASH which we allow to execute in multiple threads.
 (defmacro define-ht-setter (name std-fn)
-  `(named-lambda ,name (key table value &aux (hash-table (truly-the hash-table table))
-                                             (kv-vector (hash-table-pairs hash-table)))
+  `(defun ,name (key table value &aux (hash-table (truly-the hash-table table))
+                                      (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c:verify-arg-count 0)))
      (block done
        (let ((cache (hash-table-cache hash-table)))
@@ -1627,78 +1627,77 @@ nnnn 1_    any       linear scan
            (insert-at (hash-table-next-free-kv hash-table)
                       hash-table key hash address-based-p value))))))
 
-(defun get-puthash-definitions ()
-  (flet ((insert-at (index hash-table key hash address-based-p value)
-           (declare (optimize speed) (type index/2 index))
-           (when (zerop index)
-             (setq index (grow-hash-table hash-table))
-             ;; Growing the table can not make the key become found when it was not
-             ;; found before, so we can just proceed with insertion.
-             (aver (not (zerop index))))
-           ;; Grab the vectors AFTER possibly growing the table
-           (let ((kv-vector (hash-table-pairs hash-table))
-                 (next-vector (hash-table-next-vector hash-table)))
-             (setf (hash-table-next-free-kv hash-table)
-                   (let ((hwm (kv-vector-high-water-mark kv-vector))
-                         (cap (hash-table-pairs-capacity kv-vector)))
-                     (cond ((> index hwm) ; raise the high-water-mark
-                            (setf (kv-vector-high-water-mark kv-vector) index)
-                            ;; CPU must not buffer storing the new HWM versus the
-                            ;; stores of the K+V since they wouldn't be seen.
-                            (sb-thread:barrier (:write))
-                            (cond ((= index cap) 0)
-                                  (t (1+ index))))
-                           (t ; don't raise
-                            (let ((next (aref next-vector index)))
-                              (cond ((/= next 0) next)
-                                    ((= hwm cap) 0)
-                                    (t (1+ hwm))))))))
+(flet ((insert-at (index hash-table key hash address-based-p value)
+         (declare (optimize speed) (type index/2 index))
+         (when (zerop index)
+           (setq index (grow-hash-table hash-table))
+           ;; Growing the table can not make the key become found when it was not
+           ;; found before, so we can just proceed with insertion.
+           (aver (not (zerop index))))
+         ;; Grab the vectors AFTER possibly growing the table
+         (let ((kv-vector (hash-table-pairs hash-table))
+               (next-vector (hash-table-next-vector hash-table)))
+           (setf (hash-table-next-free-kv hash-table)
+                 (let ((hwm (kv-vector-high-water-mark kv-vector))
+                       (cap (hash-table-pairs-capacity kv-vector)))
+                   (cond ((> index hwm) ; raise the high-water-mark
+                          (setf (kv-vector-high-water-mark kv-vector) index)
+                          ;; CPU must not buffer storing the new HWM versus the
+                          ;; stores of the K+V since they wouldn't be seen.
+                          (sb-thread:barrier (:write))
+                          (cond ((= index cap) 0)
+                                (t (1+ index))))
+                         (t ; don't raise
+                          (let ((next (aref next-vector index)))
+                            (cond ((/= next 0) next)
+                                  ((= hwm cap) 0)
+                                  (t (1+ hwm))))))))
 
-             ;; We've potentially depended on the bits of the address of KEY
-             ;; before informing GC that we've done so, but the key is pinned,
-             ;; so as long as the table informs GC that it has the dependency
-             ;; by the time the key is free to move, all is well.
-             (when address-based-p
-               (logior-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
+           ;; We've potentially depended on the bits of the address of KEY
+           ;; before informing GC that we've done so, but the key is pinned,
+           ;; so as long as the table informs GC that it has the dependency
+           ;; by the time the key is free to move, all is well.
+           (when address-based-p
+             (logior-header-bits kv-vector sb-vm:vector-addr-hashing-flag))
 
-             ;; Store the hash unless an EQ table. Because the key is pinned, it is
-             ;; OK that GC would not have seen +magic-hash-vector-value+ for this
-             ;; key if applicable.
-             (awhen (hash-table-hash-vector hash-table)
-               (setf (aref it index)
-                     (if address-based-p +magic-hash-vector-value+ hash)))
+           ;; Store the hash unless an EQ table. Because the key is pinned, it is
+           ;; OK that GC would not have seen +magic-hash-vector-value+ for this
+           ;; key if applicable.
+           (awhen (hash-table-hash-vector hash-table)
+             (setf (aref it index)
+                   (if address-based-p +magic-hash-vector-value+ hash)))
 
-             ;; Store the pair
-             (let ((i (* 2 index)))
-               (setf (aref kv-vector i) key (aref kv-vector (1+ i)) value))
-             ;; Push this slot onto the front of the chain for its bucket.
-             (let* ((index-vector (hash-table-index-vector hash-table))
-                    (bucket (mask-hash hash (1- (length index-vector)))))
-               (setf (aref next-vector index) (aref index-vector bucket)
-                     (aref index-vector bucket) index)))
-           (incf (hash-table-%count hash-table))
-           value))
+           ;; Store the pair
+           (let ((i (* 2 index)))
+             (setf (aref kv-vector i) key (aref kv-vector (1+ i)) value))
+           ;; Push this slot onto the front of the chain for its bucket.
+           (let* ((index-vector (hash-table-index-vector hash-table))
+                  (bucket (mask-hash hash (1- (length index-vector)))))
+             (setf (aref next-vector index) (aref index-vector bucket)
+                   (aref index-vector bucket) index)))
+         (incf (hash-table-%count hash-table))
+         value))
 
-  (values (named-lambda puthash/weak (key hash-table value)
-            (declare (type hash-table hash-table) (optimize speed))
-            (with-weak-hash-table-entry
-                (declare (ignore predecessor))
-                (cond ((= physical-index 0)
-                       ;; There are two kinds of freelists. Prefer a smashed cell
-                       ;; so that we might shorten the chain it belonged to.
-                       (insert-at (or (hash-table-next-smashed-kv hash-table)
-                                      (hash-table-next-free-kv hash-table))
-                                  hash-table key hash address-sensitive-p value))
-                      ((or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
-                                                 probed-value value))
-                           (neq (svref kv-vector physical-index) probed-key))
-                       (signal-corrupt-hash-table hash-table))
-                      (t value))))
-          (define-ht-setter puthash/eq eq)
-          (define-ht-setter puthash/eql eql)
-          (define-ht-setter puthash/equal equal)
-          (define-ht-setter puthash/equalp equalp)
-          (define-ht-setter puthash/any nil))))
+  (defun puthash/weak (key hash-table value)
+    (declare (type hash-table hash-table) (optimize speed))
+    (with-weak-hash-table-entry
+      (declare (ignore predecessor))
+      (cond ((= physical-index 0)
+             ;; There are two kinds of freelists. Prefer a smashed cell
+             ;; so that we might shorten the chain it belonged to.
+             (insert-at (or (hash-table-next-smashed-kv hash-table)
+                            (hash-table-next-free-kv hash-table))
+                        hash-table key hash address-sensitive-p value))
+            ((or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
+                                       probed-value value))
+                 (neq (svref kv-vector physical-index) probed-key))
+             (signal-corrupt-hash-table hash-table))
+            (t value))))
+  (define-ht-setter puthash/eq eq)
+  (define-ht-setter puthash/eql eql)
+  (define-ht-setter puthash/equal equal)
+  (define-ht-setter puthash/equalp equalp)
+  (define-ht-setter puthash/any nil))
 
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
@@ -1711,7 +1710,7 @@ nnnn 1_    any       linear scan
   (funcall (hash-table-puthash-impl hash-table) key hash-table value))
 
 (defmacro define-remhash (name std-fn)
-  `(named-lambda ,name (key table &aux (hash-table (truly-the hash-table table))
+  `(defun ,name (key table &aux (hash-table (truly-the hash-table table))
                                        (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c:verify-arg-count 0)))
      ;; The cache provides no benefit to REMHASH. A hit would just mean there is work
@@ -1781,93 +1780,77 @@ nnnn 1_    any       linear scan
                 (decf (hash-table-%count hash-table))
                 t)))))
 
-(defun get-remhash-definitions ()
-  (labels ((clear-slot (index hash-table kv-vector next-vector)
-             (declare (type index/2 index))
-             ;; Mark slot as empty.
-             (let ((physindex (* 2 index)))
-               (setf (aref kv-vector physindex) +empty-ht-slot+
-                     (aref kv-vector (1+ physindex)) +empty-ht-slot+))
-             ;; Push KV slot onto free chain.
-             ;; Possible optimization: if we linked the free chain through
-             ;; the 'value' half of a pair, we could avoid rebuilding the
-             ;; free chain in %REHASH because rehashing won't affect it.
-             ;; (Maybe it already doesn't?)
-             (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
-                   (hash-table-next-free-kv hash-table) index)
-             ;; On parallel accesses this may turn out to be a
-             ;; type-error, so don't turn down the safety!
-             (decf (hash-table-%count hash-table))
-             t)
-           (remove-from-bucket (key bucket hash-table initial-stamp
-                                &aux (kv-vector (hash-table-pairs hash-table)))
-             ;; Remove KEY from BUCKET which is based on the current address
-             ;; of key after pinning.  When the key was not found initially,
-             ;; the "problem" so to speak was that the bucket that was searched
-             ;; did not hold the key, and not that search was done on the wrong
-             ;; bucket. Rehashing will place the key into the expected bucket.
-             ;;
-             ;; The current stamp must be the same as initial-stamp, because
-             ;; REMHASH is disallowed concurrently with any other operation,
-             ;; and the 'rehash' bit can't be cleared except by rehashing
-             ;; as part of such operation.
-             (unless (eq (kv-vector-rehash-stamp kv-vector) initial-stamp)
+(labels ((clear-slot (index hash-table kv-vector next-vector)
+           (declare (type index/2 index))
+           ;; Mark slot as empty.
+           (let ((physindex (* 2 index)))
+             (setf (aref kv-vector physindex) +empty-ht-slot+
+                   (aref kv-vector (1+ physindex)) +empty-ht-slot+))
+           ;; Push KV slot onto free chain.
+           ;; Possible optimization: if we linked the free chain through
+           ;; the 'value' half of a pair, we could avoid rebuilding the
+           ;; free chain in %REHASH because rehashing won't affect it.
+           ;; (Maybe it already doesn't?)
+           (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
+                 (hash-table-next-free-kv hash-table) index)
+           ;; On parallel accesses this may turn out to be a
+           ;; type-error, so don't turn down the safety!
+           (decf (hash-table-%count hash-table))
+           t)
+         (remove-from-bucket (key bucket hash-table initial-stamp
+                              &aux (kv-vector (hash-table-pairs hash-table)))
+           ;; Remove KEY from BUCKET which is based on the current address
+           ;; of key after pinning.  When the key was not found initially,
+           ;; the "problem" so to speak was that the bucket that was searched
+           ;; did not hold the key, and not that search was done on the wrong
+           ;; bucket. Rehashing will place the key into the expected bucket.
+           ;;
+           ;; The current stamp must be the same as initial-stamp, because
+           ;; REMHASH is disallowed concurrently with any other operation,
+           ;; and the 'rehash' bit can't be cleared except by rehashing
+           ;; as part of such operation.
+           (unless (eq (kv-vector-rehash-stamp kv-vector) initial-stamp)
+             (signal-corrupt-hash-table hash-table))
+           (let ((key-index (%rehash-and-find hash-table initial-stamp key)))
+             ;; If we see NIL here, it means that some other operation is racing
+             ;; to rehash. GETHASH can deal with that scenario, REMHASH can't.
+             (unless (fixnump key-index)
                (signal-corrupt-hash-table hash-table))
-             (let ((key-index (%rehash-and-find hash-table initial-stamp key)))
-               ;; If we see NIL here, it means that some other operation is racing
-               ;; to rehash. GETHASH can deal with that scenario, REMHASH can't.
-               (unless (fixnump key-index)
-                 (signal-corrupt-hash-table hash-table))
-               (when (/= key-index 0) ; found
-                 (let* ((index-vector (hash-table-index-vector hash-table))
-                        (start (aref index-vector bucket))
-                        (next-vector (hash-table-next-vector hash-table))
-                        (next (aref next-vector start))
-                        (pair-index (ash key-index -1)))
-                   (if (if (= start pair-index) ; remove head of chain
-                           (setf (aref index-vector bucket) next)
-                           (do ((probe-limit (length next-vector))
-                                (predecessor start this)
-                                (this next (aref next-vector this)))
-                               ((zerop this))
-                             (declare (type index/2 predecessor this))
-                             (when (eql this pair-index)
-                               (return (setf (aref next-vector predecessor)
-                                             (aref next-vector this))))
-                             (check-excessive-probes 1)))
-                       (clear-slot pair-index hash-table kv-vector next-vector)
-                       (signal-corrupt-hash-table hash-table))))))
-           (%remhash/eq (key hash-table kv-vector next-vector start)
-             (do ((probe-limit (length next-vector))
-                  (predecessor start this)
-                  (this (aref next-vector start) (aref next-vector this)))
-                 ((zerop this) nil)
-               (declare (type index/2 predecessor this))
-               (when (eq key (aref kv-vector (* 2 this)))
-                 (setf (aref next-vector predecessor) (aref next-vector this))
-                 (return (clear-slot this hash-table kv-vector next-vector)))
-               (check-excessive-probes 1))))
+             (when (/= key-index 0) ; found
+               (let* ((index-vector (hash-table-index-vector hash-table))
+                      (start (aref index-vector bucket))
+                      (next-vector (hash-table-next-vector hash-table))
+                      (next (aref next-vector start))
+                      (pair-index (ash key-index -1)))
+                 (if (if (= start pair-index) ; remove head of chain
+                         (setf (aref index-vector bucket) next)
+                         (do ((probe-limit (length next-vector))
+                              (predecessor start this)
+                              (this next (aref next-vector this)))
+                             ((zerop this))
+                           (declare (type index/2 predecessor this))
+                           (when (eql this pair-index)
+                             (return (setf (aref next-vector predecessor)
+                                           (aref next-vector this))))
+                           (check-excessive-probes 1)))
+                     (clear-slot pair-index hash-table kv-vector next-vector)
+                     (signal-corrupt-hash-table hash-table))))))
+         (%remhash/eq (key hash-table kv-vector next-vector start)
+           (do ((probe-limit (length next-vector))
+                (predecessor start this)
+                (this (aref next-vector start) (aref next-vector this)))
+               ((zerop this) nil)
+             (declare (type index/2 predecessor this))
+             (when (eq key (aref kv-vector (* 2 this)))
+               (setf (aref next-vector predecessor) (aref next-vector this))
+               (return (clear-slot this hash-table kv-vector next-vector)))
+             (check-excessive-probes 1))))
 
-    (values (define-remhash remhash/eq eq)
-            (define-remhash remhash/eql eql)
-            (define-remhash remhash/equal equal)
-            (define-remhash remhash/equalp equalp)
-            (define-remhash remhash/any nil))))
-
-(defun !cold-init-hash-table-methods ()
-  (multiple-value-bind (weak eq eql equal equalp any) (get-puthash-definitions)
-    (setf (symbol-function 'puthash/weak)   weak
-          (symbol-function 'puthash/eq)     eq
-          (symbol-function 'puthash/eql)    eql
-          (symbol-function 'puthash/equal)  equal
-          (symbol-function 'puthash/equalp) equalp
-          (symbol-function 'puthash/any)    any))
-  (multiple-value-bind (eq eql equal equalp any) (get-remhash-definitions)
-    (setf (symbol-function 'remhash/eq)     eq
-          (symbol-function 'remhash/eql)    eql
-          (symbol-function 'remhash/equal)  equal
-          (symbol-function 'remhash/equalp) equalp
-          (symbol-function 'remhash/any)    any)))
+  (values (define-remhash remhash/eq eq)
+          (define-remhash remhash/eql eql)
+          (define-remhash remhash/equal equal)
+          (define-remhash remhash/equalp equalp)
+          (define-remhash remhash/any nil)))
 
 (defun remhash (key hash-table)
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
