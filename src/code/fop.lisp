@@ -494,25 +494,13 @@
 (define-fop 18 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-;; This FOP is only encountered in cross-compiled files for cold-load.
+;; This FOP is only encountered in cross-compiled FASLs for cold load,
+;; and is a no-op except in cold load. A developer may want to load a
+;; cross-compiled FASL into a running system, and this FOP doesn't
+;; have to do anything, as the system can load top level forms and
+;; will define the function normally.
 (define-fop 74 :not-host (fop-fset (name fn) nil)
-  ;; Ordinary, not-for-cold-load code shouldn't need to mess with this
-  ;; at all, since it's only used as part of the conspiracy between
-  ;; the cross-compiler and GENESIS to statically link FDEFINITIONs
-  ;; for cold init.
-  (warn "~@<FOP-FSET seen in ordinary load (not cold load) -- quite
-strange! ~ If you didn't do something strange to cause this, please
-report it as a ~ bug.~:@>")
-  ;; Unlike CMU CL, we don't treat this as a no-op in ordinary code.
-  ;; If the user (or, more likely, developer) is trying to reload
-  ;; compiled-for-cold-load code into a warm SBCL, we'll do a warm
-  ;; assignment. (This is partly for abstract tidiness, since the warm
-  ;; assignment is the closest analogy to what happens at cold load,
-  ;; and partly because otherwise our compiled-for-cold-load code will
-  ;; fail, since in SBCL things like compiled-for-cold-load %DEFUN
-  ;; depend more strongly than in CMU CL on FOP-FSET actually doing
-  ;; something.)
-  (setf (fdefinition name) fn))
+  (declare (ignore name fn)))
 
 ;;; Modify a slot of the code boxed constants.
 (define-fop 19 (fop-alter-code ((:operands index) code value) nil)
