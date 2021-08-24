@@ -185,7 +185,7 @@
               ;; Certain known functions have a special way of checking
               ;; their fopcompilability in the cross-compiler.
               (or (member function '(sb-pcl::!trivial-defmethod))
-                  ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
+                  ;; allow DEFCONSTANT only if the value form is ok
                   (and (member function '(sb-impl::%defconstant))
                        (fopcompilable-p (third form))))))))
 ) ; end FLET
