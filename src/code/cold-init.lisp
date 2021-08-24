@@ -72,6 +72,7 @@
   (setq *print-readably* nil
         *print-escape* t
         *print-pretty* nil
+        *print-base* 10
         *print-radix* nil
         *print-vector-length* nil
         *print-circle* nil
@@ -90,6 +91,7 @@
   "Give the world a shove and hope it spins."
 
   (/show0 "entering !COLD-INIT")
+  #+sb-show (setq */show* t)
   (!readtable-cold-init)
   (/show0 "cold-initializing streams")
   (sb-impl::!cold-stream-init)
