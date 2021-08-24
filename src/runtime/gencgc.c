@@ -2726,23 +2726,6 @@ scavenge_newspace(generation_index_t generation)
     record_new_regions_below = 0;
     new_areas = NULL;
     new_areas_index = 0;
-
-#ifdef SC_NS_GEN_CK
-    {
-        page_index_t i;
-        /* Check that none of the write_protected pages in this generation
-         * have been written to. */
-        for (i = 0; i < page_table_pages; i++) {
-            if ((page_bytes_used(i) != 0)
-                && (page_table[i].gen == generation)
-                && (page_table[i].write_protected_cleared != 0)
-                && (page_table[i].pinned == 0)) {
-                lose("write protected page %d written to in scavenge_newspace\ngeneration=%d pin=%d",
-                     i, generation, page_table[i].pinned);
-            }
-        }
-    }
-#endif
 }
 
 /* Un-write-protect all the pages in from_space. This is done at the
