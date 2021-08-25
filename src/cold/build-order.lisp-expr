@@ -179,8 +179,6 @@
 
  ("src/code/misc" :c-headers)
 
- ("src/code/early-format")
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
  ;;; convenient to stick them here)
@@ -550,11 +548,6 @@
  #+unix ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
  #+win32 ("src/code/target-exception" :not-host)
  ("src/code/serve-event" :not-host)
- ;; Target-only stuff should usually be compiled late unless it has
- ;; compile-time side-effects. This file could probably be later,
- ;; but should certainly be no earlier than the definitions
- ;; of FORMAT-ERROR and FORMAT-DIRECTIVE.
- ("src/code/target-format" :not-host)
 
  ("src/code/late-extensions") ; needs condition system
  ("src/compiler/generic/target-core" :not-host) ; uses stuff from
@@ -633,7 +626,8 @@
  ;; other target-code-building stuff which can't be processed until
  ;; machinery like SB-XC:DEFMACRO exists
 
- ("src/code/late-format") ; needs SB-XC:DEFMACRO
+ ("src/code/format") ; needs SB-XC:DEFMACRO
+ ("src/code/target-format" :not-host)
 
  ("src/code/late-globaldb" :not-host)
  ("src/code/redblack" :not-host)
