@@ -45,7 +45,7 @@
 ;; Meta: there is no such function as READ-UNQUALIFIED-TOKEN. No biggie.
 (defconstant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
-(define-load-time-global *empty-extended-char-table* nil)
+(define-load-time-global *empty-extended-char-table* (make-hash-table :rehash-size 1 :test #'eq))
 
 (sb-xc:defstruct (readtable (:conc-name nil)
                             (:constructor make-readtable ())

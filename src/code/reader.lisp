@@ -20,26 +20,9 @@
 
 (defvar *readtable*)
 
-(defun gethash-return-default (key self default)
-  (declare (optimize (safety 0))
-           (ignore key self))
-  default)
 (defun !readtable-cold-init ()
-  (macrolet ((alloc-fake-hash-table ()
-               (let ((dd (find-defstruct-description 'hash-table)))
-                 (sb-kernel::instance-constructor-form
-                  dd
-                  (mapcar (lambda (dsd)
-                            (case (dsd-name dsd)
-                              (gethash-impl '#'gethash-return-default)
-                              (pairs (make-array (+ kv-pairs-overhead-slots 2)
-                                                 :initial-element 0))
-                              (rehash-size 1)
-                              (rehash-threshold $1.0)
-                              (t (dsd-default dsd))))
-                          (dd-slots dd))))))
-    (setq *empty-extended-char-table* (alloc-fake-hash-table)
-          *readtable* (make-readtable))))
+  (setq *empty-extended-char-table* (make-hash-table :rehash-size 1 :test #'eq)
+        *readtable* (make-readtable)))
 
 (setf (documentation '*readtable* 'variable)
       "Variable bound to current readtable.")
@@ -109,8 +92,6 @@
                        (extended-char-table readtable) table))
                (setf (gethash char table) (cons attributes function)))
               ((neq table *empty-extended-char-table*)
-               ;; can't REMHASH from *empty-extended-char-table*
-               ;; since it's not a real hash-table.
                (remhash char table)))))
   nil)
 
