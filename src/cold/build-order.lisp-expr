@@ -159,7 +159,6 @@
  ("src/code/sysmacs" :not-host)
  ("src/code/early-classoid" :c-headers)
 
- ("src/code/string-hash" :c-headers)
  ("src/compiler/generic/pinned-objects" :not-host)
  ("src/compiler/generic/layout-ids" :c-headers)
 
@@ -170,7 +169,6 @@
  #+sb-fasteval ("src/interpreter/function" :not-host)
 
  ("src/code/debug-var-io")
- ("src/code/target-error" :not-host)
 
  ("src/code/early-float")
 
@@ -200,6 +198,7 @@
  ("src/compiler/generic/objdef" :c-headers)
 
  ("src/compiler/generic/vm-array" :c-headers)
+ ("src/code/string-hash" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/code/specializable-array" :not-target)
 
@@ -269,9 +268,8 @@
 
  ("src/code/source-location")
  ("src/code/early-class")
- ("src/code/condition" :not-host)
- ("src/code/parse-defmacro-errors")
- ("src/code/format-directive")
+
+ ("src/code/target-error" :not-host)
 
  ("src/compiler/proclaim" :c-headers)
  ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
@@ -352,6 +350,8 @@
  ("src/code/deadline"  :not-host)
  ("src/code/toplevel"  :not-host)
  ("src/code/common-os" :not-host)
+
+ ("src/code/format-directive")
 
  ("src/code/host-c-call")
 
@@ -513,6 +513,7 @@
 
  ;; needed by various unhappy-path cases in the cross-compiler
  ("src/code/error")
+ ("src/code/parse-defmacro-errors")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; files which depend in some way (directly or indirectly) on stuff
