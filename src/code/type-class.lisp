@@ -984,7 +984,7 @@
            ;; It should always work to dispatch by class-id, but ALIEN-TYPE-TYPE
            ;; is a problem in the cross-compiler due to not having a type-class-id
            ;; when 'src/code/cross-type' is compiled. I briefly tried moving
-           ;; it later, but then class-init failed to compile.
+           ;; it later, but then type-init failed to compile.
            #+sb-xc-host
            (etypecase type ,@clauses)
            #-sb-xc-host

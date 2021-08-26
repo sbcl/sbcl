@@ -1,10 +1,10 @@
 ;;;; When this file's top level forms are run, it precomputes the
 ;;;; translations for commonly used type specifiers. This stuff is
 ;;;; split off from the other type stuff to get around problems with
-;;;; everything needing to be loaded before everything else. This
-;;;; stuff is also somewhat implementation-dependent in that
-;;;; implementations may want to precompute other types which are
-;;;; important to them.
+;;;; everything needing to be loaded before everything else. This file
+;;;; is the first to exercise the type machinery. This stuff is also
+;;;; somewhat implementation-dependent in that implementations may
+;;;; want to precompute other types which are important to them.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -16,6 +16,21 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
+
+;;; built-in classes
+(/show0 "beginning type-init.lisp")
+#+sb-xc-host
+(dolist (x *builtin-classoids*)
+  (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)
+      x
+    (/show "doing class with" name)
+    (when trans-p
+      (let ((classoid (classoid-cell-classoid (find-classoid-cell name :create t)))
+            (type (specifier-type translation)))
+        (when (typep (built-in-classoid-translation classoid) 'ctype)
+          (aver (eq (built-in-classoid-translation classoid) type)))
+        (setf (built-in-classoid-translation classoid) type)
+        (setf (info :type :builtin name) type)))))
 
 ;;; the Common Lisp defined type spec symbols
 (defconstant-eqx +!standard-type-names+

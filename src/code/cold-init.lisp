@@ -41,7 +41,7 @@
 
 ;;; a list of toplevel things set by GENESIS
 (defvar *!cold-toplevels*)
-(defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs and DEFPARAMETERs
+(defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)

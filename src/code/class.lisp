@@ -1242,7 +1242,7 @@ between the ~A definition and the ~A definition"
  (setq *builtin-classoids* '#.(compute-builtin-classoids)))
 (eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* t))
 
-;;; See also src/code/class-init.lisp where we finish setting up the
+;;; See also src/code/type-init.lisp where we finish setting up the
 ;;; translations for built-in types.
 (!cold-init-forms
  (dolist (x *builtin-classoids*)
