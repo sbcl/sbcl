@@ -229,8 +229,8 @@
  ("src/compiler/{arch}/vm" :c-headers)
 
  ("src/code/alieneval" :c-headers)
- ;; "src/code/toplevel.lisp" is the first to need this. It's generated
- ;; automatically by grovel_headers.c, i.e. it's not under source control.
+ ;; This is generated automatically by grovel_headers.c, i.e. it's not
+ ;; under source control.
  ("output/stuff-groveled-from-headers" :not-host)
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)
