@@ -1846,11 +1846,11 @@ nnnn 1_    any       linear scan
                (return (clear-slot this hash-table kv-vector next-vector)))
              (check-excessive-probes 1))))
 
-  (values (define-remhash remhash/eq eq)
-          (define-remhash remhash/eql eql)
-          (define-remhash remhash/equal equal)
-          (define-remhash remhash/equalp equalp)
-          (define-remhash remhash/any nil)))
+  (define-remhash remhash/eq eq)
+  (define-remhash remhash/eql eql)
+  (define-remhash remhash/equal equal)
+  (define-remhash remhash/equalp equalp)
+  (define-remhash remhash/any nil))
 
 (defun remhash (key hash-table)
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
