@@ -120,9 +120,6 @@
  ("src/code/parse-body" :c-headers)       ; on host for PARSE-BODY
  ("src/compiler/policy" :c-headers)
  #+sb-fasteval ("src/interpreter/basic-env")
- ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
- ;; condition subtypes as soon as possible
- ("src/code/condition-boot" :not-host)
 
  ("src/code/early-extensions" :c-headers) ; on host for COLLECT, SYMBOLICATE, etc.
 
@@ -136,8 +133,6 @@
  ("src/code/early-print" :not-host)
  ("src/code/early-pprint" :not-host)
  ("src/code/early-impl" :not-host)
-
- ("src/code/target-extensions" :not-host)
 
  ;; Needed before the first use of WITH-SINGLE-PACKAGE-LOCKED-ERROR.
  ("src/code/early-package" :not-host)
@@ -178,6 +173,9 @@
  ("src/code/early-time" :c-headers)
 
  ("src/code/misc" :c-headers)
+ ("src/code/early-defclass")
+ ("src/code/target-error" :not-host)
+ ("src/code/target-extensions" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
@@ -265,9 +263,6 @@
  ("src/code/debug-info" :c-headers)
 
  ("src/code/source-location")
- ("src/code/early-class")
-
- ("src/code/target-error" :not-host)
 
  ("src/compiler/proclaim" :c-headers)
  ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
@@ -346,7 +341,6 @@
  ("src/code/stream"          :not-host)
  ("src/code/load")
  ("src/code/deadline"  :not-host)
- ("src/code/toplevel"  :not-host)
  ("src/code/common-os" :not-host)
 
  ("src/code/format-directive")
@@ -557,6 +551,7 @@
  #+metaspace ("src/code/metaspace" :not-host)
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
+ ("src/code/toplevel"          :not-host)
  ("src/code/time"              :not-host)
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and

@@ -1,5 +1,3 @@
-;;;; Early support routines for class-related things (including conditions).
-
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
@@ -74,50 +72,3 @@
    'class name
    (lambda ()
      (%%compiler-defclass name readers writers slots))))
-
-;;; This used to be in an (EVAL-WHEN (:COMPILE-TOPLEVEL ...))
-;;; which no longer works, because at run-the-xc-time the
-;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR macro doesn't work yet,
-;;; so just use the definition that was loaded from the fasl
-;;; when the cross-compiler was compiled.
-(defun %%compiler-define-condition (name direct-supers layout readers writers)
-  (declare (notinline find-classoid))
-  (preinform-compiler-about-class-type name nil)
-  (preinform-compiler-about-accessors 'condition readers writers)
-  (multiple-value-bind (class old-layout)
-      (insured-find-classoid name
-                             #'condition-classoid-p
-                             #'make-condition-classoid)
-    (setf (wrapper-classoid layout) class)
-    (setf (classoid-direct-superclasses class)
-          (mapcar #'find-classoid direct-supers))
-    (cond ((not old-layout)
-           (register-layout layout))
-          ((not *type-system-initialized*)
-           (setf (wrapper-classoid old-layout) class)
-           (setq layout old-layout)
-           (unless (eq (classoid-wrapper class) layout)
-             (register-layout layout)))
-          ((warn-if-altered-layout  "current"
-                                    old-layout
-                                    "new"
-                                    (wrapper-length layout)
-                                    (wrapper-inherits layout)
-                                    (wrapper-depthoid layout)
-                                    (wrapper-bitmap layout))
-           (register-layout layout :invalidate t))
-          ((not (classoid-wrapper class))
-           (register-layout layout)))
-
-    (setf (find-classoid name) class)
-
-    ;; Initialize CPL slot.
-    (setf (condition-classoid-cpl class)
-          (remove-if-not #'condition-classoid-p
-                         (std-compute-class-precedence-list class)))))
-
-(defun %compiler-define-condition (name direct-supers layout readers writers)
-  (call-with-defining-class
-   'condition name
-   (lambda ()
-     (%%compiler-define-condition name direct-supers layout readers writers))))

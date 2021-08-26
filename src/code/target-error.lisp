@@ -12,6 +12,8 @@
 
 (in-package "SB-KERNEL")
 
+(declaim (global *type-system-initialized*))
+
 (defun decode-internal-error-args (sap trap-number &optional error-number)
   (let ((error-number (cond (error-number)
                             ((>= trap-number sb-vm:error-trap)
@@ -222,6 +224,17 @@ with that condition (or with no condition) will be returned."
 
 ;;;; Conditions.
 
+(!defstruct-with-alternate-metaclass condition
+  :slot-names (assigned-slots)
+  :constructor nil
+  :superclass-name t
+  :metaclass-name condition-classoid
+  :metaclass-constructor make-condition-classoid
+  :dd-type structure)
+
+;;; Needed for !CALL-A-METHOD to pick out CONDITIONs
+(defun !condition-p (x) (typep x 'condition))
+
 (defstruct (condition-slot (:copier nil))
   (name (missing-arg) :type symbol)
   ;; list of all applicable initargs
@@ -289,34 +302,6 @@ with that condition (or with no condition) will be returned."
 
 ) ; EVAL-WHEN
 
-
-;;;; Condition reporting:
-
-;;; FIXME: ANSI's definition of DEFINE-CONDITION says
-;;;   Condition reporting is mediated through the PRINT-OBJECT method
-;;;   for the condition type in question, with *PRINT-ESCAPE* always
-;;;   being nil. Specifying (:REPORT REPORT-NAME) in the definition of
-;;;   a condition type C is equivalent to:
-;;;     (defmethod print-object ((x c) stream)
-;;;       (if *print-escape* (call-next-method) (report-name x stream)))
-;;; The current code doesn't seem to quite match that.
-(defmethod print-object ((object condition) stream)
-  (cond
-    ((not *print-escape*)
-     ;; KLUDGE: A comment from CMU CL here said
-     ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
-     ;;   superclasses in define-condition call!
-     (funcall (or (some #'condition-classoid-report
-                        (condition-classoid-cpl (classoid-of object)))
-                  (error "no REPORT? shouldn't happen!"))
-              object stream))
-    ((and (typep object 'simple-condition)
-          (condition-slot-value object 'format-control))
-     (print-unreadable-object (object stream :type t :identity t)
-       (write (simple-condition-format-control object)
-              :stream stream :lines 1)))
-    (t
-     (print-unreadable-object (object stream :type t :identity t)))))
 
 ;;;; slots of CONDITION objects
 
@@ -560,6 +545,50 @@ with that condition (or with no condition) will be returned."
            (set-condition-slot-value condition new-value slot-name))
          t
          `(condition-slot-writer ,name))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun %%compiler-define-condition (name direct-supers layout readers writers)
+  (declare (notinline find-classoid))
+  (preinform-compiler-about-class-type name nil)
+  (preinform-compiler-about-accessors 'condition readers writers)
+  (multiple-value-bind (class old-layout)
+      (insured-find-classoid name
+                             #'condition-classoid-p
+                             #'make-condition-classoid)
+    (setf (wrapper-classoid layout) class)
+    (setf (classoid-direct-superclasses class)
+          (mapcar #'find-classoid direct-supers))
+    (cond ((not old-layout)
+           (register-layout layout))
+          ((not *type-system-initialized*)
+           (setf (wrapper-classoid old-layout) class)
+           (setq layout old-layout)
+           (unless (eq (classoid-wrapper class) layout)
+             (register-layout layout)))
+          ((warn-if-altered-layout  "current"
+                                    old-layout
+                                    "new"
+                                    (wrapper-length layout)
+                                    (wrapper-inherits layout)
+                                    (wrapper-depthoid layout)
+                                    (wrapper-bitmap layout))
+           (register-layout layout :invalidate t))
+          ((not (classoid-wrapper class))
+           (register-layout layout)))
+
+    (setf (find-classoid name) class)
+
+    ;; Initialize CPL slot.
+    (setf (condition-classoid-cpl class)
+          (remove-if-not #'condition-classoid-p
+                         (std-compute-class-precedence-list class)))))
+
+(defun %compiler-define-condition (name direct-supers layout readers writers)
+  (call-with-defining-class
+   'condition name
+   (lambda ()
+     (%%compiler-define-condition name direct-supers layout readers writers))))
+) ; EVAL-WHEN
 
 (defun %define-condition (name parent-types layout slots
                           direct-default-initargs all-readers all-writers
@@ -2356,6 +2385,36 @@ you did not expect to see this message, please report it."
    (lambda (condition stream)
      (format stream "Interactive interrupt at #x~X."
              (system-condition-address condition)))))
+
+
+;;;; Condition reporting:
+
+;;; FIXME: ANSI's definition of DEFINE-CONDITION says
+;;;   Condition reporting is mediated through the PRINT-OBJECT method
+;;;   for the condition type in question, with *PRINT-ESCAPE* always
+;;;   being nil. Specifying (:REPORT REPORT-NAME) in the definition of
+;;;   a condition type C is equivalent to:
+;;;     (defmethod print-object ((x c) stream)
+;;;       (if *print-escape* (call-next-method) (report-name x stream)))
+;;; The current code doesn't seem to quite match that.
+(defmethod print-object ((object condition) stream)
+  (declare (notinline classoid-of)) ; to avoid can't inline warning. speed irrelevant here
+  (cond
+    ((not *print-escape*)
+     ;; KLUDGE: A comment from CMU CL here said
+     ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
+     ;;   superclasses in define-condition call!
+     (funcall (or (some #'condition-classoid-report
+                        (condition-classoid-cpl (classoid-of object)))
+                  (error "no REPORT? shouldn't happen!"))
+              object stream))
+    ((and (typep object 'simple-condition)
+          (condition-slot-value object 'format-control))
+     (print-unreadable-object (object stream :type t :identity t)
+       (write (simple-condition-format-control object)
+              :stream stream :lines 1)))
+    (t
+     (print-unreadable-object (object stream :type t :identity t)))))
 
 
 (defun assert-error (assertion &rest rest)
