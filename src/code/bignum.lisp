@@ -509,7 +509,7 @@
   (flet ((@ (obj index)
            `(sap+ (sap+ (int-sap (get-lisp-obj-address ,obj)) (ash ,index sb-vm:word-shift))
                   (- (ash sb-vm:bignum-digits-offset sb-vm:word-shift)
-                     sb-vm:lowtag-mask))))
+                     sb-vm:other-pointer-lowtag))))
     `(let ((count ,(if (and (eql start1 0) (eql start2 0))
                        `(min ,end1 ,end2)
                        `(min (- ,end1 ,start1) (- ,end2 ,start2)))))
