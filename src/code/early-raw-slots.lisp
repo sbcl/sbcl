@@ -68,7 +68,7 @@
   #-sb-xc-host (comparator (missing-arg) :type function :read-only t)
   ;; the type specifier, which must specify a numeric type.
   (raw-type (missing-arg) :type symbol :read-only t)
-  (init-vop (missing-arg) :type symbol :read-only t)
+  (init-vop (missing-arg) :type symbol :read-only t) ; FIXME: remove
   ;; How many words are each value of this type?
   (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
   ;; Necessary alignment in units of words.  Note that instances
