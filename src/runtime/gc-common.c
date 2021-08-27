@@ -942,7 +942,7 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 #define SPECIALIZED_VECTOR_PAGE_FLAG UNBOXED_PAGE_FLAG
 #endif
 
-static inline void check_shadow_bits(lispobj* v) {
+static inline void check_shadow_bits(__attribute((unused)) lispobj* v) {
 #ifdef LISP_FEATURE_UBSAN
     if (is_lisp_pointer(v[1])) {
         scavenge(v + 1, 1); // shadow bits
