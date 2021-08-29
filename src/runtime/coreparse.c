@@ -723,10 +723,6 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
     };
 
-#ifdef LISP_FEATURE_DARWIN_JIT
-    static_code_space_free_pointer = (lispobj *)STATIC_CODE_SPACE_START;
-#endif
-
 #if ELFCORE
     if (&lisp_code_start) {
         VARYOBJ_SPACE_START = (uword_t)&lisp_code_start;
@@ -985,6 +981,10 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space
+#endif
+#ifdef LISP_FEATURE_DARWIN_JIT
+    if (!static_code_space_free_pointer)
+        static_code_space_free_pointer = (lispobj *)STATIC_CODE_SPACE_START;
 #endif
 }
 
