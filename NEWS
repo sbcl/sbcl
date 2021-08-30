@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.7:
+changes in sbcl-2.1.8 relative to sbcl-2.1.7:
   * minor incompatible change: the experimental DEFINE-CAS-EXPANDER macro has
     been removed.
   * minor incompatible change: the hooks in *INIT-HOOKS* are called before
