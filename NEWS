@@ -1,5 +1,29 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.7:
+  * minor incompatible change: the experimental DEFINE-CAS-EXPANDER macro has
+    been removed.
+  * minor incompatible change: the hooks in *INIT-HOOKS* are called before
+    starting the finalizer or other non-user threads.  (thanks to Sean Whitton)
+  * platform support:
+    ** many improvements to code generation on arm64.
+    ** avoid slow forms of the bit test instructions BT, BTS, BTR on x86-64.
+    ** fix a bug in loading large core files on the Apple M1/arm64.  (thanks
+       to Mayank Manjrekar)
+    ** fix a bug in loading core loading on the Apple M1/arm64.  (reported by
+       Eric Timmons)
+  * enhancement: the block-compiler is more robust to files with intermingled
+    compile-time and load-time effects.  The semantics of the block-compiler
+    remain not-entirely ANSI compatible.  (thanks to Sean Maher)
+  * enhancement: (CAS SAP-REF-<x>) and CAS on alien integers is implemented on
+    ppc64 and x86-64, working towards fixing lp#1894057
+  * bug fix: fix OPEN-STREAM-P on streams closed by saving a core.
+    (lp#1938433, reported by Guillaume LE VAILLANT)
+  * bug fix: remove a spurious warning from COERCE.  (lp#1920931, reported by
+    Andrew Berkley)
+  * bug fix: remove a warning from inlining SET-EXCLUSIVE-OR.  (lp#1936470,
+    reported by Jerome Abela)
+
 changes in sbcl-2.1.7 relative to sbcl-2.1.6:
   * incompatible change: on certain platforms (currently just x86-64),
     dynamic-extent arrays specialized on character and numeric types and
