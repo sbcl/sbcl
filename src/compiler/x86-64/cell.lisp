@@ -68,35 +68,15 @@
              (invoke-asm-routine 'call 'touch-gc-card vop)
              (gen-cell-set (object-slot-ea object offset lowtag) value)))
           #+ubsan
-          ((equal name '(setf %array-fill-pointer)) ; half-sized slot
+          ((and (eql offset sb-vm:array-fill-pointer-slot) ; half-sized slot
+                (or (eq name 'make-array)
+                    (equal name '(setf %array-fill-pointer))))
+           (when (eq name 'make-array) ; nullify the creating PC location
+             (inst mov :qword (object-slot-ea object 1 lowtag) nil-value))
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
            (gen-cell-set (object-slot-ea object offset lowtag) value)))))
-
-;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
-(define-vop (init-slot set-slot)
-  (:info name dx-p offset lowtag)
-  (:generator 1
-    (progn name dx-p)
-    (cond #+compact-instance-header
-          ((and (eq name '%make-structure-instance) (eql offset :layout))
-        ;; The layout is in the upper half of the header word.
-           (inst mov :dword (ea (- 4 instance-pointer-lowtag) object)
-                 (if (sc-is value immediate)
-                     (make-fixup (tn-value value) :layout)
-                     value)))
-          #+ubsan
-          ((and (eq name 'make-array) (eql offset sb-vm:array-fill-pointer-slot))
-           (inst mov :qword (object-slot-ea object 1 lowtag) nil-value)
-           (inst mov :dword (vector-len-ea object)
-                 (or (encode-value-if-immediate value) value)))
-          ((sc-is value immediate)
-           (move-immediate (ea (- (* offset n-word-bytes) lowtag) object)
-                           (encode-value-if-immediate value)
-                           temp-reg-tn (not dx-p)))
-          (t
-           (storew value object offset lowtag))))) ; Else, value not immediate.
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)

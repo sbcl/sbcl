@@ -47,12 +47,6 @@
           (t
            (storew (encode-value-if-immediate value) object offset lowtag)))))
 
-(define-vop (init-slot set-slot)
-  (:info name dx-p offset lowtag)
-  (:generator 1
-    (storew (encode-value-if-immediate value) object offset lowtag))
-  (:ignore name dx-p))
-
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
          (old :scs (descriptor-reg any-reg) :target eax)

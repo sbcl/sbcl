@@ -89,12 +89,6 @@
              (slot (cdr init)))
          (case kind
            (:slot
-            ;; FIXME: the only reason INIT-SLOT raw variants exist is to avoid
-            ;; an extra MOVE - setters return a value, but INITers don't.
-            ;; It would probably produce better code by not assuming that
-            ;; setters return a value, because as things are, if you call
-            ;; 8 setters in a row, then you probably produce 7 extraneous moves,
-            ;; because not all of them can deliver a value to the final result.
             (let ((raw-type (pop slot))
                   (arg (pop args)))
               (unless (and (or (eq raw-type t)
@@ -105,8 +99,8 @@
                       ((make-case (&aux (rsd-list sb-kernel::*raw-slot-data*))
                          `(ecase raw-type
                             ((t)
-                             (vop init-slot node block object arg-tn
-                                  name dx-p (+ sb-vm:instance-slots-offset slot) lowtag))
+                             (vop set-slot node block object arg-tn
+                                  name (+ sb-vm:instance-slots-offset slot) lowtag))
                             ,@(map 'list
                                (lambda (rsd)
                                  `(,(sb-kernel::raw-slot-data-raw-type rsd)
@@ -114,18 +108,18 @@
                                         node block object (emit-constant slot) arg-tn)))
                                rsd-list))))
                     (make-case))))))
+           ;; compact header passes the layout to EMIT-FIXED-ALLOC
+           ;; which generates the instruction to set the header.
+           #-compact-instance-header
            (:dd
-            (vop init-slot node block object
+            (vop set-slot node block object
                  (emit-constant (sb-kernel::dd-layout-or-lose slot))
-                 name dx-p
-                 ;; Layout has no index if compact headers.
-                 (or #+compact-instance-header :layout sb-vm:instance-slots-offset)
-                 lowtag))
+                 name sb-vm:instance-slots-offset lowtag))
            (otherwise
             (if (and (eq kind :arg)
                      (zero-init-p (car args)))
                 (pop args)
-                (vop init-slot node block object
+                (vop set-slot node block object
                      (ecase kind
                        (:arg
                         (aver args)
@@ -152,7 +146,7 @@
                                              nil sb-vm:any-reg-sc-number)))
                                     (vop make-funcallable-instance-tramp node block tn)
                                     tn)))))
-                     name dx-p slot lowtag))))))))
+                     name slot lowtag))))))))
   (unless (null args)
     (bug "Leftover args: ~S" args)))
 
