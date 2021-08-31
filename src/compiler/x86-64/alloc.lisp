@@ -45,7 +45,7 @@
               (flet ((used-p (tn)
                        (do ((tn tn (sb-c::tn-next tn)))
                            ((null tn))
-                         (when (sc-is tn avx2-reg
+                         (when (sc-is tn ymm-reg
                                       int-avx2-reg
                                       double-avx2-reg single-avx2-reg)
                            (return-from avx-registers-used-p

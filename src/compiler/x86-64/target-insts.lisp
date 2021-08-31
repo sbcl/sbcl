@@ -171,7 +171,7 @@
   (princ16 value stream))
 
 (defun print-xmmreg (value stream dstate)
-  (let* ((reg (get-fpr
+  (let* ((reg (get-fpr :xmm
                            ;; FIXME: why are we seeing a value from the GPR
                            ;; prefilter instead of XMM prefilter here sometimes?
                            (etypecase value
@@ -233,7 +233,7 @@
       (cond ((= mod #b11) ; register direct mode
              (case regclass
               (gpr (get-gpr :qword full-reg)) ; size is not really known here
-              (fpr (get-fpr full-reg))))
+              (fpr (get-fpr :xmm full-reg))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
                     (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))

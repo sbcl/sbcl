@@ -15,9 +15,7 @@
   (let* ((offset (etypecase value
                   ((unsigned-byte 4) value)
                   (reg (reg-num value))))
-         (reg (if (dstate-getprop dstate +vex-l+)
-                                (get-avx2 offset)
-                                (get-fpr offset)))
+         (reg (get-fpr (if (dstate-getprop dstate +vex-l+) :ymm :xmm) offset))
          (name (reg-name reg)))
     (if stream
         (write-string name stream)

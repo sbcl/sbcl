@@ -5,32 +5,32 @@
 
 (in-package "SB-VM")
 
-(macrolet ((do-fprs (operation fpr-size)
-             (multiple-value-bind (mnemonic fpr-align getter)
-                 (ecase fpr-size
-                   (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
-                   (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
+(macrolet ((do-fprs (operation regset)
+             (multiple-value-bind (mnemonic fpr-align)
+                 (ecase regset
+                   (:xmm (values 'movaps 16))
+                   (:ymm (values 'vmovaps 32)))
                `(progn
                   ,@(loop for regno below 16
                        collect
                          (ecase operation
                            (push
                             `(inst ,mnemonic (ea ,(+ 8 (* regno fpr-align)) rsp-tn)
-                                   (,getter ,regno)))
+                                   (sb-x86-64-asm::get-fpr ,regset ,regno)))
                            (pop
-                            `(inst ,mnemonic (,getter ,regno)
+                            `(inst ,mnemonic (sb-x86-64-asm::get-fpr ,regset ,regno)
                                    (ea ,(+ 8 (* regno fpr-align)) rsp-tn)))))))))
   ;; Caller will have allocated 512 bytes above the stack-pointer
   ;; prior to the CALL. Use that as the save area.
-  (define-assembly-routine (save-ymm) () (do-fprs push ymm))
-  (define-assembly-routine (restore-ymm) () (do-fprs pop ymm))
+  (define-assembly-routine (save-ymm) () (do-fprs push :ymm))
+  (define-assembly-routine (restore-ymm) () (do-fprs pop :ymm))
   ;; As above, but only 256 bytes of the save area are needed, the rest goes to waste.
   (define-assembly-routine (save-xmm (:export fpr-save)) ()
     fpr-save ; KLUDGE: this is element 4 of the entry point vector
-    (do-fprs push xmm))
+    (do-fprs push :xmm))
   (define-assembly-routine (restore-xmm (:export fpr-restore)) ()
     fpr-restore ; KLUDGE: this is element 6 of the entry point vector
-    (do-fprs pop xmm)))
+    (do-fprs pop :xmm)))
 
 ;;; It is arbitrary whether each of the next 4 routines is named ALLOC-something,
 ;;; exporting an additional entry named CONS-something, versus being named CONS-something

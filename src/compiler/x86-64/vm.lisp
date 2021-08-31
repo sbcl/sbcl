@@ -274,9 +274,9 @@
                   :constant-scs (single-sse-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
-  #+avx2
-  (avx2-reg float-registers
-   :locations #.*float-regs*)
+  (ymm-reg float-registers :locations #.*float-regs*)
+  ;; These next 3 should probably be named to YMM-{INT,SINGLE,DOUBLE}-REG
+  ;; but I think there are 3rd-party libraries that expect these names.
   #+sb-simd-pack-256
   (int-avx2-reg float-registers
                :locations #.*float-regs*
@@ -315,7 +315,7 @@
 (defparameter *oword-sc-names* '(sse-reg int-sse-reg single-sse-reg double-sse-reg
                                  int-sse-stack single-sse-stack double-sse-stack))
 #+sb-simd-pack-256
-(defparameter *hword-sc-names* '(avx2-reg int-avx2-reg single-avx2-reg double-avx2-reg
+(defparameter *hword-sc-names* '(ymm-reg int-avx2-reg single-avx2-reg double-avx2-reg
                                    int-avx2-stack single-avx2-stack double-avx2-stack))
 ) ; EVAL-WHEN
 (!define-storage-classes

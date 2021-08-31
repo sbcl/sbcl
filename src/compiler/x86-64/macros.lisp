@@ -36,7 +36,7 @@
        (aver (xmm-tn-p src))
        (inst movaps dst src))
       #+sb-simd-pack-256
-      ((int-avx2-reg avx2-reg)
+      ((ymm-reg int-avx2-reg)
        (aver (xmm-tn-p src))
        (inst vmovdqa dst src))
       #+sb-simd-pack-256

@@ -25,7 +25,7 @@
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
-            #+avx2 sb-vm::avx2-reg
+            sb-vm::ymm-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 (defconstant +lock-prefix-present+ #x80)
@@ -1150,19 +1150,19 @@
 ;;; set defined by the AMD64 architecture, and indices 20, 21, 22, 23 are
 ;;; for the legacy high byte registers AH,CH,DH,BH respectively.
 ;;; (indices 16 through 19 are unused)
-(defun !make-gpr-id (size index)
+(defun make-gpr-id (size index)
   (logior (ash (if (eq size :byte) (the (mod 24) index) (the (mod 16) index)) 3)
           (ash (or (position size #(:qword :dword :word :byte))
                    (error "Bad register size ~s" size))
                1)))
 
-(defun !make-fpr-id (index)
+(defun make-fpr-id (index size)
   (declare (type (mod 16) index))
-  (logior (ash index 3) 1)) ; low bit = FPR, not GPR
-
-(defun !make-avx2-id (index)
-  (declare (type (mod 16) index))
-  (logior (ash index 3) 3))
+  (ecase size
+    (:xmm (logior (ash index 3) 1)) ; low bit = FPR, not GPR
+    (:ymm (logior (ash index 3) 3))))
+(defun is-ymm-id-p (reg-id)
+  (= (ldb (byte 3 0) reg-id) 3))
 
 (declaim (inline is-gpr-id-p gpr-id-size-class reg-id-num))
 (defun is-gpr-id-p (reg-id)
@@ -1201,8 +1201,7 @@
                                   sb-vm::+byte-register-names+)
                           t)
                          (gpr-id-size-class id)))
-                 #+avx2
-                 ((is-avx2-id-p id)
+                 ((is-ymm-id-p id)
                   #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
                             'vector))
                  (t
@@ -1234,11 +1233,11 @@
 (defun get-gpr (size number)
   (svref (load-time-value
           (coerce (append
-                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :qword i)))
-                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :dword i)))
-                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :word i)))
+                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :qword i)))
+                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :dword i)))
+                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :word i)))
                    ;; byte reg vector is #(AL CL ... R15B AH CH DH BH)
-                   (loop for i from 0 below 20 collect (!make-reg (!make-gpr-id :byte i))))
+                   (loop for i from 0 below 20 collect (!make-reg (make-gpr-id :byte i))))
                   'vector)
           t)
          (+ (if (eq size :byte) (the (mod 20) number) (the (mod 16) number))
@@ -1248,13 +1247,22 @@
               (:word  32)
               (:byte  48)))))
 
-(defun get-fpr (number)
-  (svref (load-time-value
-          (coerce (loop for i from 0 below 16
-                        collect (!make-reg (!make-fpr-id i)))
-                  'vector)
-          t)
-         number))
+(defun get-fpr (regset number)
+  (ecase regset
+    (:xmm
+     (svref (load-time-value
+             (coerce (loop for i from 0 below 16
+                        collect (!make-reg (make-fpr-id i :xmm)))
+                     'vector)
+             t)
+            number))
+    (:ymm
+     (svref (load-time-value
+             (coerce (loop for i from 0 below 16
+                        collect (!make-reg (make-fpr-id i :ymm)))
+                     'vector)
+             t)
+            number))))
 
 ;;; Given a TN which maps to a GPR, return the corresponding REG.
 ;;; This is called during operand lowering, and also for emitting an EA
@@ -1279,15 +1287,14 @@
                    operand)
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
-                  #+avx2
                   ((memq (sc-name (tn-sc operand))
-                         '(avx2-reg
+                         '(ymm-reg
                            int-avx2-reg
                            double-avx2-reg
                            single-avx2-reg))
-                   (get-avx2 (tn-offset operand)))
+                   (get-fpr :ymm (tn-offset operand)))
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
-                   (get-fpr (tn-offset operand)))
+                   (get-fpr :xmm (tn-offset operand)))
                   (t ; a stack SC or constant
                    operand)))
           operands))
@@ -1354,7 +1361,7 @@
                           (if (location= index sb-vm::rsp-tn)
                               (error "can't index off of RSP")
                               (reg-encoding (if xmm-index
-                                                (get-fpr (tn-offset index))
+                                                (get-fpr :xmm (tn-offset index))
                                                 (tn-reg index))
                                             segment))))
                (base (if (null base) #b101 base-encoding)))

@@ -372,7 +372,6 @@
   ;; collect dynamic statistics.)
   #+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info))
-  #+avx2
   (avx2-used-p nil))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs

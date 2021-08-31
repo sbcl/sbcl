@@ -1,16 +1,5 @@
 (in-package "SB-X86-64-ASM")
 
-(defun get-avx2 (number)
-  (svref (load-time-value
-          (coerce (loop for i from 0 below 16
-                        collect (!make-reg (!make-avx2-id i)))
-                  'vector)
-          t)
-         number))
-
-(defun is-avx2-id-p (reg-id)
-  (= (ldb (byte 3 0) reg-id) 3))
-
 (define-arg-type ymmreg
   :prefilter #'prefilter-reg-r
   :printer #'print-ymmreg)
@@ -228,7 +217,7 @@
                0
                1))
          (xmm-size (r)
-           (cond ((is-avx2-id-p (reg-id r))
+           (cond ((is-ymm-id-p (reg-id r))
                   1)
                  ((xmm-register-p r)
                   0))))
@@ -1121,11 +1110,11 @@
                                  :w ,w
                                  :l ,(ecase sizing
                                        ((xmm/ymm-vmx/y xmm/ymm-vmx)
-                                        `(if (is-avx2-id-p (reg-id dst))
+                                        `(if (is-ymm-id-p (reg-id dst))
                                              1
                                              0))
                                        (xmm-vmx/y
-                                        `(if (eq (sc-name (tn-sc (ea-index vm))) 'avx2-reg)
+                                        `(if (eq (sc-name (tn-sc (ea-index vm))) 'ymm-reg)
                                              1
                                              0)))
                                  :vm t)))))
