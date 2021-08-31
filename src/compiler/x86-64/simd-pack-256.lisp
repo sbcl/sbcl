@@ -35,7 +35,7 @@
          (p2 (%simd-pack-256-2 x))
          (p3 (%simd-pack-256-3 x)))
     (cond ((= p0 p1 p2 p3 0)
-           (inst pxor y y))
+           (inst vpxor y y y))
           ((= p0 p1 p2 p3 (ldb (byte 64 0) -1))
            ;; don't think this is recognized as dependency breaking...
            (inst vpcmpeqd y y y))
