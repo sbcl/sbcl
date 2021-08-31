@@ -2447,6 +2447,72 @@ register."
       #-(or x86 x86-64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
+      #+sb-simd-pack
+      ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
+       (escaped-float-value simd-pack-int))
+      #+sb-simd-pack
+      ((#.sb-vm::single-sse-reg-sc-number)
+       (escaped-float-value simd-pack-single))
+      #+sb-simd-pack
+      ((#.sb-vm::double-sse-reg-sc-number)
+       (escaped-float-value simd-pack-double))
+      #+sb-simd-pack
+      ((#.sb-vm::int-sse-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-ub64
+          (sap-ref-64 nfp (number-stack-offset 0))
+          (sap-ref-64 nfp (number-stack-offset 8)))))
+      #+sb-simd-pack
+      ((#.sb-vm::single-sse-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-single
+          (sap-ref-single nfp (number-stack-offset 0))
+          (sap-ref-single nfp (number-stack-offset 4))
+          (sap-ref-single nfp (number-stack-offset 8))
+          (sap-ref-single nfp (number-stack-offset 12)))))
+      #+sb-simd-pack
+      ((#.sb-vm::double-sse-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-double
+          (sap-ref-double nfp (number-stack-offset 0))
+          (sap-ref-double nfp (number-stack-offset 8)))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::ymm-reg-sc-number #.sb-vm::int-avx2-reg-sc-number)
+       (escaped-float-value simd-pack-256-int))
+      #+sb-simd-pack-256
+      ((#.sb-vm::single-avx2-reg-sc-number)
+       (escaped-float-value simd-pack-256-single))
+      #+sb-simd-pack-256
+      ((#.sb-vm::double-avx2-reg-sc-number)
+       (escaped-float-value simd-pack-256-double))
+      #+sb-simd-pack-256
+      ((#.sb-vm::int-avx2-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-256-ub64
+          (sap-ref-64 nfp (number-stack-offset 0))
+          (sap-ref-64 nfp (number-stack-offset 8))
+          (sap-ref-64 nfp (number-stack-offset 16))
+          (sap-ref-64 nfp (number-stack-offset 24)))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::single-avx2-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-256-single
+          (sap-ref-single nfp (number-stack-offset 0))
+          (sap-ref-single nfp (number-stack-offset 4))
+          (sap-ref-single nfp (number-stack-offset 8))
+          (sap-ref-single nfp (number-stack-offset 12))
+          (sap-ref-single nfp (number-stack-offset 16))
+          (sap-ref-single nfp (number-stack-offset 20))
+          (sap-ref-single nfp (number-stack-offset 24))
+          (sap-ref-single nfp (number-stack-offset 28)))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::double-avx2-stack-sc-number)
+       (with-nfp (nfp)
+         (%make-simd-pack-256-double
+          (sap-ref-double nfp (number-stack-offset 0))
+          (sap-ref-double nfp (number-stack-offset 8))
+          (sap-ref-double nfp (number-stack-offset 16))
+          (sap-ref-double nfp (number-stack-offset 24)))))
       (#.sb-vm:single-reg-sc-number
        (escaped-float-value single-float))
       (#.sb-vm:double-reg-sc-number
@@ -2618,6 +2684,72 @@ register."
       #-(or x86 x86-64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
+      #+sb-simd-pack
+      ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
+       (set-escaped-float-value simd-pack-int value))
+      #+sb-simd-pack
+      ((#.sb-vm::single-sse-reg-sc-number)
+       (set-escaped-float-value simd-pack-single value))
+      #+sb-simd-pack
+      ((#.sb-vm::double-sse-reg-sc-number)
+       (set-escaped-float-value simd-pack-double value))
+      #+sb-simd-pack
+      ((#.sb-vm::int-sse-stack-sc-number)
+       (multiple-value-bind (a b) (%simd-pack-ub64s value)
+         (with-nfp (nfp)
+           (setf (sap-ref-64 nfp (number-stack-offset 0)) a
+                 (sap-ref-64 nfp (number-stack-offset 8)) b))))
+      #+sb-simd-pack
+      ((#.sb-vm::single-sse-stack-sc-number)
+       (multiple-value-bind (a b c d) (%simd-pack-singles value)
+         (with-nfp (nfp)
+           (setf (sap-ref-single nfp (number-stack-offset 0)) a
+                 (sap-ref-single nfp (number-stack-offset 4)) b
+                 (sap-ref-single nfp (number-stack-offset 8)) c
+                 (sap-ref-single nfp (number-stack-offset 12)) d))))
+      #+sb-simd-pack
+      ((#.sb-vm::double-sse-stack-sc-number)
+       (multiple-value-bind (a b) (%simd-pack-doubles value)
+         (with-nfp (nfp)
+           (setf (sap-ref-double nfp (number-stack-offset 0)) a
+                 (sap-ref-double nfp (number-stack-offset 8)) b))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::ymm-reg-sc-number #.sb-vm::int-avx2-reg-sc-number)
+       (set-escaped-float-value simd-pack-256-int value))
+      #+sb-simd-pack-256
+      ((#.sb-vm::single-avx2-reg-sc-number)
+       (set-escaped-float-value simd-pack-256-single value))
+      #+sb-simd-pack-256
+      ((#.sb-vm::double-avx2-reg-sc-number)
+       (set-escaped-float-value simd-pack-256-double value))
+      #+sb-simd-pack-256
+      ((#.sb-vm::int-avx2-stack-sc-number)
+       (with-nfp (nfp)
+         (multiple-value-bind (a b c d) (%simd-pack-256-ub64s value)
+           (setf (sap-ref-64 nfp (number-stack-offset 0)) a
+                 (sap-ref-64 nfp (number-stack-offset 8)) b
+                 (sap-ref-64 nfp (number-stack-offset 16)) c
+                 (sap-ref-64 nfp (number-stack-offset 24)) d))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::single-avx2-stack-sc-number)
+       (multiple-value-bind (a b c d e f g h) (%simd-pack-256-singles value)
+         (with-nfp (nfp)
+           (setf (sap-ref-single nfp (number-stack-offset 0)) a
+                 (sap-ref-single nfp (number-stack-offset 4)) b
+                 (sap-ref-single nfp (number-stack-offset 8)) c
+                 (sap-ref-single nfp (number-stack-offset 12)) d
+                 (sap-ref-single nfp (number-stack-offset 16)) e
+                 (sap-ref-single nfp (number-stack-offset 20)) f
+                 (sap-ref-single nfp (number-stack-offset 24)) g
+                 (sap-ref-single nfp (number-stack-offset 28)) h))))
+      #+sb-simd-pack-256
+      ((#.sb-vm::double-avx2-stack-sc-number)
+       (multiple-value-bind (a b c d) (%simd-pack-256-doubles value)
+         (with-nfp (nfp)
+           (setf (sap-ref-double nfp (number-stack-offset 0)) a
+                 (sap-ref-double nfp (number-stack-offset 8)) b
+                 (sap-ref-double nfp (number-stack-offset 16)) c
+                 (sap-ref-double nfp (number-stack-offset 24)) d))))
       (#.sb-vm:single-reg-sc-number
        #-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))

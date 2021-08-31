@@ -39,7 +39,49 @@
                 (sap-ref-single sap 4)))
       (complex-double-float
        (complex (sap-ref-double sap 0)
-                (sap-ref-double sap 8))))))
+                (sap-ref-double sap 8)))
+      #+sb-simd-pack
+      (simd-pack-int
+       (%make-simd-pack-ub64
+        (sap-ref-64 sap 0)
+        (sap-ref-64 sap 8)))
+      #+sb-simd-pack
+      (simd-pack-single
+       (%make-simd-pack-single
+        (sap-ref-single sap 0)
+        (sap-ref-single sap 4)
+        (sap-ref-single sap 8)
+        (sap-ref-single sap 12)))
+      #+sb-simd-pack
+      (simd-pack-double
+       (%make-simd-pack-double
+        (sap-ref-double sap 0)
+        (sap-ref-double sap 8)))
+      #+sb-simd-pack-256
+      (simd-pack-256-int
+       (%make-simd-pack-256-ub64
+        (sap-ref-64 sap 0)
+        (sap-ref-64 sap 8)
+        (sap-ref-64 sap 16)
+        (sap-ref-64 sap 24)))
+      #+sb-simd-pack-256
+      (simd-pack-256-single
+       (%make-simd-pack-256-single
+        (sap-ref-single sap 0)
+        (sap-ref-single sap 4)
+        (sap-ref-single sap 8)
+        (sap-ref-single sap 12)
+        (sap-ref-single sap 16)
+        (sap-ref-single sap 20)
+        (sap-ref-single sap 24)
+        (sap-ref-single sap 28)))
+      #+sb-simd-pack-256
+      (simd-pack-256-double
+       (%make-simd-pack-256-double
+        (sap-ref-double sap 0)
+        (sap-ref-double sap 8)
+        (sap-ref-double sap 16)
+        (sap-ref-double sap 24))))))
 
 (defun %set-context-float-register (context index format value)
   (declare (ignorable context index format))
@@ -63,7 +105,49 @@
        (locally
            (declare (type (complex double-float) value))
          (setf (sap-ref-double sap 0) (realpart value)
-               (sap-ref-double sap 8) (imagpart value)))))))
+               (sap-ref-double sap 8) (imagpart value))))
+      #+sb-simd-pack
+      (simd-pack-int
+       (multiple-value-bind (a b) (%simd-pack-ub64s value)
+         (setf (sap-ref-64 sap 0) a
+               (sap-ref-64 sap 8) b)))
+      #+sb-simd-pack
+      (simd-pack-single
+       (multiple-value-bind (a b c d) (%simd-pack-singles value)
+         (setf (sap-ref-single sap 0) a
+               (sap-ref-single sap 4) b
+               (sap-ref-single sap 8) c
+               (sap-ref-single sap 12) d)))
+      #+sb-simd-pack
+      (simd-pack-double
+       (multiple-value-bind (a b) (%simd-pack-doubles value)
+         (setf (sap-ref-double sap 0) a
+               (sap-ref-double sap 8) b)))
+      #+sb-simd-pack-256
+      (simd-pack-256-int
+       (multiple-value-bind (a b c d) (%simd-pack-256-ub64s value)
+         (setf (sap-ref-64 sap 0) a
+               (sap-ref-64 sap 8) b
+               (sap-ref-64 sap 16) c
+               (sap-ref-64 sap 24) d)))
+      #+sb-simd-pack-256
+      (simd-pack-256-single
+       (multiple-value-bind (a b c d e f g h) (%simd-pack-256-singles value)
+         (setf (sap-ref-single sap 0) a
+               (sap-ref-single sap 4) b
+               (sap-ref-single sap 8) c
+               (sap-ref-single sap 12) d
+               (sap-ref-single sap 16) e
+               (sap-ref-single sap 20) f
+               (sap-ref-single sap 24) g
+               (sap-ref-single sap 28) h)))
+      #+sb-simd-pack-256
+      (simd-pack-256-double
+       (multiple-value-bind (a b c d) (%simd-pack-256-doubles value)
+         (setf (sap-ref-double sap 0) a
+               (sap-ref-double sap 8) b
+               (sap-ref-double sap 16) c
+               (sap-ref-double sap 24) d))))))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
