@@ -247,12 +247,11 @@
   #-sb-thread 1024) ; crazy value
 
 ;;; Thread slots accessed at negative indices relative to struct thread.
-;;; This number could be 16 for non-safepoint, or for safepoint, 15, so that -16
-;;; would be on the safepoint page. I had trouble with an odd number of slots
-;;; as there seems to be an alignment requirement. 14 works in general, and the
-;;; safepoint slot is -15 which presents no problem.
 (defconstant thread-header-slots
-  #+x86-64 14
+  ;; This seems to need to be an even number.
+  ;; I'm not sure what the constraint on that stems from.
+  #+(and x86-64 sb-safepoint) 14 ; the safepoint trap page is at word index -15
+  #+(and x86-64 (not sb-safepoint)) 16
   #-x86-64 0)
 
 #+gencgc

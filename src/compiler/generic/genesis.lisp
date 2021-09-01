@@ -3155,13 +3155,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
   ;; writing primitive object layouts
     (flet ((output-c ()
-             (when (eq name 'sb-vm::thread)
-               (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
-               (dolist (x sb-vm::*thread-header-slot-names*)
-                 (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
-                   (format t "#define ~a ~d~%"
-                           (c-name (string s)) (symbol-value s))))
-               (terpri))
              (when (eq name 'sb-vm::code)
                (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d~2%"
                        sb-vm:code-slots-per-simple-fun))
@@ -3196,6 +3189,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
                        (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag)))
              (format t "#define ~A_SIZE ~d~%"
                      (string-upcase c-name) (sb-vm:primitive-object-length obj))))
+      (when (eq name 'sb-vm::thread)
+        (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
+        (dolist (x sb-vm::*thread-header-slot-names*)
+          (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
+            (format t "#define ~a ~d~%" (c-name (string s)) (symbol-value s))))
+        (terpri))
       (format t "#ifdef __ASSEMBLER__~2%")
       (output-asm)
       (format t "~%#else /* __ASSEMBLER__ */~2%")
