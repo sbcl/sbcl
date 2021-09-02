@@ -403,3 +403,10 @@
 (with-test (:name :array-psxhash-non-consing :skipped-on :interpreter)
    (let ((a (make-array 1000 :element-type 'double-float)))
      (ctu:assert-no-consing (sb-int:psxhash a))))
+
+(with-test (:name :array-psxhash)
+  (let ((table (make-hash-table :test 'equalp)))
+    (let ((x (vector 1.0d0 1.0d0))
+          (y (make-array 2 :element-type 'double-float :initial-contents '(1.0d0 1.0d0))))
+      (setf (gethash x table) t)
+      (assert (gethash y table)))))

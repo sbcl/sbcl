@@ -353,10 +353,29 @@
 
 ;;;; the PSXHASH function
 
-;;; To avoid "note: Return type not fixed values ..."
-(declaim (ftype (sfunction (number) hash-code) number-psxhash))
-
 ;;; like SXHASH, but for EQUALP hashing instead of EQUAL hashing
+(macrolet ((hash-float (type key)
+             ;; Floats that represent integers must hash as the integer would.
+             (let ((lo (coerce most-negative-fixnum type))
+                   (hi (coerce most-positive-fixnum type)))
+               `(let ((key ,key))
+                  (cond ( ;; This clause allows FIXNUM-sized integer
+                         ;; values to be handled without consing.
+                         (<= ,lo key ,hi)
+                         (multiple-value-bind (q r) (floor (the (,type ,lo ,hi) key))
+                           (if (zerop (the ,type r))
+                               (sxhash q)
+                               (sxhash (coerce key 'double-float)))))
+                        ((float-infinity-p key)
+                         ;; {single,double}-float infinities are EQUALP
+                         (if (minusp key)
+                             (sxhash sb-ext:single-float-negative-infinity)
+                             (sxhash sb-ext:single-float-positive-infinity)))
+                        (t
+                         (multiple-value-bind (q r) (floor key)
+                           (if (zerop (the ,type r))
+                               (sxhash q)
+                               (sxhash (coerce key 'double-float))))))))))
 (defun psxhash (key)
   (declare (optimize speed))
   (labels
@@ -375,6 +394,11 @@
                                                ((t) `(%psxhash ,elt depthoid))
                                                ((base-char character)
                                                 `(char-code (char-upcase ,elt)))
+                                               (single-float `(sfloat-psxhash ,elt))
+                                               (double-float `(dfloat-psxhash ,elt))
+                                               ;; the remaining types are integers and complex numbers.
+                                               ;; COMPLEX will cons here, as will word-sized
+                                               ;; integers. Nothing else should though.
                                                (t `(sxhash ,elt)))))))) ; xformed
                (typecase data
                  ;; There are two effects of this typecase:
@@ -394,7 +418,7 @@
                     (loop for i fixnum from (truly-the fixnum start) below (truly-the fixnum end)
                           do (mixf result (number-psxhash (funcall getter data i)))))))))
              result))
-     (structure-object-psxhash (key depthoid)
+       (structure-object-psxhash (key depthoid)
        ;; Compute a PSXHASH for KEY. Salient points:
        ;; * It's not enough to use the bitmap to figure out how to mix in raw slots.
        ;;   The floating-point types all need special treatment. And we want to avoid
@@ -469,104 +493,77 @@
                            (incf i)
                            (if (zerop (decf max-iterations)) (return)))))))
            result)))
-     (%psxhash (key depthoid)
-       (typecase key
-         (array
-          (if (vectorp key)
-              (with-array-data ((a key) (start) (end) :force-inline t :check-fill-pointer t)
-                (mix (data-vector-hash a start end depthoid) (length key)))
-              (with-array-data ((a key) (start) (end) :force-inline t :array-header-p t)
-                (let ((result (data-vector-hash a start end depthoid)))
-                  (dotimes (i (array-rank key) result)
-                    (mixf result (%array-dimension key i)))))))
-         (structure-object
-          (cond ((hash-table-p key)
-                 ;; This is a purposely not very strong hash so that it does not make any
-                 ;; distinctions that EQUALP does not make. Computing a hash of the k/v pair
-                 ;; vector would incorrectly take insertion order into account.
-                 (mix (mix 103924836 (hash-table-count key))
-                      (sxhash (hash-table-test key))))
-                ((pathnamep key) (pathname-sxhash key))
-                (t
-                 (structure-object-psxhash key depthoid))))
-         (list
-          (cond ((null key)
-                 (the fixnum 480929))
-                ((eql depthoid 0)
-                 (the fixnum 779578))
-                (t
-                 (let ((depthoid (1- (truly-the (integer 0 #.+max-hash-depthoid+)
-                                                depthoid))))
-                   (mix (%psxhash (car key) depthoid)
-                        (%psxhash (cdr key) depthoid))))))
-         (number (number-psxhash key))
-         (character (char-code (char-upcase key)))
-         (t (sxhash key)))))
+       (sfloat-psxhash (key)
+         (declare (single-float key))
+         (hash-float single-float key))
+       (dfloat-psxhash (key)
+         (declare (double-float key))
+         (hash-float double-float key))
+       (number-psxhash (key)
+         (declare (type number key)
+                  (muffle-conditions compiler-note))
+         (macrolet ((hash-complex (hasher)
+                      `(if (zerop (imagpart key))
+                           (,hasher (realpart key))
+                           ;; I'm not sure what the point of an additional mix step
+                           ;; with a constant was. Maybe trying to get it not to hash
+                           ;; like a ratio whose num/den are equal to the real and imag
+                           ;; parts of a complex number? That seems silly.
+                           ;; But sure, let's do something like it, but simpler.
+                           ;; (It might hash like a cons of these integers anyway)
+                           (logand (lognot (mix (,hasher (realpart key)) (,hasher (imagpart key))))
+                                   most-positive-fixnum))))
+           (etypecase key
+             (integer (sxhash key))
+             (single-float (sfloat-psxhash key))
+             (double-float (dfloat-psxhash key))
+             (rational (if (and (<= most-negative-double-float
+                                    key
+                                    most-positive-double-float)
+                                (= (coerce key 'double-float) key))
+                           (sxhash (coerce key 'double-float))
+                           ;; a rational for which '=' does not return T when compared
+                           ;; to itself cast as double-float need to have the same hash
+                           ;; as any float. That's why this case is legitimate.
+                           (sxhash key)))
+             ((complex double-float) (hash-complex dfloat-psxhash))
+             ((complex single-float) (hash-complex sfloat-psxhash))
+             ((complex rational)     (hash-complex number-psxhash)))))
+       (%psxhash (key depthoid)
+         (typecase key
+           (array
+            (if (vectorp key)
+                (with-array-data ((a key) (start) (end) :force-inline t :check-fill-pointer t)
+                  (mix (data-vector-hash a start end depthoid) (length key)))
+                (with-array-data ((a key) (start) (end) :force-inline t :array-header-p t)
+                  (let ((result (data-vector-hash a start end depthoid)))
+                    (dotimes (i (array-rank key) result)
+                      (mixf result (%array-dimension key i)))))))
+           (structure-object
+            (cond ((hash-table-p key)
+                   ;; This is a purposely not very strong hash so that it does not make any
+                   ;; distinctions that EQUALP does not make. Computing a hash of the k/v pair
+                   ;; vector would incorrectly take insertion order into account.
+                   (mix (mix 103924836 (hash-table-count key))
+                        (sxhash (hash-table-test key))))
+                  ((pathnamep key) (pathname-sxhash key))
+                  (t
+                   (structure-object-psxhash key depthoid))))
+           (list
+            (cond ((null key)
+                   (the fixnum 480929))
+                  ((eql depthoid 0)
+                   (the fixnum 779578))
+                  (t
+                   (let ((depthoid (1- (truly-the (integer 0 #.+max-hash-depthoid+)
+                                                  depthoid))))
+                     (mix (%psxhash (car key) depthoid)
+                          (%psxhash (cdr key) depthoid))))))
+           (number (number-psxhash key))
+           (character (char-code (char-upcase key)))
+           (t (sxhash key)))))
     (%psxhash key +max-hash-depthoid+)))
-
-(defun number-psxhash (key)
-  (declare (type number key)
-           (explicit-check)
-           (muffle-conditions compiler-note)
-           (optimize speed))
-  (flet ((sxhash-double-float (val)
-           (declare (type double-float val))
-           ;; FIXME: Check to make sure that the DEFTRANSFORM kicks in and the
-           ;; resulting code works without consing. (In Debian cmucl 2.4.17,
-           ;; it didn't.)
-           (sxhash val)))
-    (macrolet ((hash-float (type key)
-                 (let ((lo (coerce most-negative-fixnum type))
-                       (hi (coerce most-positive-fixnum type)))
-                   `(let ((key ,key))
-                      (cond ( ;; This clause allows FIXNUM-sized integer
-                             ;; values to be handled without consing.
-                             (<= ,lo key ,hi)
-                             (multiple-value-bind (q r)
-                                 (floor (the (,type ,lo ,hi) key))
-                               (if (zerop (the ,type r))
-                                   (sxhash q)
-                                   (sxhash-double-float
-                                    (coerce key 'double-float)))))
-                            ((float-infinity-p key)
-                             ;; {single,double}-float infinities are EQUALP
-                             (if (minusp key)
-                                 (sxhash sb-ext:single-float-negative-infinity)
-                                 (sxhash sb-ext:single-float-positive-infinity)))
-                            (t
-                             (multiple-value-bind (q r) (floor key)
-                               (if (zerop (the ,type r))
-                                   (sxhash q)
-                                   (sxhash-double-float
-                                    (coerce key 'double-float)))))))))
-               (hash-complex (&optional (hasher '(number-psxhash)))
-                 `(if (zerop (imagpart key))
-                      (,@hasher (realpart key))
-                      (let ((result 330231))
-                        (declare (type fixnum result))
-                        (mixf result (,@hasher (realpart key)))
-                        (mixf result (,@hasher (imagpart key)))
-                        result))))
-     (etypecase key
-       (integer (sxhash key))
-       (float (macrolet ()
-                (etypecase key
-                  (single-float (hash-float single-float key))
-                  (double-float (hash-float double-float key))
-                  #+long-float
-                  (long-float (error "LONG-FLOAT not currently supported")))))
-       (rational (if (and (<= most-negative-double-float
-                              key
-                              most-positive-double-float)
-                          (= (coerce key 'double-float) key))
-                     (sxhash-double-float (coerce key 'double-float))
-                     (sxhash key)))
-       ((complex double-float)
-        (hash-complex (hash-float double-float)))
-       ((complex single-float)
-        (hash-complex (hash-float single-float)))
-       ((complex rational)
-        (hash-complex))))))
+) ; end MACROLET
 
 ;;; Semantic equivalent of SXHASH, but better-behaved for function names.
 ;;; It performs more work by not cutting off as soon in the CDR direction.
