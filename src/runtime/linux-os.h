@@ -45,4 +45,6 @@ typedef int os_vm_prot_t;
  * delivery order" from 2009-03-14 on kernel-devel@vger.kernel.org.
  * https://lkml.org/lkml/2009/3/14/133
  */
+#ifndef SIG_STOP_FOR_GC // choose you own signal if you must
 #define SIG_STOP_FOR_GC (SIGUSR2)
+#endif

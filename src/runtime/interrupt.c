@@ -393,8 +393,12 @@ static void sigaddset_deferrable(sigset_t *s) {
     sigaddset(s, SIGXCPU);
 #endif
     sigaddset(s, SIGXFSZ);
+#if !(defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGVTALRM)
     sigaddset(s, SIGVTALRM);
+#endif
+#if !(defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGWINCH)
     sigaddset(s, SIGWINCH);
+#endif    
 }
 
 static void
@@ -470,20 +474,34 @@ deferrables_blocked_p(sigset_t *sigset)
      * not affect behavior of correct code - it is just to decide whether we understand
      * the signal mask to be in a valid state, but it was overly restrictive.
      *
-     * Also SIGPWR is conspicuously absent. SB-THREAD:INTERRUPT-THREAD used it long ago,
-     * but I don't know why it was never in sigaddset_deferrable.
+     * Also SIGXCPU and SIGPWR are conspicuously absent. SB-THREAD:INTERRUPT-THREAD
+     * used SIGPWR long ago, but I don't know why it was never in deferrable_sigset.
      */
-    int mask = (sigismember(sigset, SIGHUP)    << 10) |
-               (sigismember(sigset, SIGINT)    << 9) |
-               (sigismember(sigset, SIGTERM)   << 8) |
-               (sigismember(sigset, SIGQUIT)   << 7) |
-               (sigismember(sigset, SIGURG)    << 6) |
-               (sigismember(sigset, SIGTSTP)   << 5) |
-               (sigismember(sigset, SIGCHLD)   << 4) |
-               (sigismember(sigset, SIGXFSZ)   << 3) |
-               (sigismember(sigset, SIGVTALRM) << 2) |
-               (sigismember(sigset, SIGWINCH)  << 1);
-    if (mask == 0x7fe) return 1;
+    const int expected_mask = 0x3ff
+#if (defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGVTALRM)
+                              - (1<<1)
+#endif
+#if (defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGWINCH)
+                              - (1<<0)
+#endif
+                              ;
+
+    int mask = (sigismember(sigset, SIGHUP)    << 9)
+             | (sigismember(sigset, SIGINT)    << 8)
+             | (sigismember(sigset, SIGTERM)   << 7)
+             | (sigismember(sigset, SIGQUIT)   << 6)
+             | (sigismember(sigset, SIGURG)    << 5)
+             | (sigismember(sigset, SIGTSTP)   << 4)
+             | (sigismember(sigset, SIGCHLD)   << 3)
+             | (sigismember(sigset, SIGXFSZ)   << 2)
+#if !(defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGVTALRM)
+             | (sigismember(sigset, SIGVTALRM) << 1)
+#endif
+#if !(defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGWINCH)
+             | (sigismember(sigset, SIGWINCH)  << 0)
+#endif
+               ;
+    if (mask == expected_mask) return 1;
     if (!mask) return 0;
     char buf[3*64]; // assuming worst case 64 signals present in sigset
     sigset_tostring(sigset, buf, sizeof buf);
