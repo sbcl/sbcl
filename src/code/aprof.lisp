@@ -640,13 +640,16 @@
 (defun aprof-run (fun &key (stream *standard-output*) arguments)
   (aprof-reset)
   (patch-fixups)
-  (let (nbytes)
-    (unwind-protect
-         (progn (aprof-start) (apply fun (sb-int:ensure-list arguments)))
-      (aprof-stop)
-      (setq nbytes (aprof-show :stream stream))
-      (when stream (terpri stream)))
-    nbytes))
+  (dx-let ((arglist (cons arguments nil))) ; so no consing in here
+    (when (listp arguments)
+      (setq arglist (car arglist))) ; was already a list
+    (let (nbytes)
+      (unwind-protect
+           (progn (aprof-start) (apply fun arglist))
+        (aprof-stop)
+        (setq nbytes (aprof-show :stream stream))
+        (when stream (terpri stream)))
+      nbytes)))
 
 ;;;;
 
