@@ -3196,7 +3196,8 @@
                     :printer '(:name :tab reg ", " reg/mem ", XMM0"))
                 (:emitter
                  (aver (xmm-register-p dst))
-                 (aver (and (xmm-register-p mask) (= (tn-offset mask) 0)))
+                 (aver (and (xmm-register-p mask)
+                            (= (reg-id-num (reg-id mask)) 0)))
                  (emit-regular-2byte-sse-inst segment dst src ,prefix
                                               ,op1 ,op2)))))
 
