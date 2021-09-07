@@ -217,3 +217,17 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
                  (if (%boundp ',name) (make-unbound-marker) ,value)
                  (sb-c:source-location)
                  ,@(and docp `(',doc)))))
+
+;;; Ensure some VM symbols get wired TLS.
+(in-package "SB-VM")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (entry '#.per-thread-c-interface-symbols)
+    (let ((symbol (if (consp entry) (car entry) entry)))
+      (declare (notinline sb-int:info (setf sb-int:info)))
+      ;; CURRENT-{CATCH/UWP}-BLOCK are thread slots,
+      ;; so the TLS indices were already assigned.
+      ;; There may be other symbols too.
+      (unless (sb-int:info :variable :wired-tls symbol)
+        (setf (sb-int:info :variable :wired-tls symbol) :always-thread-local))
+      (unless (sb-int:info :variable :always-bound symbol)
+        (setf (sb-int:info :variable :always-bound symbol) :always-bound)))))

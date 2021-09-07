@@ -40,9 +40,7 @@
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
- ;; This comes as early as possible, so that we catch the source locations
- ;; for everything.
- ("src/code/early-source-location" :c-headers)
+
  ("src/code/cross-early" :c-headers :not-target)
 
  ;; This comes early because it's useful for debugging everywhere.
@@ -50,7 +48,7 @@
  ("src/compiler/early-constantp" :c-headers)
  ("src/code/defsetfs" :not-host)
 
- ;; Declare all target special variables defined by ANSI
+  ;; Declare all target special variables defined by ANSI
  ("src/code/cl-specials" :not-host)
 
  ;; Things like DX-FLET and AWHEN are available for use in both the

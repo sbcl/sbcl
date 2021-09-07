@@ -104,6 +104,19 @@
             (namestring name)
             nil))))
 
+#+sb-source-locations
+(progn
+  (define-source-transform source-location ()
+    (make-definition-source-location))
+  ;; We need a regular definition of SOURCE-LOCATION for calls processed
+  ;; during LOAD on a source file while *EVALUATOR-MODE* is :INTERPRET.
+  #-sb-xc-host
+  (defun source-location ()
+    (make-definition-source-location)))
+
+#-sb-source-locations
+(defun source-location () nil)
+
 (in-package "SB-IMPL")
 
 (defvar *eval-source-context* nil)

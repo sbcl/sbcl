@@ -442,7 +442,6 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "GENERATE-CALL-SEQUENCE"
                "GENERATE-RETURN-SEQUENCE"
                "WITH-COMPILER-ERROR-RESIGNALLING"
-               "WITH-SOURCE-LOCATION"
                "XDEFUN" ; extended defun for defstruct
 
                "BRANCH-IF" "MULTIWAY-BRANCH-IF-EQ"

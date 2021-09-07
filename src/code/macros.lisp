@@ -665,6 +665,8 @@ invoked. In that case it will store into PLACE and start over."
   (let ((def (make-macro-lambda (sb-c::debug-name 'compiler-macro name)
                                 lambda-list body 'define-compiler-macro name
                                 :accessor 'sb-c::compiler-macro-args)))
+    ;; FIXME: Shouldn't compiler macros also get source locations?
+    ;; Plain DEFMACRO supplies source location information.
     `(progn
        (eval-when (:compile-toplevel)
          (sb-c::%compiler-defmacro :compiler-macro-function ',name))
