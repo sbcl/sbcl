@@ -92,7 +92,6 @@
 
   (/show0 "entering !COLD-INIT")
   #+sb-show (setq */show* t)
-  (!readtable-cold-init)
   (/show0 "cold-initializing streams")
   (sb-impl::!cold-stream-init)
   (show-and-call !signal-function-cold-init)
@@ -132,11 +131,16 @@
   (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
 
   ;; Printing of symbols requires that packages be filled in, because
-  ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
+  ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility. Also
+  ;; allows IN-PACKAGE to work.
   (show-and-call !package-cold-init)
-  ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
-  (setf (symbol-function 'choose-symbol-out-fun)
-        (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
+  ;; debug machinery needed for printing symbols
+  #+sb-devel
+  (progn
+    (!readtable-cold-init)
+    ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
+    (setf (symbol-function 'choose-symbol-out-fun)
+          (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol)))
 
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
