@@ -573,7 +573,7 @@
 (macrolet ((def (name prefix)
              `(define-instruction ,name (segment dst src pattern)
                 ,@(avx2-inst-printer-list
-                   'ymm-ymm/mem prefix #x70
+                   'ymm-ymm/mem-imm prefix #x70
                    :printer '(:name :tab reg ", " reg/mem ", " imm))
                 (:emitter
                  (emit-avx2-inst segment dst src ,prefix #x70
