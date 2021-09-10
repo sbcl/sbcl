@@ -29,6 +29,7 @@
   #define boolean rpcndr_boolean
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
+  #include <ntstatus.h>
   #include <shlobj.h>
   #include <wincrypt.h>
   #include <winsock2.h>

@@ -65,3 +65,11 @@
   (let ((p (allocate-readonly-int)))
     (assert-error (setf (deref p) 42) sb-sys:memory-fault-error)
     (free-readonly-int p)))
+
+;;; Not a very robust test since neither free() nor HeapFree() document this
+;;; exception. The main result we wish for is not having the process abruptly
+;;; terminated.
+(with-test (:name :heap-corruption)
+  (let ((bad-pointer (sb-alien:sap-alien (sb-sys:int-sap 42) (* (unsigned 8)))))
+    (assert-error (sb-alien:free-alien bad-pointer)
+                  sb-sys:foreign-heap-corruption)))

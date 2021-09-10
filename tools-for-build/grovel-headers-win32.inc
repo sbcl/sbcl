@@ -77,6 +77,7 @@
     defconstant("+exception-flt-overflow+", EXCEPTION_FLT_OVERFLOW);
     defconstant("+exception-flt-stack-check+", EXCEPTION_FLT_STACK_CHECK);
     defconstant("+exception-flt-underflow+", EXCEPTION_FLT_UNDERFLOW);
+    defconstant("+exception-heap-corruption+", STATUS_HEAP_CORRUPTION);
     defconstant("+exception-illegal-instruction+", EXCEPTION_ILLEGAL_INSTRUCTION);
     defconstant("+exception-in-page-error+", EXCEPTION_IN_PAGE_ERROR);
     defconstant("+exception-int-divide-by-zero+", EXCEPTION_INT_DIVIDE_BY_ZERO);

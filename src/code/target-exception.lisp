@@ -59,6 +59,8 @@
      ;; Various
      (cons-name +exception-single-step+)
      (cons +exception-access-violation+ 'memory-fault-error)
+     #+x86-64
+     (cons +exception-heap-corruption+ 'foreign-heap-corruption)
      (cons-name +exception-array-bounds-exceeded+)
      (cons-name +exception-breakpoint+)
      (cons-name +exception-datatype-misalignment+)
@@ -111,6 +113,19 @@
                      (exception-context c)
                      (exception-record c)
                      (exception-code c)))))
+
+;;; Undocumented exception (STATUS_HEAP_CORRUPTION). Occurs when calling free()
+;;; with a bad pointer and possibly other places. On 64-bit processes,
+;;; frame-based handlers don't get a chance to handle this exception because the
+;;; HeapSetInformation() option HeapEnableTerminationOnCorruption is enabled by
+;;; default and cannot be disabled. For the sake of interactive development and
+;;; error reporting, we special-case this exception in our vectored exception
+;;; handler, otherwise the SBCL process would be abruptly terminated.
+#+x86-64
+(define-condition foreign-heap-corruption (error) ()
+  (:report
+   #.(format nil "A foreign heap corruption exception occurred. (Exception code: ~S)"
+             +exception-heap-corruption+)))
 
 ;;; Actual exception handler. We hit something the runtime doesn't
 ;;; want to or know how to deal with (that is, not a sigtrap or gc wp

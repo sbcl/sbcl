@@ -1386,7 +1386,9 @@ veh(EXCEPTION_POINTERS *ep)
         (rip >= DYNAMIC_SPACE_START &&
          rip <= DYNAMIC_SPACE_START+dynamic_space_size);
 
-    if (code == EXCEPTION_ACCESS_VIOLATION || from_lisp)
+    if (code == EXCEPTION_ACCESS_VIOLATION ||
+        code == STATUS_HEAP_CORRUPTION ||
+        from_lisp)
         disp = handle_exception_ex(ep->ExceptionRecord, 0, ep->ContextRecord,
                                    // continue search on unhandled memory faults
                                    // if not in Lisp code. This gives foreign
