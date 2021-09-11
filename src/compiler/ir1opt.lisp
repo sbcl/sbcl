@@ -2636,6 +2636,13 @@
                (not (node-deleted (bound-cast-check cast))))
       (flush-combination (bound-cast-check cast))
       (setf (bound-cast-check cast) nil))
+    (unless (array-index-cast-p cast)
+      ;; Normally the types are the same, as the cast gets its derived
+      ;; type from the lvar, but it may get a different type when an
+      ;; inlined function with a derived type is let-converted.
+      (let ((type (node-derived-type cast)))
+        (do-uses (node value)
+          (derive-node-type node type))))
     (delete-filter cast lvar value)
     (when lvar
       (reoptimize-lvar lvar)

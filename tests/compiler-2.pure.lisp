@@ -3245,3 +3245,14 @@
    `(lambda (x)
       (inline-deletion-note x t))
    ((t) 10)))
+
+(with-test (:name :cast-type-preservation)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (b)
+                (declare ((integer 1 1000) b))
+                (declare (optimize (space 0)))
+                (gcd 2 b)))))
+          '(values (integer 1 2) &optional))))

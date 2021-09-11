@@ -398,7 +398,7 @@ static void sigaddset_deferrable(sigset_t *s) {
 #endif
 #if !(defined SIG_STOP_FOR_GC && SIG_STOP_FOR_GC == SIGWINCH)
     sigaddset(s, SIGWINCH);
-#endif    
+#endif
 }
 
 static void
