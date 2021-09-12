@@ -3256,3 +3256,20 @@
                 (declare (optimize (space 0)))
                 (gcd 2 b)))))
           '(values (integer 1 2) &optional))))
+
+(with-test (:name :lvar-substituting-non-deletable-casts)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (the integer
+           (let (*)
+             (rem 2
+                  (let ((m
+                          (flet ((f ()
+                                   (truncate (the (integer -10 0) b) -4)))
+                            (f))))
+                    (if (> m 1)
+                        1
+                        m)))))
+      10)
+   ((-10) 10)))

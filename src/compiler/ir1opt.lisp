@@ -2111,22 +2111,13 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (let ((ref-type (single-value-type (node-derived-type ref))))
-        (cond ((csubtypep (single-value-type (lvar-type arg)) ref-type)
-               (substitute-lvar-uses lvar arg
-                                     ;; Really it is (EQ (LVAR-USES LVAR) REF):
-                                     t)
-               (delete-lvar-use ref))
-              (t
-               (let* ((value (make-lvar))
-                      (cast (insert-cast-before ref value ref-type
-                                                ;; KLUDGE: it should be (TYPE-CHECK 0)
-                                                *policy*)))
-                 (setf (cast-type-to-check cast) *wild-type*)
-                 (substitute-lvar-uses value arg
-                                       ;; FIXME
-                                       t)
-                 (%delete-lvar-use ref)
-                 (add-lvar-use cast lvar)))))
+        (unless (csubtypep (single-value-type (lvar-type arg)) ref-type)
+          (do-uses (node arg)
+            (derive-node-type node ref-type)))
+        (substitute-lvar-uses lvar arg
+                              ;; Really it is (EQ (LVAR-USES LVAR) REF):
+                              t)
+        (delete-lvar-use ref))
       (delete-ref ref)
       (unlink-node ref)
       (when (return-p dest)
