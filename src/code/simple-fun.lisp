@@ -303,7 +303,7 @@
                           ((not simple-vector) info))))
     ;; For backward-compatibility we expand SFUNCTION -> FUNCTION.
     (if (and (listp internal-type) (eq (car internal-type) 'sfunction))
-        (sb-ext:typexpand-1 internal-type)
+        (values (sb-ext:typexpand-1 internal-type))
         internal-type)))
 
 (defun %simple-fun-xrefs (fun)

@@ -3286,3 +3286,13 @@
                          sum (mod 77196223293181
                                   (max 75 (mod a (min -57 lv3)))))))))
    ((8000000) -571429)))
+
+(with-test (:name :values-length-mismatch)
+  (checked-compile-and-assert
+   (:allow-style-warnings t :optimize :default)
+   `(lambda (a)
+      (declare (values t &optional))
+      (when a
+        (values 1 2)))
+   ((nil) nil)
+   ((t) (condition 'type-error))))

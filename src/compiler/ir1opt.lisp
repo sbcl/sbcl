@@ -2739,7 +2739,10 @@
                     (context (if (local-call-context-p context)
                                  (local-call-context-var context)
                                  context)))
-               (unless (cast-silent-conflict cast)
+               (when (or (not (cast-silent-conflict cast))
+                         (and (eq (cast-silent-conflict cast) :style-warning)
+                              (not (cast-single-value-p cast))
+                              (setf context :multiple-values)))
                  (filter-lvar
                   value
                   (if (cast-single-value-p cast)

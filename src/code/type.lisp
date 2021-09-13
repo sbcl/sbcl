@@ -1089,6 +1089,14 @@
                       (do ((t1 types1 (rest t1))
                            (t2 types2 (rest t2)))
                           ((null t2)
+                           (loop named loop
+                                 for type in t1
+                                 do (multiple-value-bind (res win)
+                                        (csubtypep type rest2)
+                                      (unless win
+                                        (return (values nil nil)))
+                                      (unless res
+                                        (return (values nil t)))))
                            (csubtypep rest1 rest2))
                         (multiple-value-bind (res win-p)
                             (csubtypep (first t1) (first t2))

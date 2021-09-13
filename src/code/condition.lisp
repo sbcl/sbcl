@@ -637,16 +637,23 @@
    (context :initform nil :reader type-error-context :initarg :context))
   (:report report-general-type-error))
 (defun report-general-type-error (condition stream)
-     (let ((type (type-error-expected-type condition)))
-       (format stream  "~@<The value ~
+     (let ((type (type-error-expected-type condition))
+           (context (type-error-context condition)))
+       (if (eq context :multiple-values)
+           (format stream  "~@<The values ~
+                      ~@:_~2@T~S ~
+                      ~@:_are not of type ~
+                      ~@:_~2@T~/sb-impl:print-type-specifier/~:@>"
+                   (type-error-datum condition)
+                   type)
+           (format stream  "~@<The value ~
                       ~@:_~2@T~S ~
                       ~@:_is not of type ~
                       ~@:_~2@T~/sb-impl:print-type-specifier/~@[ ~
                       ~@:_~a~]~:@>"
-               (type-error-datum condition)
-               type
-               (decode-type-error-context (type-error-context condition)
-                                          type))))
+                   (type-error-datum condition)
+                   type
+                   (decode-type-error-context context type)))))
 
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())
