@@ -3273,3 +3273,16 @@
                         m)))))
       10)
    ((-10) 10)))
+
+(with-test (:name :convert-mv-bind-to-let-no-casts)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type (integer 7693489 168349189459797431) a))
+      (max
+       (floor a
+              (min -14
+                   (loop for lv3 below 3
+                         sum (mod 77196223293181
+                                  (max 75 (mod a (min -57 lv3)))))))))
+   ((8000000) -571429)))

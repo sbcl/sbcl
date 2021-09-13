@@ -2530,14 +2530,14 @@
                                   (let ((arg (pop args))
                                         (new-lvar (pop lvars))
                                         (type (pop types)))
-                                    (if (and type
-                                             (not (type-asserted-p arg type)))
-                                        ;; Propagate derived types from the VALUES call to its args:
-                                        ;; transforms can leave the VALUES call with a better type
-                                        ;; than its args have, so make sure not to throw that away.
-                                        (use-lvar (insert-cast-before use arg type **zero-typecheck-policy**)
-                                                  new-lvar)
-                                        (substitute-lvar-uses new-lvar arg nil))))
+                                    (when (and type
+                                               (not (type-asserted-p arg type)))
+                                      ;; Propagate derived types from the VALUES call to its args:
+                                      ;; transforms can leave the VALUES call with a better type
+                                      ;; than its args have, so make sure not to throw that away.
+                                      (do-uses (node arg)
+                                        (derive-node-type node type)))
+                                    (substitute-lvar-uses new-lvar arg nil)))
                             ;; Discard unused arguments
                             (loop for arg in args
                                   do (flush-dest arg))
