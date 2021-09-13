@@ -69,5 +69,23 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+# Test that slots with similar names don't trigger warnings if neither
+# name is exported.
+
+cat > $tmpfilename <<EOF
+    (defpackage "INT"
+      (:use "CL")
+      (:export "EX"))
+    (in-package "INT")
+    (defclass ex ()
+      ((a-slot :initarg :a-slot)))
+    (in-package :cl-user)
+    (handler-bind ((warning (lambda (c) (error "caught warning: ~A" c))))
+      (defclass why (int:ex)
+        ((a-slot :initarg :a-slot)))
+      (sb-mop:finalize-inheritance (find-class 'why)))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

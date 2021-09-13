@@ -1043,30 +1043,34 @@
            (return nil)))))))
 
 (defun style-warn-about-duplicate-slots (class)
-  (do* ((slots (slot-value class 'slots) (cdr slots))
-        (dupes nil))
-       ((null slots)
-        (when dupes
-          (style-warn
-           "~@<slot names with the same SYMBOL-NAME but ~
-                  different SYMBOL-PACKAGE (possible package problem) ~
-                  for class ~S:~4I~@:_~<~@{~/sb-ext:print-symbol-with-prefix/~^~:@_~}~:>~@:>"
-           class dupes)))
-    (let* ((slot-name (slot-definition-name (car slots)))
-           (oslots (and (not (eq (symbol-package slot-name)
-                                 *pcl-package*))
-                        (remove-if
-                         (lambda (slot-name-2)
-                           (or (eq (symbol-package slot-name-2)
-                                   *pcl-package*)
-                               (string/= slot-name slot-name-2)))
-                         (cdr slots)
-                         :key #'slot-definition-name))))
-      (when oslots
-        (pushnew (cons slot-name
-                       (mapcar #'slot-definition-name oslots))
-                 dupes
-                 :test #'string= :key #'car)))))
+  (flet ((symbol-exported-p (symbol)
+           (let ((packages (list-all-packages))
+                 (name (symbol-name symbol)))
+             (dolist (package packages nil)
+               (multiple-value-bind (s status) (find-symbol name package)
+                 (when (and (eq s symbol) (eq status :external))
+                   (return t)))))))
+    (do* ((dslots (class-direct-slots class) (cdr dslots))
+          (slots (slot-value class 'slots))
+          (dupes nil))
+         ((null dslots)
+          (when dupes
+            (style-warn
+             "~@<slot names with the same SYMBOL-NAME but ~
+                 different SYMBOL-PACKAGE (possible package problem) ~
+                 for class ~S:~4I~@:_~<~@{~/sb-ext:print-symbol-with-prefix/~^~:@_~}~:>~@:>"
+             class dupes)))
+      (let* ((slot-name (slot-definition-name (car dslots)))
+             (oslots (remove-if
+                      (lambda (slot-name-2)
+                        (or (eq slot-name slot-name-2)
+                            (string/= slot-name slot-name-2)
+                            (not (symbol-exported-p slot-name-2))))
+                      slots
+                      :key #'slot-definition-name)))
+        (when oslots
+          (pushnew (cons slot-name (mapcar #'slot-definition-name oslots)) dupes
+                   :test #'string= :key #'car))))))
 
 (defun %update-slots (class eslotds)
   (multiple-value-bind (instance-slots class-slots custom-slots)
