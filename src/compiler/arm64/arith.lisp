@@ -604,13 +604,13 @@
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")
   (:policy :fast-safe)
-  (:args (arg :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
+  (:args (arg :scs (unsigned-reg any-reg)))
+  (:arg-types (:or unsigned-num positive-fixnum))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:temporary (:scs (double-reg)) v)
   (:variant-vars signed)
-  (:generator 30
+  (:generator 29
               (when signed
                 (inst cmp arg 0)
                 (inst csinv res arg arg :ge)
@@ -624,10 +624,10 @@
 
 (define-vop (signed-byte-64-count unsigned-byte-64-count)
     (:note "inline (signed-byte 64) logcount")
-    (:args (arg :scs (signed-reg)))
-    (:arg-types signed-num)
+    (:args (arg :scs (signed-reg any-reg)))
+    (:arg-types (:or signed-num fixnum))
     (:variant t)
-    (:variant-cost 29))
+    (:variant-cost 30))
 
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
   (movable foldable flushable always-translatable))
