@@ -805,7 +805,7 @@
 ;;;
 
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg descriptor-reg))
+  (:args (x :scs (any-reg))
          (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
@@ -815,11 +815,13 @@
     (inst b? (if not-p :ne :eq) target)))
 ;;;
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
 (define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg descriptor-reg)))
+  (:args (x :scs (any-reg)))
   (:arg-types tagged-num (:constant (signed-byte #.(- 16 n-fixnum-tag-bits))))
   (:info target not-p y)
   (:translate eql)

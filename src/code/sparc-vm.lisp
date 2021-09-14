@@ -33,13 +33,15 @@
   (* long)
   (context (* os-context-t))
   (index int))
-#+nil
 (defun context-float-register (context index format)
   (declare (type (alien (* os-context-t)) context))
+  (error "context-float-register not working yet? ~S" (list context index format))
+  #+nil
   (coerce (deref (context-float-register-addr context index)) format))
-#+nil
 (defun %set-context-float-register (context index format new)
   (declare (type (alien (* os-context-t)) context))
+  (error "%set-context-float-register not working yet? ~S" (list context index format new))
+  #+nil
   (setf (deref (context-float-register-addr context index))
         (coerce new format)))
 
