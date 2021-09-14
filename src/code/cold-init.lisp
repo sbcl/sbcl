@@ -83,7 +83,8 @@
         *print-right-margin* nil
         *print-miser-width* nil
         *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table #() nil nil)
-        *suppress-print-errors* nil))
+        *suppress-print-errors* nil
+        *current-level-in-print* 0))
 
 ;;; called when a cold system starts up
 (defun !cold-init (&aux (real-choose-symbol-out-fun #'choose-symbol-out-fun)
