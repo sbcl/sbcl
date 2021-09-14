@@ -761,6 +761,8 @@
              `(and (eql nargs 2) (zerop (car args)) (zerop (cadr args))))
            (same-sign-infinities-p ()
              `(and (eql nargs 2)
+                   (floatp (car args))
+                   (floatp (cadr args))
                    (member (flonum-%value (car args)) '(:-infinity :+infinity))
                    (eq (flonum-%value (cadr args)) (flonum-%value (car args))))))
 
