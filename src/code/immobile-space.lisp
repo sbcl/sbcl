@@ -170,8 +170,9 @@
                  ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
                  ;; that self-modifying code works correctly, so the fetcher
                  ;; should never see a torn write.
-                 (%primitive sb-vm::signed-sap-cas-32
-                             sap 0 oldval newval))))
+                 (cas (sap-ref-32 sap 0)
+                      (ldb (byte 32 0) oldval)
+                      (ldb (byte 32 0) newval)))))
         (do-immobile-code (code)
           ;; Examine only those code components which potentially use FDEFN.
           (binding* ((constant-index (code-statically-links-fdefn-p code) :exit-if-null)

@@ -553,17 +553,6 @@
                      (atomic-pop (symbol-value 'x))))))
       1)))
 
-#+x86-64 ; missing symbol sb-vm::signed-sap-cas-32 otherwise
-(with-test (:name :cas-sap-ref ; FIXME: remove
-            :skipped-on :interpreter)
-  (let ((v (make-array 2 :element-type '(signed-byte 32)
-                         :initial-element -1)))
-    (let ((old (sb-sys:%primitive sb-vm::signed-sap-cas-32
-                                  (sb-sys:vector-sap v)
-                                  0 -1 1)))
-      (assert (= old -1))
-      (assert (eql (aref v 0) 1)))))
-
 (in-package "SB-VM")
 
 ;;; This file defines a structure, so is an 'impure' test

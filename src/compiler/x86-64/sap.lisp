@@ -387,21 +387,3 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
       (if (location= sap vector)
           (inst add sap disp)
           (inst lea sap (ea disp vector))))))
-
-;;; Compare and swap
-(define-vop (signed-sap-cas-32) ; FIXME: remove
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (offset :scs (signed-reg) :to (:eval 0))
-         (oldval :scs (signed-reg) :target eax)
-         (newval :scs (signed-reg) :to (:eval 0)))
-  (:temporary (:sc unsigned-reg :offset rax-offset
-                   :from (:argument 2) :to (:result 0)) eax)
-  (:arg-types system-area-pointer signed-num signed-num signed-num)
-  (:results (result :scs (signed-reg)))
-  (:result-types signed-num)
-  (:generator 5
-    (inst mov :dword eax oldval)
-    (inst cmpxchg :lock :dword (ea sap offset) newval)
-    (inst movsx '(:dword :qword) result eax)))
-
