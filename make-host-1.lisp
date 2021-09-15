@@ -15,7 +15,9 @@
           (satisfies optional+key-style-warning-p)
           sb-ext:code-deletion-note))
 (progn
-  (setf *host-obj-prefix* "obj/from-host/")
+  (setf *host-obj-prefix* (if (boundp 'cl-user::*sbcl-host-obj-prefix*)
+                              (symbol-value 'cl-user::*sbcl-host-obj-prefix*)
+                              "obj/from-host/"))
   (load "src/cold/set-up-cold-packages.lisp")
   (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 
@@ -171,4 +173,5 @@
  (host-cload-stem "src/compiler/generic/genesis" nil)
 ) ; END with-compilation-unit
 
-(sb-cold:genesis :c-header-dir-name "src/runtime/genesis")
+(unless (member :crossbuild-test sb-xc:*features*)
+  (sb-cold:genesis :c-header-dir-name "src/runtime/genesis"))
