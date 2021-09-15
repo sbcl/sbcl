@@ -91,6 +91,8 @@
 (defconstant tiocgpgrp 1074033795) ; #x40047483
 
 ;;; signals
+(defconstant sizeof-sigset_t 128) ; #x80
+(defconstant sig_setmask 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 10) ; #xa
 (defconstant sigchld 20) ; #x14
@@ -128,6 +130,9 @@
 (defconstant fpe-fltres 6) ; #x6
 (defconstant fpe-fltinv 7) ; #x7
 (defconstant fpe-fltsub 8) ; #x8
+
+(defconstant clock-process-cputime-id 2) ; #x2
+(defconstant clock-monotonic-coarse 6) ; #x6
 
 ;;; structures
 (define-alien-type nil

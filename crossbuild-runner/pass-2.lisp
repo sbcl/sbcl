@@ -25,11 +25,11 @@
                 (string-downcase (sb-cold::target-platform-keyword)))
         (funcall realfun stem))))
 
+(format t "~&Target features: ~S~%" sb-xc:*features*)
 (let ((warnings (sb-xc:with-compilation-unit ()
                   (load "src/cold/compile-cold-sbcl.lisp")
                   sb-c::*undefined-warnings*)))
   (finish-output host-sb-sys:*stdout*)
   (finish-output host-sb-sys:*stderr*)
-  ;; Sparc fails because stuff-groveled-from-headers is incomplete
-  (when (and warnings (not (target-featurep '(:or :sparc :win32))))
+  (when (and warnings (not (target-featurep :win32)))
     (error "Fail")))

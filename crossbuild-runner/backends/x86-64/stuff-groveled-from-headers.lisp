@@ -14,6 +14,7 @@
 (defconstant max_path 1024)
 (defconstant error-no-data 1)
 (defconstant +exception-maximum-parameters+ 6)
+(defconstant +exception-heap-corruption+ #xdeadbeef) ; random
 
 (in-package "SB-ALIEN")
 
