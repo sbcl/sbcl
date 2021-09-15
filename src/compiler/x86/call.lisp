@@ -1337,49 +1337,56 @@
 (define-vop ()
   (:translate %listify-rest-args)
   (:policy :safe)
-  (:args (context :scs (descriptor-reg) :target src)
+  ;; CONTEXT is used throughout the copying loop
+  (:args (context :scs (descriptor-reg) :to :save)
          (count :scs (any-reg) :target ecx))
   (:arg-types * tagged-num)
-  (:temporary (:sc unsigned-reg :offset esi-offset :from (:argument 0)) src)
+  ;; The only advantage to specifying ECX here is that JECXZ can be used
+  ;; in one place, and then only in the unlikely scenario that CONTEXT is not
+  ;; in ECX. If it was, SHL sets/clears the Z flag, but LEA doesn't.
+  ;; Not much of an advantage, but why not.
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
-  (:temporary (:sc unsigned-reg) dst)
+  ;; Note that DST conflicts with RESULT because we use both as temps
+  (:temporary (:sc unsigned-reg ) value dst)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-          (loop (gen-label))
+    (let ((loop (gen-label))
           (done (gen-label))
           (stack-allocate-p (node-stack-allocate-p node)))
-      (move src context)
-      (move ecx count)
-      ;; Check to see whether there are no args, and just return NIL if so.
+      ;; Compute the number of bytes to allocate
+      (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
+        (if (location= count ecx)
+            (inst shl ecx shift)
+            (inst lea ecx (make-ea :dword :index count :scale (ash 1 shift)))))
+      ;; Setup for the CDR of the last cons (or the entire result) being NIL.
       (inst mov result nil-value)
-      (inst test ecx ecx)
-      (inst jmp :z done)
-      (inst lea dst (make-ea :dword :base ecx :index ecx))
+      (inst jecxz DONE)
       (pseudo-atomic (:elide-if stack-allocate-p)
-        (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
-        ;; Set up the result.
-        (move result dst)
-        ;; Jump into the middle of the loop, 'cause that's where we want
-        ;; to start.
-        (inst jmp enter)
-        (emit-label loop)
-        ;; Compute a pointer to the next cons.
-        (inst add dst (* cons-size n-word-bytes))
-        ;; Store a pointer to this cons in the CDR of the previous cons.
-        (storew dst dst -1 list-pointer-lowtag)
-        (emit-label enter)
-        ;; Grab one value and stash it in the car of this cons.
-        (inst mov eax (make-ea :dword :base src))
-        (inst sub src n-word-bytes)
-        (storew eax dst 0 list-pointer-lowtag)
-        ;; Go back for more.
-        (inst sub ecx n-word-bytes)
-        (inst jmp :nz loop)
-        ;; NIL out the last cons.
-        (storew nil-value dst 1 list-pointer-lowtag))
+       ;; Produce an untagged pointer into DST
+       (allocation 'list ecx 0 node stack-allocate-p dst)
+       ;; Recalculate DST as a tagged pointer to the last cons
+       (inst lea dst (make-ea :dword :disp (- list-pointer-lowtag (* cons-size n-word-bytes))
+                              :base dst :index ecx))
+       (inst shr ecx (1+ word-shift)) ; convert bytes to number of cells
+       ;; The rightmost arguments are at lower addresses.
+       ;; Start by indexing the last argument
+       (inst neg ecx)
+       (emit-label LOOP)
+       ;; Grab one value and store into this cons. Use ECX as an index into the
+       ;; vector of values in CONTEXT, but add 4 because CONTEXT points exactly at
+       ;; the 0th value, which means that the index is 1 word too low.
+       ;; (It's -1 if there is exactly 1 value, instead of 0, and so on)
+       (inst mov value (make-ea :dword :disp 4 :base context :index ecx :scale 4))
+       ;; RESULT began as NIL which gives the correct value for the CDR in the final cons.
+       ;; Subsequently it points to each cons just populated, which is correct all the way
+       ;; up to and including the final result.
+       (storew result dst cons-cdr-slot list-pointer-lowtag)
+       (storew value dst cons-car-slot list-pointer-lowtag)
+       (inst mov result dst) ; preserve the value to put in the CDR of the preceding cons
+       (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
+       (inst inc ecx)
+       (inst jmp :nz loop))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by

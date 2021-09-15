@@ -1272,54 +1272,70 @@
     done))
 
 ;;; Turn more arg (context, count) into a list.
+;;; Cons cells will be filled in right-to-left.
+;;; This has a slight advantage in code size, and eliminates an initial
+;;; forward jump into the loop. it also admits an interesting possibility
+;;; to reduce the scope of the pseudo-atomic section so as not to
+;;; encompass construction of the list. To do that, we will need to invent
+;;; a new widetag for "contiguous CONS block" which has a header conveying
+;;; the total payload length. Initially we would store that into the CAR of the
+;;; first cons cell. Upon seeing such header, GC shall treat that entire object
+;;; as a boxed payload of specified length. It will be implicitly pinned
+;;; (if conservative) or transported as a whole (if precise). Then when the CAR
+;;; of the first cons is overwritten, the object changes to a linked list.
 (define-vop ()
   (:translate %listify-rest-args)
   (:policy :safe)
-  (:args (context :scs (descriptor-reg) :target src)
+  ;; CONTEXT is used throughout the copying loop
+  (:args (context :scs (descriptor-reg) :to :save)
          (count :scs (any-reg) :target rcx))
   (:arg-types * tagged-num)
-  (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 0)) src)
+  ;; The only advantage to specifying RCX here is that JRCXZ can be used
+  ;; in one place, and then only in the unlikely scenario that CONTEXT is not
+  ;; in RCX. If it was, SHL sets/clears the Z flag, but LEA doesn't.
+  ;; Not much of an advantage, but why not.
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
-  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
-  (:temporary (:sc unsigned-reg) dst)
+  ;; Note that DST conflicts with RESULT because we use both as temps
+  (:temporary (:sc unsigned-reg) value dst)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-          (loop (gen-label))
+    (let ((loop (gen-label))
           (done (gen-label))
           (stack-allocate-p (node-stack-allocate-p node)))
-      (move src context)
-      (move rcx count)
-      ;; Check to see whether there are no args, and just return NIL if so.
+      ;; Compute the number of bytes to allocate
+      (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
+        (if (location= count rcx)
+            (inst shl :dword rcx shift)
+            (inst lea :dword rcx (ea nil count (ash 1 shift)))))
+      ;; Setup for the CDR of the last cons (or the entire result) being NIL.
       (inst mov result nil-value)
-      (inst test rcx rcx)
-      (inst jmp :z done)
-      (inst lea dst (ea nil rcx (ash 2 (- word-shift n-fixnum-tag-bits))))
-      (unless stack-allocate-p
-        (instrument-alloc 'list dst node))
+      (inst jrcxz DONE)
+      (unless stack-allocate-p (instrument-alloc 'list rcx node))
       (pseudo-atomic (:elide-if stack-allocate-p)
-       (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
-       ;; Set up the result.
-       (move result dst)
-       ;; Jump into the middle of the loop, 'cause that's where we want
-       ;; to start.
-       (inst jmp enter)
-       (emit-label loop)
-       ;; Compute a pointer to the next cons.
-       (inst add dst (* cons-size n-word-bytes))
-       ;; Store a pointer to this cons in the CDR of the previous cons.
-       (storew dst dst -1 list-pointer-lowtag)
-       (emit-label enter)
-       ;; Grab one value and stash it in the car of this cons.
-       (inst mov rax (ea src))
-       (inst sub src n-word-bytes)
-       (storew rax dst 0 list-pointer-lowtag)
-       ;; Go back for more.
-       (inst sub rcx (fixnumize 1))
-       (inst jmp :nz loop)
-       ;; NIL out the last cons.
-       (storew nil-value dst 1 list-pointer-lowtag))
+       ;; Produce an untagged pointer into DST
+       (allocation 'list rcx 0 node stack-allocate-p dst)
+       ;; Recalculate DST as a tagged pointer to the last cons
+       (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
+       (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
+       ;; The rightmost arguments are at lower addresses.
+       ;; Start by indexing the last argument
+       (inst neg rcx) ; :QWORD because it's a signed number
+       (emit-label LOOP)
+       ;; Grab one value and store into this cons. Use RCX as an index into the
+       ;; vector of values in CONTEXT, but add 8 because CONTEXT points exactly at
+       ;; the 0th value, which means that the index is 1 word too low.
+       ;; (It's -1 if there is exactly 1 value, instead of 0, and so on)
+       (inst mov value (ea 8 context rcx 8))
+       ;; RESULT began as NIL which gives the correct value for the CDR in the final cons.
+       ;; Subsequently it points to each cons just populated, which is correct all the way
+       ;; up to and including the final result.
+       (storew result dst cons-cdr-slot list-pointer-lowtag)
+       (storew value dst cons-car-slot list-pointer-lowtag)
+       (inst mov result dst) ; preserve the value to put in the CDR of the preceding cons
+       (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
+       (inst inc rcx) ; :QWORD because it's a signed number
+       (inst jmp :nz loop))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
