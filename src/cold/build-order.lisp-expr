@@ -363,12 +363,7 @@
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")
- ("src/compiler/ir1-translators"
-  ;; workaround for ABCL warnings that are not of type STYLE-WARNING:
-  ;;  "Unable to compile function IR1-CONVERT-TAGBODY.  Using interpreted form instead."
-  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
-                (cl:find :abcl cl:*features*))
-        :ignore-failure-p))
+ ("src/compiler/ir1-translators")
  ("src/compiler/ir1util")
  ("src/compiler/callable-args")
  ("src/compiler/locall")

@@ -413,14 +413,6 @@
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
     ;; while the cross-compiler is being built in the host ANSI Lisp.)
     :assem
-    ;; meaning: The #'COMPILE-STEM argument called :IGNORE-FAILURE-P
-    ;; should be true. (This is a KLUDGE: I'd like to get rid of it.
-    ;; For now, it exists so that compilation can proceed through the
-    ;; legacy warnings in src/compiler/x86/array.lisp, which I've
-    ;; never figured out but which were apparently acceptable in CMU
-    ;; CL. Eventually, it would be great to just get rid of all
-    ;; warnings and remove support for this flag. -- WHN 19990323)
-    :ignore-failure-p
     ;; meaning: ignore this flag.
     ;; This works around nonstandard behavior of "#." in certain hosts.
     ;; When the evaluated form yields 0 values, ECL and CLISP treat it
@@ -546,42 +538,43 @@
 ;;; STEM and FLAGS are as per DO-STEMS-AND-FLAGS.  MODE is one of
 ;;; :HOST-COMPILE and :TARGET-COMPILE.
 (defun compile-stem (stem flags mode)
-
-  (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
-         ;; Lisp Way, although it works just fine for common UNIX environments.
-         ;; Should it come to pass that the system is ported to environments
-         ;; where version numbers and so forth become an issue, it might become
-         ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
-         ;; machinery instead of just using strings. In the absence of such a
-         ;; port, it might or might be a good idea to do the rewrite.
-         ;; -- WHN 19990815
-         (src (stem-source-path stem))
+  (let* ((src (stem-source-path stem))
          (obj (stem-object-path stem flags mode))
          ;; Compile-for-effect happens simultaneously with a forked compile,
          ;; so we need the for-effect output not to stomp on the real output.
          (tmp-obj
           (concatenate 'string obj
                        (if *compile-for-effect-only* "-scratch" "-tmp")))
-
          (compile-file (ecase mode
                          (:host-compile
-                          #+ccl
+                          #+abcl ; ABCL complains about its own deficiency and then returns T
+                          ;; for warnings and failure. "Unable to compile function" is not our problem,
+                          ;; but I tried everything to muffle it, and nothing worked; so if it occurs,
+                          ;; treat the file as a success despite any actual problems that may exist.
                           (lambda (&rest args)
-                            ;; CCL doesn't like NOTINLINE on uknown functions
+                            (let (compiler-bug)
+                              ;; Even though COMPILER-UNSUPPORTED-FEATURE-ERROR is a condition class,
+                              ;; HANDLER-BIND seems unable to match it. What the hell? Bugs all the way down.
+                              (handler-bind ((condition
+                                              (lambda (c)
+                                                (when (search "Using interpreted form" (princ-to-string c))
+                                                  (setq compiler-bug t)))))
+                                (multiple-value-bind (fasl warn err) (apply #'compile-file args)
+                                  (if compiler-bug (values fasl nil nil) (values fasl warn err))))))
+                          #+ccl ; CCL doesn't like NOTINLINE on unknown functions
+                          (lambda (&rest args)
                             (handler-bind ((ccl:compiler-warning
                                              (lambda (c)
                                                (when (eq (ccl::compiler-warning-warning-type c)
                                                          :unknown-declaration-function)
                                                  (muffle-warning c)))))
                               (apply #'compile-file args)))
-                          #-ccl
-                          #'compile-file)
+                          #-(or abcl ccl) #'compile-file)
                          (:target-compile (if (find :assem flags)
                                               *target-assemble-file*
                                               *target-compile-file*))))
          (trace-file (if (find :trace-file flags) t nil))
-         (block-compile (if (find :block-compile flags) t :specified))
-         (ignore-failure-p (find :ignore-failure-p flags)))
+         (block-compile (if (find :block-compile flags) t :specified)))
     (declare (type function compile-file))
 
     (ensure-directories-exist obj :verbose cl:*compile-print*) ; host's value
@@ -659,10 +652,7 @@
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
                  (failure-p
-                  (if ignore-failure-p
-                      (warn "ignoring FAILURE-P return value from compilation of ~S"
-                            src)
-                      (unwind-protect
+                  (unwind-protect
                            (restart-case
                                (error "FAILURE-P was set when creating ~S."
                                       obj)
@@ -675,7 +665,7 @@
                         ;; Don't leave failed object files lying around.
                         (when (and failure-p (probe-file tmp-obj))
                           (delete-file tmp-obj)
-                          (format t "~&deleted ~S~%" tmp-obj)))))
+                          (format t "~&deleted ~S~%" tmp-obj))))
                  ;; Otherwise: success, just fall through.
                  (t nil)))))
 
