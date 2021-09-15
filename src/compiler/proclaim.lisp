@@ -105,7 +105,12 @@
 
       (let ((kind (info :function :kind name)))
         ;; scrubbing old data I: possible collision with a macro
-        (when (and (fboundp name) (eq :macro kind))
+        ;; There's a silly little problem with fun names that are not ANSI-legal names,
+        ;; e.g. (CAS mumble). We can't ask the host whether that is FBOUNDP,
+        ;; because it would rightly complain. So, just assume that it is not FBOUNDP.
+        (when (and #+sb-xc-host (symbolp name)
+                   (fboundp name)
+                   (eq :macro kind))
           (assert-it)
           (compiler-style-warn "~S was previously defined as a macro." name)
           (setf (info :function :where-from name) :assumed)

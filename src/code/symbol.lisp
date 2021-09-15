@@ -242,19 +242,17 @@ distinct from the global value. Can also be SETF."
                 (sb-thread:barrier (:write) ; Retry using same newcell
                   (rplacd newcell info)))))))
 
-(declaim (inline %compare-and-swap-symbol-plist
-                 %set-symbol-plist))
+(declaim (inline (cas symbol-plist) %set-symbol-plist))
 
-(defun %compare-and-swap-symbol-plist (symbol old new)
-  ;; This is the entry point into which (CAS SYMBOL-PLIST) is transformed.
+(defun (cas symbol-plist) (old new symbol)
   ;; If SYMBOL's info cell is a cons, we can do (CAS CAR). Otherwise punt.
   (declare (symbol symbol) (list old new))
   (let ((cell (symbol-info symbol)))
     (if (consp cell)
         (%compare-and-swap-car cell old new)
-        (%%compare-and-swap-symbol-plist symbol old new))))
+        (%compare-and-swap-symbol-plist old new symbol))))
 
-(defun %%compare-and-swap-symbol-plist (symbol old new)
+(defun %compare-and-swap-symbol-plist (old new symbol)
   ;; This is just the second half of a partially-inline function, to avoid
   ;; code bloat in the exceptional case.  Type assertions should have been
   ;; done - or not, per policy - by the caller of %COMPARE-AND-SWAP-SYMBOL-PLIST

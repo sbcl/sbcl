@@ -116,18 +116,11 @@ lockless algorithms.
 
 @unnumberedsubsec CAS Protocol
 
-Our @code{compare-and-swap} is user-extensible using a protocol
-similar to @code{setf}, allowing users to add CAS support to new
-places via e.g. @code{defcas}.
-
-At the same time, new atomic operations can be built on top of CAS
-using @code{get-cas-expansion}. See @code{atomic-update},
-@code{atomic-push}, and @code{atomic-pop} for examples of how to do
-this.
+Our @code{compare-and-swap} is user-extensible by defining functions
+named (CAS place), allowing users to add CAS support to new
+places.
 
 @include macro-sb-ext-cas.texinfo
-@include macro-sb-ext-defcas.texinfo
-@include fun-sb-ext-get-cas-expansion.texinfo
 
 @node Mutex Support
 @comment  node-name,  next,  previous,  up

@@ -1907,6 +1907,7 @@ symbol-case giving up: case=((V U) (F))
                                      (the ,type ,new)))
                 `(,op ,instance))))))
 
+;;; FIXME: remove (it's EXPERIMENTAL, so doesn't need to go through deprecation)
 (defun get-cas-expansion (place &optional environment)
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
 
@@ -2022,49 +2023,6 @@ EXPERIMENTAL: Interface subject to change."
             (,old-temp ,old)
             (,new-temp ,new))
        ,cas-form)))
-
-;; don't use. pending complete removal
-(sb-xc:defmacro %def-cas-expander (accessor lambda-list &body body)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (setf (info :cas :expander ',accessor)
-           ,(make-macro-lambda `(cas-expand ,accessor) lambda-list body
-                               'define-cas-expander accessor))))
-
-;; FIXME: this interface is bogus - short-form DEFSETF/CAS does not
-;; want a lambda-list. You just blindly substitute
-;;  (CAS (PLACE arg1 ... argN) old new) -> (F arg1 ... argN old new).
-;; What role can this lambda-list have when there is no user-provided
-;; code to read the variables?
-;; And as mentioned no sbcl-devel, &REST is beyond bogus, it's broken.
-;;
-(sb-xc:defmacro defcas (accessor lambda-list function &optional docstring)
-  "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
-for compare-and-swap on places accessed using ACCESSOR. LAMBDA-LIST
-must correspond to the lambda-list of the accessor.
-
-Note that the system provides no automatic atomicity for CAS expansions
-resulting from DEFCAS, nor can it verify that they are atomic: it is up to the
-user of DEFCAS to ensure that the function specified is atomic.
-
-EXPERIMENTAL: Interface subject to change."
-  (multiple-value-bind (llks reqs opts rest)
-      (parse-lambda-list lambda-list
-                         :accept (lambda-list-keyword-mask '(&optional &rest))
-                         :context "a DEFCAS lambda-list")
-    (declare (ignore llks))
-    `(%def-cas-expander ,accessor ,lambda-list
-       ,@(when docstring (list docstring))
-       ;; FIXME: if a &REST arg is present, this is really weird.
-       (let ((temps (mapcar #'gensymify ',(append reqs opts rest)))
-             (args (list ,@(append reqs opts rest)))
-             (old (gensym "OLD"))
-             (new (gensym "NEW")))
-         (values temps
-                 args
-                 old
-                 new
-                 `(,',function ,@temps ,old ,new)
-                 `(,',accessor ,@temps))))))
 
 (sb-xc:defmacro compare-and-swap (place old new)
   "Atomically stores NEW in PLACE if OLD matches the current value of PLACE.

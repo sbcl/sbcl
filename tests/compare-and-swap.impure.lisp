@@ -502,20 +502,6 @@
                   (eval `(let (,@(mapcar 'list vars vals))
                       ,read-form)))))))
 
-(let ((foo (cons :foo nil)))
-  (defun cas-foo (old new)
-    (cas (cdr foo) old new)))
-
-(defcas foo () cas-foo)
-
-(with-test (:name :cas-and-macroexpansion)
-  (assert (not (cas (foo) nil t)))
-  (assert (eq t (cas (foo) t nil)))
-  (symbol-macrolet ((bar (foo)))
-    (assert (not (cas bar nil :ok)))
-    (assert (eq :ok (cas bar :ok nil)))
-    (assert (not (cas bar nil t)))))
-
 (with-test (:name :atomic-push
             :skipped-on (not :sb-thread))
   (let ((store (cons nil nil))
