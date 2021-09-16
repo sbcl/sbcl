@@ -2036,53 +2036,56 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 ;;;; n-argument functions
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-convert) ((&rest args) node block)
-                (cond #+gencgc
-                      ((>= (length args)
-                           (/ sb-vm:large-object-size
-                              (* sb-vm:n-word-bytes 2)))
-                       ;; The VOPs will try to allocate all space at once
-                       ;; And it'll end up in large objects, and no conses
-                       ;; are welcome there.
-                       (ir2-convert-full-call node block))
-                      (t
-                       (let* ((scs
-                               (operand-parse-scs
-                                (vop-parse-more-args
-                                 (gethash 'list *backend-parsed-vops*))))
-                              (allow-const
-                               ;; Make sure the backend allows both of IMMEDIATE
-                               ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
-                               (and (member 'sb-vm::constant scs)
-                                    (member 'sb-vm::immediate scs)
-                                    ;; FIXME: this is terribly wrong that in high debug
-                                    ;; settings we can't allow constants at the IR2 level.
-                                    ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
-                                    ;; constants are allowed. Somehow we're affecting
-                                    ;; semantics. It's baffling.
-                                    (policy node (< debug 3))))
-                              (refs (reference-tn-list
-                                     (loop for arg in args
-                                           for tn = (make-normal-tn *backend-t-primitive-type*)
-                                           do
-                                           (cond ((and allow-const (constant-lvar-p arg))
-                                                  (setq tn (emit-constant (lvar-value arg))))
-                                                 (t
-                                                  (emit-move node block (lvar-tn node block arg) tn)))
-                                           collect tn)
-                                     nil))
-                              (lvar (node-lvar node))
-                              (res (lvar-result-tns
-                                    lvar (list (specifier-type 'list)))))
-                         (when (and lvar (lvar-dynamic-extent lvar))
-                           (vop current-stack-pointer node block
-                                (ir2-lvar-stack-pointer (lvar-info lvar))))
-                         (vop* ,name node block (refs) ((first res) nil)
-                               (length args))
-                         (move-lvar-result node block res lvar)))))))
-  (def list)
-  (def list*))
+(defoptimizer (list ir2-convert) ((&rest args) node block)
+  (let* ((fun (lvar-fun-name (combination-fun node)))
+         ;; CONS won't appear here (yet) because its primitive object has ':alloc-trans cons'
+         ;; which causes it to get a specialized ir2-convert that goes to FIXED-ALLOC and INIT-SLOT.
+         ;; I plan to change it so that the only way to allocate cons cells is via this vop.
+         (star (ecase fun ((list* cons) t) ((list) nil))))
+    ;; LIST needs at least 1 arg, LIST* demands at least 2 args
+    (aver (if star (cdr args) args))
+    ;; This used to convert as a full call to LIST or LIST* when n-cons-cell exceeded a threshold
+    ;; which could confuse GC (see the :NO-CONSES-ON-LARGE-OBJECT-PAGES regression test).
+    ;; It's no longer required to special-case that situation.
+    ;; Nonetheless, beyond a certain length, it might make sense to do a full call anyway,
+    ;; because there's little to be gained by inlining all the stores - the generated code size
+    ;; grows at a rate faster than pushing more stack arguments - but because MAKE-LIST avoids
+    ;; allocating as one huge chunk (instead, doing a cons at a time), in theory it can better
+    ;; utilize free memory. But really, if you have a statically written LIST call with so many
+    ;; args that it exhausts the heap, you should probably rethink your coding style.
+    (let* ((allow-const
+            ;; The backend either does or doesn't allow constants in the "more" arg.
+            ;; Determine that once only. Only x86-64 specifies any SCs as yet.
+            (and #.(let ((scs
+                          (operand-parse-scs
+                           (vop-parse-more-args (gethash 'list *backend-parsed-vops*)))))
+                     ;; MAKE-CONSTANT-TN could produce either SC, so ensure both are present.
+                     (and (member 'sb-vm::constant scs)
+                          (member 'sb-vm::immediate scs)
+                          t))
+                 ;; FIXME: this is terribly wrong that in high debug
+                 ;; settings we can't allow constants at the IR2 level.
+                 ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
+                 ;; constants are allowed. Somehow we're affecting
+                 ;; semantics. It's baffling.
+                 (policy node (< debug 3))))
+           (refs (reference-tn-list
+                  (mapcar (lambda (arg)
+                            (cond ((and allow-const (constant-lvar-p arg))
+                                   (emit-constant (lvar-value arg)))
+                                  (t
+                                   (let ((tn (make-normal-tn *backend-t-primitive-type*)))
+                                     (emit-move node block (lvar-tn node block arg) tn)
+                                     tn))))
+                          args)
+                  nil))
+           (lvar (node-lvar node))
+           (res (lvar-result-tns lvar (list (specifier-type 'list)))))
+      (when (and lvar (lvar-dynamic-extent lvar))
+        (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
+      (vop* list node block (refs) ((first res) nil) star (- (length args) (if star 1 0)))
+      (move-lvar-result node block res lvar))))
+(setf (fun-info-ir2-convert (fun-info-or-lose 'list*)) #'list-ir2-convert-optimizer)
 
 
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)

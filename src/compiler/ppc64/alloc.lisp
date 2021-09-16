@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 ;;;; LIST and LIST*
-(define-vop (list-or-list*)
+(define-vop (list)
   (:args (things :more t))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
@@ -20,20 +20,12 @@
               res)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:temporary (:scs (non-descriptor-reg)) alloc-temp)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :safe)
   (:node-var node)
   #-gencgc (:ignore alloc-temp)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((maybe-load (tn)
+    (macrolet ((maybe-load (tn)
                   (once-only ((tn tn))
                     `(sc-case ,tn
                        ((any-reg descriptor-reg null)
@@ -41,10 +33,9 @@
                        (control-stack
                         (load-stack-tn temp ,tn)
                         temp)))))
-             (let* ((dx-p (node-stack-allocate-p node))
-                    (cons-cells (if star (1- num) num))
-                    (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag :sync nil)
+      (let ((dx-p (node-stack-allocate-p node))
+            (alloc (* (pad-data-block cons-size) cons-cells)))
+        (pseudo-atomic (pa-flag :sync nil)
                  (if dx-p
                      (progn
                        (align-csp res)
@@ -69,14 +60,7 @@
                              (maybe-load (tn-ref-tn (tn-ref-across things)))
                              null-tn)
                          ptr cons-cdr-slot list-pointer-lowtag))
-               (move result res)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
-
+        (move result res)))))
 
 ;;;; Special purpose inline allocators.
 

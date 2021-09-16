@@ -12,33 +12,25 @@
 (in-package "SB-VM")
 
 
-(define-vop (list-or-list*)
+(define-vop (list)
   (:args (things :more t))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:scs (any-reg)) temp)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:variant-vars star)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t (flet ((maybe-load (tn)
-                      (sc-case tn
-                        ((any-reg descriptor-reg)
-                         tn)
-                        (control-stack
-                         (load-stack-tn temp tn)
-                         temp))))
-               (let* ((cons-cells (if star (1- num) num))
-                      (alloc (* (pad-data-block cons-size) cons-cells)))
-                 (pseudo-atomic (pa-flag)
+    (flet ((maybe-load (tn)
+             (sc-case tn
+              ((any-reg descriptor-reg) tn)
+              (control-stack
+               (load-stack-tn temp tn)
+               temp))))
+      (let ((alloc (* (pad-data-block cons-size) cons-cells)))
+        (pseudo-atomic (pa-flag)
                    (allocation 'list alloc list-pointer-lowtag res
                                :flag-tn pa-flag
                                :stack-allocate-p (node-stack-allocate-p node)
@@ -57,13 +49,7 @@
                                (maybe-load (tn-ref-tn (tn-ref-across things)))
                                null-tn)
                        ptr cons-cdr-slot list-pointer-lowtag))
-                 (move result res)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-(define-vop (list* list-or-list*)
-  (:variant t))
-
+        (move result res)))))
 
 ;;;; Special purpose inline allocators.
 

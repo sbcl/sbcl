@@ -531,7 +531,7 @@
     (inst cbz count DONE)
 
     (let ((dx-p (node-stack-allocate-p node)))
-      (pseudo-atomic (pa-flag :sync nil :elide dx-p)
+      (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
         ;; Allocate a cons (2 words) for each item.
         (let ((size (cond (dx-p
                            (lsl count (1+ (- word-shift n-fixnum-tag-bits))))

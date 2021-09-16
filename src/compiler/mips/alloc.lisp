@@ -12,26 +12,18 @@
 (in-package "SB-VM")
 
 ;;;; LIST and LIST*
-(define-vop (list-or-list*)
+(define-vop (list)
   (:args (things :more t))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :safe)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((store-car (tn list &optional (slot cons-car-slot))
+    (macrolet ((store-car (tn list &optional (slot cons-car-slot))
                   `(let ((reg
                           (sc-case ,tn
                             ((any-reg descriptor-reg zero null)
@@ -40,10 +32,9 @@
                              (load-stack-tn temp ,tn)
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
-             (let* ((dx-p (node-stack-allocate-p node))
-                    (cons-cells (if star (1- num) num))
-                    (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc))
+      (let ((dx-p (node-stack-allocate-p node))
+            (alloc (* (pad-data-block cons-size) cons-cells)))
+        (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc))
                  (when dx-p
                    (align-csp res))
                  (inst srl res (if dx-p csp-tn alloc-tn) n-lowtag-bits)
@@ -67,13 +58,7 @@
                         (storew null-tn ptr
                                 cons-cdr-slot list-pointer-lowtag)))
                  (aver (null (tn-ref-across things)))
-                 (move result res))))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
+                 (move result res))))))
 
 ;;;; Special purpose inline allocators.
 

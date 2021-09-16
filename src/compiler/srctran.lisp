@@ -134,9 +134,13 @@
 ;;; SBCL itself); translate it to CONS to take advantage of common
 ;;; allocation routines.
 (define-source-transform list (&rest args)
-  (case (length args)
-    (1 `(cons ,(first args) nil))
-    (t (values nil t))))
+  (cond ((not args) (values nil nil))
+        ((not (cdr args))
+         ;; It's unclear to me how
+         ;; "taking advantage of common allocation routines"
+         ;; wouldn't happen anyway.
+         `(cons ,(first args) nil))
+        (t (values nil t))))
 
 (defoptimizer (list derive-type) ((&rest args))
   (if args

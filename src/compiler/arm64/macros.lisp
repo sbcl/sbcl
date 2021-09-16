@@ -243,7 +243,7 @@
               (stack-allocate-p stack-allocate-p)
               (lip lip))
     `(pseudo-atomic (,flag-tn :sync ,type-code
-                     :elide ,stack-allocate-p)
+                     :elide-if ,stack-allocate-p)
        (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
@@ -311,13 +311,13 @@
                            other-pointer-lowtag)))))
 
 ;;; handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((flag-tn &key elide (sync t)) &body forms)
+(defmacro pseudo-atomic ((flag-tn &key elide-if (sync t)) &body forms)
   (declare (ignorable sync))
   #+sb-safepoint
   `(progn ,@forms (emit-safepoint))
   #-sb-safepoint
   `(progn
-     (unless ,elide
+     (unless ,elide-if
        (without-scheduling ()
          #-sb-thread
          (store-symbol-value csp-tn *pseudo-atomic-atomic*)
@@ -327,7 +327,7 @@
                   (* n-word-bytes thread-pseudo-atomic-bits-slot)))))
      (assemble ()
        ,@forms)
-     (unless ,elide
+     (unless ,elide-if
        (without-scheduling ()
          #-sb-thread
          (progn
