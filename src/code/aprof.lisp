@@ -188,6 +188,17 @@
              (:or (or ?free ?lowtag)
                   (lea :qword ?result (ea ?lowtag ?free))))
 
+        ;; LISTIFY-REST-ARG computes a tagged pointer to the _last_ cons in the memory block,
+        ;; not the first cons.
+        (list (lea :qword ?end (ea 0 ?nbytes ?free))
+              (cmp :qword ?end :tlab-limit)
+              (jmp :nbe ?_)
+              (mov :qword :tlab-freeptr ?end)
+              (lea :qword ?free (ea ,(- sb-vm:list-pointer-lowtag
+                                        (* sb-vm:cons-size sb-vm:n-word-bytes))
+                                    ?free ?nbytes))
+              (shr ?nbytes 4))
+
         ;; either non-headered object (cons) or unknown header or unknown nbytes
         (unknown-header (:or (lea :qword ?end (ea ?nbytes ?free ?nbytes-var))
                              (lea :qword ?end (ea 0 ?nbytes-var ?free))
@@ -456,6 +467,8 @@
                    (setq type (aref *tag-to-type* (logand header #xFF)))
                    (when (eq type 'instance)
                      (setq type (deduce-layout iterator bindings))))
+                  ((eq type 'list) ; listify-rest-arg
+                   (setq nbytes nil))
                   ((member type '(any unknown-header))
                    (setq type (case lowtag
                                 (#.sb-vm:list-pointer-lowtag 'list)

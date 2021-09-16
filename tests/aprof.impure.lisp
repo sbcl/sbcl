@@ -120,6 +120,11 @@ sb-vm::
       (when (search "THAT-STRUCT" line) (setq seen-that t)))
     (assert (and seen-this seen-that))))
 
+(with-test (:name :listify-rest-arg)
+  (let ((nbytes (let ((*standard-output* (make-broadcast-stream)))
+                  (sb-aprof:aprof-run #'list :arguments '(a b c)))))
+    (assert (= nbytes (* sb-vm:n-word-bytes 6)))))
+
 (with-test (:name :aprof-brutal-test)
   (with-scratch-file (fasl "fasl")
     ;; Just compile anything that exercises the compiler.
