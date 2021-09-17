@@ -128,7 +128,9 @@
   (nevents (* dword)))
 
 (define-alien-routine "socket_input_available" int
-  (socket handle))
+  (socket handle)
+  (time long)
+  (utime long))
 
 (define-alien-routine "console_handle_p" boolean
   (handle handle))
@@ -139,7 +141,7 @@
 ;;; introspect it, so we have to try various things until we find
 ;;; something that works.  Returns true if there could be input
 ;;; available, or false if there is not.
-(defun handle-listen (handle)
+(defun handle-listen (handle &optional (time 0) (utime 0))
   (cond ((console-handle-p handle)
          (alien-funcall (extern-alien "win32_tty_listen"
                                       (function boolean handle))
@@ -151,7 +153,7 @@
              (cond
                ((not (zerop res)) (return-from handle-listen (plusp avail)))
                ((= code error-broken-pipe) (return-from handle-listen t)))))
-         (let ((res (socket-input-available handle)))
+         (let ((res (socket-input-available handle time utime)))
            (unless (zerop res)
              (return-from handle-listen (= res 1))))
          t)))
