@@ -719,12 +719,6 @@
         (leaf-debug-name leaf))))
 
 (defun note-no-stack-allocation (lvar &key flush)
-  ;; If the target being compiled does not have all 4 of these features,
-  ;; then never warn about failure to stack-allocate. It's only useful to
-  ;; see when a _particular_ allocation can't go on the stack.
-  ;; It's just a distraction otherwise.
-  (declare (ignorable lvar flush))
-
   (do-uses (use (principal-lvar lvar))
     (dolist (use (ensure-list (if (cast-p use)
                                   (principal-lvar-use (cast-value use))
