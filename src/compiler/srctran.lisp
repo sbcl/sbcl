@@ -4559,8 +4559,7 @@
 
 (defoptimizer (format derive-type) ((dest control &rest args))
   (declare (ignore control args))
-  (when (and (constant-lvar-p dest)
-             (null (lvar-value dest)))
+  (when (lvar-value-is-nil dest)
     (specifier-type 'simple-string)))
 
 ;;; We disable this transform in the cross-compiler to save memory in
@@ -5072,8 +5071,7 @@
     (when (fun-type-p type)
       (let ((null-p (not (and (constant-lvar-p waitp)
                               (lvar-value waitp)
-                              (constant-lvar-p timeout)
-                              (null (lvar-value timeout))))))
+                              (lvar-value-is-nil timeout)))))
         (if null-p
             (values-type-union (fun-type-returns type)
                                (values-specifier-type '(values null &optional)))

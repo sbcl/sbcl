@@ -1484,9 +1484,7 @@
          (constant-end2 (and end2
                              (constant-lvar-p end2)
                              (lvar-value end2)))
-         (not-from-end (or (not from-end)
-                           (and (constant-lvar-p from-end)
-                                (not (lvar-value from-end)))))
+         (not-from-end (unsupplied-or-nil from-end))
          (min-result (or constant-start2 0))
          (max-result (or constant-end2 (1- array-dimension-limit)))
          (max2 (sequence-lvar-dimensions sequence2))
@@ -1907,10 +1905,10 @@
   ;; :KEY is allowed only if IDENTITY or NIL.
   (when (and (or (not test)
                  (lvar-fun-is test '(eq eql))
-                 (and (constant-lvar-p test) (null (lvar-value test))))
+                 (lvar-value-is-nil test))
              (or (not key)
                  (lvar-fun-is key '(identity))
-                 (and (constant-lvar-p key) (null (lvar-value key)))))
+                 (lvar-value-is-nil key)))
     (type-union (lvar-type item) (specifier-type 'null))))
 
 ;;; We want to make sure that %FIND-POSITION is inline-expanded into
@@ -1948,8 +1946,7 @@
          (not (and (lvar-single-value-p (node-lvar node))
                    (constant-lvar-p start)
                    (eql (lvar-value start) 0)
-                   (constant-lvar-p end)
-                   (null (lvar-value end))))))
+                   (lvar-value-is-nil end)))))
     `(let ((find nil)
            (position nil))
        (flet ((bounds-error ()

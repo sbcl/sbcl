@@ -79,6 +79,15 @@
             (error "~S used on non-constant LVAR ~S" 'lvar-value lvar))
           value))))
 
+(defun lvar-value-is-nil (lvar)
+  (and (constant-lvar-p lvar) (null (lvar-value lvar))))
+
+;;; Return true if ARG is NIL, or is a constant-lvar whose
+;;; value is NIL, false otherwise.
+(defun unsupplied-or-nil (arg)
+  (declare (type (or lvar null) arg))
+  (or (not arg) (lvar-value-is-nil arg)))
+
 (defun lvar-uses-values (lvar)
   (declare (type lvar lvar))
   (let ((uses (principal-lvar-use lvar)))
@@ -2580,8 +2589,7 @@
         (when (or (eq name 'list)
                   (and (eq name 'cons)
                        (let ((cdr (second args)))
-                        (and (constant-lvar-p cdr)
-                             (null (lvar-value cdr))
+                        (and (lvar-value-is-nil cdr)
                              (progn
                                (flush-dest cdr)
                                (setf (cdr args) nil)

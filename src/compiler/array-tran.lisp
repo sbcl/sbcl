@@ -131,14 +131,6 @@
        :aref)))
   (lvar-type new-value))
 
-;;; Return true if ARG is NIL, or is a constant-lvar whose
-;;; value is NIL, false otherwise.
-(defun unsupplied-or-nil (arg)
-  (declare (type (or lvar null) arg))
-  (or (not arg)
-      (and (constant-lvar-p arg)
-           (not (lvar-value arg)))))
-
 (defun supplied-and-true (arg)
   (and arg
        (constant-lvar-p arg)
@@ -1119,8 +1111,7 @@
     ;; this call to MAKE-ARRAY. So look for CONS instead of LIST,
     ;; which means that LIST was *not* declared notinline.
     (when (and (lvar-matches dims :fun-names '(cons) :arg-count 2)
-               (let ((cdr (second (combination-args (lvar-uses dims)))))
-                 (and (constant-lvar-p cdr) (null (lvar-value cdr)))))
+               (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
       (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
              (dummy (cadr args)))
         (flush-dest dummy)
@@ -1154,10 +1145,7 @@
                                           initial-element initial-contents call
                                           :adjustable adjustable
                                           :fill-pointer fill-pointer))
-            ((and fill-pointer
-                  (not (and
-                        (constant-lvar-p fill-pointer)
-                        (null (lvar-value fill-pointer)))))
+            ((and fill-pointer (not (lvar-value-is-nil fill-pointer)))
              (give-up-ir1-transform))
             (t
              (let* ((total-size (reduce #'* dims))
