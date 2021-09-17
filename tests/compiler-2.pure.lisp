@@ -2870,7 +2870,12 @@
            (checked-compile
             `(lambda ()
                (values-list (cons 1 nil)))))
-          '(function () (values (integer 1 1) &optional)))))
+          '(function () (values (integer 1 1) &optional))))
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            `(lambda (x) (values-list (list* x 1 x nil)))))
+          '(function (t) (values t (integer 1 1) t &optional)))))
 
 (with-test (:name :xeps-and-inlining)
   (checked-compile-and-assert

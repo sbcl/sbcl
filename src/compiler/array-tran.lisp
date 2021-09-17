@@ -1105,28 +1105,29 @@
                           *
                           :node call)
   (block make-array
-    ;; If lvar-use of DIMS is a call to LIST, then it must mean that LIST
-    ;; was declared notinline - because if it weren't, then it would have been
-    ;; source-transformed into CONS - which gives us reason NOT to optimize
-    ;; this call to MAKE-ARRAY. So look for CONS instead of LIST,
-    ;; which means that LIST was *not* declared notinline.
-    (when (and (lvar-matches dims :fun-names '(cons) :arg-count 2)
-               (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
-      (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
-             (dummy (cadr args)))
-        (flush-dest dummy)
+    ;; Recognize vector construction where the length is spelled as (LIST n)
+    ;; or (LIST* n nil). Don't care if FUN-LEXICALLY-NOTINLINE-P on those because
+    ;; you can't portably observe whether they're called (tracing them isn't allowed).
+    ;; XXX: minor OAOO problem, see similar logic in (VALUES-LIST OPTIMIZER).
+    (awhen (cond ((and (lvar-matches dims :fun-names '(list) :arg-count 1))
+                  (car (splice-fun-args dims :any 1)))
+                 ((and (lvar-matches dims :fun-names '(list*) :arg-count 2)
+                       (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
+                  (let* ((args (splice-fun-args dims :any 2)) ; the args to LIST*
+                         (dummy (cadr args)))
+                    (flush-dest dummy)
+                    (setf (combination-args call) (delete dummy (combination-args call)))
+                    (car args))))
         ;; Don't want (list (list x)) to become a valid dimension specifier.
-        (assert-lvar-type (car args) (specifier-type 'index)
-                          (%coerce-to-policy call))
-        (setf (combination-args call) (delete dummy (combination-args call)))
+        (assert-lvar-type it (specifier-type 'index) (%coerce-to-policy call))
         (return-from make-array
-          (transform-make-array-vector (car args)
+          (transform-make-array-vector it
                                        element-type
                                        initial-element
                                        initial-contents
                                        call
                                        :adjustable adjustable
-                                       :fill-pointer fill-pointer))))
+                                       :fill-pointer fill-pointer)))
     (unless (constant-lvar-p dims)
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))

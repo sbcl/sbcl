@@ -2586,13 +2586,18 @@
     (when (combination-p use)
       (let ((name (lvar-fun-name (combination-fun use)))
             (args (combination-args use)))
+        ;; Recognizing LIST* seems completely ad-hoc, however, once upon a time
+        ;; (LIST x) was translated to (CONS x NIL), so in order for this optimizer to
+        ;; pick off (VALUES-LIST (LIST x)), it had to instead look for (CONS x NIL).
+        ;; Realistically nobody should hand-write (VALUES-LIST ({CONS | LIST*} x NIL))
+        ;; so it seems very questionable in utility to preserve both spellings.
         (when (or (eq name 'list)
-                  (and (eq name 'cons)
-                       (let ((cdr (second args)))
+                  (and (eq name 'list*)
+                       (let ((cdr (car (last args))))
                         (and (lvar-value-is-nil cdr)
                              (progn
                                (flush-dest cdr)
-                               (setf (cdr args) nil)
+                               (setf args (butlast args))
                                t)))))
 
           ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.

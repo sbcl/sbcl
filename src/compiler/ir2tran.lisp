@@ -2038,10 +2038,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (list ir2-convert) ((&rest args) node block)
   (let* ((fun (lvar-fun-name (combination-fun node)))
-         ;; CONS won't appear here (yet) because its primitive object has ':alloc-trans cons'
-         ;; which causes it to get a specialized ir2-convert that goes to FIXED-ALLOC and INIT-SLOT.
-         ;; I plan to change it so that the only way to allocate cons cells is via this vop.
-         (star (ecase fun ((list* cons) t) ((list) nil))))
+         (star (ecase fun (list* t) (list nil))))
     ;; LIST needs at least 1 arg, LIST* demands at least 2 args
     (aver (if star (cdr args) args))
     ;; This used to convert as a full call to LIST or LIST* when n-cons-cell exceeded a threshold

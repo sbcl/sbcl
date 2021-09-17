@@ -130,28 +130,19 @@
 (define-source-transform ninth (x) `(nth 8 ,x))
 (define-source-transform tenth (x) `(nth 9 ,x))
 
-;;; LIST with one arg is an extremely common operation (at least inside
-;;; SBCL itself); translate it to CONS to take advantage of common
-;;; allocation routines.
+;;; Pick off special cases of LIST and LIST*.
 (define-source-transform list (&rest args)
-  (cond ((not args) (values nil nil))
-        ((not (cdr args))
-         ;; It's unclear to me how
-         ;; "taking advantage of common allocation routines"
-         ;; wouldn't happen anyway.
-         `(cons ,(first args) nil))
-        (t (values nil t))))
+  (if args (values nil t) (values nil nil)))
+(define-source-transform list* (arg &rest others)
+  (if others (values nil t) (values arg nil)))
+;;; Use LIST* in lieu of CONS so that there are only 2 low-level allocators
+;;; instead of 3. Strictly speaking, LIST is redundant as well.
+(define-source-transform cons (x y) `(list* ,x ,y))
 
 (defoptimizer (list derive-type) ((&rest args))
   (if args
       (specifier-type 'cons)
       (specifier-type 'null)))
-
-;;; And similarly for LIST*.
-(define-source-transform list* (arg &rest others)
-  (cond ((not others) arg)
-        ((not (cdr others)) `(cons ,arg ,(car others)))
-        (t (values nil t))))
 
 (defoptimizer (list* derive-type) ((arg &rest args))
   (if args
