@@ -120,9 +120,14 @@ sb-vm::
       (when (search "THAT-STRUCT" line) (setq seen-that t)))
     (assert (and seen-this seen-that))))
 
+(defun my-list (&rest x)
+  (declare (optimize sb-c::instrument-consing))
+  x)
+(compile 'my-list)
+
 (with-test (:name :listify-rest-arg)
   (let ((nbytes (let ((*standard-output* (make-broadcast-stream)))
-                  (sb-aprof:aprof-run #'list :arguments '(a b c)))))
+                  (sb-aprof:aprof-run #'my-list :arguments '(a b c)))))
     (assert (= nbytes (* sb-vm:n-word-bytes 6)))))
 
 (with-test (:name :aprof-brutal-test)
