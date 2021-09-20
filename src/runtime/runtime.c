@@ -395,7 +395,7 @@ char *dir_name(char *path) {
 extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
 int
-sbcl_main(int argc, char *argv[], char *envp[])
+initialize_lisp(int argc, char *argv[], char *envp[])
 {
 #ifdef LISP_FEATURE_WIN32
     /* Exception handling support structure. Evil Win32 hack. */
@@ -737,6 +737,5 @@ sbcl_main(int argc, char *argv[], char *envp[])
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
     create_main_lisp_thread(initial_function);
-    lose("unexpected return from initial thread in main()");
     return 0;
 }

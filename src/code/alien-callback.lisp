@@ -12,11 +12,16 @@
 
 (in-package "SB-ALIEN")
 
-;;; ALIEN-CALLBACK is supposed to be external in SB-ALIEN-INTERNALS, but the
-;;; export gets lost, and then 'chill' gets a conflict with SB-ALIEN over it.
+;;; ALIEN-CALLBACK is supposed to be external in SB-ALIEN-INTERNALS,
+;;; but the export gets lost (as this is now a warm-loaded file), and
+;;; then 'chill' gets a conflict with SB-ALIEN over it.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export (intern "ALIEN-CALLBACK" "SB-ALIEN-INTERNALS")
-          "SB-ALIEN-INTERNALS"))
+          "SB-ALIEN-INTERNALS")
+  (export (intern "DEFINE-ALIEN-CALLABLE" "SB-ALIEN")
+          "SB-ALIEN")
+  (export (intern "ALIEN-CALLABLE-FUNCTION" "SB-ALIEN")
+          "SB-ALIEN"))
 
 ;;;; ALIEN CALLBACKS
 ;;;;
@@ -250,7 +255,7 @@ and a secondary return value of true if the callback is still valid."
 (defun invalidate-alien-callback (alien)
   "Invalidates the callback designated by the alien, if any, allowing the
 associated lisp function to be GC'd, and causing further calls to the same
-callback signal an error."
+callback to signal an error."
   (let ((info (alien-callback-info alien)))
     (when (and info (callback-info-function info))
       ;; sap cache
@@ -287,6 +292,49 @@ the alien callback for that function with the given alien type."
     `(progn
        (defun ,name ,lambda-list ,@forms)
        (defparameter ,name (alien-callback ,specifier #',name)))))
+
+;;;; Alien callables
+
+(define-load-time-global *alien-callables* (make-hash-table :test #'eq)
+    "Map from Lisp symbols to the alien callable functions they name.")
+
+(defmacro define-alien-callable (name result-type typed-lambda-list &body body)
+  "Define an alien callable function in the alien callable namespace with result
+type RESULT-TYPE and with lambda list specifying the alien types of the
+arguments."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (declare (ignore alien-name))
+    `(progn
+       (invalidate-alien-callable ',lisp-name)
+       (setf (gethash ',lisp-name *alien-callables*)
+             (alien-lambda ,result-type ,typed-lambda-list ,@body)))))
+
+(defun alien-callable-function (name)
+  "Return the alien callable function associated with NAME."
+  (gethash name *alien-callables*))
+
+(defun invalidate-alien-callable (name)
+  "Invalidates the callable designated by the alien, if any, allowing the
+associated lisp function to be GC'd, and causing further calls to the same
+callable to signal an error."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (declare (ignore alien-name))
+    (let ((alien (alien-callable-function lisp-name)))
+      (when alien
+        (invalidate-alien-callback alien)))
+    (remhash lisp-name *alien-callables*)))
+
+(defun initialize-alien-callable-symbol (name)
+  "Initialize the alien symbol named by NAME with its alien callable
+function value."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (setf (%alien-value (foreign-symbol-sap alien-name t)
+                        0
+                        (make-alien-pointer-type))
+          (cast (alien-callable-function lisp-name) (* t)))))
 
 (in-package "SB-THREAD")
 #+sb-thread

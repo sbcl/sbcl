@@ -1,5 +1,9 @@
+#include <interr.h>
+
 int main(int argc, char *argv[], char *envp[])
 {
-    extern int sbcl_main(int argc, char *argv[], char *envp[]);
-    return sbcl_main(argc, argv, envp);
+    extern int initialize_lisp(int argc, char *argv[], char *envp[]);
+    initialize_lisp(argc, argv, envp);
+    lose("unexpected return from initial thread in main()");
+    return 0;
 }

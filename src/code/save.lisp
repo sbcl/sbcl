@@ -80,16 +80,22 @@
        sb-thread::*session*
        sb-kernel::*gc-epoch*))
 
-(defun start-lisp (toplevel)
+(defun start-lisp (toplevel callable-exports)
   (named-lambda start-lisp ()
-    (handling-end-of-the-world
-     (reinit t)
-     (funcall toplevel))))
+    (cond (callable-exports
+           (reinit t)
+           (dolist (export callable-exports)
+             (sb-alien::initialize-alien-callable-symbol export)))
+          (t
+           (handling-end-of-the-world
+            (reinit t)
+            (funcall toplevel))))))
 
 (defun save-lisp-and-die (core-file-name &key
-                                         (toplevel #'toplevel-init)
+                                         (toplevel #'toplevel-init toplevel-supplied)
                                          (executable nil)
                                          (save-runtime-options nil)
+                                         (callable-exports ())
                                          (purify t)
                                          (root-structures ())
                                          (environment-name "auxiliary")
@@ -124,6 +130,13 @@ The following &KEY arguments are defined:
      run. This also inhibits normal runtime option processing, causing
      all command line arguments to be passed to the toplevel.
      Meaningless if :EXECUTABLE is NIL.
+
+  :CALLABLE-EXPORTS
+     This should be a list of symbols to be initialized to the
+     appropriate alien callables on startup. All exported symbols should
+     be present as global symbols in the symbol table of the runtime
+     before the saved core is loaded. When this list is non-empty, the
+     :TOPLEVEL argument cannot be supplied.
 
   :PURIFY
      If true (the default on cheneygc), do a purifying GC which moves all
@@ -194,6 +207,8 @@ sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
   #+gencgc
   (declare (ignore purify) (ignorable root-structures))
+  (when (and callable-exports toplevel-supplied)
+    (error ":TOPLEVEL cannot be supplied when there are callable exports."))
   ;; If the toplevel function is not defined, this will signal an
   ;; error before saving, not at startup time.
   (let ((toplevel (%coerce-callable-to-fun toplevel))
@@ -217,7 +232,7 @@ sufficiently motivated to do lengthy fixes."
              (if value 1 0)))
       (let ((name (native-namestring (physicalize-pathname core-file-name)
                                      :as-file t))
-            (startfun (start-lisp toplevel)))
+            (startfun (start-lisp toplevel callable-exports)))
         (deinit)
         ;; FIXME: Would it be possible to unmix the PURIFY logic from this
         ;; function, and just do a GC :FULL T here? (Then if the user wanted
