@@ -3301,3 +3301,17 @@
         (values 1 2)))
    ((nil) nil)
    ((t) (condition 'type-error))))
+
+(with-test (:name :substitute-single-use-lvar-type-cast-movement)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (block nil
+        (let ((x (multiple-value-prog1 a)))
+          (when (< a 0)
+            (return :good))
+          (if (minusp x)
+              1
+              (+ x 1)))))
+   ((-1) :good)
+   ((0) 1)))

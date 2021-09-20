@@ -2120,13 +2120,21 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (let ((ref-type (single-value-type (node-derived-type ref))))
-        (unless (csubtypep (single-value-type (lvar-type arg)) ref-type)
-          (do-uses (node arg)
-            (derive-node-type node ref-type)))
-        (substitute-lvar-uses lvar arg
-                              ;; Really it is (EQ (LVAR-USES LVAR) REF):
-                              t)
-        (delete-lvar-use ref))
+        (cond ((csubtypep (single-value-type (lvar-type arg)) ref-type)
+               (substitute-lvar-uses lvar arg
+                                     ;; Really it is (EQ (LVAR-USES LVAR) REF):
+                                     t)
+               (delete-lvar-use ref))
+              (t
+               (let* ((value (make-lvar))
+                      (cast (insert-cast-before ref value ref-type
+                                                **zero-typecheck-policy**)))
+                 (setf (cast-%type-check cast) nil)
+                 (substitute-lvar-uses value arg
+                                       ;; FIXME
+                                       t)
+                 (%delete-lvar-use ref)
+                 (add-lvar-use cast lvar)))))
       (delete-ref ref)
       (unlink-node ref)
       (when (return-p dest)
