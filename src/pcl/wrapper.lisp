@@ -120,7 +120,7 @@
 ;;; the state of layout_A should be changed to (:flush layout_C)
 ;;; at the same time that the state of layout_B is changed.
 ;;;
-;;; In general, alterating layout_B might might have to perform more than one
+;;; In general, altering layout_B might might have to perform more than one
 ;;; update to older versions of the layout, so it's a one-to-many relation.
 ;;; The same "transitivity" could have been implemented at the time of flushing
 ;;; layout_A by chasing an extra pointer (the B -> C pointer) and recording that
