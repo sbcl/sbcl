@@ -3315,3 +3315,12 @@
               (+ x 1)))))
    ((-1) :good)
    ((0) 1)))
+
+(with-test (:name :fold-ash-mod-0)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (loop for i below 3 sum
+               (ldb (byte 6 6)
+                    (ash i (mask-field (byte 5 8) i)))))
+    (() 0)))

@@ -459,7 +459,9 @@
                 (cut-to-width integer ,kind width ,signedp)
                 ',name))
             (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
-                  `(ash ,',width))))))
+                  `(ash ,',width))
+            (deftransform ,name ((integer count) (* (constant-arg (eql 0))))
+              'integer)))))
   ;; This should really be dependent on SB-VM:N-WORD-BITS, but since we
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB-VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
