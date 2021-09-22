@@ -76,3 +76,10 @@
                           10)))
     (assert (eql (combination-fun-debug-name combination) 'terpri))
     (assert (node-tail-p combination))))
+
+(test-util:with-test (:name :fold-derived-logand)
+  (assert (not (find 'logand
+                     (ir-calls `(lambda (x)
+                                  (declare ((integer 1 4) x))
+                                  (logand #xF00 x)))
+                     :key #'combination-fun-debug-name))))

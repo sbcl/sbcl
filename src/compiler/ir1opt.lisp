@@ -1186,6 +1186,8 @@
              (when (constant-fold-call-p node)
                (constant-fold-call node)
                (return-from ir1-optimize-combination))
+             (when (fold-call-derived-to-constant node)
+               (return-from ir1-optimize-combination))
              (when (and (ir1-attributep attr commutative)
                         (= (length args) 2)
                         (constant-lvar-p (first args))
@@ -1793,6 +1795,15 @@
                                         values)))
                    fun-name)))))))
   (values))
+
+(defun fold-call-derived-to-constant (call)
+  (when (flushable-combination-p call)
+    (let ((type (node-derived-type call)))
+      (when (type-single-value-p type)
+        (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
+          (when single-p
+            (replace-combination-with-constant value call)
+            t))))))
 
 ;;;; local call optimization
 
