@@ -2550,10 +2550,12 @@ expansion happened."
     (if (and low
              (eql low high)
              (eql (numeric-type-complexp type) :real)
-             (member (numeric-type-class type) '(integer rational float)))
-        (values t (numeric-type-low type))
+             (if (eq (numeric-type-class type) 'float)
+                 ;; (float 0.0 0.0) fits both -0.0 and 0.0
+                 (not (zerop low))
+                 (member (numeric-type-class type) '(integer rational))))
+        (values t low)
         (values nil nil))))
-
 
 (defun interned-numeric-type (specifier &rest args)
   (apply '%make-numeric-type

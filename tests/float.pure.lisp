@@ -724,3 +724,10 @@
   (let ((f (checked-compile '(lambda (y) (coerce (sqrt y) 'float)))))
     (assert (floatp (funcall f 3)))
     (assert-error (funcall f #c(1 2)))))
+
+(with-test (:name :imagpart-real-negative-zero-derived-type)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (eql (imagpart (the real x)) -0.0))
+   ((-1.0) t)))
