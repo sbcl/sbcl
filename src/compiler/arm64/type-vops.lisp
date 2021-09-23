@@ -336,3 +336,11 @@
       (inst b :eq is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag))
       (emit-label drop-thru))))
+
+(define-vop (single-float-p)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:conditional :eq)
+  (:policy :fast-safe)
+  (:translate single-float-p)
+  (:generator 7
+    (inst cmp (32-bit-reg value) single-float-widetag)))

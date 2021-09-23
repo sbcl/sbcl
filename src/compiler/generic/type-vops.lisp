@@ -246,6 +246,7 @@
 
 (define-type-vop characterp (character-widetag))
 
+#-arm-64
 (define-type-vop single-float-p (single-float-widetag))
 
 (define-type-vop fixnump
