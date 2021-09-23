@@ -239,6 +239,16 @@
                            (fixnumize hi))))
        (inst tst value (lognot fixnum-hi)))))
 
+(defun add-sub-immediate-p+1 (x)
+  (add-sub-immediate-p (1+ x)))
+
+(defun fixnum-add-sub-immediate-p+1 (x)
+  (fixnum-add-sub-immediate-p (1+ x)))
+
+(defun fixnum-add-sub-immediate-p/+1 (x)
+  (or (fixnum-add-sub-immediate-p x)
+      (fixnum-add-sub-immediate-p (1+ x))))
+
 (define-vop (test-fixnum-mod-signed-unsigned-imm)
   (:args (value :scs (unsigned-reg signed-reg)))
   (:arg-types (:or unsigned-num signed-num)
@@ -248,7 +258,14 @@
   (:info hi)
   (:policy :fast-safe)
   (:generator 3
-     (inst cmp value hi)))
+    (inst cmp value hi)))
+
+(define-vop (test-fixnum-mod-signed-unsigned-imm+1 test-fixnum-mod-signed-unsigned-imm)
+  (:arg-types (:or unsigned-num signed-num)
+              (:constant (satisfies add-sub-immediate-p+1)))
+  (:conditional :lo)
+  (:generator 3
+    (inst cmp value (1+ hi))))
 
 (define-vop (test-fixnum-mod-tagged-imm)
   (:args (value :scs (any-reg)))
@@ -261,6 +278,49 @@
   (:generator 3
     (inst cmp value (fixnumize hi))))
 
+(define-vop (test-fixnum-mod-tagged-imm+1 test-fixnum-mod-tagged-imm)
+  (:arg-types tagged-num
+              (:constant (satisfies fixnum-add-sub-immediate-p+1)))
+  (:conditional :lo)
+  (:generator 3
+    (inst cmp value (fixnumize (1+ hi)))))
+
+(define-vop (test-fixnum-mod-signed-unsigned-imm)
+  (:args (value :scs (unsigned-reg signed-reg)))
+  (:arg-types (:or unsigned-num signed-num)
+              (:constant (satisfies add-sub-immediate-p)))
+  (:translate fixnum-mod-p)
+  (:conditional :ls)
+  (:info hi)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst cmp value hi)))
+
+(define-vop (test-fixnum-mod-signed-unsigned-imm+1 test-fixnum-mod-signed-unsigned-imm)
+  (:arg-types (:or unsigned-num signed-num)
+              (:constant (satisfies add-sub-immediate-p+1)))
+  (:conditional :lo)
+  (:generator 3
+    (inst cmp value (1+ hi))))
+
+(define-vop (test-fixnum-mod-tagged-imm)
+  (:args (value :scs (any-reg)))
+  (:arg-types tagged-num
+              (:constant (satisfies fixnum-add-sub-immediate-p)))
+  (:translate fixnum-mod-p)
+  (:conditional :ls)
+  (:info hi)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst cmp value (fixnumize hi))))
+
+(define-vop (test-fixnum-mod-tagged-imm+1 test-fixnum-mod-tagged-imm)
+  (:arg-types tagged-num
+              (:constant (satisfies fixnum-add-sub-immediate-p+1)))
+  (:conditional :lo)
+  (:generator 3
+    (inst cmp value (fixnumize (1+ hi)))))
+
 (define-vop (test-fixnum-mod-tagged-unsigned)
   (:args (value :scs (any-reg unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
@@ -271,27 +331,30 @@
   (:info hi)
   (:policy :fast-safe)
   (:generator 4
-     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                          hi
-                          (fixnumize hi))))
-       (load-immediate-word temp fixnum-hi)
-       (inst cmp value temp))))
+    (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
+                         hi
+                         (fixnumize hi))))
+      (load-immediate-word temp fixnum-hi)
+      (inst cmp value temp))))
 
 (define-vop (test-fixnum-mod-*-imm)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
+  (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p/+1)))
   (:translate fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
   (:policy :fast-safe)
   (:generator 5
-    (let ((fixnum-hi (fixnumize hi)))
+    (let* ((1+ (not (fixnum-add-sub-immediate-p hi)))
+           (fixnum-hi (fixnumize (if 1+
+                                     (1+ hi)
+                                     hi))))
       #.(assert (= fixnum-tag-mask 1))
       (inst tbnz* value 0 (if not-p target skip))
       (inst cmp value fixnum-hi)
       (inst b (if not-p
-                  :hi
-                  :ls)
+                  (if 1+ :hs :hi)
+                  (if 1+ :lo :ls))
             target))
     skip))
 
