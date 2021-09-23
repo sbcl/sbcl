@@ -32,8 +32,8 @@
 (defconstant-eqx +conditions+
   '((:eq . 0)
     (:ne . 1)
-    (:cs . 2) (:hs . 2)
-    (:cc . 3) (:lo . 3)
+    (:hs . 2) (:cs . 2)
+    (:lo . 3) (:cc . 3)
     (:mi . 4)
     (:pl . 5)
     (:vs . 6)
