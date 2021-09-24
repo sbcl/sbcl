@@ -1534,7 +1534,7 @@
                                      (funcall fun node)))
                        (fun-name (combination-fun-source-name node)))
                    (when (show-transform-p show fun-name)
-                     (show-transform "ir" fun-name new-form))
+                     (show-transform "ir" fun-name new-form node))
                    (transform-call node new-form fun-name))
                  (values :none nil))
              (ecase severity

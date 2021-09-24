@@ -27,7 +27,8 @@
 
 ;;; Report as we try each transform? (either source or IR)
 ;;; Bind to T to see the ones that didn't abort,
-;;; or :ALL if you want to see each attempted transform.
+;;; :ALL if you want to see each attempted transform.
+;;; :DERIVE-TYPE for newly derived types of combinations.
 (defvar *show-transforms-p* nil)
 
 (declaim (inline source-form-has-path-p))
@@ -1111,12 +1112,20 @@
 (defun show-transform-p (showp fun-name)
   (or (and (listp showp) (member fun-name showp :test 'equal))
       (eq showp t)))
-(defun show-transform (kind name new-form)
+(defun show-transform (kind name new-form &optional combination)
   (let ((*print-length* 100)
         (*print-level* 50)
         (*print-right-margin* 128))
-    (format *trace-output* "~&xform (~a) ~S~% -> ~S~%"
-            kind name new-form)))
+    (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
+            kind
+            (if combination
+                (cons name
+                      (loop for arg in (combination-args combination)
+                            collect (if (constant-lvar-p arg)
+                                        (lvar-value arg)
+                                        (type-specifier (lvar-type arg)))))
+                name)
+            new-form)))
 ;;; Convert a call to a global function. If not NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
 ;;; expansion, but is INLINE, then give an efficiency note (unless a
