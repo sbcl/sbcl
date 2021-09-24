@@ -72,8 +72,7 @@
   (:generator 3
     (inst neg r x)))
 
-(define-modular-fun %negate-modfx (x) %negate :tagged t #.(- n-word-bits
-                                                             n-fixnum-tag-bits))
+(define-modular-fun %negate-modfx (x) %negate :tagged t #.n-fixnum-bits)
 (define-vop (%negate-modfx fast-negate/fixnum)
   (:translate %negate-modfx))
 
@@ -452,11 +451,14 @@
                   ;; For modular variants
                   (:variant-vars cut)
                   (:arg-types ,type positive-fixnum)
+                  (:args-var args)
                   (:results (result :scs (,result-type)))
                   (:result-types ,type)
                   (:policy :fast-safe)
                   (:generator ,cost
-                    (cond (cut
+                    (cond ((and cut
+                                (not (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                                                (specifier-type `(mod ,n-word-bits)))))
                            (inst cmp amount n-word-bits)
                            (cond ((location= amount result)
                                   (inst csel tmp-tn number zr-tn :lt)
@@ -778,8 +780,7 @@
                    (vopfxcf (symbolicate "FAST-" name "-MODFX-C/FIXNUM=>FIXNUM")))
                `(progn
                   (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
-                  (define-modular-fun ,funfx (x y) ,name :tagged t
-                                      #.(- n-word-bits n-fixnum-tag-bits))
+                  (define-modular-fun ,funfx (x y) ,name :tagged t ,n-fixnum-bits)
                   (define-mod-binop (,vop64u ,vopu) ,fun64)
                   (define-vop (,vop64f ,vopf) (:translate ,fun64))
                   (define-vop (,vopfxf ,vopf) (:translate ,funfx))
