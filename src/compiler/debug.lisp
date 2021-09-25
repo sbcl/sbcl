@@ -956,6 +956,8 @@
         do (format stream "~:[u~;d~]v~D~@[ ~]"
                    (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
 
+(defvar *debug-print-types* nil)
+
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
 (defun print-nodes (block)
@@ -1048,6 +1050,10 @@
            (dolist (leaf (enclose-funs node))
              (print-leaf leaf)
              (write-char #\space))))
+        (when (and *debug-print-types*
+                   (valued-node-p node))
+          (write-char #\space)
+          (princ (type-specifier (node-derived-type node))))
         (pprint-newline :mandatory)))
 
     (awhen (block-info block)
@@ -1073,7 +1079,10 @@
            (format stream "t~D" (tn-id tn))))
     (when (and (tn-sc tn) (tn-offset tn))
       (format stream "[~A]" (location-print-name tn)))
-    (format stream " ~s" (tn-kind tn))))
+    (format stream " ~s ~@[~s~]" (tn-kind tn)
+            (and *debug-print-types*
+                 (tn-sc tn)
+                 (sc-name (tn-sc tn))))))
 
 ;;; Print the TN-REFs representing some operands to a VOP, linked by
 ;;; TN-REF-ACROSS.
