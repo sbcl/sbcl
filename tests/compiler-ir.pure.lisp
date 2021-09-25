@@ -82,4 +82,14 @@
                      (ir-calls `(lambda (x)
                                   (declare ((integer 1 4) x))
                                   (logand #xF00 x)))
+                     :key #'combination-fun-debug-name)))
+  (assert (not (find 'logand
+                     (ir-calls `(lambda (x)
+                                  (declare ((integer 1 4) x))
+                                  (logand #xFF (1+ x))))
+                     :key #'combination-fun-debug-name)))
+  (assert (not (find 'logand
+                     (ir-calls `(lambda (x)
+                                  (declare ((integer 1 4) x))
+                                  (logand #xFF (ash 1 x))))
                      :key #'combination-fun-debug-name))))

@@ -175,20 +175,6 @@
                   ;; We can't tell squat about the result.
                   (specifier-type 'integer)))))))
 
-(defun make-modular-fun-type-deriver (prototype kind width signedp)
-  (declare (ignore kind))
-  (let ((info (fun-info-or-lose prototype))
-        (mask-type (specifier-type
-                    (ecase signedp
-                      ((nil) (let ((mask (1- (ash 1 width))))
-                               `(integer ,mask ,mask)))
-                      ((t) `(signed-byte ,width))))))
-    (lambda (call)
-      (let ((res (funcall (fun-info-derive-type info) call)))
-        (when (and res
-                   (not signedp))
-          (logand-derive-type-aux res mask-type))))))
-
 (defun logior-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))
          (b (numeric-type-high x))
