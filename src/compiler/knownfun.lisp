@@ -87,35 +87,39 @@
                             (type-specifier ctype)
                             ctype)))
     (dolist (name names)
-      (unless overwrite-fndb-silently
-        (let ((old-fun-info (info :function :info name)))
-          (when old-fun-info
-            ;; This is handled as an error because it's generally a bad
-            ;; thing to blow away all the old optimization stuff. It's
-            ;; also a potential source of sneaky bugs:
-            ;;    DEFKNOWN FOO
-            ;;    DEFTRANSFORM FOO
-            ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
-            ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
-            ;; However, it's continuable because it might be useful to do
-            ;; it when testing new optimization stuff interactively.
-            (cerror "Go ahead, overwrite it."
-                    "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
-                    old-fun-info name))))
-      (setf (info :function :type name) type-to-store)
-      (setf (info :function :where-from name) :declared)
-      (setf (info :function :kind name) :function)
-      (setf (info :function :info name)
-            (make-fun-info :attributes attributes
-                           :derive-type derive-type
-                           :optimizer optimizer
-                           :result-arg result-arg
-                           :call-type-deriver call-type-deriver
-                           :annotation annotation))
-      (if location
-          (setf (getf (info :source-location :declaration name) 'defknown)
-                location)
-          (remf (info :source-location :declaration name) 'defknown))))
+      (block ignore
+        (unless overwrite-fndb-silently
+          (let ((old-fun-info (info :function :info name)))
+            (when old-fun-info
+              ;; This is handled as an error because it's generally a bad
+              ;; thing to blow away all the old optimization stuff. It's
+              ;; also a potential source of sneaky bugs:
+              ;;    DEFKNOWN FOO
+              ;;    DEFTRANSFORM FOO
+              ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
+              ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
+              ;; However, it's continuable because it might be useful to do
+              ;; it when testing new optimization stuff interactively.
+              (restart-case
+                  (cerror "Go ahead, overwrite it."
+                          "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
+                          old-fun-info name)
+                (ignore ()
+                  (return-from ignore))))))
+        (setf (info :function :type name) type-to-store)
+        (setf (info :function :where-from name) :declared)
+        (setf (info :function :kind name) :function)
+        (setf (info :function :info name)
+              (make-fun-info :attributes attributes
+                             :derive-type derive-type
+                             :optimizer optimizer
+                             :result-arg result-arg
+                             :call-type-deriver call-type-deriver
+                             :annotation annotation))
+        (if location
+            (setf (getf (info :source-location :declaration name) 'defknown)
+                  location)
+            (remf (info :source-location :declaration name) 'defknown)))))
   names)
 
 
