@@ -1137,6 +1137,8 @@
                (when fun
                  (let ((res (funcall fun node)))
                    (when res
+                     (when (eq show :derive-type)
+                       (show-type-derivation node res))
                      (derive-node-type node (coerce-to-values res))
                      (maybe-terminate-block node nil)))))))
       (ecase kind

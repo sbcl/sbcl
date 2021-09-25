@@ -1126,6 +1126,21 @@
                                         (type-specifier (lvar-type arg)))))
                 name)
             new-form)))
+
+(defun show-type-derivation (combination type)
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
+    (unless (type= (node-derived-type combination)
+                   (coerce-to-values type))
+      (format *trace-output* "~&~a derived to ~a"
+              (cons (combination-fun-source-name combination)
+                    (loop for arg in (combination-args combination)
+                          collect (if (constant-lvar-p arg)
+                                      (lvar-value arg)
+                                      (type-specifier (lvar-type arg)))))
+              (type-specifier type)))))
+
 ;;; Convert a call to a global function. If not NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
 ;;; expansion, but is INLINE, then give an efficiency note (unless a
