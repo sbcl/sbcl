@@ -402,26 +402,69 @@
   (:results (result))
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) temp)
+  (:args-var args)
   (:variant-vars variant)
   (:generator 5
     (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (inst cmp temp n-word-bits)
-    ;; Only the first 6 bits count for shifts.
-    ;; This sets all bits to 1 if AMOUNT is larger than 63,
-    ;; cutting the amount to 63.
-    (inst csinv temp temp zr-tn :lt)
-    DO
+    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+                       (specifier-type `(integer -63 *)))
+      (inst cmp temp n-word-bits)
+      ;; Only the first 6 bits count for shifts.
+      ;; This sets all bits to 1 if AMOUNT is larger than 63,
+      ;; cutting the amount to 63.
+      (inst csinv temp temp zr-tn :lt))
     (ecase variant
       (:signed (inst asr result number temp))
       (:unsigned (inst lsr result number temp)))
     (inst b END)
     LEFT
-    (inst cmp temp n-word-bits)
-    (inst csel result number zr-tn :lt)
-    (inst lsl result result temp)
+    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+                      (specifier-type `(integer * 63)))
+           (inst lsl result number temp))
+          (t
+           (inst cmp temp n-word-bits)
+           (inst csel result number zr-tn :lt)
+           (inst lsl result result temp)))
     END))
+
+(define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
+  (:note "inline ASH")
+  (:translate ash-modfx)
+  (:args (number :scs (signed-reg unsigned-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target temp))
+  (:arg-types (:or signed-num unsigned-num) signed-num)
+  (:results (result :scs (any-reg)))
+  (:args-var args)
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:temporary (:sc non-descriptor-reg) temp temp-result)
+  (:generator 5
+    (inst subs temp amount zr-tn)
+    (inst b :ge LEFT)
+    (inst neg temp temp)
+    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+                       (specifier-type `(integer -63 *)))
+      (inst cmp temp n-word-bits)
+      ;; Only the first 6 bits count for shifts.
+      ;; This sets all bits to 1 if AMOUNT is larger than 63,
+      ;; cutting the amount to 63.
+      (inst csinv temp temp zr-tn :lt))
+    (sc-case number
+      (signed-reg (inst asr temp-result number temp))
+      (unsigned-reg (inst lsr temp-result number temp)))
+    (inst b END)
+    LEFT
+    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+                      (specifier-type `(integer * 63)))
+           (inst lsl temp-result number temp))
+          (t
+           (inst cmp temp n-word-bits)
+           (inst csel temp-result number zr-tn :lt)
+           (inst lsl temp-result temp-result temp)))
+    END
+    (inst lsl result temp-result n-fixnum-tag-bits)))
 
 (define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
   (:args (number :scs (signed-reg) :to :save)
@@ -431,6 +474,16 @@
   (:result-types signed-num)
   (:translate ash)
   (:variant :signed))
+
+(define-vop (fast-ash/fixnum=>fixnum fast-ash/signed/unsigned)
+  (:args (number :scs (any-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target temp))
+  (:arg-types tagged-num signed-num)
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:translate ash)
+  (:variant :signed)
+  (:variant-cost 3))
 
 (define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
   (:args (number :scs (unsigned-reg) :to :save)
@@ -553,6 +606,14 @@
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
+(define-vop (fast-ash-modfx/fixnum=>fixnum
+             fast-ash/fixnum=>fixnum)
+  (:translate ash-modfx))
+
+(define-vop (fast-ash-mod64/unsigned=>unsigned
+             fast-ash/unsigned=>unsigned)
+  (:translate ash-mod64))
+
 ;;; Only the lower 6 bits of the shift amount are significant.
 (macrolet ((define (translate operation)
              `(define-vop ()
@@ -562,12 +623,10 @@
                 (:args (num :scs (unsigned-reg))
                        (amount :scs (signed-reg)))
                 (:arg-types unsigned-num tagged-num)
-                (:temporary (:sc signed-reg) temp)
                 (:results (r :scs (unsigned-reg)))
                 (:result-types unsigned-num)
                 (:generator 1
-                  (inst and temp amount #b111111)
-                  (inst ,operation r num temp)))))
+                  (inst ,operation r num amount)))))
   (define shift-towards-start lsr)
   (define shift-towards-end   lsl))
 

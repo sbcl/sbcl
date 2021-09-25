@@ -93,3 +93,9 @@
                                   (declare ((integer 1 4) x))
                                   (logand #xFF (ash 1 x))))
                      :key #'combination-fun-debug-name))))
+
+(test-util:with-test (:name :mod-ash
+                      :skipped-on (not :arm64))
+  (assert (not (ir-full-calls `(lambda (x y)
+                                 (declare (fixnum x y))
+                                 (logand #xFF (ash x y)))))))

@@ -453,30 +453,56 @@
                          ,(1- (ash 1 (+ width (lvar-value amount))))))
               `(lambda (value amount1 amount2)
                  (ash value (+ amount1 amount2)))))))))
-
 (macrolet
-    ((def (name kind width signedp)
+    ((def (left-name name kind width signedp)
+       (declare (ignorable name))
        (let ((type (ecase signedp
                      ((nil) 'unsigned-byte)
                      ((t) 'signed-byte))))
          `(progn
-            (defknown ,name (integer (integer 0)) (,type ,width)
+            (defknown ,left-name (integer (integer 0)) (,type ,width)
                 (foldable flushable movable)
               :derive-type (make-modular-fun-type-deriver 'ash ',width ',signedp))
             (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
-              (when (and (<= width ,width)
-                         (or (and (constant-lvar-p count)
-                                  (plusp (lvar-value count)))
-                             (csubtypep (lvar-type count)
-                                        (specifier-type '(and unsigned-byte fixnum)))))
-                (cut-to-width integer ,kind width ,signedp)
-                ',name))
-            (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
+              (when (<= width ,width)
+                (cond ((or (and (constant-lvar-p count)
+                                (plusp (lvar-value count)))
+                           (csubtypep (lvar-type count)
+                                      (specifier-type '(and unsigned-byte fixnum))))
+                       (cut-to-width integer ,kind width ,signedp)
+                       ',left-name)
+                      #+arm64
+                      ((and (not (constant-lvar-p count))
+                            (csubtypep (lvar-type count) (specifier-type 'fixnum))
+                            (csubtypep (lvar-type integer)
+                                       (specifier-type `(or (unsigned-byte ,sb-vm:n-word-bits)
+                                                            (signed-byte ,sb-vm:n-word-bits)))))
+                       (unless (and ,signedp
+                                    (not (csubtypep (lvar-type integer) (specifier-type 'fixnum))))
+                         ;; MASK-SIGNED-FIELD will cut off the highest bit before it's shifted,
+                         ;; there is an ASH-MODFX VOP which first shifts a word and then cuts
+                         ;; off the result.
+                         (cut-to-width integer ,kind width ,signedp))
+                       ',name))))
+            (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
-            (deftransform ,name ((integer count) (* (constant-arg (eql 0))))
-              'integer)))))
+            (deftransform ,left-name ((integer count) (* (constant-arg (eql 0))))
+              'integer)
+            #+arm64
+            (progn
+              (defknown ,name (integer integer) (,type ,width)
+                  (foldable flushable movable)
+                :derive-type (make-modular-fun-type-deriver 'ash ',width ',signedp))
+              (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
+                    `(ash ,',width))
+              ;; Go back to ASH if the sign becomes known
+              (deftransform ,name ((integer count) (* (integer * 0)) * :important nil)
+                '(ash integer count))
+              (deftransform ,name ((integer count) (* (integer 0 *)) * :important nil)
+                '(ash integer count)))))))
   #+(or x86 x86-64 arm arm64)
-  (def sb-vm::ash-left-modfx :tagged #.sb-vm:n-fixnum-bits t)
-  (def #.(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
-                 "SB-VM")
+  (def sb-vm::ash-left-modfx sb-vm::ash-modfx :tagged #.sb-vm:n-fixnum-bits t)
+  (def #.(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")
+    #.(intern (format nil "ASH-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")
     :untagged #.sb-vm:n-machine-word-bits nil))
+
