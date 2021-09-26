@@ -471,7 +471,7 @@
                                       (specifier-type '(and unsigned-byte fixnum))))
                        (cut-to-width integer ,kind width ,signedp)
                        ',left-name)
-                      #+arm64
+                      #+(or arm64 x86-64)
                       ((and (not (constant-lvar-p count))
                             (csubtypep (lvar-type count) (specifier-type 'fixnum))
                             (csubtypep (lvar-type integer)
@@ -488,7 +488,7 @@
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (* (constant-arg (eql 0))))
               'integer)
-            #+arm64
+            #+(or arm64 x86-64)
             (progn
               (defknown ,name (integer integer) (,type ,width)
                   (foldable flushable movable)

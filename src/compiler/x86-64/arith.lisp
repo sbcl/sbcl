@@ -860,34 +860,6 @@
     OKAY
     (inst shl result :cl)))
 
-  (define-vop (fast-ash/signed=>signed)
-    (:translate ash)
-    (:policy :fast-safe)
-    (:args (number :scs (signed-reg) :target result)
-           (amount :scs (signed-reg) :target ecx))
-    (:arg-types signed-num signed-num)
-    (:results (result :scs (signed-reg) :from (:argument 0)))
-    (:result-types signed-num)
-    (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
-    (:note "inline ASH")
-    (:generator 5
-                (move result number)
-                (move ecx amount)
-                (inst test ecx ecx)
-                (inst jmp :ns POSITIVE)
-                (inst neg ecx)
-                (inst cmp ecx 63)
-                (inst jmp :be OKAY)
-                (inst mov ecx 63)
-                OKAY
-                (inst sar result :cl)
-                (inst jmp DONE)
-
-                POSITIVE
-                ;; The result-type ensures us that this shift will not overflow.
-                (inst shl result :cl)
-
-                DONE))
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
@@ -926,36 +898,6 @@
       (zeroize result))
     OKAY
     (inst shl result :cl)))
-
-(define-vop (fast-ash/unsigned=>unsigned)
-  (:translate ash)
-  (:policy :fast-safe)
-  (:args (number :scs (unsigned-reg) :target result)
-         (amount :scs (signed-reg) :target ecx))
-  (:arg-types unsigned-num signed-num)
-  (:results (result :scs (unsigned-reg) :from (:argument 0)))
-  (:result-types unsigned-num)
-  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:note "inline ASH")
-  (:generator 5
-    (move result number)
-    (move ecx amount)
-    (inst test ecx ecx)
-    (inst jmp :ns POSITIVE)
-    (inst neg ecx)
-    (inst cmp ecx 63)
-    (inst jmp :be OKAY)
-    (zeroize result)
-    (inst jmp DONE)
-    OKAY
-    (inst shr result :cl)
-    (inst jmp DONE)
-
-    POSITIVE
-    ;; The result-type ensures us that this shift will not overflow.
-    (inst shl result :cl)
-
-    DONE))
 
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
@@ -1000,6 +942,119 @@
      (inst sar result :cl)
      (inst and result (lognot fixnum-tag-mask)))))
 ) ; end MACROLET
+
+(define-vop (fast-ash/unsigned=>unsigned)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+         (amount :scs (signed-reg) :target ecx))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
+  (:args-var args)
+  (:variant-vars check-amount signed)
+  (:note "inline ASH")
+  (:generator 5
+    (move result number)
+    (move ecx amount)
+    (inst test ecx ecx)
+    (inst jmp :ns POSITIVE)
+    (inst neg ecx)
+    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+                       (specifier-type `(integer -63 *)))
+      (inst cmp ecx 63)
+      (inst jmp :be OKAY)
+      (inst or ecx 63))
+    OKAY
+    (if signed
+        (inst sar result :cl)
+        (inst shr result :cl))
+    (inst jmp DONE)
+
+    POSITIVE
+    ;; The result-type ensures us that this shift will not overflow.
+    (unless (or (not check-amount)
+                (csubtypep (tn-ref-type (tn-ref-across args))
+                           (specifier-type `(integer * 63))))
+      (inst cmp ecx 63)
+      (inst jmp :be STILL-OKAY)
+      (inst or ecx 63)
+      (inst jmp DONE))
+    STILL-OKAY
+    (inst shl result :cl)
+
+    DONE))
+
+(define-vop (fast-ash/signed=>signed
+             fast-ash/unsigned=>unsigned)
+  (:args (number :scs (signed-reg) :target result)
+         (amount :scs (signed-reg) :target ecx))
+  (:arg-types signed-num signed-num)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:variant nil t))
+
+(define-vop (fast-ash/fixnum=>fixnum fast-ash/unsigned=>unsigned)
+  (:args (number :scs (any-reg) :to :save)
+         (amount :scs (signed-reg) :target ecx))
+  (:arg-types tagged-num signed-num)
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:variant nil t)
+  (:variant-cost 3))
+
+(define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
+  (:translate ash-modfx)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg unsigned-reg) :to :save)
+          (amount :scs (signed-reg) :target ecx))
+  (:arg-types (:or signed-num unsigned-num) signed-num)
+  (:results (result :scs (any-reg)))
+  (:args-var args)
+  (:result-types tagged-num)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
+  (:note "inline ASH")
+  (:generator 5
+    (move result number)
+    (move ecx amount)
+    (inst test ecx ecx)
+    (inst jmp :ns POSITIVE)
+    (inst neg ecx)
+    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+                       (specifier-type `(integer -63 *)))
+      (inst cmp ecx 63)
+      (inst jmp :be OKAY)
+      (inst mov ecx 63))
+    OKAY
+    (sc-case number
+      (signed-reg
+       (inst sar result :cl))
+      (unsigned-reg
+       (inst shr result :cl)))
+    (inst jmp DONE)
+
+    POSITIVE
+    (unless (csubtypep (tn-ref-type (tn-ref-across args))
+                       (specifier-type `(integer * 63)))
+      (inst cmp ecx 63)
+      (inst jmp :be STILL-OKAY)
+      (inst mov ecx 63)
+      (inst jmp DONE))
+    STILL-OKAY
+    (inst shl result :cl)
+    DONE
+    (inst shl result n-fixnum-tag-bits)))
+
+(define-vop (fast-ash-modfx/fixnum=>fixnum
+             fast-ash/fixnum=>fixnum)
+  (:variant t t)
+  (:translate ash-modfx))
+
+(define-vop (fast-ash-mod64/unsigned=>unsigned
+             fast-ash/unsigned=>unsigned)
+  (:variant t nil)
+  (:translate ash-mod64))
 
 (in-package "SB-C")
 
