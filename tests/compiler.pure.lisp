@@ -5077,13 +5077,12 @@
 
 (with-test (:name :interr-type-specifier-hashing)
   (let ((specifiers
-         (remove
-          'simple-vector
+         (remove nil
           (map 'list
-               (lambda (saetp)
-                 (sb-c::type-specifier
-                  (sb-c::specifier-type
-                   `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
+               (lambda (saetp &aux (et (sb-vm:saetp-specifier saetp)))
+                 (unless (member et '(nil t))
+                   (sb-c::type-specifier
+                    (sb-c::specifier-type `(simple-array ,et (*))))))
                sb-vm:*specialized-array-element-type-properties*))))
     (assert (sb-c::%interr-symbol-for-type-spec `(or ,@specifiers)))
     (assert (sb-c::%interr-symbol-for-type-spec

@@ -71,14 +71,20 @@
 
 ;;;; hooks into the type system
 
+;;; Typically the use for UNBOXED-ARRAY is with foreign APIs where we want to
+;;; require that the array being passed has byte nature, and is not SIMPLE-VECTOR.
+;;; But (VECTOR NIL) contains no data, so surely there is no reason for
+;;; passing it to foreign code.
 (sb-xc:deftype unboxed-array (&optional dims)
   (cons 'or (mapcar (lambda (type) `(array ,type ,dims))
-                    '#.(delete t (map 'list 'sb-vm:saetp-specifier
-                                      sb-vm:*specialized-array-element-type-properties*)))))
+                    '#.(delete-if (lambda (x) (member x '(nil t)))
+                                  (map 'list 'sb-vm:saetp-specifier
+                                       sb-vm:*specialized-array-element-type-properties*)))))
 (sb-xc:deftype simple-unboxed-array (&optional dims)
   (cons 'or (mapcar (lambda (type) `(simple-array ,type ,dims))
-                    '#.(delete t (map 'list 'sb-vm:saetp-specifier
-                                      sb-vm:*specialized-array-element-type-properties*)))))
+                    '#.(delete-if (lambda (x) (member x '(nil t)))
+                                  (map 'list 'sb-vm:saetp-specifier
+                                       sb-vm:*specialized-array-element-type-properties*)))))
 
 (sb-xc:deftype complex-vector (&optional element-type length)
   `(and (vector ,element-type ,length) (not simple-array)))

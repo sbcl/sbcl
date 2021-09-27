@@ -252,6 +252,9 @@
   #-64-bit unused09-widetag                 ;  7E       7E
 
   simple-array-widetag                      ;  82   81  82   81
+  ;; NIL element type is not in the contiguous range of widetags
+  ;; corresponding to SIMPLE-UNBOXED-ARRAY
+  simple-array-nil-widetag
   simple-vector-widetag                     ;
   simple-bit-vector-widetag                 ;
   simple-array-unsigned-byte-2-widetag      ;
@@ -284,9 +287,6 @@
   simple-array-double-float-widetag         ;
   simple-array-complex-single-float-widetag ;
   simple-array-complex-double-float-widetag ;
-
-  ;; Not a string type
-  simple-array-nil-widetag                  ;
 
   simple-base-string-widetag                ;  D6   E1  D6   E1       \
   #+sb-unicode                              ;                          |

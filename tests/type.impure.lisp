@@ -928,7 +928,8 @@
   (let* ((hair (sb-kernel:specifier-type '(sb-kernel:unboxed-array 1)))
          (xform (sb-c::source-transform-union-typep 'myobj hair)))
     (assert (equal xform
-                   '(or (typep myobj '(and vector (not (array t))))))))
+                   '(or (typep myobj
+                               '(and vector (not (array t)) (not (array nil))))))))
 
   ;; Exclude one subtype at a time and make sure they all work.
   (dotimes (i (length sb-vm:*specialized-array-element-type-properties*))

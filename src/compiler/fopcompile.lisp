@@ -231,7 +231,9 @@
 ;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
 ;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
 (defun dumpable-leaflike-p (obj)
-  (or (sb-xc:typep obj '(or symbol number character unboxed-array
+  (or (sb-xc:typep obj '(or symbol number character
+                            ;; (ARRAY NIL) is not included in UNBOXED-ARRAY
+                            (or unboxed-array (array nil))
                             system-area-pointer
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))

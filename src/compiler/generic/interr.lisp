@@ -55,8 +55,9 @@
                             (type-specifier
                              (specifier-type
                               `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
-                          (remove t sb-vm:*specialized-array-element-type-properties*
-                                  :key 'sb-vm:saetp-specifier))))
+                          (remove-if (lambda (x) (member x '(nil t)))
+                                     sb-vm:*specialized-array-element-type-properties*
+                                     :key 'sb-vm:saetp-specifier))))
                 `(((integer 0 ,array-dimension-limit)
                    object-not-array-dimension)
                   ;; Union of all unboxed array specializations,

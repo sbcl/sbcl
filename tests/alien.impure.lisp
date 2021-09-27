@@ -552,3 +552,6 @@
 (with-test (:name :def-alien-rtn-use-gensym)
   (checked-compile '(lambda () (define-alien-routine "fleem" int (x int)))
                    :allow-style-warnings (or #-(or :x86-64 :arm :arm64) t)))
+
+(with-test (:name :no-vector-sap-of-array-nil)
+  (assert-error (sb-sys:vector-sap (opaque-identity (make-array 5 :element-type nil)))))
