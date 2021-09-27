@@ -2133,7 +2133,11 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (let ((ref-type (single-value-type (node-derived-type ref))))
-        (cond ((csubtypep (single-value-type (lvar-type arg)) ref-type)
+        (cond ((or (csubtypep (single-value-type (lvar-type arg)) ref-type)
+                   ;; Can't impart the same type to multiple uses, as
+                   ;; they are coming from different branches with
+                   ;; different derived values.
+                   (consp (lvar-uses lvar)))
                (substitute-lvar-uses lvar arg
                                      ;; Really it is (EQ (LVAR-USES LVAR) REF):
                                      t)

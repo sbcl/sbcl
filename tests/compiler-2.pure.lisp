@@ -3324,3 +3324,19 @@
                (ldb (byte 6 6)
                     (ash i (mask-field (byte 5 8) i)))))
     (() 0)))
+
+(with-test (:name :substitute-single-use-lvar-type-multiple-uses)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (let ((z
+              (ceiling
+               (truncate 655
+                         (min -7
+                              (if c
+                                  -1000
+                                  3)))
+               3)))
+        z))
+   ((t) 0)
+   ((nil) -31)))
