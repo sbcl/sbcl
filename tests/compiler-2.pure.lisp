@@ -3340,3 +3340,33 @@
         z))
    ((t) 0)
    ((nil) -31)))
+
+(with-test (:name :division-by-multiplication-type-derivation)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (c)
+                (declare (optimize speed))
+                (ceiling
+                 (truncate 65527
+                           (min -78
+                                (if c
+                                    -913097464
+                                    5)))
+                 39)))))
+          '(values (or (integer -21 -21) (integer 0 0)) (integer -38 0) &optional)))
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (c)
+                (declare (optimize speed))
+                (ceiling
+                 (truncate 65527
+                           (min 78
+                                (if c
+                                    913097464
+                                    5)))
+                 39)))))
+          '(values (or (integer 337 337) (integer 22 22)) (integer -38 -1) &optional))))

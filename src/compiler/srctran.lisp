@@ -1443,6 +1443,23 @@
 (defoptimizer (* derive-type) ((x y))
   (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
 
+(defoptimizer (%signed-multiply-high derive-type) ((x y))
+  (two-arg-derive-type x y
+                       (lambda (x y same-arg)
+                         (let* ((type (*-derive-type-aux x y same-arg))
+                                (low (numeric-type-low type))
+                                (high (numeric-type-high type)))
+                           (when (and low high)
+                             (make-numeric-type :class 'integer
+                                                :low
+                                                (ash low (- sb-vm:n-word-bits))
+                                                :high (ash high (- sb-vm:n-word-bits))))))
+                       #'sb-xc:*))
+
+(defoptimizer (%multiply-high derive-type) ((x y) node)
+  (declare (ignore x y))
+  (%signed-multiply-high-derive-type-optimizer node))
+
 (defun /-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
