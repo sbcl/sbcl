@@ -575,6 +575,7 @@
                  ;; or can only be the same thing for both vops,
                  ;; then we're fine to combine.
                  (or (constant-tn-p sym)
+                     (not (tn-writes sym))
                      (not (tn-ref-next (tn-writes sym))))
                  ;; Elide the SYMBOL-VALUE only if there is exactly one way to get there.
                  ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,

@@ -3370,3 +3370,15 @@
                                     5)))
                  39)))))
           '(values (or (integer 337 337) (integer 22 22)) (integer -38 -1) &optional))))
+
+(with-test (:name :boundp-ir2-optimizer)
+  (checked-compile-and-assert
+   ()
+   `(lambda (v)
+      (flet ((f (s)
+               (when (boundp s)
+                 (symbol-value s))))
+        (f v)
+        (f v)
+        v))
+   ((t) t)))
