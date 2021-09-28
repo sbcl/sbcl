@@ -912,7 +912,7 @@
     (and writes reads (not (tn-ref-next writes)) (not (tn-ref-next reads)))))
 
 (defun next-vop-is (vop names)
-  (let ((next (vop-next vop)))
+  (let ((next (next-vop vop)))
     (and next
          (let ((name (vop-name next)))
            (if (atom names) (eq name names) (memq name names)))
@@ -928,8 +928,6 @@
 ;;; Possibly replace HOWMANY vops starting at FIRST with a vop named REPLACEMENT.
 ;;; Each deleted vop must have exactly one argument and one result.
 ;;; - There must be no way to begin execution in the middle of the pattern.
-;;;   For now we'll require that the vops have the same IR2 block,
-;;;   which is a more restrictive condition.
 ;;; - The argument to each successive vop must be the result of its predecessor.
 ;;; - There must be no other refs to TNs which are to be deleted.
 ;;;
@@ -939,16 +937,15 @@
 ;;; is in a register (so we get the load as part of the instruction).
 (defun replace-vops (howmany first replacement)
   (flet ((can-replace (vop &aux (result (tn-ref-tn (vop-results vop)))
-                                (next (vop-next vop)))
-           (and (eq (vop-block vop) (vop-block next))
-                (very-temporary-p result)
+                                (next (next-vop vop)))
+           (and (very-temporary-p result)
                 (eq (tn-ref-tn (vop-args next)) result))))
     (let ((last (ecase howmany
                   (2 (when (can-replace first)
-                       (vop-next first)))
+                       (next-vop first)))
                   (3 (when (and (can-replace first)
-                                (can-replace (vop-next first)))
-                       (vop-next (vop-next first)))))))
+                                (can-replace (next-vop first)))
+                       (next-vop (next-vop first)))))))
       (when last
         (let ((new (emit-and-insert-vop (vop-node first)
                                         (vop-block first)
@@ -957,7 +954,7 @@
                                         (reference-tn (tn-ref-tn (vop-results last)) t)
                                         first))) ; insert before this
           (dotimes (i (1- howmany)) ; if 3, replace 2 "NEXT"'s and then first, etc
-            (delete-vop (vop-next first)))
+            (delete-vop (next-vop first)))
           (delete-vop first)
           new))))) ; return suitable value for RUN-VOP-OPTIMIZERS
 

@@ -223,5 +223,5 @@
 ;;; with just the TAGGED-CHAR-CODE vop.
 (defoptimizer (sb-c::vop-optimize move-to-character) (vop)
   (when (and (sb-c:next-vop-is vop 'char-code)
-             (sb-c:next-vop-is (sb-c:vop-next vop) 'move-from-word/fixnum))
+             (sb-c:next-vop-is (sb-c::next-vop vop) 'move-from-word/fixnum))
     (sb-c:replace-vops 3 vop 'tagged-char-code)))

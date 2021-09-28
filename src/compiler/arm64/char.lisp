@@ -167,3 +167,29 @@
   (:policy :fast-safe)
   (:generator 2
     (inst cmp value base-char-code-limit)))
+
+(defoptimizer (sb-c::vop-optimize move-to-character) (vop)
+  (when (sb-c:next-vop-is vop 'char-code)
+    (sb-c:replace-vops 2 vop 'tagged-char-code)))
+
+;;; Exploit the fact that the MSB of character-widetag is 0 and that n-fixnum-tag-bits is 1.
+(eval-when (:compile-toplevel)
+  (assert (not (logbitp 7 character-widetag))))
+(define-vop (tagged-char-code)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character untagging")
+  (:generator 1
+    (inst lsr y x (- n-widetag-bits n-fixnum-tag-bits))))
+
+(defoptimizer (sb-c::vop-optimize code-char) (vop)
+  (when (sb-c:next-vop-is vop 'move-from-character)
+    (sb-c:replace-vops 2 vop 'tagged-code-char)))
+
+(define-vop (tagged-code-char)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character tagging")
+  (:generator 1
+    (inst lsl y x (- n-widetag-bits n-fixnum-tag-bits))
+    (inst add y y character-widetag)))
