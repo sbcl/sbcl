@@ -15,6 +15,7 @@
           sb-c::combination-fun-source-name
           sb-c::*compile-component-hook*
           sb-c::basic-combination-p
+          sb-c::combination-p
           sb-c::basic-combination-info
           sb-c::node-tail-p
           sb-c::do-blocks
@@ -95,7 +96,7 @@
                      :key #'combination-fun-debug-name))))
 
 (test-util:with-test (:name :mod-ash
-                      :skipped-on (not :arm64))
+                      :skipped-on (not (or :arm64 :x86-64)))
   (assert (not (ir-full-calls `(lambda (x y)
                                  (declare (fixnum x y))
                                  (logand #xFF (ash x y)))))))
@@ -108,4 +109,6 @@
                                                          (values 1 0))
                                        a)
                                      1)))
-                     :key #'combination-fun-debug-name))))
+                     :key (lambda (x)
+                            (and (combination-p x)
+                                 (combination-fun-debug-name x)))))))
