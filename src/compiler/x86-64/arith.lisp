@@ -995,15 +995,6 @@
   (:result-types signed-num)
   (:variant nil t))
 
-(define-vop (fast-ash/fixnum=>fixnum fast-ash/unsigned=>unsigned)
-  (:args (number :scs (any-reg) :to :save)
-         (amount :scs (signed-reg) :target ecx))
-  (:arg-types tagged-num signed-num)
-  (:results (result :scs (any-reg)))
-  (:result-types tagged-num)
-  (:variant nil t)
-  (:variant-cost 3))
-
 (define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
   (:translate ash-modfx)
   (:policy :fast-safe)
@@ -1046,8 +1037,8 @@
     DONE
     (inst shl result n-fixnum-tag-bits)))
 
-(define-vop (fast-ash-modfx/fixnum=>fixnum
-             fast-ash/fixnum=>fixnum)
+(define-vop (fast-ash-modfx/signed=>signed
+             fast-ash/signed=>signed)
   (:variant t t)
   (:translate ash-modfx))
 

@@ -475,16 +475,6 @@
   (:translate ash)
   (:variant :signed))
 
-(define-vop (fast-ash/fixnum=>fixnum fast-ash/signed/unsigned)
-  (:args (number :scs (any-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
-  (:arg-types tagged-num signed-num)
-  (:results (result :scs (any-reg)))
-  (:result-types tagged-num)
-  (:translate ash)
-  (:variant :signed)
-  (:variant-cost 3))
-
 (define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
   (:args (number :scs (unsigned-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
@@ -606,8 +596,8 @@
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (fast-ash-modfx/fixnum=>fixnum
-             fast-ash/fixnum=>fixnum)
+(define-vop (fast-ash-modfx/signed=>signed
+             fast-ash/signed=>signed)
   (:translate ash-modfx))
 
 (define-vop (fast-ash-mod64/unsigned=>unsigned

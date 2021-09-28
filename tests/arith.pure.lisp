@@ -877,3 +877,15 @@
                (optimize speed (safety 0)))
       (mod x y))
    :allow-notes nil))
+
+(with-test (:name :ash-fixnum)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+     (declare (type (integer -2 2) b))
+     (ash b (min 13 b)))
+   ((-2) -1)
+   ((-1) -1)
+   ((0) 0)
+   ((1) 2)
+   ((2) 8)))
