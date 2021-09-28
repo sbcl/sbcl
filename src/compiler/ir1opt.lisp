@@ -305,6 +305,9 @@
   (let* ((block (node-block node))
          (component (block-component block)))
     (setf (node-reoptimize node) t)
+    (when (cast-p node)
+      (do-uses (node (cast-value node))
+        (reoptimize-node node)))
     (reoptimize-component component t)
     (setf (block-reoptimize block) t)))
 
@@ -967,9 +970,14 @@
     (when (and entry
                (eq (node-home-lambda node) (node-home-lambda entry)))
       (setf (entry-exits entry) (delq1 node (entry-exits entry)))
-      (if value
-          (delete-filter node (node-lvar node) value)
-          (unlink-node node)))))
+      (cond (value
+             ;; The number of consumed values is now known, reoptimize the users.
+             ;; The VALUES transform in particular benefits from this.
+             (do-uses (use value)
+               (reoptimize-node use))
+             (delete-filter node (node-lvar node) value))
+            (t
+             (unlink-node node))))))
 
 
 ;;;; combination IR1 optimization

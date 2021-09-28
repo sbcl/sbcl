@@ -99,3 +99,13 @@
   (assert (not (ir-full-calls `(lambda (x y)
                                  (declare (fixnum x y))
                                  (logand #xFF (ash x y)))))))
+
+(test-util:with-test (:name :exit-reoptimize-uses)
+  (assert (not (find 'cdr
+                     (ir-calls `(lambda (a b)
+                                  (/ (unwind-protect (if a
+                                                         (values b (cdr a))
+                                                         (values 1 0))
+                                       a)
+                                     1)))
+                     :key #'combination-fun-debug-name))))
