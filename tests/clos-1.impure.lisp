@@ -292,7 +292,8 @@
     (assert (eql (slot-value one 'name) 1))
     (assert (eql (slot-value two 'name) one))))
 
-(with-test (:name :defmethod-self-call-arg-mismatch)
+(with-test (:name :defmethod-self-call-arg-mismatch
+            :skipped-on :interpreter)
   (assert-signal (eval '(defmethod method-self-call (a b &key)
                          b
                          (method-self-call a)))
