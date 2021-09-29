@@ -889,3 +889,17 @@
    ((0) 0)
    ((1) 2)
    ((2) 8)))
+
+(with-test (:name :mod-ash-cut)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+      (logand #xFF (ash 1 (the (integer -1000 1000) b))))
+   ((1) 2)
+   ((500) 0))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x b)
+      (logand #xFF (ash (the (unsigned-byte 64) x) (the (integer -1000 1000) b))))
+   (((1- (expt 2 64)) -63) 1)
+      (((1- (expt 2 64)) -64) 0)))

@@ -408,16 +408,24 @@
     (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args))
-                       (specifier-type `(integer -63 *)))
-      (inst cmp temp n-word-bits)
-      ;; Only the first 6 bits count for shifts.
-      ;; This sets all bits to 1 if AMOUNT is larger than 63,
-      ;; cutting the amount to 63.
-      (inst csinv temp temp zr-tn :lt))
-    (ecase variant
-      (:signed (inst asr result number temp))
-      (:unsigned (inst lsr result number temp)))
+    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+                      (specifier-type `(integer -63 *)))
+           (ecase variant
+             (:signed (inst asr result number temp))
+             (:unsigned (inst lsr result number temp))))
+          (t
+           (inst cmp temp n-word-bits)
+           (ecase variant
+             (:signed
+              ;; Only the first 6 bits count for shifts.
+              ;; This sets all bits to 1 if AMOUNT is larger than 63,
+              ;; cutting the amount to 63.
+              (inst csinv temp temp zr-tn :lt)
+              (inst asr result number temp))
+             (:unsigned
+              (inst csel result number zr-tn :lt)
+              (inst lsr result result temp)))))
+
     (inst b END)
     LEFT
     (cond ((csubtypep (tn-ref-type (tn-ref-across args))
@@ -444,16 +452,24 @@
     (inst subs temp amount zr-tn)
     (inst b :ge LEFT)
     (inst neg temp temp)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args))
-                       (specifier-type `(integer -63 *)))
-      (inst cmp temp n-word-bits)
-      ;; Only the first 6 bits count for shifts.
-      ;; This sets all bits to 1 if AMOUNT is larger than 63,
-      ;; cutting the amount to 63.
-      (inst csinv temp temp zr-tn :lt))
-    (sc-case number
-      (signed-reg (inst asr temp-result number temp))
-      (unsigned-reg (inst lsr temp-result number temp)))
+    (cond ((csubtypep (tn-ref-type (tn-ref-across args))
+                      (specifier-type `(integer -63 *)))
+           (sc-case number
+             (signed-reg (inst asr temp-result number temp))
+             (unsigned-reg (inst lsr temp-result number temp))))
+          (t
+           (inst cmp temp n-word-bits)
+           (sc-case number
+             (signed-reg
+              ;; Only the first 6 bits count for shifts.
+              ;; This sets all bits to 1 if AMOUNT is larger than 63,
+              ;; cutting the amount to 63.
+              (inst csinv temp temp zr-tn :lt)
+              (inst asr temp-result number temp))
+             (unsigned-reg
+              (inst csel temp-result number zr-tn :lt)
+              (inst lsr temp-result temp-result temp)))))
+
     (inst b END)
     LEFT
     (cond ((csubtypep (tn-ref-type (tn-ref-across args))

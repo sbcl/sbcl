@@ -965,7 +965,10 @@
                        (specifier-type `(integer -63 *)))
       (inst cmp ecx 63)
       (inst jmp :be OKAY)
-      (inst or ecx 63))
+      (cond (signed
+             (inst or ecx 63))
+            (t
+             (zeroize result))))
     OKAY
     (if signed
         (inst sar result :cl)
@@ -973,14 +976,12 @@
     (inst jmp DONE)
 
     POSITIVE
-    ;; The result-type ensures us that this shift will not overflow.
-    (unless (or (not check-amount)
+    (unless (or (not check-amount) ;; The result-type ensures us that this shift will not overflow.
                 (csubtypep (tn-ref-type (tn-ref-across args))
                            (specifier-type `(integer * 63))))
       (inst cmp ecx 63)
       (inst jmp :be STILL-OKAY)
-      (inst or ecx 63)
-      (inst jmp DONE))
+      (zeroize result))
     STILL-OKAY
     (inst shl result :cl)
 
@@ -1016,7 +1017,11 @@
                        (specifier-type `(integer -63 *)))
       (inst cmp ecx 63)
       (inst jmp :be OKAY)
-      (inst mov ecx 63))
+      (sc-case number
+        (signed-reg
+         (inst mov ecx 63))
+        (unsigned-reg
+         (zeroize result))))
     OKAY
     (sc-case number
       (signed-reg
@@ -1030,8 +1035,7 @@
                        (specifier-type `(integer * 63)))
       (inst cmp ecx 63)
       (inst jmp :be STILL-OKAY)
-      (inst mov ecx 63)
-      (inst jmp DONE))
+      (zeroize result))
     STILL-OKAY
     (inst shl result :cl)
     DONE
