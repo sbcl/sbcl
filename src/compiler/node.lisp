@@ -28,7 +28,7 @@
              (:copier nil)
              (:constructor make-null-lexenv ())
              (:constructor make-almost-null-lexenv (%policy handled-conditions
-                                                    flushable lambda parent))
+                                                    flushable current-defmethod lambda parent))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
                             &aux (handled-conditions nil)))
@@ -36,6 +36,7 @@
                            (funs vars blocks tags
                             type-restrictions
                             flushable
+                            current-defmethod
                             lambda cleanup handled-conditions
                             disabled-package-locks %policy user-data
                             parent)))
@@ -92,7 +93,8 @@
   ;; Similar to the FLUSHABLE attribute in DEFKNOWN, but can applied
   ;; locally to things that are generally not flushable but can be
   ;; flushed in some circumstances.
-  (flushable nil :type list))
+  (flushable nil :type list)
+  (current-defmethod nil))
 
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))

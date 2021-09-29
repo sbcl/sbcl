@@ -1705,6 +1705,10 @@
         (make-lexenv
          :default res
          :flushable (cdr spec)))
+       (current-defmethod
+        (make-lexenv
+         :default res
+         :current-defmethod (cdr spec)))
        (no-constraints
         (process-no-constraints-decl spec vars)
         res)

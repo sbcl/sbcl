@@ -291,3 +291,27 @@
     (bug-1909659w-set-name one two)
     (assert (eql (slot-value one 'name) 1))
     (assert (eql (slot-value two 'name) one))))
+
+(with-test (:name :defmethod-self-call-arg-mismatch)
+  (assert-signal (eval '(defmethod method-self-call (a b &key)
+                         b
+                         (method-self-call a)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (assert-no-signal (eval '(defmethod method-self-call (a b &key z)
+                            (method-self-call a b :z z)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (assert-signal (eval '(defmethod method-self-call (a b &key j)
+                         j
+                         (method-self-call a b :z j)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (eval '(defmethod method-self-call (a (b list) &key z)
+          (list a b z)))
+
+  (assert-no-signal (eval '(defmethod method-self-call (a b &key j)
+                            j
+                            (method-self-call a b :z j :j 10)))
+      (and warning
+           (not sb-kernel:redefinition-warning))))

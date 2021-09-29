@@ -355,7 +355,9 @@ bootstrapping.
     ;; except that it doesn't clear an :ASSUMED-TYPE. Should it?
     (setf (info :function :where-from fun-name) :defined)
     (setf (info :function :type fun-name)
-          (specifier-type 'function))))
+          (if (eq **boot-state** 'complete)
+              :generic-function
+              (specifier-type 'function)))))
 
 (defun load-defgeneric (fun-name lambda-list source-location &rest initargs)
   (when (fboundp fun-name)
@@ -532,7 +534,8 @@ bootstrapping.
              (method-lambda `(lambda ,unspecialized-lambda-list
                                (declare (sb-c::source-form
                                          (lambda ,unspecialized-lambda-list
-                                           ,@body)))
+                                           ,@body))
+                                        (sb-c::current-defmethod ,*method-name* . ,unspecialized-lambda-list))
                                ,@body))
              ((method-function-lambda initargs new-lambda-list)
               (make-method-lambda-using-specializers

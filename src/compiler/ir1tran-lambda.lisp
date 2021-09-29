@@ -1239,6 +1239,7 @@
                 :handled-conditions (lexenv-handled-conditions *lexenv*)
                 :policy policy
                 :flushable (lexenv-flushable *lexenv*)
+                :current-defmethod (lexenv-current-defmethod *lexenv*)
                 :lambda lexenv-lambda
                 :parent *lexenv*)
                (make-almost-null-lexenv
@@ -1248,6 +1249,7 @@
                 ;; like a much more common case.
                 (lexenv-handled-conditions *lexenv*)
                 (lexenv-flushable *lexenv*)
+                (lexenv-current-defmethod *lexenv*)
                 lexenv-lambda
                 *lexenv*)))
          (*inlining* (not *transforming*))

@@ -503,27 +503,35 @@
           (setf (info :function :type name) :generic-function))))))
 
 (defun compute-gf-ftype (name)
-  (let ((gf (and (fboundp name) (fdefinition name))))
-    (if (generic-function-p gf)
-        (let* ((ll (generic-function-lambda-list gf))
-               ;; If the GF has &REST without &KEY then we don't augment
-               ;; the FTYPE with keywords, so as not to complain about keywords
-               ;; which seem not to be accepted.
-               (type (sb-c::ftype-from-lambda-list
-                      (if (and (member '&rest ll) (not (member '&key ll)))
-                          ll
-                          (generic-function-pretty-arglist gf)))))
-          ;; It would be nice if globaldb were transactional,
-          ;; so that either both updates or neither occur.
-          (setf (info :function :type name) type
-                (info :function :where-from name) :defined-method)
-          type)
-        ;; The defaulting expression for (:FUNCTION :TYPE) does not store
-        ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
-        ;; don't, however this branch should never be reached because the
-        ;; info only stores :GENERIC-FUNCTION when methods are loaded.
-        ;; Maybe AVER that it does not happen?
-        (sb-impl::ftype-from-fdefn name))))
+  (let ((gf (and (fboundp name) (fdefinition name)))
+        (current-defmethod (if (boundp 'sb-c::*lexenv*)
+                               (sb-c::lexenv-current-defmethod (symbol-value 'sb-c::*lexenv*)))))
+    (cond ((generic-function-p gf)
+           (let* ((ll (generic-function-lambda-list gf))
+                  (current-defmethod (and (eq (caar current-defmethod) name)
+                                          current-defmethod))
+                  ;; If the GF has &REST without &KEY then we don't augment
+                  ;; the FTYPE with keywords, so as not to complain about keywords
+                  ;; which seem not to be accepted.
+                  (type (sb-c::ftype-from-lambda-list
+                         (if (and (member '&rest ll) (not (member '&key ll)))
+                             ll
+                             (generic-function-pretty-arglist gf current-defmethod)))))
+             (unless current-defmethod ;; it's not yet added, don't store
+               ;; It would be nice if globaldb were transactional,
+               ;; so that either both updates or neither occur.
+               (setf (info :function :type name) type
+                     (info :function :where-from name) :defined-method))
+             type))
+          ((eq (caar current-defmethod) name)
+           (sb-c::ftype-from-lambda-list (cdr current-defmethod)))
+          (t
+           ;; The defaulting expression for (:FUNCTION :TYPE) does not store
+           ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
+           ;; don't, however this branch should never be reached because the
+           ;; info only stores :GENERIC-FUNCTION when methods are loaded.
+           ;; Maybe AVER that it does not happen?
+           (sb-impl::ftype-from-fdefn name)))))
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (flet ((similar-lambda-lists-p (old-method new-lambda-list)
@@ -1702,9 +1710,15 @@
 ;;; The compiler uses this for type-checking that callers pass acceptable
 ;;; keywords, so don't make this do anything fancy like looking at effective
 ;;; methods without also fixing the compiler.
-(defmethod generic-function-pretty-arglist ((gf standard-generic-function))
-  (let ((gf-lambda-list (generic-function-lambda-list gf))
-        (methods (generic-function-methods gf)))
+(defmethod generic-function-pretty-arglist ((gf standard-generic-function) &optional current-defmethod)
+  (let* ((gf-lambda-list (generic-function-lambda-list gf))
+         (methods (generic-function-methods gf))
+         (current-method-name (car current-defmethod))
+         (qualifiers (and (= (length current-method-name) 3)
+                          (second current-method-name)))
+         (specializers (if (= (length current-method-name) 3)
+                           (third current-method-name)
+                           (second current-method-name))))
     (flet ((canonize (k)
              (multiple-value-bind (kw var)
                  (parse-key-arg-spec k)
@@ -1715,14 +1729,21 @@
       (multiple-value-bind (llks required optional rest keys)
           (parse-lambda-list gf-lambda-list :silent t)
         (collect ((keys (mapcar #'canonize keys)))
-        ;; Possibly extend the keyword parameters of the gf by
-        ;; additional key parameters of its methods:
-          (dolist (m methods
-                     (make-lambda-list llks nil required optional rest (keys)))
-            (binding* (((m.llks nil nil nil m.keys)
-                        (parse-lambda-list (method-lambda-list m) :silent t)))
-              (setq llks (logior llks m.llks))
-              (dolist (k m.keys)
-                (unless (member (parse-key-arg-spec k) (keys)
-                                :key #'parse-key-arg-spec :test #'eq)
-                  (keys (canonize k)))))))))))
+          ;; Possibly extend the keyword parameters of the gf by
+          ;; additional key parameters of its methods:
+          (flet ((process (lambda-list)
+                   (binding* (((m.llks nil nil nil m.keys)
+                               (parse-lambda-list lambda-list :silent t)))
+                     (setq llks (logior llks m.llks))
+                     (dolist (k m.keys)
+                       (unless (member (parse-key-arg-spec k) (keys)
+                                       :key #'parse-key-arg-spec :test #'eq)
+                         (keys (canonize k)))))))
+            (dolist (m methods)
+              (unless (and current-defmethod
+                           (equal (method-qualifiers m) qualifiers)
+                           (equal (unparse-specializers gf (method-specializers m)) specializers))
+                (process (method-lambda-list m))))
+            (when current-defmethod
+              (process (cdr current-defmethod)))
+            (make-lambda-list llks nil required optional rest (keys))))))))

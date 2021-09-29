@@ -211,7 +211,7 @@
 
 (defgeneric generic-function-lambda-list (generic-function))
 
-(defgeneric generic-function-pretty-arglist (generic-function))
+(defgeneric generic-function-pretty-arglist (generic-function &optional current-defmethod))
 
 (defgeneric gf-fast-method-function-p (gf))
 

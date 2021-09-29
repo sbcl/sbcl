@@ -200,7 +200,8 @@
                           (t
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)
-                              (functional-p leaf))
+                              (functional-p leaf)
+                              (global-var-p leaf))
                           (cond ((or (constant-lvar-p lvar)
                                      ;; A constant may fail some checks in constant-lvar-p
                                      (constant-p leaf))
