@@ -488,7 +488,31 @@
            (lambda (instance)
              (pv-binding1 ((bug "Please report this")
                            (instance) nil)
-               (instance-boundp-custom .pv. 0 instance))))))))))
+               (instance-boundp-custom .pv. 0 instance)))))))))
+
+  (defun make-fallback-reader-method-function (slot-name)
+    (make-initargs
+     slot-name :reader
+     (make-method-function
+      (lambda (instance)
+        (declare (notinline slot-value))
+        (slot-value instance slot-name)))))
+
+  (defun make-fallback-writer-method-function (slot-name)
+    (make-initargs
+     slot-name :writer
+     (make-method-function
+      (lambda (nv instance)
+        (declare (notinline (setf slot-value)))
+        (setf (slot-value instance slot-name) nv)))))
+
+  (defun make-fallback-boundp-method-function (slot-name)
+    (make-initargs
+     slot-name :boundp
+     (make-method-function
+      (lambda (instance)
+        (declare (notinline slot-value))
+        (slot-boundp instance slot-name))))))
 
 ;;;; FINDING SLOT DEFINITIONS
 ;;;

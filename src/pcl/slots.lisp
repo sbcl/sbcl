@@ -42,6 +42,9 @@
                          (cell-error-name condition)
                          (type-of (unbound-slot-instance condition))))))))
 
+(define-condition missing-slot (cell-error simple-type-error)
+  ())
+
 ;;; These three functions work on std-instances and fsc-instances. These are
 ;;; instances for which it is possible to change the wrapper and the slots.
 ;;;
@@ -369,26 +372,30 @@
 
 (defmethod slot-missing
            ((class t) instance slot-name operation &optional new-value)
-  (error "~@<When attempting to ~A, the slot ~S is missing from the ~
+  (error 'missing-slot
+         :name slot-name
+         :format-control
+         "~@<When attempting to ~A, the slot ~S is missing from the ~
           object ~S.~@[~%~a~]~@:>"
-         (ecase operation
-           (slot-value "read the slot's value (slot-value)")
-           (setf (format nil
-                         "set the slot's value to ~S (SETF of SLOT-VALUE)"
-                         new-value))
-           (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
-           (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
-         slot-name
-         instance
-         (let ((slot (and (typep class 'slot-class)
-                          (find slot-name (class-slots class)
-                                :key #'slot-definition-name
-                                :test #'string-equal))))
-           (when slot
-             (format nil "It has a slot ~/sb-ext:print-symbol-with-prefix/, while ~
+         :format-arguments
+         (list (ecase operation
+                 (slot-value "read the slot's value (slot-value)")
+                 (setf (format nil
+                               "set the slot's value to ~S (SETF of SLOT-VALUE)"
+                               new-value))
+                 (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
+                 (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
+               slot-name
+               instance
+               (let ((slot (and (typep class 'slot-class)
+                                (find slot-name (class-slots class)
+                                      :key #'slot-definition-name
+                                      :test #'string-equal))))
+                 (when slot
+                   (format nil "It has a slot ~/sb-ext:print-symbol-with-prefix/, while ~
                          ~/sb-ext:print-symbol-with-prefix/ is requested."
-                     (slot-definition-name slot)
-                     slot-name)))))
+                           (slot-definition-name slot)
+                           slot-name))))))
 
 (defmethod slot-unbound ((class t) instance slot-name)
   (restart-case

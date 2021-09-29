@@ -6,6 +6,8 @@ changes relative to sbcl-2.1.9:
     functions or for calling Lisp code from the foreign world as a shared
     library (preliminary support). See the revised manual section "Calling
     into Lisp From C" for more details.
+  * enhancement: arg-count mismatches in self-calls in defmethod are reported.
+    (lp#1912436)
 
 changes in sbcl-2.1.9 relative to sbcl-2.1.8:
   * minor incompatible change: the experimental DEFCAS macro has been removed.
