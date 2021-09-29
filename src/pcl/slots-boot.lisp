@@ -495,7 +495,6 @@
      slot-name :reader
      (make-method-function
       (lambda (instance)
-        (declare (notinline slot-value))
         (slot-value instance slot-name)))))
 
   (defun make-fallback-writer-method-function (slot-name)
@@ -503,7 +502,6 @@
      slot-name :writer
      (make-method-function
       (lambda (nv instance)
-        (declare (notinline (setf slot-value)))
         (setf (slot-value instance slot-name) nv)))))
 
   (defun make-fallback-boundp-method-function (slot-name)
@@ -511,7 +509,6 @@
      slot-name :boundp
      (make-method-function
       (lambda (instance)
-        (declare (notinline slot-value))
         (slot-boundp instance slot-name))))))
 
 ;;;; FINDING SLOT DEFINITIONS
