@@ -436,7 +436,7 @@
 
 (defun next-vop (vop)
   (or (vop-next vop)
-      (do ((2block (ir2-block-next (ir2-block-next (vop-block vop)))
+      (do ((2block (ir2-block-next (vop-block vop))
                    (ir2-block-next 2block)))
           ((null 2block) nil)
         (cond ((or (ir2-block-%trampoline-label 2block)
