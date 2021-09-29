@@ -175,7 +175,6 @@ is replaced with replacement."
 
 (defmethod display ((c sb-c::component))
   (format nil "COMPONENT: '~S'"
-          (sb-c::component-kind c)
           (sb-c::component-name c)))
 
 ;; The sxhash is required to not end up with a single CBLOCK node
