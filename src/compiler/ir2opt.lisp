@@ -436,10 +436,14 @@
 
 (defun next-vop (vop)
   (or (vop-next vop)
-      (let ((next-block (ir2-block-next (vop-block vop))))
-        (and (not (or (ir2-block-%trampoline-label next-block)
-                      (ir2-block-%label next-block)))
-             (ir2-block-start-vop next-block)))))
+      (do ((2block (ir2-block-next (ir2-block-next (vop-block vop)))
+                   (ir2-block-next 2block)))
+          ((null 2block) nil)
+        (cond ((or (ir2-block-%trampoline-label 2block)
+                   (ir2-block-%label 2block))
+               (return))
+              ((ir2-block-start-vop 2block)
+               (return (ir2-block-start-vop 2block)))))))
 
 (defun immediate-templates (fun &optional (constants t))
   (let ((primitive-types (list (primitive-type-or-lose 'character)
