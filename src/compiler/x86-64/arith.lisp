@@ -1841,8 +1841,7 @@
                (declare (ignore vop64cf)) ; maybe someone will want it some day
                `(progn
                   (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
-                  (define-modular-fun ,funfx (x y) ,name :tagged t
-                                      #.(- n-word-bits n-fixnum-tag-bits))
+                  (define-modular-fun ,funfx (x y) ,name :tagged t #.n-fixnum-bits)
                   (define-mod-binop (,vop64u ,vopu) ,fun64)
                   ;; This seems a bit lame. Could we not just have one vop
                   ;; which which takes any combination of signed/unsigned reg
@@ -1868,7 +1867,7 @@
     (move r x)
     (inst neg r)))
 
-(define-modular-fun %negate-modfx (x) %negate :tagged t #.n-fixnum-tag-bits)
+(define-modular-fun %negate-modfx (x) %negate :tagged t #.n-fixnum-bits)
 (define-vop (%negate-modfx fast-negate/fixnum)
   (:translate %negate-modfx))
 (in-package "SB-C")
@@ -1888,7 +1887,7 @@
     (cut-to-width index :untagged width nil)
     'sb-vm::%lea-mod64))
 (define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
-  (when (and (<= width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits))
+  (when (and (<= width sb-vm:n-fixnum-bits)
              (constant-lvar-p scale)
              (constant-lvar-p disp))
     (cut-to-width base :tagged width t)
@@ -1900,7 +1899,7 @@
   (defun sb-vm::%lea-mod64 (base index scale disp)
     (ldb (byte 64 0) (%lea base index scale disp)))
   (defun sb-vm::%lea-modfx (base index scale disp)
-    (mask-signed-field (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)
+    (mask-signed-field sb-vm:n-fixnum-bits
                        (%lea base index scale disp))))
 #-sb-xc-host
 (progn
@@ -1911,7 +1910,7 @@
       ;; constant SCALE and DISP.
       (ldb (byte 64 0) (+ base (* index scale) disp))))
   (defun sb-vm::%lea-modfx (base index scale disp)
-    (let* ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits))
+    (let* ((fixnum-width sb-vm:n-fixnum-bits)
            (base (mask-signed-field fixnum-width base))
            (index (mask-signed-field fixnum-width index)))
       ;; can't use modular version of %LEA, as we only have VOPs for

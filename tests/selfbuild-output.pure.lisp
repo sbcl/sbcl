@@ -12,7 +12,8 @@
           thereis (eq (sb-kernel:code-header-ref code i)
                       sb-unicode::+character-misc-database+))))
 
-(with-test (:name :byte-bash-copier-mixup :skipped-on (:not :sb-devel))
+(with-test (:name :byte-bash-copier-mixup :skipped-on (or (:not :sb-devel)
+                                                          :sb-devel-no-errors))
   (let ((a (make-array 20 :element-type '(unsigned-byte 8)
                           :initial-element 0))
         (b (make-array 5 :element-type '(unsigned-byte 32))))

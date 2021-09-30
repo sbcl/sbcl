@@ -892,14 +892,22 @@
 
 (with-test (:name :mod-ash-cut)
   (checked-compile-and-assert
-   ()
-   `(lambda (b)
-      (logand #xFF (ash 1 (the (integer -1000 1000) b))))
-   ((1) 2)
-   ((500) 0))
+      ()
+      `(lambda (b)
+         (logand #xFF (ash 1 (the (integer -1000 1000) b))))
+    ((1) 2)
+    ((500) 0))
   (checked-compile-and-assert
-   ()
-   `(lambda (x b)
-      (logand #xFF (ash (the (unsigned-byte 64) x) (the (integer -1000 1000) b))))
-   (((1- (expt 2 64)) -63) 1)
-      (((1- (expt 2 64)) -64) 0)))
+      ()
+      `(lambda (x b)
+         (logand #xFF (ash (the (unsigned-byte 64) x) (the (integer -1000 1000) b))))
+    (((1- (expt 2 64)) -63) 1)
+    (((1- (expt 2 64)) -64) 0)))
+
+(with-test (:name :bogus-modular-fun-widths)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (logorc2 0 (- (isqrt (abs (logand (if b -1 2) 2))))))
+    ((t) 0)
+    ((nil) 0)))
