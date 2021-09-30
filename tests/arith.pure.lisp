@@ -937,3 +937,17 @@
          (dpb a (byte 20 25) (ash a (min 2 c))))
     ((23906959691249 -15632482499364879) 15512918556672)
     ((23906959691249 1) 50697318833122)))
+
+
+(with-test (:name :ash-modarith-transform-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p1 p2 p3)
+         (declare (type (integer * 53) p1)
+                  (type number p2)
+                  (type
+                   (member 21006398744832 16437837094852630852 2251799813685252
+                           -1597729350241882 466525164)
+                   p3))
+         (ldb (byte (the (integer -3642545987372 *) p1) p2) p3))
+    ((53 2 21006398744832) 5251599686208)))

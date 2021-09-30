@@ -464,26 +464,30 @@
                 (foldable flushable movable)
               :derive-type (make-modular-fun-type-deriver 'ash ',width ',signedp))
             (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
-              (when (<= width ,width)
-                (cond ((or (and (constant-lvar-p count)
-                                (plusp (lvar-value count)))
-                           (csubtypep (lvar-type count)
-                                      (specifier-type '(and unsigned-byte fixnum))))
-                       (cut-to-width integer ,kind width ,signedp)
-                       ',left-name)
-                      #+(or arm64 x86-64)
-                      ((and (not (constant-lvar-p count))
-                            (csubtypep (lvar-type count) (specifier-type 'fixnum))
-                            (csubtypep (lvar-type integer)
-                                       (specifier-type `(or (unsigned-byte ,sb-vm:n-word-bits)
-                                                            (signed-byte ,sb-vm:n-word-bits)))))
-                       (unless (and ,signedp
-                                    (not (csubtypep (lvar-type integer) (specifier-type 'fixnum))))
-                         ;; MASK-SIGNED-FIELD will cut off the highest bit before it's shifted,
-                         ;; there is an ASH-MODFX VOP which first shifts a word and then cuts
-                         ;; off the result.
-                         (cut-to-width integer ,kind width ,signedp))
-                       ',name))))
+              (let ((integer-type (lvar-type integer))
+                    (count-type (lvar-type count)))
+               (when (<= width ,width)
+                 (cond ((or (and (constant-lvar-p count)
+                                 (plusp (lvar-value count)))
+                            (csubtypep count-type
+                                       (specifier-type '(and unsigned-byte fixnum))))
+                        (cut-to-width integer ,kind width ,signedp)
+                        ',left-name)
+                       #+(or arm64 x86-64)
+                       ((and (not (constant-lvar-p count))
+                             (csubtypep count-type (specifier-type 'fixnum))
+                             ;; Unknown sign
+                             (not (csubtypep count-type (specifier-type '(integer * 0))))
+                             (not (csubtypep count-type (specifier-type '(integer 0 *))))
+                             (or (csubtypep integer-type (specifier-type `(unsigned-byte ,sb-vm:n-word-bits)))
+                                 (csubtypep integer-type (specifier-type `(signed-byte ,sb-vm:n-word-bits)))))
+                        (unless (and ,signedp
+                                     (not (csubtypep (lvar-type integer) (specifier-type 'fixnum))))
+                          ;; MASK-SIGNED-FIELD will cut off the highest bit before it's shifted,
+                          ;; there is an ASH-MODFX VOP which first shifts a word and then cuts
+                          ;; off the result.
+                          (cut-to-width integer ,kind width ,signedp))
+                        ',name)))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (* (constant-arg (eql 0))))
@@ -497,8 +501,10 @@
                     `(ash ,',width))
               ;; Go back to ASH if the sign becomes known
               (deftransform ,name ((integer count) (* (integer * 0)) * :important nil)
+                (give-up-ir1-transform)
                 '(ash integer count))
               (deftransform ,name ((integer count) (* (integer 0 *)) * :important nil)
+                (give-up-ir1-transform)
                 '(ash integer count)))))))
   #+(or x86 x86-64 arm arm64)
   (def sb-vm::ash-left-modfx sb-vm::ash-modfx :tagged #.sb-vm:n-fixnum-bits t)
