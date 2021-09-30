@@ -167,7 +167,12 @@
                             (if (expected-failure-p fails-on)
                                 (fail-test :expected-failure name error)
                                 (fail-test :unexpected-failure name error))
-                            (return-from run-test))))
+                            (return-from run-test)))
+                   (timeout (lambda (error)
+                              (if (expected-failure-p fails-on)
+                                  (fail-test :expected-failure name error t)
+                                  (fail-test :unexpected-failure name error t))
+                              (return-from run-test))))
       ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
       (log-msg/non-pretty *trace-output* "Running ~S" name)
       (funcall test-function)
@@ -285,7 +290,7 @@
       (enable-debugger)
       (invoke-debugger condition))))
 
-(defun fail-test (type test-name condition)
+(defun fail-test (type test-name condition &optional backtrace)
   (if (stringp condition)
       (log-msg *trace-output* "~@<~A ~S ~:_~A~:>"
                type test-name condition)
@@ -294,7 +299,8 @@
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (unless (stringp condition)
-    ;; (sb-debug:print-backtrace :from :interrupted-frame)
+    (when backtrace
+      (sb-debug:print-backtrace :from :interrupted-frame))
     (when (or (and *break-on-failure*
                    (not (eq type :expected-failure)))
               *break-on-expected-failure*)

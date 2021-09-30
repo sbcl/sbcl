@@ -153,17 +153,14 @@
                    (values)))))
       (assert
        (eq :ok
-           (handler-case
-               (sb-ext:with-timeout 10
-                 (test 1 1 100)
-                 (test 2 2 10000)
-                 (test 4 2 10000)
-                 (test 4 2 10000)
-                 (test 10 10 10000)
-                 (test 10 1 10000)
-                 :ok)
-             (sb-ext:timeout ()
-               :timeout)))))))
+           (sb-ext:with-timeout 10
+             (test 1 1 100)
+             (test 2 2 10000)
+             (test 4 2 10000)
+             (test 4 2 10000)
+             (test 10 10 10000)
+             (test 10 1 10000)
+             :ok))))))
 
 ;;;; Printing waitqueues
 
