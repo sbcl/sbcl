@@ -705,7 +705,8 @@
                       (values nil result)
                       (values result temp-reg-tn))
                 (move result number)
-                ,@body
+                (assemble ()
+                 ,@body)
                 (when save (inst mov save result)))))
 
 (define-vop (fast-ash-c/fixnum=>fixnum)
@@ -752,10 +753,10 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 3
+    (move ecx amount)
     (with-shift-operands
-     (move ecx amount)
-     ;; The result-type ensures us that this shift will not overflow.
-     (inst shl result :cl))))
+      ;; The result-type ensures us that this shift will not overflow.
+      (inst shl result :cl))))
 
 (define-vop (fast-ash-c/signed=>signed)
   (:translate ash)
@@ -788,9 +789,9 @@
           ((encodable-as-lea) (generate-lea))
           (t
            (with-shift-operands
-                  (if (plusp amount)
-                      (inst shl result amount)
-                      (inst shr result (- amount))))))))
+             (if (plusp amount)
+                 (inst shl result amount)
+                 (inst shr result (- amount))))))))
 
 (define-vop (fast-ash-left/signed=>signed)
   (:translate ash)
@@ -803,9 +804,9 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
+    (move ecx amount)
     (with-shift-operands
-     (move ecx amount)
-     (inst shl result :cl))))
+      (inst shl result :cl))))
 
 (define-vop (fast-ash-left/unsigned=>unsigned)
   (:translate ash)
@@ -818,23 +819,23 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
+    (move ecx amount)
     (with-shift-operands
-     (move ecx amount)
-     (inst shl result :cl))))
+      (inst shl result :cl))))
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
   (:args-var args)
   (:generator 3
-    (move result number)
     (move ecx amount)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                       (specifier-type '(mod 63)))
-      (inst cmp amount 63)
-      (inst jmp :be OKAY)
-      (zeroize result))
-    OKAY
-    (inst shl result :cl)))
+    (with-shift-operands
+      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                         (specifier-type '(mod 63)))
+        (inst cmp amount 63)
+        (inst jmp :be OKAY)
+        (zeroize result))
+      OKAY
+      (inst shl result :cl))))
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
@@ -850,30 +851,30 @@
   (:translate ash-left-mod64)
   (:args-var args)
   (:generator 3
-    (move result number)
     (move ecx amount)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                       (specifier-type '(mod 63)))
-      (inst cmp amount 63)
-      (inst jmp :be OKAY)
-      (zeroize result))
-    OKAY
-    (inst shl result :cl)))
+    (with-shift-operands
+      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                         (specifier-type '(mod 63)))
+        (inst cmp amount 63)
+        (inst jmp :be OKAY)
+        (zeroize result))
+      OKAY
+      (inst shl result :cl))))
 
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
   (:args-var args)
   (:generator 3
-    (move result number)
     (move ecx amount)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                       (specifier-type '(mod 63)))
-      (inst cmp amount 63)
-      (inst jmp :be OKAY)
-      (zeroize result))
-    OKAY
-    (inst shl result :cl)))
+    (with-shift-operands
+      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                         (specifier-type '(mod 63)))
+        (inst cmp amount 63)
+        (inst jmp :be OKAY)
+        (zeroize result))
+      OKAY
+      (inst shl result :cl))))
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
@@ -889,15 +890,15 @@
   (:translate ash-left-mod64)
   (:args-var args)
   (:generator 3
-    (move result number)
     (move ecx amount)
-    (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                       (specifier-type '(mod 63)))
-      (inst cmp amount 63)
-      (inst jmp :be OKAY)
-      (zeroize result))
-    OKAY
-    (inst shl result :cl)))
+    (with-shift-operands
+      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
+                         (specifier-type '(mod 63)))
+        (inst cmp amount 63)
+        (inst jmp :be OKAY)
+        (zeroize result))
+      OKAY
+      (inst shl result :cl))))
 
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
@@ -909,9 +910,9 @@
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
+    (move rcx amount)
     (with-shift-operands
-     (move rcx amount)
-     (inst shr result :cl))))
+      (inst shr result :cl))))
 
 (define-vop (fast-%ash/right/signed)
   (:translate %ash/right)
@@ -923,9 +924,9 @@
   (:result-types signed-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
+    (move rcx amount)
     (with-shift-operands
-     (move rcx amount)
-     (inst sar result :cl))))
+      (inst sar result :cl))))
 
 (define-vop (fast-%ash/right/fixnum)
   (:translate %ash/right)
@@ -937,10 +938,10 @@
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 3
+    (move rcx amount)
     (with-shift-operands
-     (move rcx amount)
-     (inst sar result :cl)
-     (inst and result (lognot fixnum-tag-mask)))))
+      (inst sar result :cl)
+      (inst and result (lognot fixnum-tag-mask)))))
 ) ; end MACROLET
 
 (define-vop (fast-ash/unsigned=>unsigned)
@@ -956,8 +957,8 @@
   (:variant-vars check-amount signed)
   (:note "inline ASH")
   (:generator 5
-    (move result number)
     (move ecx amount)
+    (move result number)
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
@@ -1000,16 +1001,16 @@
   (:translate ash-modfx)
   (:policy :fast-safe)
   (:args (number :scs (signed-reg unsigned-reg) :to :save)
-          (amount :scs (signed-reg) :target ecx))
+         (amount :scs (signed-reg) :target ecx))
   (:arg-types (:or signed-num unsigned-num) signed-num)
   (:results (result :scs (any-reg)))
   (:args-var args)
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:note "inline ASH")
-  (:generator 5
-    (move result number)
+  (:generator 3
     (move ecx amount)
+    (move result number)
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
@@ -1019,7 +1020,7 @@
       (inst jmp :be OKAY)
       (sc-case number
         (signed-reg
-         (inst mov ecx 63))
+         (inst or ecx 63))
         (unsigned-reg
          (zeroize result))))
     OKAY

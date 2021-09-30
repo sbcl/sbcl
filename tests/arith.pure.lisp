@@ -927,3 +927,13 @@
                     `(lambda (b)
                        (logand #xf (if b -1 2))))))
           '(values (or (integer 2 2) (integer 15 15)) &optional))))
+
+(with-test (:name :ash-vop-liftimes)
+  (checked-compile-and-assert
+      ()
+      `(lambda (A C)
+         (declare ((integer 18512171785636 25543390924355) a)
+                  ((integer -20485927966480856 54446023204744213) c))
+         (dpb a (byte 20 25) (ash a (min 2 c))))
+    ((23906959691249 -15632482499364879) 15512918556672)
+    ((23906959691249 1) 50697318833122)))
