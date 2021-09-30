@@ -1344,10 +1344,6 @@ and the number of 0 bits if INTEGER is negative."
       (do-mfuns sb-c::*tagged-modular-class*)))
   `(progn ,@(sort (forms) #'string< :key #'cadr)))
 
-;;; KLUDGE: these out-of-line definitions can't use the modular
-;;; arithmetic, as that is only (currently) defined for constant
-;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
-;;; discussion of this hack.  -- CSR, 2003-10-09
 #-(or 64-bit 64-bit-registers)
 (defun sb-vm::ash-left-mod32 (integer amount)
   (etypecase integer
@@ -1368,3 +1364,17 @@ and the number of 0 bits if INTEGER is negative."
     (etypecase integer
       (fixnum (sb-c::mask-signed-field fixnum-width (ash integer amount)))
       (integer (sb-c::mask-signed-field fixnum-width (ash (sb-c::mask-signed-field fixnum-width integer) amount))))))
+
+(sb-c::when-vop-existsp (:translate sb-vm::ash-modfx)
+  (defun sb-vm::ash-mod64 (integer amount)
+    (etypecase integer
+      ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
+      (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
+      (bignum (ldb (byte 64 0)
+                   (ash (logand integer #xffffffffffffffff) amount)))))
+
+  (defun sb-vm::ash-modfx (integer amount)
+    (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
+      (etypecase integer
+        (fixnum (sb-c::mask-signed-field fixnum-width (ash integer amount)))
+        (integer (sb-c::mask-signed-field fixnum-width (ash (sb-c::mask-signed-field fixnum-width integer) amount)))))))

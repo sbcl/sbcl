@@ -65,7 +65,7 @@
 ;;; defers. Correctness of the result requires that the vop be defined in time.
 (defmacro if-vop-existsp ((query name) then &optional else)
   (if (funcall '%vop-existsp name query) then else))
-(defmacro when-vop-existsp ((query name) &rest body)
+(defmacro when-vop-existsp ((query name) &body body)
   (if (funcall '%vop-existsp name query) `(progn ,@body)))
-(defmacro unless-vop-existsp ((query name) &rest body)
+(defmacro unless-vop-existsp ((query name) &body body)
   (if (not (funcall '%vop-existsp name query)) `(progn ,@body)))
