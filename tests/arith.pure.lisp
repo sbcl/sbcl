@@ -911,3 +911,19 @@
          (logorc2 0 (- (isqrt (abs (logand (if b -1 2) 2))))))
     ((t) 0)
     ((nil) 0)))
+
+(with-test (:name :lognot-type-derive)
+  (assert
+   (equal (caddr (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   `(lambda (b)
+                      (lognot (if b -1 2))))))
+          '(values (or (integer -3 -3) (integer 0 0)) &optional))))
+
+(with-test (:name :logand-minus-1-type-derive)
+  (assert
+   (equal (caddr (sb-kernel:%simple-fun-type
+                   (checked-compile
+                    `(lambda (b)
+                       (logand #xf (if b -1 2))))))
+          '(values (or (integer 2 2) (integer 15 15)) &optional))))

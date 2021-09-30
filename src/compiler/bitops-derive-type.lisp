@@ -139,6 +139,12 @@
 (defun logand-derive-type-aux (x y &optional same-leaf)
   (when same-leaf
     (return-from logand-derive-type-aux x))
+  (flet ((minus-one (x y)
+           (when (eql (nth-value 1 (type-singleton-p x))
+                      -1)
+             (return-from logand-derive-type-aux y))))
+    (minus-one x y)
+    (minus-one y x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (declare (ignore x-pos))
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)

@@ -1538,7 +1538,7 @@
                                        (numeric-type-format type))))))
 
 (defoptimizer (lognot derive-type) ((int))
-  (lognot-derive-type-aux (lvar-type int)))
+  (one-arg-derive-type int #'lognot-derive-type-aux #'lognot))
 
 (defoptimizer (%negate derive-type) ((num))
   (flet ((negate-bound (b)
