@@ -560,6 +560,7 @@ void* os_dlsym_default(char* name)
 {
     unsigned int i;
     void* result = 0;
+    buildTimeImages[0] = (void*)runtime_module_handle;
     if (buildTimeImageCount == 0) {
         buildTimeImageCount =
             1 + os_get_build_time_shared_libraries(15u,
