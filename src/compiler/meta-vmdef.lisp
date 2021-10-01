@@ -815,6 +815,7 @@
         (when more
           (error "The MORE operand isn't the last operand: ~S" specs))
         (incf *parse-vop-operand-count*)
+        (incf num)
         (let* ((name (first spec))
                (old (if (vop-parse-inherits parse)
                         (find-operand name
@@ -824,22 +825,22 @@
                                       nil)
                         nil))
                (res
-                (nconc (list :kind kind)
-                       (if old
-                        (list
-                         :target (operand-parse-target old)
-                         :born (operand-parse-born old)
-                         :dies (operand-parse-dies old)
-                         :scs (operand-parse-scs old)
-                         :load-tn (operand-parse-load-tn old)
-                         :load (operand-parse-load old))
-                        (ecase kind
-                          (:argument
-                           (list :born (parse-time-spec :load)
-                                 :dies (parse-time-spec `(:argument ,(incf num)))))
-                          (:result
-                           (list :born (parse-time-spec `(:result ,(incf num)))
-                                 :dies (parse-time-spec :save))))))))
+                 (nconc (list :kind kind)
+                        (if old
+                            (list
+                             :target (operand-parse-target old)
+                             :born (operand-parse-born old)
+                             :dies (operand-parse-dies old)
+                             :scs (operand-parse-scs old)
+                             :load-tn (operand-parse-load-tn old)
+                             :load (operand-parse-load old))
+                            (ecase kind
+                              (:argument
+                               (list :born (parse-time-spec :load)
+                                     :dies (parse-time-spec `(:argument ,num))))
+                              (:result
+                               (list :born (parse-time-spec `(:result ,num))
+                                     :dies (parse-time-spec :save))))))))
           (do ((tail (rest spec) (cddr tail)))
               ((null tail))
             (let ((key (first tail))
