@@ -951,3 +951,11 @@
                    p3))
          (ldb (byte (the (integer -3642545987372 *) p1) p2) p3))
     ((53 2 21006398744832) 5251599686208)))
+
+(with-test (:name :logcount-negative-fixnum)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (logcount (the fixnum x)))
+    ((54) 4)
+    ((-54) 4)))

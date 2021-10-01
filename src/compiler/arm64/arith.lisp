@@ -678,16 +678,22 @@
   (:temporary (:scs (double-reg)) v)
   (:variant-vars signed)
   (:generator 29
-              (when signed
-                (inst cmp arg 0)
-                (inst csinv res arg arg :ge)
-                (setf arg res))
-              (inst fmov v arg)
-              (inst cnt v v :8b)
-              ;; GCC uses (inst addv v :b v :8b)
-              ;; but clang uses:
-              (inst uaddlv v :h v :8b)
-              (inst umov res v 0 :b)))
+    (when signed
+      (sc-case arg
+        (any-reg
+         ;; Don't invert the tag bit
+         (inst asr res arg n-fixnum-tag-bits)
+         (setf arg res))
+        (t))
+      ;; Invert when negative
+      (inst eor res arg (asr arg 63))
+      (setf arg res))
+    (inst fmov v arg)
+    (inst cnt v v :8b)
+    ;; GCC uses (inst addv v :b v :8b)
+    ;; but clang uses:
+    (inst uaddlv v :h v :8b)
+    (inst fmov res v)))
 
 (define-vop (signed-byte-64-count unsigned-byte-64-count)
     (:note "inline (signed-byte 64) logcount")
