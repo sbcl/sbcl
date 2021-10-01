@@ -610,3 +610,9 @@
   (assert (nth-value 2
                      (checked-compile `(lambda (a) (aref a ,@(loop repeat array-rank-limit collect 0)))
                                       :allow-warnings 'warning))))
+
+(with-test (:name :defclass-bad-type)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda () (defclass ,(gensym) () ((s :type (2)))))
+                      :allow-warnings 'warning))))

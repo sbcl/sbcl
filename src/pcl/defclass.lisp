@@ -243,9 +243,9 @@
                 (setf initform val))
                (:type
                 (when (eq metaclass 'standard-class)
-                  (sb-kernel::check-slot-type-specifier
-                   val name (cons 'defclass class-name))
-                  (setf type val))))
+                  (when (sb-kernel::check-slot-type-specifier
+                         val name (cons 'defclass class-name))
+                    (setf type val)))))
              (when (get-properties others (list key))
                (%program-error "Duplicate slot option ~S for slot ~
                                 ~S in DEFCLASS ~S."
