@@ -1599,17 +1599,30 @@
               (sb-c::delete-vop vop)
               new)))))))
 
-(defun emit-optimized-cmp (x y)
-  (if (and (gpr-tn-p x) (eql y 0))
+(defun emit-optimized-cmp (x y &optional x-ctype)
+  ;; Shorten the encoding by eliding a REX prefix where the upper bits
+  ;; can not possibly matter.
+  ;; Be sure to account for N-FIXNUM-TAG-BITS in determining how many bits
+  ;; of precision are in the representation of X.
+  ;; Little-endian addressing makes this valid for stack TNs as well as registers.
+  (let ((operand-size (if (and (numeric-type-p x-ctype)
+                               (typep y '(signed-byte 32))
+                               (csubtypep x-ctype
+                                          (if (sc-is x any-reg descriptor-reg control-stack)
+                                              (specifier-type '(signed-byte 31))
+                                              (specifier-type '(signed-byte 32)))))
+                          :dword
+                          :qword)))
+    (if (and (gpr-tn-p x) (eql y 0))
       ;; Amazingly (to me), use of TEST in lieu of CMP produces all the correct
       ;; flag bits for inequality comparison as well as EQL comparison.
       ;; You'd think that the Jxx instruction should examine _only_ the S flag,
       ;; but in fact the other flags are right too. Nonetheless this is
       ;; quite confusing, and I would prefer that we alter the branch test
       ;; when emitting TEST in place of CMP.
-      (inst test x x) ; smaller instruction
-      (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y))
-             (inst cmp x y))))
+        (inst test operand-size x x) ; smaller instruction
+        (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y))
+               (inst cmp operand-size x y)))))
 
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
              (declare (ignore not-cond not-unsigned))
@@ -1620,9 +1633,11 @@
                                    ,(symbolicate "FAST-CONDITIONAL"  suffix))
                         (:translate ,tran)
                         (:conditional ,(if signed cond unsigned))
+                        (:args-var x-tn-ref)
                         (:generator ,cost
                           (emit-optimized-cmp
-                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)))))
+                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
+                           (tn-ref-type x-tn-ref)))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
                    '(4 3 6 5 6 5)
                    '(t t t t nil nil)))))
@@ -1741,7 +1756,8 @@
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eql %eql/integer)
-  (:generator 2 (emit-optimized-cmp x (fixnumize y))))
+  (:args-var x-tn-ref)
+  (:generator 2 (emit-optimized-cmp x (fixnumize y) (tn-ref-type x-tn-ref))))
 
 ;;; FIXME: this seems never to be invoked any more. What did we either break or improve?
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
