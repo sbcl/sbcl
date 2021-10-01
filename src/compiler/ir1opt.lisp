@@ -1444,8 +1444,8 @@
              (declare (ignore unwinnage))
              (cond (valid
                     (assert-call-type call type)
+                    (maybe-terminate-block call ir1-converting-not-optimizing-p)
                     (cond ((eq (combination-kind call) :error)
-                           (maybe-terminate-block call ir1-converting-not-optimizing-p)
                            (values nil nil))
                           (t
                            (setf (combination-kind call) :full)
