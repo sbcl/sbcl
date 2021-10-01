@@ -753,8 +753,8 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 3
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       ;; The result-type ensures us that this shift will not overflow.
       (inst shl result :cl))))
 
@@ -804,8 +804,8 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (inst shl result :cl))))
 
 (define-vop (fast-ash-left/unsigned=>unsigned)
@@ -819,16 +819,16 @@
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (inst shl result :cl))))
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
   (:args-var args)
   (:generator 3
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
@@ -851,8 +851,8 @@
   (:translate ash-left-mod64)
   (:args-var args)
   (:generator 3
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
@@ -866,8 +866,8 @@
   (:translate ash-left-modfx)
   (:args-var args)
   (:generator 3
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
@@ -890,8 +890,8 @@
   (:translate ash-left-mod64)
   (:args-var args)
   (:generator 3
-    (move ecx amount)
     (with-shift-operands
+      (move ecx amount)
       (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
                          (specifier-type '(mod 63)))
         (inst cmp amount 63)
@@ -910,8 +910,8 @@
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
-    (move rcx amount)
     (with-shift-operands
+      (move rcx amount)
       (inst shr result :cl))))
 
 (define-vop (fast-%ash/right/signed)
@@ -924,8 +924,8 @@
   (:result-types signed-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 4
-    (move rcx amount)
     (with-shift-operands
+      (move rcx amount)
       (inst sar result :cl))))
 
 (define-vop (fast-%ash/right/fixnum)
@@ -938,8 +938,8 @@
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:generator 3
-    (move rcx amount)
     (with-shift-operands
+      (move rcx amount)
       (inst sar result :cl)
       (inst and result (lognot fixnum-tag-mask)))))
 ) ; end MACROLET
@@ -957,8 +957,8 @@
   (:variant-vars check-amount signed)
   (:note "inline ASH")
   (:generator 5
-    (move ecx amount)
     (move result number)
+    (move ecx amount)
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
@@ -1003,14 +1003,14 @@
   (:args (number :scs (signed-reg unsigned-reg) :to :save)
          (amount :scs (signed-reg) :target ecx))
   (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (any-reg)))
+  (:results (result :scs (any-reg) :from (:argument 0)))
   (:args-var args)
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:note "inline ASH")
   (:generator 3
-    (move ecx amount)
     (move result number)
+    (move ecx amount)
     (inst test ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
