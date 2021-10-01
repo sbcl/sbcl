@@ -1336,6 +1336,8 @@
                       (defined-fun-inlinep leaf)
                       'no-chance)))
     (cond
+      ((eq (basic-combination-kind call) :error)
+       (values nil nil))
       (unknown-keys
        (setf (basic-combination-kind call) :unknown-keys)
        (values leaf nil))
@@ -1442,9 +1444,12 @@
              (declare (ignore unwinnage))
              (cond (valid
                     (assert-call-type call type)
-                    (maybe-terminate-block call ir1-converting-not-optimizing-p)
-                    (setf (combination-kind call) :full)
-                    (recognize-known-call call ir1-converting-not-optimizing-p unknown-keys))
+                    (cond ((eq (combination-kind call) :error)
+                           (maybe-terminate-block call ir1-converting-not-optimizing-p)
+                           (values nil nil))
+                          (t
+                           (setf (combination-kind call) :full)
+                           (recognize-known-call call ir1-converting-not-optimizing-p unknown-keys))))
                    (t
                     (setf (combination-kind call) :error)
                     (values nil nil))))))))

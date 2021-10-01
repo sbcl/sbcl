@@ -487,7 +487,16 @@
                            (pop required)
                            (type-intersection
                             (pop required)
-                            (specifier-type `(array * ,(length args)))))
+                            (let ((rank (length args)))
+                              (when (>= rank array-rank-limit)
+                                (setf (combination-kind call) :error)
+                                (compiler-warn "More subscripts for ~a (~a) than ~a (~a)"
+                                               (combination-fun-debug-name call)
+                                               rank
+                                               'array-rank-limit
+                                               array-rank-limit)
+                                (return-from array-call-type-deriver))
+                              (specifier-type `(array * ,rank)))))
                        set)
           (loop for type in required
                 do

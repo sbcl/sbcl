@@ -605,3 +605,8 @@
                      (checked-compile '(lambda (f z x)
                                         (mapcar f  (the integer z) (the integer x)))
                                       :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :aref-too-many-subscripts)
+  (assert (nth-value 2
+                     (checked-compile `(lambda (a) (aref a ,@(loop repeat array-rank-limit collect 0)))
+                                      :allow-warnings 'warning))))
