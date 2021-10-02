@@ -613,7 +613,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-defsymbols* *cold-methods*))
+(declaim (special *!cold-toplevels* *cold-methods*))
 
 
 ;;;; miscellaneous stuff to read and write the core memory
@@ -1064,33 +1064,11 @@ core and return a descriptor to it."
 (defun cold-symbol-value (symbol)
   (let ((val (read-wordindexed (cold-intern symbol) sb-vm:symbol-value-slot)))
     (if (= (descriptor-bits val) sb-vm:unbound-marker-widetag)
-        (unbound-cold-symbol-handler symbol)
+        (error "Symbol value of ~a is unbound." symbol)
         val)))
 (defun cold-fdefn-fun (cold-fdefn)
   (read-wordindexed cold-fdefn sb-vm:fdefn-fun-slot))
 
-(defun unbound-cold-symbol-handler (symbol)
-  (awhen (and (eq (sb-xc:symbol-package symbol) *cl-package*)
-              (find-symbol (string symbol) "SB-XC"))
-    (setq symbol it))
-  (let ((host-val (and (boundp symbol) (symbol-value symbol))))
-    (etypecase host-val
-      (number
-       ;; This case is intended to handle
-       ;; (DEFCONSTANT LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT
-       ;;              LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT) ; etc
-       ;; Several uses of MOST-POSITIVE-FIXNUM come through here as well
-       ;; due to (DEFCONSTANT mumble-LIMIT most-positive-fixnum).
-       ;; That seems weird but doesn't seem to be a problem.
-       ;; (i.e. why don't we just dump the fixnum?)
-       (number-to-core host-val))
-      (named-type
-       (let ((target-val (ctype-to-core (named-type-name host-val) host-val)))
-          ;; Though it looks complicated to assign cold symbols on demand,
-          ;; it avoids writing code to build the layout of NAMED-TYPE in the
-          ;; way we build other primordial stuff such as layout-of-layout.
-          (cold-set symbol target-val)
-          target-val)))))
 
 ;;;; layouts and type system pre-initialization
 
@@ -1329,84 +1307,6 @@ core and return a descriptor to it."
                  ((eq type-name 't) 'constantly-t)
                  (t (error "No predicate for builtin: ~S" type-name)))))))))
 
-;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
-;;; in the cold core.
-(defvar *ctype-cache*)
-
-(defun ctype-to-core (specifier obj)
-  (declare (type ctype obj))
-  (if (classoid-p obj)
-      (let* ((cell (cold-find-classoid-cell (classoid-name obj) :create t))
-             (cold-classoid (read-slot cell :classoid)))
-        (aver (not (sb-kernel::undefined-classoid-p obj)))
-        (unless (cold-null cold-classoid)
-          (return-from ctype-to-core cold-classoid)))
-      ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
-      ;; Don't check the cache for classoids though; that would be wrong.
-      ;; e.g. named-type T and classoid T both unparse to T.
-      (awhen (gethash specifier *ctype-cache*)
-        (return-from ctype-to-core it)))
-  (let ((result
-         (struct-to-core
-               obj
-               (lambda (obj)
-                 (typecase obj
-                   (xset (struct-to-core obj nil))
-                   (ctype (ctype-to-core (type-specifier obj) obj)))))))
-    (if (classoid-p obj)
-        ;; Place this classoid into its clasoid-cell.
-        (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
-          (write-slots cell :classoid result))
-        ;; Otherwise put it in the general cache
-        (setf (gethash specifier *ctype-cache*) result))
-    result))
-
-;;; Reflect OBJ, a host object, into the core and return a descriptor to it.
-;;; The helper function is responsible for dealing with shared substructure.
-(defun struct-to-core (obj obj-to-core-helper)
-  (let* ((host-type (type-of obj))
-         (simple-slots
-          ;; Precompute a list of slots that should be initialized to a
-          ;; trivially dumpable constant in lieu of whatever complicated
-          ;; substructure it currently holds.
-          (typecase obj
-            (classoid
-             (let ((slots-to-omit
-                    `(;; :predicate will be patched in during cold init.
-                      (,(get-dsd-index built-in-classoid sb-kernel::predicate) .
-                        ,(make-random-descriptor sb-vm:unbound-marker-widetag))
-                      (,(get-dsd-index classoid sb-kernel::subclasses) . nil)
-                      ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
-                      ;; we nonetheless must set LAYOUT to NIL or else warm build fails
-                      ;; in the twisty maze of class initializations.
-                      (,(get-dsd-index classoid wrapper) . nil))))
-               (if (typep obj 'built-in-classoid)
-                   slots-to-omit
-                   ;; :predicate is not a slot. Don't mess up the object
-                   ;; by omitting a slot at the same index as it.
-                   (cdr slots-to-omit))))))
-         (dd-slots (type-dd-slots-or-lose host-type))
-         ;; ASSUMPTION: all slots consume 1 storage word
-         (dd-len (+ sb-vm:instance-data-start (length dd-slots)))
-         (result (allocate-struct-of-type host-type)))
-    ;; Dump the slots.
-    (do ((index sb-vm:instance-data-start (1+ index)))
-        ((= index dd-len) result)
-      (let* ((dsd (find index dd-slots :key #'dsd-index))
-             (override (assq index simple-slots))
-             (reader (dsd-accessor-name dsd)))
-        (ecase (dsd-raw-type dsd)
-         ((t)
-          (write-wordindexed result
-                             (+ sb-vm:instance-slots-offset index)
-                             (if override
-                                 (or (cdr override) *nil-descriptor*)
-                                 (host-constant-to-core (funcall reader obj)
-                                                        obj-to-core-helper))))
-         ((word sb-vm:signed-word)
-          (write-wordindexed/raw result (+ sb-vm:instance-slots-offset index)
-                                 (or (cdr override) (funcall reader obj)))))))))
-
 ;;; Convert a layout to a wrapper and back.
 ;;; Each points to the other through its first data word.
 (defun ->wrapper (x) #+metaspace (read-wordindexed x 1) #-metaspace x)
@@ -1440,7 +1340,6 @@ core and return a descriptor to it."
                  (set-instance-layout instance (->layout wrapper-layout))
                  (set-instance-layout (->layout instance) (->layout layout-layout)))))
       (chill-layout 'function t-layout)
-      (chill-layout 'sb-kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
@@ -1458,16 +1357,6 @@ core and return a descriptor to it."
 (defun cold-find-package-info (package-name)
   (or (gethash package-name *cold-package-symbols*)
       (error "Genesis could not find a target package named ~S" package-name)))
-
-(defvar *classoid-cells*)
-(defun cold-find-classoid-cell (name &key create)
-  (aver (eq create t))
-  (or (gethash name *classoid-cells*)
-      (setf (gethash name *classoid-cells*)
-            (write-slots (allocate-struct-of-type 'sb-kernel::classoid-cell)
-                         :name name
-                         :pcl-class *nil-descriptor*
-                         :classoid *nil-descriptor*))))
 
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
@@ -1841,13 +1730,6 @@ core and return a descriptor to it."
   ;; we always pre-increment *general-layout-uniqueid-counter* when reading it.
   (cold-set 'sb-kernel::*layout-id-generator*
             (cold-list (make-fixnum-descriptor (1+ *general-layout-uniqueid-counter*))))
-  (cold-set 'sb-c::*!initial-parsed-types*
-            (vector-in-core
-             (mapcar (lambda (x)
-                       (cold-cons (host-constant-to-core (car x)) ; specifier
-                                  (cdr x))) ; cold descriptor to ctype instance
-                     (sort (%hash-table-alist *ctype-cache*) #'<
-                           :key (lambda (x) (descriptor-bits (cdr x)))))))
 
   ;; Consume the rest of read-only-space as metaspace
   #+metaspace
@@ -1931,7 +1813,7 @@ core and return a descriptor to it."
 
   (dump-symbol-infos
    (attach-fdefinitions-to-symbols
-    (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
+    (make-hash-table :test #'eq)))
 
   #+x86
   (progn
@@ -2069,33 +1951,6 @@ core and return a descriptor to it."
       (setq gf (cons name nil))
       (push gf *cold-methods*))
     (push stuff (cdr gf))))
-
-(defun attach-classoid-cells-to-symbols (hashtable)
-  (when (plusp (hash-table-count *classoid-cells*))
-    (aver (gethash 'sb-kernel::classoid-cell *cold-layouts*))
-    (let ((type-classoid-cell-info
-            (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
-          (type-kind-info
-            (sb-c::meta-info-number (sb-c::meta-info :type :kind))))
-      ;; Iteration order is immaterial. The symbols will get sorted later.
-      (maphash (lambda (symbol cold-classoid-cell)
-                 (let ((packed-info
-                        (packed-info-insert
-                         (gethash symbol hashtable +nil-packed-infos+)
-                         sb-impl::+no-auxiliary-key+
-                         type-classoid-cell-info cold-classoid-cell)))
-                   ;; an instance classoid won't be returned from %PARSE-TYPE
-                   ;; unless the :KIND is set, but we can't set the kind
-                   ;; to :INSTANCE unless the classoid is present in the cell.
-                   (when (and (eq (info :type :kind symbol) :instance)
-                              (not (cold-null (read-slot cold-classoid-cell :classoid))))
-                     (setf packed-info
-                           (packed-info-insert
-                            packed-info sb-impl::+no-auxiliary-key+
-                            type-kind-info (cold-intern :instance))))
-                   (setf (gethash symbol hashtable) packed-info)))
-               *classoid-cells*)))
-  hashtable)
 
 ;; Create pointer from SYMBOL and/or (SETF SYMBOL) to respective fdefinition
 ;;
@@ -2504,38 +2359,28 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defvar *load-time-value-counter*)
 
+(define-cold-fop (fop-funcall (n))
+  (unless (= n 0)
+    (error "Can't FOP-FUNCALL random stuff in cold load."))
+  (let ((counter *load-time-value-counter*))
+    (push (cold-list (cold-intern :load-time-value)
+                     (pop-stack)
+                     (number-to-core counter))
+          *!cold-toplevels*)
+    (setf *load-time-value-counter* (1+ counter))
+    (make-ltv-patch counter)))
+
 (flet ((pop-args (argc fasl-input)
          (let ((args)
                (stack (%fasl-input-stack fasl-input)))
            (dotimes (i argc (values (pop-fop-stack stack) args))
              (push (pop-fop-stack stack) args)))))
-  (define-cold-fop (fop-funcall (n))
-    (multiple-value-bind (fun args) (pop-args n (fasl-input))
-      (if args
-          (case fun
-           (symbol-global-value (cold-symbol-value (first args)))
-           (values-specifier-type
-            (let* ((des (first args))
-                   (spec (if (descriptor-p des) (host-object-from-core des) des)))
-              (ctype-to-core spec (funcall fun spec))))
-           (t (error "Can't FOP-FUNCALL with function ~S in cold load." fun)))
-          (let ((counter *load-time-value-counter*))
-            (push (cold-list (cold-intern :load-time-value) fun
-                             (number-to-core counter)) *!cold-toplevels*)
-            (setf *load-time-value-counter* (1+ counter))
-            (make-ltv-patch counter)))))
-
   (define-cold-fop (fop-funcall-for-effect (n))
     (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if (not args)
           (push fun *!cold-toplevels*)
           (case fun
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
-            ((sb-impl::%defconstant)
-             (destructuring-bind (name val . rest) args
-               (cold-set name (if (symbolp val) (cold-intern val) val))
-               (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)
-                     *!cold-defsymbols*)))
             (t
              (error "Can't FOP-FUNCALL-FOR-EFFECT with function ~S in cold load" fun)))))))
 
@@ -3343,9 +3188,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (let ((sections '("assembler routines"
                       "defined functions"
                       "undefined functions"
-                      "classoids"
                       "layouts"
-                      "type specifiers"
                       "symbols"
                       "linkage table"
                       #+sb-thread "TLS map")))
@@ -3400,33 +3243,7 @@ III. initially undefined function references (alphabetically):
                             (t (string< a b))))
                     :key (lambda (x) (fun-name-block-name (cadr x))))))
 
-    (format t "~%~|~%IV. classoids:
-
-      CELL   CLASSOID  NAME
-========== ==========  ====~%")
-
-    (let ((dumped-classoids))
-      (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
-        (destructuring-bind (name . cell) x
-          (format t "~10,'0x ~:[          ~;~:*~10,'0X~]  ~S~%"
-                  (descriptor-bits cell)
-                  (let ((classoid (read-slot cell :classoid)))
-                    (unless (cold-null classoid)
-                      (push classoid dumped-classoids)
-                      (descriptor-bits classoid)))
-                  name)))
-      ;; Something goes wrong when dumping classoids, so show the memory
-      (terpri)
-      (dolist (classoid dumped-classoids)
-        (let ((nwords (logand (ash (read-bits-wordindexed classoid 0)
-                                   (- sb-vm:instance-length-shift))
-                              sb-vm:instance-length-mask)))
-          (format t "Classoid @ ~x, ~d words:~%" (descriptor-bits classoid) (1+ nwords))
-          (dotimes (i (1+ nwords)) ; include the header word in output
-            (format t "~2d: ~10x~%" i (read-bits-wordindexed classoid i)))
-          (terpri))))
-
-    (format t "~%~|~%V. layout names:~2%")
+    (format t "~%~|~%IV. layouts:~2%")
     (format t "~28tBitmap  Depth  ID  Name [Length]~%")
     (dolist (pair (sort-cold-layouts))
       (let* ((proxy (cdr pair))
@@ -3440,25 +3257,14 @@ III. initially undefined function references (alphabetically):
                 (cold-layout-depthoid proxy)
                 (cold-layout-id proxy)
                 (car pair)
-                (cold-layout-length proxy))))
+                (cold-layout-length proxy)))))
 
-    (format t "~%~|~%VI. parsed type specifiers:~2%")
-    (format t "         [Hash]~%")
-    (mapc (lambda (cell)
-            (format t "~X: [~vx] ~S~%"
-                    (descriptor-bits (cdr cell))
-                    (* 2 sb-vm:n-word-bytes)
-                    (read-slot (cdr cell) :%bits)
-                    (car cell)))
-          (sort (%hash-table-alist *ctype-cache*) #'<
-                :key (lambda (x) (descriptor-bits (cdr x))))))
-
-  (format t "~%~|~%VII. symbols (numerically):~2%")
+  (format t "~%~|~%V. symbols (numerically):~2%")
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
   (progn
-    (format t "~%~|~%VIII. linkage table:~2%")
+    (format t "~%~|~%VI. linkage table:~2%")
     (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
                          #'< :key #'cdr))
       (let ((name (car entry)))
@@ -3468,7 +3274,7 @@ III. initially undefined function references (alphabetically):
                 (car (ensure-list name))))))
 
   #+sb-thread
-  (format t "~%~|~%IV. TLS map:~2%~:{~4x ~s~%~}"
+  (format t "~%~|~%VII. TLS map:~2%~:{~4x ~s~%~}"
           (sort *tls-index-to-symbol* #'< :key #'car))
 
   (values))
@@ -3727,11 +3533,8 @@ III. initially undefined function references (alphabetically):
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)
-           (*classoid-cells* (make-hash-table :test 'eq))
-           (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
            (*cold-layout-by-addr* (make-hash-table :test 'eql)) ; addr -> cold-layout
-           (*!cold-defsymbols* nil)
            (*tls-index-to-symbol* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
            ;; to adhere to the #\! convention for automatic uninterning.
@@ -3801,14 +3604,12 @@ III. initially undefined function references (alphabetically):
       (sb-cold::check-no-new-cl-symbols)
 
       (when (and verbose core-file-name)
-        (format t "~&; SB-Loader: (~D~@{+~D~}) vars/methods/other~%"
-                (length *!cold-defsymbols*)
+        (format t "~&; SB-Loader: (~D~@{+~D~}) methods/other~%"
                 (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
                 (length *!cold-toplevels*)))
 
-      (dolist (symbol '(*!cold-defsymbols* *!cold-toplevels*))
-        (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
-        (makunbound symbol)) ; so no further PUSHes can be done
+      (cold-set '*!cold-toplevels* (list-to-core (nreverse *!cold-toplevels*)))
+      (makunbound '*!cold-toplevels*)
 
       ;;; Order all trivial methods so that the first one whose guard
       ;;; returns T is the most specific method. LAYOUT-DEPTHOID is a valid

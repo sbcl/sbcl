@@ -106,9 +106,7 @@
           ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
           (contains-unknown-type-p eltype))
       *wild-type*
-      (dovector (stype
-                 (literal-ctype-vector *parsed-specialized-array-element-types*)
-                 *universal-type*)
+      (dovector (stype *parsed-specialized-array-element-types* *universal-type*)
        (when (csubtypep eltype stype)
          (return stype)))))
 

@@ -525,7 +525,6 @@
                          (values t t))
                         (t (type=-args type1 type2)))))))
 
-#+sb-xc-host
 (defvar *interned-fun-types*
   (flet ((fun-type (n)
            (!make-interned-fun-type (pack-interned-ctype-bits 'function)
@@ -548,7 +547,7 @@
             (not keywords) (not allowp) (not wild-args)
             (eq returns *wild-type*)
             (not (find *universal-type* required :test #'neq)))
-           (svref (literal-ctype-vector *interned-fun-types*) n))
+           (svref *interned-fun-types* n))
           (t
            (%make-fun-type required optional rest keyp keywords
                            allowp wild-args returns)))))
@@ -1643,39 +1642,6 @@
       *universal-type*
       (specifier-type x context)))
 
-;;; When cross-compiling SPECIFIER-TYPE with a quoted argument,
-;;; it can be rendered as a literal object unless it mentions
-;;; certain classoids.
-;;;
-;;; This is important for type system initialization.
-;;;
-;;; After the target is built, we remove this transform, both because calls
-;;; to SPECIFIER-TYPE do not arise organically through user code,
-;;; and because it is possible that user changes to types could make parsing
-;;; return a different thing, e.g. changing a DEFTYPE to a DEFCLASS.
-;;;
-#+sb-xc-host
-(labels ((xform (type-spec env parser)
-           (if (not (constantp type-spec env))
-               (values nil t)
-               (let* ((expr (constant-form-value type-spec env))
-                      (parse (funcall parser expr)))
-                 (if (cold-dumpable-type-p parse)
-                     parse
-                     (values nil t)))))
-         (cold-dumpable-type-p (ctype)
-           (when (contains-unknown-type-p ctype)
-             (bug "SPECIFIER-TYPE transform parsed an unknown type: ~S" ctype))
-           (map-type (lambda (type)
-                       (when (and (classoid-p type) (eq (classoid-name type) 'class))
-                         (return-from cold-dumpable-type-p nil)))
-                     ctype)
-           t))
-  (sb-c:define-source-transform specifier-type (type-spec &environment env)
-    (xform type-spec env #'specifier-type))
-  (sb-c:define-source-transform values-specifier-type (type-spec &environment env)
-    (xform type-spec env #'values-specifier-type)))
-
 (defun typexpand-1 (type-specifier &optional env)
   "Takes and expands a type specifier once like MACROEXPAND-1.
 Returns two values: the expansion, and a boolean that is true when
@@ -2115,12 +2081,10 @@ expansion happened."
 ;;; them to *EMPTY-TYPE* which means we need a way to recognize those hairy
 ;;; types in order reason about them. Interning them is how we recognize
 ;;; them, as they can be compared by EQ.
-#+sb-xc-host
-(progn
-  (defvar *satisfies-keywordp-type*
-    (!make-interned-hairy-type '(satisfies keywordp)))
-  (defvar *fun-name-type*
-    (!make-interned-hairy-type '(satisfies legal-fun-name-p))))
+(defvar *satisfies-keywordp-type*
+  (!make-interned-hairy-type '(satisfies keywordp)))
+(defvar *fun-name-type*
+  (!make-interned-hairy-type '(satisfies legal-fun-name-p)))
 
 (define-type-method (hairy :negate) (x) (make-negation-type x))
 
@@ -2166,7 +2130,7 @@ expansion happened."
                      (type1 type2)
  (acond ((type= type1 type2)
          type1)
-        ((eq type2 (literal-ctype *satisfies-keywordp-type*))
+        ((eq type2 *satisfies-keywordp-type*)
          ;; (AND (MEMBER A) (SATISFIES KEYWORDP)) is possibly non-empty
          ;; if A is re-homed as :A. However as a special case that really
          ;; does occur, (AND (MEMBER NIL) (SATISFIES KEYWORDP))
@@ -2176,7 +2140,7 @@ expansion happened."
              (multiple-value-bind (answer certain)
                  (types-equal-or-intersect type1 (specifier-type 'symbol))
                (and (not answer) certain *empty-type*))))
-        ((eq type2 (literal-ctype *fun-name-type*))
+        ((eq type2 *fun-name-type*)
          (multiple-value-bind (answer certain)
              (types-equal-or-intersect type1 (specifier-type 'symbol))
            (and (not answer)
@@ -2250,8 +2214,8 @@ expansion happened."
            :format-control "The SATISFIES predicate name is not a symbol: ~S"
            :format-arguments (list predicate-name)))
   (case predicate-name
-   (keywordp (literal-ctype *satisfies-keywordp-type*))
-   (legal-fun-name-p (literal-ctype *fun-name-type*))
+   (keywordp *satisfies-keywordp-type*)
+   (legal-fun-name-p *fun-name-type*)
    (adjustable-array-p (specifier-type '(and array (not simple-array))))
    (t (let ((type (info :function :predicate-for predicate-name)))
         (if type
@@ -2574,7 +2538,6 @@ expansion happened."
                  (when specifier (sb-vm::saetp-index-or-lose specifier)))
          args))
 
-#+sb-xc-host
 (progn
   ;; Work around an ABCL bug. This fails to load:
   ;;   (macrolet ((foo-it (x) `(- ,x))) (defvar *var* (foo-it 3)))
@@ -2706,13 +2669,14 @@ expansion happened."
     ;; a point in the type lattice, or construct a new one.
     (or (case class
           (float
-           (macrolet ((float-type (fmt complexp
-                                       &aux (spec (if (eq complexp :complex)
-                                                      `(complex ,fmt) fmt)))
-                        `(literal-ctype (interned-numeric-type ',spec
-                                                               :class 'float :complexp ,complexp
-                                                               :format ',fmt :enumerable nil)
-                                        ,spec)))
+           (macrolet ((float-type (fmt complexp)
+                        (let ((spec (if (eq complexp :complex)
+                                        `(complex ,fmt)
+                                        fmt)))
+                          `(!cold-init-time-value
+                            (interned-numeric-type ',spec
+                                                   :class 'float :complexp ,complexp
+                                                   :format ',fmt :enumerable nil)))))
              (when (bounds-unbounded-p low high)
                (ecase format
                  (single-float
@@ -2725,11 +2689,10 @@ expansion happened."
                     (:complex (float-type double-float :complex))))))))
           (integer
            (macrolet ((int-type (low high)
-                        `(literal-ctype
+                        `(!cold-init-time-value
                           (interned-numeric-type nil
                                                  :class 'integer :low ,low :high ,high
-                                                 :enumerable (if (and ,low ,high) t nil))
-                          (integer ,(or low '*) ,(or high '*)))))
+                                                 :enumerable (if (and ,low ,high) t nil)))))
              (cond ((neq complexp :real) nil)
                    ((and (eql low 0) (eql high (1- array-dimension-limit)))
                     (int-type 0 #.(1- array-dimension-limit))) ; INDEX type
@@ -2743,27 +2706,25 @@ expansion happened."
                         ;; is (1+ high) a power-of-2 ?
                         (and (typep high 'word) (zerop (logand (1+ high) high))))
                     (cond ((eql low 0)
-                           (svref (literal-ctype-vector *interned-unsigned-byte-types*)
+                           (svref *interned-unsigned-byte-types*
                                   (integer-length (truly-the word high))))
                           ((and (< high most-positive-word) (eql low (lognot high)))
-                           (svref (literal-ctype-vector *interned-signed-byte-types*)
+                           (svref *interned-signed-byte-types*
                                   (integer-length (truly-the word high))))))
                    ((and (not low) (eql high (1- most-negative-fixnum)))
                     ;; negative bignum
                     (int-type nil #.(1- most-negative-fixnum))))))
           (rational
            (cond ((and (eq complexp :real) (bounds-unbounded-p low high))
-                  (literal-ctype (interned-numeric-type nil :class 'rational)
-                      rational))
+                  (!cold-init-time-value (interned-numeric-type nil :class 'rational)))
                  ((and (eq complexp :complex) (bounds-unbounded-p low high))
-                  (literal-ctype (interned-numeric-type nil :complexp :complex
-                                                            :class 'rational)
-                      (complex rational)))))
+                  (!cold-init-time-value (interned-numeric-type nil :complexp :complex
+                                                                    :class 'rational)))))
           ((nil)
            (and (not format)
                 (not complexp)
                 (bounds-unbounded-p low high)
-                (literal-ctype (interned-numeric-type nil :complexp nil) number))))
+                (!cold-init-time-value (interned-numeric-type nil :complexp nil)))))
         (%make-numeric-type :class class :format format :complexp complexp
                             :low low :high high :enumerable enumerable))))
 
@@ -3454,9 +3415,9 @@ used for a COMPLEX component.~:@>"
 ;; the Lisp-theoretic sense", but means "could be implemented in SBCL
 ;; as a MEMBER type".
 (eval-when (#+sb-xc-host :compile-toplevel :load-toplevel :execute)
-  ;; may not get executed before LITERAL-CTYPE = LOAD-TIME-VALUE on
-  ;; host, since LOAD-TIME-VALUE execution order with respect to top
-  ;; level forms is unspecified.
+  ;; may not get executed before LOAD-TIME-VALUE on host, since
+  ;; LOAD-TIME-VALUE execution order with respect to top level forms
+  ;; is unspecified.
   (define-type-class character-set :enumerable nil :might-contain-other-types nil))
 
 (defun make-character-set-type (pairs)
@@ -3487,10 +3448,10 @@ used for a COMPLEX component.~:@>"
     (unless (cdr pairs)
       (macrolet ((range (low high &optional saetp-index)
                    `(return-from make-character-set-type
-                      (literal-ctype (!make-interned-character-set-type
-                                      (pack-interned-ctype-bits 'character-set nil ,saetp-index)
-                                      '((,low . ,high)))
-                                     (character-set ((,low . ,high)))))))
+                      (load-time-value
+                       (!make-interned-character-set-type
+                        (pack-interned-ctype-bits 'character-set nil ,saetp-index)
+                        '((,low . ,high)))))))
         (let* ((pair (car pairs))
                (low (car pair))
                (high (cdr pair)))
@@ -3513,8 +3474,6 @@ used for a COMPLEX component.~:@>"
 ;; one for each of simple, maybe-simple, and non-simple (in that order),
 ;; and 2 ctype objects for unknown-rank arrays, one each for simple
 ;; and maybe-simple. (Unknown rank, known-non-simple isn't important)
-#+sb-xc-host
-(progn
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
              (aver (= (type-saetp-index type) type-index))
@@ -3570,12 +3529,13 @@ used for a COMPLEX component.~:@>"
          index
          array)
         (incf index)))))
+
 (defvar *parsed-specialized-array-element-types*
   (let ((a (make-array (length sb-vm:*specialized-array-element-type-properties*))))
     (loop for i below (length a)
           do (setf (aref a i) (array-type-specialized-element-type
                                (aref *interned-array-types* (* i 5)))))
-    a)))
+    a))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -3586,7 +3546,7 @@ used for a COMPLEX component.~:@>"
   (if (and (eq element-type specialized-element-type)
            (or (and (eq dimensions '*) (neq complexp t))
                (typep dimensions '(cons (eql *) null))))
-      (let ((res (svref (literal-ctype-vector *interned-array-types*)
+      (let ((res (svref *interned-array-types*
                         (+ (* (type-saetp-index element-type) 5)
                            (if (listp dimensions) 0 3)
                            (ecase complexp ((nil) 0) ((:maybe) 1) ((t) 2))))))
@@ -4009,10 +3969,9 @@ used for a COMPLEX component.~:@>"
            (block nil
              (unless unpaired
                (macrolet ((member-type (&rest elts)
-                            `(literal-ctype
+                            `(load-time-value
                               (!make-interned-member-type
-                               (pack-interned-ctype-bits 'member) (xset-from-list ',elts) nil)
-                              (member ,@elts))))
+                               (pack-interned-ctype-bits 'member) (xset-from-list ',elts) nil))))
                  (let ((elts (xset-data xset)))
                    (when (singleton-p elts)
                      (case (first elts)
@@ -4229,11 +4188,11 @@ used for a COMPLEX component.~:@>"
   (declare (type ctype type))
   ;; If magic intersection types were interned, then
   ;; we could compare by EQ here instead of calling TYPE=
-  (cond ((type= type (literal-ctype (specifier-type 'keyword) keyword))
+  (cond ((type= type (load-time-value (specifier-type 'keyword)))
          'keyword)
-        ((type= type (literal-ctype (specifier-type 'ratio) ratio))
+        ((type= type (load-time-value (specifier-type 'ratio)))
          'ratio)
-        ((type= type (literal-ctype (specifier-type 'compiled-function) compiled-function))
+        ((type= type (load-time-value (specifier-type 'compiled-function)))
          'compiled-function)
         (t
          `(and ,@(mapcar #'type-specifier (intersection-type-types type))))))
@@ -4510,7 +4469,7 @@ used for a COMPLEX component.~:@>"
                       (setq bits
                             (logior bits
                                     (cond ,@(mapcar (lambda (atom)
-                                                      `((eq part ,atom) ,(atom->bit atom)))
+                                                      `((eq part (specifier-type ',(type-specifier atom))) ,(atom->bit atom)))
                                                     atoms)
                                           (t 0)))))
                     ;; Now we have a bitmask of all the interesting type atoms in the
@@ -4521,7 +4480,7 @@ used for a COMPLEX component.~:@>"
                                 `(when (= (logand bits ,mask) ,mask) ; is all of these
                                    (setq bits (logand bits ,(lognot mask))) ; Subtract the bits
                                    ,@(mapcar (lambda (atom)
-                                               `(setq remainder (delq1 ,atom remainder)))
+                                               `(setq remainder (delq1 (specifier-type ',(type-specifier atom)) remainder)))
                                              parts)
                                    (recognized ',name))) ; add to the output
                               *special-union-types* constituent-types))))))
@@ -4774,10 +4733,10 @@ used for a COMPLEX component.~:@>"
         ;; but it improves the hit rate in the function caches.
         ((and (type= car-type *universal-type*)
               (type= cdr-type *universal-type*))
-         (literal-ctype (!make-interned-cons-type (pack-interned-ctype-bits 'cons)
-                                                  *universal-type*
-                                                  *universal-type*)
-                        cons))
+         (load-time-value
+          (!make-interned-cons-type (pack-interned-ctype-bits 'cons)
+                                    *universal-type*
+                                    *universal-type*)))
         (t
          (%make-cons-type car-type cdr-type))))
 
@@ -5548,7 +5507,6 @@ used for a COMPLEX component.~:@>"
    '* nil
    over under))
 
-(!defun-from-collected-cold-init-forms !type-cold-init)
 
 ;;; This decides if two type expressions are equal ignoring the order of terms
 ;;; in AND and OR. It doesn't decide equivalence, but it's good enough
@@ -5570,3 +5528,124 @@ used for a COMPLEX component.~:@>"
                   (every (lambda (elt) (member elt b :test #'compare)) a)
                   (every (lambda (elt) (member elt a :test #'compare)) b))))
     (compare a b)))
+
+;;;; miscellaneous interfaces
+
+;;; Clear memoization of all type system operations that can be
+;;; altered by type definition/redefinition.
+;;;
+(defun clear-type-caches ()
+  ;; FIXME: We would like to differentiate between different cache
+  ;; kinds, but at the moment all our caches pretty much are type
+  ;; caches.
+  (drop-all-hash-caches)
+  (values))
+
+;;; This is like TYPE-OF, only we return a CTYPE structure instead of
+;;; a type specifier, and we try to return the type most useful for
+;;; type checking, rather than trying to come up with the one that the
+;;; user might find most informative.
+;;;
+;;; To avoid inadvertent memory retention we avoid using arrays
+;;; and functions as keys.
+;;; During cross-compilation, the CTYPE-OF function is not memoized.
+;;; Constants get their type stored in their LEAF, so it's ok.
+#-sb-xc-host
+(defun-cached (ctype-of :hash-bits 7 :hash-function #'sxhash
+                        :memoizer memoize)
+;; an unfortunate aspect of using EQ is that several appearances
+;; of the = double-float can be in the cache, but it's
+;; probably more efficient overall to use object identity.
+    ((x eq))
+  (flet ((try-cache (x)
+           (memoize
+            ;; For functions, the input is a type specifier
+            ;; of the form (FUNCTION (...) ...)
+            (cond ((listp x) (specifier-type x)) ; NIL can't occur
+                  ((symbolp x) (make-eql-type x))
+                  (t (ctype-of-number x))))))
+    (typecase x
+      (function
+       (if (funcallable-instance-p x)
+           (classoid-of x)
+           (let ((type (sb-impl::%fun-ftype x)))
+             (if (typep type '(cons (eql function))) ; sanity test
+                 (try-cache type)
+                 (classoid-of x)))))
+      (symbol (if x (try-cache x) (specifier-type 'null)))
+      (number (try-cache x))
+      (array (ctype-of-array x))
+      (cons (specifier-type 'cons))
+      (character
+       (typecase x
+         (standard-char (specifier-type 'standard-char))
+         (base-char (specifier-type 'base-char))
+         ;; If the last case were expressed as EXTENDED-CHAR,
+         ;; we wrongly get "this is not a (VALUES CTYPE): NIL"
+         ;; because the compiler is too naive to see that
+         ;; the last 2 cases partition CHARACTER.
+         (t (specifier-type 'extended-char))))
+      #+sb-simd-pack
+      (simd-pack
+       (let ((tag (%simd-pack-tag x)))
+         (svref (load-time-value
+                 (coerce (cons (specifier-type 'simd-pack)
+                               (mapcar (lambda (x) (specifier-type `(simd-pack ,x)))
+                                       *simd-pack-element-types*))
+                         'vector)
+                 t)
+                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                    (1+ tag)
+                    0))))
+      #+sb-simd-pack-256
+      (simd-pack-256
+       (let ((tag (%simd-pack-256-tag x)))
+         (svref (load-time-value
+                 (coerce (cons (specifier-type 'simd-pack-256)
+                               (mapcar (lambda (x) (specifier-type `(simd-pack-256 ,x)))
+                                       *simd-pack-element-types*))
+                         'vector)
+                 t)
+                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                    (1+ tag)
+                    0))))
+      (t
+       (classoid-of x)))))
+
+;; Helper function that implements (CTYPE-OF x) when X is an array.
+#-sb-xc-host
+(defun-cached (ctype-of-array
+               :values (ctype) ; Bind putative output to this when probing.
+               :hash-bits 7
+               :hash-function (lambda (a &aux (hash cookie))
+                                (if header-p
+                                    (dotimes (axis rank hash)
+                                      (mixf hash (%array-dimension a axis)))
+                                    (mixf hash (length a)))))
+    ;; "type-key" is a perfect hash of rank + widetag + simple-p.
+    ;; If it matches, then compare dims, which are read from the output.
+    ;; The hash of the type-key + dims can have collisions.
+    ((array (lambda (array type-key)
+              (and (eq type-key cookie)
+                   (let ((dims (array-type-dimensions ctype)))
+                     (if header-p
+                         (dotimes (axis rank t)
+                           (unless (eq (pop (truly-the list dims))
+                                       (%array-dimension array axis))
+                             (return nil)))
+                         (eq (length array) (car dims))))))
+            cookie) ; Store COOKIE as the single key.
+     &aux (rank (array-rank array))
+          (simple-p (if (simple-array-p array) 1 0))
+          (header-p (array-header-p array)) ; non-simple or rank <> 1 or both
+          (cookie (the fixnum (logior (ash (logior (ash rank 1) simple-p)
+                                           sb-vm:n-widetag-bits)
+                                      (array-underlying-widetag array)))))
+  ;; The value computed on cache miss.
+  (let ((etype (sb-vm::array-element-ctype array)))
+    (make-array-type (array-dimensions array)
+                     :complexp (not (simple-array-p array))
+                     :element-type etype
+                     :specialized-element-type etype)))
+
+(!defun-from-collected-cold-init-forms !type-cold-init)

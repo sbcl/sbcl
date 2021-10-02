@@ -322,13 +322,13 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (defun make-package-hashtable (size)
   (flet ((actual-package-hashtable-size (size)
            (loop for n of-type fixnum
-              from (logior (ceiling size +package-rehash-threshold+) 1)
+              from (logior (ceiling size #.+package-rehash-threshold+) 1)
               by 2
               when (positive-primep n) return n)))
     (let* ((n (actual-package-hashtable-size size))
            ;; SIZE is how many symbols we'd like to be able to store,
            ;; but the number of physical cells is N, chosen for its primality.
-           (size (truncate (* n +package-rehash-threshold+)))
+           (size (truncate (* n #.+package-rehash-threshold+)))
            (table (make-array n :initial-element 0)))
       (%make-package-hashtable table size))))
 

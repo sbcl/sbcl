@@ -39,6 +39,16 @@
   ;; meaningful concept. Just execute the forms at load time.
   #-sb-xc `(progn ,@forms))
 
+(defmacro !cold-init-time-value (form)
+  #-sb-xc `(load-time-value ,form)
+  #+sb-xc
+  (let ((gensym (gensym "COLD-INIT-TIME-VALUE")))
+    (push `(locally (declare (special ,gensym))
+             (setq ,gensym ,form))
+          *!cold-init-forms*)
+    `(locally (declare (special ,gensym))
+       ,gensym)))
+
 (defmacro !defun-from-collected-cold-init-forms (name)
   #+sb-xc `(progn
              ,(unless *!cold-init-forms*

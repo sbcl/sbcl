@@ -19,7 +19,6 @@
 
 ;;; built-in classes
 (/show0 "beginning type-init.lisp")
-#+sb-xc-host
 (dolist (x *builtin-classoids*)
   (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)
       x

@@ -23,10 +23,6 @@
 
 ;;; The CLASSOID structure is a supertype of all classoid types.
 ;;; Its definition occurs in 'early-classoid.lisp'
-#+sb-xc-host
-(defmethod make-load-form ((self classoid) &optional env)
-  (declare (ignore env))
-  `(find-classoid ',(classoid-name self)))
 
 
 ;;;; basic LAYOUT stuff
@@ -1221,16 +1217,13 @@ between the ~A definition and the ~A definition"
     (mapcar (lambda (x)
               (let* ((name (car x))
                      (classoid (find-classoid name))
-                     (translation (built-in-classoid-translation classoid))
                      (predicate
                       (if (member name '(t random-class))
                           'error
                           (or (getf (cdr x) :predicate)
-                              (sb-c::backend-type-predicate translation)))))
+                              (sb-c::backend-type-predicate (built-in-classoid-translation classoid))))))
                 (assert predicate)
-                ;; destructuring-bind will see the first :translation
-                ;; keyword; we don't need to delete the other one.
-                (list* name :predicate predicate :translation translation (cdr x))))
+                (list* name :predicate predicate (cdr x))))
             *builtin-classoids*)))
 
 ;;; The read interceptor has to be disabled to avoid infinite recursion on CTYPEs
@@ -1284,8 +1277,7 @@ between the ~A definition and the ~A definition"
                             (!make-built-in-classoid
                              :%bits (pack-ctype-bits classoid name)
                              :name name
-                             :translation #+sb-xc-host (if trans-p :initializing nil)
-                                          #-sb-xc-host translation
+                             :translation (if trans-p :initializing nil)
                              :allow-other-keys t :predicate pred-fn
                              :direct-superclasses
                              (if (eq name t)
@@ -1293,10 +1285,8 @@ between the ~A definition and the ~A definition"
                                  (mapcar #'find-classoid
                                          direct-superclasses))))))))
        (setf (info :type :kind name) :primitive)
-       #+sb-xc-host
        (unless trans-p
          (setf (info :type :builtin name) classoid))
-       #-sb-xc-host (setf (info :type :builtin name) (or translation classoid))
        (let* ((inherits-vector
                 (map 'simple-vector
                      (lambda (x)

@@ -751,8 +751,6 @@
 ;;;; Floating-point number reader interceptor
 
 (defvar *choke-on-host-irrationals* t)
-;;; FIXME: this gets stuck on forms which contain literal CTYPE objects
-;;; because of infinite recursion.
 (defun install-read-interceptor ()
   ;; Intercept READ to catch inadvertent use of host floating-point literals.
   ;; This prevents regressions in the portable float logic and allows passing

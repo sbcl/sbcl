@@ -2422,6 +2422,18 @@ is :ANY, the function name is not checked."
            ;; with the named constant. (THIS IS VERY SUSPICIOUS)
            (or (gethash name (named-constants namespace))
                (let ((new (make-constant object (ctype-of object) name)))
+                 (let ((fasl-output *compile-object*))
+                   (unless (or (member name *hairy-defconstants*)
+                               (sb-fasl::fasl-named-constant-already-dumped-p name fasl-output))
+                     (sb-fasl::fasl-note-handle-for-named-constant
+                      name
+                      (compile-load-time-value
+                       ;; KLUDGE: Inhibit transforms trying to turn
+                       ;; (SYMBOL-GLOBAL-VALUE 'X) back into X.
+                       `(locally (declare (notinline symbol-global-value))
+                          (symbol-global-value ',name))
+                       t)
+                      fasl-output)))
                  (setf (gethash name (named-constants namespace)) new)
                  ;; If there was no EQL constant, or an unnamed one, add NEW
                  (let ((old (gethash object (eql-constants namespace))))

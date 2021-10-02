@@ -17,7 +17,7 @@
 
 (define-type-class named :enumerable nil :might-contain-other-types nil)
 
-(macrolet ((frob (type global-sym)
+(macrolet ((frob (type name)
              (let* ((name-hash (%sxhash-simple-string (string type)))
                     ;; Toggle some bits so that the hash is not equal to the hash
                     ;; for a classoid of this name (relevant for named type T only)
@@ -33,16 +33,13 @@
                                ((nil t) (sb-vm::saetp-index-or-lose type))
                                (t nil)))))
                (declare (ignorable bits)) ; not used in XC
-               `(progn
-                  #+sb-xc-host
-                  (progn (defvar ,global-sym (!make-named-type ,bits ',type))
-                         ;; Make it known as a constant in the cross-compiler.
-                         (setf (info :variable :kind ',global-sym) :constant))
-                  (!cold-init-forms
-                   #+sb-xc (sb-impl::%defconstant ',global-sym ,global-sym
-                                                  (sb-c:source-location))
-                   (setf (info :type :builtin ',type) ,global-sym
-                         (info :type :kind ',type) :primitive))))))
+               `(!cold-init-forms
+                 #+sb-xc-host ; DEFCONSTANT loses compile-time effects at XC time
+                 (setf (info :variable :kind ',name) :constant)
+                 (let ((value (!make-named-type ,bits ',type)))
+                   (#+sb-xc-host defvar #-sb-xc-host defconstant ,name value)
+                   (setf (info :type :builtin ',type) value))
+                 (setf (info :type :kind ',type) :primitive)))))
   ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
   ;; special symbol which can be stuck in some places where an
   ;; ordinary type can go, e.g. (ARRAY * 1) instead of (ARRAY T 1).

@@ -28,33 +28,29 @@
     ;; defined.
     (setf (info :type :kind name) :forthcoming-defclass-type)))
 
-(symbol-macrolet
-    ((reader-function-type (specifier-type '(function (t) t)))
-     (writer-function-type (specifier-type '(function (t t) t))))
-  (flet ((proclaim-ftype-for-name (kind name type)
-           (ecase kind
-             (condition
-              (proclaim `(ftype ,(type-specifier type) ,name)))
-             (class
-              (when (eq (info :function :where-from name) :assumed)
-                (sb-c:proclaim-ftype name type nil :defined))))))
+(flet ((proclaim-ftype-for-name (kind name type)
+         (ecase kind
+           (condition
+            (proclaim `(ftype ,type ,name)))
+           (class
+            (when (eq (info :function :where-from name) :assumed)
+              (sb-c:proclaim-ftype name (specifier-type type) nil :defined))))))
 
-    (defun preinform-compiler-about-accessors (kind readers writers)
-      (flet ((inform (names type)
-               (mapc (lambda (name) (proclaim-ftype-for-name kind name type))
-                     names)))
-        (inform readers reader-function-type)
-        (inform writers writer-function-type)))
+  (defun preinform-compiler-about-accessors (kind readers writers)
+    (flet ((inform (names type)
+             (dolist (name names)
+               (proclaim-ftype-for-name kind name type))))
+      (inform readers '(function (t) t))
+      (inform writers '(function (t t) t))))
 
-    (defun preinform-compiler-about-slot-functions (kind slots)
-      (flet ((inform (slots key type)
-               (mapc (lambda (slot)
-                       (let ((name (funcall key slot)))
-                         (proclaim-ftype-for-name kind name type)))
-                     slots)))
-        (inform slots #'sb-pcl::slot-reader-name reader-function-type)
-        (inform slots #'sb-pcl::slot-boundp-name reader-function-type)
-        (inform slots #'sb-pcl::slot-writer-name writer-function-type)))))
+  (defun preinform-compiler-about-slot-functions (kind slots)
+    (flet ((inform (slots key type)
+             (dolist (slot slots)
+               (let ((name (funcall key slot)))
+                 (proclaim-ftype-for-name kind name type)))))
+      (inform slots #'sb-pcl::slot-reader-name '(function (t) t))
+      (inform slots #'sb-pcl::slot-boundp-name '(function (t) t))
+      (inform slots #'sb-pcl::slot-writer-name '(function (t t) t)))))
 
 (defun %%compiler-defclass (name readers writers slots)
   ;; ANSI says (Macro DEFCLASS, section 7.7) that DEFCLASS, if it
