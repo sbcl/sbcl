@@ -1052,6 +1052,13 @@
   (:variant t nil)
   (:translate ash-mod64))
 
+(define-vop (fast-ash-mod64/signed=>unsigned
+             fast-ash/signed=>signed)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:variant t t)
+  (:translate ash-mod64))
+
 (in-package "SB-C")
 
 (defknown %lea (integer integer (member 1 2 4 8 16) (signed-byte 64))

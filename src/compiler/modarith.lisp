@@ -482,12 +482,6 @@
                               (not (csubtypep count-type (specifier-type '(integer 0 *))))
                               (or (csubtypep integer-type (specifier-type `(unsigned-byte ,sb-vm:n-word-bits)))
                                   (csubtypep integer-type (specifier-type `(signed-byte ,sb-vm:n-word-bits)))))
-                         (unless (and ,signedp
-                                      (not (csubtypep integer-type (specifier-type 'fixnum))))
-                           ;; MASK-SIGNED-FIELD will cut off the highest bit before it's shifted,
-                           ;; there is an ASH-MODFX VOP which first shifts a word and then cuts
-                           ;; off the result.
-                           (cut-to-width integer ,kind width ,signedp))
                          ',name)))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))

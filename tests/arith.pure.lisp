@@ -959,3 +959,12 @@
          (logcount (the fixnum x)))
     ((54) 4)
     ((-54) 4)))
+
+(with-test (:name :mod-ash64-signed)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a b))
+         (logand (ash a b) (1+ most-positive-fixnum)))
+    ((-1 -3) (1+ most-positive-fixnum))
+    ((1 3) 0)))

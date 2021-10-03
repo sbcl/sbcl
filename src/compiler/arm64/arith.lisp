@@ -616,6 +616,12 @@
              fast-ash/signed=>signed)
   (:translate ash-modfx))
 
+(define-vop (fast-ash-mod64/signed=>unsigned
+             fast-ash/signed=>signed)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate ash-mod64))
+
 (define-vop (fast-ash-mod64/unsigned=>unsigned
              fast-ash/unsigned=>unsigned)
   (:translate ash-mod64))
