@@ -131,7 +131,7 @@ copied_realpath(const char *pathname)
         free(tidy);
         return NULL;
     }
-    
+
     if (messy)
         free(messy);
 

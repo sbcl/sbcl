@@ -3060,3 +3060,18 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+(defpattern "and + and -> and" ((and) (and)) (stmt next)
+  (destructuring-bind (dst1 src1 mask1) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 mask2) (stmt-operands next)
+      (when
+          (and (location= dst1 src2)
+               (integerp mask1)
+               (integerp mask2)
+               (not (tn-ref-next (sb-c::tn-reads dst1)))
+               (equal (vop-translates (tn-ref-vop (sb-c::tn-reads dst1)))
+                      '(logand)))
+        (setf (stmt-operands next) (list dst2 src1 (logand mask1 mask2)))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
