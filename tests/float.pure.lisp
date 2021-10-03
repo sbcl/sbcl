@@ -731,3 +731,16 @@
    `(lambda (x)
       (eql (imagpart (the real x)) -0.0))
    ((-1.0) t)))
+
+(with-test (:name :negative-zero-in-ranges)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (declare ((OR (INTEGER 0 0) (DOUBLE-FLOAT 0.0d0 0.0d0)) x)
+                  ((OR (RATIONAL -10 0) (DOUBLE-FLOAT -10.0d0 -0.0d0)) y))
+         (= x y))
+  ((0 0) t)
+  ((0 0d0) t)
+  ((0 -0d0) t)
+  ((0d0 -0d0) t)
+  ((0 -1d0) nil)))

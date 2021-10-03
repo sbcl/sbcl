@@ -405,22 +405,6 @@
 ;;;; have to create these new interval structures even though
 ;;;; numeric-type has everything we want to know. Reason 2 wins for
 ;;;; now.
-
-;;; Support operations that mimic real arithmetic comparison
-;;; operators, but imposing a total order on the floating points such
-;;; that negative zeros are strictly less than positive zeros.
-(macrolet ((def (name op)
-             `(defun ,name (x y)
-                (declare (type real x y))
-                (if (and (floatp x) (floatp y) (zerop x) (zerop y))
-                    (,op (float-sign x) (float-sign y))
-                    (,op x y)))))
-  (def signed-zero->= sb-xc:>=)
-  (def signed-zero-> sb-xc:>)
-  (def signed-zero-= sb-xc:=)
-  (def signed-zero-< sb-xc:<)
-  (def signed-zero-<= sb-xc:<=))
-
 (defun make-interval (&key low high)
   (labels ((normalize-bound (val)
              (cond ((and (floatp val)
@@ -456,9 +440,18 @@
            ;; With these traps masked, we might get things like infinity
            ;; or negative infinity returned. Check for this and return
            ;; NIL to indicate unbounded.
+           #+sb-xc-host
+           (when (and (eql f #'log)
+                      (zerop x))
+             (return-from bound-func))
            (let ((y (funcall f (type-bound-number x))))
-             (if (and (floatp y)
-                      (float-infinity-p y))
+             (if (or (and (floatp y)
+                          (float-infinity-p y))
+                     (and (typep y 'complex)
+                          (or (and (floatp (imagpart y))
+                                   (float-infinity-p (imagpart y)))
+                              (and (floatp (realpart y))
+                                   (float-infinity-p (realpart y))))))
                  nil
                  (set-bound y (and strict (consp x))))))
          ;; Some numerical operations will signal an ERROR, e.g. in
@@ -678,9 +671,9 @@
   (declare (type interval x))
   (let ((lo (interval-low x))
         (hi (interval-high x)))
-    (cond ((and lo (signed-zero->= (type-bound-number lo) point))
+    (cond ((and lo (sb-xc:>= (type-bound-number lo) point))
            '+)
-          ((and hi (signed-zero->= point (type-bound-number hi)))
+          ((and hi (sb-xc:>= point (type-bound-number hi)))
            '-)
           (t
            nil))))
@@ -689,9 +682,9 @@
   (declare (type interval x))
   (let ((lo (interval-low x))
         (hi (interval-high x)))
-    (cond ((and lo (signed-zero->= (type-bound-number lo) point))
+    (cond ((and lo (sb-xc:>= (type-bound-number lo) point))
            '+)
-          ((and hi (signed-zero-> point (type-bound-number hi)))
+          ((and hi (sb-xc:> point (type-bound-number hi)))
            '-))))
 
 ;;; Test to see whether the interval X is bounded. HOW determines the
@@ -717,26 +710,26 @@
         (hi (interval-high x)))
     (cond ((and lo hi)
            ;; The interval is bounded
-           (if (and (signed-zero-<= (type-bound-number lo) p)
-                    (signed-zero-<= p (type-bound-number hi)))
+           (if (and (sb-xc:<= (type-bound-number lo) p)
+                    (sb-xc:<= p (type-bound-number hi)))
                ;; P is definitely in the closure of the interval.
                ;; We just need to check the end points now.
-               (cond ((signed-zero-= p (type-bound-number lo))
+               (cond ((sb-xc:= p (type-bound-number lo))
                       (numberp lo))
-                     ((signed-zero-= p (type-bound-number hi))
+                     ((sb-xc:= p (type-bound-number hi))
                       (numberp hi))
                      (t t))
                nil))
           (hi
            ;; Interval with upper bound
-           (if (signed-zero-< p (type-bound-number hi))
+           (if (sb-xc:< p (type-bound-number hi))
                t
-               (and (numberp hi) (signed-zero-= p hi))))
+               (and (numberp hi) (sb-xc:= p hi))))
           (lo
            ;; Interval with lower bound
-           (if (signed-zero-> p (type-bound-number lo))
+           (if (sb-xc:> p (type-bound-number lo))
                t
-               (and (numberp lo) (signed-zero-= p lo))))
+               (and (numberp lo) (sb-xc:= p lo))))
           (t
            ;; Interval with no bounds
            t))))
