@@ -334,6 +334,20 @@
   (:arg-types signed-num unsigned-num)
   (:translate logand))
 
+(defun logical-immediate-or-word-mask (x)
+  (and (integerp x)
+       (or (encode-logical-immediate x)
+           (= x most-positive-word))))
+
+(define-vop (fast-logand-c/signed-unsigned=>unsigned fast-logand-c/unsigned=>unsigned)
+  (:args (x :scs (signed-reg)))
+  (:arg-types signed-num (:constant (satisfies logical-immediate-or-word-mask)))
+  (:translate logand)
+  (:generator 2
+    (if (= y most-positive-word)
+        (move r x)
+        (inst and r x y))))
+
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
       `(logxor ,@args)
