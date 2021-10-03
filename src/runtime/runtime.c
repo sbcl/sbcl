@@ -126,10 +126,14 @@ copied_realpath(const char *pathname)
 
     tidy = successful_malloc(PATH_MAX + 1);
     if (realpath((messy ? messy : pathname), tidy) == NULL) {
-        free(messy);
+        if (messy)
+            free(messy);
         free(tidy);
         return NULL;
     }
+    
+    if (messy)
+        free(messy);
 
     return tidy;
 }
