@@ -839,7 +839,7 @@
   (imms :field (byte 6 10) :type 'unsigned-immediate)
   (rn :field (byte 5 5) :type 'reg)
   (rd :field (byte 5 0) :type 'reg)
-  (lsl-alias :fields (list (byte 6 16) (byte 6 10))))
+  (ubfm-alias :fields (list (byte 6 16) (byte 6 10))))
 
 
 (define-instruction sbfm (segment rd rn immr imms)
@@ -862,9 +862,9 @@
   (:printer bitfield ((op #b10))
             ;; This ought to have a better solution.
             ;; The whole disassembler ought to be better...
-            '((:using #'print-lsl-alias-name lsl-alias)
+            '((:using #'print-ubfm-alias-name ubfm-alias)
               :tab rd  ", " rn ", "
-              (:using #'print-lsl-alias lsl-alias)))
+              (:using #'print-ubfm-alias ubfm-alias)))
   (:emitter
    (emit-bitfield segment +64-bit-size+ #b10 +64-bit-size+
                   immr imms (tn-offset rn) (tn-offset rd))))
@@ -3035,3 +3035,28 @@
                            (list value (1- (integer-length mask)) label))))
               (delete-stmt next)
               next-next)))))))
+
+(defun vop-translates (vop)
+  (sb-c::vop-parse-translate
+   (sb-c::vop-parse-or-lose (sb-c::vop-name vop))))
+
+;;; Tagging and applying a tagged mask can be done in one step.
+(defpattern "lsl + and -> ubfiz" ((ubfm) (and)) (stmt next)
+  (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 mask) (stmt-operands next)
+      (when
+          (and (location= dst1 src2)
+               (integerp mask)
+               (plusp mask)
+               (= (integer-length mask)
+                  (1+ (logcount mask)))
+               (= immr 63)
+               (= imms 62)
+               (not (tn-ref-next (sb-c::tn-reads dst1)))
+               (equal (vop-translates (tn-ref-vop (sb-c::tn-reads dst1)))
+                      '(logand)))
+        (setf (stmt-mnemonic next) 'ubfm
+              (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))

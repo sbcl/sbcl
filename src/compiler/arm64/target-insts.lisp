@@ -9,22 +9,28 @@
 (defun 32-bit-register-p (dstate)
   (not (logbitp 31 (current-instruction dstate))))
 
-(defun print-lsl-alias-name (value stream dstate)
+(defun print-ubfm-alias-name (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (immr imms) value
-    (princ (if (and (/= imms 63)
-                    (= (1+ imms) immr))
-               'lsl
-               'ubfm)
+    (princ (cond ((and (/= imms 63)
+                       (= (1+ imms) immr))
+                  'lsl)
+                 ((< imms immr)
+                  'ubfiz)
+                 (t
+                  'ubfm))
            stream)))
 
-(defun print-lsl-alias (value stream dstate)
+(defun print-ubfm-alias (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (immr imms) value
-    (if (and (/= imms 63)
-             (= (1+ imms) immr))
-        (format stream "#~d" (- 63 imms))
-        (format stream "#~d, #~d" immr imms))))
+    (cond ((and (/= imms 63)
+                (= (1+ imms) immr))
+           (format stream "#~d" (- 63 imms)))
+          ((< imms immr)
+           (format stream "#~d, #~d" (- 64 immr) (1+ imms)))
+          (t
+           (format stream "#~d, #~d" immr imms)))))
 
 (defun print-mem-bar-kind (value stream dstate)
   (declare (ignore dstate))
