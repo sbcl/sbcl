@@ -3048,6 +3048,12 @@
          (= (integer-length untag)
             (logcount untag)))))
 
+(defun untagged-mask-p (x)
+  (and (integerp x)
+       (plusp x)
+       (= (integer-length x)
+          (logcount x))))
+
 ;;; Tagging and applying a tagged mask can be done in one step.
 (defpattern "lsl + and -> ubfiz" ((ubfm) (and)) (stmt next)
   (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
@@ -3064,6 +3070,25 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+;;; If the sign bit gets cut off it can be done with just a logical shift.
+(defpattern "asr + and -> lsr" ((sbfm) (and)) (stmt next)
+  (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 mask) (stmt-operands next)
+      (when (and (location= dst1 src2)
+                 (untagged-mask-p mask)
+                 (= (integer-length mask) 63)
+                 (= immr 1)
+                 (= imms 63)
+                 (not (tn-ref-next (sb-c::tn-reads dst1)))
+                 (equal (vop-translates (tn-ref-vop (sb-c::tn-reads dst1)))
+                        '(logand)))
+        (setf (stmt-mnemonic next) 'ubfm
+              (stmt-operands next) (list dst2 src1 immr imms))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
 ;;; Applying a tagged mask and untagging
 (defpattern "and + asr -> ubfx" ((and) (sbfm)) (stmt next)
   (destructuring-bind (dst1 src1 mask) (stmt-operands stmt)
