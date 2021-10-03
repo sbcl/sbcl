@@ -3040,23 +3040,47 @@
   (sb-c::vop-parse-translate
    (sb-c::vop-parse-or-lose (sb-c::vop-name vop))))
 
+(defun tagged-mask-p (x)
+  (and (integerp x)
+       (plusp x)
+       (zerop (ldb (byte 1 0) x))
+       (let ((untag (ash x -1)))
+         (= (integer-length untag)
+            (logcount untag)))))
+
 ;;; Tagging and applying a tagged mask can be done in one step.
 (defpattern "lsl + and -> ubfiz" ((ubfm) (and)) (stmt next)
   (destructuring-bind (dst1 src1 immr imms) (stmt-operands stmt)
     (destructuring-bind (dst2 src2 mask) (stmt-operands next)
-      (when
-          (and (location= dst1 src2)
-               (integerp mask)
-               (plusp mask)
-               (= (integer-length mask)
-                  (1+ (logcount mask)))
-               (= immr 63)
-               (= imms 62)
-               (not (tn-ref-next (sb-c::tn-reads dst1)))
-               (equal (vop-translates (tn-ref-vop (sb-c::tn-reads dst1)))
-                      '(logand)))
+      (when (and (location= dst1 src2)
+                 (tagged-mask-p mask)
+                 (= immr 63)
+                 (= imms 62)
+                 (not (tn-ref-next (sb-c::tn-reads dst1)))
+                 (equal (vop-translates (tn-ref-vop (sb-c::tn-reads dst1)))
+                        '(logand)))
         (setf (stmt-mnemonic next) 'ubfm
               (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+;;; Applying a tagged mask and untagging
+(defpattern "and + asr -> ubfx" ((and) (sbfm)) (stmt next)
+  (destructuring-bind (dst1 src1 mask) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr imms) (stmt-operands next)
+      (when (and (location= dst1 src2)
+                 (tagged-mask-p mask)
+                 (= immr 1)
+                 (= imms 63)
+                 (not (tn-ref-next (sb-c::tn-reads dst1)))
+                 (eq (vop-name (tn-ref-vop (sb-c::tn-reads dst1)))
+                     'sb-vm::move-to-word/fixnum))
+        ;; Leave the ASR if the sign bit is left,
+        ;; but the AND is not needed.
+        (if (= (integer-length mask) 64)
+            (setf (stmt-operands next) (list dst2 src1 immr imms))
+            (setf (stmt-mnemonic next) 'ubfm
+                  (stmt-operands next) (list dst2 src1 1 (logcount mask))))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
