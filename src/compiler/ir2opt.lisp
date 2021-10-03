@@ -298,7 +298,26 @@
           (let ((x (tn-ref-tn args))
                 (y (tn-ref-tn results)))
             (when (location= x y)
-              (delete-vop vop)))))))))
+              (delete-vop vop)
+              ;; Deleting the copy may make it look like that register
+              ;; is not used anywhere else and some optimizations may incorrectly trigger.
+              (flet ((reference (ref tn write-p)
+                       (loop with next
+                             while ref
+                             do
+                             (setf next (tn-ref-next ref))
+                             (let* ((new-ref (reference-tn tn write-p))
+                                    (vop (setf (tn-ref-vop new-ref)
+                                               (tn-ref-vop ref))))
+                               (setf (tn-ref-across new-ref) (vop-refs vop))
+                               (setf (vop-refs vop) new-ref))
+                             (setf ref next))))
+                (let ((x-reads (tn-reads x))
+                      (x-writes (tn-writes x)))
+                  (reference (tn-reads y) x nil)
+                  (reference (tn-writes y) x t)
+                  (reference x-reads y nil)
+                  (reference x-writes y t)))))))))))
 
 ;;; Unchain BRANCHes that jump to a BRANCH.
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
