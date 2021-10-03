@@ -300,24 +300,21 @@
             (when (location= x y)
               (delete-vop vop)
               ;; Deleting the copy may make it look like that register
-              ;; is not used anywhere else and some optimizations may incorrectly trigger.
-              (flet ((reference (ref tn write-p)
-                       (loop with next
-                             while ref
-                             do
-                             (setf next (tn-ref-next ref))
-                             (let* ((new-ref (reference-tn tn write-p))
-                                    (vop (setf (tn-ref-vop new-ref)
-                                               (tn-ref-vop ref))))
-                               (setf (tn-ref-across new-ref) (vop-refs vop))
-                               (setf (vop-refs vop) new-ref))
-                             (setf ref next))))
-                (let ((x-reads (tn-reads x))
-                      (x-writes (tn-writes x)))
-                  (reference (tn-reads y) x nil)
-                  (reference (tn-writes y) x t)
-                  (reference x-reads y nil)
-                  (reference x-writes y t)))))))))))
+              ;; is not used anywhere else and some optimizations,
+              ;; like combine-instructions, may incorrectly trigger.
+              ;; FIXME: these tn-refs never go away, so things like
+              ;; combine-instructions should use a different mechanism
+              ;; for checking writes/reads.
+              (let ((x-reads (tn-reads x))
+                    (x-writes (tn-writes x)))
+                (when (tn-reads y)
+                  (reference-tn x nil))
+                (when (tn-writes y)
+                  (reference-tn x t))
+                (when x-reads
+                  (reference-tn y nil))
+                (when x-writes
+                  (reference-tn y t)))))))))))
 
 ;;; Unchain BRANCHes that jump to a BRANCH.
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
