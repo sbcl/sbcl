@@ -2643,7 +2643,7 @@ mechanism for inter-thread communication."
                 (mapcar 'allocator-histogram (list-all-threads))))
       (with-deathlok (thread c-thread)
         (unless (= c-thread 0)
-          (dx-let ((a (make-array (+ sb-vm::+n-small-buckets+ sb-vm:n-word-bits)
+          (dx-let ((a (make-array (+ sb-vm::histogram-small-bins sb-vm:n-word-bits)
                                   :element-type 'fixnum)))
             (dotimes (i (length a))
               (setf (aref a i) (histogram-value c-thread i)))
@@ -2661,7 +2661,7 @@ mechanism for inter-thread communication."
       (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
             (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0
             (metric c-thread sb-vm::thread-slow-path-allocs-slot) 0)
-      (dotimes (i (+ sb-vm::+n-small-buckets+ sb-vm:n-word-bits))
+      (dotimes (i (+ sb-vm::histogram-small-bins sb-vm:n-word-bits))
         (setf (histogram-value c-thread i) 0)))))
 
 (defun print-allocator-histogram (&optional (thread *current-thread*))
@@ -2672,10 +2672,10 @@ mechanism for inter-thread communication."
       (format t "~&       Size      Count    Cum%~%")
       (loop for index from 0
             for count across bins
-            for size-exact-p = (< index sb-vm::+n-small-buckets+)
+            for size-exact-p = (< index sb-vm::histogram-small-bins)
             for size = (if size-exact-p
                            (* (1+ index) 2 sb-vm:n-word-bytes)
-                           (ash 1 (+ (- index sb-vm::+n-small-buckets+) 10)))
+                           (ash 1 (+ (- index sb-vm::histogram-small-bins) 10)))
         do
         (incf cumulative count)
         (format t "~& ~10@a : ~8d  ~6,2,2f~%"

@@ -469,7 +469,8 @@ during backtrace.
                             *thread-header-slot-names*)))))
   (assign-header-slot-indices))
 
-(defconstant +n-small-buckets+ 32) ; for consing size histogram
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defconstant histogram-small-bins 32)) ; for consing size histogram
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -576,7 +577,7 @@ during backtrace.
   (et-find-freeish-page)
   (et-bzeroing)
   (obj-size-histo :c-type "size_histogram"
-                  :length #.(+ +n-small-buckets+ sb-vm:n-word-bits))
+                  :length #.(+ histogram-small-bins sb-vm:n-word-bits))
 
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.

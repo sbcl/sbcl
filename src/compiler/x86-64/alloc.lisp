@@ -105,14 +105,14 @@
            (1+ thread-tot-bytes-alloc-boxed-slot))))
 
 ;;; the #+allocator metrics histogram contains an exact count
-;;; for all sizes up to (* cons-size n-word-bytes +n-small-buckets+).
+;;; for all sizes up to (* cons-size n-word-bytes histogram-small-bins).
 ;;; Larger allocations are grouped by the binary log of the size.
 ;;; It seems that 99.5% of all allocations are less than the small bucket limit,
 ;;; making the histogram fairly exact except for the tail.
 (defparameter *consing-histo* nil)
 (defconstant non-small-bucket-offset
-  (+ +n-small-buckets+
-     (- (integer-length (* sb-vm::+n-small-buckets+
+  (+ histogram-small-bins
+     (- (integer-length (* sb-vm::histogram-small-bins
                            sb-vm:cons-size sb-vm:n-word-bytes)))))
 (defun instrument-alloc (type size node)
   (declare (ignorable type))
@@ -138,7 +138,7 @@
                  (cond (size-temp (inst mov temp-reg-tn size) temp-reg-tn)
                        (t size)))))
     (cond ((tn-p size)
-           (inst cmp size (* +n-small-buckets+ 16))
+           (inst cmp size (* histogram-small-bins 16))
            (inst jmp :g inexact)
            (inst mov :dword temp-reg-tn size)
            (inst shr :dword temp-reg-tn (1+ word-shift))
@@ -153,7 +153,7 @@
                                 thread-base-tn temp-reg-tn 8)))
           (t
            (let* ((n-conses (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))
-                  (bucket (if (<= n-conses +n-small-buckets+)
+                  (bucket (if (<= n-conses histogram-small-bins)
                               (1- n-conses)
                               (+ (integer-length size)
                                  non-small-bucket-offset))))
