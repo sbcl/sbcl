@@ -233,6 +233,14 @@
     (inst vpinsrq tmp tmp p3 1)
     (inst vinserti128 dst dst tmp 1)))
 
+(defmacro simd-pack-256-dispatch (pack &body body)
+  (check-type pack symbol)
+  `(let ((,pack ,pack))
+     (etypecase ,pack
+       ((simd-pack-256 double-float) ,@body)
+       ((simd-pack-256 single-float) ,@body)
+       ((simd-pack-256 integer) ,@body))))
+
 #-sb-xc-host
 (progn
   (declaim (inline %make-simd-pack-256-ub32))
@@ -246,21 +254,23 @@
   (declaim (inline %simd-pack-256-ub32s %simd-pack-256-ub64s))
   (defun %simd-pack-256-ub32s (pack)
     (declare (type simd-pack-256 pack))
-    (let ((p0 (%simd-pack-256-0 pack))
-          (p1 (%simd-pack-256-1 pack))
-          (p2 (%simd-pack-256-2 pack))
-          (p3 (%simd-pack-256-3 pack)))
-      (values (ldb (byte 32 0) p0) (ash p0 -32)
-              (ldb (byte 32 0) p1) (ash p1 -32)
-              (ldb (byte 32 0) p2) (ash p2 -32)
-              (ldb (byte 32 0) p3) (ash p3 -32))))
+    (simd-pack-256-dispatch pack
+      (let ((p0 (%simd-pack-256-0 pack))
+            (p1 (%simd-pack-256-1 pack))
+            (p2 (%simd-pack-256-2 pack))
+            (p3 (%simd-pack-256-3 pack)))
+        (values (ldb (byte 32 0) p0) (ash p0 -32)
+                (ldb (byte 32 0) p1) (ash p1 -32)
+                (ldb (byte 32 0) p2) (ash p2 -32)
+                (ldb (byte 32 0) p3) (ash p3 -32)))))
 
   (defun %simd-pack-256-ub64s (pack)
     (declare (type simd-pack-256 pack))
-    (values (%simd-pack-256-0 pack)
-            (%simd-pack-256-1 pack)
-            (%simd-pack-256-2 pack)
-            (%simd-pack-256-3 pack))))
+    (simd-pack-256-dispatch pack
+      (values (%simd-pack-256-0 pack)
+              (%simd-pack-256-1 pack)
+              (%simd-pack-256-2 pack)
+              (%simd-pack-256-3 pack)))))
 
 (define-vop (%make-simd-pack-256-double)
   (:translate %make-simd-pack-256-double)
@@ -332,14 +342,15 @@
 (declaim (inline %simd-pack-256-singles))
 (defun %simd-pack-256-singles (pack)
   (declare (type simd-pack-256 pack))
-  (values (%simd-pack-256-single-item pack 0)
-          (%simd-pack-256-single-item pack 1)
-          (%simd-pack-256-single-item pack 2)
-          (%simd-pack-256-single-item pack 3)
-          (%simd-pack-256-single-item pack 4)
-          (%simd-pack-256-single-item pack 5)
-          (%simd-pack-256-single-item pack 6)
-          (%simd-pack-256-single-item pack 7))))
+  (simd-pack-256-dispatch pack
+    (values (%simd-pack-256-single-item pack 0)
+            (%simd-pack-256-single-item pack 1)
+            (%simd-pack-256-single-item pack 2)
+            (%simd-pack-256-single-item pack 3)
+            (%simd-pack-256-single-item pack 4)
+            (%simd-pack-256-single-item pack 5)
+            (%simd-pack-256-single-item pack 6)
+            (%simd-pack-256-single-item pack 7)))))
 
 (defknown %simd-pack-256-double-item
   (simd-pack-256 (integer 0 3)) double-float (flushable))
@@ -370,10 +381,11 @@
 (declaim (inline %simd-pack-256-doubles))
 (defun %simd-pack-256-doubles (pack)
   (declare (type simd-pack-256 pack))
-  (values (%simd-pack-256-double-item pack 0)
-          (%simd-pack-256-double-item pack 1)
-          (%simd-pack-256-double-item pack 2)
-          (%simd-pack-256-double-item pack 3)))
+  (simd-pack-256-dispatch pack
+    (values (%simd-pack-256-double-item pack 0)
+            (%simd-pack-256-double-item pack 1)
+            (%simd-pack-256-double-item pack 2)
+            (%simd-pack-256-double-item pack 3))))
 
 (defun %simd-pack-256-inline-constant (pack)
   (list :avx2 (logior (%simd-pack-256-0 pack)

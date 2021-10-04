@@ -207,6 +207,14 @@
     (inst movq tmp hi)
     (inst punpcklqdq dst tmp)))
 
+(defmacro simd-pack-dispatch (pack &body body)
+  (check-type pack symbol)
+  `(let ((,pack ,pack))
+     (etypecase ,pack
+       ((simd-pack double-float) ,@body)
+       ((simd-pack single-float) ,@body)
+       ((simd-pack integer) ,@body))))
+
 #-sb-xc-host
 (progn
   (declaim (inline %make-simd-pack-ub32))
@@ -218,17 +226,19 @@
   (declaim (inline %simd-pack-ub32s %simd-pack-ub64s))
   (defun %simd-pack-ub32s (pack)
     (declare (type simd-pack pack))
-    (let ((lo (%simd-pack-low pack))
-          (hi (%simd-pack-high pack)))
-      (values (ldb (byte 32 0) lo)
-              (ash lo -32)
-              (ldb (byte 32 0) hi)
-              (ash hi -32))))
+    (simd-pack-dispatch pack
+      (let ((lo (%simd-pack-low pack))
+            (hi (%simd-pack-high pack)))
+        (values (ldb (byte 32 0) lo)
+                (ash lo -32)
+                (ldb (byte 32 0) hi)
+                (ash hi -32)))))
 
   (defun %simd-pack-ub64s (pack)
     (declare (type simd-pack pack))
-    (values (%simd-pack-low pack)
-            (%simd-pack-high pack))))
+    (simd-pack-dispatch pack
+      (values (%simd-pack-low pack)
+              (%simd-pack-high pack)))))
 
 (define-vop (%make-simd-pack-double)
   (:translate %make-simd-pack-double)
@@ -292,10 +302,11 @@
 (declaim (inline %simd-pack-singles))
 (defun %simd-pack-singles (pack)
   (declare (type simd-pack pack))
-  (values (%simd-pack-single-item pack 0)
-          (%simd-pack-single-item pack 1)
-          (%simd-pack-single-item pack 2)
-          (%simd-pack-single-item pack 3))))
+  (simd-pack-dispatch pack
+    (values (%simd-pack-single-item pack 0)
+            (%simd-pack-single-item pack 1)
+            (%simd-pack-single-item pack 2)
+            (%simd-pack-single-item pack 3)))))
 
 (defknown %simd-pack-double-item
   (simd-pack (integer 0 1)) double-float (flushable))
@@ -327,5 +338,6 @@
 (declaim (inline %simd-pack-doubles))
 (defun %simd-pack-doubles (pack)
   (declare (type simd-pack pack))
-  (values (%simd-pack-double-item pack 0)
-          (%simd-pack-double-item pack 1))))
+  (simd-pack-dispatch pack
+    (values (%simd-pack-double-item pack 0)
+            (%simd-pack-double-item pack 1)))))

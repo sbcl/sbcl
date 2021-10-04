@@ -390,32 +390,27 @@
         #+sb-simd-pack
         (simd-pack-type
          (let ((eltypes (simd-pack-type-element-type type)))
-           (cond ((member 'integer eltypes)
+           (cond ((equal '(integer) eltypes)
                   (exactly simd-pack-int))
-                 ((member 'single-float eltypes)
+                 ((equal '(single-float) eltypes)
                   (exactly simd-pack-single))
-                 ((member 'double-float eltypes)
-                  (exactly simd-pack-double)))))
+                 ((equal '(double-float) eltypes)
+                  (exactly simd-pack-double))
+                 (t (any)))))
         #+sb-simd-pack-256
         (simd-pack-256-type
          (let ((eltypes (simd-pack-256-type-element-type type)))
-           (cond ((member 'integer eltypes)
+           (cond ((equal '(integer) eltypes)
                   (exactly simd-pack-256-int))
-                 ((member 'single-float eltypes)
+                 ((equal '(single-float) eltypes)
                   (exactly simd-pack-256-single))
-                 ((member 'double-float eltypes)
-                  (exactly simd-pack-256-double)))))
+                 ((equal '(double-float) eltypes)
+                  (exactly simd-pack-256-double))
+                 (t (any)))))
         (cons-type
          (part-of list))
         (built-in-classoid
          (case (classoid-name type)
-           #+sb-simd-pack
-           ;; Can't tell what specific type; assume integers.
-           (simd-pack
-            (exactly simd-pack-int))
-           #+sb-simd-pack-256
-           (simd-pack-256
-            (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)
             (values (primitive-type-or-lose (classoid-name type)) t))
            ((pathname logical-pathname)

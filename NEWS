@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.9:
+  * incompatible change: simd-pack without a specific element-type is no
+    longer treated as containing integers. A type must be supplied for VOPs to
+    work on such values.
   * new feature: there is now a defined interface for defining foreign
     callable functions, which can be used for passing callbacks to foreign
     functions or for calling Lisp code from the foreign world as a shared
