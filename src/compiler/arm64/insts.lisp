@@ -3122,7 +3122,7 @@
           (and (location= dst1 src2)
                (integerp mask1)
                (integerp mask2)
-               (vop-delete-safe-p dst1 dst2 nil '(logand)))
+               (vop-delete-safe-p dst1 dst2 '(logand)))
         (setf (stmt-operands next) (list dst2 src1 (logand mask1 mask2)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
