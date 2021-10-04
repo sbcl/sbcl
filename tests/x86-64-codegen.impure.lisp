@@ -1044,3 +1044,32 @@ sb-vm::(define-vop (cl-user::test)
                                 most-negative-fixnum)
   (try-logbitp-walking-bit-test bitsy-sw  :sw  64
                                 (sb-c::mask-signed-field 64 (ash 1 63))))
+
+#+allocator-metrics ; missing symbols if absent feature
+(with-test (:name :allocator-histogram-bucketing)
+  (let* ((min 0) (max 5000)
+         (var-fun (compile nil '(lambda (n) (make-array (the fixnum n))))))
+    (loop for n-elements from min to max
+       do
+         (let* ((fixed-fun (compile nil `(lambda () (make-array ,n-elements))))
+               (h1 (progn
+                     (sb-thread::reset-allocator-histogram)
+                     (funcall fixed-fun)
+                     (first (sb-thread::allocator-histogram))))
+               (h2 (progn
+                     (sb-thread::reset-allocator-histogram)
+                     (funcall var-fun n-elements)
+                     (first (sb-thread::allocator-histogram)))))
+           ;; We have to allow for the possibilty of either or both MAKE-ARRAY calls causing
+           ;; a GC to occur immediately thereafter, which allocates a cons for the GC epoch.
+           ;; So if there is an extra element in bin 0, just remove it.
+           (when (and (> (aref h1 0) 0)
+                      (= (loop for value across h1 sum value) 2))
+             (decf (aref h1 0)))
+           (when (and (> (aref h2 0) 0) (= (loop for value across h2 sum value) 2))
+             (decf (aref h2 0)))
+           (unless (and (= (loop for value across h1 sum value) 1) ; exactly 1 bucket is nonzero
+                        (equalp h1 h2))
+             (let ((*print-length* nil))
+               (format t "h1=~s~%h2=~s~%" h1 h2)
+               (error "Error on n-elements = ~d" n-elements)))))))

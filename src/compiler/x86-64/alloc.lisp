@@ -104,10 +104,22 @@
   (aver (= thread-tot-bytes-alloc-unboxed-slot
            (1+ thread-tot-bytes-alloc-boxed-slot))))
 
+;;; the #+allocator metrics histogram contains an exact count
+;;; for all sizes up to (* cons-size n-word-bytes +n-small-buckets+).
+;;; Larger allocations are grouped by the binary log of the size.
+;;; It seems that 99.5% of all allocations are less than the small bucket limit,
+;;; making the histogram fairly exact except for the tail.
+(defparameter *consing-histo* nil)
+(defconstant non-small-bucket-offset
+  (+ +n-small-buckets+
+     (- (integer-length (* sb-vm::+n-small-buckets+
+                           sb-vm:cons-size sb-vm:n-word-bytes)))))
 (defun instrument-alloc (type size node)
   (declare (ignorable type))
   #+allocator-metrics
-  (let ((size-temp (not (typep size '(or (signed-byte 32) tn)))))
+  (let ((size-temp (not (typep size '(or (signed-byte 32) tn))))
+        (tally (gen-label))
+        (inexact (gen-label)))
     (cond ((tn-p type) ; from ALLOCATE-VECTOR-ON-HEAP
            ;; Constant huge size + unknown type can't occur.
            (aver (not size-temp))
@@ -126,15 +138,27 @@
                  (cond (size-temp (inst mov temp-reg-tn size) temp-reg-tn)
                        (t size)))))
     (cond ((tn-p size)
-           ;; the first 4 bins of the histogram can't be used,
-           ;; but I don't care. Math is hard.
+           (inst cmp size (* +n-small-buckets+ 16))
+           (inst jmp :g inexact)
+           (inst mov :dword temp-reg-tn size)
+           (inst shr :dword temp-reg-tn (1+ word-shift))
+           (inst dec :dword temp-reg-tn)
+           (inst jmp tally)
+           (emit-label inexact)
            (inst bsr temp-reg-tn size)
+           ;; bsr returns 1 less than INTEGER-LENGTH
+           (inst add :dword temp-reg-tn (1+ non-small-bucket-offset))
+           (emit-label tally)
            (inst inc :qword (ea (ash thread-obj-size-histo-slot word-shift)
                                 thread-base-tn temp-reg-tn 8)))
           (t
-           (inst inc :qword
-                 (thread-slot-ea (+ thread-obj-size-histo-slot
-                                    (1- (integer-length size))))))))
+           (let* ((n-conses (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))
+                  (bucket (if (<= n-conses +n-small-buckets+)
+                              (1- n-conses)
+                              (+ (integer-length size)
+                                 non-small-bucket-offset))))
+             (inst inc :qword
+                   (thread-slot-ea (+ thread-obj-size-histo-slot bucket)))))))
   (when (policy node (> sb-c::instrument-consing 1))
     (let ((skip-instrumentation (gen-label)))
       (inst mov temp-reg-tn (thread-slot-ea thread-profile-data-slot))
