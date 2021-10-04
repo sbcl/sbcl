@@ -190,6 +190,8 @@ Examples:
                        (*compiler-style-warning-count* 0)
                        (*compiler-note-count* 0)
                        (*undefined-warnings* nil)
+                       *argument-mismatch-warnings*
+                       *methods-in-compilation-unit*
                        (*in-compilation-unit* t))
                    (handler-bind ((parse-unknown-type
                                     (lambda (c)
@@ -242,6 +244,7 @@ Examples:
             (*last-error-context* nil))
         (handler-bind ((style-warning #'compiler-style-warning-handler)
                        (warning #'compiler-warning-handler))
+          (report-key-arg-mismatches)
           (dolist (kind '(:variable :function :type))
             (let ((names (mapcar #'undefined-warning-name
                                  (remove kind undefs :test #'neq

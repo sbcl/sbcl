@@ -504,27 +504,27 @@
 
 (defun compute-gf-ftype (name)
   (let ((gf (and (fboundp name) (fdefinition name)))
-        (current-defmethod (if (boundp 'sb-c::*lexenv*)
-                               (sb-c::lexenv-current-defmethod (symbol-value 'sb-c::*lexenv*)))))
+        (methods-in-compilation-unit (and (boundp 'sb-c::*methods-in-compilation-unit*)
+                                          sb-c::*methods-in-compilation-unit*
+                                          (gethash name sb-c::*methods-in-compilation-unit*))))
     (cond ((generic-function-p gf)
            (let* ((ll (generic-function-lambda-list gf))
-                  (current-defmethod (and (eq (caar current-defmethod) name)
-                                          current-defmethod))
                   ;; If the GF has &REST without &KEY then we don't augment
                   ;; the FTYPE with keywords, so as not to complain about keywords
                   ;; which seem not to be accepted.
                   (type (sb-c::ftype-from-lambda-list
                          (if (and (member '&rest ll) (not (member '&key ll)))
                              ll
-                             (generic-function-pretty-arglist gf current-defmethod)))))
-             (unless current-defmethod ;; it's not yet added, don't store
+                             (generic-function-pretty-arglist gf methods-in-compilation-unit)))))
+             (unless methods-in-compilation-unit ;; it's not yet added, don't store
                ;; It would be nice if globaldb were transactional,
                ;; so that either both updates or neither occur.
                (setf (info :function :type name) type
                      (info :function :where-from name) :defined-method))
              type))
-          ((eq (caar current-defmethod) name)
-           (sb-c::ftype-from-lambda-list (cdr current-defmethod)))
+          (methods-in-compilation-unit
+           (sb-c::ftype-from-lambda-list
+            (gf-merge-arglists methods-in-compilation-unit)))
           (t
            ;; The defaulting expression for (:FUNCTION :TYPE) does not store
            ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
@@ -1710,16 +1710,16 @@
 ;;; The compiler uses this for type-checking that callers pass acceptable
 ;;; keywords, so don't make this do anything fancy like looking at effective
 ;;; methods without also fixing the compiler.
-(defmethod generic-function-pretty-arglist ((gf standard-generic-function) &optional current-defmethod)
-  (let* ((gf-lambda-list (generic-function-lambda-list gf))
-         (methods (generic-function-methods gf))
-         (current-method-name (car current-defmethod))
-         (qualifiers (and (= (length current-method-name) 3)
-                          (second current-method-name)))
-         (specializers (if (= (length current-method-name) 3)
-                           (third current-method-name)
-                           (second current-method-name))))
-    (flet ((canonize (k)
+(defmethod generic-function-pretty-arglist ((gf standard-generic-function) &optional methods-in-compilation-unit)
+  (let ((gf-lambda-list (generic-function-lambda-list gf))
+        (methods (generic-function-methods gf)))
+    (flet ((lambda-list (m)
+             (or (loop for (qualifiers specializers lambda-list) in methods-in-compilation-unit
+                       when (and (equal (method-qualifiers m) qualifiers)
+                                 (equal (unparse-specializers gf (method-specializers m)) specializers))
+                       return lambda-list)
+                 (method-lambda-list m)))
+           (canonize (k)
              (multiple-value-bind (kw var)
                  (parse-key-arg-spec k)
                (if (and (eql (symbol-package kw) *keyword-package*)
@@ -1740,10 +1740,30 @@
                                        :key #'parse-key-arg-spec :test #'eq)
                          (keys (canonize k)))))))
             (dolist (m methods)
-              (unless (and current-defmethod
-                           (equal (method-qualifiers m) qualifiers)
-                           (equal (unparse-specializers gf (method-specializers m)) specializers))
-                (process (method-lambda-list m))))
-            (when current-defmethod
-              (process (cdr current-defmethod)))
+              (process (lambda-list m)))
             (make-lambda-list llks nil required optional rest (keys))))))))
+
+(defun gf-merge-arglists (methods-in-compilation-unit)
+  (flet ((canonize (k)
+           (multiple-value-bind (kw var)
+               (parse-key-arg-spec k)
+             (if (and (eql (symbol-package kw) *keyword-package*)
+                      (string= kw var))
+                 var
+                 (list (list kw var))))))
+    (multiple-value-bind (llks required optional rest keys)
+        (parse-lambda-list (third (car methods-in-compilation-unit)) :silent t)
+      (collect ((keys (mapcar #'canonize keys)))
+        ;; Possibly extend the keyword parameters of the gf by
+        ;; additional key parameters of its methods:
+        (flet ((process (lambda-list)
+                 (binding* (((m.llks nil nil nil m.keys)
+                             (parse-lambda-list lambda-list :silent t)))
+                   (setq llks (logior llks m.llks))
+                   (dolist (k m.keys)
+                     (unless (member (parse-key-arg-spec k) (keys)
+                                     :key #'parse-key-arg-spec :test #'eq)
+                       (keys (canonize k)))))))
+          (dolist (m (cdr methods-in-compilation-unit))
+            (process (third m)))
+          (make-lambda-list llks nil required optional rest (keys)))))))

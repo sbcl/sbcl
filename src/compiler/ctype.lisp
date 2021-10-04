@@ -117,15 +117,16 @@
                (caller (loop for annotation in (lvar-annotations fun)
                              when (typep annotation 'lvar-function-designator-annotation)
                              do (setf *compiler-error-context* annotation)
-                                (return (lvar-function-designator-annotation-caller annotation)))))
+                                (return (lvar-function-designator-annotation-caller annotation))))
+               (name (nth-value 1 (lvar-fun-type fun))))
           (cond
-            ((report-arg-count-mismatch (nth-value 1 (lvar-fun-type fun))
+            ((report-arg-count-mismatch name
                                         caller type nargs nil
                                         :lossage-fun #'note-lossage))
             (t
              (check-fixed-and-rest args (append required optional) rest)
              (when (and keyp
-                        (check-key-args args max-args type))
+                        (check-key-args name args max-args type))
                (setf unknown-keys t))))
 
           (when result-test
@@ -286,8 +287,9 @@ and no value was provided for it." name))))))))))
 ;;; be known and the corresponding argument should be of the correct
 ;;; type. If the key isn't a constant, then we can't tell, so we can
 ;;; complain about absence of manifest winnage.
-(declaim (ftype (function (list fixnum fun-type) boolean) check-key-args))
-(defun check-key-args (args pre-key type)
+(declaim (ftype (function (t list fixnum fun-type) boolean) check-key-args))
+(defun check-key-args (name args pre-key type)
+  (declare (ignorable name))
   (let (lossages allow-other-keys
         unknown-keys)
     (do ((key (nthcdr pre-key args) (cddr key))
@@ -325,12 +327,19 @@ and no value was provided for it." name))))))))))
                                     (1+ n)))))))))
     (when (and lossages (member allow-other-keys '(nil :no)))
       (setf lossages (nreverse lossages))
-      (if (cdr lossages)
-          (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
-                        (butlast lossages)
-                        (car (last lossages)))
-          (note-lossage "~S is not a known argument keyword."
-                        (car lossages))))
+
+      (cond #-sb-xc-host
+            ((or (eq (info :function :type name) :generic-function)
+                 (and (fboundp name)
+                      (sb-pcl::generic-function-p (fdefinition name))))
+             (note-key-arg-mismatch name lossages))
+            ((cdr lossages)
+             (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
+                           (butlast lossages)
+                           (car (last lossages))))
+            (t
+             (note-lossage "~S is not a known argument keyword."
+                           (car lossages)))))
     unknown-keys))
 
 ;;; Construct a function type from a definition.

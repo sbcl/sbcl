@@ -100,7 +100,8 @@
            ;; 2002-10-24
            (let* ((sb-c:*lexenv* lexenv)
                   (sb-c::*ir1-namespace* (sb-c::make-ir1-namespace))
-                  (sb-c::*undefined-warnings* nil))
+                  (sb-c::*undefined-warnings* nil)
+                  sb-c::*argument-mismatch-warnings*)
              ;; FIXME: VALUES declaration
              (sb-c::process-decls decls
                                   vars

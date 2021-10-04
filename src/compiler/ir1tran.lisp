@@ -1706,9 +1706,15 @@
          :default res
          :flushable (cdr spec)))
        (current-defmethod
-        (make-lexenv
-         :default res
-         :current-defmethod (cdr spec)))
+        (let ((methods (or *methods-in-compilation-unit*
+                           (setf *methods-in-compilation-unit*
+                                 (make-hash-table :test #'equal)))))
+          (pushnew (cddr spec)
+                   (gethash (cadr spec) methods)
+                   :test (lambda (x y)
+                           (and (equal (first x) (first y))
+                                (equal (second x) (second y))))))
+        res)
        (no-constraints
         (process-no-constraints-decl spec vars)
         res)

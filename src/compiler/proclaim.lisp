@@ -17,7 +17,8 @@
 ;;; A list of UNDEFINED-WARNING structures representing references to unknown
 ;;; stuff which came up in a compilation unit.
 (defvar *undefined-warnings*)
-(declaim (list *undefined-warnings*))
+(defvar *argument-mismatch-warnings*)
+(declaim (list *undefined-warnings* *argument-mismatch-warnings*))
 
 ;;; Delete any undefined warnings for NAME and KIND. This is for the
 ;;; benefit of the compiler, but it's sometimes called from stuff like

@@ -1115,7 +1115,6 @@
                          (policy (lexenv-policy default))
                          (user-data (lexenv-user-data default))
                          flushable
-                         (current-defmethod (lexenv-current-defmethod default))
                          (parent default))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
@@ -1129,7 +1128,6 @@
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
      (frob flushable lexenv-flushable)
-     current-defmethod
      lambda
      cleanup handled-conditions disabled-package-locks
      policy
@@ -1164,7 +1162,6 @@
      nil
      nil
      (lexenv-type-restrictions lexenv) ; XXX
-     nil
      nil
      nil
      nil

@@ -28,7 +28,7 @@
              (:copier nil)
              (:constructor make-null-lexenv ())
              (:constructor make-almost-null-lexenv (%policy handled-conditions
-                                                    flushable current-defmethod lambda parent))
+                                                    flushable lambda parent))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
                             &aux (handled-conditions nil)))
@@ -36,7 +36,6 @@
                            (funs vars blocks tags
                             type-restrictions
                             flushable
-                            current-defmethod
                             lambda cleanup handled-conditions
                             disabled-package-locks %policy user-data
                             parent)))
@@ -93,8 +92,7 @@
   ;; Similar to the FLUSHABLE attribute in DEFKNOWN, but can applied
   ;; locally to things that are generally not flushable but can be
   ;; flushed in some circumstances.
-  (flushable nil :type list)
-  (current-defmethod nil))
+  (flushable nil :type list))
 
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))
@@ -1754,7 +1752,17 @@
   ;; where this thing was used. Note that we only record the first
   ;; *UNDEFINED-WARNING-LIMIT* calls.
   (warnings () :type list))
+
 (declaim (freeze-type undefined-warning))
+
+(defstruct (argument-mismatch-warning
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t)
+                               (prin1 (argument-mismatch-warning-name x) s))))
+            (:copier nil))
+  (name nil :type (or symbol list))
+  ;; a list of (KEYS . COMPILER-ERROR-CONTEXT)
+  (warnings () :type list))
 
 
 ;;; a helper for the POLICY macro, defined late here so that the

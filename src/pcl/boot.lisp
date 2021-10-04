@@ -535,7 +535,8 @@ bootstrapping.
                                (declare (sb-c::source-form
                                          (lambda ,unspecialized-lambda-list
                                            ,@body))
-                                        (sb-c::current-defmethod ,*method-name* . ,unspecialized-lambda-list))
+                                        (sb-c::current-defmethod ,name ,qualifiers ,specializers
+                                                                 ,unspecialized-lambda-list))
                                ,@body))
              ((method-function-lambda initargs new-lambda-list)
               (make-method-lambda-using-specializers
