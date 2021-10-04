@@ -222,7 +222,7 @@
                  ((xmm-register-p r)
                   0))))
     (let ((l (cond (l)
-                   (reg
+                   ((xmm-register-p reg)
                     (xmm-size reg))
                    ((xmm-register-p thing)
                     (xmm-size thing))
