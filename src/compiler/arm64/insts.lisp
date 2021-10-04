@@ -3036,19 +3036,19 @@
               (delete-stmt next)
               next-next)))))))
 
-(defun vop-delete-safe-p (dst1 dst2 &optional safe-translates
+(defun stmt-delete-safe-p (dst1 dst2 &optional safe-translates
                                               safe-vops)
   (or (location= dst1 dst2)
       (and
        (not (tn-ref-next (sb-c::tn-reads dst1)))
-       (and (or (not safe-vops)
-                (memq (vop-name (tn-ref-vop (sb-c::tn-reads dst1)))
-                      safe-vops))
-            (or (not safe-translates)
-                (let ((vop (tn-ref-vop (sb-c::tn-reads dst1))))
+       (let ((vop (tn-ref-vop (sb-c::tn-reads dst1))))
+         (and vop
+              (or (not safe-vops)
+                  (memq (vop-name vop) safe-vops))
+              (or (not safe-translates)
                   (and vop
                        (memq (car (sb-c::vop-parse-translate
-                                   (sb-c::vop-parse-or-lose (sb-c::vop-name vop))))
+                                   (sb-c::vop-parse-or-lose (vop-name vop))))
                              safe-translates))))))))
 
 (defun tagged-mask-p (x)
@@ -3073,7 +3073,7 @@
                  (tagged-mask-p mask)
                  (= immr 63)
                  (= imms 62)
-                 (vop-delete-safe-p dst1 dst2 '(logand)))
+                 (stmt-delete-safe-p dst1 dst2 '(logand)))
         (setf (stmt-mnemonic next) 'ubfm
               (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
         (add-stmt-labels next (stmt-labels stmt))
@@ -3089,7 +3089,7 @@
                  (= (integer-length mask) 63)
                  (= immr 1)
                  (= imms 63)
-                 (vop-delete-safe-p dst1 dst2 '(logand)))
+                 (stmt-delete-safe-p dst1 dst2 '(logand)))
         (setf (stmt-mnemonic next) 'ubfm
               (stmt-operands next) (list dst2 src1 immr imms))
         (add-stmt-labels next (stmt-labels stmt))
@@ -3104,7 +3104,7 @@
                  (tagged-mask-p mask)
                  (= immr 1)
                  (= imms 63)
-                 (vop-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
+                 (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
         ;; Leave the ASR if the sign bit is left,
         ;; but the AND is not needed.
         (if (= (integer-length mask) 64)
@@ -3122,7 +3122,7 @@
           (and (location= dst1 src2)
                (integerp mask1)
                (integerp mask2)
-               (vop-delete-safe-p dst1 dst2 '(logand)))
+               (stmt-delete-safe-p dst1 dst2 '(logand)))
         (setf (stmt-operands next) (list dst2 src1 (logand mask1 mask2)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -3138,9 +3138,9 @@
                   (location= dst1 srcm)
                   (location= dst1 srcn))
                  (not (location= srcn srcm))
-                 (vop-delete-safe-p dst1 dst2
-                                    '(+ sb-vm::+-mod64 sb-vm::+-modfx
-                                      logand logior logxor)))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx
+                                       logand logior logxor)))
         (setf (stmt-operands next) (list dst2 (if (location= dst1 srcm)
                                                   srcn
                                                   srcm)
@@ -3157,8 +3157,8 @@
                  (tn-p srcm)
                  (location= dst1 srcm)
                  (not (location= srcn srcm))
-                 (vop-delete-safe-p dst1 dst2
-                                    '(- sb-vm::--mod64 sb-vm::--modfx)))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(- sb-vm::--mod64 sb-vm::--modfx)))
         (setf (stmt-operands next) (list dst2 srcn (lsl src1 (- 63 imms))))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
