@@ -643,8 +643,7 @@
 
               ;; Setup everything.  Now save sp, setup the frame.
               (inst mflr r0)
-              (inst stw r0 stack-pointer (* 2 n-word-bytes)) ; FIXME: magic
-                                        ; constant, copied from Darwin.
+              (inst stw r0 stack-pointer n-word-bytes)
               (inst stwu stack-pointer stack-pointer (- frame-size))
 
               ;; And make the call.
@@ -659,7 +658,7 @@
               ;; We're back!  Restore sp and lr, load the
               ;; return value from just under sp, and return.
               (inst lwz stack-pointer stack-pointer 0)
-              (inst lwz r0 stack-pointer (* 2 n-word-bytes))
+              (inst lwz r0 stack-pointer n-word-bytes)
               (inst mtlr r0)
               (cond
                 ((sb-alien::alien-single-float-type-p result-type)
