@@ -3163,3 +3163,38 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+(defpattern "mul + sub -> msub" ((madd) (sub)) (stmt next)
+  (destructuring-bind (dst1 srcn1 srcm1 srca) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
+      (when (and (tn-p srcm2)
+                 (location= dst1 srcm2)
+                 (location= srca zr-tn)
+                 (not (location= srcn2 srcm2))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(- sb-vm::--mod64 sb-vm::--modfx)))
+        (setf (stmt-mnemonic next) 'msub
+              (stmt-operands next) (list dst2  srcn1 srcm1 srcn2))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
+(defpattern "mul + add -> madd" ((madd) (add)) (stmt next)
+  (destructuring-bind (dst1 srcn1 srcm1 srca) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
+      (when (and (tn-p srcm2)
+                 (location= srca zr-tn)
+                 (not (location= srcn2 srcm2))
+                 (or (location= dst1 srcm2)
+                     (location= dst1 srcn2))
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx)))
+        (setf (stmt-mnemonic next) 'madd
+              (stmt-operands next) (list dst2
+                                         srcn1 srcm1
+                                         (if (location= dst1 srcm2)
+                                             srcn2
+                                             srcm2)))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
