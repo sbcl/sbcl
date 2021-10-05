@@ -281,8 +281,10 @@ appear."
          (:function
           (setf binding :function
                 localp nil
-                ftype (when (eq :declared (info :function :where-from name))
-                        (global-ftype name))
+                ftype (if (or (typep (info :function :source-transform name)
+                                     '(cons sb-kernel:defstruct-description))
+                              (eq (info :function :where-from name) :declared))
+                          (global-ftype name))
                 inlinep (info :function :inlinep name))))))
     (values binding
             localp

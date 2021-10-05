@@ -451,6 +451,21 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
    t
    ((ftype function (integer) (values integer &optional)))))
 
+(deftest function-information.ftype-struct-ctor
+  (fun-info sb-c::make-lvar)
+  (:function nil
+   ((ftype function (&optional (or sb-c::node null)) (values sb-c::lvar &optional)))))
+(deftest function-information.ftype-struct-accessor
+  (fun-info (setf sb-c::sset-vector))
+  (:function nil
+   ((ftype function (simple-vector sset) (values simple-vector &optional)))))
+(deftest function-information.ftype-struct-predicate
+  (fun-info sb-c::sset-p)
+  (:function nil ((ftype function (t) (values boolean &optional)))))
+(deftest function-information.ftype-struct-copier
+  (fun-info sb-c::copy-sset)
+  (:function nil ((ftype function (sset) (values sset &optional)))))
+
 ;;;;; AUGMENT-ENVIRONMENT
 
 (defmacro ct (form &environment env)
