@@ -650,59 +650,62 @@
       ;; KLUDGE: This is where the second half of the ARM
       ;; register-pressure change lives (see above).
       (dolist (tn #-arm arg-tns #+arm (reverse arg-tns))
-        ;; On PPC, TN might be a list. This is used to indicate
-        ;; something special needs to happen. See below.
-        ;;
-        ;; FIXME: We should implement something better than this.
-        (let* ((first-tn (if (listp tn) (car tn) tn))
-               (arg (pop args))
-               (sc (tn-sc first-tn))
-               (scn (sc-number sc))
-               (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
-          (aver arg)
-          (unless (= (length move-arg-vops) 1)
-            (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-          #+(or x86 x86-64) (emit-move-arg-template call
-                                                     block
-                                                     (first move-arg-vops)
-                                                     (lvar-tn call block arg)
-                                                     nsp
-                                                     first-tn)
-          #-(or x86 x86-64)
-          (cond
-            #+arm-softfp
-            ((and (proper-list-of-length-p tn 3)
-                  (symbolp (third tn)))
-             (emit-template call block
-                            (template-or-lose (third tn))
-                            (reference-tn (lvar-tn call block arg) nil)
-                            (reference-tn-list (butlast tn) t)))
-            (t
-             (let ((temp-tn (make-representation-tn
-                             (tn-primitive-type first-tn) scn)))
-               (emit-move call
-                          block
-                          (lvar-tn call block arg)
-                          temp-tn)
-               (emit-move-arg-template call
-                                       block
-                                       (first move-arg-vops)
-                                       temp-tn
-                                       nsp
-                                       first-tn))))
-          #+(and ppc darwin)
-          (when (listp tn)
-            ;; This means that we have a float arg that we need to
-            ;; also copy to some int regs. The list contains the TN
-            ;; for the float as well as the TNs to use for the int
-            ;; arg.
-            (destructuring-bind (float-tn i1-tn &optional i2-tn)
-                tn
-              (if i2-tn
-                  (vop sb-vm::move-double-to-int-arg call block
-                       float-tn i1-tn i2-tn)
-                  (vop sb-vm::move-single-to-int-arg call block
-                       float-tn i1-tn))))))
+        (if (functionp tn)
+            (funcall tn (pop args) call block nsp)
+            ;; On PPC, TN might be a list. This is used to indicate
+            ;; something special needs to happen. See below.
+            ;;
+            ;; FIXME: We should implement something better than this.
+            (let* ((first-tn (if (listp tn) (car tn) tn))
+                   (arg (pop args))
+                   (sc (tn-sc first-tn))
+                   (scn (sc-number sc))
+                   (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
+              (aver arg)
+              (unless (= (length move-arg-vops) 1)
+                (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
+              #+(or x86 x86-64) (emit-move-arg-template call
+                                                        block
+                                                        (first move-arg-vops)
+                                                        (lvar-tn call block arg)
+                                                        nsp
+                                                        first-tn)
+              #-(or x86 x86-64)
+              (cond
+                #+arm-softfp
+                ((and (proper-list-of-length-p tn 3)
+                      (symbolp (third tn)))
+                 (emit-template call block
+                                (template-or-lose (third tn))
+                                (reference-tn (lvar-tn call block arg) nil)
+                                (reference-tn-list (butlast tn) t)))
+                (t
+                 (let* ((sc (svref *backend-sc-numbers* scn))
+                        (primitive-type (tn-primitive-type first-tn))
+                        (scn (if (sc-number-stack-p sc)
+                                 (car (primitive-type-scs primitive-type))
+                                 scn))
+                        (temp-tn (make-representation-tn primitive-type scn)))
+                   (emit-move call block (lvar-tn call block arg) temp-tn)
+                   (emit-move-arg-template call
+                                           block
+                                           (first move-arg-vops)
+                                           temp-tn
+                                           nsp
+                                           first-tn))))
+              #+(and ppc darwin)
+              (when (listp tn)
+                ;; This means that we have a float arg that we need to
+                ;; also copy to some int regs. The list contains the TN
+                ;; for the float as well as the TNs to use for the int
+                ;; arg.
+                (destructuring-bind (float-tn i1-tn &optional i2-tn)
+                    tn
+                  (if i2-tn
+                      (vop sb-vm::move-double-to-int-arg call block
+                           float-tn i1-tn i2-tn)
+                      (vop sb-vm::move-single-to-int-arg call block
+                           float-tn i1-tn)))))))
       (aver (null args))
       (let* ((result-tns (ensure-list result-tns))
              (arg-operands

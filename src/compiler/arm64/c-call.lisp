@@ -33,30 +33,73 @@
                       nl7-offset)
        index))
 
-(defun int-arg (state prim-type reg-sc stack-sc)
+(define-vop (move-word-arg-stack)
+  (:args (x :scs (signed-reg unsigned-reg single-reg))
+         (fp :scs (any-reg)))
+  (:info size offset)
+  (:generator 0
+    (let ((addr (@ fp (load-store-offset offset))))
+      (ecase size
+        (1
+         (inst strb x addr))
+        (2
+         (inst strh x addr))
+        (4
+         (inst str (if (sc-is x single-reg)
+                       x
+                       (32-bit-reg x))
+               addr))))))
+
+(defun move-to-stack-location (value size offset prim-type sc node block nsp)
+  (let ((temp-tn (sb-c:make-representation-tn
+                  (primitive-type-or-lose prim-type)
+                  sc)))
+    (sb-c::emit-move node
+                     block
+                     (sb-c::lvar-tn node block value)
+                     temp-tn)
+    (sb-c::vop move-word-arg-stack node block temp-tn nsp size offset)))
+
+(defun int-arg (state prim-type reg-sc stack-sc &optional (size 8))
   (let ((reg-args (arg-state-num-register-args state)))
     (cond ((< reg-args +max-register-args+)
            (setf (arg-state-num-register-args state) (1+ reg-args))
            (make-wired-tn* prim-type reg-sc (register-args-offset reg-args)))
           (t
-           (let ((frame-size (arg-state-stack-frame-size state)))
-             (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (make-wired-tn* prim-type stack-sc frame-size))))))
+           (let ((frame-size (align-up (arg-state-stack-frame-size state) size)))
+             (setf (arg-state-stack-frame-size state) (+ frame-size size))
+             (cond #+darwin
+                   ((/= size n-word-bytes)
+                    (lambda (value node block nsp)
+                      (move-to-stack-location value size frame-size
+                                              prim-type reg-sc node block nsp)))
+                   (t
+                    (make-wired-tn* prim-type stack-sc (truncate frame-size size)))))))))
 
-(defun float-arg (state prim-type reg-sc stack-sc)
+(defun float-arg (state prim-type reg-sc stack-sc &optional (size 8))
   (let ((reg-args (arg-state-fp-registers state)))
     (cond ((< reg-args +max-register-args+)
            (setf (arg-state-fp-registers state) (1+ reg-args))
            (make-wired-tn* prim-type reg-sc reg-args))
           (t
-           (let ((frame-size (arg-state-stack-frame-size state)))
-             (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (make-wired-tn* prim-type stack-sc frame-size))))))
+           (let ((frame-size (align-up (arg-state-stack-frame-size state) size)))
+             (setf (arg-state-stack-frame-size state) (+ frame-size size))
+             (cond #+darwin
+                   ((/= size n-word-bytes)
+                    (lambda (value node block nsp)
+                      (move-to-stack-location value size frame-size
+                                              prim-type reg-sc node block nsp)))
+                   (t
+                    (make-wired-tn* prim-type stack-sc (truncate frame-size size)))))))))
 
 (define-alien-type-method (integer :arg-tn) (type state)
-  (if (alien-integer-type-signed type)
-      (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
-      (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
+ (let ((size #+darwin (truncate (alien-type-bits type) n-byte-bits)
+             #-darwin n-word-bytes))
+   (if (alien-integer-type-signed type)
+       (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number
+                size)
+       (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number
+                size))))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
@@ -64,7 +107,7 @@
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (float-arg state 'single-float single-reg-sc-number single-stack-sc-number))
+  (float-arg state 'single-float single-reg-sc-number single-stack-sc-number #+darwin 4))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
@@ -316,7 +359,7 @@
            ;; How many arguments have been copied
            (arg-count 0)
            ;; How many arguments have been copied from the stack
-           (stack-argument-count 0)
+           (stack-argument-bytes 0)
            (r0-tn (make-tn 0))
            (r1-tn (make-tn 1))
            (r2-tn (make-tn 2))
@@ -339,9 +382,8 @@
         ;; Copy arguments
         (dolist (type argument-types)
           (let ((target-tn (@ nsp-tn (* arg-count n-word-bytes)))
-                ;; A TN pointing to the stack location that contains
-                ;; the next argument passed on the stack.
-                (stack-arg-tn (@ nsp-save-tn (* stack-argument-count n-word-bytes))))
+                (size #+darwin (truncate (alien-type-bits type) n-byte-bits)
+                      #-darwin n-word-bytes))
             (cond ((or (alien-integer-type-p type)
                        (alien-pointer-type-p type)
                        (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
@@ -350,9 +392,30 @@
                      (cond (gpr
                             (inst str gpr target-tn))
                            (t
-                            (incf stack-argument-count)
-                            (inst ldr temp-tn stack-arg-tn)
-                            (inst str temp-tn target-tn))))
+                            (setf stack-argument-bytes
+                                  (align-up stack-argument-bytes size))
+                            (let ((addr (@ nsp-save-tn stack-argument-bytes)))
+                              (cond #+darwin
+                                    ((/= size 8)
+                                     (let ((signed (and (alien-integer-type-p type)
+                                                        (alien-integer-type-signed type))))
+                                       (ecase size
+                                         (1
+                                          (if signed
+                                              (inst ldrsb temp-tn addr)
+                                              (inst ldrb temp-tn addr)))
+                                         (2
+                                          (if signed
+                                              (inst ldrsh temp-tn addr)
+                                              (inst ldrh temp-tn addr)))
+                                         (4
+                                          (if signed
+                                              (inst ldrsw (32-bit-reg temp-tn) addr)
+                                              (inst ldr (32-bit-reg temp-tn) addr))))))
+                                    (t
+                                     (inst ldr temp-tn addr)))
+                              (inst str temp-tn target-tn))
+                            (incf stack-argument-bytes size))))
                    (incf arg-count))
                   ((alien-float-type-p type)
                    (cond ((< fp-registers 8)
@@ -362,9 +425,18 @@
                                                  'double-reg))
                                 target-tn))
                          (t
-                          (incf stack-argument-count)
-                          (inst ldr temp-tn stack-arg-tn)
-                          (inst str temp-tn target-tn)))
+                          (setf stack-argument-bytes
+                                  (align-up stack-argument-bytes size))
+                          (case size
+                            #+darwin
+                            (4
+                             (let ((reg (32-bit-reg temp-tn)))
+                              (inst ldr reg (@ nsp-save-tn stack-argument-bytes))
+                              (inst str reg target-tn)))
+                            (t
+                             (inst ldr temp-tn (@ nsp-save-tn stack-argument-bytes))
+                             (inst str temp-tn target-tn)))
+                          (incf stack-argument-bytes size)))
                    (incf fp-registers)
                    (incf arg-count))
                   (t
