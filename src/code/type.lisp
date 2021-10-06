@@ -596,14 +596,17 @@
 ;;; CONTEXT is the cookie passed down from the outermost surrounding call
 ;;; of BASIC-PARSE-TYPE. INNER-CONTEXT-KIND is an indicator of whether
 ;;; we are currently parsing a FUNCTION or a VALUES compound type specifier.
-
-;;; Why do we allow * for items in a list for FUNCTION type? I don't know
-;;; and I don't think we should.
-;;; VALUES is quite clear that it's not allowed. FUNCTION is less clear,
-;;; but * is not a type specifier, it is merely a way to write something in a place
-;;; where a specifier requires a positional argument that you don't want to supply,
-;;; but must supply in order to supply following arguments.
-;;; I would bet we're overly permissive.
+;;; If the entire LAMBDA-LISTY-THING is *, we do not call this function at all.
+;;; If an element of it is *, that constitutes an error, as is clear
+;;; for VALUES: "The symbol * may not be among the value-types."
+;;;  http://www.lispworks.com/documentation/HyperSpec/Body/t_values.htm
+;;; and the FUNCTION compound type, for which the grammar is:
+;;;   function [arg-typespec [value-typespec]]
+;;;   arg-typespec::= (typespec* [&optional typespec*] [&rest typespec];[&key (keyword typespec)*])
+;;;   typespec --- a type specifier.
+;;; where the glossary says: "type specifier: n. an expression that denotes a type."
+;;; which of course * does not denote, and is made all the more clear by the fact
+;;; that the AND, OR, and NOT combinators explicitly preclude * as an element.
 (defun parse-args-types (context lambda-listy-thing inner-context-kind)
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list
@@ -616,10 +619,10 @@
        :silent t)
    (labels ((parse-list (list) (mapcar #'parse-one list))
             (parse-one (x)
-              (if (eq inner-context-kind :function-type)
-                  (single-value-specifier-type x context) ; allow *
-                  ;; "* is not permitted as an argument to the VALUES type specifier."
-                  (specifier-type x context 'values)))) ; forbid *
+              (specifier-type x context
+                              (case inner-context-kind
+                                (:function-type 'function)
+                                (t 'values)))))
     (let ((required (parse-list required))
           (optional (parse-list optional))
           (rest (when rest (parse-one (car rest))))

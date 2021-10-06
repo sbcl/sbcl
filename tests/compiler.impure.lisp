@@ -2787,7 +2787,7 @@
      #'test-case
      `(((function ())                 "(FUNCTION NIL)")
        ((function *)                  "(FUNCTION *)")
-       ((function (function *))       "(FUNCTION (FUNCTION *))")
+       ((function (function t))       "(FUNCTION (FUNCTION T))")
        ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))
 
 (with-test (:name (:compiler-messages function :lambda-list))

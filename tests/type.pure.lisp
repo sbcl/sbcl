@@ -15,6 +15,16 @@
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
 
+(with-test (:name :no-*-as-t) ; lp#1860919
+  (assert-error (sb-kernel:specifier-type '(function (*) t)))
+  (dolist (f '((lambda (x) (the * x))
+               (lambda (x) (declare (* x)) x)
+               (lambda (x) (declare (type * x)) x)))
+    (multiple-value-bind (f warn err)
+        (let ((*error-output* (make-broadcast-stream))) (compile nil f))
+      (declare (ignore f))
+      (assert (and warn err)))))
+
 (with-test (:name :stream-layout-bits)
   (loop for wrapper being each hash-value
         of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't))
@@ -169,7 +179,7 @@
   (assert-tri-eq t   t (subtypep '(function ()) '(function (&rest t))))
   (assert-tri-eq nil t (subtypep '(function (&rest t)) '(function ())))
   (assert-tri-eq t   t (subtypep '(function)
-                                 '(function (&optional * &rest t))))
+                                 '(function (&optional t &rest t))))
   (assert-tri-eq nil t (subtypep '(function) '(function (t &rest t))))
   (assert-tri-eq t   t (subtypep 'function '(function)))
   (assert-tri-eq t   t (subtypep '(function) 'function)))

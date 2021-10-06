@@ -87,6 +87,6 @@
 ;;; first crack at a zero COUNT, since transforms are currently run
 ;;; latest-defined first.
 (deftransform %rotate-byte ((count size pos integer)
-                            ((constant-arg (member 0)) * * *) *)
+                            ((constant-arg (member 0)) t t t) *)
   "fold identity operation"
   'integer)

@@ -4,6 +4,9 @@ changes relative to sbcl-2.1.9:
   * incompatible change: simd-pack without a specific element-type is no
     longer treated as containing integers. A type must be supplied for VOPs to
     work on such values.
+  * minor incompatible change: the list form of the FUNCTION type specifier
+    does not allow * as any argument type, but does allow * as a placeholder
+    for wholly unspecified arguments when specifying the value(s) type.
   * new feature: there is now a defined interface for defining foreign
     callable functions, which can be used for passing callbacks to foreign
     functions or for calling Lisp code from the foreign world as a shared
