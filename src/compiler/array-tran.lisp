@@ -982,7 +982,7 @@
                                      adjustable fill-pointer
                                      displaced-to
                                      displaced-index-offset)
-                          (t &rest *) *
+                          (t &rest t) *
                           :node node)
   (delay-ir1-transform node :constraint)
   (when (and initial-contents initial-element)
@@ -1519,7 +1519,7 @@
                `(test-header-bit array sb-vm:+array-fill-pointer-p+)
                `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+))))))
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
+(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
   (let ((array-ref (lvar-uses array))
         (index-ref (lvar-uses index)))
     (unless (and

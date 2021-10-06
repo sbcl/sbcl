@@ -3047,7 +3047,7 @@
 ;;; Flush calls to various arith functions that convert to the
 ;;; identity function or a constant.
 (macrolet ((def (name identity result)
-             `(deftransform ,name ((x y) (* (constant-arg (member ,identity))) *)
+             `(deftransform ,name ((x y) (t (constant-arg (member ,identity))) *)
                 "fold identity operations"
                 ',result)))
   (def ash 0 x)
@@ -3062,7 +3062,7 @@
   (and (/= x -1)
        (1- (integer-length (logxor x (1+ x))))))
 
-(deftransform logand ((x y) (* (constant-arg integer)) *)
+(deftransform logand ((x y) (t (constant-arg integer)) *)
   "fold identity operation"
   (let* ((y (lvar-value y))
          (width (or (least-zero-bit y) '*)))
@@ -3072,7 +3072,7 @@
       (give-up-ir1-transform))
     'x))
 
-(deftransform mask-signed-field ((size x) ((constant-arg t) *) *)
+(deftransform mask-signed-field ((size x) ((constant-arg t) t) *)
   "fold identity operation"
   (let ((size (lvar-value size)))
     (cond ((= size 0) 0)
@@ -3081,7 +3081,7 @@
           (t
            (give-up-ir1-transform)))))
 
-(deftransform logior ((x y) (* (constant-arg integer)) *)
+(deftransform logior ((x y) (t (constant-arg integer)) *)
   "fold identity operation"
   (let* ((y (lvar-value y))
          (width (or (least-zero-bit (lognot y))
@@ -3126,7 +3126,7 @@
   (def + :type rational :folded (+ -))
   (def * :type rational :folded (* /)))
 
-(deftransform mask-signed-field ((width x) ((constant-arg unsigned-byte) *))
+(deftransform mask-signed-field ((width x) ((constant-arg unsigned-byte) t))
   "Fold mask-signed-field/mask-signed-field of constant width"
   (binding* ((node  (if (lvar-has-single-use-p x)
                         (lvar-use x)
@@ -3320,7 +3320,7 @@
                (,op ,a ,reverse)))
         `(,op ,a ,char))))
 
-(deftransform two-arg-char-equal ((a b) (* (constant-arg character)) *
+(deftransform two-arg-char-equal ((a b) (t (constant-arg character)) *
                                   :node node)
   (transform-constant-char-equal 'a b))
 
@@ -4898,13 +4898,13 @@
            (%sort-vector (or ,key #'identity))))))
 
 (deftransform sort ((list predicate &key key)
-                    (list * &rest t) *)
+                    (list t &rest t) *)
   `(sb-impl::stable-sort-list list
                               (%coerce-callable-to-fun predicate)
                               (if key (%coerce-callable-to-fun key) #'identity)))
 
 (deftransform stable-sort ((sequence predicate &key key)
-                           ((or vector list) *))
+                           ((or vector list) t))
   (let ((sequence-type (lvar-type sequence)))
     (cond ((csubtypep sequence-type (specifier-type 'list))
            `(sb-impl::stable-sort-list sequence
@@ -5053,9 +5053,9 @@
            (if (or (eq kind match-kind) (memq kind '(:constant :global))) ; as above
                `(setq ,symbol value)
                (give-up-ir1-transform)))))
-  (deftransform set-symbol-global-value ((symbol value) ((constant-arg symbol) *))
+  (deftransform set-symbol-global-value ((symbol value) ((constant-arg symbol) t))
     (xform symbol :global))
-  (deftransform set ((symbol value) ((constant-arg symbol) *))
+  (deftransform set ((symbol value) ((constant-arg symbol) t))
     (xform symbol :special)))
 
 (deftransforms (prin1-to-string princ-to-string) ((object) (number) * :important nil)

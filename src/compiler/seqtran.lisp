@@ -335,7 +335,7 @@
   `(%fun-name (svref sb-impl::%%vector-map-into-funs%% ,typecode)))
 
 (deftransform map-into ((result fun &rest seqs)
-                        (vector * &rest *)
+                        (vector t &rest t)
                         * :node node)
   "open code"
   (let* ((seqs-names (make-gensym-list (length seqs)))
@@ -387,20 +387,20 @@
 ;;; FIXME: once the confusion over doing transforms with known-complex
 ;;; arrays is over, we should also transform the calls to (AND (ARRAY
 ;;; * (*)) (NOT (SIMPLE-ARRAY * (*)))) objects.
-(deftransform elt ((s i) ((simple-array * (*)) *) *)
+(deftransform elt ((s i) ((simple-array * (*)) t) *)
   '(aref s i))
 
-(deftransform elt ((s i) (list *) * :policy (< safety 3))
+(deftransform elt ((s i) (list t) * :policy (< safety 3))
   '(nth i s))
 
-(deftransform %setelt ((s i v) ((simple-array * (*)) * *) *)
+(deftransform %setelt ((s i v) ((simple-array * (*)) t t) *)
   '(setf (aref s i) v))
 
-(deftransform %setelt ((s i v) (list * *) * :policy (< safety 3))
+(deftransform %setelt ((s i v) (list t t) * :policy (< safety 3))
   '(setf (car (nthcdr i s)) v))
 
 (deftransform %check-vector-sequence-bounds ((vector start end)
-                                             (vector * *) *
+                                             (vector t t) *
                                              :node node)
   (if (policy node (= 0 insert-array-bounds-checks))
       '(or end (length vector))
@@ -1347,7 +1347,7 @@
 
 (deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
                                key from-end)
-                      ((constant-arg sequence) * &rest *))
+                      ((constant-arg sequence) t &rest t))
   (if key
       (give-up-ir1-transform)
       (let* ((pattern (lvar-value pattern))

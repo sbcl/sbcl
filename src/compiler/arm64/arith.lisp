@@ -732,11 +732,11 @@
 (defun %%ldb (integer size posn)
   (%ldb size posn integer))
 
-(deftransform %%ldb ((integer size posn) (unsigned-byte * (constant-arg (integer #.n-word-bits))) *
+(deftransform %%ldb ((integer size posn) (unsigned-byte t (constant-arg (integer #.n-word-bits))) *
                      :important nil)
   0)
 
-(deftransform %%ldb ((integer size posn) ((integer * -1) * (constant-arg (integer #.n-word-bits))) *
+(deftransform %%ldb ((integer size posn) ((integer * -1) t (constant-arg (integer #.n-word-bits))) *
                      :important nil)
   1)
 

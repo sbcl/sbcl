@@ -1996,7 +1996,7 @@
 
 ;;;; ALIEN and call-out-to-C stuff
 
-(defknown %alien-funcall ((or string system-area-pointer) alien-type &rest *) *)
+(defknown %alien-funcall ((or string system-area-pointer) alien-type &rest t) *)
 
 ;; Used by WITH-PINNED-OBJECTS
 #+(or x86 x86-64)

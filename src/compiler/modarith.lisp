@@ -485,7 +485,7 @@
                          ',name)))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
-            (deftransform ,left-name ((integer count) (* (constant-arg (eql 0))))
+            (deftransform ,left-name ((integer count) (t (constant-arg (eql 0))))
               'integer)
             #+(or arm64 x86-64)
             (progn
@@ -499,9 +499,9 @@
                        (if ,signedp
                            `(mask-signed-field ,',width ,x)
                            `(logand ,x (ldb (byte ,',width 0) -1)))))
-                (deftransform ,name ((integer count) (* (integer * 0)) * :important nil)
+                (deftransform ,name ((integer count) (t (integer * 0)) * :important nil)
                   `,(cut '(ash integer count)))
-                (deftransform ,name ((integer count) (* (integer 0 *)) * :important nil)
+                (deftransform ,name ((integer count) (t (integer 0 *)) * :important nil)
                   `(,',left-name ,(cut 'integer) count))))))))
   #+(or x86 x86-64 arm arm64)
   (def sb-vm::ash-left-modfx sb-vm::ash-modfx :tagged #.sb-vm:n-fixnum-bits t)

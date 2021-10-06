@@ -796,7 +796,7 @@
 ;;; layout-EQ. If a structure then test for layout-EQ and then a
 ;;; general test based on layout-inherits. Otherwise, look up the indirect
 ;;; class-cell and call CLASS-CELL-TYPEP at runtime.
-(deftransform %instance-typep ((object spec) (* *) * :node node)
+(deftransform %instance-typep ((object spec) * * :node node)
   (aver (constant-lvar-p spec))
   (let* ((spec (lvar-value spec))
          (class (specifier-type spec))
@@ -1214,7 +1214,7 @@
           (t
            (fail)))))
 
-(deftransform coerce ((x type) (* *) * :node node)
+(deftransform coerce ((x type) * * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))
   (let* ((tval (lvar-value type))

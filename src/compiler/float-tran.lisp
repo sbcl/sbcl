@@ -15,10 +15,10 @@
 
 ;;;; coercions
 
-(deftransform float ((n f) (* single-float) *)
+(deftransform float ((n f) (t single-float) *)
   '(%single-float n))
 
-(deftransform float ((n f) (* double-float) *)
+(deftransform float ((n f) (t double-float) *)
   '(%double-float n))
 
 (deftransform float ((n) *)
@@ -35,7 +35,7 @@
 ;;; RANDOM
 (macrolet ((frob (fun type)
              `(deftransform random ((num &optional state)
-                                    (,type &optional *) *)
+                                    (,type &optional t) *)
                 "Use inline float operations."
                 '(,fun num (or state *random-state*)))))
   (frob %random-single-float single-float)
@@ -67,7 +67,7 @@
 ;;; a division to get the random value into the desired range.
 (deftransform random ((num &optional state)
                       ((constant-arg (integer 1 #.(expt 2 sb-vm:n-word-bits)))
-                       &optional *)
+                       &optional t)
                       *
                       :policy (and (> speed compilation-speed)
                                    (> speed space)))
@@ -220,7 +220,7 @@
 (deftransform integer-decode-float ((x) (double-float) *)
   '(integer-decode-double-float x))
 
-(deftransform scale-float ((f ex) (single-float *) *)
+(deftransform scale-float ((f ex) (single-float t) *)
   (cond #+x86
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
@@ -228,7 +228,7 @@
         (t
          '(scale-single-float f ex))))
 
-(deftransform scale-float ((f ex) (double-float *) *)
+(deftransform scale-float ((f ex) (double-float t) *)
   (cond #+x86
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
@@ -1529,7 +1529,7 @@
 
 (macrolet ((define-frobs (fun ufun)
              `(deftransform ,fun ((x &optional by)
-                                  (* &optional (constant-arg (member 1))))
+                                  (t &optional (constant-arg (member 1))))
                   '(let ((res (,ufun x)))
                     (values res (locally
                                     (declare (flushable %single-float

@@ -66,7 +66,7 @@
 (defknown (setf %alien-value) (t system-area-pointer unsigned-byte alien-type) t
   ())
 
-(defknown alien-funcall (alien-value &rest *) *
+(defknown alien-funcall (alien-value &rest t) *
   (any recursive))
 
 (defknown sb-alien::string-to-c-string (simple-string t) (or (simple-array (unsigned-byte 8) (*))
@@ -321,7 +321,7 @@
           (return type))))
     *wild-type*))
 
-(deftransform %set-heap-alien ((info value) (heap-alien-info *) *)
+(deftransform %set-heap-alien ((info value) (heap-alien-info t) *)
   (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
     `(setf (%alien-value ,sap 0 ',type) value)))
 
@@ -503,7 +503,7 @@
 ;;;; ALIEN-FUNCALL support
 
 (deftransform alien-funcall ((function &rest args)
-                             ((alien (* t)) &rest *) *)
+                             ((alien (* t)) &rest t) *)
   (let ((names (make-gensym-list (length args))))
     (/noshow "entering first DEFTRANSFORM ALIEN-FUNCALL" function args)
     `(lambda (function ,@names)
