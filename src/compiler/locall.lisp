@@ -429,8 +429,10 @@
                          (register-inline-expansion original-functional call))
                        (*lexenv* (functional-lexenv original-functional))
                        (*transforming*
-                         (and (functional-inline-expanded original-functional)
-                              (system-inline-fun-p (leaf-source-name original-functional)))))
+                         (if (and (functional-inline-expanded original-functional)
+                                  (system-inline-fun-p (leaf-source-name original-functional)))
+                             (1+ *transforming*)
+                             *transforming*)))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)

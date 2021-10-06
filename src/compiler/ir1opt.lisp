@@ -1373,7 +1373,9 @@
                   (let* ((name (leaf-source-name leaf))
                          (*inline-expansions*
                            (register-inline-expansion leaf call))
-                         (*transforming* (system-inline-fun-p name))
+                         (*transforming* (if (system-inline-fun-p name)
+                                             (1+ *transforming*)
+                                             *transforming*))
                          (res (ir1-convert-inline-expansion
                                name
                                (defined-fun-inline-expansion leaf)
@@ -1699,7 +1701,7 @@
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
-      (let* ((*transforming* t)
+      (let* ((*transforming* (1+ *transforming*))
              (new-fun (ir1-convert-inline-lambda
                        res
                        :debug-name (debug-name 'lambda-inlined source-name)
@@ -2715,6 +2717,18 @@
      (may-delete-bound-cast cast))
     (t t)))
 
+(defun cast-mismatch-from-inlined-p (cast node)
+  (let* ((path (node-source-path node))
+         (transformed (memq 'transformed path))
+         (inlined))
+    (cond ((and transformed
+                (not (eq (memq 'transformed (node-source-path cast))
+                         transformed))))
+          ((setf inlined
+                 (memq 'inlined path))
+           (not (eq (memq 'inlined (node-source-path cast))
+                    inlined))))))
+
 ;;; Delete or move around casts when possible
 (defun maybe-delete-cast (cast)
   (let ((lvar (cast-lvar cast))
@@ -2749,7 +2763,10 @@
                    (link-blocks (node-block use) next-block)
                    ;; At least one use is good, downgrade any possible
                    ;; type conflicts to style warnings.
-                   (setf (cast-silent-conflict cast) :style-warning)
+                   (setf (cast-silent-conflict cast)
+                         (if (cast-mismatch-from-inlined-p cast use)
+                             t
+                             :style-warning))
                    (when (and (return-p dest)
                               (basic-combination-p use)
                               (eq (basic-combination-kind use) :local))

@@ -1250,7 +1250,7 @@
                 (lexenv-flushable *lexenv*)
                 lexenv-lambda
                 *lexenv*)))
-         (*inlining* (not *transforming*))
+         (*inlining* (1+ *inlining*))
          (clambda (ir1-convert-lambda body
                                       :source-name source-name
                                       :debug-name debug-name

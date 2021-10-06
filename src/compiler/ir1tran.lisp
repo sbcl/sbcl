@@ -39,25 +39,29 @@
   (when (source-form-has-path-p form)
     (gethash form *source-paths*)))
 
-(defvar *transforming* nil)
-(defvar *inlining* nil)
+(defvar *transforming* 0)
+(defvar *inlining* 0)
 
 (defun ensure-source-path (form)
-  (or (get-source-path form)
-      (cond ((and *transforming*
-                  (not (memq 'transformed *current-path*)))
-             ;; Don't hide all the transformed paths, since we might want
-             ;; to look at the final form for error reporting.
-             (list* (simplify-source-path-form form)
-                    'transformed *current-path*))
-            ;; Avoids notes about inlined code leaking out
-            ((and *inlining*
-                  (not (memq 'inlined *current-path*)))
-             (list* (simplify-source-path-form form)
-                    'inlined *current-path*))
-            (t
-             (cons (simplify-source-path-form form)
-                   *current-path*)))))
+  (flet ((level> (value kind)
+           (let ((x (memq kind *current-path*)))
+             (> value
+                (if x
+                    (cadr x)
+                    0)))))
+    (or (get-source-path form)
+        (cond ((level> *transforming* 'transformed)
+               ;; Don't hide all the transformed paths, since we might want
+               ;; to look at the final form for error reporting.
+               (list* (simplify-source-path-form form)
+                      'transformed *transforming* *current-path*))
+              ;; Avoids notes about inlined code leaking out
+              ((level> *inlining* 'inlined)
+               (list* (simplify-source-path-form form)
+                      'inlined *inlining* *current-path*))
+              (t
+               (cons (simplify-source-path-form form)
+                     *current-path*))))))
 
 (defun simplify-source-path-form (form)
   (if (consp form)
@@ -1170,7 +1174,7 @@
                          (record-call name (ctran-block start) *current-path*))
                        (when (show-transform-p *show-transforms-p* name)
                          (show-transform "src" name transformed))
-                       (let ((*transforming* t))
+                       (let ((*transforming* (1+ *transforming*)))
                          (ir1-convert start next result transformed)))))
               (ir1-convert-maybe-predicate start next result
                                            (proper-list form)

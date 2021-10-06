@@ -3251,6 +3251,18 @@
       (inline-deletion-note x t))
    ((t) 10)))
 
+(with-test (:name :inline-type-mismatch)
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (car (inline-deletion-note x y)))
+    (('(a) nil) 'a))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (1+ (position x (the list y))))
+    ((1 '(1)) 1)))
+
 (with-test (:name :cast-type-preservation)
   (assert
    (equal (caddr
