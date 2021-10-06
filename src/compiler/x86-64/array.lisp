@@ -257,9 +257,9 @@
            (when (and prev
                       (eq (vop-name prev) 'slot)
                       (eq (car (vop-codegen-info prev)) 'sb-c::vector-length)
-                      (eq (tn-ref-tn (sb-c::vop-args prev))
-                          (tn-ref-tn (sb-c::vop-args vop))))
-             (let* ((args (sb-c::vop-args vop))
+                      (eq (tn-ref-tn (vop-args prev))
+                          (tn-ref-tn (vop-args vop))))
+             (let* ((args (vop-args vop))
                     (array (tn-ref-tn args))
                     (limit (tn-ref-tn (tn-ref-across args)))
                     (index (tn-ref-tn (tn-ref-across (tn-ref-across args)))))
@@ -268,7 +268,7 @@
                  (let ((new (sb-c::emit-and-insert-vop
                              (sb-c::vop-node vop) (vop-block vop)
                              (template-or-lose replacement)
-                             (sb-c::reference-tn-list (list array index) nil)
+                             (sb-c:reference-tn-list (list array index) nil)
                              nil vop)))
                    (sb-c::delete-vop prev)
                    (sb-c::delete-vop vop)
@@ -360,8 +360,8 @@
                (eq (vop-name next) 'if-eq)
                ;; Prevent this optimization in safe code
                (sb-c::policy (sb-c::vop-node vop) (< safety 3)))
-      (let* ((result-tn (tn-ref-tn (sb-c::vop-results vop)))
-             (next-args (sb-c::vop-args next))
+      (let* ((result-tn (tn-ref-tn (vop-results vop)))
+             (next-args (vop-args next))
              (left (tn-ref-tn next-args))
              (right (tn-ref-tn (tn-ref-across next-args)))
              (comparand (if (eq result-tn left) right left)))
@@ -373,9 +373,9 @@
                        (and (tn-sc comparand)
                             (plausible-signed-imm32-operand-p
                              (encode-value-if-immediate comparand)))))
-          (let* ((new-args (sb-c::reference-tn-list
-                            (list (tn-ref-tn (sb-c::vop-args vop))
-                                  (tn-ref-tn (tn-ref-across (sb-c::vop-args vop)))
+          (let* ((new-args (sb-c:reference-tn-list
+                            (list (tn-ref-tn (vop-args vop))
+                                  (tn-ref-tn (tn-ref-across (vop-args vop)))
                                   comparand)
                             nil))
                  (new (sb-c::emit-and-insert-vop

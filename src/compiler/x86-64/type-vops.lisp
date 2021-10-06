@@ -559,7 +559,7 @@
           instance-pointer-lowtag)))
     ((%raw-instance-ref/word %raw-instance-ref/signed-word)
      ;; raw slot vops accept an immediate TN, not a codegen arg
-     (let ((index (tn-ref-tn (tn-ref-across (sb-c::vop-args mem-op)))))
+     (let ((index (tn-ref-tn (tn-ref-across (vop-args mem-op)))))
        (when (sc-is index immediate)
          (- (ash (+ (tn-value index) instance-slots-offset) word-shift)
             instance-pointer-lowtag))))
@@ -606,7 +606,7 @@
   ;; to (memref+fixnump (memref x)), it would seem to allow matching of the pattern
   ;; again if this optimizer is reapplied, because the "new" fixnump vop is superficially
   ;; the same, except for the attachment of extra data to its input.
-  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+  (unless (tn-ref-memory-access (vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  vop
                  '(instance-index-ref-c slot
@@ -622,14 +622,14 @@
                  (eq (vop-name prev) 'data-vector-ref-with-offset/simple-vector-c)
                  #-ubsan (sb-c::policy (sb-c::vop-node vop) (= safety 3)))
         (return-from vop-optimize-fixnump-optimizer nil))
-      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (aver (not (vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
-        (let ((arg (sb-c::vop-args vop)))
-          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+        (let ((arg (vop-args vop)))
+          (when (and (eq (tn-ref-tn (vop-results prev)) (tn-ref-tn arg))
                      (sb-c::very-temporary-p (tn-ref-tn arg)))
             (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
                        (arg-ref
-                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                        (sb-c:reference-tn (tn-ref-tn (vop-args prev)) nil))
                        (new (sb-c::emit-and-insert-vop
                              (sb-c::vop-node vop) (vop-block vop) (sb-c::vop-info vop)
                              arg-ref nil prev (vop-codegen-info vop))))

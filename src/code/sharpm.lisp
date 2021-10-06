@@ -68,7 +68,7 @@
                              :element-type 'bit :initial-element fill)))
       (do ((i 0 (1+ i)))
           ((= i input-len) bvec)
-        (declare (index i) (optimize (sb-c::insert-array-bounds-checks 0)))
+        (declare (index i) (optimize (sb-c:insert-array-bounds-checks 0)))
         (let ((char (char bstring i)))
           (setf (elt bvec i)
                 (case char

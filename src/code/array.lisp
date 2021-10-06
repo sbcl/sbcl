@@ -1395,7 +1395,7 @@ of specialized arrays is supported."
         ;; appear to be an out-of-bounds access if the length is not
         ;; changing at all. i.e. while it's safe to always do a store,
         ;; the length check has to be skipped.
-        (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+        (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (setf (schar vector new-length) (code-char 0)))
         ;; Now treat both the old and new lengths as if they include
         ;; the byte that holds the implicit string terminator.

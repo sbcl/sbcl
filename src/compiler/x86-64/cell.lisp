@@ -145,7 +145,7 @@
 
 (deftransform %compare-and-swap-symbol-value ((symbol old new)
                                               ((constant-arg symbol) t t))
-  (if (eq (info :variable :kind (sb-c::lvar-value symbol)) :global)
+  (if (eq (info :variable :kind (sb-c:lvar-value symbol)) :global)
       `(%cas-symbol-global-value symbol old new)
       (sb-c::give-up-ir1-transform)))
 

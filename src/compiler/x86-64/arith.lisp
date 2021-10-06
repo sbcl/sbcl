@@ -283,13 +283,13 @@
 
 (defun prepare-alu-operands (op x y vop const-tn-xform commutative)
   (declare (ignore op))
-  (let ((arg (sb-c::vop-args vop)))
+  (let ((arg (vop-args vop)))
     (when (tn-ref-load-tn arg)
       (bug "Shouldn't have a load TN for arg0"))
     (let ((arg (tn-ref-across arg)))
       (when (and arg (tn-ref-load-tn arg))
         (bug "Shouldn't have a load TN for arg1"))))
-  (let ((res (sb-c::vop-results vop)))
+  (let ((res (vop-results vop)))
     (when (tn-ref-load-tn res) (bug "Shouldn't have a load TN for result")))
   ;; Immediates won't be loaded since the :LOAD-IF expression is NIL.
   ;; Such value should always be placed into Y if the operation is +.
@@ -1417,7 +1417,7 @@
 ;;; This removes one instruction and possibly shortens the TEST by eliding
 ;;; a REX prefix.
 (defoptimizer (sb-c::vop-optimize fast-logtest-c/fixnum) (vop)
-  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+  (unless (tn-ref-memory-access (vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  ;; TODO: missing data-vector-ref/simple-vector-c
                  vop '(%raw-instance-ref/signed-word
@@ -1435,22 +1435,22 @@
                        ;; because VECTOR-LENGTH is not in a slot.
                        ;; Obviously a GENERATE-CODE bug is the mother of all bugs.
                        #-ubsan slot))))
-      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (aver (not (vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
         ;; If the memory ref produces a fixnum, the constant should be a fixnum
         ;; so that we don't see cases such as in lp#1939897.
         ;; In the absence of vop combining, MOVE-TO-WORD would be inserted
         ;; between INSTANCE-INDEX-REF and LOGTEST, but it did not happen yet.
-        (let* ((arg (sb-c::vop-args vop))
+        (let* ((arg (vop-args vop))
                (info-arg (car (vop-codegen-info vop)))
                (constant (if (member (vop-name prev) '(instance-index-ref-c slot))
                              (ash info-arg n-fixnum-tag-bits)
                              info-arg)))
-          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+          (when (and (eq (tn-ref-tn (vop-results prev)) (tn-ref-tn arg))
                      (sb-c::very-temporary-p (tn-ref-tn arg))
                      (typep constant '(or word signed-word)))
             (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
-                       (arg-ref (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                       (arg-ref (sb-c:reference-tn (tn-ref-tn (vop-args prev)) nil))
                        (new (sb-c::emit-and-insert-vop
                              (sb-c::vop-node vop) (vop-block vop)
                              (template-or-lose 'logtest-memref)
@@ -1572,16 +1572,16 @@
       (inst test :byte (ea (+ slot-disp extra-disp) x) (ash 1 bit-shift)))))
 
 (defoptimizer (sb-c::vop-optimize %logbitp/c) (vop)
-  (unless (tn-ref-memory-access (sb-c::vop-args vop))
+  (unless (tn-ref-memory-access (vop-args vop))
     (let ((prev (sb-c::previous-vop-is
                  ;; TODO: missing data-vector-ref/simple-vector-c and SLOT
                  vop '(%raw-instance-ref/signed-word
                        %raw-instance-ref/word
                        instance-index-ref-c))))
-      (aver (not (sb-c::vop-results vop))) ; is a :CONDITIONAL vop
+      (aver (not (vop-results vop))) ; is a :CONDITIONAL vop
       (when (and prev (eq (vop-block prev) (vop-block vop)))
-        (let ((arg (sb-c::vop-args vop)))
-          (when (and (eq (tn-ref-tn (sb-c::vop-results prev)) (tn-ref-tn arg))
+        (let ((arg (vop-args vop)))
+          (when (and (eq (tn-ref-tn (vop-results prev)) (tn-ref-tn arg))
                      (sb-c::very-temporary-p (tn-ref-tn arg))
                      (vop-next vop)
                      ;; Ensure we can change the tested flag from CF to ZF
@@ -1589,7 +1589,7 @@
                              '(branch-if compute-from-flags)))
             (binding* ((disp (valid-memref-byte-disp prev) :exit-if-null)
                        (arg-ref
-                        (sb-c::reference-tn (tn-ref-tn (sb-c::vop-args prev)) nil))
+                        (sb-c:reference-tn (tn-ref-tn (vop-args prev)) nil))
                        (bit (car (vop-codegen-info vop)))
                        (info
                         (if (sb-c::previous-vop-is vop 'instance-index-ref-c) ; tagged slot

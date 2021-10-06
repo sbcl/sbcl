@@ -762,7 +762,7 @@
     (map-segment-instructions
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
-       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
        (loop with list = (inst-labeller inst)
              while list
              ;; item = #(FUNCTION PREFILTERED-VALUE-INDEX)

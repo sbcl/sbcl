@@ -52,7 +52,7 @@
         (unsafely-set-bit
          (compile nil
                   '(lambda (bv i val)
-                     (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                     (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                      (setf (bit bv i) val)))))
     (replace bv '(1 0 1 1 1))
     (let ((hash (sxhash bv)))

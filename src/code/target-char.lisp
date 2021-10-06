@@ -559,7 +559,7 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
         (page-var (gensym "PAGE")))
     `(block nil
        (locally
-           (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
          (let ((,code-var (char-code ,char)))
            (let* ((,shifted-var (ash ,code-var -6))
                   (,page-var (if (>= ,shifted-var (length +character-case-pages+))

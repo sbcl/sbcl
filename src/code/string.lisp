@@ -143,7 +143,7 @@
                `(return-from string=*
                   (let ((string1 (truly-the (simple-array ,type1 1) string1))
                         (string2 (truly-the (simple-array ,type2 1) string2)))
-                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                     (do ((index1 start1 (1+ index1))
                          (index2 start2 (1+ index2)))
                         ((>= index1 end1) t)
@@ -491,7 +491,7 @@ new string COUNT long filled with the fill character."
           (do ((index start (1+ index))
                (cases +character-cases+))
               ((>= index end))
-            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
             (let ((char (schar string index)))
               (with-case-info (char case-index cases
                                :cases cases)
@@ -521,7 +521,7 @@ new string COUNT long filled with the fill character."
           (do ((index start (1+ index))
                (cases +character-cases+))
               ((>= index end))
-            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
             (let ((char (schar (truly-the (or simple-base-string
                                               simple-character-string)
                                           string)

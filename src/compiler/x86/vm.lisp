@@ -467,7 +467,7 @@
       (logbitp
        (cond
          ((and (valid-funtype '((integer 0 29) fixnum) '*)
-               (sb-c::constant-lvar-p (first (sb-c::basic-combination-args node))))
+               (sb-c:constant-lvar-p (first (sb-c::basic-combination-args node))))
           (values :transform '(lambda (index integer)
                                (%logbitp integer index))))
          ((valid-funtype '((integer 0 31) (signed-byte 32)) '*)

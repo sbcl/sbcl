@@ -220,11 +220,11 @@
                (and (tn-p tn)
                     (sc-is tn control-stack)))
              (source (vop)
-               (tn-ref-tn (sb-c::vop-args  vop)))
+               (tn-ref-tn (vop-args  vop)))
              (dest (vop)
-               (tn-ref-tn (sb-c::vop-results vop)))
+               (tn-ref-tn (vop-results vop)))
              (load-tn (vop)
-               (tn-ref-load-tn (sb-c::vop-args vop)))
+               (tn-ref-load-tn (vop-args vop)))
              (suitable-offsets-p (tn1 tn2)
                (and (= (abs (- (tn-offset tn1)
                                (tn-offset tn2)))
@@ -332,8 +332,8 @@
                            '(load-stack store-stack)))
                 (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)))))
         (move-arg
-         (let ((fp1 (tn-ref-tn (tn-ref-across (sb-c::vop-args vop1))))
-               (fp2 (tn-ref-tn (tn-ref-across (sb-c::vop-args vop2))))
+         (let ((fp1 (tn-ref-tn (tn-ref-across (vop-args vop1))))
+               (fp2 (tn-ref-tn (tn-ref-across (vop-args vop2))))
                (dest1 (dest vop1))
                (dest2 (dest vop2)))
            (when (eq fp1 fp2)
@@ -342,7 +342,7 @@
                         (stack-p dest2))
                    fp1
                    cfp-tn)
-               (tn-ref-load-tn (tn-ref-across (sb-c::vop-args vop1)))))))))))
+               (tn-ref-load-tn (tn-ref-across (vop-args vop1)))))))))))
 
 
 ;;;; ILLEGAL-MOVE

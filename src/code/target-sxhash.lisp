@@ -380,7 +380,7 @@
   (declare (optimize speed))
   (labels
       ((data-vector-hash (data start end depthoid)
-         (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
          (let ((result 572539))
            (declare (type hash-code result))
            (when (plusp depthoid)

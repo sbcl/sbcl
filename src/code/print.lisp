@@ -1123,7 +1123,7 @@ variable: an unreadable object representing the error is printed instead.")
   ;;   "The function SB-KERNEL:SIMPLE-CHARACTER-STRING-P is undefined."
   ;; but a symbol-macrolet is ok. This is a FIXME except I don't care.
   (symbol-macrolet ((chars "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-    (declare (optimize (sb-c::insert-array-bounds-checks 0) speed))
+    (declare (optimize (sb-c:insert-array-bounds-checks 0) speed))
     (macrolet ((iterative-algorithm ()
                  `(loop (multiple-value-bind (q r)
                             (truncate (truly-the word integer) base)

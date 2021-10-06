@@ -312,7 +312,7 @@
   `(macrolet ((fop-stack-ref (i)
                 `(locally
                      #-sb-xc-host
-                     (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                     (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                    (svref ,',stack-var (truly-the index ,i)))))
      (let* (,@(when stack-expr
                 (list `(,stack-var (the simple-vector ,stack-expr))))

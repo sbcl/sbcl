@@ -825,7 +825,7 @@ multiple threads accessing the same hash-table without locking."
             (mask (1- (length index-vector)))
             (hwm (kv-vector-high-water-mark kv-vector))
             (result 0))
-       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
        (cond
          (hash-vector
            (do ((i hwm (1- i))) ((zerop i))
@@ -1434,7 +1434,7 @@ nnnn 1_    any       linear scan
 ;;; key and hash-table-test whenever some thread is rehashing. If hash-based
 ;;; lookup uses EQ as the comparator for KEY, then linear search does too.
 (defun hash-table-lsearch (hash-table eq-test key hash default)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (declare (type (and fixnum unsigned-byte) hash))
   (atomic-incf (hash-table-n-lsearch hash-table))
   (let* ((kv-vector (hash-table-pairs hash-table))

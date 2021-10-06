@@ -414,7 +414,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
   (flet
       ((data-vector-compare (x y start-x end-x start-y)
          (declare (index start-x end-x start-y)
-                  (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (optimize (sb-c:insert-array-bounds-checks 0)))
          (let ((xtag (%other-pointer-widetag (truly-the (simple-array * 1) x)))
                (ytag (%other-pointer-widetag (truly-the (simple-array * 1) y))))
            (case (if (= xtag ytag) xtag 0)

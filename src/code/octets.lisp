@@ -256,7 +256,7 @@
           do (let ((byte (funcall get-bytes string pos)))
                (typecase byte
                  ((unsigned-byte 8)
-                  (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                     (setf (aref octets index) byte)))
                  ((simple-array (unsigned-byte 8) (*))
                   ;; KLUDGE: We ran into encoding errors.  Bail and do

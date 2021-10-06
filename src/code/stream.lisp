@@ -357,7 +357,7 @@
                   (eof)
                   (index 0))
              (declare (type (simple-array character (*)) buffer))
-             (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+             (declare (optimize (sb-c:insert-array-bounds-checks 0)))
              (declare (index index))
              (setf (schar res index) (truly-the character ch))
              (incf index)
@@ -1342,11 +1342,11 @@
                          (char string index))))))
     (flet ((base-char-in (stream eof-error-p eof-value)
              (declare (optimize (sb-c::verify-arg-count 0)
-                                (sb-c::insert-array-bounds-checks 0)))
+                                (sb-c:insert-array-bounds-checks 0)))
              (char-in base-char))
            (character-in (stream eof-error-p eof-value)
              (declare (optimize (sb-c::verify-arg-count 0)
-                                (sb-c::insert-array-bounds-checks 0)))
+                                (sb-c:insert-array-bounds-checks 0)))
              (char-in character)))
       (let ((input-routine
              (etypecase string
@@ -1400,7 +1400,7 @@
                       (buffer (truly-the (simple-array ,elt-type (*))
                                          (string-output-stream-buffer stream)))
                       (index (string-output-stream-index stream)))
-                  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                   (when (= pointer (length buffer))
                     ;; The usual doubling technique: the new buffer shall hold as many
                     ;; characters as were already emplaced.
@@ -1444,7 +1444,7 @@
                ;; BASE-STRING, we needn't check anything.
                ;; Bounds check was already performed
                `(let ((s (truly-the simple-character-string src)))
-                  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                   (loop for i from start2 below end2
                         thereis (>= (char-code (aref s i)) base-char-code-limit)))))
     ;; The "wonderful" thing is you never know where type checks have already been done.
@@ -1801,7 +1801,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     result))
 
 (defun finite-base-string-ouch (stream character)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (let ((pointer (finite-base-string-output-stream-pointer stream))
         (buffer (finite-base-string-output-stream-buffer stream)))
     (cond ((= pointer (length buffer))
@@ -1812,7 +1812,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                  (truly-the index (1+ pointer)))))))
 
 (defun finite-base-string-sout (stream string start end)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (let* ((pointer (finite-base-string-output-stream-pointer stream))
          (buffer (finite-base-string-output-stream-buffer stream))
          (length (- end start))

@@ -157,7 +157,7 @@
                 ;; index. The returned value is a physical index.
                 (named-let recurse ((start 0) (end (ash (length v) -1)))
                   (declare (type (unsigned-byte 9) start end)
-                           (optimize (sb-c::insert-array-bounds-checks 0)))
+                           (optimize (sb-c:insert-array-bounds-checks 0)))
                   (when (< start end)
                     (let* ((i (ash (+ start end) -1))
                            (elt (keyfn (aref v (ash i 1)))))
@@ -1982,7 +1982,7 @@ PACKAGE."
                                                (logand start-state 3))))))
                      (when (zerop index)
                        (return (advance start-state))))))
-          (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (if (logtest start-state +package-iter-check-shadows+)
               (let ((shadows (package-%shadowing-symbols (this-package))))
                 (scan (not (member sym shadows :test #'string=))))

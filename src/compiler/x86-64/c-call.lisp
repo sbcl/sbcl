@@ -133,8 +133,8 @@
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
+  (aver (sb-c:constant-lvar-p type))
+  (let* ((type (sb-c:lvar-value type))
          (env (sb-c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
@@ -202,8 +202,8 @@
 
 (defoptimizer (sign-extend derive-type) ((x size))
   (declare (ignore x))
-  (when (sb-c::constant-lvar-p size)
-    (specifier-type `(signed-byte ,(sb-c::lvar-value size)))))
+  (when (sb-c:constant-lvar-p size)
+    (specifier-type `(signed-byte ,(sb-c:lvar-value size)))))
 
 (define-vop (sign-extend)
   (:translate sign-extend)

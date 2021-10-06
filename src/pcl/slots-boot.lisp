@@ -569,7 +569,7 @@
 
 (defun find-slot-cell (wrapper slot-name)
   (declare (symbol slot-name))
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (let* ((vector (wrapper-slot-table wrapper))
          (modulus (truly-the index (svref vector 0)))
          ;; Can elide the 'else' branch of (OR symbol-hash ensure-symbol-hash)
@@ -600,7 +600,7 @@
          (vector (make-array n :initial-element nil)))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
-                      (optimize (sb-c::insert-array-bounds-checks 0)))
+                      (optimize (sb-c:insert-array-bounds-checks 0)))
              (let ((index (rem (ensure-symbol-hash name) n)))
                (setf (svref vector index)
                      (acons name
