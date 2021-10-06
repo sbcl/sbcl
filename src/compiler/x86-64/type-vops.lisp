@@ -412,13 +412,13 @@
   (define unbound-marker-p unbound-marker-widetag))
 
 (define-vop (pointerp)
-  (:args (value :scs (any-reg descriptor-reg) :target temp))
+  (:args (value :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:conditional :z)
   (:policy :fast-safe)
   (:translate pointerp)
   (:generator 3
-    (inst lea :dword temp (ea -3 value))
+    (if (location= temp value) (inst sub :dword value 3) (inst lea :dword temp (ea -3 value)))
     (inst test :byte temp #b11)))
 
 ;;; FUNCTIONP, LISTP, %INSTANCEP, %OTHER-POINTER-P produce a flag result
@@ -426,7 +426,9 @@
              `(define-vop (,name pointerp)
                 (:translate ,name)
                 (:generator 2
-                  (inst lea :dword temp (ea (- ,lowtag) value))
+                  (if (location= temp value)
+                      (inst sub :dword value ,lowtag)
+                      (inst lea :dword temp (ea (- ,lowtag) value)))
                   (inst test :byte temp lowtag-mask)))))
   (define functionp fun-pointer-lowtag)
   (define listp list-pointer-lowtag)
