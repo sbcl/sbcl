@@ -2,7 +2,7 @@
 
 . ./subr.sh
 
-run_sbcl --noinform <<EOF
+run_sbcl <<EOF
  ;; The desired output differs by many factors, but an arbitrary slop allowance
  ;; could let the old bug creep back in.
  #+(and linux sb-thread) (exit :code #+(or x86 x86-64) 45

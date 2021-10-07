@@ -19,8 +19,8 @@ chmod u+x "$tmpcore"
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --no-sysinit --noprint --version --eval '(exit)' <<EOF
-  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(exit)"))
+./"$tmpcore" --no-userinit --no-sysinit --noprint --versions --eval '(exit)' <<EOF
+  (when (equal *posix-argv* '("./$tmpcore" "--versions" "--eval" "(exit)"))
     (exit :code 42))
 EOF
 status=$?
