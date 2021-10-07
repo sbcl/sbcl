@@ -187,7 +187,7 @@
                 (setf (arg-state-num-register-args arg-state) +max-register-args+))
               (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state))))
       (values (make-normal-tn *fixnum-primitive-type*)
-              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
+              (arg-state-stack-frame-size arg-state)
               (arg-tns)
               (invoke-alien-type-method :result-tn
                                         (alien-fun-type-result-type type)
