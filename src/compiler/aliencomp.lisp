@@ -664,13 +664,7 @@
               (aver arg)
               (unless (= (length move-arg-vops) 1)
                 (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-              #+(or x86 x86-64) (emit-move-arg-template call
-                                                        block
-                                                        (first move-arg-vops)
-                                                        (lvar-tn call block arg)
-                                                        nsp
-                                                        first-tn)
-              #-(or x86 x86-64)
+
               (cond
                 #+arm-softfp
                 ((and (proper-list-of-length-p tn 3)
@@ -680,8 +674,20 @@
                                 (reference-tn (lvar-tn call block arg) nil)
                                 (reference-tn-list (butlast tn) t)))
                 (t
-                 (let* ((sc (svref *backend-sc-numbers* scn))
-                        (primitive-type (tn-primitive-type first-tn))
+                 (when (eq (sb-kind (sc-sb sc)) :unbounded) ;; stacks are unbounded
+                   ;; Avoid allocating this TN on the caller's stack
+                   (setf (tn-kind first-tn) :arg-pass))
+                 #+(or x86 x86-64)
+                 (emit-move-arg-template call
+                                         block
+                                         (first move-arg-vops)
+                                         (lvar-tn call block arg)
+                                         nsp
+                                         first-tn)
+                 #-(or x86 x86-64)
+                 (let* ((primitive-type (tn-primitive-type first-tn))
+                        ;; If the destination is a stack TN make sure
+                        ;; the temporary TN is a register.
                         (scn (if (sc-number-stack-p sc)
                                  (car (primitive-type-scs primitive-type))
                                  scn))
