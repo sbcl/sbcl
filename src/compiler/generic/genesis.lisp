@@ -1012,6 +1012,7 @@ core and return a descriptor to it."
 
 ;;;; symbol magic
 
+(defvar *tls-index-to-symbol*)
 #+sb-thread
 (progn
   ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
@@ -1020,6 +1021,7 @@ core and return a descriptor to it."
   ;; This is a backend support routine, but the style within this file
   ;; is to conditionalize by the target features.
   (defun cold-assign-tls-index (symbol index)
+    (push (list index (warm-symbol symbol)) *tls-index-to-symbol*)
     #+64-bit
     (write-wordindexed/raw
      symbol 0 (logior (ash index 32) (read-bits-wordindexed symbol 0)))
@@ -1030,11 +1032,8 @@ core and return a descriptor to it."
   ;; choosing a new index if it doesn't have one yet.
   (defun ensure-symbol-tls-index (symbol)
     (let* ((cold-sym (cold-intern symbol))
-           (tls-index
-            #+64-bit
-            (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
-            #-64-bit
-            (read-bits-wordindexed cold-sym sb-vm:symbol-tls-index-slot)))
+           (tls-index #+64-bit (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
+                      #-64-bit (read-bits-wordindexed cold-sym sb-vm:symbol-tls-index-slot)))
       (unless (plusp tls-index)
         (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
           (setq tls-index (ash next sb-vm:word-shift))
@@ -3333,7 +3332,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       "layouts"
                       "type specifiers"
                       "symbols"
-                      "linkage table")))
+                      "linkage table"
+                      #+sb-thread "TLS map")))
       (dotimes (i (length sections))
         (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
@@ -3450,6 +3450,10 @@ III. initially undefined function references (alphabetically):
                 (listp name)
                 (sb-vm::linkage-table-entry-address (cdr entry))
                 (car (ensure-list name))))))
+
+  #+sb-thread
+  (format t "~%~|~%IV. TLS map:~2%~:{~4x ~s~%~}"
+          (sort *tls-index-to-symbol* #'< :key #'car))
 
   (values))
 
@@ -3710,6 +3714,7 @@ III. initially undefined function references (alphabetically):
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
            (*cold-layout-by-addr* (make-hash-table :test 'eql)) ; addr -> cold-layout
            (*!cold-defsymbols* nil)
+           (*tls-index-to-symbol* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
            ;; to adhere to the #\! convention for automatic uninterning.
            (*cold-methods* nil)
