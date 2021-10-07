@@ -402,6 +402,13 @@ any non-negative real number."
           args)
   (exit :code 1))
 
+
+(defvar *runtime-options*
+  #("--noinform" "--core" "--help" "--version" "--dynamic-space-size"
+    "--control-stack-size" "--tls"
+    "--debug-environment" "--disable-ldb" "--lose-on-corruption"
+    "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages"))
+
 ;;; the default system top level function
 (defun toplevel-init ()
   (/show0 "entering TOPLEVEL-INIT")
@@ -497,6 +504,9 @@ any non-negative real number."
                    ((string= option "--end-toplevel-options")
                     (pop-option)
                     (return))
+                   ((find option *runtime-options* :test #'string=)
+                    (startup-error "C runtime option ~a in the middle of Lisp options."
+                                   option))
                    (t
                     ;; Anything we don't recognize as a toplevel
                     ;; option must be the start of user-level
