@@ -361,7 +361,7 @@
     (let ((*orig-args-available* t)
           (*only-simple-args* nil))
       `(named-lambda ,lambda-name (stream &rest orig-args)
-         (declare (ignorable stream))
+         (declare (ignorable stream) (muffle-conditions compiler-note))
          (let ((args orig-args))
            ,(expand-control-string control-string)
            ,(and need-retval 'args))))))

@@ -116,12 +116,14 @@
     (try "~{~0%~
 ~0|~0~~}")))
 
-(with-test (:name :nowarn-princ)
+(with-test (:name :no-compiler-notes)
   ;; you should't see optimization notes from compiling format strings.
   ;; (the FORMATTER macro is a heavy user of PRINC)
   (checked-compile
    '(lambda (x) (declare (optimize speed)) (princ x))
-   :allow-notes nil))
+   :allow-notes nil)
+  (checked-compile
+   '(lambda ()  (declare (optimize speed)) (formatter "~:*"))))
 
 (defun format-to-string-stream (thing string-stream)
   (declare (notinline format))
