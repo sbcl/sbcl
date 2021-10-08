@@ -370,16 +370,12 @@
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
-  (:args (fdefn :scs (descriptor-reg) :target result))
+  (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
     (inst addi temp null-tn (make-fixup 'undefined-tramp :asm-routine-nil-offset))
-    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move result fdefn)))
-
-
+    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; Binding and Unbinding.
 

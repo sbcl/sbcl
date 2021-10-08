@@ -27,10 +27,8 @@
   (let ((fdefn (truly-the (values fdefn &optional)
                           (sb-vm::alloc-immobile-fdefn))))
     (sb-vm::%set-fdefn-name fdefn name)
-    ;; Return the result of FDEFN-MAKUNBOUND because it (strangely) returns its
-    ;; argument. Using FDEFN as the value of this function, as if we didn't know
-    ;; that FDEFN-MAKUNBOUND did that, would cause a redundant register move.
-    (truly-the fdefn (fdefn-makunbound fdefn))))
+    (fdefn-makunbound fdefn)
+    fdefn))
 
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)

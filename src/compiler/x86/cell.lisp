@@ -262,13 +262,11 @@
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
-  (:args (fdefn :scs (descriptor-reg) :target result))
-  (:results (result :scs (descriptor-reg)))
+  (:args (fdefn :scs (descriptor-reg)))
   (:generator 38
     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
-            fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move result fdefn)))
+            fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; binding and unbinding
 

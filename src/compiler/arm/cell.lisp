@@ -146,10 +146,9 @@
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
-  (:args (fdefn :scs (descriptor-reg) :target result))
+  (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
-  (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((undefined-tramp-fixup (gen-label)))
       (assemble (:elsewhere)
@@ -157,9 +156,7 @@
         (inst word (make-fixup 'undefined-tramp :assembly-routine)))
       (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
       (inst load-from-label temp lip undefined-tramp-fixup)
-      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-      (move result fdefn))))
-
+      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag))))
 
 
 ;;;; Binding and Unbinding.

@@ -584,7 +584,7 @@
 (defknown fdefn-name (fdefn) t (foldable flushable))
 (defknown fdefn-fun (fdefn) (or function null) (flushable))
 (defknown (setf fdefn-fun) (function fdefn) t ())
-(defknown fdefn-makunbound (fdefn) t ())
+(defknown fdefn-makunbound (fdefn) (values) ())
 ;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
 (defknown safe-fdefn-fun (fdefn) function ())
 

@@ -492,8 +492,7 @@
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
-  (:args (fdefn :scs (descriptor-reg) :target result))
-  (:results (result :scs (descriptor-reg)))
+  (:args (fdefn :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 38
     ;; Change the JMP instruction to INT3 so that a trap occurs in the fdefn
@@ -510,8 +509,7 @@
     ;; its callable object was not a function. In that case RAX holds a symbol,
     ;; so we're OK because we can identify the undefined function.
     (storew (make-fixup 'undefined-tramp :assembly-routine)
-            fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move result fdefn)))
+            fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; binding and unbinding
 
