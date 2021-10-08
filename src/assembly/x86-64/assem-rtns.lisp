@@ -446,7 +446,7 @@
              ;; clear WP - bit index 5 of flags byte
              (inst and :byte :lock (ea 6 rax) (lognot (ash 1 5))))
             (t
-             (inst lea rax (ea temp temp 2)) ; multiply by 3
+             (inst lea rax (ea rax rax 2)) ; multiply by 3
              (inst shl rax 2) ; then by 4, = 12
              (inst add rax (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP
