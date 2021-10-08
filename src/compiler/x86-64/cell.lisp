@@ -38,13 +38,9 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
+  #-ubsan (:ignore name)
   (:generator 1
-    (cond ((equal name '(setf %funcallable-instance-fun))
-           (pseudo-atomic ()
-             (inst push object)
-             (invoke-asm-routine 'call 'touch-gc-card vop)
-             (gen-cell-set (object-slot-ea object offset lowtag) value)))
-          #+ubsan
+    (cond #+ubsan
           ((and (eql offset sb-vm:array-fill-pointer-slot) ; half-sized slot
                 (or (eq name 'make-array)
                     (equal name '(setf %array-fill-pointer))))
@@ -467,27 +463,21 @@
          (raw-word :scs (unsigned-reg)))
   (:vop-var vop)
   (:generator 38
+    ;; N.B. concerning the use of pseudo-atomic here,
+    ;;      refer to doc/internals-notes/fdefn-gc-safety
     (pseudo-atomic ()
-      (inst push fdefn)
-      (invoke-asm-routine 'call 'touch-gc-card vop)
-      (inst mov (ea (- (ash fdefn-fun-slot word-shift) other-pointer-lowtag) fdefn)
-            function)
-      (inst mov (ea (- (ash fdefn-raw-addr-slot word-shift) other-pointer-lowtag) fdefn)
-            raw-word)
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
+      (storew raw-word fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       ;; Ensure that the header contains a JMP instruction, not INT3.
       ;; This store is aligned
       (inst mov :word (ea (- 2 other-pointer-lowtag) fdefn) #x25FF))))
 (define-vop (set-undefined-fdefn-fun)
   ;; Do not set the raw-addr slot and do not change the header
+  ;; This vop is specifically for SB-C::INSTALL-GUARD-FUNCTION
   (:args (fdefn :scs (descriptor-reg))
          (function :scs (descriptor-reg)))
   (:vop-var vop)
-  (:generator 38
-    (pseudo-atomic ()
-      (inst push fdefn)
-      (invoke-asm-routine 'call 'touch-gc-card vop)
-      (inst mov (ea (- (ash fdefn-fun-slot word-shift) other-pointer-lowtag) fdefn)
-            function)))))
+  (:generator 1 (storew function fdefn fdefn-fun-slot other-pointer-lowtag))))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

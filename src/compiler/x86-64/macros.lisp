@@ -228,7 +228,7 @@
     (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
-         ,@(when translate `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
               (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
@@ -272,8 +272,7 @@
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
@@ -287,8 +286,7 @@
          (inst mov value (ea (- (* ,offset n-word-bytes) ,lowtag)
                              object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
      (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
@@ -323,7 +321,7 @@
                                ,index-to-encode)))))))
   `(progn
      (define-vop (,name)
-       ,@(when translate `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
@@ -344,7 +342,7 @@
      ;; This vop is really not ideal to have.  Couldn't we recombine two constants
      ;; and use a vop that only takes the object and just ONE index?
      (define-vop (,(symbolicate name "-C"))
-       ,@(when translate `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index addend)
@@ -367,7 +365,7 @@
 ;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
 (defmacro define-full-setter (name type offset lowtag scs el-type translate)
   `(define-vop (,name)
-       ,@(when translate `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
@@ -382,9 +380,4 @@
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
-           ,(if (eq name 'set-funcallable-instance-info)
-                '(pseudo-atomic () ; if immobile space, need to touch a card mark bit
-                  (inst push object)
-                  (invoke-asm-routine 'call 'touch-gc-card vop)
-                  (gen-cell-set ea value))
-                '(gen-cell-set ea value))))))
+           (gen-cell-set ea value)))))

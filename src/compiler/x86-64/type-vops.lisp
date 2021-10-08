@@ -525,11 +525,8 @@
    (:variant fun-pointer-lowtag))
  (define-vop (%set-fun-layout %set-instance-layout)
    (:translate %set-fun-layout)
-   (:generator 50
-     (pseudo-atomic ()
-       (inst push object)
-       (invoke-asm-routine 'call 'touch-gc-card vop)
-       (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value))))
+   (:generator 1
+     (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value)))
  (define-vop ()
   (:translate sb-c::layout-eq)
   (:policy :fast-safe)

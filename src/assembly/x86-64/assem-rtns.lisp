@@ -461,27 +461,3 @@
       ;; store newval into object
       (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax))))
   (inst ret 24)) ; remove 3 stack args
-
-;;; Currently the only objects for which it is necessary to call TOUCH-GC-CARD
-;;; are those on varyobj pages. Therefore if no immobile-space feature, skip it.
-;;; This is not the situation for pages of code, where we manually toggle dynamic space
-;;; card marks so that when recording code coverage we don't incur the cost of a kernel
-;;; signal on a page that was otherwise untouched.
-#+sb-assembling
-(define-assembly-routine (touch-gc-card (:return-style :none)) ()
-  ;; stack: ret-pc, object
-  #+immobile-space
-  (progn
-   (ensure-thread-base-tn-loaded)
-   (inst mov temp-reg-tn (ea 8 rsp-tn))
-   (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
-   (inst shr temp-reg-tn (integer-length (1- immobile-card-bytes)))
-   (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
-   (inst jmp :ae DONE)
-
-   (inst push rax-tn)
-   (inst mov rax-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-   (inst bts :dword :lock (ea rax-tn) temp-reg-tn)
-   (inst pop rax-tn))
-  DONE
-  (inst ret 8)) ; remove 1 stack arg
