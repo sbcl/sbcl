@@ -20,6 +20,13 @@
   (defknown (setf symbol-extra) (t t) t ())
   (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
 
+;;; I don't feel a pressing need to add even more syntax to DEFINE-PRIMITIVE-OBJECT
+;;; informing it not to generate code automatically for :SET-KNOWN on these two code slots.
+;;; Just clear the IR2-CONVERT handler.
+#+(or x86 x86-64)
+(dolist (slot '(%code-debug-info %code-fixups))
+  (setf (sb-c::fun-info-ir2-convert (info :function :info `(setf ,slot))) nil))
+
 (defconstant extended-symbol-size (1+ symbol-size))
 
 #+sb-thread

@@ -407,29 +407,33 @@
 ;;;
 #+sb-assembling
 (define-assembly-routine (code-header-set (:return-style :none)) ()
-  (inst push rax-tn)
-  (inst push rdi-tn)
-  ;; stack: spill[2], ret-pc, object, index, value-to-store
-
+  ;; stack: ret-pc, object, index, value-to-store
+  (symbol-macrolet ((object (ea 8 rsp-tn))
+                    (word-index (ea 16 rsp-tn))
+                    (newval (ea 24 rsp-tn))
+                    ;; these are declared as vop temporaries
+                    (rax rax-tn)
+                    (rdx rdx-tn)
+                    (rdi rdi-tn))
   (ensure-thread-base-tn-loaded)
   (pseudo-atomic ()
     (assemble ()
       #+immobile-space
       (progn
-        (inst mov temp-reg-tn (ea 24 rsp-tn))
-        (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
-        (inst shr temp-reg-tn (1- (integer-length immobile-card-bytes)))
-        (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
+        (inst mov rax object)
+        (inst sub rax (thread-slot-ea thread-varyobj-space-addr-slot))
+        (inst shr rax (1- (integer-length immobile-card-bytes)))
+        (inst cmp rax (thread-slot-ea thread-varyobj-card-count-slot))
         (inst jmp :ae try-dynamic-space)
         (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-        (inst bts :dword :lock (ea rdi-tn) temp-reg-tn)
+        (inst bts :dword :lock (ea rdi-tn) rax)
         (inst jmp store))
 
       TRY-DYNAMIC-SPACE
-      (inst mov temp-reg-tn (ea 24 rsp-tn)) ; reload
-      (inst sub temp-reg-tn (thread-slot-ea thread-dynspace-addr-slot))
-      (inst shr temp-reg-tn (1- (integer-length gencgc-card-bytes)))
-      (inst cmp temp-reg-tn (thread-slot-ea thread-dynspace-card-count-slot))
+      (inst mov rax object) ; reload
+      (inst sub rax (thread-slot-ea thread-dynspace-addr-slot))
+      (inst shr rax (1- (integer-length gencgc-card-bytes)))
+      (inst cmp rax (thread-slot-ea thread-dynspace-card-count-slot))
       (inst jmp :ae store) ; neither dynamic nor immobile space. (weird!)
 
       ;; sizeof (struct page) depends on GENCGC-CARD-BYTES
@@ -437,28 +441,25 @@
       ;; or   4+4+1+1 = 10 bytes (rounded to 12) if wider than (unsigned-byte 16).
       ;; See the corresponding alien structure definition in 'room.lisp'
       (cond ((typep gencgc-card-bytes '(unsigned-byte 16))
-             (inst shl temp-reg-tn 3) ; multiply by 8
-             (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
+             (inst shl rax 3) ; multiply by 8
+             (inst add rax (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP - bit index 5 of flags byte
-             (inst and :byte :lock (ea 6 temp-reg-tn) (lognot (ash 1 5))))
+             (inst and :byte :lock (ea 6 rax) (lognot (ash 1 5))))
             (t
-             (inst lea temp-reg-tn (ea temp-reg-tn temp-reg-tn 2)) ; multiply by 3
-             (inst shl temp-reg-tn 2) ; then by 4, = 12
-             (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
+             (inst lea rax (ea temp temp 2)) ; multiply by 3
+             (inst shl rax 2) ; then by 4, = 12
+             (inst add rax (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP
-             (inst and :byte :lock (ea 8 temp-reg-tn) (lognot (ash 1 5)))))
+             (inst and :byte :lock (ea 8 rax) (lognot (ash 1 5)))))
 
       STORE
-      (inst mov rdi-tn (ea 24 rsp-tn))      ; object
-      (inst mov temp-reg-tn (ea 32 rsp-tn)) ; word index
-      (inst mov rax-tn (ea 40 rsp-tn))      ; newval
+      (inst mov rdi object)
+      (inst mov rdx word-index)
+      (inst mov rax newval)
       ;; set 'written' flag in the code header
-      (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi-tn) #x40)
+      (inst or :byte :lock (ea (- 3 other-pointer-lowtag) rdi) #x40)
       ;; store newval into object
-      (inst mov (ea (- other-pointer-lowtag) rdi-tn temp-reg-tn n-word-bytes)
-            rax-tn)))
-  (inst pop rdi-tn) ; restore
-  (inst pop rax-tn)
+      (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax))))
   (inst ret 24)) ; remove 3 stack args
 
 ;;; Currently the only objects for which it is necessary to call TOUCH-GC-CARD

@@ -39,30 +39,7 @@
   (:results)
   (:vop-var vop)
   (:generator 1
-    (cond ((emit-code-page-write-barrier-p name)
-           ;; Don't assume that the immediate is acceptable to 'push'
-           ;; (only MOV can take a 64-bit immediate)
-           (inst mov temp-reg-tn (encode-value-if-immediate value))
-           (inst push temp-reg-tn)
-           ;; Push the slot index into code, then code itself
-           (cond ((= lowtag fun-pointer-lowtag)
-                  ;; compute code address similarly to CODE-FROM-FUNCTION vop
-                  (inst mov :dword temp-reg-tn (ea (- fun-pointer-lowtag) object))
-                  (inst shr :dword temp-reg-tn n-widetag-bits)
-                  ;; now temp-reg-tn holds the difference in words from code to fun.
-                  (inst push temp-reg-tn)
-                  (inst add :qword (ea 0 rsp-tn) offset) ; for particular slot
-                  ;; finish computing the code address
-                  (inst neg temp-reg-tn)
-                  (inst lea temp-reg-tn
-                        (ea (- other-pointer-lowtag fun-pointer-lowtag)
-                            object temp-reg-tn n-word-bytes))
-                  (inst push temp-reg-tn))
-                 (t ; is code already
-                  (inst push offset)
-                  (inst push object)))
-           (invoke-asm-routine 'call 'code-header-set vop))
-          ((equal name '(setf %funcallable-instance-fun))
+    (cond ((equal name '(setf %funcallable-instance-fun))
            (pseudo-atomic ()
              (inst push object)
              (invoke-asm-routine 'call 'touch-gc-card vop)
@@ -780,13 +757,17 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
          (value :scs (any-reg descriptor-reg)))
-   (:arg-types * unsigned-num *)
-   (:vop-var vop)
-   (:generator 10
-     (inst push value)
-     (inst push index)
-     (inst push object)
-     (invoke-asm-routine 'call 'code-header-set vop)))
+  (:arg-types * unsigned-num *)
+  (:vop-var vop)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax) ; for the asm routine
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:temporary (:sc unsigned-reg :offset rdi-offset) rdi)
+  (:ignore rax rdx rdi)
+  (:generator 10
+    (inst push value)
+    (inst push index)
+    (inst push object)
+    (invoke-asm-routine 'call 'code-header-set vop)))
 
 ;;;; raw instance slot accessors
 

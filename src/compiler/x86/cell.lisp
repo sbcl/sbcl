@@ -21,31 +21,16 @@
   (:generator 1
     (loadw result object offset lowtag)))
 
+;;; This vop is magical in (at least) 2 ways:
+;;; 1. it is always selected by name (in ir2-convert-setter or -setfer)
+;;; 2. the ir2 converter makes it return a value despite absence of :results
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
   (:info name offset lowtag)
-  (:results)
+  (:ignore name)
   (:generator 1
-    (cond ((emit-code-page-write-barrier-p name)
-           (inst push (encode-value-if-immediate value))
-           (inst push offset)
-           (inst push object)
-           (when (= lowtag fun-pointer-lowtag)
-             (inst push eax-tn) ; spill eax to use as a temp
-             (loadw eax-tn object 0 fun-pointer-lowtag)
-             (inst shr eax-tn n-widetag-bits)
-             ;; increment index by number of boxed words
-             (inst add (make-ea :dword :base esp-tn :disp 8) eax-tn)
-             ;; and compute the code pointer from the fun pointer
-             (inst lea eax-tn
-                   (make-ea :dword :index eax-tn :scale n-word-bytes
-                            :disp (- fun-pointer-lowtag other-pointer-lowtag)))
-             (inst sub (make-ea :dword :base esp-tn :disp 4) eax-tn)
-             (inst pop eax-tn)) ; restore
-           (inst call (make-fixup 'code-header-set :assembly-routine)))
-          (t
-           (storew (encode-value-if-immediate value) object offset lowtag)))))
+    (storew (encode-value-if-immediate value) object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -486,6 +471,10 @@
          (index :scs (unsigned-reg))
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * unsigned-num *)
+  (:temporary (:sc unsigned-reg :offset eax-offset) eax) ; for the asm routine
+  (:temporary (:sc unsigned-reg :offset edx-offset) edx)
+  (:temporary (:sc unsigned-reg :offset edi-offset) edi)
+  (:ignore eax edx edi)
   (:generator 10
     (inst push value)
     (inst push index)

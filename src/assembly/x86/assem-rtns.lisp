@@ -484,14 +484,10 @@
 
 #+sb-assembling
 (define-assembly-routine (code-header-set (:return-style :none)) ()
-  (inst push eax-tn)
-  (inst push edx-tn)
-  (inst push edi-tn)
-  ;; stack: spill[3], ret-pc, object, index, value-to-store
-
-  (symbol-macrolet ((object (make-ea :dword :base esp-tn :disp 16))
-                    (word-index (make-ea :dword :base esp-tn :disp 20))
-                    (newval (make-ea :dword :base esp-tn :disp 24))
+  ;; stack: ret-pc, object, index, value-to-store
+  (symbol-macrolet ((object (make-ea :dword :base esp-tn :disp 4))
+                    (word-index (make-ea :dword :base esp-tn :disp 8))
+                    (newval (make-ea :dword :base esp-tn :disp 12))
                     (prefix #+(and sb-thread (not win32)) :fs
                             #-(and sb-thread (not win32)) nil))
     (flet ((thread-slot-ea (slot-index)
@@ -548,9 +544,6 @@
                              :index edx-tn :scale (ash 1 word-shift)
                              :disp (- other-pointer-lowtag))
                 eax-tn)))))
-  (inst pop edi-tn) ; restore
-  (inst pop edx-tn)
-  (inst pop eax-tn)
   (inst ret 12)) ; remove 3 stack args
 
 #|

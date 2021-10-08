@@ -379,6 +379,15 @@
 
 ;;;; CODE-COMPONENT
 
+#+(or x86 x86-64)
+(progn ; software mark bits require that these go through the CODE-HEADER-SET vop
+(defun (setf %code-debug-info) (newval code)
+  (code-header-set code sb-vm::code-debug-info-slot newval)
+  newval)
+(defun (setf sb-vm::%code-fixups) (newval code)
+  (code-header-set code sb-vm::code-fixups-slot newval)
+  newval))
+
 (defun %code-debug-info (code-obj)
   ;; Extract the unadulterated debug-info emitted by the compiler. The slot
   ;; value might be a cons of that and info stuffed in by the debugger.
