@@ -352,8 +352,8 @@
 ;;; It just doesn't seem worth the effort to do all that.
 (defparameter eql-dispatch nil)
 (define-assembly-routine (generic-eql (:return-style :none))
-    ((:temp rax unsigned-reg rax-offset)
-     (:temp rcx unsigned-reg rcx-offset)
+    ((:temp rcx unsigned-reg rcx-offset)  ; callee-saved
+     (:temp rax unsigned-reg rax-offset)  ; vop temps
      (:temp rsi unsigned-reg rsi-offset)
      (:temp rdi unsigned-reg rdi-offset)
      (:temp r11 unsigned-reg r11-offset))
@@ -446,20 +446,20 @@
   ;; as for all other objects (in byte index 3 of the header)
   (inst push rcx)
   (inst mov rcx (ea (- other-pointer-lowtag) rdi))
-  (inst shl rcx 1)
+  (inst shl rcx 1) ; shift out GC mark bit
   (inst shr rcx (1+ n-widetag-bits))
   #+bignum-assertions
-  (progn (inst mov temp-reg-tn rcx)
-         (inst or temp-reg-tn 1))
+  (progn (inst mov r11 rcx)
+         (inst or r11 1)) ; align to start of ubsan bits
   compare-loop
   #+bignum-assertions
   (let ((ok1 (gen-label)) (ok2 (gen-label)))
     (inst dec rcx)
-    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rsi temp-reg-tn 8) rcx)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rsi r11 8) rcx)
     (inst jmp :nc ok1)
     (inst break halt-trap)
     (emit-label ok1)
-    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rdi temp-reg-tn 8) rcx)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rdi r11 8) rcx)
     (inst jmp :nc ok2)
     (inst break halt-trap)
     (emit-label ok2)

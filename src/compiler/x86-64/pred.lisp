@@ -82,6 +82,7 @@
   (:args (x :scs (any-reg descriptor-reg)))
   (:info labels otherwise key-type keys test-vop-name)
   (:temporary (:sc unsigned-reg) table)
+  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
   (:args-var x-tn-ref)
   (:generator 10
     (let* ((key-derived-type (tn-ref-type x-tn-ref))
@@ -109,12 +110,12 @@
               ;; First exclude out-of-bounds values because there's no harm
               ;; in doing that up front regardless of the argument's lisp type.
               (typecase -min
-                ;; TODO: if min is 0, use X directly, don't move into temp-reg-tn
-                ((eql 0) (move temp-reg-tn x))
-                ((signed-byte 32) (inst lea temp-reg-tn (ea -min x)))
-                (t (inst mov temp-reg-tn x)
-                   (inst add :qword temp-reg-tn (constantize -min))))
-              (inst cmp temp-reg-tn (constantize (fixnumize (- max min))))
+                ;; TODO: if min is 0, use X directly, don't move into temp
+                ((eql 0) (move temp x))
+                ((signed-byte 32) (inst lea temp (ea -min x)))
+                (t (inst mov temp x)
+                   (inst add :qword temp (constantize -min))))
+              (inst cmp temp (constantize (fixnumize (- max min))))
               (inst jmp :a otherwise)
               ;; We have to check the type here because a chain of EQ tests
               ;; does not impose a type constraint.
@@ -122,7 +123,7 @@
               (unless (eq test-vop-name 'sb-vm::fast-if-eq-fixnum/c)
                 (inst test :byte x fixnum-tag-mask)
                 (inst jmp :ne otherwise))
-              (setq ea (ea table temp-reg-tn 4))))
+              (setq ea (ea table temp 4))))
             (inst lea table (register-inline-constant :jump-table vector))
             (inst jmp ea))
         (character
@@ -131,14 +132,14 @@
                                            fast-if-eq-character/c))
              (inst cmp :byte x character-widetag)
              (inst jmp :ne otherwise))
-           (inst mov :dword temp-reg-tn x)
-           (inst shr :dword temp-reg-tn n-widetag-bits)
+           (inst mov :dword temp x)
+           (inst shr :dword temp n-widetag-bits)
            (unless (= min 0)
-             (inst sub :dword temp-reg-tn min))
-           (inst cmp temp-reg-tn (- max min))
+             (inst sub :dword temp min))
+           (inst cmp temp (- max min))
            (inst jmp :a otherwise)
            (inst lea table (register-inline-constant :jump-table vector))
-           (inst jmp (ea table temp-reg-tn 8)))))))
+           (inst jmp (ea table temp 8)))))))
 
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)
@@ -200,6 +201,7 @@
   (:args (then) (else))
   (:results (res))
   (:info flags)
+  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
   (:generator 0
      (let ((not-p (eq (first flags) 'not)))
        (when not-p (pop flags))
@@ -214,8 +216,8 @@
                     (load-immediate res else)
                     (move res else))
                 (when (sc-is then immediate)
-                  (load-immediate temp-reg-tn then (sc-name (tn-sc res)))
-                  (setf then temp-reg-tn))
+                  (load-immediate temp then (sc-name (tn-sc res)))
+                  (setf then temp))
                 (inst cmov (if not-p
                                (negate-condition (first flags))
                                (first flags))
@@ -224,8 +226,8 @@
                (not-p
                 (cond ((sc-is then immediate)
                        (when (location= else res)
-                         (inst mov temp-reg-tn else)
-                         (setf else temp-reg-tn))
+                         (inst mov temp else)
+                         (setf else temp))
                        (load-immediate res then))
                       ((location= else res)
                        (inst xchg else then)
@@ -233,8 +235,8 @@
                       (t
                        (move res then)))
                 (when (sc-is else immediate)
-                  (load-immediate temp-reg-tn else (sc-name (tn-sc res)))
-                  (setf else temp-reg-tn))
+                  (load-immediate temp else (sc-name (tn-sc res)))
+                  (setf else temp))
                 (dolist (flag flags)
                   (inst cmov flag res else)))
                (t
@@ -242,8 +244,8 @@
                     (load-immediate res else)
                     (move res else))
                 (when (sc-is then immediate)
-                  (load-immediate temp-reg-tn then (sc-name (tn-sc res)))
-                  (setf then temp-reg-tn))
+                  (load-immediate temp then (sc-name (tn-sc res)))
+                  (setf then temp))
                 (dolist (flag flags)
                   (inst cmov flag res then))))))))
 
@@ -348,16 +350,24 @@
 ;;; Note: a constant-tn is allowed in CMP; it uses an EA displacement,
 ;;; not immediate data.
 (define-vop (if-eq)
-  (:args (x :scs (any-reg descriptor-reg control-stack))
-         (y :scs (any-reg descriptor-reg immediate)
-            :load-if (and (sc-is x control-stack)
-                          (not (sc-is y any-reg descriptor-reg immediate)))))
+  (:args (x :scs (any-reg descriptor-reg control-stack immediate))
+         (y :scs (any-reg descriptor-reg control-stack immediate constant)))
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
   (:args-var x-tn-ref)
+  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
   (:generator 6
+    ;; Why is this getting called with two NILs? That seems super dumb.
+    (when (and (sc-is x immediate) (eq (tn-value x) nil)
+               (sc-is y immediate) (eq (tn-value y) nil))
+      (zeroize temp)
+      ;; (bug "Should not happen")
+      (return-from if-eq))
     (cond
+      ((sc-is y constant)
+       (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
+                         (t (inst mov temp y) temp))))
       ((sc-is y immediate)
        (let* ((value (encode-value-if-immediate y))
               (immediate (plausible-signed-imm32-operand-p value)))
@@ -385,8 +395,11 @@
                ((not (sc-is x control-stack))
                 (inst cmp x (constantize value)))
                (t
-                (inst mov temp-reg-tn value)
-                (inst cmp x temp-reg-tn)))))
+                (inst mov temp value)
+                (inst cmp x temp)))))
+      ((and (sc-is x control-stack) (sc-is y control-stack))
+       (inst mov temp x)
+       (inst cmp temp y))
       (t
        (inst cmp x y)))))
 
@@ -454,7 +467,9 @@
   (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 1)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset r11-offset) asm-temp)
   (:vop-var vop)
+  (:ignore asm-temp)
   (:generator 15
     (inst cmp x y)
     (inst jmp :e done) ; affirmative

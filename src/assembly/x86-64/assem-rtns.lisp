@@ -268,6 +268,7 @@
                          ((:arg target (descriptor-reg any-reg) rdx-offset)
                           (:arg start any-reg rbx-offset)
                           (:arg count any-reg rcx-offset)
+                          (:temp bsp-temp any-reg r11-offset)
                           (:temp catch any-reg rax-offset))
 
   (declare (ignore start count))
@@ -323,6 +324,7 @@
                           (:temp where unsigned-reg r8-offset)
                           (:temp symbol unsigned-reg r9-offset)
                           (:temp value unsigned-reg r10-offset)
+                          (:temp bsp-temp unsigned-reg r11-offset)
                           (:temp zero complex-double-reg float0-offset))
   AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
@@ -349,7 +351,7 @@
   ;; run it twice) one of the variables being unbound can be
   ;; *interrupts-enabled*
   (loadw where uwp unwind-block-bsp-slot)
-  (unbind-to-here where symbol value temp-reg-tn zero)
+  (unbind-to-here where symbol value bsp-temp zero)
 
   ;; Set next unwind protect context.
   (loadw block uwp unwind-block-uwp-slot)
@@ -370,7 +372,7 @@
 
   DO-EXIT
   (loadw where block unwind-block-bsp-slot)
-  (unbind-to-here where symbol value temp-reg-tn zero)
+  (unbind-to-here where symbol value bsp-temp zero)
 
   (loadw rbp-tn block unwind-block-cfp-slot)
 
