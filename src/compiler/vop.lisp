@@ -12,8 +12,6 @@
 
 (in-package "SB-C")
 
-#+host-quirks-sbcl (cl:declaim (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
-
 ;;; the largest number of TNs whose liveness changes that we can have
 ;;; in any block
 (defconstant local-tn-limit 64)

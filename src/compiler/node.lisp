@@ -12,8 +12,6 @@
 
 (in-package "SB-C")
 
-#+host-quirks-sbcl (cl:declaim (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
-
 (declaim (special *lexenv*))
 
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.
