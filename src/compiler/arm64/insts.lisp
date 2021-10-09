@@ -3170,6 +3170,24 @@
         (delete-stmt stmt)
         next))))
 
+;;; An even number can be shifted right and then negated,
+;;; and fixnums are even.
+(defpattern "neg + asr -> neg" ((sub) (sbfm)) (stmt next)
+  (destructuring-bind (dst1 srcn srcm) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr imms) (stmt-operands next)
+      (when (and (= imms 63)
+                 (= immr 1)
+                 (tn-p srcm)
+                 (sc-is srcm sb-vm::any-reg)
+                 (location= srcn zr-tn)
+                 (location= dst1 src2)
+                 (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
+        (setf (stmt-mnemonic next) 'sub
+              (stmt-operands next) (list dst2 srcn (asr srcm 1)))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
 (defpattern "mul + sub -> msub" ((madd) (sub)) (stmt next)
   (destructuring-bind (dst1 srcn1 srcm1 srca) (stmt-operands stmt)
     (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
