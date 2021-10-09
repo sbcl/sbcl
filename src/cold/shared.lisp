@@ -632,6 +632,7 @@
                                         ;; completely broken from the
                                         ;; beginning of SBCL history
                                         ;; until version 2.0.2.
+                                        #+sbcl
                                         (or (eq mode :target-compile)
                                             (and (find-symbol "SPLIT-VERSION-STRING" "HOST-SB-C")
                                                  (funcall (find-symbol "VERSION>=" "HOST-SB-C")
