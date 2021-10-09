@@ -374,8 +374,7 @@ default-value-8
               values-start)
   (:temporary (:sc any-reg :offset nargs-offset
                :from :eval :to (:result 1))
-              nvals)
-  (:temporary (:scs (non-descriptor-reg)) temp))
+              nvals))
 
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry

@@ -901,6 +901,8 @@
     (dolist (name (cddr spec))
       (unless (symbolp name)
         (error "bad temporary name: ~S" name))
+      (when (member name (vop-parse-temps parse) :key #'operand-parse-name)
+        (warn "temp ~s already exists in ~s" name (vop-parse-name parse)))
       (incf *parse-vop-operand-count*)
       (let ((res (list :born (parse-time-spec :load)
                        :dies (parse-time-spec :save))))
