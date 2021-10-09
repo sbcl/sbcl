@@ -271,7 +271,7 @@
                           (:temp bsp-temp any-reg r11-offset)
                           (:temp catch any-reg rax-offset))
 
-  (declare (ignore start count))
+  (declare (ignore start count bsp-temp))
 
   (load-tl-symbol-value catch *current-catch-block*)
 

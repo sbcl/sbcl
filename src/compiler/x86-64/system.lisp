@@ -371,7 +371,7 @@
     (let ((out (gen-label)))
       (loadw temp x symbol-info-slot other-pointer-lowtag)
       (inst mov res nil-value)
-      (inst test :byte temp #b1000) ; if temp-reg-tn is a vector, return NIL
+      (inst test :byte temp #b1000) ; if temp is a vector, return NIL
       (inst jmp :ne out)
       (loadw res temp cons-car-slot list-pointer-lowtag)
       (emit-label out))))

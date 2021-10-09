@@ -488,7 +488,7 @@
                      ;; stack location to a temporary register.
                      (unless gpr
                        (incf stack-argument-count)
-                       (setf gpr temp-reg-tn)
+                       (setf gpr rax)
                        (inst mov gpr stack-arg-tn))
                      ;; Copy from either argument register or temporary
                      ;; register to target.
@@ -505,8 +505,8 @@
                             ;; temporary (general purpose) register, and
                             ;; from there to the target location.
                             (incf stack-argument-count)
-                            (inst mov temp-reg-tn stack-arg-tn)
-                            (inst mov target-tn temp-reg-tn)))))
+                            (inst mov rax stack-arg-tn)
+                            (inst mov target-tn rax)))))
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
 
