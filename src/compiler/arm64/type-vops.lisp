@@ -67,71 +67,82 @@
                       &key (drop-through (gen-label))
                            value-tn-ref)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
-    (multiple-value-bind (when-true when-false)
-        (if not-p
-            (values drop-through target)
-            (values target drop-through))
-      (assemble ()
-        (unless (and value-tn-ref
-                     (eq lowtag other-pointer-lowtag)
-                     (other-pointer-tn-ref-p value-tn-ref))
-          (%test-lowtag value temp when-false t lowtag))
-        (load-type temp value (- lowtag))
-        (do ((remaining headers (cdr remaining)))
-            ((null remaining))
-          (let ((header (car remaining))
-                (last (null (cdr remaining))))
-            (cond
-              ((atom header)
-               (cond
-                 ((and (not last) (null (cddr remaining))
-                       (atom (cadr remaining))
-                       (= (logcount (logxor header (cadr remaining))) 1))
-                  (inst and temp temp (logical-mask
-                                       (ldb (byte 8 0) (logeqv header (cadr remaining)))))
-                  (inst cmp temp (ldb (byte 8 0) (logand header (cadr remaining))))
-                  (inst b (if not-p :ne :eq) target)
-                  (return))
-                 (t
-                  (inst cmp temp header)
-                  (if last
-                      (inst b (if not-p :ne :eq) target)
-                      (inst b :eq when-true)))))
-              (t
-               (let ((start (car header))
-                     (end (cdr header)))
+    (flet ((%logical-mask (x)
+             (cond ((encode-logical-immediate x)
+                    x)
+                   ;; The remaining bits of the widetag are zero, no
+                   ;; need to mask them off. Possible to encode more
+                   ;; values that way.
+                   ((let ((extend (dpb x (byte 8 0) most-positive-word)))
+                      (and (encode-logical-immediate extend)
+                           extend)))
+                   (t
+                    (logical-mask x)))))
+      (multiple-value-bind (when-true when-false)
+          (if not-p
+              (values drop-through target)
+              (values target drop-through))
+        (assemble ()
+          (unless (and value-tn-ref
+                       (eq lowtag other-pointer-lowtag)
+                       (other-pointer-tn-ref-p value-tn-ref))
+            (%test-lowtag value temp when-false t lowtag))
+          (load-type temp value (- lowtag))
+          (do ((remaining headers (cdr remaining)))
+              ((null remaining))
+            (let ((header (car remaining))
+                  (last (null (cdr remaining))))
+              (cond
+                ((atom header)
                  (cond
-                   ((and last (not (= start bignum-widetag))
-                         (= (+ start 4) end)
-                         (= (logcount (logxor start end)) 1))
-                    (inst and temp temp (logical-mask
-                                         (ldb (byte 8 0) (logeqv start end))))
-                    (inst cmp temp (ldb (byte 8 0) (logand start end)))
-                    (inst b (if not-p :ne :eq) target))
                    ((and (not last) (null (cddr remaining))
-                         (= (+ start 4) end) (= (logcount (logxor start end)) 1)
-                         (listp (cadr remaining))
-                         (= (+ (caadr remaining) 4) (cdadr remaining))
-                         (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
-                         (= (logcount (logxor (caadr remaining) start)) 1))
-                    (inst and temp temp (ldb (byte 8 0) (logeqv start (cdadr remaining))))
-                    (inst cmp temp (ldb (byte 8 0) (logand start (cdadr remaining))))
+                         (atom (cadr remaining))
+                         (= (logcount (logxor header (cadr remaining))) 1))
+                    (inst and temp temp (%logical-mask
+                                         (ldb (byte 8 0) (logeqv header (cadr remaining)))))
+                    (inst cmp temp (ldb (byte 8 0) (logand header (cadr remaining))))
                     (inst b (if not-p :ne :eq) target)
                     (return))
                    (t
-                    (unless (= start bignum-widetag)
-                      (inst cmp temp start)
-                      (if (= end complex-array-widetag)
-                          (progn
-                            (aver last)
-                            (inst b (if not-p :lt :ge) target))
-                          (inst b :lt when-false)))
-                    (unless (= end complex-array-widetag)
-                      (inst cmp temp end)
-                      (if last
-                          (inst b (if not-p :gt :le) target)
-                          (inst b :le when-true))))))))))
-        (emit-label drop-through)))))
+                    (inst cmp temp header)
+                    (if last
+                        (inst b (if not-p :ne :eq) target)
+                        (inst b :eq when-true)))))
+                (t
+                 (let ((start (car header))
+                       (end (cdr header)))
+                   (cond
+                     ((and last (not (= start bignum-widetag))
+                           (= (+ start 4) end)
+                           (= (logcount (logxor start end)) 1))
+                      (inst and temp temp (%logical-mask
+                                           (ldb (byte 8 0) (logeqv start end))))
+                      (inst cmp temp (ldb (byte 8 0) (logand start end)))
+                      (inst b (if not-p :ne :eq) target))
+                     ((and (not last) (null (cddr remaining))
+                           (= (+ start 4) end) (= (logcount (logxor start end)) 1)
+                           (listp (cadr remaining))
+                           (= (+ (caadr remaining) 4) (cdadr remaining))
+                           (= (logcount (logxor (caadr remaining) (cdadr remaining))) 1)
+                           (= (logcount (logxor (caadr remaining) start)) 1))
+                      (inst and temp temp (ldb (byte 8 0) (logeqv start (cdadr remaining))))
+                      (inst cmp temp (ldb (byte 8 0) (logand start (cdadr remaining))))
+                      (inst b (if not-p :ne :eq) target)
+                      (return))
+                     (t
+                      (unless (= start bignum-widetag)
+                        (inst cmp temp start)
+                        (if (= end complex-array-widetag)
+                            (progn
+                              (aver last)
+                              (inst b (if not-p :lt :ge) target))
+                            (inst b :lt when-false)))
+                      (unless (= end complex-array-widetag)
+                        (inst cmp temp end)
+                        (if last
+                            (inst b (if not-p :gt :le) target)
+                            (inst b :le when-true))))))))))
+          (emit-label drop-through))))))
 
 ;;;; Other integer ranges.
 
