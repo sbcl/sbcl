@@ -31,9 +31,11 @@
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &key (drop-through (gen-label))
                                          value-tn-ref)
-
-  (inst mov temp immediate)
-  (inst cmp temp (extend value :uxtb))
+  (cond ((= immediate single-float-widetag)
+         (inst cmp (32-bit-reg value) single-float-widetag))
+        (t
+         (inst mov temp immediate)
+         (inst cmp temp (extend value :uxtb))))
   (inst b :eq (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
