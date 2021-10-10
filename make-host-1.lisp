@@ -11,9 +11,8 @@
 (in-package "SB-COLD")
 #+sbcl
 (declaim (sb-ext:muffle-conditions
-          (satisfies unable-to-optimize-note-p)
-          (satisfies optional+key-style-warning-p)
-          sb-ext:code-deletion-note))
+          sb-ext:compiler-note
+          (satisfies optional+key-style-warning-p)))
 (progn
   (setf *host-obj-prefix* (if (boundp 'cl-user::*sbcl-host-obj-prefix*)
                               (symbol-value 'cl-user::*sbcl-host-obj-prefix*)

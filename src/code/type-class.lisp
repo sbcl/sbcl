@@ -16,8 +16,6 @@
 
 (in-package "SB-KERNEL")
 
-#+host-quirks-sbcl (cl:declaim (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
-
 (!begin-collecting-cold-init-forms)
 
 ;; We can't make an instance of any CTYPE descendant until its type-class

@@ -34,8 +34,6 @@
 
 (in-package "SB-IMPL")
 
-#+host-quirks-sbcl (cl:declaim (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
-
 (defmethod print-object ((x meta-info) stream)
   (print-unreadable-object (x stream)
     (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)

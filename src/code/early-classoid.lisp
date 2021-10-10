@@ -13,8 +13,6 @@
 
 (in-package "SB-KERNEL")
 
-#+host-quirks-sbcl (cl:declaim (host-sb-ext:muffle-conditions host-sb-ext:compiler-note))
-
 ;;;; DEFSTRUCT-DESCRIPTION
 
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
