@@ -43,13 +43,8 @@
                          (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
                          (setq style-warnp 'style-warning)))
                       (simple-warning
-                       (lambda (c &aux (fc (simple-condition-format-control c)))
-                         ;; hack for PPC. See 'build-order.lisp-expr'
-                         ;; Ignore the warning, and the warning about the warning.
-                         (unless (and (stringp fc)
-                                      (or (search "not allowed by the operand type" fc)
-                                          (search "ignoring FAILURE-P return" fc)))
-                           (setq warnp 'warning)))))
+                        (lambda (c)
+                          (setq warnp 'warning))))
          (with-compilation-unit () ,@forms))
        (when (and (or warnp style-warnp) *fail-on-warnings*)
          (cerror "Proceed anyway"
