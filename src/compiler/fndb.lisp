@@ -343,6 +343,9 @@
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 
+(defknown multiply-fixnums (fixnum fixnum) integer
+  (movable foldable flushable))
+
 (defknown %signed-multiply-high (sb-vm:signed-word sb-vm:signed-word) sb-vm:signed-word
     (movable foldable flushable))
 

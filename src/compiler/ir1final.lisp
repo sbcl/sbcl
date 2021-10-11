@@ -144,7 +144,7 @@
                (delete-filter node lvar (cast-value node))))))))
 
 (defglobal *two-arg-functions*
-    `((* two-arg-*)
+    `((* two-arg-* (,(specifier-type 'fixnum) ,(specifier-type 'fixnum)) multiply-fixnums)
       (+ two-arg-+)
       (- two-arg--)
       (/ two-arg-/ (,(specifier-type 'integer) ,(specifier-type 'integer)) sb-kernel::integer-/-integer)
