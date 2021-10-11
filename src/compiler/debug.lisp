@@ -1079,10 +1079,13 @@
            (format stream "t~D" (tn-id tn))))
     (when (and (tn-sc tn) (tn-offset tn))
       (format stream "[~A]" (location-print-name tn)))
-    (format stream " ~s ~@[~s~]" (tn-kind tn)
+    (format stream " ~s~@[ ~a~]~@[ ~a~]" (tn-kind tn)
             (and *debug-print-types*
-                 (tn-sc tn)
-                 (sc-name (tn-sc tn))))))
+                 (and (tn-sc tn)
+                      (sc-name (tn-sc tn))))
+            (and *debug-print-types*
+                 (and (tn-primitive-type tn)
+                      (primitive-type-name (tn-primitive-type tn)))))))
 
 ;;; Print the TN-REFs representing some operands to a VOP, linked by
 ;;; TN-REF-ACROSS.
