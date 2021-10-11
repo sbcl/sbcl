@@ -163,3 +163,26 @@
                  (sb-kernel::ctype-eq-comparable type))
             (vector-getf (truly-the simple-vector group) type #'eq 1)
             (vector-getf (truly-the simple-vector group) type #'type= 1))))))
+
+(defglobal *backend-union-type-predicates*
+    (let ((unions (sort
+                   (loop for (type . pred) in *backend-type-predicates*
+                         when (union-type-p type)
+                         collect (cons type pred))
+                   #'>
+                   :key (lambda (x)
+                          (length (union-type-types (car x)))))))
+      (coerce (loop for (key . value) in unions
+                    collect key
+                    collect value)
+              'vector)))
+(declaim (simple-vector *backend-union-type-predicates*))
+
+(defun split-union-type-tests (type)
+  (let ((predicates *backend-union-type-predicates*)
+        (types (union-type-types type)))
+    (loop for x below (length predicates) by 2
+          for union-types = (union-type-types (aref predicates x))
+          when (subsetp union-types types :test #'type=)
+          return (values (aref predicates (1+ x))
+                         (set-difference types union-types)))))

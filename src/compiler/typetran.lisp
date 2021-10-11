@@ -538,13 +538,21 @@
           (t
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
-             (if widetags
-                 `(or (%other-pointer-subtype-p ,object ',widetags)
-                      (typep ,object '(or ,@(mapcar #'type-specifier more-types))))
-                 `(or
-                   ,@(mapcar (lambda (x)
-                               `(typep ,object ',(type-specifier x)))
-                             more-types))))))))
+             (multiple-value-bind (predicate more-union-types)
+                 (split-union-type-tests type)
+               (cond ((and predicate
+                           (< (length more-union-types)
+                              (length more-types)))
+                      `(or (,predicate ,object)
+                           (typep ,object '(or ,@(mapcar #'type-specifier more-union-types)))))
+                     (widetags
+                      `(or (%other-pointer-subtype-p ,object ',widetags)
+                           (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
+                     (t
+                      `(or
+                        ,@(mapcar (lambda (x)
+                                    `(typep ,object ',(type-specifier x)))
+                                  more-types))))))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)

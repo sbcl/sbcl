@@ -212,6 +212,7 @@ of condition handling occurring."
 ;;; The real definitions are found in 'condition.lisp'
 (defvar *!cold-warn-action* #+sb-devel 'print #-sb-devel nil)
 (defun warn (datum &rest arguments)
+  (declare (explicit-check datum)) ;; CONDITION-CLASS not yet defined
   (when (and (stringp datum) (plusp (mismatch "defining setf macro" datum)))
     (return-from warn nil))
   (let ((action (cond ((boundp '*!cold-warn-action*) *!cold-warn-action*)
