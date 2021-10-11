@@ -368,7 +368,7 @@
           (if (singleton-p list) (car list) list))))
 
 ;;; This is used only to keep track of which vops emit which insts.
-(defvar **current-vop**)
+(defvar *current-vop*)
 
 ;;; Return the final statement emitted.
 (defun emit (section &rest things)
@@ -377,7 +377,7 @@
   ;; - a list (mnemonic . operands) for a machine instruction or assembler directive
   ;; - a function to emit a postit
   (let ((last (section-tail section))
-        (vop (if (boundp '**current-vop**) **current-vop**)))
+        (vop (if (boundp '*current-vop*) *current-vop*)))
     (dolist (thing things (setf (section-tail section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
           (if (stmt-mnemonic last)
@@ -440,8 +440,7 @@
                         (:code '(asmstream-code-section *asmstream*))
                         (:elsewhere '(asmstream-elsewhere-section *asmstream*))
                         (t dest)))))
-              ,@(when vop
-                  `((**current-vop** ,vop)))
+              ,@(when vop `((*current-vop* ,vop)))
               ,@(mapcar (lambda (name)
                           `(,name (gen-label)))
                         new-labels))
@@ -1422,7 +1421,7 @@
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble (segment section)
-  (let ((**current-vop** nil)
+  (let ((*current-vop* nil)
         (in-without-scheduling)
         (was-scheduling))
     ;; HEADER-SKEW is 1 word (in bytes) if the boxed code header word count is odd.
@@ -1447,9 +1446,9 @@
       (dump-symbolic-asm section sb-c::*compiler-trace-output*))
     (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
         ((null statement))
-      (awhen (stmt-vop statement) (setq **current-vop** it))
+      (awhen (stmt-vop statement) (setq *current-vop* it))
       (dolist (label (ensure-list (stmt-labels statement)))
-        (%emit-label segment **current-vop** label))
+        (%emit-label segment *current-vop* label))
       (let ((mnemonic (stmt-mnemonic statement))
             (operands (stmt-operands statement)))
         (if (functionp mnemonic)
@@ -1569,7 +1568,7 @@
             (if (eq section (asmstream-code-section asmstream))
                 :regular
                 :elsewhere)))
-      (sb-c::trace-instruction section-name **current-vop** mnemonic operands
+      (sb-c::trace-instruction section-name *current-vop* mnemonic operands
                                (asmstream-tracing-state asmstream)))))
 
 (defmacro inst (&whole whole mnemonic &rest args)
@@ -1904,7 +1903,7 @@
                 ',fun-name
                 (named-lambda ,(string fun-name) (,segment-name ,@operands)
                   (declare ,@decls)
-                  (let ,(and vop-name `((,vop-name **current-vop**)))
+                  (let ,(and vop-name `((,vop-name *current-vop*)))
                     (block ,fun-name ,@emitter)))
                 ',accept-prefixes))))
        ',fun-name)))
@@ -1930,7 +1929,7 @@
 
 (%def-inst-encoder '.align
                    (lambda (segment bits &optional (pattern 0))
-                     (%emit-alignment segment **current-vop** bits pattern)))
+                     (%emit-alignment segment *current-vop* bits pattern)))
 (%def-inst-encoder '.byte
                    (lambda (segment &rest bytes)
                      (dolist (byte bytes) (emit-byte segment byte))))
