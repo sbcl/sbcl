@@ -145,7 +145,7 @@
  ("src/code/type-class" :c-headers)
 
  ("src/code/cas" :not-host)
- ("src/code/thread-structs" :c-headers :block-compile) ; some defstructs for genesis
+ ("src/code/thread-structs" :c-headers #-sb-devel :block-compile) ; some defstructs for genesis
  ("src/compiler/early-c" :c-headers)
  ("src/pcl/slot-name")
 
@@ -243,7 +243,7 @@
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
- ("src/code/thread" :not-host :block-compile) ; provides *CURRENT-THREAD* for target-signal
+ ("src/code/thread" :not-host #-sb-devel :block-compile) ; provides *CURRENT-THREAD* for target-signal
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,
@@ -325,7 +325,7 @@
  ("src/code/foreign"         :not-host)
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
- ("src/code/bignum"          :not-host #-bignum-assertions :block-compile)
+ ("src/code/bignum"          :not-host #-(or bignum-assertions sb-devel) :block-compile)
  ("src/code/number-dispatch" :not-host)
  ("src/code/float-inf-nan"   :not-host)
  ("src/code/numbers"         :not-host)
