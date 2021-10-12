@@ -44,6 +44,7 @@
                          (setq style-warnp 'style-warning)))
                       (simple-warning
                         (lambda (c)
+                          (declare (ignore c))
                           (setq warnp 'warning))))
          (with-compilation-unit () ,@forms))
        (when (and (or warnp style-warnp) *fail-on-warnings*)
