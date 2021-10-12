@@ -330,8 +330,7 @@ and no value was provided for it." name))))))))))
 
       (cond #-sb-xc-host
             ((or (eq (info :function :type name) :generic-function)
-                 (and (fboundp name)
-                      (sb-pcl::generic-function-p (fdefinition name))))
+                 (eq (info :function :where-from name) :defined-method))
              (note-key-arg-mismatch name lossages))
             ((cdr lossages)
              (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"

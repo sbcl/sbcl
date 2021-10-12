@@ -516,15 +516,16 @@
                          (if (and (member '&rest ll) (not (member '&key ll)))
                              ll
                              (generic-function-pretty-arglist gf methods-in-compilation-unit)))))
-             (unless methods-in-compilation-unit ;; it's not yet added, don't store
-               ;; It would be nice if globaldb were transactional,
-               ;; so that either both updates or neither occur.
-               (setf (info :function :type name) type
-                     (info :function :where-from name) :defined-method))
-             type))
+
+             ;; It would be nice if globaldb were transactional,
+             ;; so that either both updates or neither occur.
+             (setf (info :function :where-from name) :defined-method
+                   (info :function :type name) type)))
           (methods-in-compilation-unit
-           (sb-c::ftype-from-lambda-list
-            (gf-merge-arglists methods-in-compilation-unit)))
+           (setf (info :function :where-from name) :defined-method
+                 (info :function :type name)
+                 (sb-c::ftype-from-lambda-list
+                  (gf-merge-arglists methods-in-compilation-unit))))
           (t
            ;; The defaulting expression for (:FUNCTION :TYPE) does not store
            ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
@@ -1714,10 +1715,10 @@
   (let ((gf-lambda-list (generic-function-lambda-list gf))
         (methods (generic-function-methods gf)))
     (flet ((lambda-list (m)
-             (or (loop for (qualifiers specializers lambda-list) in methods-in-compilation-unit
-                       when (and (equal (method-qualifiers m) qualifiers)
-                                 (equal (unparse-specializers gf (method-specializers m)) specializers))
-                       return lambda-list)
+             (or (and methods-in-compilation-unit
+                      (gethash (cons (method-qualifiers m)
+                                     (unparse-specializers gf (method-specializers m)))
+                               methods-in-compilation-unit))
                  (method-lambda-list m)))
            (canonize (k)
              (multiple-value-bind (kw var)
@@ -1728,20 +1729,23 @@
                    (list (list kw var))))))
       (multiple-value-bind (llks required optional rest keys)
           (parse-lambda-list gf-lambda-list :silent t)
-        (collect ((keys (mapcar #'canonize keys)))
-          ;; Possibly extend the keyword parameters of the gf by
-          ;; additional key parameters of its methods:
-          (flet ((process (lambda-list)
-                   (binding* (((m.llks nil nil nil m.keys)
-                               (parse-lambda-list lambda-list :silent t)))
-                     (setq llks (logior llks m.llks))
-                     (dolist (k m.keys)
-                       (unless (member (parse-key-arg-spec k) (keys)
-                                       :key #'parse-key-arg-spec :test #'eq)
-                         (keys (canonize k)))))))
-            (dolist (m methods)
-              (process (lambda-list m)))
-            (make-lambda-list llks nil required optional rest (keys))))))))
+        (if (or (ll-kwds-keyp llks)
+                (ll-kwds-restp llks))
+            (collect ((keys (mapcar #'canonize keys)))
+              ;; Possibly extend the keyword parameters of the gf by
+              ;; additional key parameters of its methods:
+              (flet ((process (lambda-list)
+                       (binding* (((m.llks nil nil nil m.keys)
+                                   (parse-lambda-list lambda-list :silent t)))
+                         (setq llks (logior llks m.llks))
+                         (dolist (k m.keys)
+                           (unless (member (parse-key-arg-spec k) (keys)
+                                           :key #'parse-key-arg-spec :test #'eq)
+                             (keys (canonize k)))))))
+                (dolist (m methods)
+                  (process (lambda-list m))))
+              (make-lambda-list llks nil required optional rest (keys)))
+            (make-lambda-list llks nil required optional))))))
 
 (defun gf-merge-arglists (methods-in-compilation-unit)
   (flet ((canonize (k)
@@ -1751,19 +1755,28 @@
                       (string= kw var))
                  var
                  (list (list kw var))))))
-    (multiple-value-bind (llks required optional rest keys)
-        (parse-lambda-list (third (car methods-in-compilation-unit)) :silent t)
-      (collect ((keys (mapcar #'canonize keys)))
-        ;; Possibly extend the keyword parameters of the gf by
-        ;; additional key parameters of its methods:
-        (flet ((process (lambda-list)
-                 (binding* (((m.llks nil nil nil m.keys)
-                             (parse-lambda-list lambda-list :silent t)))
-                   (setq llks (logior llks m.llks))
-                   (dolist (k m.keys)
-                     (unless (member (parse-key-arg-spec k) (keys)
-                                     :key #'parse-key-arg-spec :test #'eq)
-                       (keys (canonize k)))))))
-          (dolist (m (cdr methods-in-compilation-unit))
-            (process (third m)))
-          (make-lambda-list llks nil required optional rest (keys)))))))
+    (with-hash-table-iterator (iterator methods-in-compilation-unit)
+      (multiple-value-bind (llks required optional rest keys)
+          (parse-lambda-list (nth-value 2 (iterator)) :silent t)
+        (if (or (ll-kwds-keyp llks)
+                (ll-kwds-restp llks))
+            (collect ((keys (mapcar #'canonize keys)))
+              ;; Possibly extend the keyword parameters of the gf by
+              ;; additional key parameters of its methods:
+              (flet ((process (lambda-list)
+                       (binding* (((m.llks nil nil nil m.keys)
+                                   (parse-lambda-list lambda-list :silent t)))
+                         (setq llks (logior llks m.llks))
+                         (dolist (k m.keys)
+                           (unless (member (parse-key-arg-spec k) (keys)
+                                           :key #'parse-key-arg-spec :test #'eq)
+                             (keys (canonize k)))))))
+
+                (loop
+                 (multiple-value-bind (more key value) (iterator)
+                   (declare (ignore key))
+                   (unless more
+                     (return))
+                   (process value)))
+                (make-lambda-list llks nil required optional rest (keys))))
+            (make-lambda-list llks nil required optional))))))
