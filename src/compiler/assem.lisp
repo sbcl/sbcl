@@ -329,6 +329,9 @@
   ;; into the data section
   (constant-table (make-hash-table :test #'equal) :read-only t)
   (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
+  ;; for deterministic allocation profiler (or possibly other tooling)
+  ;; that wants to monkey patch the instructions at runtime.
+  (alloc-points)
   ;; tracking where we last wrote an instruction so that SB-C::TRACE-INSTRUCTION
   ;; can print "in the {x} section" whenever it changes.
   (tracing-state (list nil nil) :read-only t)) ; segment and vop
@@ -336,6 +339,12 @@
 ;;; FIXME: suboptimal since *asmstream* was declaimed earlier because reasons.
 ;;; (so we're missing uses of the known type even though the special var is known)
 (declaim (type asmstream *asmstream*))
+
+(defun get-allocation-points (asmstream)
+  ;; Convert the label positions to a packed integer
+  ;; Utilize PACK-CODE-FIXUP-LOCS to perform compression.
+  (awhen (mapcar 'label-posn (asmstream-alloc-points asmstream))
+    (sb-c::pack-code-fixup-locs it nil)))
 
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)

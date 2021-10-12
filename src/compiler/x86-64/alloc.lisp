@@ -160,7 +160,8 @@
              (inst inc :qword
                    (thread-slot-ea (+ thread-obj-size-histo-slot bucket)))))))
   (when (policy node (> sb-c::instrument-consing 1))
-    (let ((skip-instrumentation (gen-label)))
+    (let ((patch-loc (gen-label))
+          (skip-instrumentation (gen-label)))
       (inst mov temp-reg-tn (thread-slot-ea thread-profile-data-slot))
       (inst test temp-reg-tn temp-reg-tn)
       ;; This instruction is modified to "JMP :z" when profiling is
@@ -169,6 +170,8 @@
       ;; loss if the profiler is statically disabled. (one memory
       ;; read and a test whose result is never used, which the CPU
       ;; is good at ignoring as far as instruction prefetch goes)
+      (emit-label patch-loc)
+      (push patch-loc (sb-assem::asmstream-alloc-points sb-assem:*asmstream*))
       (inst jmp skip-instrumentation)
       (emit-alignment 3 :long-nop)
       (let ((helper (if (integerp size)

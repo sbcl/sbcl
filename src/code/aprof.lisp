@@ -82,9 +82,6 @@
 
 (defvar *allocation-profile-metadata* nil)
 
-(defvar *allocation-fixups-installed*
-  (make-hash-table :test 'eq :weakness :key :synchronized t))
-
 (define-alien-variable alloc-profile-buffer system-area-pointer)
 (defun aprof-reset ()
   (alien-funcall (extern-alien "memset" (function void system-area-pointer int size-t))
@@ -96,8 +93,7 @@
 (defun patch-fixups ()
   (let ((n-fixups 0)
         (n-patched 0)
-        (from-ht sb-c::*allocation-point-fixups*)
-        (to-ht *allocation-fixups-installed*))
+        (from-ht sb-c::*allocation-patch-points*))
     (when (plusp (hash-table-count from-ht))
       (dohash ((code fixups) from-ht)
         (do-packed-varints (loc fixups)
@@ -106,7 +102,6 @@
             (when (eql byte #xEB)
               (setf (sap-ref-8 (code-instructions code) loc) #x74) ; JEQ
               (incf n-patched))))
-        (setf (gethash code to-ht) fixups)
         (remhash code from-ht)))
     (values n-fixups n-patched)))
 

@@ -18,13 +18,11 @@
 
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
-(define-load-time-global *allocation-point-fixups*
+(define-load-time-global *allocation-patch-points*
   (make-hash-table :test 'eq :weakness :key :synchronized t))
 
 #-x86-64
 (progn
-(defun convert-alloc-point-fixups (dummy1 dummy2)
-  (declare (ignore dummy1 dummy2)))
 (defun sb-vm::statically-link-code-obj (code fixups)
   (declare (ignore code fixups))))
 
@@ -107,11 +105,7 @@
            (ecase kind
              (:relative (push offset (elt preserved-lists 1)))
              (:absolute (push offset (elt preserved-lists 2)))
-             (:absolute64 (push offset (elt preserved-lists 3)))))
-         ;; These won't exist except for x86-64, but it doesn't matter.
-         (when (member sym '(sb-vm::enable-alloc-counter
-                             sb-vm::enable-sized-alloc-counter))
-           (push offset (elt preserved-lists 4))))
+             (:absolute64 (push offset (elt preserved-lists 3))))))
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
@@ -123,9 +117,7 @@
            (when (or abs-fixups rel-fixups)
              (setf (sb-vm::%code-fixups code-obj)
                    (sb-c:pack-code-fixup-locs abs-fixups rel-fixups))))
-         (awhen (elt preserved-lists 4)
-           (setf (gethash code-obj *allocation-point-fixups*)
-                 (convert-alloc-point-fixups code-obj it)))
+
          ;; Assign all SIMPLE-FUN-SELF slots
          (dotimes (i (code-n-entries code-obj))
            (let ((fun (%code-entry-point code-obj i)))
@@ -142,13 +134,14 @@
          (aref preserved-lists 0)))
 
   (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
-    (dx-let ((preserved (make-array 5 :initial-element nil)))
+    (dx-let ((preserved (make-array 4 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
+        (binding* ((alloc-points (pop-fop-stack) :exit-if-null))
+          (setf (gethash code-obj *allocation-patch-points*) alloc-points))
         (dotimes (i n-fixups (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
               (sb-fasl::!unpack-fixup-info (pop-fop-stack))
-            (fixup code-obj offset (pop-fop-stack) kind flavor
-                   preserved nil))))
+            (fixup code-obj offset (pop-fop-stack) kind flavor preserved nil))))
       (finish-fixups code-obj preserved)))
 
   (defun apply-core-fixups (fixup-notes code-obj)
@@ -258,7 +251,7 @@
           (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
                   jumptable-word))))
 
-(defun make-core-component (component segment length fixup-notes object)
+(defun make-core-component (component segment length fixup-notes alloc-points object)
   (declare (type component component)
            (type segment segment)
            (type index length)
@@ -309,6 +302,9 @@
            ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
             (setf (%code-debug-info code-obj) debug-info)
             (apply-core-fixups fixup-notes code-obj))))
+
+    (when alloc-points
+      (setf (gethash code-obj *allocation-patch-points*) alloc-points))
 
       ;; Don't need code pinned now
       ;; (It will implicitly be pinned on the conservatively scavenged backends)

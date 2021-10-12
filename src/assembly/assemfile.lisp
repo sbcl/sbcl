@@ -68,6 +68,7 @@
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb-assem::segment-fixup-notes segment)
+                                     (sb-assem::get-allocation-points asmstream)
                                      *entry-points*
                                      lap-fasl-output))
           (setq won t))

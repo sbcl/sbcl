@@ -2206,7 +2206,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; In case we need to store code fixups in code objects.
 ;;; At present only the x86 backends use this
 (defvar *code-fixup-notes*)
-(defvar *allocation-point-fixup-notes*)
 
 (defun code-jump-table-words (code)
   (ldb (byte 14 0) (read-bits-wordindexed code (code-header-words code))))
@@ -2730,6 +2729,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (fop-stack code-obj n-fixups)
+  (let ((alloc-points (pop-fop-stack fop-stack)))
+    (when alloc-points
+      (cold-set 'sb-c::*!cold-allocation-patch-point*
+                (cold-cons (cold-cons code-obj alloc-points)
+                           (cold-symbol-value 'sb-c::*!cold-allocation-patch-point*)))))
   (dotimes (i n-fixups code-obj)
     (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
                (sym (pop-fop-stack fop-stack))
@@ -2763,13 +2767,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:named-call
               (+ (descriptor-bits (cold-fdefinition-object sym))
                  (- 2 sb-vm:other-pointer-lowtag))))
-           kind flavor))
-      (when (and (member sym '(sb-vm::enable-alloc-counter
-                               sb-vm::enable-sized-alloc-counter))
-                 ;; Ignore symbol fixups naming these assembly routines!
-                 (member flavor '(:assembly-routine :assembly-routine*)))
-        (push (cold-cons code-obj (make-fixnum-descriptor offset))
-              *allocation-point-fixup-notes*)))))
+           kind flavor)))))
 
 ;;;; sanity checking space layouts
 
@@ -3722,7 +3720,6 @@ III. initially undefined function references (alphabetically):
            *cold-assembler-obj*
            *deferred-undefined-tramp-refs*
            (*code-fixup-notes* (make-hash-table))
-           (*allocation-point-fixup-notes* nil)
            (*deferred-known-fun-refs* nil))
 
       (setf *nil-descriptor* (make-nil-descriptor)
@@ -3735,6 +3732,7 @@ III. initially undefined function references (alphabetically):
       (when core-file-name
         (initialize-packages))
       (initialize-static-space tls-init)
+      (cold-set 'sb-c::*!cold-allocation-patch-point* *nil-descriptor*)
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
@@ -3829,8 +3827,6 @@ III. initially undefined function references (alphabetically):
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb-vm::code-fixups-slot (repack-fixups (cdr pair))))
-      (cold-set 'sb-c::*!cold-allocation-point-fixups*
-                (vector-in-core *allocation-point-fixup-notes*))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)

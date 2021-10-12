@@ -1102,7 +1102,7 @@
 ;;; constants.
 ;;;
 ;;; We dump trap objects in any unused slots or forward referenced slots.
-(defun dump-code-object (component code-segment code-length fixups fasl-output)
+(defun dump-code-object (component code-segment code-length fixups alloc-points fasl-output)
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
@@ -1111,6 +1111,7 @@
          (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants))
          (n-named-calls 0))
+    (dump-object alloc-points fasl-output)
     (collect ((patches))
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.
@@ -1181,8 +1182,9 @@
 
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
-(defun dump-assembler-routines (code-segment octets fixups routines file)
+(defun dump-assembler-routines (code-segment octets fixups alloc-points routines file)
   (let ((n-fixups (dump-fixups fixups file)))
+    (dump-object alloc-points file)
     ;; The name -> address table has to be created before applying fixups
     ;; because a fixup may refer to an entry point in the same code component.
     ;; So these go on the stack last, i.e. nearest the top.
@@ -1211,11 +1213,7 @@
 
 ;;; Dump the code, constants, etc. for component. We pass in the
 ;;; assembler fixups, code vector and node info.
-(defun fasl-dump-component (component
-                            code-segment
-                            code-length
-                            fixups
-                            file)
+(defun fasl-dump-component (component code-segment code-length fixups alloc-points file)
   (declare (type component component))
   (declare (type fasl-output file))
 
@@ -1247,7 +1245,8 @@
                     `(:constant ,(sb-c::entry-info-form/doc entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
                     `(:constant ,(sb-c::entry-info-type/xref entry))))
-            (dump-code-object component code-segment code-length fixups file)))
+            (dump-code-object component code-segment code-length fixups
+                              alloc-points file)))
          (fun-index nfuns))
 
     (dolist (entry entries)

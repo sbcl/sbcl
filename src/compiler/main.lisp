@@ -647,7 +647,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
           (maybe-mumble "Code ")
           (multiple-value-bind (segment text-length fun-table
-                                elsewhere-label fixup-notes)
+                                elsewhere-label fixup-notes alloc-points)
               (let ((*compiler-trace-output*
                       (and (memq :vop *compile-trace-targets*)
                            *compiler-trace-output*)))
@@ -679,7 +679,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (core-object (maybe-mumble "Core") #'make-core-component)
                          (null (lambda (&rest dummies)
                                  (declare (ignore dummies)))))
-                       component segment (length bytes) fixup-notes
+                       component segment (length bytes)
+                       fixup-notes alloc-points
                        object))))))
 
   ;; We're done, so don't bother keeping anything around.

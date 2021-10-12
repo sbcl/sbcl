@@ -495,23 +495,6 @@
                  (snarf-error-junk sap offset trap-number length-only)))
            trap stream dstate)))))))
 
-;;; Note: this really has nothing to do with the code fixups, and we're
-;;; merely utilizing PACK-CODE-FIXUP-LOCS to perform data compression.
-(defun sb-c::convert-alloc-point-fixups (code locs)
-  ;; Find the instruction which jumps over the profiling code,
-  ;; and record the offset, and not the instruction that makes the call
-  ;; to enable the counter. The instructions preceding the call comprise
-  ;; a test, jmp, and long nop. Luckily a long nop encoding never
-  ;; has the byte #xEB in it, so just scan backwards looking for that.
-  (pack-code-fixup-locs
-   (mapcar (lambda (loc)
-             (loop (cond ((zerop (decf loc))
-                          (bug "Failed to find allocation point"))
-                         ((eql (sap-ref-8 (code-instructions code) loc) #xEB)
-                          (return loc)))))
-           locs)
-   nil))
-
 ;;; Disassemble memory of CODE from START-ADDRESS for LENGTH bytes
 ;;; calling FUNCTION on each instruction that has a PC-relative operand.
 ;;; If supplied, PREDICATE is used to filter out some function invocations.

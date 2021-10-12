@@ -400,7 +400,8 @@
            (make-segment :header-skew skew
                          :run-scheduler (default-segment-run-scheduler)))
         (values segment text-length fun-table
-                (asmstream-elsewhere-label asmstream) fixup-notes)))))
+                (asmstream-elsewhere-label asmstream) fixup-notes
+                (sb-assem::get-allocation-points asmstream))))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
