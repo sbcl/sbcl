@@ -93,7 +93,7 @@
                         (if to-r11
                             (if consp 'cons->r11 'alloc->r11)
                             (if consp 'cons->rnn 'alloc->rnn))
-                        node)
+                        node t)
     (unless to-r11
       (inst pop result-tn)))
   (unless (eql lowtag 0)
@@ -177,18 +177,17 @@
       (let ((helper (if (integerp size)
                         'enable-alloc-counter
                         'enable-sized-alloc-counter)))
-        (cond ((or (not node) ; assembly routine
-                   (sb-c::code-immobile-p node))
-               (inst call (make-fixup helper :assembly-routine)) ; 5 bytes
-               (emit-alignment 3 :long-nop))
-              (t
-               (inst call (ea (make-fixup helper :assembly-routine*))) ; 7 bytes
-               (inst nop))) ; align
-        (unless (integerp size)
-          ;; This TEST instruction is never executed- it informs the profiler
-          ;; which register holds SIZE.
-          (inst test size size) ; 3 bytes
-          (emit-alignment 3 :long-nop)))
+        ;; This jump is always encoded as 5 bytes
+        (inst call (if (or (not node) ; assembly routine
+                           (sb-c::code-immobile-p node))
+                       (make-fixup helper :assembly-routine)
+                       (uniquify-fixup helper))))
+      (emit-alignment 3 :long-nop)
+      (unless (integerp size)
+        ;; This TEST instruction is never executed- it informs the profiler
+        ;; which register holds SIZE.
+        (inst test size size) ; 3 bytes
+        (emit-alignment 3 :long-nop))
       (emit-label skip-instrumentation))))
 
 ;;; Emit code to allocate an object with a size in bytes given by

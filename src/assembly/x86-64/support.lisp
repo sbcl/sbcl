@@ -14,11 +14,24 @@
       (floor (+ feature-bit n-fixnum-tag-bits) n-byte-bits)
     (inst test :byte (static-symbol-value-ea '*cpu-feature-bits* byte) (ash 1 bit))))
 
-(defun invoke-asm-routine (inst routine vop)
+(defun uniquify-fixup (name &aux (asmstream *asmstream*))
+  (or (cdr (assoc name (sb-assem::asmstream-indirection-table asmstream)))
+      (let ((label (gen-label)))
+        ;; This has to be separate from the :ELSEWHERE section because we could be
+        ;; emitting code into :ELSEWHERE when requesting a unique label.
+        (assemble (:indirections)
+          (emit-label label)
+          (inst jmp (ea (make-fixup name :assembly-routine*))))
+        (push (cons name label) (sb-assem::asmstream-indirection-table asmstream))
+        label)))
+
+(defun invoke-asm-routine (inst routine vop &optional uniquify)
   (declare (ignorable vop))
   (let ((fixup
          (cond ((sb-c::code-immobile-p vop)
                 (make-fixup routine :assembly-routine))
+               (uniquify
+                (uniquify-fixup routine))
                (t
                 (ea (make-fixup routine :assembly-routine*))))))
     (ecase inst

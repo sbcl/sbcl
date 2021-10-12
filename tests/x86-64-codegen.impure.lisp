@@ -1073,3 +1073,13 @@ sb-vm::(define-vop (cl-user::test)
              (let ((*print-length* nil))
                (format t "h1=~s~%h2=~s~%" h1 h2)
                (error "Error on n-elements = ~d" n-elements)))))))
+
+(with-test (:name :uniquify-fixups)
+  (let* ((f (let ((sb-c::*compile-to-memory-space* :dynamic))
+              (compile nil
+                       '(lambda (x)
+                         `(,(list 1 2) ,(cons 1 2) ,(list nil x) ,(list '(a) #\x))))))
+         (fixups
+          (sb-c::unpack-code-fixup-locs
+           (sb-vm::%code-fixups (sb-kernel:fun-code-header f)))))
+    (assert (<= (length fixups) 2))))

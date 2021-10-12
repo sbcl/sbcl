@@ -319,6 +319,7 @@
 
 (defstruct asmstream
   (data-section (make-section) :read-only t)
+  (indirections-section (make-section) :read-only t)
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)
   (data-origin-label (gen-label "data start") :read-only t)
@@ -332,6 +333,11 @@
   ;; for deterministic allocation profiler (or possibly other tooling)
   ;; that wants to monkey patch the instructions at runtime.
   (alloc-points)
+  ;; for shrinking the size of the code fixups, we can choose to emit at most one call
+  ;; from a dynamic space code component to a given assembly routine. The call goes
+  ;; through an extra indirection in the component.
+  ;; This table is stored as an alist of (NAME . LABEL).
+  (indirection-table)
   ;; tracking where we last wrote an instruction so that SB-C::TRACE-INSTRUCTION
   ;; can print "in the {x} section" whenever it changes.
   (tracing-state (list nil nil) :read-only t)) ; segment and vop
@@ -448,6 +454,8 @@
                      ,(case dest
                         (:code '(asmstream-code-section *asmstream*))
                         (:elsewhere '(asmstream-elsewhere-section *asmstream*))
+                        (:indirections
+                         '(asmstream-indirections-section *asmstream*))
                         (t dest)))))
               ,@(when vop `((*current-vop* ,vop)))
               ,@(mapcar (lambda (name)
@@ -1494,8 +1502,10 @@
          (end-text (gen-label))
          (combined
            (append-sections
-             (append-sections (asmstream-data-section asmstream)
-                              (asmstream-code-section asmstream))
+            (append-sections (asmstream-data-section asmstream)
+                             (append-sections
+                              (asmstream-code-section asmstream)
+                              (asmstream-indirections-section asmstream)))
              (let ((section (asmstream-elsewhere-section asmstream)))
                (emit section
                      end-text
