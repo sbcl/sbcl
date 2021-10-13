@@ -86,7 +86,7 @@
   (:node-var node)
   (:note "SSE to pointer coercion")
   (:generator 13
-     (alloc-other y simd-pack-widetag simd-pack-size node)
+     (alloc-other simd-pack-widetag simd-pack-size y node nil)
        ;; see *simd-pack-element-types*
      (storew (fixnumize
               (sc-case x
@@ -187,7 +187,7 @@
   (:result-types t)
   (:node-var node)
   (:generator 13
-    (alloc-other dst simd-pack-widetag simd-pack-size node)
+    (alloc-other simd-pack-widetag simd-pack-size dst node nil)
       ;; see *simd-pack-element-types*
     (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
     (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)

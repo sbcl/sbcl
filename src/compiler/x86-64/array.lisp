@@ -69,6 +69,7 @@
   (:arg-types positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :to :eval) bytes)
   (:temporary (:sc any-reg :to :result) header)
+  (:temporary (:sc unsigned-reg :offset 11) temp) ; TODO: remove the offset
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 13
@@ -82,9 +83,9 @@
     (inst shl :dword header array-rank-byte-pos)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
-    (instrument-alloc nil bytes node)
+    (instrument-alloc nil bytes node temp)
     (pseudo-atomic ()
-     (allocation nil bytes 0 node nil result)
+     (allocation nil bytes 0 result node temp)
      (storew header result 0 0)
      (inst or :byte result other-pointer-lowtag))))
 

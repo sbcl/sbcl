@@ -68,7 +68,7 @@
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-vm #:rbp-offset)
   (:import-from #:sb-x86-64-asm
-                #:get-gpr #:reg #:reg-num
+                #:register-p #:get-gpr #:reg #:reg-num
                 #:machine-ea #:machine-ea-p
                 #:machine-ea-disp #:machine-ea-base #:machine-ea-index
                 #:inc #:add #:mov))
@@ -166,7 +166,15 @@
 ;;; "don't know how to dump R13 (default MAKE-LOAD-FORM method called)."
 #-sb-show
 (setq *allocation-templates*
-      `((array ;; also array-header
+      `((fixed+header
+         (add ?end ?nbytes)
+         (cmp :qword ?end :tlab-limit)
+         (jmp :nbe ?_)
+         (mov :qword :tlab-freeptr ?end)
+         (add ?end ?bias)
+         (mov ?_ (ea ?_ ?end) ?header))
+
+        (array ;; also array-header
                (xadd ?free ?size)
                (cmp :qword ?free :tlab-limit)
                (jmp :nbe ?_)
@@ -410,16 +418,17 @@
     (let* ((inst (get-instruction iterator))
            (ea (third inst))) ; (INC :qword EA)
       (when (and (eq (car inst) 'inc)
-                 (eql (machine-ea-base ea) (sb-c:tn-offset sb-vm::temp-reg-tn))
+                 (machine-ea-base ea)
                  (null (machine-ea-index ea)))
         (incf (car iterator))
-        (let ((profiler-index (machine-ea-disp ea)))
+        (let ((profiler-base (machine-ea-base ea))
+              (profiler-index (machine-ea-disp ea)))
           ;; Optional: the total number of bytes at the allocation point
           (let* ((inst (get-instruction iterator))
                  (ea (third inst)))
             (when (and (eq (car inst) 'add)
                        (machine-ea-p ea)
-                       (eql (machine-ea-base ea) (sb-c:tn-offset sb-vm::temp-reg-tn))
+                       (eql (machine-ea-base ea) profiler-base)
                        (null (machine-ea-index ea))
                        (eql (machine-ea-disp ea) (+ profiler-index sb-vm:n-word-bytes)))
               (incf (car iterator)))))))
@@ -462,7 +471,7 @@
             ;; when register indirect mode is used without a SIB byte.
             (when (eq nbytes 0)
               (setq nbytes nil))
-            (cond ((and (member type '(array any))
+            (cond ((and (member type '(fixed+header array any))
                         (typep header '(or sb-vm:word sb-vm:signed-word)))
                    (setq type (aref *tag-to-type* (logand header #xFF)))
                    (when (eq type 'instance)

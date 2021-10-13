@@ -68,10 +68,11 @@ sb-vm::
   (:node-var node)
   (:generator 1
     (let* ((bytes large-object-size) ; payload + header total
+           (temp sb-vm::r11-tn)
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
-      (instrument-alloc nil bytes node)
+      (instrument-alloc nil bytes node temp)
       (pseudo-atomic ()
-       (allocation nil bytes 0 node nil result)
+       (allocation nil bytes 0 result node temp)
        (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
        (storew* (fixnumize words) result vector-length-slot 0 t)
        (inst or :byte result other-pointer-lowtag)))))
@@ -146,9 +147,13 @@ sb-vm::
                                      ;; FIXME: need to return nbytes with or without a report
                                      #|:report nil|#
                                      )))
-    (assert (= (loop for i below n
-                     sum (sb-ext:primitive-object-size (make-array i)))
-               nbytes))))
+    ;; If the lisp image was compiled with cons profiling, then the COMPILE
+    ;; inside MAKE-NEW-CODE was also instrumented, messing up the result.
+    ;; (The compiler conses about ~128Kb but there's no way to predict how much)
+    (unless (sb-c:policy nil (> sb-c:instrument-consing 0))
+      (assert (= (loop for i below n
+                       sum (sb-ext:primitive-object-size (make-array i)))
+                 nbytes)))))
 
 (with-test (:name :aprof-brutal-test)
   (with-scratch-file (fasl "fasl")

@@ -47,15 +47,6 @@
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (alloc->r11 (:export cons->r11) (:return-style :none)) ()
-  (inst or :byte (ea 8 rsp-tn) 1)
-  CONS->R11
-  (with-registers-preserved (c :except r11-tn)
-    (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
-    (inst mov r11-tn rax-tn))
-  (inst ret 8)) ; pop argument
-
 (define-assembly-routine (alloc-dispatch (:return-style :none)) ()
   ;; If RDI has a 0 in the low bit, then we're allocating cons cells.
   ;; A 1 bit signifies anything other than cons cells, and is equivalent
@@ -67,7 +58,6 @@
 
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.
-;;; FIXME: we're missing routines that preserve YMM. I guess nobody cares.
 (define-assembly-routine (enable-alloc-counter) ()
   (with-registers-preserved (c)
     (inst lea rdi-tn (ea 8 rbp-tn))
@@ -143,7 +133,7 @@
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
-  (with-registers-preserved (lisp :except r11-tn)
+  (with-registers-preserved (lisp)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
@@ -151,13 +141,13 @@
 (define-assembly-routine (sb-impl::install-hash-table-lock
                           (:return-style :raw))
   ()
-  (with-registers-preserved (lisp :except r11-tn)
+  (with-registers-preserved (lisp)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'sb-impl::install-hash-table-lock 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
 
 (define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
-  (with-registers-preserved (lisp :except r11-tn)
+  (with-registers-preserved (lisp)
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'update-object-layout 1)
     (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc

@@ -1302,6 +1302,7 @@
   (:generator 20
     (let ((loop (gen-label))
           (done (gen-label))
+          (alloc-temp temp-reg-tn) ; TODO: use VALUE as temp
           (stack-allocate-p (node-stack-allocate-p node)))
       ;; Compute the number of bytes to allocate
       (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
@@ -1311,10 +1312,13 @@
       ;; Setup for the CDR of the last cons (or the entire result) being NIL.
       (inst mov result nil-value)
       (inst jrcxz DONE)
-      (unless stack-allocate-p (instrument-alloc 'list rcx node))
+      (unless stack-allocate-p
+        (instrument-alloc 'list rcx node (list value dst)))
       (pseudo-atomic (:elide-if stack-allocate-p)
        ;; Produce an untagged pointer into DST
-       (allocation 'list rcx 0 node stack-allocate-p dst)
+       (if stack-allocate-p
+           (stack-allocation rcx 0 dst)
+           (allocation 'list rcx 0 dst node alloc-temp))
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
