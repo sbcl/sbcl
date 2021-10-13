@@ -316,7 +316,9 @@
        (cond ((and (eql (numeric-type-class type) 'integer)
                    (and (fixnump low)
                         (fixnump high)
-                        (<= (1+ (- high low)) 2)))
+                        #+(or x86 x86-64 arm arm64)
+                        (/= low 0)
+                        (< (- high low) 2)))
               ;; The fixnum-mod-p case is worse than just EQ testing with
               ;; only 2 values in the range. (INTEGER 1 2) would have become
               ;;   (and (not (eq x 0)) (fixnump x) (not (> x 2))).
