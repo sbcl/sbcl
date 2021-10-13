@@ -281,8 +281,7 @@
   (assemble ()
     (inst b :eq MULTIPLE)
     (move start csp-tn)
-    (inst add csp-tn csp-tn n-word-bytes)
-    (inst str (first *register-arg-tns*) (@ start))
+    (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
     (inst mov count (fixnumize 1))
     (inst b DONE)
     MULTIPLE
