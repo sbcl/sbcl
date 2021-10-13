@@ -37,9 +37,92 @@
                 (first flags))
             dest)))
 
+(define-load-time-global *cmov-ptype-representation-vop*
+  (mapcan (lambda (entry)
+            (destructuring-bind (ptypes &optional sc vop)
+                entry
+              (mapcar (if (and vop sc)
+                          (lambda (ptype)
+                            (list ptype sc vop))
+                          #'list)
+                      (ensure-list ptypes))))
+          '((t descriptor-reg move-if/descriptor)
+            ((fixnum positive-fixnum) any-reg move-if/descriptor)
+            ((unsigned-byte-64 unsigned-byte-63) unsigned-reg move-if/word)
+            (signed-byte-64 signed-reg move-if/word)
+            (character character-reg move-if/char)
+            ((single-float complex-single-float
+              double-float complex-double-float))
+            (system-area-pointer sap-reg move-if/sap))))
+
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
-  nil)
+  (declare (ignore node))
+  (let* ((ptype (sb-c::tn-primitive-type dst-tn))
+         (name  (sb-c:primitive-type-name ptype))
+         (param (cdr (or (assoc name *cmov-ptype-representation-vop*)
+                         '(t descriptor-reg move-if/descriptor)))))
+    (when param
+      (destructuring-bind (representation vop) param
+        (let ((scn (sc-number-or-lose representation)))
+          (labels ((make-tn (tn)
+                     (cond ((and (tn-sc tn)
+                                 (or
+                                  (and
+                                   (sc-is tn immediate)
+                                   (eq (tn-value tn) 0))
+                                  (and
+                                   (sc-is tn descriptor-reg)
+                                   (eql (tn-offset tn) null-offset))))
+                            tn)
+                           (t
+                            (make-representation-tn ptype scn)))))
+            (values vop
+                    (make-tn x-tn) (make-tn y-tn)
+                    (make-tn dst-tn)
+                    nil)))))))
+
+
+(define-vop (move-if)
+  (:args (then) (else))
+  (:results (res))
+  (:info flags)
+  (:generator 0
+    (let ((not-p (eq (first flags) 'not)))
+      (when not-p (pop flags))
+      (flet ((zr (tn)
+               (cond ((and (eq (tn-kind tn) :constant)
+                           (eq (tn-value tn) 0))
+                      zr-tn)
+                     (t
+                      tn))))
+        (setf then (zr then)
+              else (zr else))
+        (cond ((null (rest flags))
+               (inst csel res then else (if not-p
+                                            (negate-condition (car flags))
+                                            (car flags))))
+              (not-p
+               (dolist (flag flags)
+                 (inst csel res else then flag)))
+              (t
+               (dolist (flag flags)
+                 (inst csel res then else flag))))))))
+
+(macrolet ((def-move-if (name type reg)
+             `(define-vop (,name move-if)
+                (:args (then :scs ,reg
+                             :load-if (not (and (sc-is then immediate)
+                                                (eql (tn-value then) 0))))
+                       (else :scs ,reg
+                             :load-if (not (and (sc-is else immediate)
+                                                (eql (tn-value else) 0)))))
+                (:arg-types ,type ,type)
+                (:results (res :scs ,reg))
+                (:result-types ,type))))
+  (def-move-if move-if/descriptor * (descriptor-reg any-reg))
+  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg))
+  (def-move-if move-if/char character (character-reg))
+  (def-move-if move-if/sap system-area-pointer (sap-reg)))
 
 
 ;;;; Conditional VOPs:
@@ -52,23 +135,15 @@
                        (immediate
                         (not (fixnum-add-sub-immediate-p (tn-value y))))
                        (t t))))
-  (:conditional)
-  (:info target not-p)
+  (:conditional :eq)
   (:policy :fast-safe)
   (:translate eq)
   (:generator 6
-    (cond ((not (and (sc-is y immediate)
-                     (eql 0 (tn-value y))))
-           (inst cmp x
-                 (sc-case y
-                   (immediate
-                    (fixnumize (tn-value y)))
-                   (t y)))
-           (inst b (if not-p :ne :eq) target))
-          (not-p
-           (inst cbnz x target))
-          (t
-           (inst cbz x target)))))
+    (inst cmp x
+      (sc-case y
+        (immediate
+         (fixnumize (tn-value y)))
+        (t y)))))
 
 (macrolet ((def (eq-name eql-name cost)
              `(define-vop (,eq-name ,eql-name)
