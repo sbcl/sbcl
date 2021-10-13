@@ -327,6 +327,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "INLINING-DEPENDENCY-FAILURE"
                "INSERT-ARRAY-BOUNDS-CHECKS"
                "INSERT-STEP-CONDITIONS"
+               "INSTRUMENT-CONSING"
                "IR2-COMPONENT-CONSTANTS" "IR2-CONVERT"
                "IR2-PHYSENV-NUMBER-STACK-P"
                "KNOWN-CALL-LOCAL" "KNOWN-RETURN"
@@ -2679,6 +2680,11 @@ package is deprecated in favour of SB-MOP."
       :doc "public: the interface to the profiler"
       :use ("CL" "SB-EXT" "SB-INT" "SB-KERNEL")
       :export ("PROFILE" "REPORT" "RESET" "UNPROFILE"))
+
+   #s(sb-cold:package-data
+      :name "SB-APROF"
+      :doc "public: the interface to the deterministic consing profiler"
+      :use ("CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-ALIEN" "SB-SYS"))
 
    #s(sb-cold:package-data
       :name "SB-SEQUENCE"

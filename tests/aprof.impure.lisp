@@ -130,6 +130,26 @@ sb-vm::
                   (sb-aprof:aprof-run #'my-list :arguments '(a b c)))))
     (assert (= nbytes (* sb-vm:n-word-bytes 6)))))
 
+(defun make-new-code (n)
+  (let ((f
+         (compile nil
+                   '(lambda (n)
+                     (declare (optimize sb-c::instrument-consing))
+                     (make-array (the fixnum n))))))
+    (loop for i below n
+       do (funcall f i))
+    f))
+(with-test (:name :make-new-code)
+  (let* ((n 20)
+         (nbytes (sb-aprof:aprof-run #'make-new-code :arguments n
+                                     :stream (make-broadcast-stream)
+                                     ;; FIXME: need to return nbytes with or without a report
+                                     #|:report nil|#
+                                     )))
+    (assert (= (loop for i below n
+                     sum (sb-ext:primitive-object-size (make-array i)))
+               nbytes))))
+
 (with-test (:name :aprof-brutal-test)
   (with-scratch-file (fasl "fasl")
     ;; Just compile anything that exercises the compiler.

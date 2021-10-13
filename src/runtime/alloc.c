@@ -40,7 +40,7 @@ lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 os_vm_address_t alloc_profile_buffer; // array of counters
 static size_t profile_buffer_size;
 lispobj alloc_profile_data;           // SIMPLE-VECTOR of <code-component,PC>
-boolean alloc_profiling;              // enabled flag
+int alloc_profiling;              // enabled flag
 
 #ifdef LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_SB_THREAD
@@ -142,6 +142,7 @@ void allocation_profiler_start()
     }
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
+    fflush(stdout);
 }
 
 // This is not exactly threadsafe. Don't try anything fancy.

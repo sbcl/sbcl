@@ -90,20 +90,25 @@
                  (* (/ (length *allocation-profile-metadata*) 2)
                     sb-vm:n-word-bytes)))
 
-(defun patch-fixups ()
-  (let ((n-fixups 0)
-        (n-patched 0)
-        (from-ht sb-c::*allocation-patch-points*))
-    (when (plusp (hash-table-count from-ht))
-      (dohash ((code fixups) from-ht)
-        (do-packed-varints (loc fixups)
-          (incf n-fixups)
-          (let ((byte (sap-ref-8 (code-instructions code) loc)))
-            (when (eql byte #xEB)
-              (setf (sap-ref-8 (code-instructions code) loc) #x74) ; JEQ
-              (incf n-patched))))
-        (remhash code from-ht)))
-    (values n-fixups n-patched)))
+(defun patch-code (code locs &aux (n 0) (n-patched 0))
+  (do-packed-varints (loc locs)
+    (incf n)
+    (let ((byte (sap-ref-8 (code-instructions code) loc)))
+      (when (eql byte #xEB)
+        (setf (sap-ref-8 (code-instructions code) loc) #x74) ; JEQ
+        (incf n-patched))))
+  (values n n-patched))
+
+(defun patch-all-code ()
+  (let ((total-n-patch-points 0)
+        (total-n-patched 0)
+        (ht sb-c::*allocation-patch-points*))
+    (dohash ((code locs) ht)
+      (remhash code ht)
+      (multiple-value-bind (n-patch-points n-patched) (patch-code code locs)
+        (incf total-n-patch-points n-patch-points)
+        (incf total-n-patched n-patched)))
+    (values total-n-patch-points total-n-patched)))
 
 (defun aprof-start ()
   (let ((v *allocation-profile-metadata*))
@@ -645,16 +650,17 @@
 ;;; cons profiling.
 ;;; STREAM is where to report, defaulting to *standard-output*.
 ;;; The convention is that of map-segment-instructions, meaning NIL is a sink.
-(defun aprof-run (fun &key (stream *standard-output*) arguments)
+(defun aprof-run (fun &key (report t) (stream *standard-output*) arguments)
   (aprof-reset)
-  (patch-fixups)
+  (patch-all-code)
   (dx-let ((arglist (cons arguments nil))) ; so no consing in here
     (when (listp arguments)
       (setq arglist (car arglist))) ; was already a list
     (let (nbytes)
       (unwind-protect
            (progn (aprof-start) (apply fun arglist))
-        (aprof-stop)
+        (aprof-stop))
+      (when report
         (setq nbytes (aprof-show :stream stream))
         (when stream (terpri stream)))
       nbytes)))

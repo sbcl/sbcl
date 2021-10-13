@@ -1082,4 +1082,8 @@ sb-vm::(define-vop (cl-user::test)
          (fixups
           (sb-c::unpack-code-fixup-locs
            (sb-vm::%code-fixups (sb-kernel:fun-code-header f)))))
-    (assert (<= (length fixups) 2))))
+    ;; There are 5 call outs to the fallback allocator, but only 2 (or 3)
+    ;; fixups to the asm routines, because of uniquification per code component.
+    ;; 2 of them are are CONS->RNN and CONS->R11
+    ;; the other is ENABLE-ALLOC-COUNTER which may or may not be present
+    (assert (<= (length fixups) 3))))

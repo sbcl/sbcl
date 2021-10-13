@@ -29,6 +29,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
 (require :sb-sprof)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
+#+(and x86-64 linux sb-thread) (push :test-aprof *features*)
 (in-package run-tests)
 (import '(sb-alien:alien-funcall sb-alien:extern-alien
           sb-alien:int sb-alien:c-string sb-alien:unsigned))
@@ -154,6 +155,10 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                              (sb-sys:fd-stream-fd stream) 1)
               (alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
             (setq file (car file))
+            #+test-aprof
+            (unless (search "allocator.pure" file)
+              (sb-aprof::aprof-start)
+              (proclaim '(optimize sb-c:instrument-consing)))
             ;; Send this to the log file, not the terminal
             (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                   *error-output*))
@@ -182,6 +187,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                          (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
                            (format output "~7d ~s~%" count name)))))
                    (sb-sprof:stop-profiling)
+                   #+test-aprof (progn (sb-aprof::aprof-stop) (sb-aprof:aprof-show))
                    (when (member :allocator-metrics sb-impl:+internal-features+)
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))

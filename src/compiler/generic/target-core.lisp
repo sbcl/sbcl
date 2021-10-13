@@ -304,7 +304,10 @@
             (apply-core-fixups fixup-notes code-obj))))
 
     (when alloc-points
-      (setf (gethash code-obj *allocation-patch-points*) alloc-points))
+      #+(and x86-64 sb-thread)
+      (if (= (extern-alien "alloc_profiling" int) 0) ; record the object for later
+          (setf (gethash code-obj *allocation-patch-points*) alloc-points)
+          (funcall 'sb-aprof::patch-code code-obj alloc-points)))
 
       ;; Don't need code pinned now
       ;; (It will implicitly be pinned on the conservatively scavenged backends)
