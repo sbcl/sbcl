@@ -469,17 +469,12 @@
                 (emit-add-sub-shift-reg segment size ,op shift (tn-offset rm)
                                         amount (tn-offset rn) (tn-offset rd))))
              ((extend-p rm)
-              (let* ((shift 0)
+              (let* ((shift (extend-operand rm))
                      (extend (ecase (extend-kind rm)
                                (:uxtb #b00)
                                (:uxth #b001)
                                (:uxtw #b010)
-                               (:lsl
-                                (aver (or (= (extend-operand rm) 0)
-                                          (= (extend-operand rm) 3)))
-                                (setf shift 1)
-                                #b011)
-                               (:uxtx #b011)
+                               ((:lsl :uxtx) #b011)
                                (:sxtb #b100)
                                (:sxth #b101)
                                (:sxtw #b110)
@@ -749,7 +744,9 @@
     (when (shifter-operand-p rm)
       (setf shift (shifter-operand-function-code rm)
             amount (shifter-operand-operand rm)))
-    (emit-logical-reg segment +64-bit-size+ opc
+    (emit-logical-reg segment
+                      (reg-size rd)
+                      opc
                       shift n (tn-offset
                                (if (shifter-operand-p rm)
                                    (shifter-operand-register rm)
@@ -1359,8 +1356,7 @@
                   (extend (if (extend-p offset)
                               (ecase (extend-kind offset)
                                 (:uxtw #b010)
-                                (:lsl
-                                 #b011)
+                                (:lsl #b011)
                                 (:sxtw #b110)
                                 (:sxtx #b111))
                               #b011)))
