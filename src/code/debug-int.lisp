@@ -939,7 +939,7 @@
                           (make-bogus-debug-fun
                            "bogus stack frame"))
                          (t
-                          (debug-fun-from-pc code pc-offset)))))
+                          (debug-fun-from-pc code pc-offset escaped)))))
             (make-compiled-frame caller up-frame d-fun
                                  (code-location-from-pc d-fun pc-offset
                                                         escaped)
