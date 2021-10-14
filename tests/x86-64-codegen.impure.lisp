@@ -11,6 +11,11 @@
 
 #-x86-64 (sb-ext:exit :code 104)
 
+;;; This trivial function failed to compile due to rev 88d078fe
+(defun foo (&key k)
+  (make-list (reduce #'max (mapcar #'length k))))
+(compile 'foo)
+
 (with-test (:name :lowtag-test-elision)
   ;; This tests a certain behavior that while "undefined" should at least not
   ;; be fatal. This is important for things like hash-table :TEST where we might

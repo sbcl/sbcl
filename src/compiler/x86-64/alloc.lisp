@@ -319,7 +319,7 @@
             (size (* (pad-data-block cons-size) cons-cells))
             (lowtag (if (<= cons-cells 2) 0 list-pointer-lowtag)))
         (unless stack-allocate-p
-          (instrument-alloc 'list size node (list res ptr temp)))
+          (instrument-alloc 'list size node (list ptr temp)))
         (pseudo-atomic (:elide-if stack-allocate-p)
           (if stack-allocate-p
               (stack-allocation size lowtag res)
@@ -674,7 +674,7 @@
             (loop (gen-label))
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
-        (instrument-alloc 'list size node limit)
+        (instrument-alloc 'list size node (list limit tail))
         (pseudo-atomic ()
          (allocation 'list size list-pointer-lowtag result node alloc-temp)
          (compute-end)
