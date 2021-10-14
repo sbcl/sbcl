@@ -771,10 +771,14 @@
 
 (defoptimizer (%%primitive derive-type) ((template info &rest args))
   (declare (ignore info args))
-  (let ((type (template-type (gethash (lvar-value template) *backend-template-names*))))
-    (if (fun-type-p type)
-        (fun-type-returns type)
-        *wild-type*)))
+  (let* ((template (gethash (lvar-value template) *backend-template-names*))
+         (type (template-type template)))
+    (cond ((zerop (vop-info-num-results template))
+           (values-specifier-type '(values &optional)))
+          ((fun-type-p type)
+           (fun-type-returns type))
+          (t
+           *wild-type*))))
 
 ;;;; local call
 

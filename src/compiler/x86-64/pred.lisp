@@ -358,12 +358,6 @@
   (:args-var x-tn-ref)
   (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
   (:generator 6
-    ;; Why is this getting called with two NILs? That seems super dumb.
-    (when (and (sc-is x immediate) (eq (tn-value x) nil)
-               (sc-is y immediate) (eq (tn-value y) nil))
-      (zeroize temp)
-      ;; (bug "Should not happen")
-      (return-from if-eq))
     (cond
       ((sc-is y constant)
        (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)

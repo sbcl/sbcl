@@ -18,7 +18,8 @@
 ;;; be used.
 ;;; This is only enabled for certain build configurations that need
 ;;; a scratch register in various random places.
-#-ubsan (defconstant global-temp-reg nil)
+#-ubsan (eval-when (:compile-toplevel :load-toplevel :execute)
+          (defconstant global-temp-reg nil))
 #+ubsan (progn (define-symbol-macro temp-reg-tn r11-tn)
                (defconstant global-temp-reg 11))
 
