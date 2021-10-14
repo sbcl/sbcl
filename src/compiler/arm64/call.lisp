@@ -192,8 +192,9 @@
 (defun default-unknown-values (vop values nvals move-temp node)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals) (type tn move-temp))
-  (let ((type (sb-c::node-derived-type node))
-        (expecting-values-on-stack (> nvals register-arg-count)))
+  (let* ((type (sb-c::node-derived-type node))
+         (min-values (values-type-min-value-count type))
+         (expecting-values-on-stack (> nvals register-arg-count)))
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
@@ -208,14 +209,20 @@
              (val (tn-ref-across values) (tn-ref-across val)))
             ((= i (min nvals register-arg-count)))
           (unless (eq (tn-kind (tn-ref-tn val)) :unused)
-            (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne))))
+            (cond
+              ((and min-values
+                    (> min-values i)))
+              (t
+               (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne))))))
 
       ;; If we're not expecting values on the stack, all that
       ;; remains is to clear the stack frame (for the multiple-
       ;; value return case).
       (unless (or expecting-values-on-stack
                   (type-single-value-p type))
-        (inst csel csp-tn ocfp-tn csp-tn :eq))
+        (if (values-type-may-be-single-value-p type)
+            (inst csel csp-tn ocfp-tn csp-tn :eq)
+            (inst mov csp-tn ocfp-tn)))
 
       ;; If we ARE expecting values on the stack, we need to
       ;; either move them to their result location or to set their
@@ -225,9 +232,10 @@
         ;; For the single-value return case, fake up NARGS and
         ;; OCFP so that we don't screw ourselves with the
         ;; defaulting and stack clearing logic.
-        (inst csel ocfp-tn csp-tn ocfp-tn :ne)
-        (inst mov tmp-tn (fixnumize 1))
-        (inst csel nargs-tn tmp-tn nargs-tn :ne)
+        (unless (> min-values 1)
+          (inst csel ocfp-tn csp-tn ocfp-tn :ne)
+          (inst mov tmp-tn (fixnumize 1))
+          (inst csel nargs-tn tmp-tn nargs-tn :ne))
 
         ;; For each expected stack value...
         (do ((i register-arg-count (1+ i))
@@ -238,22 +246,64 @@
                   (tn-ref-across val)))
             ((null val))
           (let ((tn (tn-ref-tn val)))
-            (if (eq (tn-kind tn) :unused)
-                (incf decrement (fixnumize 1))
-                (assemble ()
-                  ;; ... Load it if there is a stack value available, or
-                  ;; default it if there isn't.
-                  (inst subs nargs-tn nargs-tn decrement)
-                  (setf decrement (fixnumize 1))
-                  (inst b :lt NONE)
-                  (loadw move-temp ocfp-tn i 0)
-                  NONE
-                  (sc-case tn
-                    (control-stack
-                     (inst csel move-temp null-tn move-temp :lt)
-                     (store-stack-tn tn move-temp))
-                    (t
-                     (inst csel tn null-tn move-temp :lt)))))))
+            (cond ((eq (tn-kind tn) :unused)
+                   (incf decrement (fixnumize 1)))
+                  ((< i min-values)
+                   (incf decrement (fixnumize 1))
+                   (sc-case tn
+                     (control-stack
+                      (let* ((next (and (< (1+ i) min-values)
+                                        (tn-ref-across val)))
+                             (next-tn (and next
+                                           (tn-ref-tn next))))
+                        (cond ((and next-tn
+                                    (not (sc-is next-tn control-stack))
+                                    (neq (tn-kind next-tn) :unused)
+                                    (ldp-stp-offset-p (* i n-word-bytes) n-word-bits))
+                               (inst ldp move-temp next-tn
+                                     (@ ocfp-tn (* i n-word-bytes)))
+                               (store-stack-tn tn move-temp)
+                               (setf val next)
+                               (incf i)
+                               (incf decrement (fixnumize 1)))
+                              (t
+                               (loadw move-temp ocfp-tn i)
+                               (store-stack-tn tn move-temp)))))
+                     (t
+                      (let* ((next (and (< (1+ i) min-values)
+                                        (tn-ref-across val)))
+                             (next-tn (and next
+                                           (tn-ref-tn next))))
+                        (cond ((and next-tn
+                                    (neq (tn-kind next-tn) :unused)
+                                    (ldp-stp-offset-p (* i n-word-bytes) n-word-bits))
+                               (let ((stack (sc-is next-tn control-stack)))
+                                 (inst ldp tn (if stack
+                                                  move-temp
+                                                  next-tn)
+                                       (@ ocfp-tn (* i n-word-bytes)))
+                                 (when stack
+                                   (store-stack-tn next-tn move-temp)))
+                               (setf val next)
+                               (incf i)
+                               (incf decrement (fixnumize 1)))
+                              (t
+                               (loadw tn ocfp-tn i)))))))
+                  (t
+                   (assemble ()
+                     ;; ... Load it if there is a stack value available, or
+                     ;; default it if there isn't.
+                     (inst subs nargs-tn nargs-tn decrement)
+                     (setf decrement (fixnumize 1))
+                     (inst b :lt NONE)
+                     (loadw move-temp ocfp-tn i)
+                     NONE
+                     (sc-case tn
+                       (control-stack
+                        (inst csel move-temp null-tn move-temp :lt)
+                        (store-stack-tn tn move-temp))
+                       (t
+                        (inst csel tn null-tn move-temp :lt))))))))
         ;; Deallocate the callee stack frame.
         (move csp-tn ocfp-tn))))
   (values))
