@@ -56,7 +56,7 @@
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (object-slot-ea ,ptr ,slot ,lowtag)))
 
-(defun storew (value ptr &optional (slot 0) (lowtag 0))
+(defun storew (value ptr &optional (slot 0) (lowtag 0) temp)
   (let* ((size (if (tn-p value)
                    (sc-operand-size (tn-sc value))
                    :qword))
@@ -64,8 +64,11 @@
     (aver (eq size :qword))
     (cond ((and (integerp value)
                 (not (typep value '(signed-byte 32))))
-           (inst mov temp-reg-tn value)
-           (inst mov ea temp-reg-tn))
+           (cond (temp
+                  (inst mov temp value)
+                  (inst mov ea temp))
+                 (t
+                  (bug "need temp reg for STOREW of oversized immediate operand"))))
           (t
            (inst mov :qword ea value)))))
 
@@ -372,6 +375,7 @@
               (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
        (:vop-var vop)
+       (:temporary (:sc unsigned-reg) val-temp)
        (:generator 4
          ,@(when (eq translate 'sb-bignum:%bignum-set)
              '((bignum-index-check object index 0 vop)))
@@ -380,4 +384,4 @@
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
-           (gen-cell-set ea value)))))
+           (gen-cell-set ea value val-temp)))))

@@ -174,6 +174,15 @@
          (add ?end ?bias)
          (mov ?_ (ea ?_ ?end) ?header))
 
+        (var-array
+         (add ?end ?nbytes)
+         (cmp :qword ?end :tlab-limit)
+         (jmp :nbe ?_)
+         (mov :qword :tlab-freeptr ?end)
+         (sub ?end ?nbytes)
+         (mov ?_ (ea ?_ ?end) ?header)
+         (mov ?_ (ea ?_ ?end) ?vector-len))
+
         (array ;; also array-header
                (xadd ?free ?size)
                (cmp :qword ?free :tlab-limit)
@@ -471,9 +480,11 @@
             ;; when register indirect mode is used without a SIB byte.
             (when (eq nbytes 0)
               (setq nbytes nil))
-            (cond ((and (member type '(fixed+header array any))
+            (cond ((and (member type '(fixed+header var-array array any))
                         (typep header '(or sb-vm:word sb-vm:signed-word)))
                    (setq type (aref *tag-to-type* (logand header #xFF)))
+                   (when (register-p nbytes)
+                     (setq nbytes nil))
                    (when (eq type 'instance)
                      (setq type (deduce-layout iterator bindings))))
                   ((eq type 'list) ; listify-rest-arg

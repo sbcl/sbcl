@@ -13,6 +13,19 @@
 
 ;;;; register specs
 
+;;; A register that's never used by the code generator, and can therefore
+;;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
+;;; be used.
+;;; This is only enabled for certain build configurations that need
+;;; a scratch register in various random places.
+#-ubsan (defconstant global-temp-reg nil)
+#+ubsan (progn (define-symbol-macro temp-reg-tn r11-tn)
+               (defconstant global-temp-reg 11))
+
+;;; Kludge needed for decoding internal error args - we assume that the
+;;; shadow memory is pointed to by this register (RAX).
+(defconstant msan-temp-reg-number 0)
+
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
              `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -45,7 +58,7 @@
                              array))))
                 (defglobal ,offsets-list
                     (remove-if (lambda (x)
-                                 (member x `(,r11-offset ; temp reg
+                                 (member x `(,global-temp-reg ; if there is one
                                              ,r13-offset ; thread base
                                              ,rsp-offset
                                              ,rbp-offset)))
@@ -376,11 +389,6 @@
 (defun stack-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'stack)))
-
-;; A register that's never used by the code generator, and can therefore
-;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
-;; be used.
-(define-symbol-macro temp-reg-tn r11-tn)
 
 ;;; TNs for registers used to pass arguments
 ;;; This can't be a DEFCONSTANT-EQX, for a similar reason to above, but worse.

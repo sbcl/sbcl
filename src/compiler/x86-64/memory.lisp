@@ -18,7 +18,7 @@
                  (+ nil-value (static-symbol-offset symbol) offset)
                  (make-fixup symbol :immobile-symbol offset)))))
 
-(defun gen-cell-set (ea value)
+(defun gen-cell-set (ea value val-temp)
   (if (sc-is value immediate)
       (let ((bits (encode-value-if-immediate value)))
         ;; Try to move imm-to-mem if BITS fits
@@ -29,8 +29,8 @@
                     (plausible-signed-imm32-operand-p bits))
                 (inst mov :qword ea it))
                (t
-                (inst mov temp-reg-tn bits)
-                (inst mov ea temp-reg-tn))))
+                (inst mov val-temp bits)
+                (inst mov ea val-temp))))
       (inst mov :qword ea value)))
 
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
@@ -49,8 +49,9 @@
          (value :scs (descriptor-reg any-reg immediate)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
+  (:temporary (:sc unsigned-reg) val-temp)
   (:generator 4
-    (gen-cell-set (object-slot-ea object offset lowtag) value)))
+    (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))
 
 ;;; X86 special
 (define-vop (cell-xadd)

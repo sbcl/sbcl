@@ -38,6 +38,7 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
+  (:temporary (:sc unsigned-reg) val-temp)
   #-ubsan (:ignore name)
   (:generator 1
     (cond #+ubsan
@@ -49,7 +50,7 @@
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
-           (gen-cell-set (object-slot-ea object offset lowtag) value)))))
+           (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -78,13 +79,12 @@
   (:args (object :scs (descriptor-reg immediate))
          (value :scs (descriptor-reg any-reg immediate)))
   (:policy :fast-safe)
+  (:temporary (:sc unsigned-reg) val-temp)
   (:generator 4
-    (gen-cell-set (cond ((sc-is object immediate)
-                         (symbol-slot-ea (tn-value object) symbol-value-slot))
-                        (t
-                         (object-slot-ea object symbol-value-slot
-                                                  other-pointer-lowtag)))
-                  value)))
+    (gen-cell-set (if (sc-is object immediate)
+                      (symbol-slot-ea (tn-value object) symbol-value-slot)
+                      (object-slot-ea object symbol-value-slot other-pointer-lowtag))
+                  value val-temp)))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -198,12 +198,13 @@
       (:args (symbol :scs (descriptor-reg))
              (value :scs (descriptor-reg any-reg immediate)))
       (:temporary (:sc descriptor-reg) cell)
+      (:temporary (:sc unsigned-reg) val-temp)
       (:generator 4
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
         (compute-virtual-symbol)
-        (gen-cell-set (symbol-value-slot-ea cell) value)))
+        (gen-cell-set (symbol-value-slot-ea cell) value val-temp)))
 
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
@@ -357,15 +358,15 @@
   (:policy :fast-safe)
   (:translate ensure-symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
+  (:results (res :from :load :scs (any-reg))) ; force it to conflict with arg 0
   (:result-types positive-fixnum)
   (:vop-var vop)
   (:generator 5
-    (when (location= res symbol) (move temp-reg-tn symbol)) ; save a backup
+    (aver (not (location= res symbol)))
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst test :dword res res)
     (inst jmp :ne good)
-    (inst push (if (location= res symbol) temp-reg-tn symbol))
+    (inst push symbol)
     (invoke-asm-routine 'call 'ensure-symbol-hash vop)
     (inst pop res)
     GOOD
@@ -721,10 +722,11 @@
   (:arg-types * (:constant integer) unsigned-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 3
     ;; Use RESULT as the source of the exchange, unless doing so
     ;; would clobber NEWVAL
-    (let ((source (if (location= result instance) temp-reg-tn result)))
+    (let ((source (if (location= result instance) temp result)))
       (if (sc-is newval immediate)
           (inst mov source (constantize (tn-value newval)))
           (move source newval))
@@ -732,7 +734,7 @@
                         instance-pointer-lowtag) instance)
             source)
       (unless (eq source result)
-        (move result temp-reg-tn)))))
+        (move result temp)))))
 
 ;;;; code object frobbing
 

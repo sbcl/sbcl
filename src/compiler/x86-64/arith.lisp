@@ -27,6 +27,7 @@
 (define-vop (fixnum-unop fast-safe-arith-op)
   (:args (x :scs (any-reg control-stack) :target res :load-if nil))
   (:results (res :scs (any-reg control-stack) :load-if nil))
+  (:temporary (:sc unsigned-reg) temp)
   (:note "inline fixnum arithmetic")
   (:arg-types tagged-num)
   (:result-types tagged-num))
@@ -34,22 +35,23 @@
 (define-vop (signed-unop fast-safe-arith-op)
   (:args (x :scs (signed-reg signed-stack) :target res :load-if nil))
   (:results (res :scs (signed-reg signed-stack) :load-if nil))
+  (:temporary (:sc unsigned-reg) temp)
   (:note "inline (signed-byte 64) arithmetic")
   (:arg-types signed-num)
   (:result-types signed-num))
 
 ;;; logical or arithmetic negation
-(defun emit-inline-neg (op arg result vop &optional fixnump)
+(defun emit-inline-neg (op arg result temp vop &optional fixnump)
   (declare (ignore vop))
   ;; If ARG and RESULT are the same location, then the initial and final MOVEs
   ;; are both no-ops. If different locations and not both memory,
   ;; then the initial move is a physical move and the final is a no-op.
-  ;; If both are stack locations, then compute the answer in temp-reg-tn.
+  ;; If both are stack locations, then compute the answer in temp.
   ;; (REG might be a stack location, not necessarily a GPR in this emitter.
   ;; It's just a naming convention that is consistent with other emitters)
   (let ((reg (if (or (alias-p arg result) (gpr-tn-p arg) (gpr-tn-p result))
                  result
-                 temp-reg-tn)))
+                 temp)))
     (move reg arg)
     (case op
       (not (if fixnump (inst xor reg (fixnumize -1)) (inst not reg)))
@@ -59,36 +61,36 @@
 (define-vop (fast-negate/fixnum fixnum-unop)
   (:translate %negate)
   (:vop-var vop)
-  (:generator 1 (emit-inline-neg 'neg x res vop)))
+  (:generator 1 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-negate/signed signed-unop)
   (:translate %negate)
   (:vop-var vop)
-  (:generator 2 (emit-inline-neg 'neg x res vop)))
+  (:generator 2 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-negate/unsigned signed-unop)
   (:args (x :scs (unsigned-reg unsigned-stack) :target res :load-if nil))
   (:arg-types unsigned-num)
   (:translate %negate)
   (:vop-var vop)
-  (:generator 3 (emit-inline-neg 'neg x res vop)))
+  (:generator 3 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-negate/signed-unsigned signed-unop)
   (:results (res :scs (unsigned-reg unsigned-stack) :load-if nil))
   (:result-types unsigned-num)
   (:translate %negate)
   (:vop-var vop)
-  (:generator 3 (emit-inline-neg 'neg x res vop)))
+  (:generator 3 (emit-inline-neg 'neg x res temp vop)))
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
   (:vop-var vop)
-  (:generator 1 (emit-inline-neg 'not x res vop t)))
+  (:generator 1 (emit-inline-neg 'not x res temp vop t)))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
   (:vop-var vop)
-  (:generator 2 (emit-inline-neg 'not x res vop nil)))
+  (:generator 2 (emit-inline-neg 'not x res temp vop nil)))
 
 ;;;; binary fixnum operations
 
@@ -303,14 +305,14 @@
     (rotatef x y)) ; weird! why did IR1 not flip the args?
   (values x y))
 
-(defun emit-inline-smul (op x y result vop dummy taggedp) ; signed multiply
+(defun emit-inline-smul (op x y result temp vop dummy taggedp) ; signed multiply
   (declare (ignore op dummy))
   (multiple-value-setq (x y) (prepare-alu-operands 'mul x y vop 'identity t))
   (aver (not (integerp x)))
   (let ((constant-y (integerp y))) ; don't need to unscale Y if true
     (when (and constant-y (not (typep y '(signed-byte 32))))
       (setq y (register-inline-constant :qword y)))
-    (let ((reg (if (gpr-tn-p result) result temp-reg-tn)))
+    (let ((reg (if (gpr-tn-p result) result temp)))
       (cond ((integerp y)
              (inst imul reg x y))
             ((alias-p reg y)
@@ -336,7 +338,7 @@
 ;;; is going.
 ;;; Non-commutative operations (notably SUB) need a little extra care.
 ;;; MUL is also a bit different due to asymmetry of the instruction.
-(defun emit-inline-add-sub (op x y result vop const-tn-xform)
+(defun emit-inline-add-sub (op x y result temp vop const-tn-xform)
   (declare (type (member add sub) op))
   (multiple-value-setq (x y)
     (prepare-alu-operands op x y vop const-tn-xform (eq op 'add)))
@@ -359,8 +361,8 @@
                ;; At most one memory operand. Result could be memory or register.
                (inst* op x y))
               (t ; two memory operands: X is not a GPR, Y is neither GPR nor immm
-               (inst mov temp-reg-tn y)
-               (inst* op x temp-reg-tn)))
+               (inst mov temp y)
+               (inst* op x temp)))
         (return-from emit-inline-add-sub))
       (when (and (alias-p result y) commutative)
         ;; Result in the same location as Y can happen because we no longer specify
@@ -368,22 +370,22 @@
         (cond ((or (gpr-tn-p x) (gpr-tn-p y))
                (inst* op y x))
               (t
-               (inst mov temp-reg-tn x)
-               (inst* op y temp-reg-tn)))
+               (inst mov temp x)
+               (inst* op y temp)))
         (return-from emit-inline-add-sub))
       (let ((reg (if (and (gpr-tn-p result)
                           ;; If Y aliases RESULT in SUB, then an initial (move reg x)
                           ;; could clobber Y.
                           (or commutative (not (alias-p result y))))
                      result
-                     temp-reg-tn)))
+                     temp)))
         (cond ((and (eq op 'add) ; LEA can't do subtraction
                     (gpr-tn-p x) y-is-reg-or-imm32) ; register + (register | imm32)
                (inst lea reg (if (fixnump y) (ea y x) (ea x y))))
               (t
                ;; If commutative, then neither X nor Y is an alias of RESULT.
                ;; If non-commutative, then RESULT could be Y, in which case REG is
-               ;; TEMP-REG-TN so that we don't trash Y by moving X into it.
+               ;; TEMP so that we don't trash Y by moving X into it.
                (inst mov reg x)
                (inst* op reg y)))
         (move result reg))))
@@ -409,10 +411,11 @@
                   (:arg-types ,primtype ,primtype)
                   (:results (r :scs ,scs :load-if nil))
                   (:result-types ,primtype)
+                  (:temporary (:sc unsigned-reg) temp)
                   (:vop-var vop) ;; (:node-var node)
                   (:note ,note)
                   (:generator ,(1+ cost)
-                   (,emit ',op x y r vop ',val-xform ,@extra)))
+                   (,emit ',op x y r temp vop ',val-xform ,@extra)))
                 (define-vop (,name/c fast-safe-arith-op)
                   (:translate ,fun-name)
                   (:args (x :scs ,scs :target r :load-if nil))
@@ -420,10 +423,11 @@
                   (:arg-types ,primtype (:constant ,type))
                   (:results (r :scs ,scs :load-if nil))
                   (:result-types ,primtype)
+                  (:temporary (:sc unsigned-reg) temp)
                   (:vop-var vop) ;; (:node-var node)
                   (:note ,note)
                   (:generator ,cost
-                   (,emit ',op x (,val-xform y) r vop ',val-xform ,@extra))))))
+                   (,emit ',op x (,val-xform y) r temp vop ',val-xform ,@extra))))))
   (def + fast-+/fixnum=>fixnum fast-+-c/fixnum=>fixnum
        (any-reg control-stack) tagged-num fixnum 1 fixnumize)
   (def + fast-+/signed=>signed fast-+-c/signed=>signed
@@ -703,7 +707,7 @@
              `(multiple-value-bind (save result)
                   (if (or (location= number result) (gpr-tn-p number) (gpr-tn-p result))
                       (values nil result)
-                      (values result temp-reg-tn))
+                      (values result temp))
                 (move result number)
                 (assemble ()
                  ,@body)
@@ -720,6 +724,7 @@
   (:note "inline ASH")
   (:variant nil)
   (:variant-vars modularp)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 2
     (cond ((= amount 0) (bug "shifting by 0"))
           ((>= amount 64) ; shifting left (zero fill)
@@ -752,6 +757,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:note "inline ASH")
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 3
     (with-shift-operands
       (move ecx amount)
@@ -767,6 +773,7 @@
   (:results (result :scs (signed-reg signed-stack)))
   (:result-types signed-num)
   (:note "inline ASH")
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 3
     (cond ((encodable-as-lea) (generate-lea))
           (t
@@ -783,6 +790,7 @@
   (:results (result :scs (unsigned-reg unsigned-stack)))
   (:result-types unsigned-num)
   (:note "inline ASH")
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 3
     (cond ((= amount 0) (bug "shifting by 0"))
           ((not (< -64 amount 64)) (zeroize result))
@@ -803,6 +811,7 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:note "inline ASH")
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (with-shift-operands
       (move ecx amount)
@@ -818,6 +827,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:note "inline ASH")
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (with-shift-operands
       (move ecx amount)
@@ -909,6 +919,7 @@
   (:results (result :scs (unsigned-reg unsigned-stack) :from (:argument 0)))
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (with-shift-operands
       (move rcx amount)
@@ -923,6 +934,7 @@
   (:results (result :scs (signed-reg signed-stack) :from (:argument 0)))
   (:result-types signed-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (with-shift-operands
       (move rcx amount)
@@ -937,6 +949,7 @@
   (:results (result :scs (any-reg control-stack) :from (:argument 0)))
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 3
     (with-shift-operands
       (move rcx amount)
@@ -1251,6 +1264,7 @@
 (define-vop (fast-conditional)
   (:conditional :e)
   (:info)
+  (:temporary (:sc unsigned-reg) temp)
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
@@ -1286,10 +1300,10 @@
   (:arg-types unsigned-num (:constant (unsigned-byte 64)))
   (:info y))
 
-(defun ensure-not-mem+mem (x y)
+(defun ensure-not-mem+mem (x y temp)
   (cond ((sc-is x immediate)
-         (inst mov temp-reg-tn (tn-value x))
-         (ensure-not-mem+mem temp-reg-tn y))
+         (inst mov temp (tn-value x))
+         (ensure-not-mem+mem temp y nil))
         (t
          (when (and (tn-p y)
                     (sc-is y immediate))
@@ -1299,14 +1313,14 @@
                    (return-from ensure-not-mem+mem (values x it)))
                   ((typep y '(unsigned-byte 32))
                    ;; Rather than a RIP-relative constant, load a dword (w/o sign-extend)
-                   (inst mov :dword temp-reg-tn y)
-                   (return-from ensure-not-mem+mem (values x temp-reg-tn))))
+                   (inst mov :dword temp y)
+                   (return-from ensure-not-mem+mem (values x temp))))
            (setq y (register-inline-constant :qword y)))
          (cond ((or (gpr-tn-p x) (gpr-tn-p y))
                 (values x y))
                (t
-                (inst mov temp-reg-tn x)
-                (values temp-reg-tn y))))))
+                (inst mov temp x)
+                (values temp y))))))
 
 (defun immediate-operand-smallest-nbits (x)
   (declare (type word x))
@@ -1333,7 +1347,7 @@
 ;;; if doing so could affect whether the sign flag comes out the same.
 ;;; e.g. if EDX is #xff, "TEST EDX, #x80" indicates a non-negative result
 ;;; whereas "TEST DL, #x80" indicates a negative result.
-(defun emit-optimized-test-inst (x y sign-bit-matters)
+(defun emit-optimized-test-inst (x y temp sign-bit-matters)
   (let* ((bits (if (or (not (integerp y)) (minusp y))
                    64
                    (immediate-operand-smallest-nbits y)))
@@ -1349,8 +1363,8 @@
           (and (eq size :word) (not (logtest #xFF y)))))
     (cond ((not size)
            ;; Ensure that both operands are acceptable
-           ;; by possibly loading one into TEMP-REG-TN
-           (multiple-value-setq (x y) (ensure-not-mem+mem x y))
+           ;; by possibly loading one into TEMP
+           (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
            (inst test :qword x y))
           ((sc-is x control-stack unsigned-stack signed-stack)
            ;; Otherwise, when using an immediate operand smaller
@@ -1380,7 +1394,7 @@
                          (:generator ,cost
                           (emit-optimized-test-inst x
                            ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                           nil)))))))
+                           temp nil)))))))
   (define-logtest-vops))
 
 ;;; This works for tagged or untagged values, but the vop optimizer
@@ -1410,8 +1424,8 @@
        (cond ((integerp y)
               (inst test :qword val y))
              (t
-              (inst mov temp-reg-tn val)
-              (inst test :qword temp-reg-tn y)))))))
+              (inst mov temp val)
+              (inst test :qword temp y)))))))
 
 ;;; Try to absorb a memory load into LOGTEST.
 ;;; This removes one instruction and possibly shortens the TEST by eliding
@@ -1499,15 +1513,16 @@
          (int :scs (constant signed-reg signed-stack unsigned-reg unsigned-stack)
               :load-if nil))
   (:arg-types untagged-num untagged-num)
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
     (when (sc-is int constant immediate) (setq int (tn-value int)))
     ;; Force INT to be a RIP-relative operand if it is a constant.
     (let ((word (if (integerp int) (register-inline-constant :qword int) int))
           (bit (cond ((sc-is bit signed-reg unsigned-reg) bit)
-                     (t (inst mov :dword temp-reg-tn bit)
+                     (t (inst mov :dword temp bit)
                         (when (sc-is bit any-reg control-stack)
-                          (inst shr :dword temp-reg-tn n-fixnum-tag-bits))
-                        temp-reg-tn))))
+                          (inst shr :dword temp n-fixnum-tag-bits))
+                        temp))))
       (inst bt word bit))))
 
 (defun change-tested-flag (vop from-flag to-flag)
@@ -1565,6 +1580,7 @@
   (:args-var arg-ref)
   (:vop-var vop)
   (:conditional :ne)
+  (:ignore temp)
   (:generator 1
     ;; This resembles the above case for TN being not in a GPR
     (binding* ((slot-disp (cdr (tn-ref-memory-access arg-ref)))
@@ -1606,7 +1622,7 @@
               (sb-c::delete-vop vop)
               new)))))))
 
-(defun emit-optimized-cmp (x y &optional x-ctype)
+(defun emit-optimized-cmp (x y temp &optional x-ctype)
   ;; Shorten the encoding by eliding a REX prefix where the upper bits
   ;; can not possibly matter.
   ;; Be sure to account for N-FIXNUM-TAG-BITS in determining how many bits
@@ -1628,7 +1644,7 @@
       ;; quite confusing, and I would prefer that we alter the branch test
       ;; when emitting TEST in place of CMP.
         (inst test operand-size x x) ; smaller instruction
-        (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y))
+        (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
                (inst cmp operand-size x y)))))
 
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
@@ -1644,7 +1660,7 @@
                         (:generator ,cost
                           (emit-optimized-cmp
                            x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                           (tn-ref-type x-tn-ref)))))
+                           temp (tn-ref-type x-tn-ref)))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
                    '(4 3 6 5 6 5)
                    '(t t t t nil nil)))))
@@ -1719,19 +1735,19 @@
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
   (:translate eql %eql/integer)
-  (:generator 6 (emit-optimized-cmp x y)))
+  (:generator 6 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
   (:translate eql %eql/integer)
-  (:generator 5 (emit-optimized-cmp x y)))
+  (:generator 5 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
   (:translate eql %eql/integer)
-  (:generator 6 (emit-optimized-cmp x y)))
+  (:generator 6 (emit-optimized-cmp x y temp)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
   (:translate eql %eql/integer)
-  (:generator 5 (emit-optimized-cmp x y)))
+  (:generator 5 (emit-optimized-cmp x y temp)))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
 ;;; known fixnum.
@@ -1748,7 +1764,7 @@
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql %eql/integer)
-  (:generator 4 (emit-optimized-cmp x y)))
+  (:generator 4 (emit-optimized-cmp x y temp)))
 
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg control-stack))
@@ -1764,7 +1780,7 @@
   (:policy :fast-safe)
   (:translate eql %eql/integer)
   (:args-var x-tn-ref)
-  (:generator 2 (emit-optimized-cmp x (fixnumize y) (tn-ref-type x-tn-ref))))
+  (:generator 2 (emit-optimized-cmp x (fixnumize y) temp (tn-ref-type x-tn-ref))))
 
 ;;; FIXME: this seems never to be invoked any more. What did we either break or improve?
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)

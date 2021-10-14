@@ -69,7 +69,7 @@
   (:arg-types positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :to :eval) bytes)
   (:temporary (:sc any-reg :to :result) header)
-  (:temporary (:sc unsigned-reg :offset 11) temp) ; TODO: remove the offset
+  (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 13
@@ -311,11 +311,12 @@
                                                      n-word-bytes
                                                      vector-data-offset))
                    ,el-type)
+       (:temporary (:sc unsigned-reg) val-temp)
        (:generator 4
          ,@(unless (eq type 'simple-vector) '((unpoison-element object index addend)))
          (gen-cell-set (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
                            object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                       value)))
+                       value val-temp)))
      (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
@@ -327,11 +328,12 @@
                                                      n-word-bytes
                                                      vector-data-offset))
                    ,el-type)
+       (:temporary (:sc unsigned-reg) val-temp)
        (:generator 3
          ,@(unless (eq type 'simple-vector) '((unpoison-element object (+ index addend))))
          (gen-cell-set (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag)
                            object)
-                       value)))))
+                       value val-temp)))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
@@ -433,8 +435,9 @@
              (cond ((typep disp '(signed-byte 32))
                     (inst* inst :dword (ea disp bv) bit))
                    (t                   ; excessive index, really?
-                    (inst mov temp-reg-tn index)
-                    (inst* inst (ea (bit-base 0) bv) temp-reg-tn))))))
+                    (aver temp)
+                    (inst mov temp index)
+                    (inst* inst (ea (bit-base 0) bv) temp))))))
         (t
          ;; mem/reg BT[SR] are really slow.
          (inst mov word index)

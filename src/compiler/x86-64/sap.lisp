@@ -163,16 +163,16 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 /// and we store the shadow _before_ the app store."
 |#
 
-(defun emit-sap-ref (size insn modifier result ea node vop)
-  (declare (ignorable node size vop))
+(defun emit-sap-ref (size insn modifier result ea node vop temp)
+  (declare (ignorable node size vop temp))
   (cond
    #+linux
    ((and (sb-c:msan-unpoison sb-c:*compilation*) (policy node (> safety 0)))
-    ;; Must not clobber TEMP-REG-TN with the load.
-    (aver (not (location= temp-reg-tn result)))
-    (inst lea temp-reg-tn ea)
-    (sb-assem:inst* insn modifier result (ea temp-reg-tn))
-    (inst xor temp-reg-tn (thread-slot-ea thread-msan-xor-constant-slot))
+    ;; Must not clobber TEMP with the load.
+    (aver (not (location= temp result)))
+    (inst lea temp ea)
+    (sb-assem:inst* insn modifier result (ea temp))
+    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
     ;; Per the documentation, shadow is tested _after_
     (let ((mask (sb-c::masked-memory-load-p vop))
           (good (gen-label))
@@ -181,17 +181,17 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
       ;; If the load is going to be masked, then we must only check the
       ;; shadow bits under the mask.
       (cond ((not mask)
-             (inst cmp size (ea temp-reg-tn) 0))
+             (inst cmp size (ea temp) 0))
             ((or (neq size :qword) (plausible-signed-imm32-operand-p mask))
-             (inst test size (ea temp-reg-tn)
+             (inst test size (ea temp)
                    (ldb (byte (* 8 nbytes) 0) mask)))
             (t
              ;; Test two 32-bit chunks of the shadow memory since we don't
              ;; have an available register to load a 64-bit constant.
-             (inst test :dword (ea temp-reg-tn) (ldb (byte 32 0) mask))
+             (inst test :dword (ea temp) (ldb (byte 32 0) mask))
              (setq bad (gen-label))
              (inst jmp :ne bad)
-             (inst test :dword (ea 4 temp-reg-tn) (ldb (byte 32 32) mask))))
+             (inst test :dword (ea 4 temp) (ldb (byte 32 32) mask))))
       (inst jmp :e good)
       (when bad (emit-label bad))
       (inst break sb-vm:uninitialized-load-trap)
@@ -203,29 +203,29 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
    (t
     (sb-assem:inst* insn modifier result ea))))
 
-(defun emit-sap-set (size ea value)
+(defun emit-sap-set (size ea value temp)
   #+linux
   (when (sb-c:msan-unpoison sb-c:*compilation*)
-    (inst lea temp-reg-tn ea)
-    (inst xor temp-reg-tn (thread-slot-ea thread-msan-xor-constant-slot))
-    (inst mov size (ea temp-reg-tn) 0))
+    (inst lea temp ea)
+    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
+    (inst mov size (ea temp) 0))
   (when (sc-is value constant immediate)
     (cond ((plausible-signed-imm32-operand-p (tn-value value))
            (setq value (tn-value value)))
           (t
-           (inst mov temp-reg-tn (tn-value value))
-           (setq value temp-reg-tn))))
+           (inst mov temp (tn-value value))
+           (setq value temp))))
   (inst mov size ea value))
 
-(defun emit-cas-sap-ref (size sap offset oldval newval result rax)
+(defun emit-cas-sap-ref (size sap offset oldval newval result rax temp)
   (multiple-value-bind (disp index)
       (cond ((sc-is offset signed-reg)
              (values 0 offset))
             ((typep (tn-value offset) '(signed-byte 32))
              (values (tn-value offset) nil))
             (t
-             (inst mov temp-reg-tn (tn-value offset))
-             (values 0 temp-reg-tn)))
+             (inst mov temp (tn-value offset))
+             (values 0 temp)))
     (cond ((sc-is oldval immediate constant)
            (inst mov rax (tn-value oldval)))
           ((not (location= oldval rax))
@@ -234,6 +234,10 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (unless (location= result rax)
       (inst mov (if (eq size :qword) :qword :dword) result rax))))
 
+;;; TODO: these should be refactored so that there is only one vop for any given
+;;; result storage class. In particular, sap-ref-{8,16,32} can all produce tagged-num.
+;;; The vop can examine the node to see which function it translates
+;;; and select the appropriate modifier to movzx or movsx.
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     ref-insn
@@ -266,8 +270,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                           (:result-types ,type)
                           (:temporary (:sc unsigned-reg :offset rax-offset
                                        :from (:argument 0) :to :result) rax)
+                          (:temporary (:sc unsigned-reg) temp)
                           (:generator 3
-                            (emit-cas-sap-ref ',size sap offset oldval newval result rax)))))
+                            (emit-cas-sap-ref ',size sap offset oldval newval result rax temp)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -278,8 +283,13 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:result-types ,type)
                     (:node-var node)
                     (:vop-var vop)
+                    ;; this temp has to be wired because the uninitialized-load-trap handler
+                    ;; looks in RAX to get the poisoned address.
+                    ;; We should have a different variant of this reffer for msan or no msan
+                    ;; to avoid wasting a register that is not needed.
+                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
                     (:generator 3 (emit-sap-ref ,size ',ref-insn
-                                                ',modifier result (ea sap offset) node vop)))
+                                                ',modifier result (ea sap offset) node vop temp)))
                   (define-vop (,(symbolicate ref-name "-C"))
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -290,8 +300,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:result-types ,type)
                     (:node-var node)
                     (:vop-var vop)
+                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
                     (:generator 2 (emit-sap-ref ,size ',ref-insn
-                                                ',modifier result (ea offset sap) node vop)))
+                                                ',modifier result (ea offset sap) node vop temp)))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -299,8 +310,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                            (sap :scs (sap-reg))
                            (offset :scs (signed-reg)))
                     (:arg-types ,type system-area-pointer signed-num)
+                    (:temporary (:sc unsigned-reg) temp)
                     (:generator 5
-                      (emit-sap-set ,size (ea sap offset) value)))
+                      (emit-sap-set ,size (ea sap offset) value temp)))
                   (define-vop (,(symbolicate set-name "-C"))
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -308,8 +320,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                            (sap :scs (sap-reg)))
                     (:arg-types ,type system-area-pointer (:constant (signed-byte 32)))
                     (:info offset)
+                    (:temporary (:sc unsigned-reg) temp)
                     (:generator 4
-                      (emit-sap-set ,size (ea offset sap) value)))))))
+                      (emit-sap-set ,size (ea offset sap) value temp)))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
     unsigned-reg positive-fixnum :byte)

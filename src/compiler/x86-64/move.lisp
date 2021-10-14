@@ -65,10 +65,11 @@
                (not (or (location= x y)
                         (and (sc-is x any-reg descriptor-reg immediate)
                              (sc-is y control-stack))))))
+  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)) temp)
   (:generator 0
     (if (and (sc-is x immediate)
              (sc-is y any-reg descriptor-reg control-stack))
-        (move-immediate y (encode-value-if-immediate x) temp-reg-tn)
+        (move-immediate y (encode-value-if-immediate x) temp)
         (move y x))))
 
 (define-move-vop move :move
@@ -124,20 +125,20 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
+  (:temporary (:sc unsigned-reg) val-temp) ; for oversized immediate operand
   (:generator 0
+    (let ((val (encode-value-if-immediate x)))
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-           (let ((val (encode-value-if-immediate x)))
-             (if (eql val 0) (zeroize y) (inst mov y val)))
+           (if (eql val 0) (zeroize y) (inst mov y val))
            (move y x)))
       ((control-stack)
        (if (= (tn-offset fp) rsp-offset)
            ;; C-call
-           (storew (encode-value-if-immediate x) fp (tn-offset y))
+           (storew val fp (tn-offset y) 0 val-temp)
            ;; Lisp stack
-           (storew (encode-value-if-immediate x) fp
-               (frame-word-offset (tn-offset y))))))))
+           (storew val fp (frame-word-offset (tn-offset y)) 0 val-temp)))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)

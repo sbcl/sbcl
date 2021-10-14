@@ -190,10 +190,9 @@
                      (let* ((data (sap-ref-8 pc 1)) ; encodes dst register and size
                             (value (sb-vm:context-register context (ash data -2)))
                             (nbytes (ash 1 (logand data #b11)))
-                            ;; EMIT-SAP-REF always loads the EA into TEMP-REG-TN
-                            ;; which points to the shadow, not the user memory now.
-                            (ea (logxor (sb-vm:context-register
-                                         context (tn-offset sb-vm::temp-reg-tn))
+                            ;; EMIT-SAP-REF wires the EA to a predetermined register,
+                            ;; which now points to the shadow space, not the user memory.
+                            (ea (logxor (sb-vm:context-register context msan-temp-reg-number)
                                         msan-mem-to-shadow-xor-const)))
                        `(:raw ,ea ,nbytes ,value)))))
           (t
