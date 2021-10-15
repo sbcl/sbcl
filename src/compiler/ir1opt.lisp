@@ -481,7 +481,11 @@
       (setf (node-reoptimize node) nil)
       (typecase node
         (combination
-         (ir1-optimize-combination-fast node))))))
+         (ir1-optimize-combination-fast node))
+        (cif
+         ;; Don't want comparisons of constants against constants
+         ;; from reaching the VOPs.
+         (ir1-optimize-if node t))))))
 
 ;;; Only handle constant folding, some VOPs do not work
 ;;; on constants.
@@ -698,39 +702,39 @@
 ;;; of them.
 ;;; Also, if the test has multiple uses, replicate the node when possible...
 ;;; in fact, splice in direct jumps to the right branch if possible.
-(defun ir1-optimize-if (node)
+(defun ir1-optimize-if (node &optional fast)
   (declare (type cif node))
-  (let ((test (if-test node))
-        (block (node-block node)))
-    (let* ((type (lvar-type test))
-           (consequent  (if-consequent  node))
-           (alternative (if-alternative node))
-           (victim
-             (cond ((constant-lvar-p test)
-                    (if (lvar-value test) alternative consequent))
-                   ((not (types-equal-or-intersect type (specifier-type 'null)))
-                    alternative)
-                   ((type= type (specifier-type 'null))
-                    consequent)
-                   ((or (eq consequent alternative)
-                        (blocks-equivalent-p alternative consequent)
-                        (if-test-redundant-p test consequent alternative))
-                    ;; Even if the references are the same they can have
-                    ;; different derived types based on the TEST
-                    ;; Don't lose the second type when killing it.
-                    (let ((consequent-ref (block-start-node consequent)))
-                      (derive-node-type consequent-ref
-                                        (values-type-union
-                                         (node-derived-type consequent-ref)
-                                         (node-derived-type (block-start-node alternative)))
-                                        :from-scratch t))
-                    alternative))))
-      (when victim
-        (kill-if-branch-1 node test block victim)
-        (return-from ir1-optimize-if (values))))
-    (tension-if-if-1 node test block)
-    (duplicate-if-if-1 node test block)
-    (values)))
+  (let* ((test (if-test node))
+         (block (node-block node))(type (lvar-type test))
+         (consequent  (if-consequent  node))
+         (alternative (if-alternative node))
+         (victim
+           (cond ((constant-lvar-p test)
+                  (if (lvar-value test) alternative consequent))
+                 ((not (types-equal-or-intersect type (specifier-type 'null)))
+                  alternative)
+                 ((type= type (specifier-type 'null))
+                  consequent)
+                 ((or (eq consequent alternative)
+                      (and (not fast)
+                           (or
+                            (blocks-equivalent-p alternative consequent)
+                            (if-test-redundant-p test consequent alternative))))
+                  ;; Even if the references are the same they can have
+                  ;; different derived types based on the TEST
+                  ;; Don't lose the second type when killing it.
+                  (let ((consequent-ref (block-start-node consequent)))
+                    (derive-node-type consequent-ref
+                                      (values-type-union
+                                       (node-derived-type consequent-ref)
+                                       (node-derived-type (block-start-node alternative)))
+                                      :from-scratch t))
+                  alternative))))
+    (cond (victim
+           (kill-if-branch-1 node test block victim))
+          ((not fast)
+           (tension-if-if-1 node test block)
+           (duplicate-if-if-1 node test block)))))
 
 ;; When we know that we only have a single successor, kill the victim
 ;; ... unless the victim and the remaining successor are the same.
