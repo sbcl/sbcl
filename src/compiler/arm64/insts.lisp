@@ -538,6 +538,8 @@
             '('cmp :tab rn ", " rm extend))
   (:printer add-sub-shift-reg ((op #b11) (rd #b11111))
             '('cmp :tab rn ", " rm shift))
+  (:printer add-sub-shift-reg ((op #b11) (rn #b11111) (rd #b11111))
+            '('cmp :tab rn ", " rm shift))
   (:printer add-sub-shift-reg ((op #b11) (rn #b11111))
             '('negs :tab rd ", " rm shift)))
 
