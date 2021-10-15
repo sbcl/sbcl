@@ -96,12 +96,13 @@
 ;;; REX-R            A REX prefix with the "register" bit set was found
 ;;; REX-X            A REX prefix with the "index" bit set was found
 ;;; REX-B            A REX prefix with the "base" bit set was found
-(defconstant +allow-qword-imm+ #b1000000000)
-(defconstant +imm-size-8+      #b0100000000)
-(defconstant +operand-size-8+  #b0010000000)
-(defconstant +operand-size-16+ #b0001000000)
-(defconstant +fs-segment+      #b0000100000)
-(defconstant +rex+             #b0000010000)
+(defconstant +allow-qword-imm+ #b10000000000)
+(defconstant +imm-size-8+      #b01000000000)
+(defconstant +operand-size-8+  #b00100000000)
+(defconstant +operand-size-16+ #b00010000000)
+(defconstant +fs-segment+      #b00001000000)
+(defconstant +gs-segment+      #b00000100000)
+(defconstant +rex+             #b00000010000)
 ;;; The next 4 exactly correspond to the bits in the REX prefix itself,
 ;;; to avoid unpacking and stuffing into inst-properties one at a time.
 (defconstant +rex-w+           #b1000)
@@ -1058,8 +1059,9 @@
 (declaim (freeze-type label+addend))
 
 ;;;; the effective-address (ea) structure
-(defstruct (ea (:constructor %ea (disp base index scale))
+(defstruct (ea (:constructor %ea (segment disp base index scale))
                (:copier nil))
+  (segment nil :type (member nil :gs) :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
@@ -1100,8 +1102,8 @@
 ;;;   (EA displacement &OPTIONAL base-register index-register scale)
 ;;;   (EA base-register &OPTIONAL index-register scale)
 ;;;
-;;; mnemonic device: the syntax is like AT&T "disp(%rbase,%rindex,scale)"
-;;; where the leading "disp" is optional.
+;;; mnemonic device: the syntax is like AT&T "%seg:disp(%rbase,%rindex,scale)"
+;;; where the leading "seg" and "disp" are optional.
 ;;;
 ;;; Most instructions can determine an EA size based on the size of a register
 ;;; operand. The few that can't are mem+immediate mode instructions, and
@@ -1112,17 +1114,34 @@
 ;;;  Intel : test byte ptr [rax], 40
 ;;;  SBCL  : (TEST :BYTE (EA RAX-TN) #x40)
 ;;;
-(defun ea (displacement &optional base (index nil indexp) (scale 1 scalep))
-  (when (or (null displacement) (tn-p displacement))
-    (aver (not scalep))
-    (setq scale (if indexp index 1)
-          index base
-          base displacement
-          displacement 0))
-  (%ea displacement base index scale))
+(defun ea (&rest args) ; [seg] [displacement] [base] [index] [scale]
+  ;; The default segment register is equivalent to both :CS (code) and :DS (data).
+  ;; (I'm not sure which it technically is)
+  (declare (dynamic-extent args))
+  (let (seg disp)
+    (let ((first (car args)))
+      (when (eq first :gs)
+        (setq seg first)
+        (pop args)))
+    (let ((first (car args)))
+      ;; Rather than checking explicitly for all the things that are legal to be
+      ;; a displacement (i.e. LABEL, FIXUP, INTEGER), look for (NOT (OR TN NULL).)
+      ;; That is, NIL must be a placeholder for absence of base register,
+      ;; and not a displacement.
+      (unless (typep first '(or tn null))
+        (setq disp first)
+        (pop args)))
+    ;; The minimal EA is either an absolute address or an unindexed base register.
+    ;; So gotta have at least one of disp or base. Enforce by doing either of two
+    ;; destructuring-binds depending on whether DISP was present.
+    (if disp
+        (destructuring-bind (&optional base index (scale 1)) args
+          (%ea seg disp base index scale))
+        (destructuring-bind (base &optional index (scale 1)) args
+          (%ea seg 0 base index scale)))))
 
 (defun rip-relative-ea (label &optional addend)
-  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1))
+  (%ea nil (if addend (make-label+addend label addend) label) rip-tn nil 1))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
@@ -1429,8 +1448,10 @@
   (declare (type (or tn reg ea fixup null) thing)
            (type (or tn reg integer null) reg)
            (type (member :byte :word :dword :qword :do-not-set) operand-size))
-  ;; Legacy prefixes are order-insensitive, but let's match the
+  ;; Legacy prefixes are order-insensitive, but let's approximately match the
   ;; output of the system assembler for consistency's sake.
+  (when (and (ea-p thing) (eq (ea-segment thing) :gs))
+    (emit-byte segment #x65))
   (when (eq operand-size :word)
     (emit-byte segment #x66))
   (ecase lock
@@ -1509,6 +1530,11 @@
   (:printer byte ((op #x64 :prefilter (lambda (dstate value)
                                         (declare (ignore value))
                                         (dstate-setprop dstate +fs-segment+))))
+            nil :print-name nil))
+(define-instruction gs (segment)
+  (:printer byte ((op #x65 :prefilter (lambda (dstate value)
+                                        (declare (ignore value))
+                                        (dstate-setprop dstate +gs-segment+))))
             nil :print-name nil))
 
 (define-instruction lock (segment)

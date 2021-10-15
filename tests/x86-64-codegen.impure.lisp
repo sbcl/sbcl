@@ -55,6 +55,14 @@
                 #\newline)))
     (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)))
 
+(sb-vm::define-vop (tryme)
+    (:generator 1 (sb-assem:inst mov :byte (sb-vm::ea :gs sb-vm::rax-tn) 0)))
+(with-test (:name :try-gs-segment)
+  (assert (loop for line in (disassembly-lines
+                             (compile nil
+                                      '(lambda () (sb-sys:%primitive tryme))))
+                thereis (search "MOV BYTE PTR GS:[RAX]" line))))
+
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
   ;; is something stupid like (lambda () in ...) which pretty-prints

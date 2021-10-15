@@ -306,6 +306,8 @@
       (princ '| PTR | stream))
     (when (dstate-getprop dstate +fs-segment+)
       (princ "FS:" stream))
+    (when (dstate-getprop dstate +gs-segment+)
+      (princ "GS:" stream))
     (write-char #\[ stream)
     (when base-reg
       (if (eql :rip base-reg)
