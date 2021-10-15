@@ -782,9 +782,8 @@ sb-vm::(define-vop (cl-user::test)
              '(lambda (x) (if (stringp (foo-s (truly-the foo x))) 'is 'not)))))
     ;; the comparison of X to NIL should be a single-byte test
     (assert (loop for line in f1
-                  thereis (search (format nil "CMP AL, ~D"
-                                          (logand sb-vm:nil-value #xff))
-                                  line)))
+                  thereis (and (search (format nil "CMP ") line) ; register is arbitrary
+                               (search (format nil ", ~D" (logand sb-vm:nil-value #xff))))))
     ;; the two variations of the test compile to the identical code
     (dotimes (i 4)
       (assert (string= (nth i f1) (nth i f2))))))

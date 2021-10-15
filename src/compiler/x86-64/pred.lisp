@@ -82,7 +82,7 @@
   (:args (x :scs (any-reg descriptor-reg)))
   (:info labels otherwise key-type keys test-vop-name)
   (:temporary (:sc unsigned-reg) table)
-  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
+  (:temporary (:sc unsigned-reg) temp)
   (:args-var x-tn-ref)
   (:generator 10
     (let* ((key-derived-type (tn-ref-type x-tn-ref))
@@ -201,7 +201,7 @@
   (:args (then) (else))
   (:results (res))
   (:info flags)
-  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 0
      (let ((not-p (eq (first flags) 'not)))
        (when not-p (pop flags))
@@ -356,7 +356,7 @@
   (:policy :fast-safe)
   (:translate eq)
   (:args-var x-tn-ref)
-  (:temporary (:sc unsigned-reg :offset 11) temp) ; FIXME: unwire from r11
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 6
     (cond
       ((sc-is y constant)
