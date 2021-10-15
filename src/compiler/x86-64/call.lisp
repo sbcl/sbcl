@@ -258,7 +258,7 @@
 ;;;     there are stack values.
 ;;;  -- Reset SP. This must be done whenever other than 1 value is
 ;;;     returned, regardless of the number of values desired.
-(defun default-unknown-values (vop values nvals node)
+(defun default-unknown-values (vop values nvals node rbx move-temp)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals))
   (let ((type (sb-c::basic-combination-derived-type node)))
@@ -275,9 +275,9 @@
             ;; dangling. Let's emit a NOP.
             (inst nop)))
          ((not (sb-kernel:values-type-may-be-single-value-p type))
-          (inst mov rsp-tn rbx-tn))
+          (inst mov rsp-tn rbx))
          (t
-          (inst cmov :c rsp-tn rbx-tn))))
+          (inst cmov :c rsp-tn rbx))))
       ((<= nvals register-arg-count)
        (note-this-location vop :unknown-return)
        (when (sb-kernel:values-type-may-be-single-value-p type)
@@ -298,11 +298,11 @@
                  do
                  (inst mov :dword (tn-ref-tn tn-ref)
                        (if 2nd-tn-live 2nd-tn nil-value)))))
-           (inst mov rbx-tn rsp-tn)
+           (inst mov rbx rsp-tn)
            (emit-label regs-defaulted)))
        (when (< register-arg-count
                 (sb-kernel:values-type-max-value-count type))
-         (inst mov rsp-tn rbx-tn)))
+         (inst mov rsp-tn rbx)))
       (t
        (collect ((defaults))
          (let ((default-stack-slots (gen-label))
@@ -327,7 +327,7 @@
                    (loop for null = nil-value then (car used-registers)
                          for reg in used-registers
                          do (inst mov :dword reg null))
-                   (move rbx-tn rsp-tn)
+                   (move rbx rsp-tn)
                    (inst jmp defaulting-done)))
             REGS-DEFAULTED
             (do ((i register-arg-count (1+ i))
@@ -343,12 +343,12 @@
                     (inst jmp :be default-lab)
                     (sc-case tn
                       (control-stack
-                       (loadw r11-tn rbx-tn (frame-word-offset (+ sp->fp-offset i)))
-                       (inst mov tn r11-tn))
+                       (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
+                       (inst mov tn move-temp))
                       (t
-                       (loadw tn rbx-tn (frame-word-offset (+ sp->fp-offset i)))))))))
+                       (loadw tn rbx (frame-word-offset (+ sp->fp-offset i)))))))))
             DEFAULTING-DONE
-            (move rsp-tn rbx-tn)
+            (move rsp-tn rbx)
             (let ((defaults (defaults)))
               (when defaults
                 (assemble (:elsewhere)
@@ -356,7 +356,7 @@
                   (loop for null = nil-value then (car used-registers)
                         for reg in used-registers
                         do (inst mov :dword reg null))
-                  (move rbx-tn rsp-tn)
+                  (move rbx rsp-tn)
                   (dolist (default defaults)
                     (emit-label (car default))
                     (inst mov (cdr default) nil-value))
@@ -506,11 +506,12 @@
   (:vop-var vop)
   (:ignore nfp arg-locs args callee)
   (:node-var node)
+  (:temporary (:sc any-reg) move-temp)
   (:generator 5
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
-    (default-unknown-values vop values nvals node)))
+    (default-unknown-values vop values nvals node rbx-tn move-temp)))
 
 ;;; Non-TR local call for a variable number of return values passed according
 ;;; to the unknown values convention. The results are the start of the values
@@ -660,8 +661,7 @@
 
                (:ignore
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
-               ,@(unless variable '(args))
-               ,@(and (eq return :fixed) '(rbx)))
+               ,@(unless variable '(args)))
 
                ;; We pass either the fdefn object (for named call) or
                ;; the actual function object (for unnamed call) in
@@ -682,7 +682,8 @@
                ,@(when (eq return :fixed)
                    ;; Save it for DEFAULT-UNKNOWN-VALUES to work
                    `((:temporary (:sc unsigned-reg :offset rbx-offset
-                                  :from :result) rbx)))
+                                  :from :result) rbx)
+                     (:temporary (:sc any-reg) move-temp)))
 
                ;; With variable call, we have to load the
                ;; register-args out of the (new) stack frame before
@@ -851,7 +852,7 @@
                        `(call-unnamed rax fun-type vop)))
                ,@(ecase return
                    (:fixed
-                    '((default-unknown-values vop values nvals node)))
+                    '((default-unknown-values vop values nvals node rbx move-temp)))
                    (:unknown
                     '((note-this-location vop :unknown-return)
                       (receive-unknown-values values-start nvals start count
