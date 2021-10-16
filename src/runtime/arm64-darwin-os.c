@@ -1,29 +1,4 @@
-#ifdef LISP_FEATURE_SB_THREAD
-#include <mach/mach_init.h>
-#endif
-
 #include "thread.h"
-#include "validate.h"
-#include "runtime.h"
-#include "interrupt.h"
-#include "arm64-darwin-os.h"
-#include "arm64-arch.h"
-#include "genesis/fdefn.h"
-#include "gc-internal.h"
-#include "arch.h"
-
-#include <mach/mach.h>
-#include <mach/mach_error.h>
-#include <mach/mach_types.h>
-#include <mach/sync_policy.h>
-#include <mach/machine/thread_state.h>
-#include <mach/machine/thread_status.h>
-#include <sys/_types.h>
-#include <sys/ucontext.h>
-#include <pthread.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
 
 void set_thread_stack(void *address) {
     /* KLUDGE: There is no interface to change the stack location of
