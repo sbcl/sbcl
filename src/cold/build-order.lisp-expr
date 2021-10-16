@@ -334,7 +334,6 @@
  ("src/code/irrat"           :not-host)
 
  ("src/code/fd-stream"       :not-host)
-; ("src/code/jeez" :not-host :trace-file)
  ("src/code/target-char"     :not-host)
  ("src/code/stream"          :not-host)
  ("src/code/load")
