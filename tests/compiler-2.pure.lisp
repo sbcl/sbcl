@@ -3394,3 +3394,15 @@
         (f v)
         v))
    ((t) t)))
+
+(with-test (:name :nfp-in-unwinding)
+  (catch 'z
+    (checked-compile-and-assert
+        ()
+        `(lambda (x y f)
+           (declare (double-float x y))
+           (block nil
+             (let ((z (+ x y)))
+               (unwind-protect  (funcall f)
+                 (return (+ z 1d0))))))
+      ((4d0 1d0 (lambda () (throw 'z 1))) 6d0))))

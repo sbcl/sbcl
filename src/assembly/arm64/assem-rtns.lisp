@@ -304,7 +304,7 @@
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
   (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
-              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
+              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
   (inst mov-sp nsp-tn next-uwp)
   (inst br lip)
   RET
