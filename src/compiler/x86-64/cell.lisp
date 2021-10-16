@@ -110,7 +110,7 @@
       (inst cmp :byte value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
-;; Return the DISP field to use in an EA relative to thread-base-tn
+;; Return the DISP field to use in an EA relative to thread-base
 (defun load-time-tls-offset (symbol)
   (let ((where (info :variable :wired-tls symbol)))
     (cond ((integerp where) where)
@@ -131,9 +131,12 @@
            (compute-virtual-symbol ()
              `(progn
                 (inst mov :dword cell (tls-index-of symbol))
+                #+gs-segment-thread (inst mov thread-temp (thread-slot-ea thread-this-slot))
                 (inst lea cell
                       (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
-                          thread-base-tn cell))
+                          #+gs-segment-thread thread-temp
+                          #-gs-segment-thread thread-tn
+                          cell))
                 (inst cmp :dword (symbol-value-slot-ea cell) ; TLS reference
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
@@ -152,6 +155,7 @@
                  :from (:argument 1) :to (:result 0)) rax)
     #+sb-thread
     (:temporary (:sc descriptor-reg :to (:result 0)) cell)
+    #+gs-segment-thread (:temporary (:sc unsigned-reg) thread-temp)
     (:results (result :scs (descriptor-reg any-reg)))
     (:policy :fast-safe)
     (:vop-var vop)
@@ -194,11 +198,15 @@
   #+sb-thread
   (progn
     ;; TODO: SET could be shorter for any known wired-tls symbol.
+    ;; Note that the 32-bit x86 code prefers to use branching code here, where it accesses
+    ;; either the symbol's slot or the segment-relative absolute displacement to the TLS.
+    ;; This prefers CMOV, which means we always need the thread's address in a GPR.
     (define-vop (set)
       (:args (symbol :scs (descriptor-reg))
              (value :scs (descriptor-reg any-reg immediate)))
       (:temporary (:sc descriptor-reg) cell)
       (:temporary (:sc unsigned-reg) val-temp)
+      #+gs-segment-thread (:temporary (:sc unsigned-reg) thread-temp)
       (:generator 4
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and

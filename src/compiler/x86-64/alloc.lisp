@@ -105,8 +105,9 @@
            (inst set :ne temp)
            (inst and :dword temp 1)
            (inst add :qword
-                 (ea (ash thread-tot-bytes-alloc-boxed-slot word-shift)
-                     thread-base-tn temp 8)
+                 (ea thread-segment-reg
+                     (ash thread-tot-bytes-alloc-boxed-slot word-shift)
+                     thread-reg-tn temp 8)
                  size))
           (t
            (inst add :qword
@@ -127,8 +128,9 @@
            ;; bsr returns 1 less than INTEGER-LENGTH
            (inst add :dword temp (1+ non-small-bucket-offset))
            (emit-label tally)
-           (inst inc :qword (ea (ash thread-obj-size-histo-slot word-shift)
-                                thread-base-tn temp 8)))
+           (inst inc :qword (ea thread-segment-reg
+                                (ash thread-obj-size-histo-slot word-shift)
+                                thread-reg-tn temp 8)))
           (t
            (let* ((n-conses (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))
                   (bucket (if (<= n-conses histogram-small-bins)
@@ -210,8 +212,9 @@
            (DONE (gen-label))
            (free-pointer #+sb-thread (thread-slot-ea thread-boxed-tlab-slot)
                          #-sb-thread (ea boxed-region))
-           (end-addr
-            (ea (+ n-word-bytes (ea-disp free-pointer)) (ea-base free-pointer))))
+           (end-addr (ea thread-segment-reg
+                         (+ n-word-bytes (ea-disp free-pointer))
+                         (ea-base free-pointer))))
       (cond ((typep size `(integer ,large-object-size))
              ;; large objects will never be made in a per-thread region
              (fallback size)

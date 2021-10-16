@@ -23,6 +23,19 @@
 #+ubsan (progn (define-symbol-macro temp-reg-tn r11-tn)
                (defconstant global-temp-reg 11))
 
+;; r13 is preferable to r12 because 12 is an alias of 4 in ModRegRM, which
+;; implies use of a SIB byte with no index register for fixed displacement.
+#+gs-segment-thread
+(progn
+  (define-symbol-macro thread-segment-reg :gs)
+  (define-symbol-macro thread-reg nil)
+  (define-symbol-macro thread-tn nil))
+#-gs-segment-thread
+(progn
+  (define-symbol-macro thread-segment-reg :cs)
+  (define-symbol-macro thread-reg 13)
+  (define-symbol-macro thread-tn r13-tn))
+
 ;;; Kludge needed for decoding internal error args - we assume that the
 ;;; shadow memory is pointed to by this register (RAX).
 (defconstant msan-temp-reg-number 0)
@@ -60,7 +73,7 @@
                 (defglobal ,offsets-list
                     (remove-if (lambda (x)
                                  (member x `(,global-temp-reg ; if there is one
-                                             ,r13-offset ; thread base
+                                             ,thread-reg      ; if using a GPR
                                              ,rsp-offset
                                              ,rbp-offset)))
                                (loop for i below 16 collect i))))))
@@ -401,10 +414,6 @@
   (mapcar (lambda (register-arg-name)
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
-
-;; r13 is preferable to r12 because 12 is an alias of 4 in ModRegRM, which
-;; implies use of a SIB byte with no index register for fixed displacement.
-(define-symbol-macro thread-base-tn r13-tn)
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

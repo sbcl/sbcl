@@ -382,14 +382,10 @@
                  ;; Q: what's the difference between "tls_index:" and "tls:" (below)?
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
-            ((and (not base-reg) (not index-reg) disp)
-             (let ((addr (+ disp ; guess that DISP points to a symbol-value slot
-                            (- (ash sb-vm:symbol-value-slot sb-vm:word-shift))
-                            sb-vm:other-pointer-lowtag)))
-               (awhen (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))
-                 (note (lambda (stream) (format stream "~A" it)) dstate))))
-            ((and (eql base-reg #.(tn-offset sb-vm::thread-base-tn))
-                  (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
+            ;; thread slots
+            ((and (eql base-reg sb-vm::thread-reg)
+                  #+gs-segment-thread (dstate-getprop dstate +gs-segment+)
+                  #-gs-segment-thread (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
                   (typep disp '(integer 0 *)) ; positive displacement
                   (zerop (logand disp 7))) ; lispword-aligned
@@ -407,7 +403,14 @@
                (when symbol
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "tls: ~S" symbol))
-                         dstate)))))))))
+                         dstate)))))
+            ((and (not base-reg) (not index-reg) disp)
+             (let ((addr (+ disp ; guess that DISP points to a symbol-value slot
+                            (- (ash sb-vm:symbol-value-slot sb-vm:word-shift))
+                            sb-vm:other-pointer-lowtag)))
+               (awhen (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))
+                 (note (lambda (stream) (format stream "~A" it)) dstate))))
+            ))))
 
 (defun lea-compute-label (value dstate)
   ;; If VALUE should be regarded as a label, return the address.

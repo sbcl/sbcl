@@ -141,7 +141,7 @@
 ;;; These EAs are s-expressions, not instances of EA or MACHINE-EA.
 #-sb-safepoint
 (defconstant-eqx p-a-flag `(ea ,(ash sb-vm::thread-pseudo-atomic-bits-slot sb-vm:word-shift)
-                               ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn)))
+                               ,(get-gpr :qword sb-vm::thread-reg))
   #'equal)
 
 (defun header-word-store-p (inst bindings)
@@ -261,7 +261,7 @@
             (when (typep (car tail) '(cons machine-ea))
               (let ((ea (caar tail)))
                 (setf inst (list* (car inst) (cdar tail) (cdr inst))) ; insert the :size)
-                (when (eq (machine-ea-base ea) (sb-c:tn-offset sb-vm::thread-base-tn))
+                (when (eq (machine-ea-base ea) sb-vm::thread-reg)
                   ;; Figure out if we're looking at an allocation buffer
                   (let ((disp (ash (machine-ea-disp ea) (- sb-vm:word-shift))))
                     (awhen (case disp
@@ -409,7 +409,7 @@
                    `((mov ?scratch ?header)
                      (or :qword ?scratch
                          (ea ,(ash sb-vm::thread-function-layout-slot sb-vm:word-shift)
-                             ,(get-gpr :qword (sb-c:tn-offset sb-vm::thread-base-tn))))
+                             ,(get-gpr :qword sb-vm::thread-reg)))
                      (mov :qword (ea ,(- sb-vm:fun-pointer-lowtag) ?result) ?scratch))
                    t)
                   bindings))

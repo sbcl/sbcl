@@ -357,7 +357,7 @@
   ;; Store SP in thread struct, unless the enclosing block says not to
   #+sb-safepoint
   (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
-    (storew rsp-tn thread-base-tn thread-saved-csp-offset))
+    (inst mov (thread-slot-ea thread-saved-csp-offset) rsp-tn))
 
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
 
@@ -391,8 +391,7 @@
   ;; Zero the saved CSP, unless this code shouldn't ever stop for GC
   #+sb-safepoint
   (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
-    (inst xor (object-slot-ea thread-base-tn thread-saved-csp-offset 0)
-          rsp-tn)))
+    (inst xor (thread-slot-ea thread-saved-csp-offset) rsp-tn)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

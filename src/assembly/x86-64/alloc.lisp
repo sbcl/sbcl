@@ -62,10 +62,12 @@
                  (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil)
                  (popw number bignum-digits-offset other-pointer-lowtag))))))
      (define (op)
-       ;; R13 is reserved as the thread-base register
+       ;; R13 is usually the thread register, but might not be
        `(progn
           ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
-                               r8 r9 r10 r11 r12 r14 r15)
+                               r8 r9 r10 r11 r12
+                               #+gs-segment-thread r13
+                               r14 r15)
                   collect `(,op ,reg)))))
   (define signed)
   (define unsigned))

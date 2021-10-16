@@ -179,7 +179,7 @@ Lstack:
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GS_SEGMENT_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
 	movq	%fs:(THREAD_BASE_REG), THREAD_BASE_REG

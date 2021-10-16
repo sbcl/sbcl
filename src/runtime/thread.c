@@ -233,6 +233,12 @@ struct thread *alloc_thread_struct(void*,lispobj);
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), \
                     GetCurrentProcess(), (LPHANDLE)&thread->os_thread, 0, TRUE, \
                     DUPLICATE_SAME_ACCESS)
+#elif defined LISP_FEATURE_GS_SEGMENT_THREAD
+#include <asm/prctl.h>
+#include <sys/prctl.h>
+extern int arch_prctl(int code, unsigned long *addr);
+#define ASSOCIATE_OS_THREAD(thread) arch_prctl(ARCH_SET_GS, (uword_t*)thread), \
+      thread->os_thread = thread_self()
 #else
 #define ASSOCIATE_OS_THREAD(thread) thread->os_thread = thread_self()
 #endif

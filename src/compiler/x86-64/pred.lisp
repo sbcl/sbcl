@@ -323,7 +323,8 @@
          (inst set flag res)
          (inst movzx '(:byte :dword) res res)
          (inst mov :dword res
-               (ea (ash thread-t-nil-constants-slot word-shift) thread-base-tn res 4)))
+               (ea thread-segment-reg (ash thread-t-nil-constants-slot word-shift)
+                   thread-tn res 4)))
         (shl
          (when (eql x 0)
            (setq flag (negate-condition flag)))

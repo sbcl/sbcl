@@ -400,13 +400,13 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
-  (:args (n :scs (any-reg) :target sap))
+  (:args (index :scs (any-reg) :target sap))
   (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
     (inst mov sap
-          (ea thread-base-tn
-              n (ash 1 (- word-shift n-fixnum-tag-bits)))))))
+          (ea thread-segment-reg thread-tn
+              index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
 
 (define-vop (halt)
   (:generator 1

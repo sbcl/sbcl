@@ -93,24 +93,26 @@
           (- other-pointer-lowtag))))
 
 (defun thread-tls-ea (index)
+  #+gs-segment-thread (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
+  #-gs-segment-thread
   ;; Whether index is an an integer or a register, the EA constructor
   ;; call is the same.
-  ;; Due to an encoding peculiarity, using thread-base-tn as the index register
+  ;; Due to an encoding peculiarity, using thread-base-reg as the index register
   ;; is better when index is non-constant.
   ;; Base of r13 is reg=5 in ModRegRM, so if mod were 0, it would imply
   ;; RIP-relative addressing. (And attempting to encode an index is illegal)
   ;; So the 'mod' bits must be nonzero, which mandates encoding of an
   ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
-  (ea index thread-base-tn))
+  (ea index thread-tn))
 
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
-;;; using a single byte displacement from thread-base-tn
+;;; using a single byte displacement from thread-tn
 (eval-when (:compile-toplevel)
   (aver (<= (1+ thread-boxed-tlab-slot) 15))
   (aver (<= (1+ thread-unboxed-tlab-slot) 15)))
 
 (defun thread-slot-ea (slot-index)
-  (ea (ash slot-index word-shift) thread-base-tn))
+  (ea thread-segment-reg (ash slot-index word-shift) thread-tn))
 
 #+sb-thread
 (progn

@@ -1114,15 +1114,16 @@
 ;;;  Intel : test byte ptr [rax], 40
 ;;;  SBCL  : (TEST :BYTE (EA RAX-TN) #x40)
 ;;;
-(defun ea (&rest args) ; [seg] [displacement] [base] [index] [scale]
-  ;; The default segment register is equivalent to both :CS (code) and :DS (data).
-  ;; (I'm not sure which it technically is)
+(defun ea (&rest args) ; seg displacement base index scale
   (declare (dynamic-extent args))
   (let (seg disp)
     (let ((first (car args)))
-      (when (eq first :gs)
-        (setq seg first)
-        (pop args)))
+      (case first
+        ;; Let's say that if you put :CS, it's as if you had put nothing,
+        ;; which makes the positional syntax consistent and unambiguous
+        ;; (becase I can't use NIL for that, which implies no base register)
+        (:gs (setq seg first) (pop args))
+        (:cs (pop args))))
     (let ((first (car args)))
       ;; Rather than checking explicitly for all the things that are legal to be
       ;; a displacement (i.e. LABEL, FIXUP, INTEGER), look for (NOT (OR TN NULL).)
