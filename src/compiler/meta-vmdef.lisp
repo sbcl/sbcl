@@ -821,7 +821,10 @@
                         (find-operand name
                                       (vop-parse-or-lose
                                        (vop-parse-inherits parse))
-                                      (list kind)
+                                      (list* kind
+                                             (if (eq kind :argument)
+                                                 '(:more-argument)
+                                                 '(:more-result)))
                                       nil)
                         nil))
                (res

@@ -218,6 +218,21 @@
     (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref) lip)
     (inst ldr res (@ res))))
 
+(defun emit-c-call (vop nfp-save temp lip cfunc function)
+  (let ((cur-nfp (current-nfp-tn vop)))
+    (when cur-nfp
+      (store-stack-tn nfp-save cur-nfp))
+    (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
+    (if (stringp function)
+        (load-inline-constant cfunc `(:fixup ,function :foreign) lip)
+        (sc-case function
+          (sap-reg (move cfunc function))
+          (sap-stack
+           (load-stack-offset cfunc cur-nfp function))))
+    (inst blr temp)
+    (when cur-nfp
+      (load-stack-tn cur-nfp nfp-save))))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
@@ -231,17 +246,14 @@
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 0
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (store-stack-tn nfp-save cur-nfp))
-      (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
-      (sc-case function
-        (sap-reg (move cfunc function))
-        (sap-stack
-         (load-stack-offset cfunc cur-nfp function)))
-      (inst blr temp)
-      (when cur-nfp
-        (load-stack-tn cur-nfp nfp-save)))))
+    (emit-c-call vop nfp-save temp lip cfunc function)))
+
+;;; Manually load the fixup instead of using foreign-symbol-sap,
+;;; because it wants to go to r9, which is not compatible with sap-reg.
+(define-vop (call-out-named call-out)
+  (:args (args :more t))
+  (:info function variadic)
+  (:ignore args results variadic))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
