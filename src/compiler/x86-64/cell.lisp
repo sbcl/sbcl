@@ -131,7 +131,7 @@
            (compute-virtual-symbol ()
              `(progn
                 (inst mov :dword cell (tls-index-of symbol))
-                #+gs-segment-thread (inst mov thread-temp (thread-slot-ea thread-this-slot))
+                #+gs-segment-thread (inst rdgsbase thread-temp)
                 (inst lea cell
                       (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
                           #+gs-segment-thread thread-temp

@@ -2985,6 +2985,17 @@
                 (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
                                   :printer '(:name :tab reg/mem ", " reg)))))
 
+(define-instruction rdfsbase (segment dst)
+  (:printer rex-f3-escape-reg-reg/mem ((op #xAE)
+                                       (reg nil :prefilter nil :printer #("RDFSBASE" "RDGSBASE")))
+            '(reg :tab reg/mem))
+  (:printer f3-escape-reg-reg/mem ((op #xAE)
+                                   (reg nil :prefilter nil :printer #("RDFSBASE" "RDGSBASE")))
+            '(reg :tab reg/mem))
+  (:emitter (emit-sse-inst segment 0 dst #xf3 #xae)))
+(define-instruction rdgsbase (segment dst)
+  (:emitter (emit-sse-inst segment 1 dst #xf3 #xae)))
+
 ;;; Instructions having an XMM register as the destination operand
 ;;; and a general-purpose register or a memory location as the source
 ;;; operand. The operand size is calculated from the source operand.
