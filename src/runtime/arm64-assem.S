@@ -297,7 +297,7 @@ GNAME(call_into_c):
 	ldr	reg_NFP, =GNAME(current_control_stack_pointer)
 	str	reg_CSP, [reg_NFP]
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
-	str	reg_LEXENV, [reg_NFP]
+	str	reg_R8, [reg_NFP]
 
         // Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =GNAME(foreign_function_call_active)
