@@ -187,7 +187,7 @@ GNAME(call_into_lisp):
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 #ifdef LISP_FEATURE_SB_THREAD
-        str     xzr,[reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
+        str     xzr,[reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
 #else
 	ldr     reg_NL3, =GNAME(foreign_function_call_active)
 	str     xzr, [reg_NL3]
@@ -238,7 +238,6 @@ no_args:
 // Save the lisp stack and frame pointers.
 #ifdef LISP_FEATURE_SB_THREAD
 	stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-        str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
 #else
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
 	str	reg_CFP, [reg_NFP]
@@ -291,7 +290,6 @@ GNAME(call_into_c):
 
 #ifdef LISP_FEATURE_SB_THREAD
         stp     reg_CSP, reg_R8, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-        str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
 #else
         ENTER_PA
 	ldr	reg_NFP, =GNAME(current_control_stack_pointer)
@@ -343,7 +341,7 @@ GNAME(call_into_c):
 
         // Restore the Lisp stack and frame pointers
 #ifdef LISP_FEATURE_SB_THREAD
-        str     xzr, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
+        str     xzr, [reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
 #else
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 	str     xzr, [reg_OCFP]

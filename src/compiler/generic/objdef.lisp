@@ -556,7 +556,7 @@ during backtrace.
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in
   ;; the runtime, but it's clearly a per-thread value.
-  #+sb-thread
+  #+(and sb-thread (not arm64))
   (foreign-function-call-active :c-type "boolean")
   ;; Same as above for the location of the current control stack frame.
   #+(and sb-thread (not (or x86 x86-64)))

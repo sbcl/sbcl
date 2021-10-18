@@ -52,9 +52,7 @@
         (map-pairs stp nsp-tn 0 nl-registers :pre-index -80)
         (inst mov nl0 tmp-tn) ;; size
         #+sb-thread
-        (progn
-          (inst stp cfp-tn csp-tn (@ thread-tn (* thread-control-frame-pointer-slot n-word-bytes)))
-          (inst str csp-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes))))
+        (inst stp cfp-tn csp-tn (@ thread-tn (* thread-control-frame-pointer-slot n-word-bytes)))
         #-sb-thread
         (progn
           ;; Each of these loads of a fixup loads the address of a linkage table entry,
@@ -93,7 +91,7 @@
 
         (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
         #+sb-thread
-        (inst str zr-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes)))
+        (inst str zr-tn (@ thread-tn (* thread-control-stack-pointer-slot n-word-bytes)))
         #-sb-thread
         (progn
           ;; We haven't restored NL1 yet, so it's ok to use as a scratch register here.

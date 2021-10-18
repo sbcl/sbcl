@@ -803,7 +803,24 @@ check_interrupt_context_or_lose(os_context_t *context)
 /*
  * utility routines used by various signal handlers
  */
+#ifdef LISP_FEATURE_ARM64
+static void
+build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
+                                os_context_t __attribute__((unused)) *context)
+{
 
+    lispobj oldcont;
+    /* Ignore the two words above CSP, which can be used without adjusting CSP */
+    lispobj* csp = (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP)) + 2;
+    access_control_frame_pointer(th) = (lispobj *)(uword_t) csp;
+
+    oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
+
+    access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
+    access_control_frame_pointer(th)[0] = oldcont;
+    access_control_stack_pointer(th) = csp + 3;
+}
+#else
 static void
 build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
                                 os_context_t __attribute__((unused)) *context)
@@ -855,9 +872,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
 
-    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
 
-    access_control_frame_pointer(th)[0] = oldcont;
 #ifdef reg_CODE
     access_control_frame_pointer(th)[1] = NIL;
     access_control_frame_pointer(th)[2] =
@@ -865,8 +880,12 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 #else
     access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
 #endif
+    access_control_frame_pointer(th)[0] = oldcont;
+    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
+
 #endif
 }
+#endif
 
 /* Stores the context for gc to scavange and builds fake stack
  * frames. */
@@ -903,8 +922,6 @@ void fake_foreign_function_call_noassert(os_context_t *context)
                   thread);
 #endif
 
-    build_fake_control_stack_frames(thread,context);
-
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
     context_index =
@@ -918,10 +935,17 @@ void fake_foreign_function_call_noassert(os_context_t *context)
 
     nth_interrupt_context(context_index, thread) = context;
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+    build_fake_control_stack_frames(thread, context);
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) &&  \
+  !(defined(LISP_FEATURE_ARM64) && defined(LISP_FEATURE_SB_THREAD))
     /* x86oid targets don't maintain the foreign function call flag at
      * all, so leave them to believe that they are never in foreign
-     * code. */
+     * code.
+
+     And ARM64 uses control_stack_pointer, which is set in
+     build_fake_control_stack_frames. */
+
     foreign_function_call_active_p(thread) = 1;
 #endif
 }

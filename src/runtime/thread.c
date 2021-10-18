@@ -1012,7 +1012,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
      * all. */
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     th->foreign_function_call_active = 0;
-#else
+#elif !defined(LISP_FEATURE_ARM64) // uses control_stack_start
     th->foreign_function_call_active = 1;
 #endif
 #endif

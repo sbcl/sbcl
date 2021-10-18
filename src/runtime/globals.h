@@ -25,7 +25,7 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define foreign_function_call_active_p(thread) \
-    (thread->foreign_function_call_active)
+    (thread->control_stack_pointer)
 #else
 extern int foreign_function_call_active;
 #define foreign_function_call_active_p(thread) \
