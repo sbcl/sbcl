@@ -218,7 +218,7 @@
     (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref) lip)
     (inst ldr res (@ res))))
 
-(defun emit-c-call (vop nfp-save temp lip cfunc function)
+(defun emit-c-call (vop nfp-save temp temp2 lip cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
@@ -232,16 +232,16 @@
       #+sb-thread
       (progn
         (inst add temp csp-tn (* 2 n-word-bytes))
-        ;; For the GC to see the current code object
-        (inst adr lr-tn return)
-        (inst stp cfp-tn lr-tn (@ csp-tn))
+        ;; Build a new frame to stash a pointer to the current code object
+        ;; for the GC to see.
+        (inst adr temp2 return)
+        (inst stp cfp-tn temp2 (@ csp-tn))
         (storew-pair csp-tn thread-control-frame-pointer-slot temp thread-control-stack-pointer-slot thread-tn)
         (inst blr cfunc)
 
         (loop for reg in (list r0-offset r1-offset r2-offset r3-offset
                                r4-offset r5-offset r6-offset r7-offset
-                               #-darwin r10-offset
-                               lexenv-offset)
+                               #-darwin r10-offset)
               do
               (inst mov
                     (make-random-tn
@@ -253,6 +253,7 @@
       return
       #-sb-thread
       (progn
+        temp2
         (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
         (inst blr temp))
       (when cur-nfp
@@ -265,8 +266,7 @@
                       r0-offset r1-offset r2-offset r3-offset
                       r4-offset r5-offset r6-offset r7-offset
                       #-darwin r10-offset
-                      #-sb-thread r11-offset
-                      lexenv-offset))
+                      #-sb-thread r11-offset))
           (vars))
       (append
        (loop for gpr in gprs
@@ -286,10 +286,11 @@
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset r8-offset) temp)
+  (:temporary (:sc any-reg :offset lexenv-offset) temp2)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop nfp-save temp lip cfunc function))
+    (emit-c-call vop nfp-save temp temp2 lip cfunc function))
   .
   #. (destroyed-c-registers))
 

@@ -269,7 +269,7 @@ no_args:
 	ret
 	SIZE(call_into_lisp)
 
-
+#ifdef LISP_FEATURE_SB_THREAD
 	.align 2
 	.global	GNAME(call_into_c)
 	TYPE(call_into_c)
@@ -350,6 +350,7 @@ GNAME(call_into_c):
         ret
 
 	SIZE(call_into_c)
+#endif
 
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
