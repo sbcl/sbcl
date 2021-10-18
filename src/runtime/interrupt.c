@@ -818,7 +818,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 
     access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
     access_control_frame_pointer(th)[0] = oldcont;
-    access_control_stack_pointer(th) = csp + 3;
+    access_control_stack_pointer(th) = csp + 2;
 }
 #else
 static void
@@ -872,7 +872,9 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
 
+    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
 
+    access_control_frame_pointer(th)[0] = oldcont;
 #ifdef reg_CODE
     access_control_frame_pointer(th)[1] = NIL;
     access_control_frame_pointer(th)[2] =
@@ -880,9 +882,6 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 #else
     access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
 #endif
-    access_control_frame_pointer(th)[0] = oldcont;
-    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
-
 #endif
 }
 #endif

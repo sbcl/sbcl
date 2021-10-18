@@ -24,8 +24,15 @@
 #ifndef __ASSEMBLER__
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+#ifdef LISP_FEATURE_ARM64
 #define foreign_function_call_active_p(thread) \
     (thread->control_stack_pointer)
+#else
+#define foreign_function_call_active_p(thread) \
+    (thread->foreign_function_call_active)
+#endif
+
 #else
 extern int foreign_function_call_active;
 #define foreign_function_call_active_p(thread) \
