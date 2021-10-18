@@ -394,15 +394,16 @@
    (:args (object :scs (descriptor-reg))
           (index :scs (any-reg))
           (comparand :scs (any-reg descriptor-reg immediate)))
+   (:temporary (:sc unsigned-reg) temp)
    (:info addend)
    (:arg-types simple-vector tagged-num * (:constant integer))
    (:conditional :z)
    (:generator 1
-    (inst cmp :qword
-          (ea (- (* (+ vector-data-offset addend) n-word-bytes) other-pointer-lowtag)
-              object index
-              (ash 1 (- word-shift n-fixnum-tag-bits)))
-          (encode-value-if-immediate comparand))))
+    (compare (ea (- (* (+ vector-data-offset addend) n-word-bytes) other-pointer-lowtag)
+                 object index
+                 (ash 1 (- word-shift n-fixnum-tag-bits)))
+             comparand
+             temp)))
 
 (define-vop (data-vector-ref-with-offset/constant-simple-vector)
   (:policy :fast-safe)

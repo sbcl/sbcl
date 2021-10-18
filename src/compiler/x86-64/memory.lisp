@@ -13,10 +13,10 @@
 (in-package "SB-VM")
 
 (defun symbol-slot-ea (symbol slot)
-  (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
-             (if (static-symbol-p symbol)
-                 (+ nil-value (static-symbol-offset symbol) offset)
-                 (make-fixup symbol :immobile-symbol offset)))))
+  (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
+    (if (static-symbol-p symbol)
+        (ea (+ (static-symbol-offset symbol) offset) null-tn)
+        (ea (make-fixup symbol :immobile-symbol offset)))))
 
 (defun gen-cell-set (ea value val-temp)
   (if (sc-is value immediate)

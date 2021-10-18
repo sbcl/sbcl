@@ -83,6 +83,7 @@
 #endif
 
 #define THREAD_BASE_REG %r13
+#define NULL_REG %r12
 
 #ifdef LISP_FEATURE_WIN32
 #define CARG1 %rcx
@@ -179,6 +180,8 @@ Lstack:
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
+	mov	$(NIL),NULL_REG // initialize NIL
+
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GS_SEGMENT_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
@@ -273,6 +276,7 @@ GNAME(funcall_alien_callback):
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
+	mov	$(NIL),NULL_REG // initialize NIL
 #ifdef LISP_FEATURE_SB_THREAD
         mov     %rcx, THREAD_BASE_REG
 #endif

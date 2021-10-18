@@ -114,6 +114,7 @@
                 (defglobal ,offsets-list
                     (remove-if (lambda (x)
                                  (member x `(,global-temp-reg ; if there is one
+                                             ,r12-offset      ; null tn
                                              ,thread-reg      ; if using a GPR
                                              ,rsp-offset
                                              ,rbp-offset)))
@@ -456,10 +457,15 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
+(define-symbol-macro null-offset r12-offset)
+(define-symbol-macro null-tn r12-tn)
+
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
+    (null
+     (values descriptor-reg-sc-number null-offset))
     ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)

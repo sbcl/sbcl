@@ -122,7 +122,7 @@
       (inst movzx '(:byte :dword) rax (ea rax))
       (inst jmp  load-from-vector)
       IMM-OR-LIST
-      (inst cmp  object nil-value)
+      (inst cmp  object null-tn)
       (inst jmp  :eq NULL)
       (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
@@ -354,6 +354,7 @@
   (:translate symbol-plist)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (descriptor-reg)))
+  #+ubsan
   (:temporary (:sc unsigned-reg) temp)
   (:generator 1
     #-ubsan
@@ -362,15 +363,14 @@
     ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
     ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
     (loadw res res cons-car-slot list-pointer-lowtag)
-    (inst mov temp nil-value)
     (inst test :byte res fixnum-tag-mask)
-    (inst cmov :e res temp))
+    (inst cmov :e res null-tn))
     ;; This way doesn't assume that CAR and VECTOR-LENGTH are the same memory access.
     ;; (And it's not even clear that using CMOV is preferable)
     #+ubsan
     (let ((out (gen-label)))
       (loadw temp x symbol-info-slot other-pointer-lowtag)
-      (inst mov res nil-value)
+      (inst mov res null-tn)
       (inst test :byte temp #b1000) ; if temp is a vector, return NIL
       (inst jmp :ne out)
       (loadw res temp cons-car-slot list-pointer-lowtag)

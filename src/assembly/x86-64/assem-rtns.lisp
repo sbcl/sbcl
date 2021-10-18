@@ -81,9 +81,9 @@
   ;; Handle the register arg cases.
   ZERO-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (inst mov rdx nil-value)
-  (inst mov rdi rdx)
-  (inst mov rsi rdx)
+  (inst mov rdx null-tn)
+  (inst mov rdi null-tn)
+  (inst mov rsi null-tn)
   (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
@@ -102,7 +102,7 @@
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (loadw rdx rsi -1)
   (loadw rdi rsi -2)
-  (inst mov rsi nil-value)
+  (inst mov rsi null-tn)
   (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
@@ -239,7 +239,7 @@
   (inst jmp :ne not-callable)
   (load-symbol-info-vector vector fun)
   ;; info-vector-fdefn
-  (inst cmp vector nil-value)
+  (inst cmp vector null-tn)
   (inst jmp :e undefined)
 
   (inst mov :dword r10-tn (ea (- (* 2 n-word-bytes) other-pointer-lowtag) vector))
@@ -255,7 +255,7 @@
   UNDEFINED
   (inst jmp (make-fixup 'undefined-tramp :assembly-routine))
   NOT-CALLABLE
-  (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
+  (inst cmp fun null-tn) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e undefined)
 
   (inst pop (ea n-word-bytes rbp-tn))

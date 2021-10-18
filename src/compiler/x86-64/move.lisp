@@ -19,7 +19,18 @@
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))
-  (move-immediate y (encode-value-if-immediate x)))
+  (let ((val (tn-value x)))
+    (etypecase val
+      (integer
+       (move-immediate y (fixnumize val)))
+      (symbol
+       (load-symbol y val))
+      #+(and immobile-space (not metaspace))
+      (wrapper
+       (inst mov y (make-fixup val :layout)))
+      (character
+       (move-immediate y (logior (ash (char-code val) n-widetag-bits)
+                                 character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
@@ -66,10 +77,27 @@
                         (and (sc-is x any-reg descriptor-reg immediate)
                              (sc-is y control-stack))))))
   (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)) temp)
+  (:vop-var vop)
   (:generator 0
-    (if (and (sc-is x immediate)
-             (sc-is y any-reg descriptor-reg control-stack))
-        (move-immediate y (encode-value-if-immediate x) temp)
+    (if (sc-is x immediate)
+        (sc-case y
+          ((any-reg descriptor-reg)
+           (load-immediate vop x y))
+          (control-stack
+           (let ((val (tn-value x)))
+             (etypecase val
+               (integer
+                (move-immediate y (fixnumize val) temp))
+               (symbol
+                (load-symbol temp val)
+                (move y temp))
+               #+(and immobile-space (not metaspace))
+               (wrapper
+                (inst mov y (make-fixup val :layout)))
+               (character
+                (move-immediate y (logior (ash (char-code val) n-widetag-bits)
+                                          character-widetag)
+                                temp))))))
         (move y x))))
 
 (define-move-vop move :move
@@ -126,19 +154,36 @@
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:temporary (:sc unsigned-reg) val-temp) ; for oversized immediate operand
+  (:vop-var vop)
   (:generator 0
-    (let ((val (encode-value-if-immediate x)))
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-           (if (eql val 0) (zeroize y) (inst mov y val))
+           (load-immediate vop x y)
            (move y x)))
       ((control-stack)
-       (if (= (tn-offset fp) rsp-offset)
-           ;; C-call
-           (storew val fp (tn-offset y) 0 val-temp)
-           ;; Lisp stack
-           (storew val fp (frame-word-offset (tn-offset y)) 0 val-temp)))))))
+       (let ((slot (if (= (tn-offset fp) rsp-offset)
+                       ;; C-call
+                       (tn-offset y)
+                       ;; Lisp stack
+                       (frame-word-offset (tn-offset y)))))
+         (if (sc-is x immediate)
+             (let ((val (tn-value x)))
+               (etypecase val
+                 (integer (storew (fixnumize val) fp slot 0 val-temp))
+                 (symbol (if (static-symbol-p val)
+                             (progn
+                               (inst lea val-temp (ea (static-symbol-offset val) null-tn))
+                               (storew val-temp fp slot))
+                             (storew (make-fixup val :immobile-symbol) fp slot)))
+                 #+(and immobile-space (not metaspace))
+                 (wrapper
+                  (storew (make-fixup val :layout) fp slot))
+                 (character
+                  (storew (logior (ash (char-code val) n-widetag-bits)
+                                  character-widetag)
+                          fp slot 0 val-temp))))
+             (storew x fp slot)))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)

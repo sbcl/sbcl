@@ -285,10 +285,9 @@
            (inst jmp :c regs-defaulted)
            ;; Default the unsupplied registers.
            (let* ((2nd-tn-ref (tn-ref-across values))
-                  (2nd-tn (tn-ref-tn 2nd-tn-ref))
-                  (2nd-tn-live (neq (tn-kind 2nd-tn) :unused)))
-             (when 2nd-tn-live
-               (inst mov 2nd-tn nil-value))
+                  (2nd-tn (tn-ref-tn 2nd-tn-ref)))
+             (when (neq (tn-kind 2nd-tn) :unused)
+               (inst mov 2nd-tn null-tn))
              (when (> nvals 2)
                (loop
                  for tn-ref = (tn-ref-across 2nd-tn-ref)
@@ -296,8 +295,7 @@
                  for count from 2 below register-arg-count
                  unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
                  do
-                 (inst mov :dword (tn-ref-tn tn-ref)
-                       (if 2nd-tn-live 2nd-tn nil-value)))))
+                 (inst mov (tn-ref-tn tn-ref) null-tn))))
            (inst mov rbx rsp-tn)
            (emit-label regs-defaulted)))
        (when (< register-arg-count
@@ -324,9 +322,8 @@
                    (inst jmp :nc default-stack-slots))
                   (t
                    (inst jmp :c regs-defaulted)
-                   (loop for null = nil-value then (car used-registers)
-                         for reg in used-registers
-                         do (inst mov :dword reg null))
+                   (dolist (reg used-registers)
+                     (inst mov reg null-tn))
                    (move rbx rsp-tn)
                    (inst jmp defaulting-done)))
             REGS-DEFAULTED
@@ -353,13 +350,12 @@
               (when defaults
                 (assemble (:elsewhere)
                   (emit-label default-stack-slots)
-                  (loop for null = nil-value then (car used-registers)
-                        for reg in used-registers
-                        do (inst mov :dword reg null))
+                  (dolist (reg used-registers)
+                    (inst mov reg null-tn))
                   (move rbx rsp-tn)
                   (dolist (default defaults)
                     (emit-label (car default))
-                    (inst mov (cdr default) nil-value))
+                    (inst mov (cdr default) null-tn))
                   (inst jmp defaulting-done)))))))))))
 
 ;;;; unknown values receiving
@@ -840,7 +836,7 @@
                           (inst ,(if (eq return :tail) 'jmp 'call) target))
                        #-immobile-code
                        `(inst ,(if (eq return :tail) 'jmp 'call)
-                              (ea (+ nil-value (static-fun-offset fun)))))
+                              (ea (static-fun-offset fun) null-tn)))
                       #-immobile-code
                       (named
                        `(inst ,(if (eq return :tail) 'jmp 'call)
@@ -1003,11 +999,9 @@
         (inst mov rcx (fixnumize nvals)))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
-      (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
-             (first (first arg-tns)))
-        (inst mov first nil-value)
-        (dolist (tn (cdr arg-tns))
-          (inst mov tn first))))
+      (let ((arg-tns (nthcdr nvals (list a0 a1 a2))))
+        (dolist (tn arg-tns)
+          (inst mov tn null-tn))))
     ;; Set the multiple value return flag.
     (inst stc)
     ;; And away we go. Except that return-pc is still on the
@@ -1266,7 +1260,7 @@
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 3
-    (inst mov value nil-value)
+    (inst mov value null-tn)
     (inst cmp count (fixnumize index))
     (inst jmp :be done)
     (inst mov value (ea (- (* index n-word-bytes)) object))
@@ -1311,7 +1305,7 @@
             (inst shl :dword rcx shift)
             (inst lea :dword rcx (ea nil count (ash 1 shift)))))
       ;; Setup for the CDR of the last cons (or the entire result) being NIL.
-      (inst mov result nil-value)
+      (inst mov result null-tn)
       (inst jrcxz DONE)
       (unless stack-allocate-p
         (instrument-alloc 'list rcx node (list value dst) thread-tn))

@@ -472,7 +472,7 @@
   (:conditional :z)
   (:generator 5
     ;; SYMBOLP would have been IR1-transformed to NON-NULL-SYMBOL-P when possible
-    (inst cmp value nil-value)
+    (inst cmp value null-tn)
     (inst jmp :e out)
     (test-other-ptr value args symbol-widetag temp out)
     out))
@@ -485,7 +485,7 @@
   (:translate consp)
   (:generator 8
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
-      (inst cmp value nil-value)
+      (inst cmp value null-tn)
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))

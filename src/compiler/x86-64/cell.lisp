@@ -46,7 +46,7 @@
                 (or (eq name 'make-array)
                     (equal name '(setf %array-fill-pointer))))
            (when (eq name 'make-array) ; nullify the creating PC location
-             (inst mov :qword (object-slot-ea object 1 lowtag) nil-value))
+             (inst mov :qword (object-slot-ea object 1 lowtag) null-tn))
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
@@ -440,8 +440,7 @@
   (:save-p :compute-only)
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
-    ;; byte comparison works because lowtags of function and nil differ
-    (inst cmp :byte value (logand nil-value #xff))
+    (inst cmp value null-tn)
     (let* ((*location-context* (make-restart-location RETRY value))
            (err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst jmp :e err-lab))
@@ -500,7 +499,7 @@
           (logand undefined-fdefn-header #xFFFF))
     ;; Once the opcode is written, the values in 'fun' and 'raw-addr' become irrelevant.
     ;; These stores act primarily to clear the reference from a GC perspective.
-    (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
+    (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
     ;; With #+immobile-code we never call via the raw-addr slot for undefined
     ;; functions if the single instruction "call <fdefn>" form is used. The INT3
     ;; raises sigtrap which we catch, then load RAX with the address of the fdefn

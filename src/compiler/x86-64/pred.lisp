@@ -183,18 +183,21 @@
     (when param
       (destructuring-bind (representation vop) param
         (let ((scn (sc-number-or-lose representation)))
-          (labels ((make-tn ()
-                     (make-representation-tn ptype scn))
-                   (frob-tn (tn)
+          (labels ((make-tn (tn)
                      ;; Careful not to load constants which require boxing
                      ;; and may overwrite the flags.
                      ;; Representation selection should avoid that.
-                     (if (eq (tn-kind tn) :constant)
-                         tn
-                         (make-tn))))
+                     (cond ((or (eq (tn-kind tn) :constant)
+                                (and (tn-sc tn)
+                                     (and
+                                      (sc-is tn descriptor-reg)
+                                      (eql (tn-offset tn) null-offset))))
+                            tn)
+                           (t
+                            (make-representation-tn ptype scn)))))
             (values vop
-                    (frob-tn x-tn) (frob-tn y-tn)
-                    (make-tn)
+                    (make-tn x-tn) (make-tn y-tn)
+                    (make-tn dst-tn)
                     nil)))))))
 
 (define-vop (move-if)
@@ -202,15 +205,19 @@
   (:results (res))
   (:info flags)
   (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
   (:generator 0
      (let ((not-p (eq (first flags) 'not)))
        (when not-p (pop flags))
-       (flet ((load-immediate (dst constant-tn
-                               &optional (sc (sc-name (tn-sc dst))))
+       (flet ((load-immediate (dst immediate &optional (sc (sc-name (tn-sc dst))))
                 ;; Can't use ZEROIZE, since XOR will affect the flags.
-                (inst mov dst
-                      (encode-value-if-immediate constant-tn
-                                                 (memq sc '(any-reg descriptor-reg))))))
+                (if (eql (tn-value immediate) 0)
+                    (inst mov dst 0)
+                    (case sc
+                      ((any-reg descriptor-reg)
+                       (load-immediate vop immediate dst))
+                      (t
+                       (inst mov dst (encode-value-if-immediate immediate nil)))))))
          (cond ((null (rest flags))
                 (if (sc-is else immediate)
                     (load-immediate res else)
@@ -261,7 +268,7 @@
                 (:results (res :scs (,reg)
                                :from (:argument 1)))
                 (:result-types ,type))))
-  (def-move-if move-if/t t descriptor-reg control-stack)
+  (def-move-if move-if/t * descriptor-reg control-stack)
   (def-move-if move-if/fx tagged-num any-reg control-stack)
   (def-move-if move-if/unsigned unsigned-num unsigned-reg unsigned-stack)
   (def-move-if move-if/signed signed-num signed-reg signed-stack)
@@ -295,9 +302,7 @@
                 (typep (fixnumize y) '(signed-byte 32))
                 (member (abs (fixnumize (- x y))) '(2 4 8))
                 'add)))
-    (or #+sb-thread (or (and (eq x t) (eq y nil) 'boolean)
-                        (and (eq x nil) (eq y t) 'boolean))
-        (try-shift x y)
+    (or (try-shift x y)
         (try-shift y x)
         (try-add x y))))
 
@@ -309,23 +314,9 @@
   (:generator 3
     (let* ((x (tn-value x-tn))
            (y (tn-value y-tn))
-           #+gs-seg (thread-tn nil)
            (hint (computable-from-flags-p res x y flags))
            (flag (car flags)))
       (ecase hint
-        (boolean
-         ;; FIXNUMP -> {T,NIL} could be special-cased, reducing the instruction count by
-         ;; 1 or 2 depending on whether the argument and result are in the same register.
-         ;; Best case would be "AND :dword res, arg, 1 ; MOV res, [ea]".
-         (when (eql x t)
-           ;; T is at the lower address, so to pick it out we need index=0
-           ;; which makes the condition in (IF BIT T NIL) often flipped.
-           (setq flag (negate-condition flag)))
-         (inst set flag res)
-         (inst movzx '(:byte :dword) res res)
-         (inst mov :dword res
-               (ea thread-segment-reg (ash thread-t-nil-constants-slot word-shift)
-                   thread-tn res 4)))
         (shl
          (when (eql x 0)
            (setq flag (negate-condition flag)))
@@ -349,55 +340,15 @@
 
 ;;;; conditional VOPs
 
-;;; Note: a constant-tn is allowed in CMP; it uses an EA displacement,
-;;; not immediate data.
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg control-stack immediate))
          (y :scs (any-reg descriptor-reg control-stack immediate constant)))
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
-  (:args-var x-tn-ref)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 6
-    (cond
-      ((sc-is y constant)
-       (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
-                         (t (inst mov temp y) temp))))
-      ((sc-is y immediate)
-       (let* ((value (encode-value-if-immediate y))
-              (immediate (plausible-signed-imm32-operand-p value)))
-         (when (and (null (tn-value y)) (tn-ref-type x-tn-ref))
-           ;; if the complement of X's type with respect to type NULL can't
-           ;; be a cons, then we don't need a 4-byte comparison against NIL.
-           ;; It suffices to test the low byte. Similar logic could pertain to many
-           ;; other type tests, e.g. STRINGP on known (OR INSTANCE STRING)
-           ;; could skip the widetag test.
-           ;; I'm starting to wonder if it would be better to expose the lowtag/widetag
-           ;; tests in IR1 as an AND expression so that type inference can remove what's
-           ;; possible to deduce. The we just need a way to efficiently recombine
-           ;; the AND back to one vop where we can. "selection DAG, anyone?"
-           (when (not (types-equal-or-intersect
-                       (type-difference (tn-ref-type x-tn-ref) (specifier-type 'null))
-                       (specifier-type 'cons)))
-             (inst cmp :byte x (logand nil-value #xff))
-             (return-from if-eq)))
-         (cond ((fixup-p value) ; immobile object
-                (inst cmp x value))
-               ((and (zerop value) (sc-is x any-reg descriptor-reg))
-                (inst test x x))
-               (immediate
-                (inst cmp x immediate))
-               ((not (sc-is x control-stack))
-                (inst cmp x (constantize value)))
-               (t
-                (inst mov temp value)
-                (inst cmp x temp)))))
-      ((and (sc-is x control-stack) (sc-is y control-stack))
-       (inst mov temp x)
-       (inst cmp temp y))
-      (t
-       (inst cmp x y)))))
+    (compare x y temp)))
 
 ;; The template above is a very good fallback for the generic
 ;; case.  However, it is sometimes possible to perform unboxed
@@ -422,22 +373,19 @@
 
 (define-vop (%instance-ref-eq)
   (:args (instance :scs (descriptor-reg))
-         (x :scs (descriptor-reg any-reg)
-            :load-if (or (not (sc-is x immediate))
-                         (typep (tn-value x)
-                                '(and integer
-                                  (not (signed-byte #.(- 32 n-fixnum-tag-bits))))))))
+         (x :scs (descriptor-reg any-reg immediate)))
+  (:temporary (:sc unsigned-reg) temp)
   (:arg-types * (:constant (unsigned-byte 16)) *)
   (:info slot)
   (:translate %instance-ref-eq)
   (:conditional :e)
   (:policy :fast-safe)
   (:generator 1
-   (inst cmp :qword
-         (ea (+ (- instance-pointer-lowtag)
-                (ash (+ slot instance-slots-offset) word-shift))
-             instance)
-         (encode-value-if-immediate x))))
+   (compare (ea (+ (- instance-pointer-lowtag)
+                   (ash (+ slot instance-slots-offset) word-shift))
+                instance)
+            x
+            temp)))
 
 ;;; See comment below about ASSUMPTIONS
 (eval-when (:compile-toplevel)

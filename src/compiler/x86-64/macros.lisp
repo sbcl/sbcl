@@ -48,6 +48,49 @@
            (inst mov size dst src)
            (inst mov dst src))))))
 
+(defun compare (x y temp &optional (size :qword))
+  (cond
+    ((sc-is y constant)
+     ;; A constant-tn is allowed in CMP; it uses an EA displacement,
+     ;; not immediate data.
+     (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
+                       (t (inst mov temp y) temp))))
+    ((sc-is y immediate)
+     (let ((value (tn-value y)))
+       (etypecase value
+         ((integer 0 0)
+          (if (and (not (ea-p x))
+                   (sc-is x any-reg descriptor-reg))
+              (inst test x x)
+              (inst cmp size x 0)))
+         ((or integer character)
+          (let ((value (if (characterp value)
+                           (logior (ash (char-code value) n-widetag-bits)
+                                   character-widetag)
+                           (fixnumize value))))
+            (if (plausible-signed-imm32-operand-p value)
+                (inst cmp size x value)
+                (cond ((or (ea-p x) (sc-is x control-stack))
+                       (inst mov temp value)
+                       (inst cmp size x temp))
+                      (t
+                       (inst cmp x (constantize value)))))))
+         (symbol
+          (cond ((static-symbol-p value)
+                 (inst lea temp (ea (static-symbol-offset value) null-tn))
+                 (inst cmp x temp))
+                (t
+                 (inst cmp size x (make-fixup value :immobile-symbol)))))
+         #+(and immobile-space (not metaspace))
+         (wrapper
+          (inst cmp size x (make-fixup value :layout))))))
+    ((and (or (ea-p x) (sc-is x control-stack))
+          (sc-is y control-stack))
+     (inst mov temp x)
+     (inst cmp size y temp))
+    (t
+     (inst cmp size x y))))
+
 (defmacro object-slot-ea (ptr slot lowtag)
   `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr))
 (defmacro tls-index-of (sym)
@@ -81,16 +124,18 @@
 
 ;;;; macros to generate useful values
 
-(defmacro load-symbol (reg symbol)
-  `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
+(defun load-symbol (reg symbol)
+  (if (static-symbol-p symbol)
+      (inst lea reg (ea (static-symbol-offset symbol) null-tn))
+      (inst mov reg (make-fixup symbol :immobile-symbol))))
 
 ;; Return the effective address of the value slot of static SYMBOL.
 (defun static-symbol-value-ea (symbol &optional (byte 0))
-   (ea (+ nil-value
-          (static-symbol-offset symbol)
+   (ea (+ (static-symbol-offset symbol)
           (ash symbol-value-slot word-shift)
           byte
-          (- other-pointer-lowtag))))
+          (- other-pointer-lowtag))
+       null-tn))
 
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA

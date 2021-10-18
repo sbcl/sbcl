@@ -30,7 +30,7 @@
     (move ptr object)
     (zeroize count)
     ;; If we are starting with NIL, then it's really easy.
-    (inst cmp ptr nil-value)
+    (inst cmp ptr null-tn)
     (inst jmp :e DONE)
     ;; Note: we don't have to test to see whether the original argument is a
     ;; list, because this is a :fast-safe vop.
@@ -39,7 +39,7 @@
     (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst add count (fixnumize 1))
     ;; If we hit NIL, then we are done.
-    (inst cmp ptr nil-value)
+    (inst cmp ptr null-tn)
     (inst jmp :e DONE)
     ;; Otherwise, check to see whether we hit the end of a dotted list. If
     ;; not, loop back for more.
@@ -65,13 +65,13 @@
     (move ptr object)
     (zeroize count)
     ;; If we are starting with NIL, we be done.
-    (inst cmp ptr nil-value)
+    (inst cmp ptr null-tn)
     (inst jmp :e DONE)
     ;; Indirect the next cons cell, and boost the count.
     LOOP
     (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst add count (fixnumize 1))
     ;; If we aren't done, go back for more.
-    (inst cmp ptr nil-value)
+    (inst cmp ptr null-tn)
     (inst jmp :ne LOOP)
     DONE))

@@ -910,9 +910,6 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->tls_size = dynamic_values_bytes;
 #endif
     __attribute((unused)) lispobj* tls = (lispobj*)th;
-#ifdef THREAD_T_NIL_CONSTANTS_SLOT
-    tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | T;
-#endif
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_LINUX
     tls[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
 #endif

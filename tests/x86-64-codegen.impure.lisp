@@ -783,18 +783,6 @@ sb-vm::(define-vop (cl-user::test)
                      'sb-di::bogus-debug-fun)))))
 
 (defstruct foo (s 0 :type (or null string)))
-(with-test (:name :reduce-stringp-to-not-null)
-  (let ((f1 (disassembly-lines
-             '(lambda (x) (if (null (foo-s (truly-the foo x))) 'not 'is))))
-        (f2 (disassembly-lines
-             '(lambda (x) (if (stringp (foo-s (truly-the foo x))) 'is 'not)))))
-    ;; the comparison of X to NIL should be a single-byte test
-    (assert (loop for line in f1
-                  thereis (and (search (format nil "CMP ") line) ; register is arbitrary
-                               (search (format nil ", ~D" (logand sb-vm:nil-value #xff)) line))))
-    ;; the two variations of the test compile to the identical code
-    (dotimes (i 4)
-      (assert (string= (nth i f1) (nth i f2))))))
 
 (with-test (:name :make-list-ridiculously-huge)
   (checked-compile '(lambda () (make-list 3826305079707827596))

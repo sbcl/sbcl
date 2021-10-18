@@ -83,7 +83,7 @@
       (emit-label done)
       (assemble (:elsewhere)
         (emit-label bogus)
-        (inst mov code nil-value)
+        (inst mov code null-tn)
         (inst jmp done)))))
 
 (define-vop (%make-lisp-obj)

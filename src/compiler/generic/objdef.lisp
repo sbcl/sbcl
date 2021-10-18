@@ -452,8 +452,7 @@ during backtrace.
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
 (defglobal *thread-header-slot-names*
   (append #+x86-64
-          '(t-nil-constants
-            msan-xor-constant
+          '(msan-xor-constant
             ;; The following slot's existence must NOT be conditional on #+msan
             msan-param-tls) ; = &__msan_param_tls
           #+immobile-space '(function-layout

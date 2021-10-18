@@ -362,7 +362,7 @@
                          (setf things (tn-ref-across things))
                          (store-slot (tn-ref-tn things) last-base-reg cdr lowtag))
                         (t
-                         (storew* nil-value last-base-reg cdr lowtag
+                         (storew* null-tn last-base-reg cdr lowtag
                                   (not stack-allocate-p))))
                   (cond ((<= cons-cells 2)
                          (if (location= result res)
@@ -650,7 +650,7 @@
                      (aver (/= (tn-value ,length) 0))
                      (* (tn-value ,length) n-word-bytes 2))
                     (t
-                     (inst mov result nil-value)
+                     (inst mov result null-tn)
                      (inst test ,length ,length)
                      (inst jmp :z done)
                      (inst lea ,answer
@@ -688,7 +688,7 @@
         (storew next tail cons-cdr-slot list-pointer-lowtag)
         (inst cmp next limit)
         (inst jmp :ne loop)
-        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
+        (storew null-tn tail cons-cdr-slot list-pointer-lowtag))
       done))
 
   (define-vop (allocate-list-on-heap)
@@ -723,7 +723,7 @@
            (storew element tail cons-car-slot list-pointer-lowtag))
          (inst cmp next limit)
          (inst jmp :ne loop))
-        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
+        (storew null-tn tail cons-cdr-slot list-pointer-lowtag))
       done)))
 
 #-immobile-space
@@ -737,7 +737,7 @@
   (:generator 37
     (alloc-other fdefn-widetag fdefn-size result node nil thread-tn)
     (storew name result fdefn-name-slot other-pointer-lowtag)
-    (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
+    (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
             result fdefn-raw-addr-slot other-pointer-lowtag)))
 

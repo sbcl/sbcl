@@ -91,7 +91,7 @@
       (move start rsp-tn))               ; WARN pointing 1 below
 
     LOOP
-    (inst cmp list nil-value)
+    (inst cmp list null-tn)
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
