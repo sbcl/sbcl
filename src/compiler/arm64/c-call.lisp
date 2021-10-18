@@ -222,31 +222,76 @@
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
-    (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
     (if (stringp function)
         (load-inline-constant cfunc `(:fixup ,function :foreign) lip)
         (sc-case function
           (sap-reg (move cfunc function))
           (sap-stack
            (load-stack-offset cfunc cur-nfp function))))
-    (inst blr temp)
-    (when cur-nfp
-      (load-stack-tn cur-nfp nfp-save))))
+    (assemble ()
+      #+sb-thread
+      (progn
+        (inst add temp csp-tn (* 2 n-word-bytes))
+        ;; For the GC to see the current code object
+        (inst adr lr-tn return)
+        (inst stp cfp-tn lr-tn (@ csp-tn))
+        (storew-pair csp-tn thread-control-frame-pointer-slot temp thread-control-stack-pointer-slot thread-tn)
+        (inst blr cfunc)
+
+        (loop for reg in (list r0-offset r1-offset r2-offset r3-offset
+                               r4-offset r5-offset r6-offset r7-offset
+                               #-darwin r10-offset
+                               lexenv-offset)
+              do
+              (inst mov
+                    (make-random-tn
+                     :kind :normal
+                     :sc (sc-or-lose 'descriptor-reg)
+                     :offset reg)
+                    0))
+        (storew zr-tn thread-tn thread-control-stack-pointer-slot))
+      return
+      #-sb-thread
+      (progn
+        (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
+        (inst blr temp))
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))))
+
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (defun destroyed-c-registers ()
+    (let ((gprs (list nl0-offset nl1-offset nl2-offset nl3-offset
+                      nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset nl9-offset
+                      r0-offset r1-offset r2-offset r3-offset
+                      r4-offset r5-offset r6-offset r7-offset
+                      #-darwin r10-offset
+                      #-sb-thread r11-offset
+                      lexenv-offset))
+          (vars))
+      (append
+       (loop for gpr in gprs
+             collect `(:temporary (:sc any-reg :offset ,gpr :from :eval :to :result)
+                                  ,(car (push (sb-xc:gensym) vars))))
+       (loop for float to 31
+             collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
+                                  ,(car (push (sb-xc:gensym) vars))))
+       `((:ignore ,@vars))))))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
   (:ignore args results)
-  (:save-p t)
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc any-reg :offset r7-offset) temp)
+  (:temporary (:sc any-reg :offset r8-offset) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop nfp-save temp lip cfunc function)))
+    (emit-c-call vop nfp-save temp lip cfunc function))
+  .
+  #. (destroyed-c-registers))
 
 ;;; Manually load the fixup instead of using foreign-symbol-sap,
 ;;; because it wants to go to r9, which is not compatible with sap-reg.

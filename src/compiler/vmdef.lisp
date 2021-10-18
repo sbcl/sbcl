@@ -111,8 +111,8 @@
          (last-result (1- num-operands))
          (temps (vop-info-temps template))
          ;; Can't have more temps than registers in the CPU.
-         ;; 32 is totally reasonable
-         (refs (make-array (+ (* 2 (the (mod 32) (length temps)))
+         ;; 64 is totally reasonable
+         (refs (make-array (+ (* 2 (the (mod 64) (length temps)))
                               num-operands)))
          (ref-ordering (vop-info-ref-ordering template)))
     (declare (dynamic-extent refs))
