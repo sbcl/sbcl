@@ -570,22 +570,6 @@
   (op    :field (byte 5 11))
   (reg   :field (byte 3 8) :type 'reg-b))
 
-;;; Same as reg/mem, but with a prefix of #x0F
-(define-instruction-format (ext-reg/mem 24
-                                        :default-printer '(:name :tab reg/mem))
-  (prefix  :field (byte 8 0)    :value #x0F)
-  (op      :fields (list (byte 7 9) (byte 3 19)))
-  (width   :field (byte 1 8)    :type 'width)
-  (reg/mem :fields (list (byte 2 22) (byte 3 16))
-                                :type 'sized-reg/mem)
-  ;; optional fields
-  (imm))
-
-(define-instruction-format (ext-reg/mem-imm 24
-                                        :include ext-reg/mem
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " imm))
-  (imm :type 'signed-imm-data))
 
 (define-instruction-format (ext-reg/mem-no-width+imm8 24
                                         :include ext-reg/mem-no-width
@@ -847,28 +831,6 @@
 ;;; Instructions having a general-purpose register as one operand and an a
 ;;; general-purpose register or a memory location as the other operand,
 ;;; and using a prefix byte.
-
-(define-instruction-format (ext-prefix-reg-reg/mem 32
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (x0f     :field (byte 8 8)    :value #x0f)
-  (op      :field (byte 8 16))
-  (reg/mem :fields (list (byte 2 30) (byte 3 24))
-                                :type 'sized-reg/mem)
-  (reg     :field (byte 3 27)   :type 'reg))
-
-(define-instruction-format (ext-rex-prefix-reg-reg/mem 40
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'sized-reg/mem)
-  (reg     :field (byte 3 35)   :type 'reg))
 
 (define-instruction-format (ext-2byte-prefix-reg-reg/mem 40
                                         :default-printer

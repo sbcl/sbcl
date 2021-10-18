@@ -246,11 +246,6 @@
   (imm)
   )
 
-;;; Same as reg, but with direction bit
-(define-instruction-format (reg-dir 8 :include reg)
-  (op  :field (byte 3 5))
-  (dir :field (byte 1 4)))
-
 (define-instruction-format (reg-reg/mem 16
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -336,23 +331,6 @@
   (op    :field (byte 5 11))
   (reg   :field (byte 3 8) :type 'reg))
 
-;;; Same as reg/mem, but with a prefix of #b00001111
-(define-instruction-format (ext-reg/mem 24
-                                        :default-printer '(:name :tab reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
-  (op      :fields (list (byte 7 9) (byte 3 19)))
-  (width   :field (byte 1 8)    :type 'width)
-  (reg/mem :fields (list (byte 2 22) (byte 3 16))
-                                :type 'sized-reg/mem)
-  ;; optional fields
-  (imm))
-
-(define-instruction-format (ext-reg/mem-imm 24
-                                        :include ext-reg/mem
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " imm))
-  (imm :type 'imm-data))
-
 (define-instruction-format (ext-reg/mem-no-width+imm8 24
                                         :include ext-reg/mem-no-width
                                         :default-printer
@@ -376,17 +354,6 @@
   (suffix :field (byte 2 14) :value #b11)
   (op     :fields (list (byte 3 0) (byte 3 11)))
   (fp-reg :field (byte 3 8) :type 'fp-reg))
-
-;;; fp insn to/from fp reg, with the reversed source/destination flag.
-(define-instruction-format (floating-point-fp-d 16
-                            :default-printer
-                            `(:name :tab ,(swap-if 'd "ST0" ", " 'fp-reg)))
-  (prefix :field (byte 5 3) :value #b11011)
-  (suffix :field (byte 2 14) :value #b11)
-  (op     :fields (list (byte 2 0) (byte 3 11)))
-  (d      :field (byte 1 2))
-  (fp-reg :field (byte 3 8) :type 'fp-reg))
-
 
 ;;; (added by (?) pfw)
 ;;; fp no operand isns
