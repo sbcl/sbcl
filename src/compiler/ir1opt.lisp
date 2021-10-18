@@ -715,11 +715,12 @@
                   alternative)
                  ((type= type (specifier-type 'null))
                   consequent)
-                 ((or (eq consequent alternative)
-                      (and (not fast)
-                           (or
-                            (blocks-equivalent-p alternative consequent)
-                            (if-test-redundant-p test consequent alternative))))
+                 ((eq consequent alternative)
+                  alternative)
+                 ((and (not fast)
+                       (or
+                        (blocks-equivalent-p alternative consequent)
+                        (if-test-redundant-p test consequent alternative)))
                   ;; Even if the references are the same they can have
                   ;; different derived types based on the TEST
                   ;; Don't lose the second type when killing it.

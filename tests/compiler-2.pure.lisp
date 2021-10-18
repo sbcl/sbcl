@@ -3406,3 +3406,18 @@
                (unwind-protect  (funcall f)
                  (return (+ z 1d0))))))
       ((4d0 1d0 (lambda () (throw 'z 1))) 6d0))))
+
+(with-test (:name :ir1-optimize-if-same-target-type-derivation)
+  (catch 'z
+    (checked-compile-and-assert
+        ()
+        `(lambda (b c)
+           (declare (notinline equal))
+           (multiple-value-bind (v7 v2)
+               (if (equal 0 0)
+                   (values c 0)
+                   (values b 0))
+             (declare (ignore v2))
+             (tagbody (progn v7))
+             b))
+      ((1 2) 1))))
