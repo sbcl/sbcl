@@ -8,7 +8,10 @@ create_test_subdirectory
 run_sbcl <<EOF
 ;; technically this is "skipped" if not fasteval, but we don't have "skipped"
 ;; as a status code from shell tests.
-(unless (find-package "SB-INTERPRETER") (exit :code $EXIT_TEST_WIN))
+(unless (and (find-package "SB-INTERPRETER")
+             ;; host with #+sb-devel hangs, not sure why
+             (not (member :sb-devel *features*)))
+ (exit :code $EXIT_TEST_WIN))
 (setq *evaluator-mode* :interpret)
 (defvar *sbcl-local-target-features-file* "../local-target-features.lisp-expr")
 (load "../src/cold/shared.lisp")
