@@ -64,7 +64,7 @@
 
 (defpackage #:sb-aprof
   (:use #:cl #:sb-ext #:sb-alien #:sb-sys #:sb-int #:sb-kernel)
-  (:export #:aprof-run #:aprof-show)
+  (:export #:aprof-run #:aprof-show #:aprof-reset)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-vm #:rbp-offset)
   (:import-from #:sb-x86-64-asm
@@ -80,7 +80,7 @@
   bytes count type pc)
 (declaim (freeze-type alloc))
 
-(defvar *allocation-profile-metadata* nil)
+(defglobal *allocation-profile-metadata* nil)
 
 (define-alien-variable alloc-profile-buffer system-area-pointer)
 (defun aprof-reset ()

@@ -136,6 +136,7 @@ sb-vm::
                    '(lambda (n)
                      (declare (optimize sb-c::instrument-consing))
                      (make-array (the fixnum n))))))
+    (sb-aprof:aprof-reset) ; In case the counts are already nonzero
     (loop for i below n
        do (funcall f i))
     f))
