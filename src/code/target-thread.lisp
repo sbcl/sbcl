@@ -2009,7 +2009,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       ;; before the various interrupt-related special vars are set up.
       ;; Preserve the current mask into SAVED-SIGMASK and CHILD-SIGMASK.
       (sb-unix::pthread-sigmask sb-unix::SIG_BLOCK
-                                (foreign-symbol-sap "deferrable_sigset" t)
+                                (foreign-symbol-sap "thread_start_sigset" t)
                                 saved-sigmask)
       (replace child-sigmask saved-sigmask)
       ;; Ensure that timers and interrupt-thread are directed only to "user" threads.

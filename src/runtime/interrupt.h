@@ -24,6 +24,7 @@ extern void sigaddset_blockable(sigset_t *s);
 extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
 extern sigset_t gc_sigset;
+extern sigset_t thread_start_sigset;
 
 extern boolean deferrables_blocked_p(sigset_t *sigset);
 

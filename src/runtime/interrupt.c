@@ -431,6 +431,7 @@ sigaddset_blockable(sigset_t *sigset)
 /* initialized in interrupt_init */
 sigset_t deferrable_sigset;
 sigset_t blockable_sigset;
+sigset_t thread_start_sigset;
 /* gc_sigset will have exactly 1 bit on, for SIG_STOP_FOR_GC, or no bits on.
  * We always use SIGUSR2 as SIG_STOP_FOR_GC, though in days past it may have
  * varied by OS. Also, long ago, there was a different signal to resume after
@@ -2050,6 +2051,14 @@ interrupt_init(void)
     sigaddset_deferrable(&deferrable_sigset);
     sigaddset_blockable(&blockable_sigset);
     sigaddset_gc(&gc_sigset);
+
+    sigaddset_deferrable(&thread_start_sigset);
+    /* sigprof_handler may interrupt a thread that doesn't have
+     current_thread set up yet, which can be a thread-local variable,
+     and sigprof_handler will try to allocate it, but thread-local
+     initialization is not guaranteed to be async safe. */
+    sigaddset(&thread_start_sigset, SIGPROF);
+
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     // Use this only if you know what you're doing
