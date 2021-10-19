@@ -577,7 +577,7 @@
                                       (- operand (bounds-low (core-code-bounds core))))))
                    (push (list* (dstate-cur-offs dstate) 5 "mov" text) list)))
                 ((and (eq (inst-name inst) 'mov) ; match "mov qword ptr [R+disp8], imm32"
-                      (eql (sap-ref-8 sap (1- offs))    #x48)
+                      (member (sap-ref-8 sap (1- offs)) '(#x48 #x49)) ; REX.w and maybe REX.b
                       (eql (sap-ref-8 sap offs)         #xC7)
                       ;; modRegRm = #b01 #b000 #b___
                       (eql (logand (sap-ref-8 sap (1+ offs)) #o370) #o100))

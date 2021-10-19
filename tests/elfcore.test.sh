@@ -16,7 +16,7 @@
 export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
-run_sbcl --noinform <<EOF
+run_sbcl <<EOF
   #+(and linux elf sb-thread)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
@@ -35,7 +35,7 @@ set -e # exit on error
 
 # Prevent style-warnings in the editcore script, but don't assume that it
 # can be compiled in the first place unless actually doing the ELFcore tests.
-run_sbcl --noinform <<EOF
+run_sbcl <<EOF
   (let ((*evaluator-mode* :interpret))
     (load "../tests/test-util")
     (load "../tools-for-build/corefile"))
@@ -72,7 +72,7 @@ echo Basic smoke test: PASS
 create_test_subdirectory
 tmpcore=$TEST_DIRECTORY/$TEST_FILESTEM.tmpcore
 
-run_sbcl --noinform <<EOF
+run_sbcl <<EOF
   (setq sb-c:*compile-to-memory-space* :dynamic)
   ;; Call an assembly routine from dynamic space
   (defun f (x y z) (+ x (- y z)))
