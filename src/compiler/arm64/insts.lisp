@@ -2062,14 +2062,16 @@
     (#b1101101000010000 :nzcv)
     (#b1101101000100000 :fpcr)
     (#b1101101000100001 :fpsr)
-    (#b1101110011101000 :ccnt)))
+    (#b1101110011101000 :ccnt)
+    (#b1101111010000011 :tpidrro_el0)))
 
 (defun encode-sys-reg (reg)
   (ecase reg
     (:nzcv #b1101101000010000)
     (:fpcr #b1101101000100000)
     (:fpsr #b1101101000100001)
-    (:ccnt #b1101110011101000)))
+    (:ccnt #b1101110011101000)
+    (:tpidrro_el0 #b1101111010000011)))
 
 (define-instruction msr (segment sys-reg rt)
   (:printer sys-reg ((l 0)) '(:name :tab sys-reg ", " rt))
