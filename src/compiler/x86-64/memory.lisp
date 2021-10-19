@@ -178,6 +178,7 @@
   (:policy :fast-safe)
   (:translate splat)
   (:args (vector :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg) temp) ;fixme conditionalize
   (:info words value)
   (:arg-types * (:constant (eql 1)) (:constant t))
   (:results (result :scs (descriptor-reg)))
@@ -185,12 +186,18 @@
    (progn words) ; don't put it in :ignore, which gets inherited
    (inst mov :qword
          (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
-         (compute-splat-bits value))
+         (let ((bits (compute-splat-bits value)))
+           (cond ((plausible-signed-imm32-operand-p bits)
+                  bits)
+                 (t
+                  (inst mov temp bits)
+                  temp))))
    (move result vector)))
 
 (define-vop (splat-small splat-word)
   (:arg-types * (:constant (integer 2 10)) (:constant t))
   (:temporary (:sc complex-double-reg) zero)
+  (:ignore temp)
   (:generator 5
    (let ((bits (compute-splat-bits value)))
      (if (= bits 0)
@@ -214,6 +221,7 @@
   (:args (vector :scs (descriptor-reg) :to (:result 0))
          (words :scs (unsigned-reg immediate) :target rcx))
   (:info value)
+  (:ignore temp)
   (:arg-types * positive-fixnum (:constant t))
   (:temporary (:sc any-reg :offset rdi-offset :from (:argument 0)
                :to (:result 0)) rdi)

@@ -96,7 +96,7 @@
 ;;; it would cause. -- JES, 2005-12-11
 
 #+(or linux darwin)
-(!gencgc-space-setup #x50000000
+(!gencgc-space-setup #x1dead0000
                      :read-only-space-size #+metaspace #.(* 2 1024 1024)
                                            #-metaspace 0
                      :fixedobj-space-size #.(* 40 1024 1024)

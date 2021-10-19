@@ -386,11 +386,13 @@
 (defun ensure-thread-base-tn-loaded ()
   #-sb-thread
   (progn
-    ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
+    ;; Load THREAD-TN from the all_threads. Does not need to be spilled
     ;; to stack, because we do do not give the register allocator access to it.
     ;; And call_into_lisp saves it as per convention, not that it matters,
     ;; because there's no way to get back into C code anyhow.
-    (inst mov thread-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+
+    (inst mov thread-tn (make-fixup "all_threads" :foreign-dataref))
+    (inst mov thread-tn (ea thread-tn))
     (inst mov thread-tn (ea thread-tn))))
 
 ;;; Perform a store to code, updating the GC page (card) protection bits.

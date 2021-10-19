@@ -240,11 +240,13 @@
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
+  (:temporary (:sc unsigned-reg) temp)
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))))
+   (inst mov temp (make-fixup foreign-symbol :foreign-dataref))
+   (inst mov res (ea temp))))
 
 #+sb-safepoint
 (defconstant thread-saved-csp-offset (- (1+ sb-vm::thread-header-slots)))
@@ -369,7 +371,9 @@
   #-win32
   (inst call (cond ((tn-p fun) fun)
                    ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
-                   (t (ea (make-fixup fun :foreign 8)))))
+                   (t (inst mov null-tn (make-fixup fun :foreign 8))
+                      (ea null-tn))))
+  (inst mov null-tn nil-value)
   ;; On win64, we don't support immobile space (yet) and calls go through one of
   ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is
   ;; involved, RBX either points to a linkage table trampoline or to the linkage

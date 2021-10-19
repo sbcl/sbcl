@@ -882,7 +882,7 @@
          (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
          (inst test :byte rbx-tn lowtag-mask)
          (inst jmp :nz (if relative-call
-                           (make-fixup 'call-symbol :assembly-routine)
+                           (ea (make-fixup 'call-symbol :asm-routine-nil-offset*) null-tn)
                            not-fun))
          (inst jmp fun-ea)
          not-fun

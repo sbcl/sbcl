@@ -2747,6 +2747,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:assembly-routine* (lookup-assembler-reference sym :indirect))
              (:asm-routine-nil-offset
               (- (lookup-assembler-reference sym) sb-vm:nil-value))
+             (:asm-routine-nil-offset*
+              (- (lookup-assembler-reference sym :indirect) sb-vm:nil-value))
              (:foreign
               (linkage-table-note-symbol (base-string-from-core sym) nil))
              (:foreign-dataref

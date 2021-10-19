@@ -1412,74 +1412,80 @@
 
 (defun emit-mov (segment size dst src)
   (cond ((gpr-p dst)
-            (cond ((integerp src)
-                   ;; We want to encode the immediate using the fewest bytes possible.
-                   (let ((imm-size
-                          ;; If it's a :qword constant that fits in an unsigned
-                          ;; :dword, then use a zero-extended :dword immediate.
-                          (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
-                              :dword
-                              size)))
-                     (emit-prefixes segment dst nil imm-size))
-                   (acond ((neq size :qword) ; :dword or smaller dst is straightforward
-                           (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
-                           (emit-imm-operand segment src size))
-                          ;; This must be move to a :qword register.
-                          ((typep src '(unsigned-byte 32))
-                           ;; Encode as B8+dst using operand size of 32 bits
-                           ;; and implicit zero-extension.
-                           ;; Instruction size: 5 if no REX prefix, or 6 with.
-                           (emit-byte+reg segment #xB8 dst)
-                           (emit-dword segment src))
-                          ((plausible-signed-imm32-operand-p src)
-                           ;; It's either a signed-byte-32, or a large unsigned
-                           ;; value whose 33 high bits are all 1.
-                           ;; Encode as C7 which sign-extends a 32-bit imm to 64 bits.
-                           ;; Instruction size: 7 bytes.
-                           (emit-byte segment #xC7)
-                           (emit-mod-reg-r/m-byte segment #b11 #b000
-                                                  (reg-encoding dst segment))
-                           (emit-signed-dword segment it))
-                          (t
-                           ;; 64-bit immediate. Instruction size: 10 bytes.
-                           (emit-byte+reg segment #xB8 dst)
-                           (emit-qword segment src))))
-                  ((fixup-p src) ; treat as a 32-bit unsigned integer
-                   ;; But imm-to-reg could take a 64-bit operand if needed.
-                   (emit-prefixes segment dst nil :dword)
-                   (emit-byte+reg segment #xB8 dst)
-                   (emit-absolute-fixup segment src))
-                  (t
-                   (emit-prefixes segment src dst size)
-                   (emit-byte segment (opcode+size-bit #x8A size))
-                   (emit-ea segment src dst))))
+         (cond ((integerp src)
+                ;; We want to encode the immediate using the fewest bytes possible.
+                (let ((imm-size
+                        ;; If it's a :qword constant that fits in an unsigned
+                        ;; :dword, then use a zero-extended :dword immediate.
+                        (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
+                            :dword
+                            size)))
+                  (emit-prefixes segment dst nil imm-size))
+                (acond ((neq size :qword) ; :dword or smaller dst is straightforward
+                        (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
+                        (emit-imm-operand segment src size))
+                       ;; This must be move to a :qword register.
+                       ((typep src '(unsigned-byte 32))
+                        ;; Encode as B8+dst using operand size of 32 bits
+                        ;; and implicit zero-extension.
+                        ;; Instruction size: 5 if no REX prefix, or 6 with.
+                        (emit-byte+reg segment #xB8 dst)
+                        (emit-dword segment src))
+                       ((plausible-signed-imm32-operand-p src)
+                        ;; It's either a signed-byte-32, or a large unsigned
+                        ;; value whose 33 high bits are all 1.
+                        ;; Encode as C7 which sign-extends a 32-bit imm to 64 bits.
+                        ;; Instruction size: 7 bytes.
+                        (emit-byte segment #xC7)
+                        (emit-mod-reg-r/m-byte segment #b11 #b000
+                                               (reg-encoding dst segment))
+                        (emit-signed-dword segment it))
+                       (t
+                        ;; 64-bit immediate. Instruction size: 10 bytes.
+                        (emit-byte+reg segment #xB8 dst)
+                        (emit-qword segment src))))
+               ((fixup-p src)
+                ;; We emit the fixup as 32-bit or 64-bit, depending
+                ;; on where read only spaces are located.
+                (cond ((<= read-only-space-start #xffffffff)
+                       (emit-prefixes segment dst nil :dword)
+                       (emit-byte+reg segment #xB8 dst)
+                       (emit-absolute-fixup segment src))
+                      (t
+                       (emit-prefixes segment dst nil :qword)
+                       (emit-byte+reg segment #xB8 dst)
+                       (emit-absolute-fixup segment src t))))
+               (t
+                (emit-prefixes segment src dst size)
+                (emit-byte segment (opcode+size-bit #x8A size))
+                (emit-ea segment src dst))))
         ((integerp src) ; imm to memory
-            ;; C7 only deals with 32 bit immediates even if the
-            ;; destination is a 64-bit location. The value is
-            ;; sign-extended in this case.
-            (let ((imm-size (if (eq size :qword) :dword size))
-                  ;; If IMMEDIATE32-P returns NIL, use the original value,
-                  ;; which will signal an error in EMIT-IMMEDIATE
-                  (imm-val (or (and (eq size :qword)
-                                    (plausible-signed-imm32-operand-p src))
-                               src)))
-              (emit-prefixes segment dst nil size)
-              (emit-byte segment (opcode+size-bit #xC6 size))
-              ;; The EA could be RIP-relative, thus it is important
-              ;; to get :REMAINING-BYTES correct.
-              (emit-ea segment dst #b000 :remaining-bytes (size-nbyte imm-size))
-              (emit-imm-operand segment imm-val imm-size)))
+         ;; C7 only deals with 32 bit immediates even if the
+         ;; destination is a 64-bit location. The value is
+         ;; sign-extended in this case.
+         (let ((imm-size (if (eq size :qword) :dword size))
+               ;; If IMMEDIATE32-P returns NIL, use the original value,
+               ;; which will signal an error in EMIT-IMMEDIATE
+               (imm-val (or (and (eq size :qword)
+                                 (plausible-signed-imm32-operand-p src))
+                            src)))
+           (emit-prefixes segment dst nil size)
+           (emit-byte segment (opcode+size-bit #xC6 size))
+           ;; The EA could be RIP-relative, thus it is important
+           ;; to get :REMAINING-BYTES correct.
+           (emit-ea segment dst #b000 :remaining-bytes (size-nbyte imm-size))
+           (emit-imm-operand segment imm-val imm-size)))
         ((gpr-p src) ; reg to mem
             (emit-prefixes segment dst src size)
             (emit-byte segment (opcode+size-bit #x88 size))
             (emit-ea segment dst src))
         ((fixup-p src) ; equivalent to 32-bit unsigned integer
-            ;; imm-to-mem can not take a 64-bit operand, but could sign-extend
-            ;; to 8 bytes, which is probably not what you want.
-            (emit-prefixes segment dst nil size)
-            (emit-byte segment #xC7)
-            (emit-ea segment dst #b000)
-            (emit-absolute-fixup segment src))
+         ;; imm-to-mem can not take a 64-bit operand, but could sign-extend
+         ;; to 8 bytes, which is probably not what you want.
+         (emit-prefixes segment dst nil size)
+         (emit-byte segment #xC7)
+         (emit-ea segment dst #b000)
+         (emit-absolute-fixup segment src))
         (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))
 

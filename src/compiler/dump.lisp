@@ -1016,7 +1016,7 @@
   (assert (<= (length +fixup-kinds+) 8))) ; fixup-kind fits in 3 bits
 
 (defconstant-eqx +fixup-flavors+
-  #(:assembly-routine :assembly-routine* :asm-routine-nil-offset
+  #(:assembly-routine :assembly-routine* :asm-routine-nil-offset :asm-routine-nil-offset*
     :symbol-tls-index
     :foreign :foreign-dataref :code-object
     :layout :immobile-symbol :named-call :static-call
@@ -1070,7 +1070,7 @@
                           (t name)))))
               (:layout-id
                (the wrapper name))
-              ((:assembly-routine :assembly-routine* :asm-routine-nil-offset
+              ((:assembly-routine :assembly-routine* :asm-routine-nil-offset :asm-routine-nil-offset*
                :symbol-tls-index
                ;; Only #+immobile-space can use the following two flavors.
                ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,

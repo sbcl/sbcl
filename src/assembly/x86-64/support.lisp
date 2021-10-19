@@ -21,7 +21,7 @@
         ;; emitting code into :ELSEWHERE when requesting a unique label.
         (assemble (:indirections)
           (emit-label label)
-          (inst jmp (ea (make-fixup name :assembly-routine*))))
+          (inst jmp (ea (make-fixup name :asm-routine-nil-offset*) null-tn)))
         (push (cons name label) (sb-assem::asmstream-indirection-table asmstream))
         label)))
 
@@ -33,7 +33,7 @@
                (uniquify
                 (uniquify-fixup routine))
                (t
-                (ea (make-fixup routine :assembly-routine*))))))
+                (ea (make-fixup routine :asm-routine-nil-offset*) null-tn)))))
     (ecase inst
       (jmp  (inst jmp fixup))
       (call (inst call fixup)))))

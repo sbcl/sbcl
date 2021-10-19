@@ -168,7 +168,7 @@
         ;; This jump is always encoded as 5 bytes
         (inst call (if (or (not node) ; assembly routine
                            (sb-c::code-immobile-p node))
-                       (make-fixup helper :assembly-routine)
+                       (ea (make-fixup helper :asm-routine-nil-offset*) null-tn)
                        (uniquify-fixup helper))))
       (inst nop)
       ;; Emit "TEST AL, imm" where the immediate value
@@ -731,6 +731,7 @@
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
+  (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (descriptor-reg) :from :argument))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
@@ -738,8 +739,8 @@
     (alloc-other fdefn-widetag fdefn-size result node nil thread-tn)
     (storew name result fdefn-name-slot other-pointer-lowtag)
     (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
-    (storew (make-fixup 'undefined-tramp :assembly-routine)
-            result fdefn-raw-addr-slot other-pointer-lowtag)))
+    (inst mov temp (make-fixup 'undefined-tramp :assembly-routine))
+    (storew temp result fdefn-raw-addr-slot other-pointer-lowtag)))
 
 (define-vop (make-closure)
   ; (:args (function :to :save :scs (descriptor-reg)))

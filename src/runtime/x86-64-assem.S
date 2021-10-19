@@ -289,10 +289,10 @@ GNAME(funcall_alien_callback):
 #ifdef LISP_FEATURE_IMMOBILE_CODE
 #include "genesis/vector.h"
         // An extra instruction is needed to load the fdefn.
-        mov	(STATIC_FDEFNS+VECTOR_DATA_OFFSET+8*ENTER_ALIEN_CALLBACK_fdefn),%rax
+        movabsq	(STATIC_FDEFNS+VECTOR_DATA_OFFSET+8*ENTER_ALIEN_CALLBACK_fdefn),%rax
         mov	FDEFN_FUN_OFFSET(%rax),%rax
 #else
-        mov     (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
+        movabsq (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
 #endif
 	call	*CLOSURE_FUN_OFFSET(%rax)
 

@@ -82,10 +82,12 @@
          (when (sb-vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
-                   ((:assembly-routine :assembly-routine* :asm-routine-nil-offset)
-                    (- (or (get-asm-routine sym (eq flavor :assembly-routine*))
+                   ((:assembly-routine :assembly-routine* :asm-routine-nil-offset :asm-routine-nil-offset*)
+                    (- (or (get-asm-routine sym (member flavor '(:assembly-routine* :asm-routine-nil-offset*)))
                            (error "undefined assembler routine: ~S" sym))
-                       (if (eq flavor :asm-routine-nil-offset) sb-vm:nil-value 0)))
+                       (if (member flavor '(:asm-routine-nil-offset :asm-routine-nil-offset*))
+                           sb-vm:nil-value
+                           0)))
                    (:foreign (foreign-symbol-address sym))
                    (:foreign-dataref (foreign-symbol-address sym t))
                    (:code-object (get-lisp-obj-address code-obj))

@@ -192,7 +192,7 @@
                 ,@(ecase test
                     (:l `((inst mov y (1+ nil-value))
                           (inst cmp y x)))
-                    (:g `((inst cmp x (1+ nil-value))))))))
+                    (:g `((inst cmp x (constantize (1+ nil-value)))))))))
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
@@ -215,7 +215,7 @@
 
   DO-STATIC-FUN
   (call-static-fun 'two-arg-= 2)
-  (inst cmp x (+ nil-value (static-symbol-offset t))))
+  (inst cmp x (constantize (+ nil-value (static-symbol-offset t)))))
 
 #+sb-assembling
 (define-assembly-routine (logcount)

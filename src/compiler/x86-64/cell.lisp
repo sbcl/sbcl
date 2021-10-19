@@ -491,6 +491,7 @@
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg) temp)
   (:vop-var vop)
   (:generator 38
     ;; Change the JMP instruction to INT3 so that a trap occurs in the fdefn
@@ -506,8 +507,8 @@
     ;; and resume at undefined-tramp. However, CALL-SYMBOL jumps via raw-addr if
     ;; its callable object was not a function. In that case RAX holds a symbol,
     ;; so we're OK because we can identify the undefined function.
-    (storew (make-fixup 'undefined-tramp :assembly-routine)
-            fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
+    (inst mov temp (make-fixup 'undefined-tramp :assembly-routine))
+    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; binding and unbinding
 
