@@ -150,25 +150,37 @@
 
 ;;;; searching for an instruction in instruction space
 
+#-x86-64
+(defun pre-decode (chunk dstate)
+  (declare (ignore dstate))
+  (values chunk 0))
+
 ;;; Return the instruction object within INST-SPACE corresponding to the
 ;;; bit-pattern CHUNK, or NIL if there isn't one.
-(defun find-inst (chunk inst-space)
+(defun find-inst (chunk inst-space &optional dstate)
   (declare (type dchunk chunk)
            (type (or null inst-space instruction) inst-space))
-  (etypecase inst-space
-    (null nil)
-    (instruction
-     (if (inst-matches-p inst-space chunk)
-         (choose-inst-specialization inst-space chunk)
-         nil))
-    (inst-space
-     (let* ((mask (ispace-valid-mask inst-space))
-            (id (dchunk-and mask chunk)))
-       (declare (type dchunk id mask))
-       (dolist (choice (ispace-choices inst-space))
-         (declare (type inst-space-choice choice))
-         (when (dchunk= id (ischoice-common-id choice))
-           (return (find-inst chunk (ischoice-subspace choice)))))))))
+  (binding* (((new-chunk length-adjustment)
+              (if dstate (pre-decode chunk dstate) (values chunk 0)))
+             (inst
+              (named-let recurse ((chunk new-chunk) (inst-space inst-space))
+                (etypecase inst-space
+                  (null nil)
+                  (instruction
+                   (if (inst-matches-p inst-space chunk)
+                       (choose-inst-specialization inst-space chunk)
+                       nil))
+                  (inst-space
+                   (let* ((mask (ispace-valid-mask inst-space))
+                          (id (dchunk-and mask chunk)))
+                     (declare (type dchunk id mask))
+                     (dolist (choice (ispace-choices inst-space))
+                       (declare (type inst-space-choice choice))
+                       (when (dchunk= id (ischoice-common-id choice))
+                         (return (recurse chunk (ischoice-subspace choice)))))))))))
+    (if inst
+        (values inst (+ (inst-length inst) length-adjustment) new-chunk)
+        (values nil 0 chunk))))
 
 ;;;; building the instruction space
 
@@ -554,12 +566,13 @@
   (setf (dstate-filtered-arg-pool-in-use dstate) nil)
   (loop
    ;; There is no point to using GET-DCHUNK. How many bytes remain is unknown.
-   (let* ((chunk (logand (sap-ref-word (dstate-segment-sap dstate)
-                                       (dstate-cur-offs dstate))
-                         dchunk-one))
-          (inst (find-inst chunk *disassem-inst-space*)))
+   (multiple-value-bind (inst len chunk)
+       (find-inst (logand (sap-ref-word (dstate-segment-sap dstate)
+                                        (dstate-cur-offs dstate))
+                          dchunk-one)
+                  *disassem-inst-space* dstate)
      (aver inst)
-     (let ((offs (+ (dstate-cur-offs dstate) (inst-length inst))))
+     (let ((offs (+ (dstate-cur-offs dstate) len)))
        (setf (dstate-next-offs dstate) offs)
        (funcall (inst-prefilter inst) dstate chunk)
        ;; Grab the revised NEXT-OFFS
@@ -643,12 +656,12 @@
         (with-pinned-segment
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
-                (chunk (get-dchunk dstate))
-                (fun-prefix-p (call-fun-hooks chunk stream dstate)))
+                (raw-chunk (get-dchunk dstate))
+                (fun-prefix-p (call-fun-hooks raw-chunk stream dstate)))
            (declare (index bytes-remaining))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
                (setf prefix-p fun-prefix-p)
-               (let ((inst (find-inst chunk ispace)))
+               (multiple-value-bind (inst len chunk) (find-inst raw-chunk ispace dstate)
                  (cond ((null inst)
                         (handle-bogus-instruction stream dstate prefix-len)
                         (setf prefix-p nil))
@@ -656,19 +669,17 @@
                        ;; decode as "ADD [RAX], AL" if there are 2 bytes,
                        ;; but if there's only 1 byte, it should show "BYTE 0".
                        ;; There's really nothing we can do about the former.
-                       ((> (inst-length inst) bytes-remaining)
+                       ((> len bytes-remaining)
                         (when stream
                           (print-inst bytes-remaining stream dstate)
                           (print-bytes bytes-remaining stream dstate)
                           (terpri stream))
                         (return))
                        (t
-                        (setf (dstate-inst dstate) inst)
-                        (setf (dstate-next-offs dstate)
-                              (+ (dstate-cur-offs dstate) (inst-length inst)))
+                        (setf (dstate-inst dstate) inst
+                              (dstate-next-offs dstate) (+ (dstate-cur-offs dstate) len))
                         (when stream
-                          (print-inst (inst-length inst) stream dstate
-                                      :trailing-space nil))
+                          (print-inst len stream dstate :trailing-space nil))
                         (let ((orig-next (dstate-next-offs dstate)))
                           (funcall (inst-prefilter inst) dstate chunk)
                           (setf prefix-p (null (inst-printer inst)))
@@ -680,12 +691,11 @@
                                                  orig-next)))
                               (when (plusp suffix-len)
                                 (print-inst suffix-len stream dstate
-                                            :offset (inst-length inst)
+                                            :offset len
                                             :trailing-space nil))
                               ;; Keep track of the number of bytes
                               ;; printed so far.
-                              (incf prefix-len (+ (inst-length inst)
-                                                  suffix-len)))
+                              (incf prefix-len (+ len suffix-len)))
                             (if prefix-p
                                 (awhen (inst-print-name inst)
                                   (push it prefix-print-names))

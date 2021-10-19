@@ -15,6 +15,25 @@
 
 (in-package "SB-X86-64-ASM")
 
+(defun sb-disassem::pre-decode (chunk dstate)
+  (let ((byte (ldb (byte 8 0) chunk)))
+    (case byte
+      ((#x64  ; FS:
+        #x65  ; GS:
+        #x66  ; operand size modifier
+        #x67  ; address size modifier
+        #xf0  ; LOCK
+        #xf2  ; REPNE or SSE inst
+        #xf3) ; REP or SSE inst
+       ;; If the next byte is a REX prefix, then strip it out, recording the 'wrxb'
+       ;; bits in the dstate, and return the chunk as if the REX byte were absent.
+       (let ((next (ldb (byte 8 8) chunk)))
+         (when (= (logand next #xf0) #x40)
+           (dstate-setprop dstate (logior +rex+ (logand next #b1111)))
+           (let ((new (logior byte (ash (ldb (byte 48 16) chunk) 8))))
+             (return-from sb-disassem::pre-decode (values new 1))))))))
+  (values chunk 0))
+
 (defmethod print-object ((reg reg) stream)
   (if *print-readably*
       ;; cross-compiled DEFMETHOD can't use call-next-method

@@ -590,6 +590,7 @@
 (define-instruction-format (xmm-xmm/mem 24
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
+  (rex) ; optional
   (x0f     :field (byte 8 0)    :value #x0f)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -602,6 +603,7 @@
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op      :field (byte 8 16))
   (reg/mem :fields (list (byte 2 30) (byte 3 24))
@@ -609,42 +611,17 @@
   (reg     :field (byte 3 27)   :type 'xmmreg)
   (imm))
 
-(define-instruction-format (ext-rex-xmm-xmm/mem 40
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 35)   :type 'xmmreg)
-  (imm))
-
 (define-instruction-format (ext-2byte-xmm-xmm/mem 40
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op1     :field (byte 8 16))          ; #x38 or #x3a
   (op2     :field (byte 8 24))
   (reg/mem :fields (list (byte 2 38) (byte 3 32))
                                 :type 'xmmreg/mem)
   (reg     :field (byte 3 35)   :type 'xmmreg))
-
-(define-instruction-format (ext-rex-2byte-xmm-xmm/mem 48
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op1     :field (byte 8 24))          ; #x38 or #x3a
-  (op2     :field (byte 8 32))
-  (reg/mem :fields (list (byte 2 46) (byte 3 40))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 43)   :type 'xmmreg))
 
 ;;; Same as xmm-xmm/mem etc., but with direction bit.
 
@@ -657,15 +634,6 @@
   (op      :field (byte 7 17))
   (dir     :field (byte 1 16)))
 
-(define-instruction-format (ext-rex-xmm-xmm/mem-dir 40
-                                        :include ext-rex-xmm-xmm/mem
-                                        :default-printer
-                                        `(:name
-                                          :tab
-                                          ,(swap-if 'dir 'reg ", " 'reg/mem)))
-  (op      :field (byte 7 25))
-  (dir     :field (byte 1 24)))
-
 ;;; Instructions having an XMM register as one operand
 ;;; and a constant (unsigned) byte as the other.
 
@@ -673,25 +641,12 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)   :value #x0f)
   (op      :field (byte 8 16))
   (/i      :field (byte 3 27))
   (b11     :field (byte 2 30) :value #b11)
   (reg/mem :field (byte 3 24)
-           :type 'xmmreg-b)
-  (imm     :type 'imm-byte))
-
-(define-instruction-format (ext-rex-xmm-imm 40
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " imm))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (/i      :field (byte 3 35))
-  (b11     :field (byte 2 38) :value #b11)
-  (reg/mem :field (byte 3 32)
            :type 'xmmreg-b)
   (imm     :type 'imm-byte))
 
@@ -701,6 +656,7 @@
 (define-instruction-format (xmm-reg/mem 24
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
+  (rex) ; optional
   (x0f     :field (byte 8 0)    :value #x0f)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -719,23 +675,11 @@
   (reg     :field (byte 3 27)   :type 'xmmreg)
   (imm))
 
-(define-instruction-format (ext-rex-xmm-reg/mem 40
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'sized-reg/mem)
-  (reg     :field (byte 3 35)   :type 'xmmreg)
-  (imm))
-
 (define-instruction-format (ext-2byte-xmm-reg/mem 40
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op1     :field (byte 8 16))
   (op2     :field (byte 8 24))
@@ -749,6 +693,7 @@
 (define-instruction-format (reg-xmm/mem 24
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
+  (rex) ; optional
   (x0f     :field (byte 8 0)    :value #x0f)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -759,23 +704,12 @@
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op      :field (byte 8 16))
   (reg/mem :fields (list (byte 2 30) (byte 3 24))
                                 :type 'xmmreg/mem)
   (reg     :field (byte 3 27)   :type 'reg))
-
-(define-instruction-format (ext-rex-reg-xmm/mem 40
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 35)   :type 'reg))
 
 ;;; Instructions having a general-purpose register or a memory location
 ;;; as one operand and an a XMM register as the other operand.
@@ -784,6 +718,7 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " reg))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op      :field (byte 8 16))
   (reg/mem :fields (list (byte 2 30) (byte 3 24))
@@ -791,41 +726,16 @@
   (reg     :field (byte 3 27)   :type 'xmmreg)
   (imm))
 
-(define-instruction-format (ext-rex-reg/mem-xmm 40
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " reg))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)    :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'reg/mem)
-  (reg     :field (byte 3 35)   :type 'xmmreg)
-  (imm))
-
 (define-instruction-format (ext-2byte-reg/mem-xmm 40
                                         :default-printer
                                         '(:name :tab reg/mem ", " reg))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op1     :field (byte 8 16))
   (op2     :field (byte 8 24))
   (reg/mem :fields (list (byte 2 38) (byte 3 32)) :type 'reg/mem)
   (reg     :field (byte 3 35)   :type 'xmmreg)
-  (imm))
-
-(define-instruction-format (ext-rex-2byte-reg/mem-xmm 48
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " reg))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op1     :field (byte 8 24))
-  (op2     :field (byte 8 32))
-  (reg/mem :fields (list (byte 2 46) (byte 3 40)) :type 'reg/mem)
-  (reg     :field (byte 3 43)   :type 'xmmreg)
   (imm))
 
 ;;; Instructions having a general-purpose register as one operand and an a
@@ -836,25 +746,13 @@
                                         :default-printer
                                         '(:name :tab reg ", " reg/mem))
   (prefix  :field (byte 8 0))
+  (rex) ; optional
   (x0f     :field (byte 8 8)    :value #x0f)
   (op1     :field (byte 8 16))          ; #x38 or #x3a
   (op2     :field (byte 8 24))
   (reg/mem :fields (list (byte 2 38) (byte 3 32))
                                 :type 'sized-reg/mem)
   (reg     :field (byte 3 35)   :type 'reg))
-
-(define-instruction-format (ext-rex-2byte-prefix-reg-reg/mem 48
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op1     :field (byte 8 24))          ; #x38 or #x3a
-  (op2     :field (byte 8 32))
-  (reg/mem :fields (list (byte 2 46) (byte 3 40))
-                                :type 'sized-reg/mem)
-  (reg     :field (byte 3 43)   :type 'reg))
 
 ;; XMM comparison instruction
 
@@ -927,36 +825,6 @@
 (define-instruction-format (word-imm 24 :default-printer '(:name :tab code))
   (op :field (byte 16 0))
   (code :field (byte 8 16) :reader word-imm-code))
-
-;;; F3 escape map - Needs a ton more work.
-
-(define-instruction-format (F3-escape 24)
-  (prefix1 :field (byte 8 0) :value #xF3)
-  (prefix2 :field (byte 8 8) :value #x0F)
-  (op      :field (byte 8 16)))
-
-(define-instruction-format (rex-F3-escape 32)
-  ;; F3 is a legacy prefix which was generalized to select an alternate opcode
-  ;; map. Legacy prefixes are encoded in the instruction before a REX prefix.
-  (prefix1 :field (byte 8 0)  :value #xF3)
-  (rex     :field (byte 4 12) :value 4)    ; "prefix2"
-  (wrxb    :field (byte 4 8)  :type 'wrxb)
-  (prefix3 :field (byte 8 16) :value #x0F)
-  (op      :field (byte 8 24)))
-
-(define-instruction-format (F3-escape-reg-reg/mem 32
-                                        :include F3-escape
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (reg/mem :fields (list (byte 2 30) (byte 3 24)) :type 'sized-reg/mem)
-  (reg     :field  (byte 3 27) :type 'reg))
-
-(define-instruction-format (rex-F3-escape-reg-reg/mem 40
-                                        :include rex-F3-escape
-                                        :default-printer
-                                        '(:name :tab reg ", " reg/mem))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32)) :type 'sized-reg/mem)
-  (reg     :field  (byte 3 35) :type 'reg))
 
 
 ;;;; primitive emitters
@@ -2491,38 +2359,21 @@
 
 ;;;; Instructions required to do floating point operations using SSE
 
-;; Return a one- or two-element list of printers for SSE instructions.
-;; The one-element list is used in the cases where the REX prefix is
-;; really a prefix and thus automatically supported, the two-element
-;; list is used when the REX prefix is used in an infix position.
+;;; Return a :PRINTER expression for SSE instructions.
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun sse-inst-printer-list (inst-format-stem prefix opcode
-                                &key more-fields printer)
-    (let ((fields `(,@(when prefix
-                        `((prefix ,prefix)))
+  (defun sse-inst-printer (inst-format-stem prefix opcode &key more-fields printer)
+    (let ((fields `(,@(when prefix `((prefix ,prefix)))
                     (op ,opcode)
-                    ,@more-fields))
-          (inst-formats (if prefix
-                            (list (symbolicate "EXT-" inst-format-stem)
-                                  (symbolicate "EXT-REX-" inst-format-stem))
-                            (list inst-format-stem))))
-      (mapcar (lambda (inst-format)
-                `(:printer ,inst-format ,fields ,@(if printer `(',printer))))
-              inst-formats)))
-  (defun 2byte-sse-inst-printer-list (inst-format-stem prefix op1 op2
-                                      &key more-fields printer)
-    (let ((fields `(,@(when prefix
-                        `((prefix, prefix)))
+                    ,@more-fields)))
+      `((:printer ,(if prefix (symbolicate "EXT-" inst-format-stem) inst-format-stem)
+                  ,fields ,@(if printer `(',printer))))))
+  (defun 2byte-sse-inst-printer (inst-format-stem prefix op1 op2 &key more-fields printer)
+    (let ((fields `(,@(when prefix `((prefix, prefix)))
                     (op1 ,op1)
                     (op2 ,op2)
-                    ,@more-fields))
-          (inst-formats (if prefix
-                            (list (symbolicate "EXT-" inst-format-stem)
-                                  (symbolicate "EXT-REX-" inst-format-stem))
-                            (list inst-format-stem))))
-      (mapcar (lambda (inst-format)
-                `(:printer ,inst-format ,fields ,@(if printer `(',printer))))
-              inst-formats))))
+                    ,@more-fields)))
+      `((:printer ,(if prefix (symbolicate "EXT-" inst-format-stem) inst-format-stem)
+                  ,fields ,@(if printer `(',printer)))))))
 
 (defun emit-sse-inst (segment dst src prefix opcode
                       &key operand-size (remaining-bytes 0))
@@ -2562,12 +2413,13 @@
 (macrolet
     ((define-imm-sse-instruction (name opcode /i)
          `(define-instruction ,name (segment dst/src imm)
-            ,@(sse-inst-printer-list 'xmm-imm #x66 opcode
-                                     :more-fields `((/i ,/i)))
+            ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
             (:emitter
              (emit-sse-inst-with-imm segment dst/src imm
                                      #x66 ,opcode ,/i
                                      :operand-size :do-not-set)))))
+  ;; FIXME: why did someone decide to invent new mnemonics for the immediate forms?
+  ;; Can we put them back to normal?
   (define-imm-sse-instruction pslldq #x73 7)
   (define-imm-sse-instruction psllw-imm #x71 6)
   (define-imm-sse-instruction pslld-imm #x72 6)
@@ -2604,7 +2456,7 @@
 
 (macrolet ((define-regular-sse-inst (name prefix opcode)
              `(define-instruction ,name (segment dst src)
-                ,@(sse-inst-printer-list 'xmm-xmm/mem prefix opcode)
+                ,@(sse-inst-printer 'xmm-xmm/mem prefix opcode)
                 (:emitter
                  (emit-regular-sse-inst segment dst src ,prefix ,opcode)))))
   ;; moves
@@ -2747,7 +2599,7 @@
                       (intern (format nil "SSE-SHUFFLE-PATTERN-~D-~D"
                                       n-bits radix))))
                  `(define-instruction ,name (segment dst src pattern)
-                    ,@(sse-inst-printer-list
+                    ,@(sse-inst-printer
                         'xmm-xmm/mem prefix opcode
                         :more-fields `((imm nil :type ',shuffle-pattern))
                         :printer '(:name :tab reg ", " reg/mem ", " imm))
@@ -2769,12 +2621,12 @@
    (aver (xmm-register-p src))
    (aver (xmm-register-p mask))
    (emit-regular-sse-inst segment src mask #x66 #xf7))
-  . #.(sse-inst-printer-list 'xmm-xmm/mem #x66 #xf7))
+  . #.(sse-inst-printer 'xmm-xmm/mem #x66 #xf7))
 
 (macrolet ((define-comparison-sse-inst (name prefix opcode
                                         name-prefix name-suffix)
                `(define-instruction ,name (segment op x y)
-                  ,@(sse-inst-printer-list
+                  ,@(sse-inst-printer
                       'xmm-xmm/mem prefix opcode
                       :more-fields '((imm nil :type 'sse-condition-code))
                       :printer `(,name-prefix imm ,name-suffix
@@ -2793,7 +2645,7 @@
 ;;; MOVSD, MOVSS
 (macrolet ((define-movsd/ss-sse-inst (name prefix)
              `(define-instruction ,name (segment dst src)
-                ,@(sse-inst-printer-list 'xmm-xmm/mem-dir prefix #b0001000)
+                ,@(sse-inst-printer 'xmm-xmm/mem-dir prefix #b0001000)
                 (:emitter
                  (cond ((xmm-register-p dst)
                         (emit-sse-inst segment dst src ,prefix #x10
@@ -2818,8 +2670,8 @@
                                                 ,prefix ,opcode-from))))
                   (define-instruction ,name (segment dst src)
                     ,@(when opcode-from
-                        (sse-inst-printer-list 'xmm-xmm/mem prefix opcode-from))
-                    ,@(sse-inst-printer-list
+                        (sse-inst-printer 'xmm-xmm/mem prefix opcode-from))
+                    ,@(sse-inst-printer
                           'xmm-xmm/mem prefix opcode-to
                           :printer '(:name :tab reg/mem ", " reg))
                     (:emitter
@@ -2860,7 +2712,7 @@
    (aver (and (xmm-register-p dst)
               (not (xmm-register-p src))))
    (emit-regular-2byte-sse-inst segment dst src #x66 #x38 #x2a))
-  . #.(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem #x66 #x38 #x2a))
+  . #.(2byte-sse-inst-printer '2byte-xmm-xmm/mem #x66 #x38 #x2a))
 
 ;;; Move a 32-bit value (MOVD) or 64-bit value (MOVQ)
 ;;; MOVD has encodings for xmm <-> r/m32.
@@ -2926,9 +2778,9 @@
                 (emit-sse-inst segment src dst #x66 #x7e)))))
   (define-instruction movd (segment dst src)
     (:emitter (move-xmm<->gpr segment dst src :dword))
-    . #.(append (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e
+    . #.(append (sse-inst-printer 'xmm-reg/mem #x66 #x6e
                  :printer '(#'print-mov[dq]-opcode :tab reg ", " reg/mem))
-                (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
+                (sse-inst-printer 'xmm-reg/mem #x66 #x7e
                  :printer '(#'print-mov[dq]-opcode :tab reg/mem ", " reg))))
 
   (define-instruction movq (segment dst src)
@@ -2943,16 +2795,13 @@
                    (aver (xmm-register-p src))
                    (emit-sse-inst segment src dst #x66 #xd6
                                   :operand-size :do-not-set))))))
-    . #.(append (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
-                (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
+    . #.(append (sse-inst-printer 'xmm-xmm/mem #xf3 #x7e)
+                (sse-inst-printer 'xmm-xmm/mem #x66 #xd6
                                   :printer '(:name :tab reg/mem ", " reg)))))
 
 (define-instruction rdfsbase (segment dst)
-  (:printer rex-f3-escape-reg-reg/mem ((op #xAE)
-                                       (reg nil :prefilter nil :printer #("RDFSBASE" "RDGSBASE")))
-            '(reg :tab reg/mem))
-  (:printer f3-escape-reg-reg/mem ((op #xAE)
-                                   (reg nil :prefilter nil :printer #("RDFSBASE" "RDGSBASE")))
+  (:printer ext-xmm-reg/mem ((prefix #xF3) (op #xAE)
+                             (reg nil :prefilter nil :printer #("RDFSBASE" "RDGSBASE")))
             '(reg :tab reg/mem))
   (:emitter (emit-sse-inst segment 0 dst #xf3 #xae)))
 (define-instruction rdgsbase (segment dst)
@@ -2965,15 +2814,28 @@
 (macrolet ((define-extract-sse-instruction (name prefix op1 op2
                                             &key explicit-qword)
              `(define-instruction ,name (segment dst src imm)
-                (:printer
-                 ,(if explicit-qword
-                      'ext-rex-2byte-reg/mem-xmm
-                      'ext-2byte-reg/mem-xmm)
-                 ((prefix '(,prefix))
-                  (op1 '(,op1))
-                  (op2 '(,op2))
-                  (imm nil :type 'imm-byte))
-                 '(:name :tab reg/mem ", " reg ", " imm))
+                ;; The printer for PEXTRD changes the opcode name to PEXTRQ
+                ;; depending on the REX.W bit.
+                ,@(case name
+                    (pextrq nil)
+                    (pextrd
+                     `((:printer ext-2byte-reg/mem-xmm
+                                 ((prefix '(,prefix))
+                                  (rex nil :prefilter (lambda (dstate)
+                                                        (if (dstate-getprop dstate +rex-w+) 1 0))
+                                           :printer #("PEXTRD" "PEXTRQ"))
+                                  (op1 '(,op1))
+                                  (op2 '(,op2))
+                                  (imm nil :type 'imm-byte))
+                                 '(rex :tab reg/mem ", " reg ", " imm))))
+
+                    (t
+                     `((:printer ext-2byte-reg/mem-xmm
+                                 ((prefix '(,prefix))
+                                  (op1 '(,op1))
+                                  (op2 '(,op2))
+                                  (imm nil :type 'imm-byte))
+                                 '(:name :tab reg/mem ", " reg ", " imm)))))
                 (:emitter
                  (aver (and (xmm-register-p src) (not (xmm-register-p dst))))
                  (emit-sse-inst-2byte segment src dst ,prefix ,op1 ,op2
@@ -3027,16 +2889,16 @@
                             :operand-size :do-not-set :remaining-bytes 1))
    (emit-byte segment imm))
   . #.(append
-       (2byte-sse-inst-printer-list '2byte-reg/mem-xmm #x66 #x3a #x15
+       (2byte-sse-inst-printer '2byte-reg/mem-xmm #x66 #x3a #x15
                                     :more-fields '((imm nil :type 'imm-byte))
                                     :printer '(:name :tab reg/mem ", " reg ", " imm))
-       (sse-inst-printer-list 'reg/mem-xmm #x66 #xc5
+       (sse-inst-printer 'reg/mem-xmm #x66 #xc5
                               :more-fields '((imm nil :type 'imm-byte))
                               :printer '(:name :tab reg/mem ", " reg ", " imm))))
 
 (macrolet ((define-integer-source-sse-inst (name prefix opcode &key mem-only)
              `(define-instruction ,name (segment dst src)
-                ,@(sse-inst-printer-list 'xmm-reg/mem prefix opcode)
+                ,@(sse-inst-printer 'xmm-reg/mem prefix opcode)
                 (:emitter
                  (aver (xmm-register-p dst))
                  ,(when mem-only
@@ -3059,7 +2921,7 @@
                                                   &key (size '(operand-size dst))
                                                        reg-only)
              `(define-instruction ,name (segment dst src)
-                ,@(sse-inst-printer-list 'reg-xmm/mem prefix opcode)
+                ,@(sse-inst-printer 'reg-xmm/mem prefix opcode)
                 (:emitter
                  (aver (gpr-p dst))
                  ,(when reg-only
@@ -3092,14 +2954,14 @@
 
 (macrolet ((regular-2byte-sse-inst (name prefix op1 op2)
              `(define-instruction ,name (segment dst src)
-                ,@(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix
+                ,@(2byte-sse-inst-printer '2byte-xmm-xmm/mem prefix
                                                 op1 op2)
                 (:emitter
                  (emit-regular-2byte-sse-inst segment dst src ,prefix
                                               ,op1 ,op2))))
            (regular-2byte-sse-inst-imm (name prefix op1 op2)
              `(define-instruction ,name (segment dst src imm)
-                ,@(2byte-sse-inst-printer-list
+                ,@(2byte-sse-inst-printer
                     '2byte-xmm-xmm/mem prefix op1 op2
                     :more-fields '((imm nil :type 'imm-byte))
                     :printer `(:name :tab reg ", " reg/mem ", " imm))
@@ -3191,7 +3053,7 @@
 ;; Instructions implicitly using XMM0 as a mask
 (macrolet ((define-sse-inst-implicit-mask (name prefix op1 op2)
              `(define-instruction ,name (segment dst src mask)
-                ,@(2byte-sse-inst-printer-list
+                ,@(2byte-sse-inst-printer
                     '2byte-xmm-xmm/mem prefix op1 op2
                     :printer '(:name :tab reg ", " reg/mem ", XMM0"))
                 (:emitter
@@ -3264,14 +3126,15 @@
     (:printer ext-reg/mem-no-width ((op '(#xae 3))))
     (:emitter (emit* segment dst 3))))
 
-(define-instruction popcnt (segment dst src)
-  (:printer f3-escape-reg-reg/mem ((op #xB8)))
-  (:printer rex-f3-escape-reg-reg/mem ((op #xB8)))
+(define-instruction popcnt (segment &prefix prefix dst src)
+  (:printer ext-xmm-reg/mem ((prefix #xF3) (op #xB8) (reg nil :type 'reg)))
   (:emitter
-   (aver (gpr-p dst))
-   (aver (and (gpr-p dst) (not (eq (operand-size dst) :byte))))
-   (aver (not (eq (operand-size src) :byte)))
-   (emit-sse-inst segment dst src #xf3 #xb8)))
+   (let ((size (pick-operand-size prefix dst src)))
+     (aver (neq size :byte))
+     ;; FIXME: this disagrees with the prefix order that other assemblers emit
+     ;; for "popcnt %ax,%r10w" which is 66 f3 44 0f b8 d0.
+     ;; We disassemble it wrongly, but I think ours is a valid encoding.
+     (emit-sse-inst segment dst src #xf3 #xb8 :operand-size size))))
 
 (define-instruction crc32 (segment src-size dst src)
   ;; The low bit of the final opcode byte sets the source size.
@@ -3280,11 +3143,6 @@
             ((prefix #xf2) (op1 #x38)
              (op2 #b1111000 :field (byte 7 25)) ; #xF0 ignoring the low bit
              (src-width nil :field (byte 1 24) :prefilter #'prefilter-width)
-             (reg nil :printer #'print-d/q-word-reg)))
-  (:printer ext-rex-2byte-prefix-reg-reg/mem
-            ((prefix #xf2) (op1 #x38)
-             (op2 #b1111000 :field (byte 7 33)) ; ditto
-             (src-width nil :field (byte 1 32) :prefilter #'prefilter-width)
              (reg nil :printer #'print-d/q-word-reg)))
   (:emitter
    (let ((dst-size (operand-size dst)))
