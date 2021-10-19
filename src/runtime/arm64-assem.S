@@ -136,16 +136,19 @@ GNAME(call_into_lisp):
 
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
+#ifdef LISP_FEATURE_DARWIN
+
+        adrp    x0, _current_thread@TLVPPAGE
+        ldr     x0, [x0, _current_thread@TLVPPAGEOFF]
+        ldr     x8, [x0]
+        blr     x8
+        ldr     reg_THREAD, [x0]
+#else
 	adrp	x0, :gottprel:current_thread
 	ldr	x0, [x0, #:gottprel_lo12:current_thread]
 	mrs	reg_THREAD, tpidr_el0
 	ldr	reg_THREAD, [reg_THREAD,x0]
-#elif defined(LISP_FEATURE_DARWIN)
-        adrp    x0, _specials@GOTPAGE
-        ldr     x0, [x0, _specials@GOTPAGEOFF]
-        ldr     x0, [x0]
-        bl      GNAME(pthread_getspecific)
-        mov     reg_THREAD, x0
+#endif
 #else
         ldr	x0, specials
         bl      pthread_getspecific

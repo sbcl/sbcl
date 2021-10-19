@@ -563,7 +563,7 @@ case "$sbcl_os" in
             fi
         fi
         if [ $sbcl_arch = "arm64" ]; then
-            printf ' :darwin-jit' >> $ltf
+            printf ' :darwin-jit :gcc-tls' >> $ltf
         fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
