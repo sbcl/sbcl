@@ -968,3 +968,13 @@
          (logand (ash a b) (1+ most-positive-fixnum)))
     ((-1 -3) (1+ most-positive-fixnum))
     ((1 3) 0)))
+
+(with-test (:name :zero-shift-flags)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a m)
+         (declare ((integer 0 5000000000) a)
+                  (bit m))
+         (zerop (ash a m)))
+    ((1 0) nil)
+    ((0 1) t)))

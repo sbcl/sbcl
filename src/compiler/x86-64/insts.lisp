@@ -3462,6 +3462,10 @@
                (location= dst1 dst2) ; they can have different SCs
                (eq dst2 src2)
                next-next
+               ;; Zero shifts do not affect the flags
+               (not (and (memq (stmt-mnemonic stmt) '(sar shl shr))
+                         (memq (car (last (stmt-operands stmt)))
+                               '(:cl 0))))
                (memq (stmt-mnemonic next-next) '(jmp set))
                ;; TODO: figure out when it would be correct to omit TEST for the carry flag
                (case (car (stmt-operands next-next))
