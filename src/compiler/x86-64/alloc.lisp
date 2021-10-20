@@ -732,10 +732,10 @@
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 37
-    (alloc-other fdefn-widetag fdefn-size result node nil thread)
+    (alloc-other fdefn-widetag fdefn-size result node nil thread-tn)
     (storew name result fdefn-name-slot other-pointer-lowtag)
     (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
