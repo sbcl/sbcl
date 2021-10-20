@@ -83,10 +83,11 @@
 (define-vop (move-from-sse)
   (:args (x :scs (single-sse-reg double-sse-reg int-sse-reg)))
   (:results (y :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "SSE to pointer coercion")
   (:generator 13
-     (alloc-other simd-pack-widetag simd-pack-size y node nil)
+     (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
        ;; see *simd-pack-element-types*
      (storew (fixnumize
               (sc-case x
@@ -185,9 +186,10 @@
   (:arg-types tagged-num unsigned-num unsigned-num)
   (:results (dst :scs (descriptor-reg) :from :load))
   (:result-types t)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 13
-    (alloc-other simd-pack-widetag simd-pack-size dst node nil)
+    (alloc-other simd-pack-widetag simd-pack-size dst node nil thread-tn)
       ;; see *simd-pack-element-types*
     (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
     (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)

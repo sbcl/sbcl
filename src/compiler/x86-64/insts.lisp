@@ -891,7 +891,7 @@
 ;;;; the effective-address (ea) structure
 (defstruct (ea (:constructor %ea (segment disp base index scale))
                (:copier nil))
-  (segment nil :type (member nil :gs) :read-only t)
+  (segment nil :type (member :cs :gs) :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
@@ -946,12 +946,9 @@
 ;;;
 (defun ea (&rest args) ; seg displacement base index scale
   (declare (dynamic-extent args))
-  (let (seg disp)
+  (let ((seg :cs) disp)
     (let ((first (car args)))
       (case first
-        ;; Let's say that if you put :CS, it's as if you had put nothing,
-        ;; which makes the positional syntax consistent and unambiguous
-        ;; (becase I can't use NIL for that, which implies no base register)
         (:gs (setq seg first) (pop args))
         (:cs (pop args))))
     (let ((first (car args)))
@@ -972,7 +969,7 @@
           (%ea seg 0 base index scale)))))
 
 (defun rip-relative-ea (label &optional addend)
-  (%ea nil (if addend (make-label+addend label addend) label) rip-tn nil 1))
+  (%ea :cs (if addend (make-label+addend label addend) label) rip-tn nil 1))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1

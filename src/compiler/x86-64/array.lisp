@@ -70,6 +70,7 @@
   (:temporary (:sc any-reg :to :eval) bytes)
   (:temporary (:sc any-reg :to :result) header)
   (:temporary (:sc unsigned-reg) temp)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 13
@@ -83,9 +84,9 @@
     (inst shl :dword header array-rank-byte-pos)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
-    (instrument-alloc nil bytes node temp)
-    (pseudo-atomic ()
-     (allocation nil bytes 0 result node temp)
+    (instrument-alloc nil bytes node temp thread-tn)
+    (pseudo-atomic (:thread-tn thread-tn)
+     (allocation nil bytes 0 result node temp thread-tn)
      (storew header result 0 0)
      (inst or :byte result other-pointer-lowtag))))
 

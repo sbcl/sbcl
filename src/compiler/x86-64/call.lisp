@@ -1298,6 +1298,7 @@
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
   ;; Note that DST conflicts with RESULT because we use both as temps
   (:temporary (:sc unsigned-reg) value dst)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
@@ -1313,12 +1314,12 @@
       (inst mov result nil-value)
       (inst jrcxz DONE)
       (unless stack-allocate-p
-        (instrument-alloc 'list rcx node (list value dst)))
-      (pseudo-atomic (:elide-if stack-allocate-p)
+        (instrument-alloc 'list rcx node (list value dst) thread-tn))
+      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
        (if stack-allocate-p
            (stack-allocation rcx 0 dst)
-           (allocation 'list rcx 0 dst node value))
+           (allocation 'list rcx 0 dst node value thread-tn))
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells

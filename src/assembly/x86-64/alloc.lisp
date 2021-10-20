@@ -23,13 +23,13 @@
           ,@(cond
               ((eq reg 'r12) ; problematic case for INSTRUMENT-ALLOC
                '((inst push rax-tn)
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
                  (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
                  (inst mov number rax-tn)
                  (inst pop rax-tn)))
               (t
                '((inst push number)
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
                  (popw number bignum-digits-offset other-pointer-lowtag))))))
      (unsigned (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
@@ -41,13 +41,13 @@
                '((inst push rax-tn)
                  (inst jmp :ns one-word-bignum)
                  ;; Two word bignum
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) rax-tn nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) rax-tn nil nil nil)
                  (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
                  (inst mov number rax-tn)
                  (inst pop rax-tn)
                  (inst ret)
                  ONE-WORD-BIGNUM
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
                  (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
                  (inst mov number rax-tn)
                  (inst pop rax-tn)))
@@ -55,18 +55,18 @@
                '((inst push number)
                  (inst jmp :ns one-word-bignum)
                  ;; Two word bignum
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
                  (popw number bignum-digits-offset other-pointer-lowtag)
                  (inst ret)
                  ONE-WORD-BIGNUM
-                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
                  (popw number bignum-digits-offset other-pointer-lowtag))))))
      (define (op)
        ;; R13 is usually the thread register, but might not be
        `(progn
           ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
                                r8 r9 r10 r11 r12
-                               #+gs-segment-thread r13
+                               #+gs-seg r13
                                r14 r15)
                   collect `(,op ,reg)))))
   (define signed)

@@ -13,6 +13,25 @@
 
 ;;;; register specs
 
+;;; Observe that [R12 + displacement] needs an extra byte of encoding in
+;;; certain addressing modes, as does [R13 + index]
+;;;     49895B08         MOV [R11+8], RBX
+;;;     49895C2408       MOV [R12+8], RBX
+;;;     49895D08         MOV [R13+8], RBX
+;;;     49891C03         MOV [R11+RAX], RBX
+;;;     49891C04         MOV [R12+RAX], RBX
+;;;     49895C0500       MOV [R13+RAX], RBX
+;;; This is because 12 and 13 are equal-mod-8 to 4 and 5, the indices of RSP
+;;; and RBP respectively, which have different behaviors in the ModRegR/M byte.
+;;; So due to lack of perfectly orthogonal encodings, it would be slightly
+;;; beneficial to hint to the register allocator that it should pick registers
+;;; 12 and 13 only when all other registers are unavailable.
+;;; And you might think that it should "work" simply to list the usable offsets
+;;; in the SC in the order in which they should be chosen when the register
+;;; allocator needs to pick the next available register, but unfortunately
+;;; it does not work to do that, because it uses bitmaps from which to pick,
+;;; and not an ordered list.
+
 ;;; A register that's never used by the code generator, and can therefore
 ;;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
 ;;; be used.
@@ -23,12 +42,34 @@
 #+ubsan (progn (define-symbol-macro temp-reg-tn r11-tn)
                (defconstant global-temp-reg 11))
 
-#+gs-segment-thread
+#+gs-seg
 (progn
+  ;; There is no permanent THREAD-TN. There are a few problems in trying
+  ;; cleverly to make PSEUDO-ATOMIC agnostic of whether you're using a global
+  ;; THREAD-TN or a local one (a global symbol macro vs. a let binding)
+  ;; 1) ECL seems to think that it is an error to LET bind a global symbol macro.
+  ;;    > (define-symbol-macro thread-tn 'wat)
+  ;;    > (defun f (&optional (thread-tn thread-tn)) (format t "Hi: ~a~%" thread-tn))
+  ;;    > (compile'f)
+  ;;    ;;; Error:
+  ;;    ;;;   * The constant THREAD-TN is being bound.
+  ;; 2) It actually doesn't completely work completely anyway,
+  ;;    because pseudo-atomic needs to know not to use a segment override,
+  ;;    and TNs don't indicate a memory segment.
+  ;; While the second problem could be solved, the first can't,
+  ;; and it's not clear to me whether ECL is wrong to say it's an error,
+  ;; or SBCL is remiss in choosing not to style-warn (which would annoy me
+  ;; for that reason).
+  ;; So we wire the thread structure to r15 within some vops when convenient.
+  ;; Wiring to r15 is not strictly necessary, but I want to see if sb-aprof
+  ;; can be made to work slightly easier regardless of #+gs-seg.
+  ;; And with 15 being the highest register number, it is the least likely
+  ;; to be picked by the register allocator for anything else.
+  ;; Additionally I'd like to have an optimization pass that avoids reloading
+  ;; r15 when consecutive allocation sequences occur in straight-line code.
   (define-symbol-macro thread-segment-reg :gs)
-  (define-symbol-macro thread-reg nil)
-  (define-symbol-macro thread-tn nil))
-#-gs-segment-thread
+  (define-symbol-macro thread-reg nil))
+#-gs-seg
 (progn
   (define-symbol-macro thread-segment-reg :cs)
   ;; r13 is preferable to r12 because 12 is an alias of 4 in ModRegRM, which

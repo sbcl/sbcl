@@ -131,11 +131,11 @@
            (compute-virtual-symbol ()
              `(progn
                 (inst mov :dword cell (tls-index-of symbol))
-                #+gs-segment-thread (inst rdgsbase thread-temp)
+                #+gs-seg (inst rdgsbase thread-temp)
                 (inst lea cell
                       (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
-                          #+gs-segment-thread thread-temp
-                          #-gs-segment-thread thread-tn
+                          #+gs-seg thread-temp
+                          #-gs-seg thread-tn
                           cell))
                 (inst cmp :dword (symbol-value-slot-ea cell) ; TLS reference
                       no-tls-value-marker-widetag)
@@ -155,7 +155,7 @@
                  :from (:argument 1) :to (:result 0)) rax)
     #+sb-thread
     (:temporary (:sc descriptor-reg :to (:result 0)) cell)
-    #+gs-segment-thread (:temporary (:sc unsigned-reg) thread-temp)
+    #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
     (:results (result :scs (descriptor-reg any-reg)))
     (:policy :fast-safe)
     (:vop-var vop)
@@ -206,7 +206,7 @@
              (value :scs (descriptor-reg any-reg immediate)))
       (:temporary (:sc descriptor-reg) cell)
       (:temporary (:sc unsigned-reg) val-temp)
-      #+gs-segment-thread (:temporary (:sc unsigned-reg) thread-temp)
+      #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
       (:generator 4
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and

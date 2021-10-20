@@ -86,14 +86,19 @@
 ;;; always requires a SIB byte, which doesn't fit in the reserved bytes
 ;;; of the instruction stream where hot patching occurs.
 (defun instrument-alloc (type size node scratch-registers
+                         &optional thread-temp
                          &aux (temp
                                (if (listp scratch-registers)
                                    (dolist (reg scratch-registers
                                                 (first scratch-registers))
                                      (unless (location= reg r12-tn) (return reg)))
                                    scratch-registers)))
-  (declare (ignorable type))
+  (declare (ignorable type thread-temp))
   (aver (not (location= temp r12-tn)))
+  ;; Each allocation sequence has to call INSTRUMENT-ALLOC,
+  ;; so we may as well take advantage of this fact to load the temp reg
+  ;; here, if provided, rather than spewing more #+gs-seg tests around.
+  #+gs-seg (when thread-temp (inst rdgsbase thread-temp))
   #+allocator-metrics
   (let ((use-size-temp (not (typep size '(or (signed-byte 32) tn))))
         (tally (gen-label))
@@ -145,7 +150,7 @@
     (let ((data temp)
           (patch-loc (gen-label))
           (skip-instrumentation (gen-label)))
-      (inst mov data (thread-slot-ea thread-profile-data-slot))
+      (inst mov data (thread-slot-ea thread-profile-data-slot thread-temp))
       (inst test data data)
       ;; This instruction is modified to "JMP :z" when profiling is
       ;; partially enabled. After the buffer is assigned, it becomes
@@ -187,8 +192,9 @@
 ;;; A mnemonic device for the argument pattern here:
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. where to put the result
-;;; 3. node (for determining immobile-space-p) and a scratch register
-(defun allocation (type size lowtag alloc-tn node temp)
+;;; 3. node (for determining immobile-space-p) and a scratch register or two
+(defun allocation (type size lowtag alloc-tn node temp thread-temp)
+  (declare (ignorable thread-temp))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
@@ -210,15 +216,15 @@
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))
-           (free-pointer #+sb-thread (thread-slot-ea thread-boxed-tlab-slot)
+           (free-pointer #+sb-thread (thread-slot-ea thread-boxed-tlab-slot #+gs-seg thread-temp)
                          #-sb-thread (ea boxed-region))
-           (end-addr (ea thread-segment-reg
+           (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))
       (cond ((typep size `(integer ,large-object-size))
              ;; large objects will never be made in a per-thread region
              (fallback size)
-             (unless (= lowtag 0) (inst or :byte alloc-tn lowtag)))
+             (when (/= lowtag 0) (inst or :byte alloc-tn lowtag)))
             ((and (tn-p size) (location= size alloc-tn))
              (aver (and temp (not (location= temp size))))
              (inst mov temp free-pointer)
@@ -228,7 +234,7 @@
              (inst jmp :a NOT-INLINE)
              (inst mov free-pointer temp)
              (emit-label DONE)
-             (unless (= lowtag 0) (inst or :byte alloc-tn lowtag))
+             (when (/= lowtag 0) (inst or :byte alloc-tn lowtag))
              (assemble (:elsewhere)
                (emit-label NOT-INLINE)
                (inst sub temp alloc-tn) ; new-free-ptr - old-free-ptr = size
@@ -272,8 +278,9 @@
 ;;; Allocate an other-pointer object of fixed NWORDS with a single-word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.  NWORDS counts the header word.
-(defun alloc-other (widetag nwords result-tn node alloc-temp
+(defun alloc-other (widetag nwords result-tn node alloc-temp thread-temp
                     &aux (bytes (pad-data-block nwords)))
+  (declare (ignorable thread-temp))
   (let ((header (compute-object-header nwords widetag)))
     #+bignum-assertions
     (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
@@ -282,20 +289,20 @@
            ;; Therefore, allocate into RAX but save it in RESULT-TN
            ;; and then switch them back.
            (inst mov result-tn rax-tn)
-           (instrument-alloc widetag bytes node rax-tn)
-           (pseudo-atomic ()
-             (allocation nil bytes other-pointer-lowtag rax-tn node nil)
+           (instrument-alloc widetag bytes node rax-tn thread-temp)
+           (pseudo-atomic (:thread-tn thread-temp)
+             (allocation nil bytes other-pointer-lowtag rax-tn node nil thread-temp)
              (storew* header rax-tn 0 other-pointer-lowtag t))
            (inst xchg rax-tn result-tn))
           (t
-           (instrument-alloc widetag bytes node result-tn)
+           (instrument-alloc widetag bytes node result-tn thread-temp)
            (pseudo-atomic ()
              (cond (alloc-temp
-                    (allocation nil bytes 0 result-tn node alloc-temp)
+                    (allocation nil bytes 0 result-tn node alloc-temp thread-temp)
                     (storew* header result-tn 0 0 t)
                     (inst or :byte result-tn other-pointer-lowtag))
                    (t
-                    (allocation nil bytes other-pointer-lowtag result-tn node nil)
+                    (allocation nil bytes other-pointer-lowtag result-tn node nil thread-temp)
                     (storew* header result-tn 0 other-pointer-lowtag t))))))))
 
 ;;;; CONS, LIST and LIST*
@@ -303,6 +310,7 @@
   (:args (things :more t :scs (descriptor-reg constant immediate)))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -323,11 +331,11 @@
             (size (* (pad-data-block cons-size) cons-cells))
             (lowtag (if (<= cons-cells 2) 0 list-pointer-lowtag)))
         (unless stack-allocate-p
-          (instrument-alloc 'list size node (list ptr temp)))
-        (pseudo-atomic (:elide-if stack-allocate-p)
+          (instrument-alloc 'list size node (list ptr temp) thread-tn))
+        (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
           (if stack-allocate-p
               (stack-allocation size lowtag res)
-              (allocation 'list size lowtag res node temp))
+              (allocation 'list size lowtag res node temp thread-tn))
           (multiple-value-bind (last-base-reg lowtag car cdr)
                     (case cons-cells
                       (1
@@ -486,6 +494,7 @@
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     (:temporary (:sc unsigned-reg) temp)
+    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
@@ -502,7 +511,7 @@
         (let ((nbytes (calc-shadow-bits-size result)))
           (pseudo-atomic ()
             ;; Allocate the bits into RESULT
-            (allocation nil nbytes 0 result node temp)
+            (allocation nil nbytes 0 result node temp nil)
             (inst mov :byte (ea result) simple-bit-vector-widetag)
             (inst mov :dword (vector-len-ea result 0)
                   (if (sc-is length immediate) (fixnumize (tn-value length)) length))
@@ -538,9 +547,9 @@
                                 (#.simple-vector-widetag 'simple-vector)
                                 (t 'unboxed-array))
                               type)
-                          size-tn node instrumentation-temp)
-        (pseudo-atomic ()
-         (allocation nil size-tn 0 result node alloc-temp)
+                          size-tn node instrumentation-temp thread-tn)
+        (pseudo-atomic (:thread-tn thread-tn)
+         (allocation nil size-tn 0 result node alloc-temp thread-tn)
          (put-header result 0 type length t alloc-temp)
          (inst or :byte result other-pointer-lowtag)))
       #+ubsan
@@ -692,15 +701,16 @@
     (:policy :fast-safe)
     (:node-var node)
     (:temporary (:sc descriptor-reg) tail next limit)
+    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:generator 20
       (let ((size (calc-size-in-bytes length tail))
             (entry (gen-label))
             (loop (gen-label))
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
-        (instrument-alloc 'list size node (list next limit))
-        (pseudo-atomic ()
-         (allocation 'list size list-pointer-lowtag result node limit)
+        (instrument-alloc 'list size node (list next limit) thread-tn)
+        (pseudo-atomic (:thread-tn thread-tn)
+         (allocation 'list size list-pointer-lowtag result node limit thread-tn)
          (compute-end)
          (inst mov next result)
          (inst jmp entry)
@@ -722,9 +732,10 @@
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread)
   (:node-var node)
   (:generator 37
-    (alloc-other fdefn-widetag fdefn-size result node nil)
+    (alloc-other fdefn-widetag fdefn-size result node nil thread)
     (storew name result fdefn-name-slot other-pointer-lowtag)
     (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
@@ -734,6 +745,7 @@
   ; (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
   (:temporary (:sc any-reg) temp)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
@@ -741,11 +753,11 @@
           (bytes (pad-data-block words))
           (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
      (unless stack-allocate-p
-       (instrument-alloc closure-widetag bytes node (list result temp)))
-     (pseudo-atomic (:elide-if stack-allocate-p)
+       (instrument-alloc closure-widetag bytes node (list result temp) thread-tn))
+     (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
        (if stack-allocate-p
            (stack-allocation bytes fun-pointer-lowtag result)
-           (allocation nil bytes fun-pointer-lowtag result node temp))
+           (allocation nil bytes fun-pointer-lowtag result node temp thread-tn))
        (storew* #-immobile-space header ; write the widetag and size
                 #+immobile-space        ; ... plus the layout pointer
                 (progn (inst mov temp header)
@@ -767,6 +779,7 @@
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg) :to :result))
   (:results (result :scs (descriptor-reg) :from :eval))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
@@ -775,7 +788,7 @@
            (let ((header (compute-object-header value-cell-size value-cell-widetag)))
              (storew header result 0 other-pointer-lowtag)))
           (t
-           (alloc-other value-cell-widetag value-cell-size result node nil)))
+           (alloc-other value-cell-widetag value-cell-size result node nil thread-tn)))
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects
@@ -795,6 +808,7 @@
   (:info name words type lowtag stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) alloc-temp)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 50
    (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
@@ -803,13 +817,13 @@
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
     (unless stack-allocate-p
-      (instrument-alloc type bytes node (list result alloc-temp)))
-    (pseudo-atomic (:elide-if stack-allocate-p)
+      (instrument-alloc type bytes node (list result alloc-temp) thread-tn))
+    (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
       ;; If storing a header word, defer ORing in the lowtag until after
       ;; the header is written so that displacement can be 0.
       (if stack-allocate-p
           (stack-allocation bytes (if type 0 lowtag) result)
-          (allocation nil bytes (if type 0 lowtag) result node alloc-temp))
+          (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn))
       (when type
         (let* ((widetag (if instancep instance-widetag type))
                (header (compute-object-header words widetag)))
@@ -844,6 +858,7 @@
   (:temporary (:sc unsigned-reg :from :eval :to :result) header)
   ;; KLUDGE: wire to RAX so that it doesn't get R12
   (:temporary (:sc unsigned-reg :offset 0) alloc-temp)
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 50
    ;; With the exception of bignums, these objects have effectively
@@ -866,9 +881,9 @@
              ;; can't pass RESULT as a possible choice of scratch register
              ;; because it might be in the same physical reg as BYTES.
              ;; Yup, the lifetime specs in this vop are pretty confusing.
-             (instrument-alloc type bytes node alloc-temp)
-             (pseudo-atomic ()
-              (allocation nil bytes lowtag result node alloc-temp)
+             (instrument-alloc type bytes node alloc-temp thread-tn)
+             (pseudo-atomic (:thread-tn thread-tn)
+              (allocation nil bytes lowtag result node alloc-temp thread-tn)
               (storew header result 0 lowtag))))))
 
 (macrolet ((c-call (name)

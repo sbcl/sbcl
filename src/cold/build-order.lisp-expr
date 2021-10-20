@@ -712,7 +712,7 @@
   "src/code/describe-policy"
   "src/code/inspect"
   "src/code/profile"
-  #+(and x86-64 sb-thread (not gs-segment-thread)) "src/code/aprof" ; precise allocation profiler
+  #+(and x86-64 sb-thread (not gs-seg)) "src/code/aprof" ; precise allocation profiler
   "src/code/step"
   "src/code/warm-lib"
   "src/code/alien-callback"

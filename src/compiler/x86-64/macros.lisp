@@ -93,8 +93,7 @@
           (- other-pointer-lowtag))))
 
 (defun thread-tls-ea (index)
-  #+gs-segment-thread (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
-  #-gs-segment-thread
+  #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
   ;; Whether index is an an integer or a register, the EA constructor
   ;; call is the same.
   ;; Due to an encoding peculiarity, using thread-base-reg as the index register
@@ -103,7 +102,7 @@
   ;; RIP-relative addressing. (And attempting to encode an index is illegal)
   ;; So the 'mod' bits must be nonzero, which mandates encoding of an
   ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
-  (ea index thread-tn))
+  #-gs-seg (ea index thread-tn))
 
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-tn
@@ -111,8 +110,15 @@
   (aver (<= (1+ thread-boxed-tlab-slot) 15))
   (aver (<= (1+ thread-unboxed-tlab-slot) 15)))
 
-(defun thread-slot-ea (slot-index)
-  (ea thread-segment-reg (ash slot-index word-shift) thread-tn))
+;;; Access a thread slot at a fixed index. If GPR-TN is provided,
+;;; then it points to 'struct thread', which is relevant only if
+;;; #+gs-seg.
+(defun thread-slot-ea (slot-index &optional gpr-tn)
+  (if gpr-tn
+      (ea (ash slot-index word-shift) gpr-tn)
+      ;; Otherwise do something depending on #[-+]gs-seg
+      (let (#+gs-seg (thread-tn nil))
+        (ea thread-segment-reg (ash slot-index word-shift) thread-tn))))
 
 #+sb-thread
 (progn
@@ -197,14 +203,20 @@
   ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
   (inst test :byte rax-tn (ea (- static-space-start gc-safepoint-trap-offset))))
 
-(defmacro pseudo-atomic ((&key elide-if) &rest forms)
+;;; This macro is purposely unhygienic with respect to THREAD-TN,
+;;; which is either a global symbol macro, or a LET-bound variable,
+;;; depending on #+gs-seg.
+(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &rest forms)
+  (declare (ignorable thread))
   #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
   #-sb-safepoint
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
-            #+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
+            #+sb-thread (thread-slot-ea
+                         thread-pseudo-atomic-bits-slot
+                         #+gs-seg ,@(if thread (list thread)))
             #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
        (unless ,elide-if
          (inst mov ,pa-bits-ea rbp-tn))

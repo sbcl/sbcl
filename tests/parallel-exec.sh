@@ -30,7 +30,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread)
-  (unless (find :gs-segment-thread sb-impl:+internal-features+)
+  (unless (find :gs-seg sb-impl:+internal-features+)
     (push :test-aprof *features*))
 (in-package run-tests)
 (import '(sb-alien:alien-funcall sb-alien:extern-alien

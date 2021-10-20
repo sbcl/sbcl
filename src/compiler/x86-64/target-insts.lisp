@@ -403,8 +403,8 @@
                        dstate))))
             ;; thread slots
             ((and (eql base-reg sb-vm::thread-reg)
-                  #+gs-segment-thread (dstate-getprop dstate +gs-segment+)
-                  #-gs-segment-thread (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
+                  #+gs-seg (dstate-getprop dstate +gs-segment+)
+                  #-gs-seg (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
                   (typep disp '(integer 0 *)) ; positive displacement
                   (zerop (logand disp 7))) ; lispword-aligned

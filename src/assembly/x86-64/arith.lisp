@@ -54,7 +54,7 @@
         (nbytes #+bignum-assertions 32 #-bignum-assertions 16))
     (instrument-alloc bignum-widetag nbytes nil alloc-tn)
     (pseudo-atomic ()
-      (allocation bignum-widetag nbytes 0 alloc-tn nil nil)
+      (allocation bignum-widetag nbytes 0 alloc-tn nil nil nil)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)
       (if (eq dest alloc-tn)
@@ -133,7 +133,7 @@
     (inst cmp x rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
-    (alloc-other bignum-widetag (+ bignum-digits-offset 2) res nil nil)
+    (alloc-other bignum-widetag (+ bignum-digits-offset 2) res nil nil nil)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
     (inst clc) (inst ret)

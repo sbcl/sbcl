@@ -404,9 +404,10 @@
   (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
-    (inst mov sap
-          (ea thread-segment-reg thread-tn
-              index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
+    (let (#+gs-seg (thread-tn nil))
+      (inst mov sap
+            (ea thread-segment-reg thread-tn
+                index (ash 1 (- word-shift n-fixnum-tag-bits))))))))
 
 (define-vop (halt)
   (:generator 1

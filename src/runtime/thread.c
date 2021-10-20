@@ -233,7 +233,7 @@ struct thread *alloc_thread_struct(void*,lispobj);
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), \
                     GetCurrentProcess(), (LPHANDLE)&thread->os_thread, 0, TRUE, \
                     DUPLICATE_SAME_ACCESS)
-#elif defined LISP_FEATURE_GS_SEGMENT_THREAD
+#elif defined LISP_FEATURE_GS_SEG
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 extern int arch_prctl(int code, unsigned long *addr);
