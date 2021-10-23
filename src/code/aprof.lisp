@@ -144,20 +144,6 @@
                                ,(get-gpr :qword sb-vm::thread-reg))
   #'equal)
 
-(defun header-word-store-p (inst bindings)
-  ;; a byte-sized or word-sized store at displacement 8 through 10 is OK
-  (let ((ea (caddr inst))
-        (freeptr (cdr (assoc '?free bindings))))
-    (and (eq (car inst) 'mov)
-         (typep ea 'machine-ea)
-         (typep freeptr 'reg)
-         (eql (reg-num freeptr) (machine-ea-base ea))
-         (or (and (member (cadr inst) '(:byte :word))
-                  (typep (machine-ea-disp ea) '(integer 8 10)))
-             (and (eq (cadr inst) :qword)
-                  (eql (machine-ea-disp ea) 8)
-                  (typep (cadddr inst) 'reg))))))
-
 ;;; Templates to try in order.  The one for unknown headered objects should be last
 ;;; so that we try to match a store to the header word if possible.
 (defglobal *allocation-templates* nil)
@@ -183,15 +169,18 @@
          (mov ?_ (ea ?_ ?end) ?header)
          (mov ?_ (ea ?_ ?end) ?vector-len))
 
-        (array ;; also array-header
+        (var-xadd
+               ;; after the xadd, SIZE holds the original value of free-ptr
+               ;; and free-ptr points to the end of the putative data block.
                (xadd ?free ?size)
                (cmp :qword ?free :tlab-limit)
                (jmp :nbe ?_)
                (mov :qword :tlab-freeptr ?free)
-               (mov ?_ (ea 0 ?size) ?header); after XADD, size is the old free ptr
+               ;; Could have one or two stores prior to ORing in a lowtag.
+               (:optional (mov ?_ (ea 0 ?size) ?header))
                (:optional (mov ?_ (ea 8 ?size) ?vector-len))
-               (:or (or ?size ,sb-vm:other-pointer-lowtag)
-                    (lea :qword ?result (ea ,sb-vm:other-pointer-lowtag ?size))))
+               (:or (or ?size ?lowtag)
+                    (lea :qword ?result (ea ?lowtag ?size))))
 
         (any (:or (lea :qword ?end (ea ?nbytes ?free ?nbytes-var))
                   ;; LEA with scale=1 can have base and index swapped
@@ -201,7 +190,7 @@
              (jmp :nbe ?_)
              (mov :qword :tlab-freeptr ?end)
              (mov ?_ (ea 0 ?free) ?header)
-             (:optional (:if header-word-store-p (mov ?_ (ea ?_ ?free) ?vector-len)))
+             (:optional (mov ?_ (ea ?_ ?free) ?vector-len))
              (:or (or ?free ?lowtag)
                   (lea :qword ?result (ea ?lowtag ?free))))
 
@@ -277,7 +266,7 @@
           inst))))
 
 (defparameter *debug-deduce-type* nil)
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :execute)
   (defmacro note (&rest args)
     `(when *debug-deduce-type*
        (let ((*print-pretty* nil))
@@ -362,15 +351,22 @@
     (loop (when (endp template) (return bindings))
           (let ((pattern (pop template)))
             (case (car pattern)
-             ((:optional :repeat)
-              (let ((count (if (eq (car pattern) :repeat) most-positive-fixnum 1)))
-                ;; :REPEAT matches zero or more instructions, but as few as possible.
-                ;; :OPTIONAL matches zero or one, similarly.
+             (:optional
+              ;; :OPTIONAL is greedy, preferring to match if it can,
+              ;; but if the rest of the template fails, we'll backtrack
+              ;; and skip this pattern.
+              (when (inst-matchp input (cadr pattern))
+                (let ((bindings (matchp input template bindings)))
+                  (cond ((eq bindings :fail)
+                         (setf (car input) start)) ; don't match
+                        (t
+                         (return bindings))))))
+             (:repeat
+              ;; :REPEAT matches zero or more instructions, as few as possible.
                 (let ((next-pattern (pop template)))
                   (loop (when (inst-matchp input next-pattern) (return))
-                        (unless (and (>= (decf count) 0)
-                                     (inst-matchp input (cadr pattern)))
-                          (fail))))))
+                        (unless (inst-matchp input (cadr pattern))
+                          (fail)))))
              (t
               (unless (inst-matchp input pattern)
                 (fail))))))))
@@ -480,7 +476,7 @@
             ;; when register indirect mode is used without a SIB byte.
             (when (eq nbytes 0)
               (setq nbytes nil))
-            (cond ((and (member type '(fixed+header var-array array any))
+            (cond ((and (member type '(fixed+header var-array var-xadd any))
                         (typep header '(or sb-vm:word sb-vm:signed-word)))
                    (setq type (aref *tag-to-type* (logand header #xFF)))
                    (when (register-p nbytes)
