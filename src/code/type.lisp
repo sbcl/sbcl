@@ -1594,10 +1594,12 @@
   ;; This catches uses of literal '* where it shouldn't appear, but it
   ;; accidentally lets other uses slip through. We'd have to catch '*
   ;; post-type-expansion to be more strict, but it isn't very important.
-  (if (eq type-specifier '*)
-      (error "* is not permitted as a type specifier")
-      (dx-let ((context (make-type-context type-specifier)))
-        (basic-parse-typespec type-specifier context))))
+  (cond ((eq type-specifier '*)
+         (warn "* is not permitted as a type specifier")
+         *universal-type*)
+        (t
+         (dx-let ((context (make-type-context type-specifier)))
+           (basic-parse-typespec type-specifier context)))))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
@@ -1621,15 +1623,21 @@
                ~/sb-impl:print-type-specifier/"
                   type-specifier))
           (wildp
+           (when context
+             (setf (type-context-options context)
+                   (logior (type-context-options context)
+                           +type-parse-cache-inhibit+)))
            (if subcontext
-               (error "* is not permitted as an argument to the ~S type specifier"
-                      subcontext)
-               (error "* is not permitted as a type specifier~@[ in the context ~S~]"
-                      ;; If the entire surrounding context is * then there's not much
-                      ;; else to say. Otherwise, show the original expression.
-                      (when (and context (neq (type-context-spec context) '*))
-                        (type-context-spec context))))))
-    ctype))
+               (warn "* is not permitted as an argument to the ~S type specifier"
+                     subcontext)
+               (warn "* is not permitted as a type specifier~@[ in the context ~S~]"
+                     ;; If the entire surrounding context is * then there's not much
+                     ;; else to say. Otherwise, show the original expression.
+                     (when (and context (neq (type-context-spec context) '*))
+                       (type-context-spec context))))
+           *universal-type*)
+          (t
+           ctype))))
 
 (defun single-value-specifier-type (x &optional context)
   (if (eq x '*)

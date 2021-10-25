@@ -16,7 +16,7 @@
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
 
 (with-test (:name :no-*-as-t) ; lp#1860919
-  (assert-error (sb-kernel:specifier-type '(function (*) t)))
+  (assert-signal (sb-kernel:specifier-type '(function (*) t)) warning)
   (dolist (f '((lambda (x) (the * x))
                (lambda (x) (declare (* x)) x)
                (lambda (x) (declare (type * x)) x)))
@@ -648,7 +648,7 @@
                (values bit &optional *)
                (values bit &rest *)
                (values bit &rest *)))
-    (assert-error (sb-kernel:values-specifier-type x))))
+    (assert-signal (sb-kernel:values-specifier-type x) warning)))
 
 (with-test (:name :classoids-as-type-specifiers)
   (dolist (classoid (list (find-classoid 'integer)

@@ -3142,8 +3142,7 @@
       (checked-compile '(lambda (x) (the * x))
                        :allow-failure t :allow-warnings t)
     (assert errorp)
-    (assert (= (length warnings) 1))
-    (assert-error (funcall fun 1)))
+    (assert (= (length warnings) 1)))
   ;; (values t) parses into *wild-type* and has to be allowed
   ;; even though * which parses into *wild-type* isn't.
   (checked-compile '(lambda () (the (values t) t))))
