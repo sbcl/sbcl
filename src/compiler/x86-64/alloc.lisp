@@ -112,7 +112,7 @@
            (inst add :qword
                  (ea thread-segment-reg
                      (ash thread-tot-bytes-alloc-boxed-slot word-shift)
-                     thread-reg-tn temp 8)
+                     thread-tn temp 8)
                  size))
           (t
            (inst add :qword
@@ -135,7 +135,7 @@
            (emit-label tally)
            (inst inc :qword (ea thread-segment-reg
                                 (ash thread-obj-size-histo-slot word-shift)
-                                thread-reg-tn temp 8)))
+                                thread-tn temp 8)))
           (t
            (let* ((n-conses (/ size (* sb-vm:cons-size sb-vm:n-word-bytes)))
                   (bucket (if (<= n-conses histogram-small-bins)
