@@ -427,12 +427,7 @@
               (with-ir1-environment-from-node call
                 (let* ((*inline-expansions*
                          (register-inline-expansion original-functional call))
-                       (*lexenv* (functional-lexenv original-functional))
-                       (*transforming*
-                         (if (and (functional-inline-expanded original-functional)
-                                  (system-inline-fun-p (leaf-source-name original-functional)))
-                             (1+ *transforming*)
-                             *transforming*)))
+                       (*lexenv* (functional-lexenv original-functional)))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)

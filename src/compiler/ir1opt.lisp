@@ -989,7 +989,6 @@
 
 #-sb-devel
 (declaim (start-block ir1-optimize-combination maybe-terminate-block
-                      system-inline-fun-p
                       validate-call-type))
 
 (defun check-important-result (node info)
@@ -1308,13 +1307,6 @@
                      (mark-for-deletion succ)))))
         t))))
 
-(defun system-inline-fun-p (name)
-  (and (symbolp name)
-       (let ((package (cl:symbol-package name)))
-         (and package
-              (or (eq package *cl-package*)
-                  (system-package-p package))))))
-
 ;;; This is called both by IR1 conversion and IR1 optimization when
 ;;; they have verified the type signature for the call, and are
 ;;; wondering if something should be done to special-case the call. If
@@ -1378,9 +1370,6 @@
                   (let* ((name (leaf-source-name leaf))
                          (*inline-expansions*
                            (register-inline-expansion leaf call))
-                         (*transforming* (if (system-inline-fun-p name)
-                                             (1+ *transforming*)
-                                             *transforming*))
                          (res (ir1-convert-inline-expansion
                                name
                                (defined-fun-inline-expansion leaf)
