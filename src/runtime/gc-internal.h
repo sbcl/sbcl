@@ -105,7 +105,8 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
  * so they can't easily be made gencgc-only */
 #define FREE_PAGE_FLAG        0
 #define PAGE_TYPE_MASK        7 // mask out the 'single-object flag'
-/* Note: MAP-ALLOCATED-OBJECTS expects this value to be 1 */
+/* Note: lisp's CLOSE-CURRENT-GC-REGION expects BOXED_PAGE_FLAG = 1.
+ * (probably should do a foreign call rather than kludge it) */
 #define BOXED_PAGE_FLAG       1
 #define UNBOXED_PAGE_FLAG     2
 /* CONS_PAGE_FLAG doesn't get stored in the page table, though I am considering

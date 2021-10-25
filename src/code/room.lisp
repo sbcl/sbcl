@@ -572,7 +572,7 @@ We could try a few things to mitigate this:
     (unless (eql (sap-ref-word region-struct (ash 3 word-shift)) 0)
       (alien-funcall (extern-alien "gc_close_region" (function void system-area-pointer int))
                      region-struct
-                     1))
+                     1)) ; ASSUMPTION: BOXED_PAGE_FLAG = 1
     nil))
 
 ;;;; MEMORY-USAGE
