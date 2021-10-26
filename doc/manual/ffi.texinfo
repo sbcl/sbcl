@@ -1081,14 +1081,10 @@ it exposes the symbol @code{initialize_lisp} which can be used in
 conjunction with a core initializing global symbols to foreign callables
 as function pointers and with object code allocating those symbols to
 initialize the runtime properly. The arguments to @code{initialize_lisp}
-are the same as the arguments to the main @code{sbcl} program.
+are the same as the arguments to the main @code{sbcl}
+program.
 
-While standalone C code can call exposed Lisp functions which spawn Lisp
-threads after the runtime has been initialized, it is currently not
-advised to call into Lisp this way from separate C threads running
-concurrently.
-
-Note: There is also currently no way to run exit hooks or otherwise undo
+Note: There is currently no way to run exit hooks or otherwise undo
 Lisp initialization gracefully from C.
 
 @node  Step-By-Step Example of the Foreign Function Interface
