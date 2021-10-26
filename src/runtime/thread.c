@@ -291,6 +291,9 @@ void reset_gc_stats() { // after sb-posix:fork
 }
 #endif
 
+static void unregister_thread(struct thread *th,
+                              init_thread_data __attribute__((unused)) *scribble);
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -346,6 +349,11 @@ void create_main_lisp_thread(lispobj function) {
     call_into_lisp_first_time(function,args,0);
 #else
     funcall0(function);
+#endif
+#ifdef SHARED_LIBRARY
+    // if we do return, clean up the initial thread.
+    init_thread_data scribble;
+    unregister_thread(th, &scribble);
 #endif
 }
 
