@@ -122,9 +122,9 @@ libsbcl.so: $(PIC_OBJS)
 # for this to work, you must have with-gcc-tls in your build features already.
 # can't define it here because then it conflicts if you have it in both places.
 %.pic.o: %.c
-	$(CC) -fPIC -c $(CPPFLAGS) -DSHARED_LIBRARY=1 $(filter-out -fno-pie,$(CFLAGS)) $< -o $@
+	$(CC) -fPIC -c $(CPPFLAGS) $(filter-out -fno-pie,$(CFLAGS)) $< -o $@
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
-	$(CC) -c $(CPPFLAGS) -DSHARED_LIBRARY=1 $(CFLAGS) $< -o $@
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
