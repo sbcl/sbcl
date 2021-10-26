@@ -131,9 +131,12 @@
              LOCAL))))
 
       (when check-boundp
-        (let ((err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
-          (inst cmp value unbound-marker-widetag)
-          (inst b :eq err-lab)))))
+        (assemble ()
+          (let* ((*location-context* (make-restart-location RETRY value))
+                 (err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
+            (inst cmp value unbound-marker-widetag)
+            (inst b :eq err-lab))
+          RETRY))))
 
   (define-vop (fast-symbol-value symbol-value)
     (:policy :fast)

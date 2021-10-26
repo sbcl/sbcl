@@ -590,7 +590,7 @@
 (defun ggg+1 () (1+ *ggg*))
 
 (with-test (:name :restart-unbound-variable
-                  :skipped-on (not (and :x86-64 :sb-thread)))
+                  :skipped-on (not (and (or :arm64 :x86-64) :sb-thread)))
   (let ((success nil))
     (handler-bind
         ((unbound-variable
