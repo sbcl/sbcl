@@ -324,7 +324,7 @@ static void record_signal(int sig, void* context)
 #define RECORD_SIGNAL(sig,ctxt)
 #endif
 
-#if defined(SHARED_LIBRARY) || defined(LISP_FEATURE_WIN32)
+#ifdef LISP_FEATURE_WIN32
 # define should_handle_in_this_thread(c) (1)
 #else
 # define should_handle_in_this_thread(c) lisp_thread_p(c)
