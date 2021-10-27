@@ -150,7 +150,7 @@ allocate_lisp_dynamic_space(boolean did_preinit)
 }
 
 static inline void
-protect_page(void *page, int protect_p, os_vm_prot_t flags) {
+protect_guard_page(void *page, int protect_p, os_vm_prot_t flags) {
     os_protect(page, os_vm_page_size, protect_p ?
                flags : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
 }
@@ -160,7 +160,7 @@ protect_page(void *page, int protect_p, os_vm_prot_t flags) {
     protect_##name(int protect_p, struct thread *thread) {              \
         if (!thread)                                                    \
             thread = get_sb_vm_thread();                      \
-        protect_page(page_name(thread), protect_p, flags);              \
+        protect_guard_page(page_name(thread), protect_p, flags);        \
     }
 
 DEF_PROTECT_PAGE(control_stack_hard_guard_page,
