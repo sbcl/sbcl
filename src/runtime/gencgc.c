@@ -2936,6 +2936,18 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             state->tagged_object_start = compute_lispobj(where);
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
             state->object_gen = gen_of((lispobj)where);
+            // FIXME: should not have code acting as filler
+            if (state->widetag != FILLER_WIDETAG && !filler_obj_p(where)) { // Any page can have a filler on it
+                page_index_t pg = find_page_index(where);
+                if (pg >= 0) {
+                    // Assert proper page type
+                    if (state->widetag == CODE_HEADER_WIDETAG) {
+                        if (!is_code(page_table[pg].type)) lose("object @ %p is code on non-code page", where);
+                    } else {
+                        if (is_code(page_table[pg].type)) lose("object @ %p is non-code on code page", where);
+                    }
+                }
+            }
             // Should not see filler after sweeping all gens
             /* if (!conservative_stack && widetag_of(where) == FILLER_WIDETAG)
                  fprintf(stderr, "Note: filler object @ %p\n", where); */
@@ -5030,6 +5042,9 @@ static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
 
 sword_t scav_code_header(lispobj *object, lispobj header)
 {
+    struct code* code = (struct code*)object;
+    if (filler_obj_p(object)) goto done; /* it's not code at all */
+
     ++n_scav_calls[CODE_HEADER_WIDETAG/4];
 
     int my_gen = gc_gen_of((lispobj)object, 127);
@@ -5041,7 +5056,6 @@ sword_t scav_code_header(lispobj *object, lispobj header)
                            find_page_index(object)));
         my_gen = new_space;
     }
-    struct code* code = (struct code*)object;
 
     // If the header's 'written' flag is off and it was not copied by GC
     // into newspace, then the object should be ignored.
