@@ -1366,6 +1366,9 @@
                       ;; It has already been processed by locall,
                       ;; inline again.
                       (functional-kind fun))
+                  (unless (or (memq 'transformed *current-path*)
+                              (memq 'inlined *current-path*))
+                    (setf (ctran-source-path (node-prev call)) *current-path*))
                   ;; Convert.
                   (let* ((name (leaf-source-name leaf))
                          (*inline-expansions*
@@ -1376,6 +1379,7 @@
                                leaf
                                inlinep
                                (info :function :info name))))
+
                     ;; Allow backward references to this function from following
                     ;; forms. (Reused only if policy matches.)
                     (push res (defined-fun-functionals leaf))
@@ -1695,6 +1699,9 @@
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
+      (unless (or (memq 'transformed *current-path*)
+                  (memq 'inlined *current-path*))
+        (setf (ctran-source-path (node-prev call)) *current-path*))
       (let* ((*transforming* (1+ *transforming*))
              (new-fun (ir1-convert-inline-lambda
                        res
@@ -2179,10 +2186,15 @@
   (declare (type clambda clambda))
   (aver (functional-letlike-p clambda))
   (note-unreferenced-fun-vars clambda)
-  (let ((call (let-combination clambda)))
+  (let ((call (let-combination clambda))
+        (bind (lambda-bind clambda)))
     (flush-dest (basic-combination-fun call))
+    (setf (ctran-source-path
+           (or (node-next bind)
+               (block-start (car (block-succ (node-block bind))))))
+          (ctran-source-path (node-prev call)))
     (unlink-node call)
-    (unlink-node (lambda-bind clambda))
+    (unlink-node bind)
     (setf (lambda-bind clambda) nil))
   (setf (functional-kind clambda) :zombie)
   (let ((home (lambda-home clambda)))

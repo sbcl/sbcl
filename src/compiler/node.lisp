@@ -165,7 +165,10 @@
   ;; :UNUSED continuations.
   (block nil :type (or cblock null))
   ;; Entries created by the BLOCK special operator
-  (entries nil :type list))
+  (entries nil :type list)
+  ;; Use for reporting notes for the following node,
+  ;; which can be transformed and lose its original source code.
+  (source-path nil :type list))
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)

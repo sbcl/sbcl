@@ -112,7 +112,7 @@
 ;;; If true, this is the node which is used as context in compiler warning
 ;;; messages.
 (declaim (type (or null compiler-error-context node
-                   lvar-annotation) *compiler-error-context*))
+                   lvar-annotation ctran) *compiler-error-context*))
 (defvar *compiler-error-context* nil)
 
 ;;; a plist mapping macro names to source context parsers. Each parser
@@ -256,6 +256,8 @@
                             (node-source-path context))
                            ((lvar-annotation-p context)
                             (lvar-annotation-source-path context))
+                           ((ctran-p context)
+                            (ctran-source-path context))
                            ((boundp '*current-path*)
                             *current-path*)))
                (old
@@ -490,8 +492,11 @@ has written, having proved that it is unreachable."))
 
   (defun compiler-notify (datum &rest args)
     (unless (if *compiler-error-context*
-              (policy *compiler-error-context* (= inhibit-warnings 3))
-              (policy *lexenv* (= inhibit-warnings 3)))
+                (policy (if (ctran-p *compiler-error-context*)
+                            (ctran-next *compiler-error-context*)
+                            *compiler-error-context*)
+                    (= inhibit-warnings 3))
+                (policy *lexenv* (= inhibit-warnings 3)))
       (with-condition (condition datum args)
         (incf *compiler-note-count*)
         (print-compiler-message

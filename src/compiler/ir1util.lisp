@@ -2008,38 +2008,44 @@
     (unless (eq (functional-kind home) :deleted)
       (do-nodes (node nil block)
         (let* ((path (node-source-path node))
-               (first (first path)))
-          (when (and (not (return-p node))
-                     ;; CASTs are just value filters and do not
-                     ;; represent code and they can be moved around
-                     ;; making CASTs from the original source code
-                     ;; appear in code inserted by the compiler, generating
-                     ;; false deletion notes.
-                     ;; And if a block with the original source gets
-                     ;; deleted the node that produces the value for
-                     ;; the CAST will get a note, no need to note
-                     ;; twice.
-                     (not (cast-p node))
-                     ;; Nothing interesting in BIND nodes
-                     (not (bind-p node))
-                     (or (eq first 'original-source-start)
-                         (and (atom first)
-                              (or (not (symbolp first))
-                                  (let ((pkg (cl:symbol-package first)))
-                                    (and pkg (neq pkg *keyword-package*))))
-                              (not (member first '(t nil)))
-                              (not (cl:typep first '(or fixnum character
-                                                     #+64-bit single-float)))
-                              (every (lambda (x)
-                                       (present-in-form first x 0))
-                                     (source-path-forms path))
-                              (present-in-form first (find-original-source path)
-                                               0))))
-            (let ((*compiler-error-context* node))
-              (compiler-notify 'code-deletion-note
-                               :format-control "deleting unreachable code"
-                               :format-arguments nil))
-            (return))))))
+               (first (first path))
+               (ctran-path (ctran-source-path (node-prev node))))
+          (if ctran-path
+              (let* ((*compiler-error-context* (node-prev node)))
+                (compiler-notify 'code-deletion-note
+                                 :format-control "deleting unreachable code"
+                                 :format-arguments nil))
+              (when (and (not (return-p node))
+                         ;; CASTs are just value filters and do not
+                         ;; represent code and they can be moved around
+                         ;; making CASTs from the original source code
+                         ;; appear in code inserted by the compiler, generating
+                         ;; false deletion notes.
+                         ;; And if a block with the original source gets
+                         ;; deleted the node that produces the value for
+                         ;; the CAST will get a note, no need to note
+                         ;; twice.
+                         (not (cast-p node))
+                         ;; Nothing interesting in BIND nodes
+                         (not (bind-p node))
+                         (or (eq first 'original-source-start)
+                             (and (atom first)
+                                  (or (not (symbolp first))
+                                      (let ((pkg (cl:symbol-package first)))
+                                        (and pkg (neq pkg *keyword-package*))))
+                                  (not (member first '(t nil)))
+                                  (not (cl:typep first '(or fixnum character
+                                                         #+64-bit single-float)))
+                                  (every (lambda (x)
+                                           (present-in-form first x 0))
+                                         (source-path-forms path))
+                                  (present-in-form first (find-original-source path)
+                                                   0))))
+                (let ((*compiler-error-context* node))
+                  (compiler-notify 'code-deletion-note
+                                   :format-control "deleting unreachable code"
+                                   :format-arguments nil))
+                (return)))))))
   (values))
 
 ;;; Delete a node from a block, deleting the block if there are no
@@ -2056,7 +2062,6 @@
   (declare (type node node))
   (when (valued-node-p node)
     (delete-lvar-use node))
-
   (let* ((ctran (node-next node))
          (next (and ctran (ctran-next ctran)))
          (prev (node-prev node))
@@ -2072,7 +2077,8 @@
                  (t
                   (setf (ctran-next prev) next)
                   (setf (node-prev next) prev)
-                  (when (if-p next) ; AOP wanted
+                  (setf (ctran-source-path prev) (ctran-source-path ctran))
+                  (when (if-p next)
                     (reoptimize-lvar (if-test next)))))
            (setf (node-prev node) nil)
            nil)

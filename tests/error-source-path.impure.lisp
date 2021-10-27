@@ -59,7 +59,7 @@
   (assert-condition-source-paths (do* (x (1)) (t)) (1 1)))
 
 (with-test (:name (:source-path dolist))
-  (assert-condition-source-paths (dolist (x (1 . 2))) (1 1)))
+  (assert-condition-source-paths (dolist (x (1 . 2))) (1 1) ()))
 
 (with-test (:name (:source-path restart-bind))
   (assert-condition-source-paths (restart-bind ((continue (lambda ()) 1))) (0 1))
@@ -279,3 +279,12 @@
    (typep 1 'undefined-type)
    ;; both the style-warning and the note count
    (2) (2)))
+
+(with-test (:name :dead-code-note-after-transforms)
+  (assert
+   (typep (nth-value 4
+                     (checked-compile
+                      `(lambda (x)
+                         (when nil
+                           (funcall x)))))
+          '(cons sb-ext:code-deletion-note null))))
