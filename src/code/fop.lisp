@@ -475,7 +475,7 @@
           (sb-c::apply-fasl-fixups stack code n-fixups))
         (when *show-new-code*
           (let ((*print-pretty* nil))
-            (format t "~&~X New code(load): ~A~%" (get-lisp-obj-address code) code)))
+            (format t "~&New code(~Db,load): ~A~%" (code-object-size code) code)))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
