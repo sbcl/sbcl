@@ -7,13 +7,37 @@ changes relative to sbcl-2.1.9:
   * minor incompatible change: the list form of the FUNCTION type specifier
     does not allow * as any argument type, but does allow * as a placeholder
     for wholly unspecified arguments when specifying the value(s) type.
+  * minor incompatible change: the default (Lisp) toplevel option parser
+    throws an error if it encounters an option which was intended to be used
+    and removed by the C runtime.  (lp#1945081, reported by Luke Gorrie)
   * new feature: there is now a defined interface for defining foreign
     callable functions, which can be used for passing callbacks to foreign
     functions or for calling Lisp code from the foreign world as a shared
     library (preliminary support). See the revised manual section "Calling
     into Lisp From C" for more details.
   * enhancement: arg-count mismatches in self-calls in defmethod are reported.
-    (lp#1912436)
+    (lp#1912436, reported by 3b)
+  * enhancement: the SB-CLTL2 contrib now returns type information for
+    generated structure accessors.  (lp#1934859, reported by SATO shinichi)
+  * optimization: code generation is improved for modular arithmetic involving
+    signed operations.
+  * platform support:
+    ** x86-64 machine code emitter crash when attempting to assemble some
+       vector instructions.  (lp#1945975, thanks to Marco Heisig)
+    ** conditional move instructions are now supported on arm64.
+    ** a number of new peephole optimizations have been implemented on arm64.
+    ** arm64 on Darwin now uses gcc-compatible thread-local storage.
+  * bug fix: compiler notes are no longer emitted when compiling FORMATTER
+    forms, including when implicitly triggered on a constant string argument
+    to FORMAT.  (lp#1946246, reported by SATO shinichi)
+  * bug fix: a compiler error when attempting to compile a call to AREF with
+    too many dimensions.  (lp#1902985)
+  * bug fix: harmonize the behaviour of SLOT-BOUNDP on non-standard-objects
+    between the various ways in which it can be called.  (lp#732229, reported
+    by Zach Beane)
+  * bug fix: FTRUNCATE and similar functions are now more careful about
+    deriving facts about the sign of zero they might return.  (lp#1732009,
+    reported by Paul Dietz)
 
 changes in sbcl-2.1.9 relative to sbcl-2.1.8:
   * minor incompatible change: the experimental DEFCAS macro has been removed.
