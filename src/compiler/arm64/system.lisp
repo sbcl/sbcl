@@ -288,10 +288,10 @@
     (:result-types system-area-pointer)
     (:translate current-thread-offset-sap)
     (:info n)
-    (:arg-types (:constant (satisfies ldr-str-offset-encodable)))
+    (:arg-types (:constant (satisfies ldr-str-word-offset-encodable)))
     (:policy :fast-safe)
     (:generator 1
-                (inst ldr sap (@ thread-tn (ash n word-shift)))))
+      (inst ldr sap (@ thread-tn (ash n word-shift)))))
 
   (define-vop (current-thread-offset-sap)
     (:results (sap :scs (sap-reg)))
@@ -301,7 +301,7 @@
     (:arg-types signed-num)
     (:policy :fast-safe)
     (:generator 2
-                (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
+      (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
 
 ;;; Barriers
 (define-vop (%compiler-barrier)

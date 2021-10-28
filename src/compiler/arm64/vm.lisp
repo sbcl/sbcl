@@ -388,4 +388,5 @@
         sb-arm64-asm::fixnum-encode-logical-immediate
         bic-encode-immediate
         bic-fixnum-encode-immediate
-        logical-immediate-or-word-mask))
+        logical-immediate-or-word-mask
+        sb-arm64-asm::ldr-str-offset-encodable))
