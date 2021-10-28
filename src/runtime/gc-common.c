@@ -1017,6 +1017,24 @@ trans_weak_pointer(lispobj object)
     return copy;
 }
 
+// Two helpers to avoid invoking the memory fault signal handler.
+// For clarity, distinguish between words which *actually* need to frob
+// the page_table's write_protected bit, versus those which don't
+// but are forced to call mprotect() because of MMU-based protection.
+static inline void ensure_word_writable(__attribute__((unused)) void* addr)
+{
+#ifdef LISP_FEATURE_GENCGC
+    page_index_t index = find_page_index(addr);
+    gc_assert(index >= 0);
+    if (page_table[index].write_protected) unprotect_page_index(index);
+#endif
+}
+// Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
+// the ensuing store toggles the WP bit without invoking the fault handler.
+static inline void ensure_ptr_word_writable(void* addr) {
+    ensure_word_writable(addr);
+}
+
 void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
@@ -1050,6 +1068,7 @@ void smash_weak_pointers(void)
     while (vectors) {
         struct vector* vector = (struct vector*)vectors->car;
         vectors = (struct cons*)vectors->cdr;
+        ensure_word_writable(&vector->header);
         UNSET_WEAK_VECTOR_VISITED(vector);
         sword_t len = vector_len(vector);
         sword_t i;
@@ -1506,7 +1525,24 @@ scav_vector_t(lispobj *where, lispobj header)
 
 /* Walk through the chain whose first element is *FIRST and remove
  * dead weak entries.
- * Return the new value for 'should rehash' */
+ * Return the new value for 'should rehash'.
+ *
+ * This operation might have to touch a hash-table that is currently
+ * on a write-protected page, as follows:
+ *    hash-table in gen5 (WRITE-PROTECTED) -> pair vector in gen5 (NOT WRITE-PROTECTED)
+ *    -> younger k/v in gen1 that are deemed not-alive.
+ * That's all fine, but now we have to store into the table for two reasons:
+ *  1. to adjust the count
+ *  2. to store the list of reusable cells
+ * The former store is a non-pointer, but the latter may create an old->young pointer,
+ * because the list of cells for reuse is freshly consed (and therefore young).
+ * Moreover, when updating 'smashed_cells', that slot might not even be on the same
+ * hardware page as the table header (if a page-spanning object) so it might be
+ * unwritable even if words 0 through <something> are writable.
+ * Employing the NON_FAULTING_STORE macro might make sense for the non-pointer slot,
+ * except that it's potentially a lot more unprotects and reprotects.
+ * Better to just get it done once.
+ */
 static inline boolean
 cull_weak_hash_table_bucket(struct hash_table *hash_table,
                             uint32_t bucket, uint32_t index,
@@ -1544,12 +1580,14 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                 cons->cdr = hash_table->culled_values;
                 cons->car = val;
                 lispobj list = make_lispobj(cons, LIST_POINTER_LOWTAG);
+                ensure_ptr_word_writable(&hash_table->culled_values);
                 hash_table->culled_values = list;
                 // ensure this cons doesn't get smashed into (0 . 0) by full gc
                 if (!compacting_p()) gc_mark_obj(list);
             }
             kv_vector[2 * index] = empty_symbol;
             kv_vector[2 * index + 1] = empty_symbol;
+            ensure_word_writable(&hash_table->_count);
             hash_table->_count -= make_fixnum(1);
 
             // Push (index . bucket) onto the table's GC culled cell list.
@@ -1573,6 +1611,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             cons->cdr = hash_table->smashed_cells;
             // Lisp code must atomically pop the list whereas this C code
             // always wins and does not need compare-and-swap.
+            ensure_ptr_word_writable(&hash_table->smashed_cells);
             hash_table->smashed_cells = make_lispobj(cons, LIST_POINTER_LOWTAG);
             // ensure this cons doesn't get smashed into (0 . 0) by full gc
             if (!compacting_p()) gc_mark_obj(hash_table->smashed_cells);
