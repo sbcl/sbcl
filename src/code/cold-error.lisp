@@ -209,7 +209,7 @@ of condition handling occurring."
     (apply #'%break 'break datum arguments)))
 
 ;;; These functions definitions are for cold-init.
-;;; The real definitions are found in 'condition.lisp'
+;;; The real definitions are found in 'warm-error.lisp'
 (defvar *!cold-warn-action* #+sb-devel 'print #-sb-devel nil)
 (defun warn (datum &rest arguments)
   (declare (explicit-check datum)) ;; CONDITION-CLASS not yet defined
@@ -245,7 +245,7 @@ of condition handling occurring."
                  (terpri))))))
     (when (eq action 'lose)
       (sb-sys:%primitive sb-c:halt)
-      (sb-impl::critically-unreachable))))
+      (sb-impl::critically-unreachable "losing-warn"))))
 (defun style-warn (datum &rest arguments)
   (declare (notinline warn))
   (apply 'warn datum arguments))
