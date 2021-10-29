@@ -1007,3 +1007,18 @@
     (delete-unused-ir2-blocks component))
 
   (values))
+
+(defun delete-unnecessary-move (vop)
+  (when (and (vop-next vop)
+             (eq (vop-name (vop-next vop)) 'move)
+             ;; the source of the move is the result of this
+             (eq (tn-ref-tn (vop-args (vop-next vop)))
+                 (tn-ref-tn (vop-results vop)))
+             ;; the destination of the move is the same as the input of this
+             (eq (tn-ref-tn (vop-results (vop-next vop)))
+                 (tn-ref-tn (vop-args vop)))
+             ;; there is exactly one write and one read of the intermediate TN
+             (very-temporary-p (tn-ref-tn (vop-results vop))))
+    ;; Change my result ref to the same TN as the input and delete the MOVE
+    (change-tn-ref-tn (vop-results vop) (tn-ref-tn (vop-args vop)))
+    (delete-vop (vop-next vop))))

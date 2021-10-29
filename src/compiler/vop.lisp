@@ -738,6 +738,12 @@
   (declare (type vop vop))
   (vop-info-name (vop-info vop)))
 
+(defun set-vop-optimizer (info fun)
+  (when (vop-info-optimizer info)
+    ;; Warn about trying to make two optimizers, because it doesn't work
+    (warn "Redefining vop-info-optimizer for ~S" (vop-info-name info)))
+  (setf (vop-info-optimizer info) fun))
+
 ;; These printers follow the definition of VOP-INFO because they
 ;; want to inline VOP-INFO-NAME, and it's less code to move them here
 ;; than to move the defstructs of VOP-INFO and TEMPLATE.

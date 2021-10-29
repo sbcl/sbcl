@@ -384,8 +384,7 @@
              ,@body)
            ,@(loop for vop-name in (ensure-list (second what))
                    collect
-                   `(setf (vop-info-optimizer (template-or-lose ',vop-name))
-                          #',name)))
+                   `(set-vop-optimizer (template-or-lose ',vop-name) #',name)))
         (binding* (((forms decls) (parse-body body nil))
                    ((var-decls more-decls) (extract-var-decls decls vars))
                    ;; In case the BODY declares IGNORE of the formal NODE var,

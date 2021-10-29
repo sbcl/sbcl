@@ -1622,6 +1622,40 @@
               (sb-c::delete-vop vop)
               new)))))))
 
+;;; We can delete some MOVEs that seem often to get inserted with iteration constructs
+;;; such as (setq i (1+ i)) where the result of 1+ creates a new TN which is moved
+;;; to the same TN that is the input to 1+, but PACK chooses different physical registers
+;;; for the arg and result of FAST-+-C/FIXNUM=>FIXNUM. So we "cleverly" can use the LEA
+;;; instruction as a 3-operand ADD, only to move the destination of LEA back to the
+;;; same register that was one of the input operands. Yet the TN which was the result
+;;; had otherwise no use. Why does this happen? I don't know.
+;;;
+;;; So let's try to prevent it by removing the MOVE, which reduces to just the ADD
+;;; instruction instead of LEA + MOV. If a vop can only take one physical representation
+;;; (such as tagged fixnum) for input, and can only produce that same representation,
+;;; and the TN flows back to that vop, then the move is not needed. But if a vop can take
+;;; several physical representations, such as accepting either tagged or untagged,
+;;; and the SC has not been chosen yet (which happens), then we can't remove.
+;;;
+;;; For some reason, it seems to come up a trememdous amount with FAST-+-C/FIXNUM=>FIXNUM.
+;;; Maybe it comes up with others, I don't know. No harm in trying, I suppose.
+;;; To do this for other vops, you have to be certain that the move isn't a coercion.
+;;;
+;;; [And it would be nice if every backend named their vops consistently
+;;; so that this optimizer could be made architecture-independent]
+;;; The SB-C::DELETE- function isn't defined yet in the build order, so wrap it in a lambda.
+(flet ((optimizer (vop) (sb-c::delete-unnecessary-move vop)))
+  (dolist (name '(sb-vm::fast-+-c/fixnum=>fixnum
+                  sb-vm::fast-+-c/signed=>signed
+                  sb-vm::fast-+-c/unsigned=>unsigned
+                  sb-vm::fast---c/fixnum=>fixnum
+                  sb-vm::fast---c/signed=>signed
+                  sb-vm::fast---c/unsigned=>unsigned
+                  sb-vm::fast-*-c/fixnum=>fixnum
+                  sb-vm::fast-*-c/signed=>signed
+                  sb-vm::fast-*-c/unsigned=>unsigned))
+    (sb-c::set-vop-optimizer (template-or-lose name) #'optimizer)))
+
 (defun emit-optimized-cmp (x y temp &optional x-ctype)
   ;; Shorten the encoding by eliding a REX prefix where the upper bits
   ;; can not possibly matter.
