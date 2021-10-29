@@ -133,17 +133,24 @@
             :load-if (sc-case y
                        ((any-reg descriptor-reg))
                        (immediate
-                        (not (fixnum-add-sub-immediate-p (tn-value y))))
+                        (not (and (integerp (tn-value y))
+                                  (abs-add-sub-immediate-p (fixnumize (tn-value y))))))
                        (t t))))
   (:conditional :eq)
   (:policy :fast-safe)
   (:translate eq)
   (:generator 6
-    (inst cmp x
-      (sc-case y
-        (immediate
-         (fixnumize (tn-value y)))
-        (t y)))))
+    (let ((value (sc-case y
+                   (immediate
+                    (fixnumize (tn-value y)))
+                   (t y))))
+      (cond ((or (not (integerp value))
+                 (add-sub-immediate-p value))
+             (inst cmp x value))
+            ((minusp value)
+             (inst cmn x (- value)))
+            (t
+             (inst cmn x (ldb (byte n-word-bits 0) (- value))))))))
 
 (macrolet ((def (eq-name eql-name cost)
              `(define-vop (,eq-name ,eql-name)
