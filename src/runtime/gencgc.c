@@ -3988,6 +3988,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
 maybe_verify:
     if (generation >= verify_gens)
         verify_heap(VERIFY_POST_GC | (generation<<16));
+    extern int n_unboxed_instances;
+    n_unboxed_instances = 0;
 }
 
 static page_index_t
@@ -4681,6 +4683,8 @@ zero_all_free_ranges() /* called only by gc_and_save() */
  * + The pseudo-static generation isn't normally collected, but it seems
  *   reasonable to collect it at least when saving a core. So move the
  *   pages to a normal generation.
+ * + Instances on unboxed pages need to have their layout pointer visited,
+ *   so all pages have to be turned to boxed.
  */
 static void
 prepare_for_final_gc ()
@@ -4692,6 +4696,11 @@ prepare_for_final_gc ()
         // Compaction requires that we permit large objects to be copied henceforth.
         // Object of size >= LARGE_OBJECT_SIZE get re-allocated to single-object pages.
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
+        // Turn every page to boxed so that the layouts of instances
+        // which were relocated to unboxed pages get scanned and fixed.
+        if ((page_table[i].type & PAGE_TYPE_MASK) == UNBOXED_PAGE_FLAG)
+            page_table[i].type =
+                (page_table[i].type | BOXED_PAGE_FLAG) & ~UNBOXED_PAGE_FLAG;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
             int used = page_bytes_used(i);
             page_table[i].gen = HIGHEST_NORMAL_GENERATION;

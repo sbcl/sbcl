@@ -441,11 +441,36 @@ trans_fun_header(lispobj object)
  * instances
  */
 
+int n_unboxed_instances;
 static inline lispobj copy_instance(lispobj object)
 {
     // Object is an un-forwarded object in from_space
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
     int original_length = instance_length(header);
+
+    int page_type = BOXED_PAGE_FLAG;
+#ifdef LISP_FEATURE_GENCGC
+    lispobj layout = instance_layout((lispobj*)(object - INSTANCE_POINTER_LOWTAG));
+    generation_index_t gen = 0;
+    // If the layout is pseudo-static and the bitmap is 0 then this instance can go
+    // on an unboxed page to avoid further pointer tracing.
+    // And it could never be a valid argument to CHANGE-CLASS.
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (find_fixedobj_page_index((void*)layout))
+        gen = immobile_obj_generation((lispobj*)LAYOUT(layout));
+#else
+    page_index_t p = find_page_index((void*)layout);
+    if (p >= 0) gen = page_table[p].gen;
+#endif
+    if (gen == PSEUDO_STATIC_GENERATION) {
+        struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+        if (bitmap.nwords == 1 && !bitmap.bits[0]) {
+            page_type = UNBOXED_PAGE_FLAG;
+            ++n_unboxed_instances;
+        }
+    }
+#endif
+
     lispobj copy;
     // KLUDGE: reading both flags at once doesn't really work
     // unless either we know what the opaque values are:
@@ -458,7 +483,8 @@ static inline lispobj copy_instance(lispobj object)
          * adding 1 for the header will effectively add 2 words.
          * Otherwise, don't add anything because a padding slot exists */
         int new_length = original_length + (original_length & 1);
-        copy = gc_copy_object_resizing(object, 1 + (new_length|1), BOXED_PAGE_FLAG,
+        copy = gc_copy_object_resizing(object, 1 + (new_length|1),
+                                       page_type,
                                        1 + (original_length|1));
         lispobj *base = native_pointer(copy);
         /* store the old address as the hash value */
@@ -480,7 +506,7 @@ static inline lispobj copy_instance(lispobj object)
                instance_length(*base));
 #endif
     } else {
-        copy = copy_object(object, 1 + (original_length|1));
+        copy = gc_general_copy_object(object, 1 + (original_length|1), page_type);
     }
     set_forwarding_pointer(native_pointer(object), copy);
     return copy;
