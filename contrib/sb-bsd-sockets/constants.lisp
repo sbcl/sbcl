@@ -230,6 +230,7 @@
  (:function fcntl ("fcntl" int
                    (fd int)
                    (cmd int)
+                   &optional
                    (arg long)))
  (:function getsockopt ("getsockopt" int
                         (socket int)

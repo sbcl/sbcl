@@ -787,38 +787,41 @@ way that the argument is passed.
               (arg-types) (alien-vars)
               (alien-args) (results))
       (dolist (arg args)
-        (if (stringp arg)
-            (docs arg)
-            (destructuring-bind (name type &optional (style :in)) arg
-              (unless (member style '(:in :copy :out :in-out))
-                (error "bogus argument style ~S in ~S" style arg))
-              (when (and (member style '(:out :in-out))
-                         (typep (parse-alien-type type lexenv)
-                                'alien-pointer-type))
-                (error "can't use :OUT or :IN-OUT on pointer-like type:~%  ~S"
-                       type))
-              (let (arg-type)
-                (cond ((eq style :in)
-                       (setq arg-type type)
-                       (alien-args name))
-                      (t
-                       (setq arg-type `(* ,type))
-                       (if (eq style :out)
-                           (alien-vars `(,name ,type))
-                           (alien-vars `(,name ,type ,name)))
-                       (alien-args `(addr ,name))))
-                (arg-types arg-type)
-                (unless (eq style :out)
-                  (lisp-args name)
-                  (lisp-arg-types t
-                                  ;; FIXME: It should be something
-                                  ;; like `(ALIEN ,ARG-TYPE), except
-                                  ;; for we also accept SAPs where
-                                  ;; pointers are required.
-                                  )))
-              (when (or (eq style :out) (eq style :in-out))
-                (results name)
-                (lisp-result-types `(alien ,type))))))
+        (cond ((stringp arg)
+               (docs arg))
+              ((eq arg '&optional)
+               (arg-types arg))
+              (t
+               (destructuring-bind (name type &optional (style :in)) arg
+                 (unless (member style '(:in :copy :out :in-out))
+                   (error "bogus argument style ~S in ~S" style arg))
+                 (when (and (member style '(:out :in-out))
+                            (typep (parse-alien-type type lexenv)
+                                   'alien-pointer-type))
+                   (error "can't use :OUT or :IN-OUT on pointer-like type:~%  ~S"
+                          type))
+                 (let (arg-type)
+                   (cond ((eq style :in)
+                          (setq arg-type type)
+                          (alien-args name))
+                         (t
+                          (setq arg-type `(* ,type))
+                          (if (eq style :out)
+                              (alien-vars `(,name ,type))
+                              (alien-vars `(,name ,type ,name)))
+                          (alien-args `(addr ,name))))
+                   (arg-types arg-type)
+                   (unless (eq style :out)
+                     (lisp-args name)
+                     (lisp-arg-types t
+                                     ;; FIXME: It should be something
+                                     ;; like `(ALIEN ,ARG-TYPE), except
+                                     ;; for we also accept SAPs where
+                                     ;; pointers are required.
+                                     )))
+                 (when (or (eq style :out) (eq style :in-out))
+                   (results name)
+                   (lisp-result-types `(alien ,type)))))))
       `(progn
          ;; The theory behind this automatic DECLAIM is that (1) if
          ;; you're calling C, static typing is what you're doing
