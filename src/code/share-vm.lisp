@@ -55,9 +55,7 @@
 ;; the pointer in order to read the lower half.  This has been broken
 ;; at least twice in the past.  MIPS also appears to be the ONLY
 ;; system for which the signal context field size may differ from
-;; n-word-bits (well, and ALPHA, but that's a separate matter), but
-;; this entire thing will likely need to be revisited when we add x32
-;; or n32 ABI support.
+;; n-word-bits.
 (defconstant kludge-big-endian-short-pointer-offset
   (+ 0
      #+(and mips big-endian (not 64-bit)) 1))
