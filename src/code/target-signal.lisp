@@ -78,18 +78,23 @@
   nil)
 
 (defun %install-handler (signal handler)
-  (flet ((run-handler (signo info-sap context-sap)
-           #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
-           (unblock-gc-signals)
-           (in-interruption ()
-             (funcall handler signo info-sap context-sap))))
-    (with-pinned-objects (#'run-handler)
-      ;; 0 and 1 probably coincide with SIG_DFL and SIG_IGN, but those
-      ;; constants are opaque. We use our own explicit translation
-      ;; of them in the C install_handler() argument convention.
-      (with-alien ((%sigaction (function void int unsigned) :extern "install_handler"))
-        (alien-funcall %sigaction
-                       signal
+  ;; 0 and 1 should coincide with SIG_DFL and SIG_IGN, but in theory those values
+  ;; are opaque. We use our own explicit translation of 0 and 1 to them
+  ;; in the C install_handler() argument passing convention.
+  (with-alien ((%sigaction (function void int unsigned) :extern "install_handler"))
+    #+sb-safepoint
+    (alien-funcall %sigaction signal
+                   (case handler
+                     (:default 0)
+                     (:ignore 1)
+                     (t (sb-kernel:get-lisp-obj-address handler))))
+    #-sb-safepoint
+    (flet ((run-handler (signo info-sap context-sap)
+             #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
+             (unblock-gc-signals)
+             (in-interruption () (funcall handler signo info-sap context-sap))))
+      (with-pinned-objects (#'run-handler)
+        (alien-funcall %sigaction signal
                        (case handler
                          (:default 0)
                          (:ignore 1)
@@ -251,6 +256,8 @@
 (define-load-time-global *sighandler-thread* nil)
 (declaim (type (or sb-thread:thread null) *sighandler-thread*))
 (defun signal-handler-loop ()
+  ;; We could potentially use sigwaitinfo() to obtain more information about the signal,
+  ;; but I don't see the point. This is just minimal functionality.
   (with-alien ((sigwait (function int system-area-pointer (* int)) :extern "sigwait")
                (mask (array (unsigned 8) #.sizeof-sigset_t))
                (num int))
@@ -262,7 +269,4 @@
               (let ((fun (sap-ref-lispobj (foreign-symbol-sap "lisp_sig_handlers" t)
                                           (ash num sb-vm:word-shift))))
                 (when (functionp fun)
-                  (let ((userfun (sb-kernel:%closure-index-ref fun 0)))
-                    ;; We could potentially use sigwaitinfo() but I don't see the point.
-                    ;; This is just minimal functionality.
-                    (funcall userfun num nil nil))))))))))
+                  (funcall fun num nil nil)))))))))
