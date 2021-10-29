@@ -2008,47 +2008,50 @@
     (unless (eq (functional-kind home) :deleted)
       (do-nodes (node nil block)
         (let* ((path (node-source-path node))
-               (first (first path))
                (ctran-path (ctran-source-path (node-prev node))))
-          (cond (ctran-path
-                 (push (cons ctran-path (node-lexenv node))
-                       (deleted-source-paths *compilation*))
-                 (return))
-                ((and (not (return-p node))
-                      ;; CASTs are just value filters and do not
-                      ;; represent code and they can be moved around
-                      ;; making CASTs from the original source code
-                      ;; appear in code inserted by the compiler, generating
-                      ;; false deletion notes.
-                      ;; And if a block with the original source gets
-                      ;; deleted the node that produces the value for
-                      ;; the CAST will get a note, no need to note
-                      ;; twice.
-                      (not (cast-p node))
-                      ;; Nothing interesting in BIND nodes
-                      (not (bind-p node))
-                      ;; Try to get the outer deleted node.
-                      (not (and (valued-node-p node)
-                                (let ((dest (node-dest node)))
-                                  (and dest
-                                       (node-to-be-deleted-p dest)
-                                       (node-source-inside-p node dest)))))
-                      (or (eq first 'original-source-start)
-                          (and (atom first)
-                               (or (not (symbolp first))
-                                   (let ((pkg (cl:symbol-package first)))
-                                     (and pkg (neq pkg *keyword-package*))))
-                               (not (member first '(t nil)))
-                               (not (cl:typep first '(or fixnum character
-                                                      #+64-bit single-float)))
-                               (every (lambda (x)
-                                        (present-in-form first x 0))
-                                      (source-path-forms path))
-                               (present-in-form first (find-original-source path)
-                                                0))))
-                 (push (cons path (node-lexenv node))
-                       (deleted-source-paths *compilation*))
-                 (return)))))))
+          (flet ((visible-p (path)
+                   (let ((first (first path)))
+                     (or (eq first 'original-source-start)
+                         (and (atom first)
+                              (or (not (symbolp first))
+                                  (let ((pkg (cl:symbol-package first)))
+                                    (and pkg (neq pkg *keyword-package*))))
+                              (not (member first '(t nil)))
+                              (not (cl:typep first '(or fixnum character
+                                                     #+64-bit single-float)))
+                              (every (lambda (x)
+                                       (present-in-form first x 0))
+                                     (source-path-forms path))
+                              (present-in-form first (find-original-source path)
+                                               0))))))
+            (cond ((and ctran-path
+                        (visible-p ctran-path))
+                   (push (cons ctran-path (node-lexenv node))
+                         (deleted-source-paths *compilation*))
+                   (return))
+                  ((and (not (return-p node))
+                        ;; CASTs are just value filters and do not
+                        ;; represent code and they can be moved around
+                        ;; making CASTs from the original source code
+                        ;; appear in code inserted by the compiler, generating
+                        ;; false deletion notes.
+                        ;; And if a block with the original source gets
+                        ;; deleted the node that produces the value for
+                        ;; the CAST will get a note, no need to note
+                        ;; twice.
+                        (not (cast-p node))
+                        ;; Nothing interesting in BIND nodes
+                        (not (bind-p node))
+                        ;; Try to get the outer deleted node.
+                        (not (and (valued-node-p node)
+                                  (let ((dest (node-dest node)))
+                                    (and dest
+                                         (node-to-be-deleted-p dest)
+                                         (node-source-inside-p node dest)))))
+                        (visible-p path))
+                   (push (cons path (node-lexenv node))
+                         (deleted-source-paths *compilation*))
+                   (return))))))))
   (values))
 
 (defun node-source-inside-p (inner-node outer-node)

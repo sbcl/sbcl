@@ -59,7 +59,7 @@
   (assert-condition-source-paths (do* (x (1)) (t)) (1 1)))
 
 (with-test (:name (:source-path dolist))
-  (assert-condition-source-paths (dolist (x (1 . 2))) (1 1) ()))
+  (assert-condition-source-paths (dolist (x (1 . 2))) (1 1)))
 
 (with-test (:name (:source-path restart-bind))
   (assert-condition-source-paths (restart-bind ((continue (lambda ()) 1))) (0 1))
