@@ -6,6 +6,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy: 
       matrix: 
         options: [--with-sb-thread, --without-sb-thread]

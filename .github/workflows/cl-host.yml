@@ -7,6 +7,7 @@ jobs:
   ecl:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@v1
@@ -40,6 +41,7 @@ jobs:
   clisp:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@v1
@@ -55,6 +57,7 @@ jobs:
   ccl:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@v1
@@ -70,6 +73,7 @@ jobs:
   cmucl:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@v1
@@ -79,6 +83,7 @@ jobs:
         cd cmucl
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/cmucl.tar.bz2
         tar xf cmucl.tar.bz2
+        echo '(setf ext:*gc-verbose* nil)' > ~/.cmucl-init.lisp
       working-directory: /tmp/
     - name: build
       env:  
