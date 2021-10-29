@@ -464,7 +464,9 @@
                          for i from 0
                          for loc = (pop locs)
                          collect (cond ((and loc
-                                             (eq (tn-primitive-type loc) prim-type))
+                                             (if (eq (tn-kind loc) :unused)
+                                                 (member i optional)
+                                                 (eq (tn-primitive-type loc) prim-type)))
                                         loc)
                                        ((and (not loc)
                                              (member i optional))
