@@ -430,13 +430,11 @@
                  (alloc-immobile-fixedobj
                   symbol-size
                   (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)))))
-    ;; no pin, it's immobile (and obviously live)
-    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address symbol))
-                           (- (ash symbol-name-slot word-shift) other-pointer-lowtag))
-          name)
+    ;; symbol-hash was initialized to 0
     (%set-symbol-global-value symbol (make-unbound-marker))
-    ;; symbol-hash is 0
     (setf (symbol-info symbol) nil)
+    (%primitive sb-vm::set-slot symbol name
+                'make-symbol sb-vm:symbol-name-slot sb-vm:other-pointer-lowtag)
     (%set-symbol-package symbol nil)
     symbol))
 
