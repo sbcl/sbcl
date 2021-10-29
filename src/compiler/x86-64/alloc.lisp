@@ -199,20 +199,13 @@
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
            ;; in C. This is chosen by the name of the asm routine.
-           (let ((consp (eq type 'list)))
-             (when (typep size 'integer)
-               (aver (= (align-up size (* 2 n-word-bytes)) size))
-               (when (neq type 'list)
-                 (incf size) ; the low bit means we're allocating a non-cons object
-                 ;; Jump into the cons entry point which saves one instruction because why not.
-                 (setq consp t)))
-             (cond ((typep size '(and integer (not (signed-byte 32))))
-                    ;; MOV accepts large immediate operands, PUSH does not
-                    (inst mov alloc-tn size)
-                    (inst push alloc-tn))
-                   (t
-                    (inst push size)))
-             (invoke-asm-routine 'call (if consp 'cons->rnn 'alloc->rnn) node t))
+           (cond ((typep size '(and integer (not (signed-byte 32))))
+                  ;; MOV accepts large immediate operands, PUSH does not
+                  (inst mov alloc-tn size)
+                  (inst push alloc-tn))
+                 (t
+                  (inst push size)))
+           (invoke-asm-routine 'call (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp) node t)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))

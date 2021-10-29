@@ -998,7 +998,7 @@ sb-vm::(define-vop (cl-user::test)
 (with-test (:name :sap-set-does-not-cons)
   (loop for (type accessor telltale) in
         '((sb-vm:word sb-sys:sap-ref-word "ALLOC-UNSIGNED-BIGNUM")
-          (double-float sb-sys:sap-ref-double "CONS"))
+          (double-float sb-sys:sap-ref-double "ALLOC-TRAMP"))
         do (let* ((positive-test
                    (compile nil `(lambda (sap) (,accessor sap 0))))
                   (negative-test
