@@ -271,9 +271,8 @@
 (defun generate-code (component &aux (ir2-component (component-info component)))
   (declare (type ir2-component ir2-component))
   (when *compiler-trace-output*
-    (format *compiler-trace-output*
-            "~|~%assembly code for ~S~2%"
-            component))
+    (let ((*print-pretty* nil)) ; force 1 line
+      (format *compiler-trace-output* "~|~%assembly code for ~S~2%" component)))
   (let* ((prev-env nil)
          ;; The first function's alignment word is zero-filled, but subsequent
          ;; ones can use a NOP which helps the disassembler not lose sync.
