@@ -2189,10 +2189,12 @@
   (let ((call (let-combination clambda))
         (bind (lambda-bind clambda)))
     (flush-dest (basic-combination-fun call))
-    (setf (ctran-source-path
-           (or (node-next bind)
-               (block-start (car (block-succ (node-block bind))))))
-          (ctran-source-path (node-prev call)))
+
+    (unless (or (memq 'transformed (node-source-path bind))
+                (memq 'inlined (node-source-path bind)))
+      (setf (ctran-source-path (node-prev (car (leaf-refs clambda))))
+            (node-source-path bind)))
+
     (unlink-node call)
     (unlink-node bind)
     (setf (lambda-bind clambda) nil))

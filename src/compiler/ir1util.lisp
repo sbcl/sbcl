@@ -2027,6 +2027,12 @@
                       (not (cast-p node))
                       ;; Nothing interesting in BIND nodes
                       (not (bind-p node))
+                      ;; Try to get the outer deleted node.
+                      (not (and (valued-node-p node)
+                                (let ((dest (node-dest node)))
+                                  (and dest
+                                       (node-to-be-deleted-p dest)
+                                       (node-source-inside-p node dest)))))
                       (or (eq first 'original-source-start)
                           (and (atom first)
                                (or (not (symbolp first))
@@ -2045,6 +2051,10 @@
                  (return)))))))
   (values))
 
+(defun node-source-inside-p (inner-node outer-node)
+  (tailp (source-path-original-source (node-source-path outer-node))
+         (source-path-original-source (node-source-path inner-node))))
+
 (defun report-code-deletion ()
   (let ((forms (make-hash-table :test #'equal))
         (reversed-path))
@@ -2057,7 +2067,9 @@
           (push pair reversed-path))
     (loop for (path . lexenv) in reversed-path
           for original = (source-path-original-source path)
-          when (loop for outer on (cdr original)
+          when (loop for outer on (if (eq (car path) 'original-source-start)
+                                      (cdr original)
+                                      original)
                      never (gethash outer forms))
           do
           (let ((*current-path* path)
@@ -2094,7 +2106,8 @@
                  (t
                   (setf (ctran-next prev) next)
                   (setf (node-prev next) prev)
-                  (setf (ctran-source-path prev) (ctran-source-path ctran))
+                  (unless (ctran-source-path prev)
+                    (setf (ctran-source-path prev) (ctran-source-path ctran)))
                   (when (if-p next)
                     (reoptimize-lvar (if-test next)))))
            (setf (node-prev node) nil)

@@ -298,3 +298,31 @@
                     (print 20)
                     (print x)))))
    (2 2)))
+
+(with-test (:name :ignore-deleted-subforms.2)
+  (assert-condition-source-paths
+   (lambda ()
+     (when nil
+       (let ((z (print 10)))
+         z)))
+   (2 2)))
+
+(with-test (:name :ignore-deleted-subforms.3)
+  (assert-condition-source-paths
+   (lambda (x)
+     (when x
+       (unless x
+         (let ((z (print 10)))
+           (if z
+               10
+               (funcall x))))))
+   (2 2 2)))
+
+(with-test (:name :ignore-deleted-subforms.4)
+  (assert-condition-source-paths
+   (lambda (x)
+     (when nil
+       (if (print 10)
+           10
+           x)))
+   (2 2)))
