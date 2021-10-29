@@ -1855,7 +1855,9 @@ session."
                       (with-pinned-objects (mask)
                         (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK mask nil))
                       ;; Otherwise just do the usual thing
-                      (sb-unix::unblock-deferrable-signals)))))
+                      (sb-unix::pthread-sigmask sb-unix::SIG_UNBLOCK
+                                                (foreign-symbol-sap "thread_start_sigset" t)
+                                                nil)))))
          ;; notinline keeps array off the call stack by getting it out of the curent frame
          (declare (notinline unmask-signals))
          ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
