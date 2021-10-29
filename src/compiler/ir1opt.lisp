@@ -2190,6 +2190,11 @@
         (bind (lambda-bind clambda)))
     (flush-dest (basic-combination-fun call))
 
+    (let ((next (or (node-next bind)
+                    (block-start (car (block-succ (node-block bind)))))))
+      (when next
+        (setf (ctran-source-path next)
+              (ctran-source-path (node-prev call)))))
     (unless (or (memq 'transformed (node-source-path bind))
                 (memq 'inlined (node-source-path bind)))
       (setf (ctran-source-path (node-prev (car (leaf-refs clambda))))
