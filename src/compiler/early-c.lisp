@@ -315,7 +315,7 @@ the stack without triggering overflow protection.")
   (objmap-id-to-ir2block nil :type (or null id-array)) ; number -> IR2-BLOCK
   (objmap-id-to-tn       nil :type (or null id-array)) ; number -> TN
   (objmap-id-to-label    nil :type (or null id-array)) ; number -> LABEL
-  )
+  deleted-source-paths)
 (declaim (freeze-type compilation))
 
 (sb-impl::define-thread-local *compilation*)

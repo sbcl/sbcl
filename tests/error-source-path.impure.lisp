@@ -288,3 +288,13 @@
                          (when nil
                            (funcall x)))))
           '(cons sb-ext:code-deletion-note null))))
+
+(with-test (:name :ignore-deleted-subforms)
+  (assert-condition-source-paths
+   (lambda (x m)
+     (when nil
+       (funcall x
+                (if m
+                    (print 20)
+                    (print x)))))
+   (2 2)))

@@ -2010,44 +2010,61 @@
         (let* ((path (node-source-path node))
                (first (first path))
                (ctran-path (ctran-source-path (node-prev node))))
-          (if ctran-path
-              (let* ((*compiler-error-context* (node-prev node)))
-                (compiler-notify 'code-deletion-note
-                                 :format-control "deleting unreachable code"
-                                 :format-arguments nil))
-              (when (and (not (return-p node))
-                         ;; CASTs are just value filters and do not
-                         ;; represent code and they can be moved around
-                         ;; making CASTs from the original source code
-                         ;; appear in code inserted by the compiler, generating
-                         ;; false deletion notes.
-                         ;; And if a block with the original source gets
-                         ;; deleted the node that produces the value for
-                         ;; the CAST will get a note, no need to note
-                         ;; twice.
-                         (not (cast-p node))
-                         ;; Nothing interesting in BIND nodes
-                         (not (bind-p node))
-                         (or (eq first 'original-source-start)
-                             (and (atom first)
-                                  (or (not (symbolp first))
-                                      (let ((pkg (cl:symbol-package first)))
-                                        (and pkg (neq pkg *keyword-package*))))
-                                  (not (member first '(t nil)))
-                                  (not (cl:typep first '(or fixnum character
-                                                         #+64-bit single-float)))
-                                  (every (lambda (x)
-                                           (present-in-form first x 0))
-                                         (source-path-forms path))
-                                  (present-in-form first (find-original-source path)
-                                                   0))))
-                (let ((*compiler-error-context* node))
-                  (compiler-notify 'code-deletion-note
-                                   :format-control "deleting unreachable code"
-                                   :format-arguments nil))
-                (return)))))))
+          (cond (ctran-path
+                 (push (cons ctran-path (node-lexenv node))
+                       (deleted-source-paths *compilation*))
+                 (return))
+                ((and (not (return-p node))
+                      ;; CASTs are just value filters and do not
+                      ;; represent code and they can be moved around
+                      ;; making CASTs from the original source code
+                      ;; appear in code inserted by the compiler, generating
+                      ;; false deletion notes.
+                      ;; And if a block with the original source gets
+                      ;; deleted the node that produces the value for
+                      ;; the CAST will get a note, no need to note
+                      ;; twice.
+                      (not (cast-p node))
+                      ;; Nothing interesting in BIND nodes
+                      (not (bind-p node))
+                      (or (eq first 'original-source-start)
+                          (and (atom first)
+                               (or (not (symbolp first))
+                                   (let ((pkg (cl:symbol-package first)))
+                                     (and pkg (neq pkg *keyword-package*))))
+                               (not (member first '(t nil)))
+                               (not (cl:typep first '(or fixnum character
+                                                      #+64-bit single-float)))
+                               (every (lambda (x)
+                                        (present-in-form first x 0))
+                                      (source-path-forms path))
+                               (present-in-form first (find-original-source path)
+                                                0))))
+                 (push (cons path (node-lexenv node))
+                       (deleted-source-paths *compilation*))
+                 (return)))))))
   (values))
 
+(defun report-code-deletion ()
+  (let ((forms (make-hash-table :test #'equal))
+        (reversed-path))
+    ;; Report only the outermost form
+    (loop for pair in (shiftf (deleted-source-paths *compilation*) nil)
+          for (path) = pair
+          do
+          (when (eq (car path) 'original-source-start)
+            (setf (gethash (source-path-original-source path) forms) path))
+          (push pair reversed-path))
+    (loop for (path . lexenv) in reversed-path
+          for original = (source-path-original-source path)
+          when (loop for outer on (cdr original)
+                     never (gethash outer forms))
+          do
+          (let ((*current-path* path)
+                (*lexenv* lexenv))
+            (compiler-notify 'code-deletion-note
+                             :format-control "deleting unreachable code"
+                             :format-arguments nil)))))
 ;;; Delete a node from a block, deleting the block if there are no
 ;;; nodes left. We remove the node from the uses of its LVAR.
 ;;;

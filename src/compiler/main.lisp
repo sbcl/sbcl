@@ -580,6 +580,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (maybe-mumble "Control ")
     (control-analyze component)
 
+    (report-code-deletion)
+
     (when (or (ir2-component-values-receivers (component-info component))
               (component-dx-lvars component))
       (maybe-mumble "Stack ")
@@ -767,9 +769,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (delete-if-no-entries component)
 
-    (unless (eq (block-next (component-head component))
-                (component-tail component))
-      (%compile-component component))
+    (if (eq (block-next (component-head component))
+            (component-tail component))
+        (report-code-deletion)
+        (%compile-component component))
     (when *compile-component-hook*
       (funcall *compile-component-hook* component)))
 
