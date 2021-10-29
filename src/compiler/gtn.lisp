@@ -66,7 +66,13 @@
            (physenv-live-tn res (lambda-physenv fun)))
 
           (debug-variable-p
-           (physenv-debug-live-tn res (lambda-physenv fun))))
+           ;; If it's a constant it may end up being never read,
+           ;; replaced by COERCE-FROM-CONSTANT.
+           ;; Yet it might get saved on the stack, but since it's
+           ;; never read no stack space is allocated for it in the
+           ;; callee frame.
+           (unless (type-singleton-p (leaf-type var))
+             (physenv-debug-live-tn res (lambda-physenv fun)))))
 
         (setf (tn-leaf res) var)
         (setf (tn-type res) (leaf-type var))

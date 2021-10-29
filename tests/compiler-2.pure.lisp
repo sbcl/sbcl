@@ -3430,3 +3430,13 @@
     ((3) -32913480)
     ((-54972) 1796)))
 
+(with-test (:name :unused-debug-tns)
+  (checked-compile-and-assert
+      ()
+      `(lambda (d)
+         (flet ((f (x)
+                  (unwind-protect d
+                    (eval x))))
+           (dotimes (i 3)
+             (f (1+ most-positive-fixnum)))))
+    ((3) nil)))
