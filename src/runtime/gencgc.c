@@ -475,25 +475,23 @@ write_generation_stats(FILE *file)
     for (i = begin; i <= end; i++) {
         page_index_t page;
         // page kinds: small {boxed,code,unboxed}, large {boxed,code,unboxed}
-        page_index_t pagect[6], pinned_cnt = 0, tot_pages = 0;
+        page_index_t pagect[6], pinned_cnt = 0;
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
             if (!page_free_p(page) && page_table[page].gen == i) {
-                int k;
-                switch (page_table[page].type & PAGE_TYPE_MASK) {
-                case CODE_PAGE_TYPE: k = 1; break;
-                case UNBOXED_PAGE_FLAG: k = 2; break;
-                default: k = 0; break;
-                }
+                // translate BOXED -> 0, UNBOXED -> 1, CODE -> 2
+                int k = (page_table[page].type & PAGE_TYPE_MASK) - 1;
                 if (page_single_obj_p(page)) k += 3;
                 pagect[k]++;
                 if (page_table[page].pinned) pinned_cnt++;
             }
-        tot_pages = pagect[0] + pagect[1] + pagect[2]
-                  + pagect[3] + pagect[4] + pagect[5];
         struct generation* gen = &generations[i];
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
+        page_index_t tot_pages, n_protected;
+        tot_pages = count_generation_pages(i, &n_protected);
+        gc_assert(tot_pages ==
+                  pagect[0] + pagect[1] + pagect[2] + pagect[3] + pagect[4] + pagect[5]);
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
@@ -503,12 +501,12 @@ write_generation_stats(FILE *file)
                 " %11"OS_VM_SIZE_FMT
                 " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
                 i,
-                pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
+                pagect[0], pagect[2], pagect[1], pagect[3], pagect[5], pagect[4],
                 pinned_cnt,
                 (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
                 (uintptr_t)gen->gc_trigger,
-                count_generation_pages(i, 0),
+                n_protected,
                 gen->num_gc,
                 generation_average_age(i));
     }
