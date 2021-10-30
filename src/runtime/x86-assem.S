@@ -51,15 +51,9 @@
  */
 #if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(__OpenBSD__) || \
         defined(__sun) || defined(LISP_FEATURE_WIN32) || defined(__DragonFly__)
-#define align_4byte	4
-#define align_8byte	8
 #define align_16byte	16
-#define align_page	4096
 #else
-#define	align_4byte	2
-#define	align_8byte	3
 #define	align_16byte	4
-#define align_page	12
 #endif
 
 /*

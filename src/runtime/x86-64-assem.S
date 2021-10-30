@@ -25,8 +25,6 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
-#include "genesis/ratio.h"
-#include "genesis/complex.h"
 
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined LISP_FEATURE_HAIKU || defined LISP_FEATURE_FREEBSD || \
@@ -49,16 +47,9 @@
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
  * want alignment in bytes. */
 #if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__OpenBSD__) || defined __NetBSD__ || defined(__sun) || defined _WIN64 || defined(__DragonFly__)
-#define align_4byte	4
-#define align_8byte	8
 #define align_16byte	16
-#define align_32byte	32
-#define align_page	32768
 #else
-#define	align_4byte	2
-#define	align_8byte	3
 #define	align_16byte	4
-#define	align_page	15
 #endif
 
 /*
