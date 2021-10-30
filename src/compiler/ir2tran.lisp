@@ -1859,7 +1859,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
         (emit-move node block loc temp))
     (if value
         (let ((locs (ir2-lvar-locs (lvar-info value))))
-          (vop unwind node block temp (first locs) (second locs)))
+          (vop unwind node block temp (first locs)
+               (or (second locs)
+                   ;; FIXME: avoid writing this TN
+                   (emit-constant 0))))
         (let ((0-tn (emit-constant 0)))
           (vop unwind node block temp 0-tn 0-tn))))
 
@@ -1979,9 +1982,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (let* ((info (lvar-value info-lvar))
          (lvar (node-lvar node))
          (2info (nlx-info-info info))
-         (target (ir2-nlx-info-target 2info)))
+         (target (ir2-nlx-info-target 2info))
+         (kind (cleanup-kind (nlx-info-cleanup info))))
 
-    (ecase (cleanup-kind (nlx-info-cleanup info))
+    (ecase kind
       ((:catch :block :tagbody)
        (let ((top-loc (ir2-nlx-info-save-sp 2info))
              (start-loc (make-nlx-entry-arg-start-location))
@@ -1993,11 +1997,23 @@ not stack-allocated LVAR ~S." source-lvar)))))
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                    target)
              (let ((locs (standard-result-tns lvar)))
-               (vop* nlx-entry node block
-                     (top-loc start-loc count-loc nil)
-                     ((reference-tn-list locs t))
-                     target
-                     (length locs))
+
+               (cond ((when-vop-existsp (:named nlx-entry-single)
+                        (when (and (= (length locs) 1)
+                                   (memq kind '(:block :tagbody))
+                                   lvar
+                                   (type-single-value-p (lvar-derived-type lvar)))
+                          (vop* nlx-entry-single node block
+                                (top-loc start-loc nil)
+                                ((reference-tn-list locs t))
+                                target)
+                          t)))
+                     (t
+                      (vop* nlx-entry node block
+                            (top-loc start-loc count-loc nil)
+                            ((reference-tn-list locs t))
+                            target
+                            (length locs))))
                (move-lvar-result node block locs lvar)))))
       #-no-continue-unwind
       ((:unwind-protect)

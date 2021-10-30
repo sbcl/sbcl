@@ -140,7 +140,7 @@
 
 (define-vop (nlx-entry)
   (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
-              ; would be inserted before the LRA.
+              ; would be inserted before the label.
          (start)
          (count))
   (:results (values :more t :from :load))
@@ -178,6 +178,19 @@
                     (loadw move-temp start i)
                     LESS-THAN
                     (store-stack-tn tn move-temp))))))))
+    (load-stack-tn csp-tn sp)))
+
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (value))
+  (:results (res :from :load))
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    (inst mov res value)
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
