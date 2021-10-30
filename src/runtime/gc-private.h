@@ -134,11 +134,11 @@ static inline int header_rememberedp(lispobj header) {
   return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
 }
 
-#ifndef LISP_FEATURE_IMMOBILE_SPACE
+static inline boolean filler_obj_p(lispobj* obj) {
+    return widetag_of(obj) == CODE_HEADER_WIDETAG && obj[1] == 0;
+}
 
-static inline boolean filler_obj_p(lispobj __attribute__((unused)) *obj) { return 0; }
-
-#else
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
 
 extern void enliven_immobile_obj(lispobj*,int);
 
@@ -202,10 +202,6 @@ static inline void assign_generation(lispobj* obj, generation_index_t gen)
 #else
 #error "Need to define immobile_obj_gen_bits() for big-endian"
 #endif /* little-endian */
-
-static inline boolean filler_obj_p(lispobj* obj) {
-    return widetag_of(obj) == CODE_HEADER_WIDETAG && obj[1] == 0;
-}
 
 #endif /* immobile space */
 
