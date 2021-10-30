@@ -2739,6 +2739,13 @@ unprotect_oldspace(void)
     char *page_addr = 0;
     uword_t region_bytes = 0;
 
+#ifndef LISP_FEATURE_ARM64
+    // should never have protection applied to gen0, do so nothing.
+    // But I don't know enough about how arm64 + darwin works.
+    // Somebody else can try removing the preceding #ifndef.
+    if (from_space == 0) return;
+#endif
+
     for (i = 0; i < next_free_page; i++) {
         if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == from_space)) {
