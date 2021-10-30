@@ -47,10 +47,10 @@ os_restore_fp_control(os_context_t *context)
     // just guessing here
 
     /* reset exception flags and restore control flags on SSE2 FPU */
-    unsigned int temp = (context->uc_mcontext.fpu.mxcsr) & ~0x3F;
+    unsigned int temp = (context->uc_mcontext.fpu.fp_fxsave.mxcsr) & ~0x3F;
     asm ("ldmxcsr %0" : : "m" (temp));
     /* same for x87 FPU. */
-    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpu.control));
+    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpu.fp_fxsave.control));
 }
 
 void
