@@ -250,7 +250,7 @@ specification."
                                    (push `(,fun ,ll ,@declarations (progn ,@body)) local-funs))
                                  (list tag type ll fun)))))
                          cases)))
-          (with-unique-names (block cell form-fun)
+          (with-unique-names (block condition form-fun)
             `(dx-flet ((,form-fun ()
                          #-x86 (progn ,form) ;; no declarations are accepted
                          ;; Need to catch FP errors here!
@@ -258,14 +258,8 @@ specification."
                        ,@(reverse local-funs))
                (declare (optimize (sb-c::check-tag-existence 0)))
                (block ,block
-                 ;; KLUDGE: We use a dx CONS cell instead of just assigning to
-                 ;; the variable directly, so that we can stack allocate
-                 ;; robustly: dx value cells don't work quite right, and it is
-                 ;; possible to construct user code that should loop
-                 ;; indefinitely, but instead eats up some stack each time
-                 ;; around.
-                 (dx-let ((,cell (cons :condition nil)))
-                   (declare (ignorable ,cell))
+                 (let ((,condition))
+                   (declare (ignorable ,condition))
                    (tagbody
                       (%handler-bind
                        ,(mapcar (lambda (annotated-case)
@@ -274,7 +268,7 @@ specification."
                                     (list type
                                           `(lambda (temp)
                                              ,(if ll
-                                                  `(setf (cdr ,cell) temp)
+                                                  `(setf ,condition temp)
                                                   '(declare (ignore temp)))
                                              (go ,tag)))))
                                 annotated-cases)
@@ -286,7 +280,7 @@ specification."
                              (list tag
                                    `(return-from ,block
                                       ,(if ll
-                                           `(,fun-name (cdr ,cell))
+                                           `(,fun-name ,condition)
                                            `(,fun-name))))))
                          annotated-cases))))))))))
 
