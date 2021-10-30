@@ -926,6 +926,26 @@
                            (vop-codegen-info vop))
         (delete-vop vop)))))
 
+;;; No need to reset the stack pointer just before returning.
+(defoptimizer (vop-optimize reset-stack-pointer) (vop)
+  (loop for next = (next-vop vop) then (next-vop next)
+        do (cond ((not next)
+                  (return))
+                 ((eq (vop-name next) 'move))
+                 ((memq (vop-name next) '(return-single return known-return
+                                          tail-call tail-call-named
+                                          static-tail-call-named))
+                  (delete-vop vop)
+                  ;; Delete the VOP that saves the stack pointer too.
+                  (let ((tn (tn-ref-tn (vop-args vop))))
+                    (unless (tn-reads tn)
+                      (aver (eq (vop-name (tn-ref-vop (tn-writes tn)))
+                                'current-stack-pointer))
+                      (delete-vop (tn-ref-vop (tn-writes tn)))))
+                  (return))
+                 (t
+                  (return)))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))
