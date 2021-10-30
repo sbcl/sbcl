@@ -3496,6 +3496,102 @@ void pin_stack(struct thread* th) {
 }
 #endif
 
+#if !GENCGC_IS_PRECISE
+static void conservative_stack_scan(struct thread* th,
+                                    void* stack_hot_end)
+{
+    /* there are potentially two stacks for each thread: the main
+     * stack, which may contain Lisp pointers, and the alternate stack.
+     * We don't ever run Lisp code on the altstack, but it may
+     * host a sigcontext with lisp objects in it */
+
+    /* what we need to do: (1) find the stack pointer for the main
+     * stack; scavenge it (2) find the interrupt context on the
+     * alternate stack that might contain lisp values, and scavenge
+     * that */
+
+    /* we assume that none of the preceding applies to the thread that
+     * initiates GC.  If you ever call GC from inside an altstack
+     * handler, you will lose. */
+
+    void* esp = (void*)-1;
+# if defined(LISP_FEATURE_SB_SAFEPOINT)
+    /* Conservative collect_garbage is always invoked with a
+     * foreign C call or an interrupt handler on top of every
+     * existing thread, so the stored SP in each thread
+     * structure is valid, no matter which thread we are looking
+     * at.  For threads that were running Lisp code, the pitstop
+     * and edge functions maintain this value within the
+     * interrupt or exception handler. */
+    esp = os_get_csp(th);
+    assert_on_stack(th, esp);
+
+    /* And on platforms with interrupts: scavenge ctx registers. */
+
+    /* Disabled on Windows, because it does not have an explicit
+     * stack of `interrupt_contexts'.  The reported CSP has been
+     * chosen so that the current context on the stack is
+     * covered by the stack scan.  See also set_csp_from_context(). */
+#  ifndef LISP_FEATURE_WIN32
+    if (th != get_sb_vm_thread()) {
+        int k = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        while (k > 0) {
+            os_context_t* context = nth_interrupt_context(--k, th);
+            if (context)
+                preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
+                                           context);
+        }
+    }
+#  endif
+# elif defined(LISP_FEATURE_SB_THREAD)
+    if(th==get_sb_vm_thread()) {
+        esp = stack_hot_end;
+    } else {
+        sword_t i,free;
+        lispobj* esp1;
+        free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        for(i=free-1;i>=0;i--) {
+            os_context_t *c = nth_interrupt_context(i, th);
+            esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
+            if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end) {
+                if ((void*)esp1<esp) esp = esp1;
+                preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
+                                           c);
+            }
+        }
+    }
+# else
+    esp = stack_hot_end;
+# endif
+    if (!esp || esp == (void*) -1)
+        UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
+
+    // Words on the stack which point into the stack are likely
+    // frame pointers or alien or DX object pointers. In any case
+    // there's no need to call preserve_pointer on them since
+    // they definitely don't point to the heap.
+    // See the picture at create_thread_struct() as a reminder.
+    lispobj exclude_from = (lispobj)th->control_stack_start;
+    lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
+
+    // This loop would be more naturally expressed as
+    //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
+    // However there is a very subtle problem with that: 'esp = &raise'
+    // is not necessarily properly aligned to be a stack pointer!
+    void **ptr;
+    for (ptr = ((void **)th->control_stack_end)-1; ptr >= (void**)esp;  ptr--) {
+        lispobj word = (lispobj)*ptr;
+        // Also note that we can eliminate small fixnums from consideration
+        // since there is no memory on the 0th page.
+        // (most OSes don't let users map memory there, though they used to).
+        if (word >= BACKEND_PAGE_BYTES &&
+            !(exclude_from <= word && word < exclude_to)) {
+            preserve_pointer((void*)word);
+        }
+    }
+}
+#endif
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
@@ -3619,82 +3715,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
-            void* esp = (void*)-1;
-            if (th->state_word.state == STATE_DEAD)
-                continue;
-# if defined(LISP_FEATURE_SB_SAFEPOINT)
-            /* Conservative collect_garbage is always invoked with a
-             * foreign C call or an interrupt handler on top of every
-             * existing thread, so the stored SP in each thread
-             * structure is valid, no matter which thread we are looking
-             * at.  For threads that were running Lisp code, the pitstop
-             * and edge functions maintain this value within the
-             * interrupt or exception handler. */
-            esp = os_get_csp(th);
-            assert_on_stack(th, esp);
-
-            /* And on platforms with interrupts: scavenge ctx registers. */
-
-            /* Disabled on Windows, because it does not have an explicit
-             * stack of `interrupt_contexts'.  The reported CSP has been
-             * chosen so that the current context on the stack is
-             * covered by the stack scan.  See also set_csp_from_context(). */
-#  ifndef LISP_FEATURE_WIN32
-            if (th != get_sb_vm_thread()) {
-                int k = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-                while (k > 0) {
-                    os_context_t* context = nth_interrupt_context(--k, th);
-                    if (context)
-                        preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                                   context);
-                }
-            }
-#  endif
-# elif defined(LISP_FEATURE_SB_THREAD)
-            if(th==get_sb_vm_thread()) {
-                esp = (void*)&raise;
-            } else {
-                sword_t i,free;
-                lispobj* esp1;
-                free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-                for(i=free-1;i>=0;i--) {
-                    os_context_t *c = nth_interrupt_context(i, th);
-                    esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
-                    if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end) {
-                        if ((void*)esp1<esp) esp = esp1;
-                        preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                                   c);
-                    }
-                }
-            }
-# else
-            esp = (void*)&raise;
-# endif
-            if (!esp || esp == (void*) -1)
-                UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
-
-            // Words on the stack which point into the stack are likely
-            // frame pointers or alien or DX object pointers. In any case
-            // there's no need to call preserve_pointer on them since
-            // they definitely don't point to the heap.
-            // See the picture at create_thread_struct() as a reminder.
-            lispobj exclude_from = (lispobj)th->control_stack_start;
-            lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
-
-            // This loop would be more naturally expressed as
-            //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
-            // However there is a very subtle problem with that: 'esp = &raise'
-            // is not necessarily properly aligned to be a stack pointer!
-            void **ptr;
-            for (ptr = ((void **)th->control_stack_end)-1; ptr >= (void**)esp;  ptr--) {
-                lispobj word = (lispobj)*ptr;
-                // Also note that we can eliminate small fixnums from consideration
-                // since there is no memory on the 0th page.
-                // (most OSes don't let users map memory there, though they used to).
-                if (word >= BACKEND_PAGE_BYTES &&
-                    !(exclude_from <= word && word < exclude_to))
-                    preserve_pointer((void*)word);
-            }
+            if (th->state_word.state != STATE_DEAD)
+                conservative_stack_scan(th, &raise);
         }
     }
 #else
