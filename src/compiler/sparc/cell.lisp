@@ -222,7 +222,7 @@
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %funcallable-instance-info))
 
-(define-vop (set-funcallable-instance-info word-index-set-nr)
+(define-vop (set-funcallable-instance-info word-index-set)
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %set-funcallable-instance-info))
 
@@ -272,7 +272,7 @@
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types * positive-fixnum))
 
-(define-vop (instance-index-set word-index-set-nr)
+(define-vop (instance-index-set word-index-set)
   (:policy :fast-safe)
   (:translate %instance-set)
   (:variant instance-slots-offset instance-pointer-lowtag)

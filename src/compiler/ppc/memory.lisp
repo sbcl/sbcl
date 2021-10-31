@@ -35,7 +35,7 @@
 
 ;;; Define some VOPs for indexed memory reference.
 (defmacro define-indexer (name write-p ri-op rr-op shift &key sign-extend-byte
-                                                              (result t))
+                                                         &aux (result (not write-p)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg zero immediate))
@@ -83,10 +83,6 @@
 (define-indexer word-index-set              t stw stwx 0)
 (define-indexer halfword-index-set          t sth sthx 1)
 (define-indexer byte-index-set              t stb stbx 2)
-;; the -NR setters yield no result
-(define-indexer word-index-set-nr           t stw stwx 0 :result nil)
-(define-indexer halfword-index-set-nr       t sth sthx 1 :result nil)
-(define-indexer byte-index-set-nr           t stb stbx 2 :result nil)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))

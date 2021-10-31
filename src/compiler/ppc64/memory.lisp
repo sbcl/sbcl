@@ -56,8 +56,8 @@
 ;;; and there is no case in which left-shift is required.
 (defmacro define-indexer (name shift write-p ri-op rr-op &key sign-extend-byte
                                                               multiple-of-four
-                                                              (result t)
-                          &aux (net-shift (- shift n-fixnum-tag-bits)))
+                          &aux (net-shift (- shift n-fixnum-tag-bits))
+                               (result (not write-p)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate))
@@ -109,11 +109,6 @@
 (define-indexer 32-bits-index-set        2 t   stw stwx)
 (define-indexer 16-bits-index-set        1 t   sth sthx)
 (define-indexer byte-index-set           0 t   stb stbx)
-;; the -NR setters yield no result
-(define-indexer word-index-set-nr        3 t   std stdx :result nil)
-(define-indexer 32-bits-index-set-nr     2 t   stw stwx :result nil)
-(define-indexer 16-bits-index-set-nr     1 t   sth sthx :result nil)
-(define-indexer byte-index-set-nr        0 t   stb stbx :result nil)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))

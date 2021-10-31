@@ -478,7 +478,7 @@
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %funcallable-instance-info))
 
-(define-vop (set-funcallable-instance-info word-index-set-nr)
+(define-vop (set-funcallable-instance-info word-index-set)
   (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %set-funcallable-instance-info))
 
@@ -590,7 +590,7 @@
         (%primitive code-header-ref-fdefn code index)
         (%primitive code-header-ref-any code index))))
 
-(define-vop (code-header-set word-index-set-nr)
+(define-vop (code-header-set word-index-set)
   (:translate code-header-set)
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))
@@ -613,7 +613,7 @@
                   (:arg-types instance positive-fixnum)
                   (:results (value :scs (,sc)))
                   (:result-types ,primtype))
-                (define-vop (,(symbolicate "%RAW-INSTANCE-SET/" suffix) word-index-set-nr)
+                (define-vop (,(symbolicate "%RAW-INSTANCE-SET/" suffix) word-index-set)
                   (:policy :fast-safe)
                   (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
                   (:variant instance-slots-offset instance-pointer-lowtag)

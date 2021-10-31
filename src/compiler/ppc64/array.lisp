@@ -53,7 +53,7 @@
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
-(define-vop (%set-array-dimension word-index-set-nr)
+(define-vop (%set-array-dimension word-index-set)
   (:translate %set-array-dimension)
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
@@ -107,7 +107,7 @@
        (:results (value :scs ,scs))
        (:result-types ,element-type))
      (define-vop (,(symbolicate "DATA-VECTOR-SET/" (string type))
-                  ,(symbolicate (string variant) "-SET-NR"))
+                  ,(symbolicate (string variant) "-SET"))
        (:note "inline array store")
        (:variant vector-data-offset other-pointer-lowtag)
        (:translate data-vector-set)
@@ -472,7 +472,7 @@
   (:result-types unsigned-num)
   (:variant vector-data-offset other-pointer-lowtag))
 
-(define-vop (set-vector-raw-bits word-index-set-nr)
+(define-vop (set-vector-raw-bits word-index-set)
   (:note "setf vector-raw-bits VOP")
   (:translate %set-vector-raw-bits)
   (:args (object :scs (descriptor-reg))
@@ -491,7 +491,7 @@
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num))
 
-(define-vop (data-vector-set/simple-array-signed-byte-8 byte-index-set-nr)
+(define-vop (data-vector-set/simple-array-signed-byte-8 byte-index-set)
   (:note "inline array store")
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
@@ -509,7 +509,7 @@
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num))
 
-(define-vop (data-vector-set/simple-array-signed-byte-16 16-bits-index-set-nr)
+(define-vop (data-vector-set/simple-array-signed-byte-16 16-bits-index-set)
   (:note "inline array store")
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
@@ -527,7 +527,7 @@
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num))
 
-(define-vop (data-vector-set/simple-array-signed-byte-32 32-bits-index-set-nr)
+(define-vop (data-vector-set/simple-array-signed-byte-32 32-bits-index-set)
   (:note "inline array store")
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)

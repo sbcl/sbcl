@@ -1013,7 +1013,7 @@
   (:results (value :scs (unsigned-reg)))
   (:result-types unsigned-num))
 
-(define-vop (bignum-set word-index-set-nr)
+(define-vop (bignum-set word-index-set)
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate #+bignum-assertions sb-bignum:%%bignum-set
               #-bignum-assertions sb-bignum:%bignum-set)

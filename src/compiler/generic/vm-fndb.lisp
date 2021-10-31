@@ -256,8 +256,7 @@
 ;;; These two are mostly used for bit-bashing operations.
 (defknown %vector-raw-bits (t index) sb-vm:word
   (flushable))
-(defknown (%set-vector-raw-bits) (t index sb-vm:word) sb-vm:word
-  ())
+(defknown (%set-vector-raw-bits) (t index sb-vm:word) (values) ())
 
 
 ;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
@@ -605,7 +604,7 @@
   ())
 
 (defknown %funcallable-instance-info (function index) t (flushable))
-(defknown %set-funcallable-instance-info (function index t) t ())
+(defknown %set-funcallable-instance-info (function index t) (values) ())
 
 #+sb-fasteval
 (defknown sb-interpreter:fun-proto-fn (interpreted-function)

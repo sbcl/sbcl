@@ -34,7 +34,7 @@
 ;;;; Indexed references:
 
 ;;; Define some VOPs for indexed memory reference.
-(macrolet ((define-indexer (name write-p op shift &key (result t))
+(macrolet ((define-indexer (name write-p op shift &aux (result (not write-p)))
               `(define-vop (,name)
                  (:args (object :scs (descriptor-reg))
                         (index :scs (any-reg zero immediate))
@@ -71,13 +71,10 @@
                   ,@(when (and write-p result)
                           '((move result value)))))))
   (define-indexer word-index-ref nil ld 0)
-  (define-indexer word-index-set-nr t st 0 :result nil)
   (define-indexer word-index-set t st 0)
   (define-indexer halfword-index-ref nil lduh 1)
   (define-indexer signed-halfword-index-ref nil ldsh 1)
-  (define-indexer halfword-index-set-nr t sth 1 :result nil)
   (define-indexer halfword-index-set t sth 1)
   (define-indexer byte-index-ref nil ldub 2)
   (define-indexer signed-byte-index-ref nil ldsb 2)
-  (define-indexer byte-index-set-nr t stb 2 :result nil)
   (define-indexer byte-index-set t stb 2))

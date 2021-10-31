@@ -869,7 +869,7 @@
   (:results (value :scs (unsigned-reg)))
   (:result-types unsigned-num))
 
-(define-vop (bignum-set word-index-set-nr)
+(define-vop (bignum-set word-index-set)
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate sb-bignum:%bignum-set)
   (:args (object :scs (descriptor-reg))
