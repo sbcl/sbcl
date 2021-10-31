@@ -378,9 +378,9 @@
   closure-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg) * %closure-index-ref)
 
-(define-full-setter set-funcallable-instance-info *
-  funcallable-instance-info-offset fun-pointer-lowtag
-  (descriptor-reg any-reg) * %set-funcallable-instance-info)
+(define-full-setter %closure-index-set *
+  closure-info-offset fun-pointer-lowtag
+  (descriptor-reg any-reg) * %closure-index-set)
 
 (define-full-reffer funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag

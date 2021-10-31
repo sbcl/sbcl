@@ -208,7 +208,6 @@
   (foldable flushable))
 (defknown %set-instance-layout (instance sb-vm:layout) (values) ())
 ;;; %SET-FUN-LAYOUT should only called on FUNCALLABLE-INSTANCE
-;;; (but %set-funcallable-instance-layout is too long a name)
 (defknown %set-fun-layout (funcallable-instance sb-vm:layout) (values) ())
 ;;; Layout getter that accepts any object, and if it has INSTANCE- or FUN-
 ;;; POINTER-LOWTAG returns the layout, otherwise some agreed-upon layout.
@@ -594,6 +593,7 @@
 
 (defknown %closure-index-ref (function index) t
   (flushable))
+(defknown %closure-index-set (function index t) (values) ())
 
 ;; T argument is for the 'fun' slot.
 (defknown sb-vm::%alloc-closure (index t) function (flushable))
@@ -604,6 +604,7 @@
   ())
 
 (defknown %funcallable-instance-info (function index) t (flushable))
+(defknown (setf %funcallable-instance-info) (t function index) t ())
 (defknown %set-funcallable-instance-info (function index t) (values) ())
 
 #+sb-fasteval

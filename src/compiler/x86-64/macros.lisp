@@ -378,8 +378,8 @@
            ,@(trap '(emit-constant (+ index addend)))
            (inst mov value ea)))))))
 
-;;; used for (SB-BIGNUM:%BIGNUM-SET %SET-FUNCALLABLE-INSTANCE-INFO
-;;;           %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS)
+;;; used for: INSTANCE-INDEX-SET %CLOSURE-INDEX-SET
+;;;           SB-BIGNUM:%BIGNUM-SET %SET-ARRAY-DIMENSION %SET-VECTOR-RAW-BITS
 (defmacro define-full-setter (name type offset lowtag scs el-type translate)
   `(define-vop (,name)
        (:translate ,translate)

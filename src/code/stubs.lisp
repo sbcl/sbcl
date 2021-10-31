@@ -131,7 +131,6 @@
   (def %funcallable-instance-fun)
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
-  (def %set-funcallable-instance-info (fin i new-value))
   #+compact-instance-header (progn (def wrapper-of)
                                    (def %instanceoid-layout))
 

@@ -41,9 +41,19 @@
 (in-package "SB-IMPL")
 
 (declaim (inline (setf %funcallable-instance-info)))
-(defun (setf %funcallable-instance-info) (value instance index)
-  (%set-funcallable-instance-info instance index value)
-  value)
+;;; Funcallable instances are just like closures, but there's another slot or two
+;;; depending on whether the layout pointer is in a slot or in the header word.
+(defun (setf %funcallable-instance-info) (newval fin index)
+  (%closure-index-set fin (+ index (- sb-vm:funcallable-instance-info-offset
+                                      sb-vm:closure-info-offset))
+                      newval)
+  newval)
+;;; This is just to keep the DEFSTRUCT logic consistent with %INSTANCE-SET,
+;;; but the canonical setter is the function named (setf %funcallable-instance-info)
+(declaim (inline %set-funcallable-instance-info))
+(defun %set-funcallable-instance-info (fin index newval)
+  (funcall #'(setf %funcallable-instance-info) newval fin index)
+  (values))
 
 ;;; from early-setf.lisp
 

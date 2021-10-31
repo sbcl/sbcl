@@ -2190,6 +2190,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "DO-CLOSURE-VALUES"
                "%CLOSURE-FUN"
                "%CLOSURE-INDEX-REF"
+               "%CLOSURE-INDEX-SET"
                "%CLOSURE-VALUES"
 
                ;; Abstract function accessors

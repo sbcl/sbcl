@@ -296,7 +296,7 @@
               (truly-the word (+ addr insts-offs))
               (sap-ref-word sap insts-offs) #xFFFFFFE9058B48  ; MOV RAX,[RIP-23]
               (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
-    (%set-funcallable-instance-info gf 0 slot-vector)
+    (setf (%funcallable-instance-info gf 0) slot-vector)
     gf))
 
 (defun fdefn-has-static-callers (fdefn)
