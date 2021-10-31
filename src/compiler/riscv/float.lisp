@@ -787,14 +787,12 @@
          (unless (location= value-tn r)
            (inst fmove :single r value-tn)))
        #+64-bit
-       (ecase slot
-         (:real
-          (unless (location= r x)
-            (inst fmove :single r x)))
-         (:imag
-          (inst fmvx<- :double temp x)
-          (inst srli temp temp 32)
-          (inst fmvx-> :single r temp))))
+       (progn
+         (inst fmvx<- :double temp x)
+         (ecase slot
+           (:real)
+           (:imag (inst srli temp temp 32)))
+         (inst fmvx-> :single r temp)))
       (complex-single-stack
        (inst fload :single r (current-nfp-tn vop)
              (+ (ecase slot

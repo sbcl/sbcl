@@ -375,9 +375,8 @@
       ;; optimize this.
       (loop for masker in maskers
             for shift = 1 then (ash shift 1) do
-              (inst li mask masker) ; NL1
+              (inst li mask masker)
               (let ((input (if (= shift 1) arg num)))
-                ; TEMP = NL2 ARG = NL3 NUM = NL0
                 (inst srli temp input shift)
                 (inst and num input mask))
               (inst and temp temp mask)

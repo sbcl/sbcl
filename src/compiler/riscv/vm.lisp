@@ -259,15 +259,17 @@
 ;;; addresses.
 (defconstant single-value-return-byte-offset 0)
 
+;;; This function is called by debug output routines that want a pretty name
+;;; for a TN's location.  It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
         (offset (tn-offset tn)))
     (ecase sb
       (registers (or (svref *register-names* offset)
-                     (format nil "x~D" offset)))
+                     (format nil "R~D" offset)))
+      (float-registers (format nil "F~D" offset))
       (control-stack (format nil "CS~D" offset))
-      (float-registers (format nil "f~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))

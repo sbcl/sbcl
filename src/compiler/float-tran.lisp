@@ -1673,7 +1673,7 @@
     (values (complex re im)
             (locally (declare (notinline complex)) (complex re im)))))
 
-#+(and (not sb-xc-host) (not riscv)) ; broken on riscv
+#-sb-xc-host
 (dolist (test '(try-folding-complex-single try-folding-complex-double))
   (multiple-value-bind (a b) (funcall test)
     (assert (eql a b)))

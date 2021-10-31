@@ -45,13 +45,6 @@
   (print-unreadable-object (inst stream :type t :identity t)
     (format stream "~A(~A)" (inst-name inst) (inst-format-name inst))))
 
-(declaim (ftype function read-suffix))
-(defun read-signed-suffix (length dstate)
-  (declare (type (member 8 16 32 64) length)
-           (type disassem-state dstate)
-           (optimize (speed 3) (safety 0)))
-  (sign-extend (read-suffix length dstate) length))
-
 ;;;; combining instructions where one specializes another
 
 ;;; Return non-NIL if the instruction SPECIAL is a more specific
@@ -2206,7 +2199,7 @@
 ;;;; code to disassemble assembler segments
 
 ;;; Disassemble the machine code instructions associated with
-;;; BYTES (a vector of assembly-unit) betwen each of RANGES.
+;;; BYTES (a vector of assembly-unit) between each of RANGES.
 (defun disassemble-assem-segment (bytes ranges stream)
   (declare (type stream stream))
   (let* ((dstate (make-dstate))
@@ -2355,6 +2348,13 @@
                    length
                    (dstate-byte-order dstate))
       (incf (dstate-next-offs dstate) length))))
+
+(defun read-signed-suffix (length dstate)
+  (declare (type (member 8 16 32 64) length)
+           (type disassem-state dstate)
+           (optimize (speed 3) (safety 0)))
+  (sign-extend (read-suffix length dstate) length))
+
 
 ;;;; optional routines to make notes about code
 
