@@ -66,17 +66,22 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
     (move start csp-tn)
-    (inst add csp-tn csp-tn (* nvals n-word-bytes))
-    (do ((val vals (tn-ref-across val))
-         (i 0 (1+ i)))
-        ((null val))
-      (let ((tn (tn-ref-tn val)))
-        (sc-case tn
-          (descriptor-reg
-           (storew tn start i))
-          (control-stack
-           (load-stack-tn temp tn)
-           (storew temp start i)))))
+    (flet ((load-tn (tn-ref)
+             (let ((tn (tn-ref-tn tn-ref)))
+               (sc-case tn
+                 (descriptor-reg
+                  tn)
+                 (control-stack
+                  (load-stack-tn temp tn)
+                  temp)))))
+     (cond ((= nvals 1)
+            (inst str (load-tn vals) (@ csp-tn n-word-bytes :post-index)))
+           (t
+            (inst add csp-tn csp-tn (* nvals n-word-bytes))
+            (do ((val vals (tn-ref-across val))
+                 (i 0 (1+ i)))
+                ((null val))
+              (storew (load-tn val) start i)))))
     (inst mov count (fixnumize nvals))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in
