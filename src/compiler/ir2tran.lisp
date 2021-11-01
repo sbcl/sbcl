@@ -1997,12 +1997,11 @@ not stack-allocated LVAR ~S." source-lvar)))))
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                    target)
              (let ((locs (standard-result-tns lvar)))
-
                (cond ((when-vop-existsp (:named nlx-entry-single)
                         (when (and (= (length locs) 1)
                                    (memq kind '(:block :tagbody))
                                    lvar
-                                   (type-single-value-p (lvar-derived-type lvar)))
+                                   (lvar-single-value-p lvar))
                           (vop* nlx-entry-single node block
                                 (top-loc start-loc nil)
                                 ((reference-tn-list locs t))

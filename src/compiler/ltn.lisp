@@ -476,8 +476,7 @@
   (let ((value (exit-value node)))
     (when value
       (if (and (vop-existsp :named nlx-entry-single)
-               (type-single-value-p (lvar-derived-type value))
-               (type-single-value-p (lvar-derived-type (node-lvar node))))
+               (lvar-single-value-p (node-lvar node)))
           (annotate-fixed-values-lvar value (list *backend-t-primitive-type*))
           (annotate-unknown-values-lvar value))))
   (values))

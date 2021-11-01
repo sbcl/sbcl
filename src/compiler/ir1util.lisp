@@ -1076,7 +1076,9 @@
 (defun %lvar-single-value-p (lvar)
   (let ((dest (lvar-dest lvar)))
     (typecase dest
-      ((or creturn exit)
+      (exit
+       (lvar-single-value-p (node-lvar dest)))
+      (creturn
        nil)
       (mv-combination
        (eq (basic-combination-fun dest) lvar))
