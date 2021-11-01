@@ -1364,7 +1364,10 @@ We could try a few things to mitigate this:
 ;;; Unfortunately this is a near total copy of the test in gc.impure.lisp
 (defun !ensure-genesis-code/data-separation ()
   #+gencgc
-  (let* ((n-bits (+ next-free-page 10))
+  (let* ((n-bits
+          (progn
+            (sb-vm::close-current-gc-region)
+            (+ next-free-page 50)))
          (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (total-code-size 0))
