@@ -612,6 +612,12 @@ necessary, since type inference may take arbitrarily long to converge.")
           (ir2-optimize component)
 
           (select-representations component)
+          ;; Try to combine consecutive uses of %INSTANCE-SET.
+          ;; This can't be done prior to selecting representations
+          ;; because SELECT-REPRESENTATIONS might insert some
+          ;; things like MOVE-FROM-DOUBLE which makes the
+          ;; "consecutive" vops no longer consecutive.
+          (ir2-optimize-stores component)
 
           (when *check-consistency*
             (maybe-mumble "Check2 ")

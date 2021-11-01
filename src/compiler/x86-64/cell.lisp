@@ -787,36 +787,6 @@
          (unless indices (return)))))
     (aver (not values))))
 
-(defoptimizer (sb-c::vop-optimize instance-index-set) (vop)
-  (let ((instance (tn-ref-tn (vop-args vop)))
-        (this vop)
-        (pairs))
-    (loop
-       (let ((index (tn-ref-tn (tn-ref-across (vop-args this)))))
-         (unless (constant-tn-p index) (return))
-         (push (cons (tn-value index) (tn-ref-tn (vop-nth-arg 2 this)))
-               pairs))
-       (let ((next (vop-next this)))
-         (unless (and next
-                      (eq (vop-name next) 'instance-index-set)
-                      (eq (tn-ref-tn (vop-args next)) instance))
-           (return))
-         (setq this next)))
-    (unless (cdr pairs) ; if at least 2
-      (return-from vop-optimize-instance-index-set-optimizer nil))
-    (setq pairs (nreverse pairs))
-    (let ((new (sb-c::emit-and-insert-vop
-                (sb-c::vop-node vop) (vop-block vop)
-                (template-or-lose 'instance-set-multiple)
-                (reference-tn-list (cons instance (mapcar #'cdr pairs)) nil)
-                nil vop (list (mapcar #'car pairs)))))
-      (loop (let ((next (vop-next vop)))
-              (sb-c::delete-vop vop)
-              (pop pairs)
-              (setq vop next))
-            (unless pairs (return)))
-      new)))
-
 (define-full-compare-and-swap %instance-cas instance
   instance-slots-offset instance-pointer-lowtag
   (any-reg descriptor-reg) * %instance-cas)

@@ -1009,6 +1009,52 @@
                             (funcall it vop))
                           (vop-next vop)))))))
 
+(defun merge-instance-set-vops (vop)
+  (let ((instance (tn-ref-tn (vop-args vop)))
+        (this vop)
+        (pairs))
+    (loop
+       (let ((index (tn-ref-tn (tn-ref-across (vop-args this)))))
+         (unless (constant-tn-p index) (return))
+         (push (cons (tn-value index) (tn-ref-tn (sb-vm::vop-nth-arg 2 this)))
+               pairs))
+       (let ((next (vop-next this)))
+         (unless (and next
+                      (eq (vop-name next) 'sb-vm::instance-index-set)
+                      (eq (tn-ref-tn (vop-args next)) instance))
+           (return))
+         (setq this next)))
+    (unless (cdr pairs) ; if at least 2
+      (return-from merge-instance-set-vops nil))
+    (setq pairs (nreverse pairs))
+    (let ((new (emit-and-insert-vop
+                (vop-node vop) (vop-block vop)
+                (template-or-lose 'sb-vm::instance-set-multiple)
+                (reference-tn-list (cons instance (mapcar #'cdr pairs)) nil)
+                nil vop (list (mapcar #'car pairs)))))
+      (loop (let ((next (vop-next vop)))
+              (delete-vop vop)
+              (pop pairs)
+              (setq vop next))
+            (unless pairs (return)))
+      new)))
+
+(defun ir2-optimize-stores (component)
+  ;; This runs after representation selection. It's the same as RUN-VOP-OPTIMIZERS,
+  ;; but with hardcoded vop names and function to call.
+  ;; It seems like this should also supplant the #+arm64 hack in GENERATE-CODE.
+  (do-ir2-blocks (block component)
+    (let ((vop (ir2-block-start-vop block)))
+      (loop (unless vop (return))
+            (let ((optimizer
+                   (case (vop-name vop)
+                     (sb-vm::instance-index-set
+                      (when (gethash 'sb-vm::instance-set-multiple
+                                     *backend-parsed-vops*)
+                        'merge-instance-set-vops)))))
+              (setq vop (or (awhen optimizer (funcall it vop))
+                            (vop-next vop))))))))
+
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)

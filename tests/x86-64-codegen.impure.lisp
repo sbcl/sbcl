@@ -1102,6 +1102,7 @@ sb-vm::(define-vop (cl-user::test)
 
 (defstruct submarine x y z)
 (defstruct (moreslots (:include submarine)) a b c)
+(declaim (ftype (function () double-float) get-dbl))
 (with-test (:name :write-combining-instance-set)
   (let* ((f (compile nil '(lambda (s)
                             (setf (submarine-x (truly-the submarine s)) 0
@@ -1115,4 +1116,13 @@ sb-vm::(define-vop (cl-user::test)
                                   (submarine-x s) 0
                                   (moreslots-c s) 0))))
          (lines (disassembly-lines f)))
-    (assert (= 3 (loop for line in lines count (search "MOVSD" line))))))
+    (assert (= 3 (loop for line in lines count (search "MOVSD" line)))))
+  ;; This was crashing in the MOV emitter (luckily) because it received
+  ;; an XMM register due to omission of a MOVE-FROM-DOUBLE to heap-allocate.
+  (compile nil
+           '(lambda (sub a)
+             (declare (submarine sub))
+             (let ((fooval (+ (get-dbl) 23d0)))
+               (setf (submarine-x sub) a
+                     (submarine-y sub) fooval)
+               a))))
