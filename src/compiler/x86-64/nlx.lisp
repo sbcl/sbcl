@@ -186,6 +186,19 @@
                  (inst jmp defaulting-done))))))
     (inst mov rsp-tn sp)))
 
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (start))
+  (:results (res :from :load))
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    (inst mov res start)
+    (inst mov rsp-tn sp)))
+
 (define-vop (nlx-entry-multiple)
   (:args (top :target result
               :scs (any-reg))
