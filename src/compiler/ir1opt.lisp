@@ -542,7 +542,9 @@
          ;; type.
          (let ((value (exit-value node)))
            (when value
-             (derive-node-type node (lvar-derived-type value)))))
+             (derive-node-type node (if (lvar-single-value-p (node-lvar node))
+                                        (lvar-type value)
+                                        (lvar-derived-type value))))))
         (cset
          ;; PROPAGATE-FROM-SETS can do a better job if NODE-REOPTIMIZE
          ;; is accurate till the node actually has been reoptimized.

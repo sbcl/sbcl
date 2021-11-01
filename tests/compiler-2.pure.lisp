@@ -3440,3 +3440,15 @@
            (dotimes (i 3)
              (f (1+ most-positive-fixnum)))))
     ((3) nil)))
+
+(with-test (:name :exit-becomes-single-value)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x z)
+         (max
+          (block nil
+            (flet ((x () (return (floor 1020 z))))
+              (funcall x #'x))
+            nil)
+          10))
+    (((lambda (x) (funcall x)) 4) 255)))
