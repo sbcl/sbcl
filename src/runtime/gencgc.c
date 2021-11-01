@@ -3497,8 +3497,9 @@ void pin_stack(struct thread* th) {
 #endif
 
 #if !GENCGC_IS_PRECISE
-static void conservative_stack_scan(struct thread* th,
-                                    void* stack_hot_end)
+static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
+conservative_stack_scan(struct thread* th,
+                        void* stack_hot_end)
 {
     /* there are potentially two stacks for each thread: the main
      * stack, which may contain Lisp pointers, and the alternate stack.
