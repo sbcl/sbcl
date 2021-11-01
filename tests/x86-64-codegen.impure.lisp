@@ -1126,3 +1126,11 @@ sb-vm::(define-vop (cl-user::test)
                (setf (submarine-x sub) a
                      (submarine-y sub) fooval)
                a))))
+
+#+immobile-code
+(with-test (:name :no-static-linkage-if-notinline)
+  ;; The normal state of the image has no "static" calls to FIND-PACKAGE
+  ;; but also has no globally proclaimed NOTINLINE, because that would
+  ;; suppress the optimization for CACHED-FIND-PACKAGE on a constant string.
+  (assert (not (sb-vm::fdefn-has-static-callers (sb-kernel::find-fdefn 'find-package))))
+  (assert (not (sb-int:info :function :inlinep 'find-package))))
