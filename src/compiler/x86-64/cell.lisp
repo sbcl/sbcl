@@ -863,16 +863,18 @@
          (move result-hi rdx))))
 
 (macrolet
-    ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)
-       `(define-vop (,name)
+    ((define-dblcas (translate indexedp &rest rest)
+       `(define-vop ()
           (:policy :fast-safe)
-          ,@more-stuff
+          (:translate ,translate)
           (:args (object :scs (descriptor-reg) :to :eval)
-                 ,@index-arg
+                 ,@(when indexedp '((index :scs (any-reg) :to :eval)))
                  (expected-old-lo :scs (descriptor-reg any-reg) :target eax)
                  (expected-old-hi :scs (descriptor-reg any-reg) :target edx)
                  (new-lo :scs (descriptor-reg any-reg) :target ebx)
                  (new-hi :scs (descriptor-reg any-reg) :target ecx))
+          ,@(when indexedp '((:arg-types * positive-fixnum * * * *)))
+          ,@rest
           (:results (result-lo :scs (descriptor-reg any-reg))
                     (result-hi :scs (descriptor-reg any-reg)))
           (:temporary (:sc unsigned-reg :offset rax-offset
@@ -882,28 +884,29 @@
           (:temporary (:sc unsigned-reg :offset rbx-offset
                        :from (:argument 4) :to (:result 0)) ebx)
           (:temporary (:sc unsigned-reg :offset rcx-offset
-                       :from (:argument 5) :to (:result 0)) ecx)
-          (:generator 7
-           (generate-dblcas ,memory-operand
-                            expected-old-lo expected-old-hi new-lo new-hi
-                            eax ebx ecx edx result-lo result-hi)))))
-  (define-cmpxchg-vop compare-and-exchange-pair
-      (ea (- list-pointer-lowtag) object)
-      ((:translate %cons-cas-pair)))
-  (define-cmpxchg-vop compare-and-exchange-pair-indexed
-      (ea offset object index (ash n-word-bytes (- n-fixnum-tag-bits)))
-      ((:variant-vars offset))
-      ((index :scs (descriptor-reg any-reg) :to :eval))))
+                       :from (:argument 5) :to (:result 0)) ecx))))
 
-;; The CPU requires 16-byte alignment for the memory operand.
-;; A vector's data portion starts on a 16-byte boundary,
-;; so any even numbered index is OK.
-(define-vop (%vector-cas-pair compare-and-exchange-pair-indexed)
-  (:translate %vector-cas-pair)
-  (:variant (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)))
+  (define-dblcas %cons-cas-pair nil
+    (:generator 2
+      (generate-dblcas (ea (- list-pointer-lowtag) object)
+                       expected-old-lo expected-old-hi new-lo new-hi
+                       eax ebx ecx edx result-lo result-hi)))
 
-;; Here you specify an odd numbered slot, otherwise get a bus error.
-;; An instance's first user-visible slot at index 1 is 16-byte-aligned.
-(define-vop (%instance-cas-pair compare-and-exchange-pair-indexed)
-  (:translate %instance-cas-pair)
-  (:variant (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)))
+  ;; The CPU requires 16-byte alignment for the memory operand.
+  ;; A vector's data portion starts on a 16-byte boundary, so any even numbered index is OK.
+  (define-dblcas %vector-cas-pair t
+    (:generator 2
+      (let ((ea (ea (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)
+                    object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
+        (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi
+                         eax ebx ecx edx result-lo result-hi))))
+
+  ;; Here you have to specify an odd numbered slot.
+  ;; An instance's first user-visible slot at index 1 is 16-byte-aligned.
+  ;; (Hmm, does the constraint differ by +/- compact-instance-header?)
+  (define-dblcas %instance-cas-pair t
+    (:generator 2
+      (let ((ea (ea (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)
+                    object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
+        (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi
+                         eax ebx ecx edx result-lo result-hi)))))
