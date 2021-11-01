@@ -210,6 +210,10 @@
        (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                       (specifier-type '(eql nil))))))
 
+(defun vop-nth-arg (n vop)
+  (let ((ref (vop-args vop)))
+    (dotimes (i n ref) (setq ref (tn-ref-across ref)))))
+
 (defun length-field-shift (widetag)
   (if (= widetag instance-widetag)
       instance-length-shift

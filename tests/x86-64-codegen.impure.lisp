@@ -1099,3 +1099,20 @@ sb-vm::(define-vop (cl-user::test)
     ;; 2 of them are are CONS->RNN and CONS->R11
     ;; the other is ENABLE-ALLOC-COUNTER which may or may not be present
     (assert (<= (length fixups) 3))))
+
+(defstruct submarine x y z)
+(defstruct (moreslots (:include submarine)) a b c)
+(with-test (:name :write-combining-instance-set)
+  (let* ((f (compile nil '(lambda (s)
+                            (setf (submarine-x (truly-the submarine s)) 0
+                                  (submarine-y s) 0
+                                  (submarine-z s) 0))))
+         (lines (disassembly-lines f)))
+    (assert (= 1 (loop for line in lines count (search "MOVUPD" line))))
+    (assert (= 1 (loop for line in lines count (search "MOVSD" line)))))
+  (let* ((f (compile nil '(lambda (s)
+                            (setf (moreslots-a (truly-the moreslots s)) 0
+                                  (submarine-x s) 0
+                                  (moreslots-c s) 0))))
+         (lines (disassembly-lines f)))
+    (assert (= 3 (loop for line in lines count (search "MOVSD" line))))))

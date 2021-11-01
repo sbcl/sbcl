@@ -712,7 +712,110 @@
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (any-reg descriptor-reg immediate) * %instance-set)
+  instance-pointer-lowtag (any-reg descriptor-reg immediate constant) * %instance-set)
+
+;;; Try to group consecutive %INSTANCE-SET vops on the same instance
+;;; so that:
+;;; 1) we can potentially utilize multi-word stores,
+;;; 2) a GC store barrier need occur once only (depending on the kind of barrier)
+;;;
+;;; in the absence of barriers, we would like to be allowed to rearrange
+;;; stores; in particular, storing the constant 0 to clear out a structure
+;;; should not require that you remember the slot order.
+;;; all the more so if we are permitted to optimize the slot order of the defstruct
+;;; by putting all tagged slots together, then all raw slots together.
+;;;
+(define-vop (instance-set-multiple)
+  (:args (instance :scs (descriptor-reg))
+         (values :more t :scs (descriptor-reg constant immediate)))
+  (:temporary (:sc unsigned-reg) val-temp)
+  ;; Would like to try to store adjacent 0s (and/or NILs) using 16 byte stores.
+  (:temporary (:sc int-sse-reg) xmm-temp)
+  (:info indices)
+  (:generator 1
+    (let* ((max-index (reduce #'max indices))
+           ;;(min-index (reduce #'min indices))
+           ;;(count (length indices))
+           (zerop-mask 0) ; slots which become a zero
+           (constantp-mask 0) ; slots which become any constant
+           (const-vals (make-array (1+ max-index) :initial-element nil))
+           (use-xmm-p))
+      (do ((tn-ref values (tn-ref-across tn-ref))
+           (indices indices (cdr indices)))
+          ((null tn-ref))
+        (let ((tn (tn-ref-tn tn-ref)))
+          (when (constant-tn-p tn)
+            (let ((slot (car indices))
+                  (val (tn-value tn)))
+              (setf constantp-mask (logior constantp-mask (ash 1 slot))
+                    zerop-mask (logior zerop-mask (if (eql val 0) (ash 1 slot) 0))
+                    (aref const-vals slot) val)))))
+      ;; If there are at least 3 zeros stored or any pair of adjacent 0s
+      ;; then load the xmm-temp with 0.
+      (setq use-xmm-p (or (>= (logcount zerop-mask) 3)
+                          (loop for slot below max-index
+                             thereis (= (ldb (byte 2 slot) zerop-mask) #b11))))
+      (when use-xmm-p
+        (inst xorpd xmm-temp xmm-temp))
+      (loop
+       (let* ((slot (pop indices))
+              (val (tn-ref-tn values))
+              (ea (ea (- (ash (+ instance-slots-offset slot) word-shift)
+                         instance-pointer-lowtag)
+                      instance)))
+         (aver (tn-p instance))
+         (setq values (tn-ref-across values))
+         ;; If the xmm temp was loaded with 0 and this value is 0,
+         ;; and possibly the next, then store through the temp
+         (cond
+           ((and use-xmm-p (constant-tn-p val) (eql (tn-value val) 0))
+            (let* ((next-slot (car indices))
+                   (next-val (if next-slot (tn-ref-tn values))))
+              (cond ((and (eql (1+ slot) next-slot)
+                          (constant-tn-p next-val)
+                          (eql (tn-value next-val) 0))
+                     (inst movupd ea xmm-temp)
+                     (pop indices)
+                     (setq values (tn-ref-across values)))
+                    (t
+                     (inst movsd ea xmm-temp)))))
+           ((stack-tn-p val)
+            (inst mov val-temp val)
+            (inst mov ea val-temp))
+           (t
+            (gen-cell-set ea val val-temp)))
+         (unless indices (return)))))
+    (aver (not values))))
+
+(defoptimizer (sb-c::vop-optimize instance-index-set) (vop)
+  (let ((instance (tn-ref-tn (vop-args vop)))
+        (this vop)
+        (pairs))
+    (loop
+       (let ((index (tn-ref-tn (tn-ref-across (vop-args this)))))
+         (unless (constant-tn-p index) (return))
+         (push (cons (tn-value index) (tn-ref-tn (vop-nth-arg 2 this)))
+               pairs))
+       (let ((next (vop-next this)))
+         (unless (and next
+                      (eq (vop-name next) 'instance-index-set)
+                      (eq (tn-ref-tn (vop-args next)) instance))
+           (return))
+         (setq this next)))
+    (unless (cdr pairs) ; if at least 2
+      (return-from vop-optimize-instance-index-set-optimizer nil))
+    (setq pairs (nreverse pairs))
+    (let ((new (sb-c::emit-and-insert-vop
+                (sb-c::vop-node vop) (vop-block vop)
+                (template-or-lose 'instance-set-multiple)
+                (reference-tn-list (cons instance (mapcar #'cdr pairs)) nil)
+                nil vop (list (mapcar #'car pairs)))))
+      (loop (let ((next (vop-next vop)))
+              (sb-c::delete-vop vop)
+              (pop pairs)
+              (setq vop next))
+            (unless pairs (return)))
+      new)))
 
 (define-full-compare-and-swap %instance-cas instance
   instance-slots-offset instance-pointer-lowtag

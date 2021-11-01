@@ -19,7 +19,8 @@
                  (make-fixup symbol :immobile-symbol offset)))))
 
 (defun gen-cell-set (ea value val-temp)
-  (if (sc-is value immediate)
+  (sc-case value
+   (immediate
       (let ((bits (encode-value-if-immediate value)))
         ;; Try to move imm-to-mem if BITS fits
         (acond ((or (and (fixup-p bits)
@@ -30,8 +31,12 @@
                 (inst mov :qword ea it))
                (t
                 (inst mov val-temp bits)
-                (inst mov ea val-temp))))
-      (inst mov :qword ea value)))
+                (inst mov ea val-temp)))))
+   (constant
+      (inst mov val-temp value)
+      (inst mov :qword ea val-temp))
+   (t
+      (inst mov :qword ea value))))
 
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
