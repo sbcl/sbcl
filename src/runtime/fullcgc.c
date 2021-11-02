@@ -75,7 +75,7 @@ static page_index_t free_page;
 
 /* The whole-page allocator works backwards from the end of dynamic space.
  * If it collides with 'next_free_page', then you lose.
- * TOOD: It would be reasonably simple to have this request more memory from
+ * TODO: It would be reasonably simple to have this request more memory from
  * the OS instead of failing on overflow */
 static void* get_free_page() {
     --free_page;

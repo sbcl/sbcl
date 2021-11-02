@@ -132,12 +132,6 @@ generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 /* Should we do a pre-scan of the heap before it's GCed? */
 boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
 
-/* If defined, free pages are read-protected to ensure that nothing
- * accesses them.
- */
-
-/* #define READ_PROTECT_FREE_PAGES */
-
 
 /*
  * GC structures and variables
@@ -730,9 +724,6 @@ static generation_index_t gc_alloc_generation;
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     page_index_t i, j;
 
-#ifdef READ_PROTECT_FREE_PAGES
-    os_protect(page_address(start), npage_bytes(1+end-start), OS_VM_PROT_ALL);
-#endif
     // If allocating boxed pages to gen0 (or scratch which becomes gen0) then
     // this allocation is potentially going to be extended by lisp (if it happens to
     // pick up the tail of the page as its next available region)
@@ -2825,12 +2816,6 @@ free_oldspace(void)
          * but is otherwise not a big deal */
         visit_freed_objects(page_address(first_page),
                             npage_bytes(last_page-first_page-1) + last_page_bytes);
-
-#ifdef READ_PROTECT_FREE_PAGES
-        os_protect(page_address(first_page),
-                   npage_bytes(last_page-first_page),
-                   OS_VM_PROT_NONE);
-#endif
         first_page = last_page;
     } while (first_page < next_free_page);
 
