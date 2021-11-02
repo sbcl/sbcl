@@ -509,6 +509,8 @@
         (when (and (block-start succ)
                    (not (eq (ir2-block-start-stack (block-info succ))
                             top)))
-          (insert-stack-cleanups block succ)))))
-
+          ;; Return reset the stack, no need to clean anything
+          (unless (return-p (block-last succ))
+            (insert-stack-cleanups block succ))))))
+  
   (values))
