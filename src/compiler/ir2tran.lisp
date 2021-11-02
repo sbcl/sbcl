@@ -2096,10 +2096,26 @@ not stack-allocated LVAR ~S." source-lvar)))))
                           args)
                   nil))
            (lvar (node-lvar node))
-           (res (lvar-result-tns lvar (list (specifier-type 'list)))))
+           (res (lvar-result-tns lvar (list (specifier-type 'list))))
+           (num-conses (- (length args) (if star 1 0))))
       (when (and lvar (lvar-dynamic-extent lvar))
         (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
-      (vop* list node block (refs) ((first res) nil) star (- (length args) (if star 1 0)))
+      ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name
+      ;;; doesn't exist. This was the best workaround I found, short of using #+.
+      (or (when-vop-existsp (:named cons)
+            (when (= num-conses 1)
+              (unless star
+                (setf (tn-ref-across refs) (reference-tn (emit-constant nil) nil)))
+              (vop* cons node block (refs) ((first res) nil))
+              t))
+          (when-vop-existsp (:named sb-vm::cons-2)
+            (when (= num-conses 2)
+              (unless star
+                (setf (tn-ref-across (tn-ref-across refs))
+                      (reference-tn (emit-constant nil) nil)))
+              (vop* sb-vm::cons-2 node block (refs) ((first res) nil))
+              t))
+          (vop* list node block (refs) ((first res) nil) star num-conses))
       (move-lvar-result node block res lvar))))
 (setf (fun-info-ir2-convert (fun-info-or-lose 'list*)) #'list-ir2-convert-optimizer)
 

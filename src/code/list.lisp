@@ -1194,7 +1194,9 @@
 
 (defun acons (key datum alist)
   "Construct a new alist by adding the pair (KEY . DATUM) to ALIST."
-  (cons (cons key datum) alist))
+  (sb-c::if-vop-existsp (:named acons)
+    (acons key datum alist)
+    (cons (cons key datum) alist)))
 
 (defun pairlis (keys data &optional (alist '()))
   "Construct an association list from KEYS and DATA (adding to ALIST)."

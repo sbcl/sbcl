@@ -298,7 +298,101 @@
                     (allocation nil bytes other-pointer-lowtag result-tn node nil thread-temp)
                     (storew* header result-tn 0 other-pointer-lowtag t))))))))
 
-;;;; CONS, LIST and LIST*
+;;;; CONS, ACONS, LIST and LIST*
+(macrolet ((store-slot (tn list &optional (slot cons-car-slot)
+                                          (lowtag list-pointer-lowtag))
+             `(let ((reg
+                     ;; FIXME: single-float gets placed in the boxed header
+                     ;; rather than just doing an immediate store.
+                     (sc-case ,tn
+                      ((control-stack constant)
+                       (move temp ,tn)
+                       temp)
+                      (t
+                       (encode-value-if-immediate ,tn)))))
+                (storew* reg ,list ,slot ,lowtag (not stack-allocate-p) temp))))
+
+(define-vop (cons)
+  (:args (car :scs (any-reg descriptor-reg constant immediate))
+         (cdr :scs (any-reg descriptor-reg constant immediate)))
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
+  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
+  (:results (result :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:node-var node)
+  (:generator 10
+    (let ((stack-allocate-p (node-stack-allocate-p node))
+          (nbytes (* cons-size n-word-bytes)))
+      (unless stack-allocate-p
+        (instrument-alloc 'list nbytes node (list temp alloc) thread-tn))
+      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+        (if stack-allocate-p
+            (stack-allocation nbytes 0 alloc)
+            (allocation 'list nbytes 0 alloc node temp thread-tn))
+        (store-slot car alloc cons-car-slot 0)
+        (store-slot cdr alloc cons-cdr-slot 0)
+        (if (location= alloc result)
+            (inst or :byte alloc list-pointer-lowtag)
+            (inst lea result (ea list-pointer-lowtag alloc)))))))
+
+(define-vop (acons)
+  (:args (key :scs (any-reg descriptor-reg constant immediate))
+         (val :scs (any-reg descriptor-reg constant immediate))
+         (tail :scs (any-reg descriptor-reg constant immediate)))
+  (:temporary (:sc unsigned-reg :to (:result 0)) alloc)
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) temp)
+  (:results (result :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:node-var node)
+  (:translate acons)
+  (:policy :fast-safe)
+  (:generator 10
+    (let ((stack-allocate-p nil)
+          (nbytes (* cons-size 2 n-word-bytes)))
+      (instrument-alloc 'list nbytes node (list temp alloc) thread-tn)
+      (pseudo-atomic (:thread-tn thread-tn)
+        (allocation 'list nbytes 0 alloc node temp thread-tn)
+        (store-slot tail alloc cons-cdr-slot 0)
+        (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
+        (store-slot temp alloc cons-car-slot 0)
+        (let ((pair temp) (temp alloc)) ; give STORE-SLOT the ALLOC as its TEMP
+          (store-slot key pair)
+          (store-slot val pair cons-cdr-slot))
+        ;; ALLOC could have been clobbered by using it as a temp for
+        ;; loading a constant.
+        (if (location= temp result)
+            (inst sub result 16) ; TEMP is ALLOC+16+lowtag, so just subtract 16
+            (inst lea result (ea (- 16) temp)))))))
+
+;;; CONS-2 is similar to ACONS, except that instead of producing
+;;;  ((X . Y) . Z) it produces (X Y . Z)
+(define-vop (cons-2)
+  (:args (car :scs (any-reg descriptor-reg constant immediate))
+         (cadr :scs (any-reg descriptor-reg constant immediate))
+         (cddr :scs (any-reg descriptor-reg constant immediate)))
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
+  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
+  (:results (result :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+  (:node-var node)
+  (:generator 10
+    (let ((stack-allocate-p (node-stack-allocate-p node))
+          (nbytes (* cons-size 2 n-word-bytes)))
+      (unless stack-allocate-p
+        (instrument-alloc 'list nbytes node (list temp alloc) thread-tn))
+      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+        (if stack-allocate-p
+            (stack-allocation nbytes 0 alloc)
+            (allocation 'list nbytes 0 alloc node temp thread-tn))
+        (store-slot car alloc cons-car-slot 0)
+        (store-slot cadr alloc (+ 2 cons-car-slot) 0)
+        (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
+        (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
+        (store-slot temp alloc cons-cdr-slot 0)
+        (if (location= alloc result)
+            (inst or :byte alloc list-pointer-lowtag)
+            (inst lea result (ea list-pointer-lowtag alloc)))))))
+
 (define-vop (list)
   (:args (things :more t :scs (descriptor-reg constant immediate)))
   (:temporary (:sc unsigned-reg) ptr temp)
@@ -308,62 +402,31 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 0
-    (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
-                                               (lowtag list-pointer-lowtag))
-                  `(let ((reg
-                          ;; FIXME: single-float gets placed in the boxed header
-                          ;; rather than just doing an immediate store.
-                          (sc-case ,tn
-                            ((control-stack constant)
-                             (move temp ,tn)
-                             temp)
-                            (t
-                             (encode-value-if-immediate ,tn)))))
-                     (storew* reg ,list ,slot ,lowtag (not stack-allocate-p) temp))))
-      (let ((stack-allocate-p (node-stack-allocate-p node))
-            (size (* (pad-data-block cons-size) cons-cells))
-            (lowtag (if (<= cons-cells 2) 0 list-pointer-lowtag)))
-        (unless stack-allocate-p
-          (instrument-alloc 'list size node (list ptr temp) thread-tn))
-        (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-          (if stack-allocate-p
-              (stack-allocation size lowtag res)
-              (allocation 'list size lowtag res node temp thread-tn))
-          (multiple-value-bind (last-base-reg lowtag car cdr)
-                    (case cons-cells
-                      (1
-                       (values res 0 cons-car-slot cons-cdr-slot))
-                      (2
-                       ;; Note that this does not use the 'ptr' register at all.
-                       ;; It would require a different vop to free that register up.
-                       (store-slot (tn-ref-tn things) res cons-car-slot 0)
-                       (setf things (tn-ref-across things))
-                       (inst lea temp (ea (+ (* cons-size n-word-bytes) list-pointer-lowtag) res))
-                       (store-slot temp res cons-cdr-slot 0)
-                       (values res 0 (+ cons-size cons-car-slot) (+ cons-size cons-cdr-slot)))
-                      (t
-                       (move ptr res)
-                       (dotimes (i (1- cons-cells))
-                         (store-slot (tn-ref-tn things) ptr)
-                         (setf things (tn-ref-across things))
-                         (inst add ptr (pad-data-block cons-size))
-                         (storew ptr ptr (- cons-cdr-slot cons-size)
-                                 list-pointer-lowtag))
-                       (values ptr list-pointer-lowtag cons-car-slot cons-cdr-slot)))
-                  (store-slot (tn-ref-tn things) last-base-reg car lowtag)
-                  (cond (star
-                         (setf things (tn-ref-across things))
-                         (store-slot (tn-ref-tn things) last-base-reg cdr lowtag))
-                        (t
-                         (storew* nil-value last-base-reg cdr lowtag
-                                  (not stack-allocate-p))))
-                  (cond ((<= cons-cells 2)
-                         (if (location= result res)
-                             (inst or :byte result list-pointer-lowtag)
-                             (inst lea result (ea list-pointer-lowtag res))))
-                        (t
-                         (move result res)))))))
-    (aver (null (tn-ref-across things)))))
+    (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
+    (let ((stack-allocate-p (node-stack-allocate-p node))
+          (size (* (pad-data-block cons-size) cons-cells)))
+      (unless stack-allocate-p
+        (instrument-alloc 'list size node (list ptr temp) thread-tn))
+      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+        (if stack-allocate-p
+            (stack-allocation size list-pointer-lowtag res)
+            (allocation 'list size list-pointer-lowtag res node temp thread-tn))
+        (move ptr res)
+        (dotimes (i (1- cons-cells))
+          (store-slot (tn-ref-tn things) ptr)
+          (setf things (tn-ref-across things))
+          (inst add ptr (pad-data-block cons-size))
+          (storew ptr ptr (- cons-cdr-slot cons-size) list-pointer-lowtag))
+        (store-slot (tn-ref-tn things) ptr cons-car-slot list-pointer-lowtag)
+        (cond (star
+               (setf things (tn-ref-across things))
+               (store-slot (tn-ref-tn things) ptr cons-cdr-slot list-pointer-lowtag))
+              (t
+               (storew* nil-value ptr cons-cdr-slot list-pointer-lowtag
+                        (not stack-allocate-p))))))
+    (aver (null (tn-ref-across things)))
+    (move result res)))
+)
 
 ;;;; special-purpose inline allocators
 
