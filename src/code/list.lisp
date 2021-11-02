@@ -1194,9 +1194,11 @@
 
 (defun acons (key datum alist)
   "Construct a new alist by adding the pair (KEY . DATUM) to ALIST."
-  (sb-c::if-vop-existsp (:named acons)
-    (acons key datum alist)
-    (cons (cons key datum) alist)))
+  ;; This function is maybe-inline, so can't use vop-existsp
+  ;; which does not remain in the image post-build.
+  #.(if (gethash 'acons sb-c::*backend-template-names*)
+        '(acons key datum alist) ; vop translated
+        '(cons (cons key datum) alist)))
 
 (defun pairlis (keys data &optional (alist '()))
   "Construct an association list from KEYS and DATA (adding to ALIST)."
