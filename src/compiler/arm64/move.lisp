@@ -172,6 +172,7 @@
             :scs (any-reg descriptor-reg)
             :load-if (not (or (location= x y)
                               (and (sc-is x immediate)
+                                   (sc-is y control-stack)
                                    (eql (tn-value x) 0))))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
@@ -194,7 +195,10 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg))
+            :scs (any-reg descriptor-reg)
+            :load-if (not (and (sc-is x immediate)
+                               (sc-is y control-stack)
+                               (eql (tn-value x) 0))))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
@@ -203,7 +207,11 @@
       ((any-reg descriptor-reg)
        (move y x))
       (control-stack
-       (store-stack-offset x fp y)))))
+       (store-stack-offset (if (and (sc-is x immediate)
+                                    (eql (tn-value x) 0))
+                               zr-tn
+                               x)
+                           fp y)))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
