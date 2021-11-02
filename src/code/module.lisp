@@ -82,8 +82,9 @@
           (merge-pathnames
            (make-pathname :directory (list :relative "contrib")
                           :name filesys-name)
-           (truename (or (sbcl-homedir-pathname)
-                         (return-from module-provide-contrib nil)))))
+           ;; DO NOT CALL TRUENAME HERE. YOU SHOULD NOT NEED THAT.
+           (or (sbcl-homedir-pathname)
+               (return-from module-provide-contrib nil))))
          (fasl-path (merge-pathnames
                      (make-pathname :type *fasl-file-type*)
                      unadorned-path))
@@ -93,9 +94,24 @@
     ;; be removed by the time we get round to trying to load it.
     ;; Maybe factor out the logic in the LOAD guesser as to which file
     ;; was meant, so that we can use it here on open streams instead?
-    (let ((file (or (probe-file fasl-path)
-                    (probe-file unadorned-path)
-                    (probe-file lisp-path))))
+    ;;
+    ;; Prefer the untruename as the argument to give to LOAD,
+    ;; because users need to see (in backtraces and similar) the pathnames
+    ;; actually handed off to the filesystem calls, like:
+    ;;    ... #P"blaze-out/k8-fastbuild/bin/third_party/lisp/sbcl/binary-distribution/k8/sbcl/bin/../lib/sbcl/contrib/sb-md5.fasl"
+    ;; and not names that have been obtained through readlink like
+    ;;    ... #P"/build/cas/081/081f9f05e4af917b63b6ccf7453e4565fc66587a093a45fb1c6dbe64e8c8ad58_0100b65b"
+    ;; as the latter can not be reverse-engineered to a source file
+    ;; except possibly by much trial and error.
+    ;;
+    ;; If the idea of using PROBE-FILE was to get the newest version
+    ;; on a versioned file system, I don't see how it helps to truenameize early,
+    ;; because as per the "possible race" cited above, there may be an even newer version
+    ;; when you call LOAD, or it may go away. Aside from ensuring existence,
+    ;; was there any benefit to using the result of PROBE-FILE?
+    (let ((file (cond ((probe-file fasl-path) fasl-path)
+                      ((probe-file unadorned-path) unadorned-path)
+                      ((probe-file lisp-path) lisp-path))))
       (when file
         (handler-bind
             (((or style-warning package-at-variance) #'muffle-warning))
