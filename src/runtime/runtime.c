@@ -304,37 +304,23 @@ search_for_executable(const char *argv0)
 static size_t
 parse_size_arg(char *arg, char *arg_name)
 {
-  char *tail, *power_name;
-  size_t power, res;
+  char *tail;
+  size_t power = 20, res;
 
   res = strtoul(arg, &tail, 0);
 
   if (arg == tail) {
     lose("%s argument is not a number: %s", arg_name, arg);
   } else if (tail[0]) {
-    int i, size;
-    power_name = copied_string(tail);
-    size = strlen(power_name);
-    for (i=0; i<size; i++)
-      power_name[i] = toupper(power_name[i]);
-  } else {
-    power = 20;
-    power_name = NULL;
-  }
-  if (power_name) {
-    if ((0==strcmp("KB", power_name)) ||
-        (0==strcmp("KIB", power_name))) {
+    if (!strcasecmp("KB", tail) || !strcasecmp("KIB", tail)) {
       power = 10;
-    } else if ((0==strcmp("MB", power_name)) ||
-               (0==strcmp("MIB", power_name))) {
+    } else if (!strcasecmp("MB", tail) || !strcasecmp("MIB", tail)) {
       power = 20;
-    } else if ((0==strcmp("GB", power_name)) ||
-               (0==strcmp("GIB", power_name))) {
+    } else if (!strcasecmp("GB", tail) || !strcasecmp("GIB", tail)) {
       power = 30;
     } else {
       lose("%s argument has an unknown suffix: %s", arg_name, tail);
     }
-    free(power_name);
   }
   if ((res <= 0) ||
       (res >= (SIZE_MAX >> power))) {
