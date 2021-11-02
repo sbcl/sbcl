@@ -548,13 +548,14 @@
                (move-results-coerced node block results locs))))
           (:unknown
            (let ((locs (loop for tn in results
-                             collect (cond #+(or x86 x86-64)
+                             collect (cond #+(or x86 x86-64 arm64)
                                            ((eq (tn-kind tn) :constant)
                                             tn)
                                            ((and
-                                             #-(or x86 x86-64)
+                                             #-(or x86 x86-64 arm64)
                                              (neq (tn-kind tn) :constant)
-                                             (eq (tn-primitive-type tn) *backend-t-primitive-type*))
+                                             (equal (primitive-type-scs (tn-primitive-type tn))
+                                                    `(,sb-vm:descriptor-reg-sc-number)))
                                             tn)
                                            ((let ((new (make-normal-tn *backend-t-primitive-type*)))
                                               (emit-move node block tn new)

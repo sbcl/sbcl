@@ -64,24 +64,41 @@
             (count :scs (any-reg)))
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
+  (:vop-var vop)
   (:generator 20
     (move start csp-tn)
-    (flet ((load-tn (tn-ref)
-             (let ((tn (tn-ref-tn tn-ref)))
-               (sc-case tn
-                 (descriptor-reg
-                  tn)
-                 (control-stack
-                  (load-stack-tn temp tn)
-                  temp)))))
-     (cond ((= nvals 1)
-            (inst str (load-tn vals) (@ csp-tn n-word-bytes :post-index)))
-           (t
-            (inst add csp-tn csp-tn (* nvals n-word-bytes))
-            (do ((val vals (tn-ref-across val))
-                 (i 0 (1+ i)))
-                ((null val))
-              (storew (load-tn val) start i)))))
+    (let (prev-constant)
+      (flet ((load-tn (tn-ref)
+               (let ((tn (tn-ref-tn tn-ref)))
+                 (sc-case tn
+                   (descriptor-reg
+                    tn)
+                   ((immediate constant)
+                    (cond ((eql (tn-value tn) 0)
+                           zr-tn)
+                          ((or (eql prev-constant (tn-value tn))
+                               (progn
+                                 (setf prev-constant (tn-value tn))
+                                 nil))
+                           temp)
+                          ((sc-is tn constant)
+                           (load-constant vop tn temp)
+                           temp)
+                          (t
+                           (load-immediate vop tn temp)
+                           temp)))
+                   (control-stack
+                    (setf prev-constant nil)
+                    (load-stack-tn temp tn)
+                    temp)))))
+        (cond ((= nvals 1)
+               (inst str (load-tn vals) (@ csp-tn n-word-bytes :post-index)))
+              (t
+               (inst add csp-tn csp-tn (* nvals n-word-bytes))
+               (do ((val vals (tn-ref-across val))
+                    (i 0 (1+ i)))
+                   ((null val))
+                 (storew (load-tn val) start i))))))
     (inst mov count (fixnumize nvals))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in
