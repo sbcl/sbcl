@@ -64,6 +64,19 @@
     (inst add res res 1)
     (inst and res res array-rank-mask)))
 
+(define-vop ()
+  (:translate %array-rank=)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:temporary (:scs (unsigned-reg)) x)
+  (:info rank)
+  (:arg-types * (:constant t))
+  (:conditional :eq)
+  (:generator 2
+    (inst ldrb x (@ array #+little-endian (- 2 other-pointer-lowtag)
+                          #+big-endian    (- 5 other-pointer-lowtag)))
+    (inst cmp x (add-sub-immediate (encode-array-rank rank)))))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
