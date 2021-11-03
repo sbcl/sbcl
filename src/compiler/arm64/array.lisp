@@ -59,10 +59,9 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldrb res (@ x (- (/ array-rank-position n-word-bytes)
+    (inst ldrsb res (@ x (- (/ array-rank-position n-word-bytes)
                           other-pointer-lowtag)))
-    (inst add res res 1)
-    (inst and res res array-rank-mask)))
+    (inst add res res 1)))
 
 (define-vop ()
   (:translate %array-rank=)
