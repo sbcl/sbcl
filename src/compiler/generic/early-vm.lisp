@@ -77,7 +77,10 @@
   (ldb (byte (- n-word-bits n-widetag-bits 1) 0) -1))
 
 ;;; The ANSI-specified minimum is 8.
-(defconstant array-rank-limit 256
+;;; Since the array rank is stored as rank-1 in the array header,
+;;; having it stop at 128 ensures that adding 1 produces an unsigned
+;;; result.
+(defconstant array-rank-limit 129
   "the exclusive upper bound on the rank of an array")
 
 ;;; FIXME: these limits are wrong at the most basic level according to the spec,
