@@ -80,10 +80,6 @@
 
 ;;;; Other non-type constants.
 
-(defenum ()
-  atomic-flag
-  interrupted-flag)
-
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
