@@ -29,7 +29,7 @@
     ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
     (inst addu header rank (fixnumize -1))
     (inst and header header (fixnumize array-rank-mask))
-    (inst sll header header array-rank-byte-pos)
+    (inst sll header header array-rank-position)
     (inst or header type)
     ;; Remove the extraneous fixnum tag bits because TYPE and RANK
     ;; were fixnums

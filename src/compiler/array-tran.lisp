@@ -812,7 +812,7 @@
                             ;; for the the header word.
                             (header-bits
                               (logior (if (eq has-fill-pointer t) ; (i.e. can't handle :maybe)
-                                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:n-widetag-bits)
+                                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-position)
                                           0)
                                       (or (sb-vm:saetp-complex-typecode saetp)
                                           sb-vm:complex-vector-widetag)))
@@ -1517,7 +1517,8 @@
              (delay-ir1-transform node :ir1-phases))
            (if (vop-existsp :named test-header-bit)
                `(test-header-bit array sb-vm:+array-fill-pointer-p+)
-               `(logtest (get-header-data array) sb-vm:+array-fill-pointer-p+))))))
+               `(logtest (get-header-data array)
+                         (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
 
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
   (let ((array-ref (lvar-uses array))

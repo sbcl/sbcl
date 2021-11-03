@@ -310,10 +310,14 @@
 
 ;;; Byte index:           3           2           1           0
 ;;;                 +-----------------------------------+-----------+
-;;;                 |  unused   |   rank    |   flags   |  widetag  |
+;;;                 |  unused   |   rank   <|>   flags  |  widetag  |
 ;;;                 +-----------+-----------+-----------+-----------+
 ;;;                 |<---------- HEADER DATA ---------->|
 
+(defconstant array-rank-position 16)
+(defconstant array-flags-position 8)
+
+(defconstant array-flags-data-position (- array-flags-position n-widetag-bits))
 (defconstant +array-fill-pointer-p+    #x80)
 
 (defconstant +vector-dynamic-extent+   #x40)

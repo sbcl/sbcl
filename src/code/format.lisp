@@ -33,8 +33,9 @@
                  t)))
     (if (logtest (get-header-data string)
                  ;; shareable = readonly
-                 (logior sb-vm:+vector-shareable+
-                         sb-vm:+vector-shareable-nonstd+))
+                 (ash (logior sb-vm:+vector-shareable+
+                              sb-vm:+vector-shareable-nonstd+)
+                      sb-vm:array-flags-data-position))
         (memoize (compute-it))
         (compute-it))))
 

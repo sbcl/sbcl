@@ -223,7 +223,8 @@
 
 (with-test (:name (hash-table :custom-hashfun-with-standard-test))
   (flet ((kv-flag-bits (ht)
-           (sb-kernel:get-header-data (sb-impl::hash-table-pairs ht))))
+           (ash (sb-kernel:get-header-data (sb-impl::hash-table-pairs ht))
+                (- sb-vm:array-flags-data-position))))
     ;; verify that EQ hashing on symbols is address-sensitive
     (let ((h (make-hash-table :test 'eq)))
       (setf (gethash 'foo h) 1)

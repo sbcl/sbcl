@@ -1477,7 +1477,7 @@ core and return a descriptor to it."
 (defun set-readonly (vector)
   (write-wordindexed/raw vector 0 (logior (read-bits-wordindexed vector 0)
                                           (ash sb-vm:+vector-shareable+
-                                               sb-vm:n-widetag-bits)))
+                                               sb-vm:array-flags-position)))
   vector)
 
 (defun initialize-packages ()
@@ -2933,7 +2933,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                  sb-vm:n-widetag-bits sb-vm:widetag-mask
                  sb-vm:n-fixnum-tag-bits sb-vm:fixnum-tag-mask
                  sb-vm:dsd-raw-type-mask
-                 sb-vm:short-header-max-words))
+                 sb-vm:short-header-max-words
+                 sb-vm:array-flags-position
+                 sb-vm:array-rank-position))
       (push (list (c-symbol-name c)
                   -1                    ; invent a new priority
                   (symbol-value c)

@@ -96,8 +96,8 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
     // If 1, then we share vectors tagged as +VECTOR-SHAREABLE+,
     // but if >1, those and also +VECTOR-SHAREABLE-NONSTD+.
     int mask = gc_coalesce_string_literals > 1
-      ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<N_WIDETAG_BITS
-      : (VECTOR_SHAREABLE                        )<<N_WIDETAG_BITS;
+      ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<ARRAY_FLAGS_POSITION
+      : (VECTOR_SHAREABLE                        )<<ARRAY_FLAGS_POSITION;
 
     lispobj* obj = native_pointer(ptr);
     lispobj header = *obj;

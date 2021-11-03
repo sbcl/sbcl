@@ -272,7 +272,7 @@
 ;;; vector type will usuallly end up calling allocate-vector-with-widetag
 ;;; via %MAKE-ARRAY.
 (defknown allocate-vector (#+ubsan boolean
-                           (unsigned-byte 9) index
+                           word index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
                            (and index

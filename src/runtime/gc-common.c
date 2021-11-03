@@ -693,7 +693,7 @@ DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 static inline int array_header_nwords(lispobj header) {
-    unsigned char rank = (header >> 16);
+    unsigned char rank = (header >> ARRAY_RANK_POSITION);
     ++rank; // wraparound from 255 to 0
     int nwords = sizeof (struct array)/N_WORD_BYTES + (rank-1);
     return ALIGN_UP(nwords, 2);
@@ -1179,7 +1179,7 @@ void add_to_weak_vector_list(lispobj* vector, lispobj header)
     if (!vector_flagp(header, VectorWeakVisited)) {
         weak_vectors = (struct cons*)gc_private_cons((uword_t)vector,
                                                      (uword_t)weak_vectors);
-        *vector |= flag_VectorWeakVisited << N_WIDETAG_BITS;
+        *vector |= flag_VectorWeakVisited << ARRAY_FLAGS_POSITION;
     }
 }
 

@@ -219,7 +219,9 @@
   (:args (x :scs (descriptor-reg)))
   (:info bits)
   (:arg-types t (:constant (unsigned-byte 8)))
-  (:generator 1 (inst mov :byte (ea (- 1 other-pointer-lowtag) x) bits)))
+  (:generator 1
+    (inst mov :byte (ea (- (/ array-flags-position n-word-bytes) other-pointer-lowtag) x)
+      bits)))
 (define-vop ()
   (:translate reset-header-bits)
   (:policy :fast-safe)
@@ -227,7 +229,8 @@
   (:arg-types t (:constant (unsigned-byte 8)))
   (:info bits)
   (:generator 1
-    (inst and :byte (ea (- 1 other-pointer-lowtag) x) (logandc1 bits #xff))))
+    (inst and :byte (ea (- (/ array-flags-position n-word-bytes) other-pointer-lowtag) x)
+      (logandc1 bits #xff))))
 (define-vop (test-header-bit)
   (:translate test-header-bit)
   (:policy :fast-safe)
@@ -239,7 +242,8 @@
     ;; Assert that the mask is in header-data byte index 0
     ;; which is byte index 1 of the whole header word.
     (aver (typep mask '(unsigned-byte 8)))
-    (inst test :byte (ea (- 1 other-pointer-lowtag) array) mask)))
+    (inst test :byte (ea (- (/ array-flags-position n-word-bytes) other-pointer-lowtag) array)
+      mask)))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)

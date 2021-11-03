@@ -32,7 +32,7 @@
     ;; rank 1 is stored as 0, 2 is stored as 1, ...
     (inst lea header (make-ea :dword :disp (fixnumize -1) :base rank))
     (inst and header (fixnumize array-rank-mask))
-    (inst shl header array-rank-byte-pos)
+    (inst shl header array-rank-position)
     (inst or  header type)
     (inst shr header n-fixnum-tag-bits)
     (pseudo-atomic ()

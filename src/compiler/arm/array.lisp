@@ -36,7 +36,7 @@
       ;; See ENCODE-ARRAY-RANK.
       (inst sub ndescr rank (fixnumize 1))
       (inst and ndescr ndescr (fixnumize array-rank-mask))
-      (inst orr ndescr type (lsl ndescr array-rank-byte-pos))
+      (inst orr ndescr type (lsl ndescr array-rank-position))
       (inst mov ndescr (lsr ndescr n-fixnum-tag-bits))
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))

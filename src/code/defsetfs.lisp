@@ -29,13 +29,13 @@
 (progn
   (declaim (inline assign-vector-flags logior-header-bits reset-header-bits))
   (defun assign-vector-flags (vector flags)
-    (set-header-data vector (dpb flags (byte 8 0) (get-header-data vector)))
+    (set-header-data vector (dpb flags (byte 8 #.array-flags-data-position) (get-header-data vector)))
     (values))
   (defun logior-header-bits (vector bits)
-    (set-header-data vector (logior (get-header-data vector) bits))
+    (set-header-data vector (logior (get-header-data vector) (ash bits #.array-flags-data-position)))
     vector)
   (defun reset-header-bits (vector bits)
-    (set-header-data vector (logand (get-header-data vector) (lognot bits)))
+    (set-header-data vector (logand (get-header-data vector) (lognot (ash bits #.array-flags-data-position))))
     (values)))
 
 (in-package "SB-IMPL")

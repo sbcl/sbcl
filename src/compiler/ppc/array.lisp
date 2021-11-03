@@ -38,7 +38,7 @@
       ;; Exercise for the reader: these next 4 instructions can be
       ;; replaced by just 2: one RLWINM and one RLWIMI
       (inst andi. ndescr ndescr (fixnumize array-rank-mask))
-      (inst slwi ndescr ndescr array-rank-byte-pos)
+      (inst slwi ndescr ndescr array-rank-position)
       (inst or ndescr ndescr type)
       (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))

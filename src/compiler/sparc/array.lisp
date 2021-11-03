@@ -31,7 +31,7 @@
       ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
       (inst sub ndescr rank (fixnumize 1))
       (inst and ndescr ndescr (fixnumize array-rank-mask))
-      (inst sll ndescr ndescr array-rank-byte-pos)
+      (inst sll ndescr ndescr array-rank-position)
       (inst or ndescr ndescr type)
       ;; Remove the extraneous fixnum tag bits because TYPE and RANK
       ;; were fixnums

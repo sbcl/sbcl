@@ -219,7 +219,6 @@
       instance-length-shift
       n-widetag-bits))
 
-(defconstant array-rank-byte-pos 16)
 (defconstant array-rank-mask 255)
 ;;; Rank is encoded as a (UNSIGNED-BYTE 8) minus one.
 ;;; Initialization of simple rank 1 array header words is completely unaffected-
@@ -236,7 +235,7 @@
              (>= widetag complex-base-string-widetag))))
     (logior (if array-header-p
                 (let ((rank (- nwords array-dimensions-offset)))
-                  (ash (encode-array-rank rank) array-rank-byte-pos))
+                  (ash (encode-array-rank rank) array-rank-position))
                 (case widetag
                   (#.fdefn-widetag 0)
                   (t (ash (1- nwords) (length-field-shift widetag)))))

@@ -1883,7 +1883,7 @@ function to be removed without further warning."
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   ;; Explicitly compute a widetag with the weakness bit ORed in.
-  (let ((type (logior (ash vector-weak-flag n-widetag-bits) simple-vector-widetag)))
+  (let ((type (logior (ash vector-weak-flag array-flags-position) simple-vector-widetag)))
     ;; These allocation calls are the transforms of MAKE-ARRAY for a vector with
     ;; the respective initializing keyword arg. This is badly OAOO-violating and
     ;; almost makes me want to cry, but not quite enough for me to improve it.
@@ -1904,4 +1904,4 @@ function to be removed without further warning."
 (defun weak-vector-p (x)
   (and (simple-vector-p x)
        #+(or x86 x86-64) (test-header-bit x vector-weak-flag)
-       #-(or x86 x86-64) (logtest (get-header-data x) vector-weak-flag)))
+       #-(or x86 x86-64) (logtest (get-header-data x) (ash vector-weak-flag array-flags-data-position))))

@@ -34,7 +34,7 @@
       ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
       (inst subi ndescr rank (fixnumize 1))
       (inst andi ndescr ndescr (fixnumize array-rank-mask))
-      (inst slli ndescr ndescr array-rank-byte-pos)
+      (inst slli ndescr ndescr array-rank-position)
       (inst or ndescr ndescr type)
       (inst srli ndescr ndescr n-fixnum-tag-bits)
       ;; And store the header value.

@@ -81,7 +81,7 @@
     ;; rank 1 is stored as 0, 2 is stored as 1, ...
     (inst lea :dword header (ea (fixnumize -1) rank))
     (inst and :dword header (fixnumize array-rank-mask))
-    (inst shl :dword header array-rank-byte-pos)
+    (inst shl :dword header array-rank-position)
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
     (instrument-alloc nil bytes node temp thread-tn)

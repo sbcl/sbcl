@@ -37,7 +37,7 @@
       ;; See ENCODE-ARRAY-RANK.
       (inst sub ndescr rank (fixnumize 1))
       (inst and ndescr ndescr (fixnumize array-rank-mask))
-      (inst orr ndescr type (lsl ndescr array-rank-byte-pos))
+      (inst orr ndescr type (lsl ndescr array-rank-position))
       (inst lsr ndescr ndescr n-fixnum-tag-bits)
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))
@@ -59,8 +59,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldrb res (@ x #+little-endian (- 2 other-pointer-lowtag)
-                        #+big-endian    (- 5 other-pointer-lowtag)))
+    (inst ldrb res (@ x (- (/ array-rank-position n-word-bytes)
+                          other-pointer-lowtag)))
     (inst add res res 1)
     (inst and res res array-rank-mask)))
 
@@ -73,8 +73,8 @@
   (:arg-types * (:constant t))
   (:conditional :eq)
   (:generator 2
-    (inst ldrb x (@ array #+little-endian (- 2 other-pointer-lowtag)
-                          #+big-endian    (- 5 other-pointer-lowtag)))
+    (inst ldrb x (@ array (- (/ array-rank-position n-word-bytes)
+                            other-pointer-lowtag)))
     (inst cmp x (add-sub-immediate (encode-array-rank rank)))))
 
 ;;;; Bounds checking routine.

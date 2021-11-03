@@ -29,7 +29,7 @@
   (weak-table-allocation-test))
 
 (defun vector-flag-bits (v)
-  (logand (sb-kernel:get-header-data v) #xFF))
+  (logand (ash (sb-kernel:get-header-data v) (- sb-vm:array-flags-data-position)) #xFF))
 
 (defun is-address-sensitive (tbl)
   (logtest (vector-flag-bits (sb-impl::hash-table-pairs tbl))

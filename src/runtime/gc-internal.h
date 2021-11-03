@@ -84,21 +84,21 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
  * - With smarter macros it ought to be possible to avoid 8-byte loads and shifts.
  *   They would need to be endian-aware, which I didn't want to do just yet.
  */
-#define vector_flagp(header, val) ((int)header & (flag_##val << N_WIDETAG_BITS))
-#define vector_flags_zerop(header) ((int)(header) & 0x0700) == 0
+#define vector_flagp(header, val) ((int)header & (flag_##val << ARRAY_FLAGS_POSITION))
+#define vector_flags_zerop(header) ((int)(header) & 0x07 << ARRAY_FLAGS_POSITION) == 0
 // True if flags are zero, also testing the widetag at the same time.
-#define ordinary_simple_vector_p(header) ((int)(header) & 0x07ff) == SIMPLE_VECTOR_WIDETAG
+#define ordinary_simple_vector_p(header) ((int)(header) & (0x07 << ARRAY_FLAGS_POSITION | 0xff)) == SIMPLE_VECTOR_WIDETAG
 // Return true if vector is a weak vector that is not a hash-table <k,v> vector.
 #define vector_is_weak_not_hashing_p(header) \
-  ((int)(header) & ((flag_VectorWeak|flag_VectorHashing) << N_WIDETAG_BITS)) == \
-    (flag_VectorWeak << N_WIDETAG_BITS)
+  ((int)(header) & ((flag_VectorWeak|flag_VectorHashing) << ARRAY_FLAGS_POSITION)) == \
+    (flag_VectorWeak << ARRAY_FLAGS_POSITION)
 
 // Mask out the fullcgc mark bit when asserting header validity
 #define UNSET_WEAK_VECTOR_VISITED(v) \
-  gc_assert((v->header & 0xffff) == \
-    (((flag_VectorWeakVisited|flag_VectorWeak) << N_WIDETAG_BITS) \
+  gc_assert((v->header & (0xff << ARRAY_FLAGS_POSITION | 0xff)) ==     \
+    (((flag_VectorWeakVisited|flag_VectorWeak) << ARRAY_FLAGS_POSITION) \
      | SIMPLE_VECTOR_WIDETAG)); \
-  v->header ^= flag_VectorWeakVisited << N_WIDETAG_BITS
+  v->header ^= flag_VectorWeakVisited << ARRAY_FLAGS_POSITION
 
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h. These constants are used in gc-common,
