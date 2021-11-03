@@ -205,12 +205,9 @@ during backtrace.
   ;; Define this slot if the architecture might ever use fixups.
   ;; x86-64 doesn't necessarily use them, depending on the feature set,
   ;; but this keeps things consistent.
-  #+(or x86 x86-64)
-  (fixups :type t
-          :ref-known (flushable)
-          :ref-trans %code-fixups
-          :set-known ()
-          :set-trans (setf %code-fixups))
+  ;; The corresponding SETF function is defined using code-header-set
+  ;; on the slot index.
+  #+(or x86 x86-64) (fixups :type t :ref-known (flushable) :ref-trans %code-fixups)
   (constants :rest-p t))
 
 (define-primitive-object (fdefn :type fdefn
