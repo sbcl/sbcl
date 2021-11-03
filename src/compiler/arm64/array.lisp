@@ -77,6 +77,28 @@
                             other-pointer-lowtag)))
     (inst cmp x (add-sub-immediate (encode-array-rank rank)))))
 
+(define-vop (simple-array-header-of-rank-p type-predicate)
+  (:translate sb-c::simple-array-header-of-rank-p)
+  (:policy :fast-safe)
+  (:info target not-p rank)
+  (:arg-types * (:constant t))
+  (:generator 2
+    (unless (other-pointer-tn-ref-p args)
+      (%test-lowtag value temp (if not-p
+                                   target
+                                   drop-through)
+                    t other-pointer-lowtag))
+    (inst ldrh temp (@ value (- other-pointer-lowtag)))
+    (inst cmp temp (add-sub-immediate
+                     (dpb (encode-array-rank rank)
+                       (byte 8 array-rank-position)
+                       simple-array-widetag)))
+    (inst b (if not-p
+                :ne
+                :eq)
+      target)
+    drop-through))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)

@@ -314,8 +314,11 @@
 ;;;                 +-----------+-----------+-----------+-----------+
 ;;;                 |<---------- HEADER DATA ---------->|
 
-(defconstant array-rank-position 16)
-(defconstant array-flags-position 8)
+;;; Having contiguous rank and widetag allows
+;;; SIMPLE-ARRAY-HEADER-OF-RANK-P to be done with just one comparison.
+;;; Other backends may not be ready to switch the order yet.
+(defconstant array-rank-position  #-arm64 16 #+arm64 8)
+(defconstant array-flags-position #-arm64 8  #+arm64 16)
 
 (defconstant array-flags-data-position (- array-flags-position n-widetag-bits))
 (defconstant +array-fill-pointer-p+    #x80)

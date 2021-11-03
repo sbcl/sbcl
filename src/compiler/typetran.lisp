@@ -686,11 +686,15 @@
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
       (cond ((cdr dims)
-             (values `(,header-test
-                       ,@(when (eq (array-type-dimensions stype) '*)
-                           (if (vop-existsp :translate %array-rank=)
-                               `((%array-rank= ,obj ,(length dims)))
-                               `((= (%array-rank ,obj) ,(length dims)))))
+             (values `(,@(if (and simple-array-header-p
+                                  (vop-existsp :translate simple-array-header-of-rank-p)
+                                  (eq (array-type-dimensions stype) '*))
+                             `((simple-array-header-of-rank-p ,obj ,(length dims)))
+                             `(,header-test
+                               ,@(when (eq (array-type-dimensions stype) '*)
+                                   (if (vop-existsp :translate %array-rank=)
+                                       `((%array-rank= ,obj ,(length dims)))
+                                       `((= (%array-rank ,obj) ,(length dims)))))))
                        ,@(loop for d in dims
                                for i from 0
                                unless (eq '* d)

@@ -185,6 +185,8 @@
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
+(defknown simple-array-header-of-rank-p (t array-rank) boolean
+  (flushable))
 (defknown sb-kernel::check-array-shape (simple-array list)
   (simple-array)
   (flushable)
