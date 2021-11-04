@@ -417,8 +417,10 @@
 (defun disable-arg-count-checking (leaf type arg-count)
   (when (lambda-p leaf)
     (multiple-value-bind (min max) (fun-type-arg-limits type)
-      (when (and min max
-                 (= min min arg-count))
+      (when (and min
+                 (if max
+                     (<= min arg-count max)
+                     (<= min arg-count)))
         (setf (lambda-lexenv leaf)
               (make-lexenv :default (lambda-lexenv leaf)
                            :policy (augment-policy verify-arg-count 0

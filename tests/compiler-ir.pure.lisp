@@ -135,4 +135,23 @@
                      (ir2-vops '(lambda (&rest args)
                                  (reduce #'+
                                   (car args)
-                                  :key (lambda (x) (sqrt x)))))))))
+                                  :key (lambda (x) (sqrt x))))))))
+  (assert (not (find 'sb-c:verify-arg-count
+                     (ir2-vops '(lambda (&rest args)
+                                 (map 'list (lambda (x &optional z)
+                                              (declare (ignore z))
+                                              x)
+                                  (car args)))))))
+  (assert (not (find 'sb-c:verify-arg-count
+                     (ir2-vops '(lambda (&rest args)
+                                 (find 0 (car args)
+                                  :key
+                                  (lambda (x &rest z)
+                                    (declare (ignore z))
+                                    x)))))))
+  (assert (not (find 'sb-c:verify-arg-count
+                     (ir2-vops '(lambda (&rest args)
+                                 (remove 0 (car args)
+                                  :key
+                                  (lambda (&optional z)
+                                    z))))))))
