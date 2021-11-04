@@ -5,6 +5,16 @@
 (defpackage :bug254 (:use :cl))
 (in-package :bug254)
 (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+;;; Kill all stupid useless notes, which is to say that IMHO 99.999999% of all notes
+;;; are useless and stupid unless expressly requested. If a test wants notes,
+;;; then it needs to do something to request them.
+;;; Of course I don't know which tests wanted them, so ... maybe this causes
+;;; some test to stop testing a thing. That's its fault for being badly written.
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+;;; Oh for f***'s sake why is INHIBIT-WARNINGS *STRONGER* *THAN* MUFFLE-CONDITIONS?
+;;; (which is to say, more effective than, i.e. effective at all)
+;;; Maybe one of these days we should fix MUFFLE-CONDITIONS to actually do its job ?????
+(declaim (optimize (sb-ext:inhibit-warnings 3)))
 (defstruct foo
   (uhw2 nil :type (or package null)))
 (macrolet ((defprojection (variant &key lexpr eexpr)

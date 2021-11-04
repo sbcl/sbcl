@@ -1135,6 +1135,7 @@
     (call-next-method))
   (:method (x (y (eql nil)))
     (setf y t)
+    (opaque-identity y) ; or else "assigned but never read" style-warning
     (call-next-method)))
 (with-test (:name (:cnm-assignment :bug-1734771 1))
   (assert (equal (bug-1734771 2 3) '(2 3))))
