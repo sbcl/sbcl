@@ -2514,6 +2514,9 @@
          (:layout-id
           (setf (signed-sap-ref-32 sap offset) value)
           nil) ; do not record this
+         (:gc-barrier
+          (setf (signed-sap-ref-32 sap offset) value)
+          :immediate)
          (t
           ;; Word at sap + offset contains a value to be replaced by
           ;; adding that value to fixup.

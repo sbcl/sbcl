@@ -4394,11 +4394,11 @@ static void gc_allocate_ptes()
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
     int nbits = 15, num_gc_cards = 1 << nbits;
 
-#ifdef LISP_FEATURE_X86_64
     extern void gcbarrier_patch_code_range(uword_t start, void* limit);
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.

@@ -2768,7 +2768,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:layout-id ; SYM is a #<WRAPPER>
               (cold-layout-id (gethash (descriptor-bits (->layout sym))
                                        *cold-layout-by-addr*)))
-             ;; This is specific to x86-64
+             ;; This is specific to x86 in either word size
              (:gc-barrier card-table-index-mask)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
