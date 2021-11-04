@@ -259,8 +259,7 @@ futex_wake(int *lock_word, int n)
 #endif
 
 
-void os_init(char __attribute__((unused)) *argv[],
-             char __attribute__((unused)) *envp[])
+void os_init()
 {
 #ifdef LISP_FEATURE_SB_FUTEX
     futex_init();

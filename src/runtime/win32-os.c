@@ -841,8 +841,7 @@ set_up_win64_seh_thunk(size_t page_size)
 static LARGE_INTEGER lisp_init_time;
 static double qpcMultiplier;
 
-void os_init(char __attribute__((__unused__)) *argv[],
-             char __attribute__((__unused__)) *envp[])
+void os_init()
 {
 #ifdef LISP_FEATURE_64_BIT
     LARGE_INTEGER qpcFrequency;

@@ -384,35 +384,23 @@ char *dir_name(char *path) {
 
 extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
-int
-initialize_lisp(int argc, char *argv[], char *envp[])
+
+struct cmdline_options {
+    char *core;
+    char **argv;
+    boolean disable_lossage_handler_p;
+    int merge_core_pages;
+};
+static struct cmdline_options
+parse_argv(struct memsize_options memsize_options,
+           int argc, char *argv[], char *core)
 {
-#ifdef LISP_FEATURE_WIN32
-    /* Exception handling support structure. Evil Win32 hack. */
-    struct lisp_exception_frame exception_frame;
-#endif
-#ifdef LISP_FEATURE_UNIX
-    clock_gettime(
-#ifdef LISP_FEATURE_LINUX
-        CLOCK_MONOTONIC_COARSE
-#else
-        CLOCK_MONOTONIC
-#endif
-        , &lisp_init_time);
-#endif
-
-    /* the name of the core file we're to execute. Note that this is
-     * a malloc'ed string which should be freed eventually. */
-    char *core = 0;
-
 #ifdef LISP_FEATURE_WIN32
     wchar_t
 #else
         char
 #endif
         **sbcl_argv = 0;
-    os_vm_offset_t embedded_core_offset = 0;
-
     /* other command line options */
     boolean end_runtime_options = 0;
     boolean disable_lossage_handler_p
@@ -421,41 +409,8 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 #else
         = 1;
 #endif
-
     boolean debug_environment_p = 0;
-
-    lispobj initial_function;
     int merge_core_pages = -1;
-    struct memsize_options memsize_options;
-    memsize_options.present_in_core = 0;
-
-    boolean have_hardwired_spaces = os_preinit(argv, envp);
-
-    interrupt_init();
-#ifdef LISP_FEATURE_UNIX
-    /* Not sure why anyone sends signals to this process so early.
-     * But win32 models the signal mask as part of 'struct thread'
-     * which doesn't exist yet, so don't do this */
-    block_blockable_signals(0);
-#endif
-
-    /* Check early to see if this executable has an embedded core,
-     * which also populates runtime_options if the core has runtime
-     * options */
-    if (!(sbcl_runtime = os_get_runtime_executable_path()))
-        sbcl_runtime = search_for_executable(argv[0]);
-
-    if (!(sbcl_runtime_home = dir_name(argv[0])))
-      if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
-        sbcl_runtime_home = libpath;
-
-    if (sbcl_runtime) {
-        os_vm_offset_t offset = search_for_embedded_core(sbcl_runtime, &memsize_options);
-        if (offset != -1) {
-            embedded_core_offset = offset;
-            core = sbcl_runtime;
-        }
-    }
 
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
@@ -533,7 +488,6 @@ initialize_lisp(int argc, char *argv[], char *envp[])
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --control-stack-size");
-                errno = 0;
                 thread_control_stack_size = parse_size_arg(argv[argi++], "--control-stack-size");
             } else if (0 == strcmp(arg, "--tls-limit")) {
                 // this is not named "tls-size" because "size" is not the
@@ -614,6 +568,74 @@ initialize_lisp(int argc, char *argv[], char *envp[])
             sbcl_argv[argj] = 0;
         }
     }
+    if (debug_environment_p) {
+        print_environment(argc, argv);
+    }
+
+    struct cmdline_options o;
+    o.core = core;
+    o.argv = sbcl_argv;
+    o.disable_lossage_handler_p = disable_lossage_handler_p;
+    o.merge_core_pages = merge_core_pages;
+    return o;
+}
+
+int
+initialize_lisp(int argc, char *argv[], char *envp[])
+{
+#ifdef LISP_FEATURE_WIN32
+    /* Exception handling support structure. Evil Win32 hack. */
+    struct lisp_exception_frame exception_frame;
+#endif
+#ifdef LISP_FEATURE_UNIX
+    clock_gettime(
+#ifdef LISP_FEATURE_LINUX
+        CLOCK_MONOTONIC_COARSE
+#else
+        CLOCK_MONOTONIC
+#endif
+        , &lisp_init_time);
+#endif
+
+    /* the name of the core file we're to execute. Note that this is
+     * a malloc'ed string which should be freed eventually. */
+    char *core = 0;
+
+    os_vm_offset_t embedded_core_offset = 0;
+
+    lispobj initial_function;
+    struct memsize_options memsize_options;
+    memsize_options.present_in_core = 0;
+
+    boolean have_hardwired_spaces = os_preinit(argv, envp);
+
+    interrupt_init();
+#ifdef LISP_FEATURE_UNIX
+    /* Not sure why anyone sends signals to this process so early.
+     * But win32 models the signal mask as part of 'struct thread'
+     * which doesn't exist yet, so don't do this */
+    block_blockable_signals(0);
+#endif
+
+    /* Check early to see if this executable has an embedded core,
+     * which also populates runtime_options if the core has runtime
+     * options */
+    if (!(sbcl_runtime = os_get_runtime_executable_path()))
+        sbcl_runtime = search_for_executable(argv[0]);
+
+    if (!(sbcl_runtime_home = dir_name(argv[0])))
+      if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
+        sbcl_runtime_home = libpath;
+
+    if (sbcl_runtime) {
+        os_vm_offset_t offset = search_for_embedded_core(sbcl_runtime, &memsize_options);
+        if (offset != -1) {
+            embedded_core_offset = offset;
+            core = sbcl_runtime;
+        }
+    }
+
+    struct cmdline_options options = parse_argv(memsize_options, argc, argv, core);
 
     /* Align down to multiple of page_table page size, and to the appropriate
      * stack alignment. */
@@ -623,10 +645,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 #endif
     thread_control_stack_size &= ~(sword_t)(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
-    os_init(argv, envp);
-    if (debug_environment_p) {
-        print_environment(argc, argv);
-    }
+    os_init();
     dyndebug_init();
     // FIXME: if the 'have' flag is 0 and you've disabled disabling of ASLR
     // then we haven't done an exec(), nor unmapped the mappings that were obtained
@@ -635,6 +654,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     gc_init();
 
     /* If no core file was specified, look for one. */
+    core = options.core;
     if (!core && !(core = search_for_core())) {
       /* Try resolving symlinks */
       if (sbcl_runtime) {
@@ -682,7 +702,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
      * of mapping dynamic space at our preferred address (if movable).
      * If not movable, it was already mapped in allocate_spaces(). */
     initial_function = load_core_file(core, embedded_core_offset,
-                                      merge_core_pages);
+                                      options.merge_core_pages);
     if (initial_function == NIL) {
         lose("couldn't find initial function");
     }
@@ -694,7 +714,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     define_var("nil", NIL, 1);
     define_var("t", T, 1);
 
-    if (!disable_lossage_handler_p)
+    if (!options.disable_lossage_handler_p)
         enable_lossage_handler();
 
     os_link_runtime();
@@ -722,7 +742,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
      * need to be processed further there, to do locale conversion.
      */
     core_string = core;
-    posix_argv = sbcl_argv;
+    posix_argv = options.argv;
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));

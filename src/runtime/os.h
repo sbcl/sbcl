@@ -76,7 +76,7 @@ void os_unlink_runtime();
 
 /* Do anything we need to do when starting up the runtime environment
  * in this OS. */
-extern void os_init(char *argv[], char *envp[]);
+extern void os_init();
 
 /* Install any OS-dependent low-level signal handlers which are needed
  * by the runtime environment. E.g. the signals raised by a violation

@@ -61,10 +61,7 @@ char *os_get_runtime_executable_path()
     return (status == 0) ? copied_string(info.name) : 0;
 }
 
-void
-os_init(char __attribute__((unused)) *argv[], char __attribute__((unused)) *envp[])
-{
-}
+void os_init() {}
 
 static void
 sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)

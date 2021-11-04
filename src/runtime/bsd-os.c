@@ -85,8 +85,7 @@ static void dragonfly_init();
 static void openbsd_init();
 #endif
 
-void
-os_init(char *argv[], char *envp[])
+void os_init()
 {
 #ifdef __NetBSD__
     netbsd_init();
