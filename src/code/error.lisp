@@ -238,7 +238,7 @@ specification."
                (annotated-cases
                  (mapcar (lambda (case)
                            (with-current-source-form (case)
-                             (with-unique-names (tag fun)
+                             (with-unique-names (block fun)
                                (destructuring-bind (type ll &body body) case
                                  (unless (and (listp ll)
                                               (symbolp (car ll))
@@ -248,41 +248,43 @@ specification."
                                  (multiple-value-bind (body declarations)
                                      (parse-body body nil)
                                    (push `(,fun ,ll ,@declarations (progn ,@body)) local-funs))
-                                 (list tag type ll fun)))))
+                                 (list block type ll fun)))))
                          cases)))
-          (with-unique-names (block condition form-fun)
-            `(dx-flet ((,form-fun ()
-                         #-x86 (progn ,form) ;; no declarations are accepted
-                         ;; Need to catch FP errors here!
-                         #+x86 (multiple-value-prog1 ,form (float-wait)))
-                       ,@(reverse local-funs))
-               (declare (optimize (sb-c::check-tag-existence 0)))
-               (block ,block
-                 (let ((,condition))
-                   (declare (ignorable ,condition))
-                   (tagbody
-                      (%handler-bind
-                       ,(mapcar (lambda (annotated-case)
-                                  (destructuring-bind (tag type ll fun-name) annotated-case
-                                    (declare (ignore fun-name))
-                                    (list type
-                                          `(lambda (temp)
-                                             ,(if ll
-                                                  `(setf ,condition temp)
-                                                  '(declare (ignore temp)))
-                                             (go ,tag)))))
-                                annotated-cases)
-                       (return-from ,block (,form-fun)))
-                      ,@(mapcan
-                         (lambda (annotated-case)
-                           (destructuring-bind (tag type ll fun-name) annotated-case
-                             (declare (ignore type))
-                             (list tag
-                                   `(return-from ,block
-                                      ,(if ll
-                                           `(,fun-name ,condition)
-                                           `(,fun-name))))))
-                         annotated-cases))))))))))
+          (with-unique-names (block form-fun)
+            (let ((body `(%handler-bind
+                          ,(mapcar (lambda (annotated-case)
+                                     (destructuring-bind (block type ll fun-name) annotated-case
+                                       (declare (ignore fun-name))
+                                       (list type
+                                             `(lambda (temp)
+                                                ,@(unless ll
+                                                    `((declare (ignore temp))))
+                                                (return-from ,block
+                                                  ,@(and ll '(temp)))))))
+                                   annotated-cases)
+                          (return-from ,block (,form-fun)))))
+              (labels ((wrap (cases)
+                         (if cases
+                             (destructuring-bind (fun-block type ll fun-name) (car cases)
+                               (declare (ignore type))
+                               `(return-from ,block
+                                  ,(if ll
+                                       `(,fun-name (block ,fun-block
+                                                     ,(wrap (cdr cases))))
+                                       `(progn (block ,fun-block
+                                                 ,(wrap (cdr cases)))
+                                               (,fun-name)))))
+                             body)))
+                `(flet ((,form-fun ()
+                          #-x86 (progn ,form) ;; no declarations are accepted
+                          ;; Need to catch FP errors here!
+                          #+x86 (multiple-value-prog1 ,form (float-wait)))
+                        ,@(reverse local-funs))
+                   (declare (optimize (sb-c::check-tag-existence 0))
+                            (inline ,form-fun
+                                    ,@(mapcar #'car local-funs)))
+                   (block ,block
+                     ,(wrap annotated-cases))))))))))
 
 (sb-xc:defmacro ignore-errors (&rest forms)
   "Execute FORMS handling ERROR conditions, returning the result of the last
