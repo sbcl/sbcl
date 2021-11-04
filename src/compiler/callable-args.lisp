@@ -455,7 +455,9 @@
                                            arg-count
                                            condition)
                 (let ((param-types (fun-type-n-arg-types arg-count type)))
-                  (disable-arg-count-checking leaf type arg-count)
+                  (unless (and (eq caller 'reduce)
+                               (eql arg-count 2))
+                    (disable-arg-count-checking leaf type arg-count))
                   (block nil
                     ;; Need to check each OR seperately, a UNION could
                     ;; intersect with the function parameters
