@@ -25,7 +25,7 @@
 
 (defun inspect-ir (form fun &rest checked-compile-args)
   (let ((*compile-component-hook* fun))
-    (apply #'test-util:checked-compile form checked-compile-args)))
+    (apply #'checked-compile form checked-compile-args)))
 
 (defun ir-full-calls (form)
   (let (calls)
@@ -50,7 +50,19 @@
              (push node calls))))))
     calls))
 
-(test-util:with-test (:name :%bit-pos-fwd/1-tail-called)
+(defun ir2-vops (form)
+  (let (vops)
+    (inspect-ir
+     form
+     (lambda (component)
+       (sb-c::do-ir2-blocks (block component)
+         (do ((vop (sb-c::ir2-block-start-vop block)
+                   (sb-c:vop-next vop)))
+             ((null vop))
+           (push (sb-c:vop-name vop) vops)))))
+    vops))
+
+(with-test (:name :%bit-pos-fwd/1-tail-called)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda (x)
                         (declare (optimize (debug 2)))
@@ -58,7 +70,7 @@
     (assert (eql (combination-fun-debug-name combination) '%bit-pos-fwd/1))
     (assert (node-tail-p combination))))
 
-(test-util:with-test (:name :bounds-check-constants)
+(with-test (:name :bounds-check-constants)
   (assert (= (count '%check-bound
                     (ir-calls
                      `(lambda (v)
@@ -67,7 +79,7 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
-(test-util:with-test (:name :local-call-tail-call)
+(with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda ()
                         (flet ((x ()
@@ -78,7 +90,7 @@
     (assert (eql (combination-fun-debug-name combination) 'terpri))
     (assert (node-tail-p combination))))
 
-(test-util:with-test (:name :fold-derived-logand)
+(with-test (:name :fold-derived-logand)
   (assert (not (find 'logand
                      (ir-calls `(lambda (x)
                                   (declare ((integer 1 4) x))
@@ -95,13 +107,13 @@
                                   (logand #xFF (ash 1 x))))
                      :key #'combination-fun-debug-name))))
 
-(test-util:with-test (:name :mod-ash
+(with-test (:name :mod-ash
                       :skipped-on (not (or :arm64 :x86-64)))
   (assert (not (ir-full-calls `(lambda (x y)
                                  (declare (fixnum x y))
                                  (logand #xFF (ash x y)))))))
 
-(test-util:with-test (:name :exit-reoptimize-uses)
+(with-test (:name :exit-reoptimize-uses)
   (assert (not (find 'cdr
                      (ir-calls `(lambda (a b)
                                   (/ (unwind-protect (if a
@@ -112,3 +124,15 @@
                      :key (lambda (x)
                             (and (combination-p x)
                                  (combination-fun-debug-name x)))))))
+
+(with-test (:name :no-arg-count-checking)
+  (assert (not (find 'sb-c:verify-arg-count
+                     (ir2-vops '(lambda (&rest args)
+                                 (block nil
+                                   (handler-bind ((error (lambda (c) (return c))))
+                                     (funcall (car args)))))))))
+  (assert (not (find 'sb-c:verify-arg-count
+                     (ir2-vops '(lambda (&rest args)
+                                 (reduce #'+
+                                  (car args)
+                                  :key (lambda (x) (sqrt x)))))))))

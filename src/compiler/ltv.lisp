@@ -86,7 +86,10 @@ guaranteed to never be modified, so it can be put in read-only storage."
         ;;  (LET ((X 3)) (MACROLET ((M () (HAIR))) (LOAD-TIME-VALUE (THING)))
         ;; can make use of M. We choose to say that it can't.
         (let ((value (let ((thunk ; Pass T for the EPHEMERAL flag.
-                            (compile-in-lexenv `(lambda () ,form) (make-null-lexenv)
+                            (compile-in-lexenv `(lambda ()
+                                                  (declare (local-optimize (verify-arg-count 0)))
+                                                  ,form)
+                                               (make-null-lexenv)
                                                nil nil nil t nil)))
                        (handler-case (funcall thunk)
                          (error (condition)
