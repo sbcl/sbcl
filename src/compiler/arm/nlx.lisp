@@ -182,6 +182,21 @@
     (load-stack-tn move-temp sp)
     (store-csp move-temp)))
 
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (value))
+  (:results (res :from :load))
+  (:temporary (:scs (descriptor-reg)) move-temp)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+    (move res value)
+    (load-stack-tn move-temp sp)
+    (store-csp move-temp)))
+
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))
   ;; Again, no SC restrictions for the args, 'cause the loading would
