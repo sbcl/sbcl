@@ -71,44 +71,50 @@
                   (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
                (get-lisp-obj-address self))))
 
-(flet ((fixup (code-obj offset sym kind flavor preserved-lists statically-link-p)
+(flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))
+         ;; NAME depends on the kind and flavor of fixup.
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
          ;; at which fixup must be re-applied after code movement.
          ;; CODE-OBJ must already be pinned in order to legally call this.
          ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
          ;; and the other is LOAD-CODE, both of which pin the code.
-         ;; SYM is a little bit of a misnomer - it may be a generalized function name.
-         (when (sb-vm:fixup-code-object
+         (ecase
+             (sb-vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
                    ((:assembly-routine :assembly-routine* :asm-routine-nil-offset)
-                    (- (or (get-asm-routine sym (eq flavor :assembly-routine*))
-                           (error "undefined assembler routine: ~S" sym))
+                    (- (or (get-asm-routine name (eq flavor :assembly-routine*))
+                           (error "undefined assembler routine: ~S" name))
                        (if (eq flavor :asm-routine-nil-offset) sb-vm:nil-value 0)))
-                   (:foreign (foreign-symbol-address sym))
-                   (:foreign-dataref (foreign-symbol-address sym t))
+                   (:foreign (foreign-symbol-address name))
+                   (:foreign-dataref (foreign-symbol-address name t))
                    (:code-object (get-lisp-obj-address code-obj))
-                   #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index sym))
+                   #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
-                             (wrapper-friend (if (symbolp sym) (find-layout sym) sym))))
-                   (:layout-id (layout-id sym))
-                   (:immobile-symbol (get-lisp-obj-address sym))
-                   (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
+                             (wrapper-friend (if (symbolp name) (find-layout name) name))))
+                   (:layout-id (layout-id name))
+                   (:immobile-symbol (get-lisp-obj-address name))
+                   ;; It is legal to take the address of symbol-value only if the
+                   ;; value is known to be an immobile object
+                   ;; (whose address we don't want to wire in).
+                   (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
                    #+immobile-code
                    (:named-call
-                    (prog1 (sb-vm::fdefn-entry-address sym) ; creates if didn't exist
+                    (prog1 (sb-vm::fdefn-entry-address name) ; creates if didn't exist
                       (when statically-link-p
-                        (push (cons offset (find-fdefn sym)) (elt preserved-lists 0)))))
-                   #+immobile-code (:static-call (sb-vm::function-raw-address sym)))
+                        (push (cons offset (find-fdefn name)) (elt preserved-lists 0)))))
+                   #+immobile-code (:static-call (sb-vm::function-raw-address name)))
                  kind flavor)
-           (ecase kind
-             (:relative (push offset (elt preserved-lists 1)))
-             (:absolute (push offset (elt preserved-lists 2)))
-             (:absolute64 (push offset (elt preserved-lists 3))))))
+           ((nil)) ; don't need to save it in the code-fixups, otherwise do
+           (:relative (push offset (elt preserved-lists 1)))
+           (:absolute (push offset (elt preserved-lists 2)))
+           (:absolute64 (push offset (elt preserved-lists 3)))))
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
+         ;; PRESERVED-LISTS is machine-dependent; it would be nice to delegate
+         ;; handling it to the architecture-specific code.
          #+(or x86 x86-64)
          (let ((rel-fixups (elt preserved-lists 1))
                (abs-fixups (elt preserved-lists 2))

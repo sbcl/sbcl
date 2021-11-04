@@ -3309,7 +3309,7 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;; Return KIND  if the fixup needs to be recorded in %CODE-FIXUPS.
+;;; Return KIND if the fixup needs to be recorded in %CODE-FIXUPS.
 ;;; The code object we're fixing up is pinned whenever this is called.
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset))

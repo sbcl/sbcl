@@ -176,7 +176,7 @@
     (let* ((random-numbers (loop repeat (+ (random 20) 3)
                                  collect (1+ (random 4000))))
            (test-list (sort (delete-duplicates random-numbers) #'<))
-           (packed-int (sb-c::pack-code-fixup-locs test-list nil))
+           (packed-int (sb-c:pack-code-fixup-locs test-list nil))
            (result (make-array 1 :element-type '(unsigned-byte 32))))
       (sb-sys:with-pinned-objects (packed-int result)
         ;; Now exercise the C unpacker.

@@ -2216,9 +2216,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
                            descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
-  (when (sb-vm:fixup-code-object code-object after-header value kind flavor)
-    (push (cons kind after-header)
-          (gethash (descriptor-bits code-object) *code-fixup-notes*)))
+  (let ((classification
+         (sb-vm:fixup-code-object code-object after-header value kind flavor)))
+    (when classification
+      (push (cons classification after-header)
+            (gethash (descriptor-bits code-object) *code-fixup-notes*))))
   code-object)
 
 (defun resolve-static-call-fixups ()

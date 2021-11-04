@@ -2523,7 +2523,8 @@
             ;; exception: fixups within the range of unboxed words containing
             ;; jump tables are automatically adjusted if the code moves.
             (and (sb-vm::self-referential-code-fixup-p final-val code)
-                 (>= offset (ash (code-jump-table-words code) word-shift)))))))
+                 (>= offset (ash (code-jump-table-words code) word-shift))
+                 :absolute)))))
       (:relative
        ;; VALUE is the actual address wanted.
        ;; Replace word with displacement to get there.
@@ -2539,7 +2540,7 @@
        ;; Record relative fixups pointing outside of this object.
        (when (eq (sb-vm::containing-memory-space code) :dynamic)
          (aver (not (sb-vm::self-referential-code-fixup-p value code)))
-         t)))))
+         :relative)))))
 
 ;;; Perform exhaustive analysis here because of the extreme degree
 ;;; of confusion I have about what is allowed to reach the instruction
