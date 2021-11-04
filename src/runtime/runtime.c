@@ -391,6 +391,51 @@ struct cmdline_options {
     boolean disable_lossage_handler_p;
     int merge_core_pages;
 };
+
+static int is_memsize_arg(char *argv[], int argi, int argc, int *merge_core_pages)
+{
+    char *arg = argv[argi];
+    if (!strcmp(arg, "--dynamic-space-size")) {
+        if ((argi+1) >= argc) lose("missing argument for --dynamic-space-size");
+        dynamic_space_size = parse_size_arg(argv[argi+1],
+                                            "--dynamic-space-size");
+#ifdef MAX_DYNAMIC_SPACE_END
+        if (!((DYNAMIC_SPACE_START <
+                       DYNAMIC_SPACE_START+dynamic_space_size) &&
+                      (DYNAMIC_SPACE_START+dynamic_space_size <=
+                       MAX_DYNAMIC_SPACE_END))) {
+            char* suffix = "";
+            char* size = argv[argi-1];
+            if (!strchr(size, 'B') && !strchr(size, 'b')) suffix = " [MB]";
+            lose("--dynamic-space-size argument %s%s is too large, max %lu KB",
+                 size, suffix, (MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START) / 1024);
+        }
+#endif
+        return 2;
+    }
+    if (!strcmp(arg, "--control-stack-size")) {
+        if ((argi+1) >= argc) lose("missing argument for --control-stack-size");
+        thread_control_stack_size = parse_size_arg(argv[argi+1], "--control-stack-size");
+        return 2;
+    }
+    if (!strcmp(arg, "--tls-limit")) {
+        // this is not named "tls-size" because "size" is not the
+        // best measurement for how many symbols to allow
+        if ((argi+1) >= argc) lose("missing argument for --tls-limit");
+        dynamic_values_bytes = N_WORD_BYTES * atoi(argv[argi+1]);
+        return 2;
+    }
+    if (!strcmp(arg, "--merge-core-pages")) {
+        *merge_core_pages = 1;
+        return 1;
+    }
+    if (!strcmp(arg, "--no-merge-core-pages")) {
+        *merge_core_pages = 0;
+        return 1;
+    }
+    return 0;
+}
+           
 static struct cmdline_options
 parse_argv(struct memsize_options memsize_options,
            int argc, char *argv[], char *core)
@@ -402,7 +447,6 @@ parse_argv(struct memsize_options memsize_options,
 #endif
         **sbcl_argv = 0;
     /* other command line options */
-    boolean end_runtime_options = 0;
     boolean disable_lossage_handler_p
 #if defined(LISP_FEATURE_SB_LDB)
         = 0;
@@ -412,21 +456,51 @@ parse_argv(struct memsize_options memsize_options,
     boolean debug_environment_p = 0;
     int merge_core_pages = -1;
 
-    /* Parse our part of the command line (aka "runtime options"),
-     * stripping out those options that we handle. */
+    int argi = 1;
+    int n_consumed;
     if (memsize_options.present_in_core) {
+        /* Our arg parsing isn't (and can't be) integrated with the application's,
+         * but we really want users to be able to override the heap size.
+         * So don't parse most options, but _do_ parse memory size options and/or
+         * core page merging options, wherever they occur, and strip them out.
+         * Any args that remain are passed through to Lisp.
+         *
+         * This does have a small semantic glitch: If your executable accepts
+         * flags such as "--my-opt" "--merge-core-pages" where "--merge-core-pages"
+         * is literally (and perversely) the value the user gives to "--my-opt",
+         * that's just too bad! The somewhat conventional "--" option will stop
+         * parsing SBCL options and pass everything else through including the "--".
+         * The rationale for passing "--" through is that we're trying to be
+         * as uninvasive as possible. Let's hope that nobody needs to put a "--"
+         * to the left of any of the memory size options */
         dynamic_space_size = memsize_options.dynamic_space_size;
         thread_control_stack_size = memsize_options.thread_control_stack_size;
         dynamic_values_bytes = memsize_options.thread_tls_bytes;
 #ifndef LISP_FEATURE_WIN32
-        sbcl_argv = argv;
+        sbcl_argv = successful_malloc((argc + 1) * sizeof(char *));
+        sbcl_argv[0] = argv[0];
+        int stop_parsing = 0; // have we seen '--'
+        int output_index = 1;
+        while (argi < argc) {
+            if (stop_parsing) // just copy it over
+                sbcl_argv[output_index++] = argv[argi++];
+            else if (!strcmp(argv[argi], "--")) // keep it, but parse nothing else
+                sbcl_argv[output_index++] = argv[argi++], stop_parsing = 1;
+            else if ((n_consumed = is_memsize_arg(argv, argi, argc, &merge_core_pages)))
+                argi += n_consumed; // eat it
+            else // default action - copy it
+                sbcl_argv[output_index++] = argv[argi++];
+        }
+        sbcl_argv[output_index] = 0;
 #else
         int wargc;
         sbcl_argv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+        // Somebody who wishes this to work for #+win32 should feel free to do the same...
 #endif
     } else {
-        int argi = 1;
-
+        boolean end_runtime_options = 0;
+        /* Parse our any of the command-line options that we handle from C,
+         * stopping at the first one that we don't, and leave the rest */
         while (argi < argc) {
             char *arg = argv[argi];
             if (0 == strcmp(arg, "--script")) {
@@ -463,39 +537,8 @@ parse_argv(struct memsize_options memsize_options,
                 /* As in "--help" case, I think this is expected. */
                 print_version();
                 exit(0);
-            } else if (0 == strcmp(arg, "--dynamic-space-size")) {
-                ++argi;
-                if (argi >= argc)
-                    lose("missing argument for --dynamic-space-size");
-                  dynamic_space_size = parse_size_arg(argv[argi++],
-                                                      "--dynamic-space-size");
-#               ifdef MAX_DYNAMIC_SPACE_END
-                if (!((DYNAMIC_SPACE_START <
-                       DYNAMIC_SPACE_START+dynamic_space_size) &&
-                      (DYNAMIC_SPACE_START+dynamic_space_size <=
-                       MAX_DYNAMIC_SPACE_END))) {
-                  char* suffix = "";
-                  char* size = argv[argi-1];
-                  if (!strchr(size, 'B') && !strchr(size, 'b')) {
-                    suffix = " [MB]";
-                  }
-                  lose("--dynamic-space-size argument %s%s is too large, max %lu KB",
-                       size, suffix,
-                       (MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START) / 1024);
-                }
-#               endif
-            } else if (0 == strcmp(arg, "--control-stack-size")) {
-                ++argi;
-                if (argi >= argc)
-                    lose("missing argument for --control-stack-size");
-                thread_control_stack_size = parse_size_arg(argv[argi++], "--control-stack-size");
-            } else if (0 == strcmp(arg, "--tls-limit")) {
-                // this is not named "tls-size" because "size" is not the
-                // best measurement for how many symbols to allow
-                ++argi;
-                if (argi >= argc)
-                    lose("missing argument for --tls-limit");
-                dynamic_values_bytes = N_WORD_BYTES * atoi(argv[argi++]);
+            } else if ((n_consumed = is_memsize_arg(argv, argi, argc, &merge_core_pages))) {
+                argi += 2;
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 debug_environment_p = 1;
                 ++argi;
@@ -509,12 +552,6 @@ parse_argv(struct memsize_options memsize_options,
                 end_runtime_options = 1;
                 ++argi;
                 break;
-            } else if (0 == strcmp(arg, "--merge-core-pages")) {
-                ++argi;
-                merge_core_pages = 1;
-            } else if (0 == strcmp(arg, "--no-merge-core-pages")) {
-                ++argi;
-                merge_core_pages = 0;
             } else {
                 /* This option was unrecognized as a runtime option,
                  * so it must be a toplevel option or a user option,
