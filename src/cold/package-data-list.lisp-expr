@@ -459,7 +459,8 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"
 
                "DO-BLOCKS" "DO-BLOCKS-BACKWARDS"
-               "DO-NODES" "DO-NODES-BACKWARDS"))
+               "DO-NODES" "DO-NODES-BACKWARDS"
+               "DO-IR2-BLOCKS"))
 
    #s(sb-cold:package-data
       :name "SB-DEBUG"
