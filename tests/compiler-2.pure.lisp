@@ -2432,9 +2432,7 @@
        (list a b)))
    ((1 3) '(1 3) :test #'equal)))
 
-(with-test (:name (:mv-call :more-arg-unused)
-            ;; needs SB-VM::MORE-ARG-OR-NIL VOP
-            :broken-on (not (or :x86-64 :x86 :ppc :ppc64 :arm :arm64 :riscv)))
+(with-test (:name (:mv-call :more-arg-unused))
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)

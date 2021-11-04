@@ -1002,7 +1002,7 @@
   (:generator 3
     (move value null-tn)
     (cond ((zerop index)
-           (inst bge zero-tn count done))
+           (inst beq count zero-tn done))
           (t
            (inst li index-temp (fixnumize index))
            (inst bge index-temp count done)))

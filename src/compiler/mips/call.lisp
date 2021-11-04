@@ -1126,6 +1126,23 @@ default-value-8
   (:generator 4
     (loadw value context index)))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:temporary (:scs (any-reg)) temp)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (cond ((zerop index)
+           (inst beq count done))
+          (t
+           (inst subu temp (fixnumize index) count)
+           (inst bgez temp done)))
+    (move value null-tn)
+    (loadw value object index)
+    done))
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop ()
