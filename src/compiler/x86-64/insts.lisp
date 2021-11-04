@@ -1729,7 +1729,8 @@
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
-                      (memq (fixup-flavor src) '(:layout-id :layout :immobile-symbol))))
+                      (memq (fixup-flavor src) '(:layout-id :layout :immobile-symbol
+                                                 :gc-barrier))))
              (emit-prefixes segment dst nil size :lock (lockp prefix))
              (cond ((accumulator-p dst)
                     (emit-byte segment
@@ -3358,6 +3359,7 @@
       ((:named-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
         :assembly-routine :assembly-routine* :static-call) ; -> varyobj subspace
        (if (eq kind :absolute) :absolute))
+      (:gc-barrier :immediate)
       (:foreign
        ;; linkage-table calls using the "CALL rel32" format need to be saved,
        ;; because the linkage table resides at a fixed address.

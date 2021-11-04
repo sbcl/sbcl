@@ -888,7 +888,7 @@
                   collect (sap-ref-8 text-sap i)))
     (when additional-relative-fixups
       (binding* ((existing-fixups (sb-vm::%code-fixups code))
-                 ((absolute relative)
+                 ((absolute relative immediate)
                   (sb-c::unpack-code-fixup-locs
                    (if (fixnump existing-fixups)
                        existing-fixups
@@ -903,9 +903,8 @@
                                                    sb-vm:word-shift))))
                                 additional-relative-fixups)
                         #'<)))
-        (sb-c::pack-code-fixup-locs
-         absolute
-         (merge 'list relative new-sorted #'<))))))
+        (sb-c:pack-code-fixup-locs
+         absolute (merge 'list relative new-sorted #'<) immediate)))))
 
 (defconstant +gf-name-slot+ 5)
 
@@ -1751,14 +1750,15 @@
                       ;; adjust this entry's start page in the new core
                       (decf data-page page-adjust)))))
             (#.page-table-core-entry-type-code
-             (aver (= len 3))
-             (symbol-macrolet ((nbytes (%vector-raw-bits core-header (1+ ptr)))
-                               (data-page (%vector-raw-bits core-header (+ ptr 2))))
+             (aver (= len 4))
+             (symbol-macrolet ((n-ptes (%vector-raw-bits core-header (+ ptr 1)))
+                               (nbytes (%vector-raw-bits core-header (+ ptr 2)))
+                               (data-page (%vector-raw-bits core-header (+ ptr 3))))
                (aver (= data-page original-total-npages))
                (aver (= (ceiling (space-nwords
                                   (find dynamic-core-space-id spaces :key #'space-id))
                                  (/ +backend-page-bytes+ n-word-bytes))
-                        (%vector-raw-bits core-header ptr))) ; number of PTEs
+                        n-ptes))
                (when verbose
                  (format t "PTE: page=~5x~40tbytes=~8x~%" data-page nbytes))
                (push (cons data-page nbytes) copy-actions)

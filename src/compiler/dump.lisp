@@ -1017,7 +1017,7 @@
 
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine* :asm-routine-nil-offset
-    :symbol-tls-index
+    :gc-barrier :symbol-tls-index
     :foreign :foreign-dataref :code-object
     :layout :immobile-symbol :named-call :static-call
     :symbol-value
@@ -1060,7 +1060,7 @@
                                    flavor))
            (operand
             (ecase flavor
-              (:code-object (the null name))
+              ((:code-object :gc-barrier) (the null name))
               (:layout
                (if (symbolp name)
                    name

@@ -408,6 +408,13 @@
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
 
+#+gencgc
+(progn
+  (defparameter card-table-index-nbits
+    (integer-length (1- (ceiling sb-vm::default-dynamic-space-size
+                                 sb-vm::gencgc-card-bytes))))
+  (defparameter card-table-index-mask (1- (ash 1 card-table-index-nbits))))
+
 ;; Special case for dynamic space code/data segregation
 #+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type)
@@ -2230,16 +2237,17 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (cold-fun-entry-addr (cold-symbol-function name))
                   kind :static-call))))
 
-;;; Save packed lists of absolute and relative fixups.
+;;; Save packed lists of fixups.
 ;;; (cf. FINISH-FIXUPS in generic/target-core.)
 (defun repack-fixups (list)
-  (collect ((relative) (absolute))
+  (collect ((immediate) (relative) (absolute))
     (dolist (item list)
       (ecase (car item)
         ;; There should be no absolute64 fixups to preserve
+        (:immediate (immediate (cdr item)))
         (:relative (relative (cdr item)))
         (:absolute (absolute (cdr item)))))
-    (number-to-core (sb-c:pack-code-fixup-locs (absolute) (relative)))))
+    (number-to-core (sb-c:pack-code-fixup-locs (absolute) (relative) (immediate)))))
 
 (defun linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
@@ -2760,6 +2768,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:layout-id ; SYM is a #<WRAPPER>
               (cold-layout-id (gethash (descriptor-bits (->layout sym))
                                        *cold-layout-by-addr*)))
+             ;; This is specific to x86-64
+             (:gc-barrier card-table-index-mask)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3547,8 +3557,10 @@ III. initially undefined function references (alphabetically):
       (write-bigvec-as-sequence ptes core-file :end pte-bytes)
       (force-output core-file)
       (file-position core-file posn))
-    (mapc write-word ; 5 = number of words in this core header entry
-          `(,page-table-core-entry-type-code 5 ,n-ptes ,pte-bytes ,data-page))))
+    (mapc write-word
+          `(,page-table-core-entry-type-code
+            6 ; = number of words in this core header entry
+            ,card-table-index-nbits ,n-ptes ,pte-bytes ,data-page))))
 
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later

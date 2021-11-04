@@ -88,3 +88,10 @@ int varint_unpack(struct varint_unpacker* unpacker, int* result)
     *result = accumulator;
     return 1;
 }
+
+void skip_data_stream(struct varint_unpacker* unpacker)
+{
+    // Read elements until seeing a 0
+    int val;
+    while (varint_unpack(unpacker, &val) && val != 0) { }
+}

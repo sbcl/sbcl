@@ -989,10 +989,10 @@ process_directory(int count, struct ndir_entry *entry,
 }
 
 #ifdef LISP_FEATURE_GENCGC
-extern void gc_load_corefile_ptes(core_entry_elt_t, core_entry_elt_t,
+extern void gc_load_corefile_ptes(int, core_entry_elt_t, core_entry_elt_t,
                                   os_vm_offset_t offset, int fd);
 #else
-#define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4)
+#define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4,dummy5)
 #endif
 
 static void sanity_check_loaded_core(lispobj);
@@ -1055,8 +1055,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                               merge_core_pages, &adj);
             break;
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
-            gc_load_corefile_ptes(ptr[0], ptr[1],
-                                  file_offset + (ptr[2] + 1) * os_vm_page_size, fd);
+            gc_load_corefile_ptes(ptr[0], ptr[1], ptr[2],
+                                  file_offset + (ptr[3] + 1) * os_vm_page_size, fd);
             break;
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
             initial_function = adjust_word(&adj, (lispobj)*ptr);

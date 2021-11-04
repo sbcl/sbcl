@@ -350,7 +350,7 @@
   ;; Convert the label positions to a packed integer
   ;; Utilize PACK-CODE-FIXUP-LOCS to perform compression.
   (awhen (mapcar 'label-posn (asmstream-alloc-points asmstream))
-    (sb-c:pack-code-fixup-locs it nil)))
+    (sb-c:pack-code-fixup-locs it nil nil)))
 
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)

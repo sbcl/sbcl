@@ -4359,6 +4359,9 @@ gc_init(void)
     gc_assert(test.write_protected_cleared);
 }
 
+int gc_card_table_nbits;
+char *gc_card_table;
+
 static void gc_allocate_ptes()
 {
     page_index_t i;
@@ -4391,6 +4394,30 @@ static void gc_allocate_ptes()
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
+    // The card table size is a power of 2 at *least* as large
+    // as the number of cards. These are the default values.
+    int nbits = 15, num_gc_cards = 1 << nbits;
+
+#ifdef LISP_FEATURE_X86_64
+    extern void gcbarrier_patch_code_range(uword_t start, void* limit);
+    // Sure there's a fancier way to round up to a power-of-2
+    // but this is executed exactly once, so KISS.
+    while (num_gc_cards < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+    // If the space size is less than or equal to the number of cards
+    // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
+    if (nbits > gc_card_table_nbits) {
+        gc_card_table_nbits = nbits;
+        // The value needed based on dynamic space size exceeds the value that the
+        // core was compiled for, so we need to patch all code blobs.
+        gcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);
+        gcbarrier_patch_code_range(STATIC_SPACE_START, static_space_free_pointer);
+        gcbarrier_patch_code_range(DYNAMIC_SPACE_START, dynamic_space_free_pointer);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        gcbarrier_patch_code_range(VARYOBJ_SPACE_START, varyobj_free_pointer);
+#endif
+    }
+    gc_card_table = calloc(1<<nbits, 1);
+#endif
     gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
@@ -4892,7 +4919,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
 /* Read corefile ptes from 'fd' which has already been positioned
  * and store into the page table */
-void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
+void gc_load_corefile_ptes(int card_table_nbits,
+                           core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
                            os_vm_offset_t offset, int fd)
 {
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
@@ -4900,6 +4928,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
 
     // Allocation of PTEs is delayed 'til now so that calloc() doesn't
     // consume addresses that would have been taken by a mapped space.
+    gc_card_table_nbits = card_table_nbits;
     gc_allocate_ptes();
 
     if (

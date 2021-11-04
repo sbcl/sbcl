@@ -94,6 +94,10 @@
                    (:layout (get-lisp-obj-address
                              (wrapper-friend (if (symbolp name) (find-layout name) name))))
                    (:layout-id (layout-id name))
+                   (:gc-barrier
+                    ;; in theory this would depend on the particular backend
+                    ;; and gc strategy. Just kludge it for now.
+                    (1- (ash 1 (extern-alien "gc_card_table_nbits" int))))
                    (:immobile-symbol (get-lisp-obj-address name))
                    ;; It is legal to take the address of symbol-value only if the
                    ;; value is known to be an immobile object
@@ -109,7 +113,8 @@
            ((nil)) ; don't need to save it in the code-fixups, otherwise do
            (:relative (push offset (elt preserved-lists 1)))
            (:absolute (push offset (elt preserved-lists 2)))
-           (:absolute64 (push offset (elt preserved-lists 3)))))
+           (:immediate (push offset (elt preserved-lists 3)))
+           (:absolute64 (push offset (elt preserved-lists 4)))))
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
@@ -118,11 +123,12 @@
          #+(or x86 x86-64)
          (let ((rel-fixups (elt preserved-lists 1))
                (abs-fixups (elt preserved-lists 2))
-               (abs64-fixups (elt preserved-lists 3)))
+               (gc-barrier-fixups (elt preserved-lists 3))
+               (abs64-fixups (elt preserved-lists 4)))
            (aver (not abs64-fixups)) ; no preserved 64-bit fixups
-           (when (or abs-fixups rel-fixups)
+           (when (or abs-fixups rel-fixups gc-barrier-fixups)
              (setf (sb-vm::%code-fixups code-obj)
-                   (sb-c:pack-code-fixup-locs abs-fixups rel-fixups))))
+                   (sb-c:pack-code-fixup-locs abs-fixups rel-fixups gc-barrier-fixups))))
 
          ;; Assign all SIMPLE-FUN-SELF slots
          (dotimes (i (code-n-entries code-obj))
@@ -140,7 +146,7 @@
          (aref preserved-lists 0)))
 
   (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
-    (dx-let ((preserved (make-array 4 :initial-element nil)))
+    (dx-let ((preserved (make-array 5 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
         (binding* ((alloc-points (pop-fop-stack) :exit-if-null))
           (setf (gethash code-obj *allocation-patch-points*) alloc-points))

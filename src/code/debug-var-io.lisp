@@ -164,9 +164,10 @@
 ;;;   the code that could not be deduced by examining the object.
 ;;; It makes sense to store these externally to the object, as it would otherwise
 ;;; intrude on text pages. Also, some of the bignums are shareable this way.
-(defun pack-code-fixup-locs (abs-fixups rel-fixups)
+(defun pack-code-fixup-locs (abs-fixups rel-fixups more)
   (dx-let ((bytes (make-array (min (* 2 (+ (length abs-fixups) ; guess at final length
-                                           (length rel-fixups)))
+                                           (length rel-fixups)
+                                           (length more)))
                                    1024) ; limit the stack usage
                               :fill-pointer 0 :adjustable t
                               :element-type '(unsigned-byte 8))))
@@ -178,9 +179,12 @@
                (write-var-integer (- x prev) bytes)
                (setq prev x))))
       (pack (sort abs-fixups #'<))
-      (when rel-fixups
+      (when (or rel-fixups more)
         (write-var-integer 0 bytes)
-        (pack (sort rel-fixups #'<))))
+        (pack (sort rel-fixups #'<)))
+      (when more
+        (write-var-integer 0 bytes)
+        (pack (sort more #'<))))
     ;; Stuff octets into an integer
     ;; It would be quite possible in the target to do something clever here
     ;; by creating a bignum directly from the ub8 vector.
@@ -211,12 +215,14 @@
                  (let ((,loc (+ ,prev ,acc))) ,@body (setq ,prev ,loc))
                  (setq ,acc 0 ,shift 0))))))))
 
+;;; Unpack the (potentially) three stream of data in PACKED-INTEGER.
 (defun unpack-code-fixup-locs (packed-integer)
-  (collect ((abs-locs) (rel-locs))
+  (collect ((stream1) (stream2) (stream3))
     (let ((pos 0))
-      (do-packed-varints (loc packed-integer pos) (abs-locs loc))
-      (do-packed-varints (loc packed-integer pos) (rel-locs loc)))
-    (values (abs-locs) (rel-locs))))
+      (do-packed-varints (loc packed-integer pos) (stream1 loc))
+      (do-packed-varints (loc packed-integer pos) (stream2 loc))
+      (do-packed-varints (loc packed-integer pos) (stream3 loc)))
+    (values (stream1) (stream2) (stream3))))
 
 (define-symbol-macro lz-symbol-1 210) ; arbitrary value that isn't frequent in the input
 (define-symbol-macro lz-symbol-2 218) ; ditto

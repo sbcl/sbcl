@@ -368,7 +368,8 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         memset(data + aligned_size - N_WORD_BYTES, 0, N_WORD_BYTES);
         gc_store_corefile_ptes((struct corefile_pte*)data);
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
-        write_lispobj(5, file); // 5 = # of words in this core header entry
+        write_lispobj(6, file); // number of words in this core header entry
+        write_lispobj(gc_card_table_nbits, file);
         write_lispobj(next_free_page, file);
         write_lispobj(aligned_size, file);
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
