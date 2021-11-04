@@ -3139,6 +3139,7 @@
   (multiple-value-bind (fun errorp warnings)
       (checked-compile '(lambda (x) (the * x))
                        :allow-failure t :allow-warnings t)
+    (declare (ignore fun))
     (assert errorp)
     (assert (= (length warnings) 1)))
   ;; (values t) parses into *wild-type* and has to be allowed
