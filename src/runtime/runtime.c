@@ -435,7 +435,7 @@ static int is_memsize_arg(char *argv[], int argi, int argc, int *merge_core_page
     }
     return 0;
 }
-           
+
 static struct cmdline_options
 parse_argv(struct memsize_options memsize_options,
            int argc, char *argv[], char *core)

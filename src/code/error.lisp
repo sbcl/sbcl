@@ -187,7 +187,11 @@
                                ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
                                ;; but the cast kills DX allocation.
                                `(lambda (c) (funcall ,name c))))))
-                      (local-functions `(,name ,@(rest lexpr)))
+                      (local-functions
+                       `(,name ,(cadr lexpr)
+                               ,@(when (typep (cadr lexpr) '(cons t null))
+                                   '((declare (sb-c::local-optimize (sb-c::verify-arg-count 0)))))
+                               ,@(cddr lexpr)))
                       `#',name))))))))
 
       `(let ,(complex-initforms)

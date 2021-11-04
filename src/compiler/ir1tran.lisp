@@ -1774,6 +1774,7 @@
         (allow-explicit-check allow-lambda-list)
         (lambda-list (if allow-lambda-list :unspecified nil))
         (optimize-qualities)
+        (local-optimize)
         source-form
         (post-binding-lexenv (if binding-form-p (list nil)))) ; dummy cell
     (flet ((process-it (spec decl)
@@ -1816,6 +1817,12 @@
                    ((equal spec '(top-level-form))) ; ignore
                    ((typep spec '(cons (eql source-form)))
                     (setf source-form (cadr spec)))
+                   ;; Used only for the current function.
+                   ;; E.g. suppressing argument checking without doing
+                   ;; so in all the subforms.
+                   ((typep spec '(cons (eql local-optimize)))
+                    (setf local-optimize spec)
+                    (setf source-form (cadr spec)))
                    (t
                     (multiple-value-bind (new-env new-qualities)
                         (process-1-decl spec lexenv vars fvars
@@ -1831,8 +1838,11 @@
               ;; Kludge: EVAL calls this function to deal with LOCALLY.
               (process-it spec decl)))))
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
+
     (values lexenv result-type (cdr post-binding-lexenv)
-            lambda-list explicit-check source-form)))
+            lambda-list explicit-check source-form
+            (when local-optimize
+              (process-optimize-decl local-optimize (lexenv-policy lexenv))))))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)

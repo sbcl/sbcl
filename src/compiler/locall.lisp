@@ -272,10 +272,14 @@
   (declare (type functional fun))
   (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
-    (let ((xep (ir1-convert-lambda (make-xep-lambda-expression fun)
-                                   :debug-name (debug-name
-                                                'xep (leaf-debug-name fun))
-                                   :system-lambda t)))
+    (let* ((*lexenv* (if (neq (lexenv-policy (functional-lexenv fun))
+                              (lexenv-policy *lexenv*))
+                         (make-lexenv :policy (lexenv-policy (functional-lexenv fun)))
+                         *lexenv*))
+           (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
+                                    :debug-name (debug-name
+                                                 'xep (leaf-debug-name fun))
+                                    :system-lambda t)))
       (setf (functional-kind xep) :external
             (leaf-ever-used xep) t
             (functional-entry-fun xep) fun
