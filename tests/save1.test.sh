@@ -15,6 +15,7 @@ tmpcore=$TEST_FILESTEM.core
 # diagnosed and fixed by Dan Barlow in sbcl-0.7.7.29
 run_sbcl <<EOF
   (defun foo (x) (+ x 11))
+  (setq *features* (union *features* sb-impl:+internal-features+))
   ;; The basic smoke test includes a test that immobile-space defragmentation
   ;; supports calls to "static" functions - those called without reference
   ;; to an fdefn, from a caller in dynamic space.
