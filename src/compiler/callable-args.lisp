@@ -414,6 +414,16 @@
             "The function ~s is called with odd number of keyword arguments."
             callee)))))))
 
+(defun disable-arg-count-checking (leaf type arg-count)
+  (when (lambda-p leaf)
+    (multiple-value-bind (min max) (fun-type-arg-limits type)
+      (when (and min max
+                 (= min min arg-count))
+        (setf (lambda-lexenv leaf)
+              (make-lexenv :default (lambda-lexenv leaf)
+                           :policy (augment-policy verify-arg-count 0
+                                                   (lexenv-policy (lambda-lexenv leaf)))))))))
+
 ;;; This can provide better errors and better handle OR types than a
 ;;; simple type intersection.
 (defun check-function-designator-lvar (lvar annotation)
@@ -445,6 +455,7 @@
                                            arg-count
                                            condition)
                 (let ((param-types (fun-type-n-arg-types arg-count type)))
+                  (disable-arg-count-checking leaf type arg-count)
                   (block nil
                     ;; Need to check each OR seperately, a UNION could
                     ;; intersect with the function parameters

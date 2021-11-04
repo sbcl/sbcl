@@ -1106,7 +1106,7 @@
   ;; INLINEP will always be NIL as well.)
   (inline-expansion nil :type list)
   ;; the lexical environment that the INLINE-EXPANSION should be converted in
-  (lexenv *lexenv* :type lexenv :read-only t)
+  (lexenv *lexenv* :type lexenv)
   ;; the original function or macro lambda list, or :UNSPECIFIED if
   ;; this is a compiler created function
   (arg-documentation nil :type (or list (member :unspecified)))
