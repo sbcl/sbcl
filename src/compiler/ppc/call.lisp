@@ -1129,7 +1129,7 @@ default-value-8
     (inst cmpwi count (fixnumize index))
     (move value null-tn)
     (inst ble done)
-    (inst lwz value object (ash index word-shift))
+    (loadw value object index)
     done))
 
 ;;; Turn more arg (context, count) into a list.

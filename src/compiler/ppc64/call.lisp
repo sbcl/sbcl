@@ -1133,6 +1133,20 @@ default-value-8
   (:variant 0 0)
   (:translate %more-arg))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg)))
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst cmpwi count (fixnumize index))
+    (move value null-tn)
+    (inst ble done)
+    (loadw value object index)
+    done))
+
 ;;; Turn more arg (context, count) into a list.
 (define-vop ()
   (:translate %listify-rest-args)
