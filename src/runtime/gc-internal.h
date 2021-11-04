@@ -88,7 +88,7 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 #define vector_flags_zerop(header) ((int)(header) & 0x07 << ARRAY_FLAGS_POSITION) == 0
 // True if flags are zero, also testing the widetag at the same time.
 #define ordinary_simple_vector_p(header) \
-    ((int)(header) & (0x07 << ARRAY_FLAGS_POSITION | 0xffff >> 16-ARRAY_FLAGS_POSITION)) \
+    ((int)(header) & (0x07 << ARRAY_FLAGS_POSITION | 0xffff >> (16-ARRAY_FLAGS_POSITION))) \
     == SIMPLE_VECTOR_WIDETAG
 // Return true if vector is a weak vector that is not a hash-table <k,v> vector.
 #define vector_is_weak_not_hashing_p(header) \
