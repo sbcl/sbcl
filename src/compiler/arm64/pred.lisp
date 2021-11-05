@@ -89,40 +89,28 @@
   (:generator 0
     (let ((not-p (eq (first flags) 'not)))
       (when not-p (pop flags))
-      (flet ((zr (tn)
-               (cond ((and (eq (tn-kind tn) :constant)
-                           (eq (tn-value tn) 0))
-                      zr-tn)
-                     (t
-                      tn))))
-        (setf then (zr then)
-              else (zr else))
-        (cond ((null (rest flags))
-               (inst csel res then else (if not-p
-                                            (negate-condition (car flags))
-                                            (car flags))))
-              (not-p
-               (dolist (flag flags)
-                 (inst csel res else then flag)))
-              (t
-               (dolist (flag flags)
-                 (inst csel res then else flag))))))))
+      (cond ((null (rest flags))
+             (inst csel res then else (if not-p
+                                          (negate-condition (car flags))
+                                          (car flags))))
+            (not-p
+             (dolist (flag flags)
+               (inst csel res else then flag)))
+            (t
+             (dolist (flag flags)
+               (inst csel res then else flag)))))))
 
 (macrolet ((def-move-if (name type reg)
              `(define-vop (,name move-if)
-                (:args (then :scs ,reg
-                             :load-if (not (and (sc-is then immediate)
-                                                (eql (tn-value then) 0))))
-                       (else :scs ,reg
-                             :load-if (not (and (sc-is else immediate)
-                                                (eql (tn-value else) 0)))))
+                (:args (then :scs ,reg)
+                       (else :scs ,reg))
                 (:arg-types ,type ,type)
                 (:results (res :scs ,reg))
                 (:result-types ,type))))
-  (def-move-if move-if/descriptor * (descriptor-reg any-reg))
-  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg))
-  (def-move-if move-if/char character (character-reg))
-  (def-move-if move-if/sap system-area-pointer (sap-reg)))
+  (def-move-if move-if/descriptor * (descriptor-reg any-reg zero))
+  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg zero))
+  (def-move-if move-if/char character (character-reg zero))
+  (def-move-if move-if/sap system-area-pointer (sap-reg zero)))
 
 
 ;;;; Conditional VOPs:

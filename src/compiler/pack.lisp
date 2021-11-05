@@ -1211,7 +1211,8 @@
     (let ((target (tn-ref-target op))
           (tn (tn-ref-tn op)))
       (when (and target
-                 (not (eq (tn-kind tn) :unused)))
+                 (not (eq (tn-kind tn) :unused))
+                 (tn-primitive-type tn))
         (let* ((load-tn (tn-ref-load-tn op))
                (load-scs (svref (car scs)
                                 (sc-number
@@ -1228,7 +1229,8 @@
     (let ((target (tn-ref-target op))
           (tn (tn-ref-tn op)))
       (unless (or target
-                  (eq (tn-kind tn) :unused))
+                  (eq (tn-kind tn) :unused)
+                  (not (tn-primitive-type tn)))
         (let* ((load-tn (tn-ref-load-tn op))
                (load-scs (svref (car scs)
                                 (sc-number

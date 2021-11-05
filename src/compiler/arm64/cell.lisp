@@ -24,7 +24,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg zero)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -81,7 +81,7 @@
 (progn
   (define-vop (set)
     (:args (object :scs (descriptor-reg))
-           (value :scs (descriptor-reg any-reg)))
+           (value :scs (descriptor-reg any-reg zero)))
     (:temporary (:sc any-reg) tls-index)
     (:generator 4
       (inst ldr (32-bit-reg tls-index) (tls-index-of object))

@@ -219,7 +219,8 @@
                       :alternate-scs (complex-double-stack))
 
   (catch-block control-stack :element-size catch-block-size)
-  (unwind-block control-stack :element-size unwind-block-size))
+  (unwind-block control-stack :element-size unwind-block-size)
+  (zero immediate-constant))
 
 ;;;; Make some random tns for important registers.
 

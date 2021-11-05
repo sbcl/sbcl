@@ -170,15 +170,11 @@
                 (define-vop (,set-name)
                   (:translate ,set-name)
                   (:policy :fast-safe)
-                  (:args (value :scs (,sc)
-                                :load-if (not (and (sc-is value immediate)
-                                                   (eql (tn-value value) 0))))
+                  (:args (value :scs (,sc zero))
                          (sap :scs (sap-reg))
                          (offset :scs (signed-reg)))
                   (:arg-types ,type system-area-pointer signed-num)
                   (:generator 5
-                    (when (sc-is value immediate)
-                      (setf value zr-tn))
                     (inst ,(case size
                              (:byte 'strb)
                              (:short 'strh)
@@ -208,15 +204,11 @@
                 (define-vop (,(symbolicate set-name "-C"))
                   (:translate ,set-name)
                   (:policy :fast-safe)
-                  (:args (value :scs (,sc)
-                                :load-if (not (and (sc-is value immediate)
-                                                   (eql (tn-value value) 0))))
+                  (:args (value :scs (,sc zero))
                          (sap :scs (sap-reg)))
                   (:info offset)
                   (:arg-types ,type system-area-pointer (:constant (satisfies ldr-str-offset-encodable)))
                   (:generator 4
-                    (when (sc-is value immediate)
-                      (setf value zr-tn))
                     (inst ,(case size
                              (:byte 'strb)
                              (:short 'strh)

@@ -804,6 +804,35 @@
                 (cdr (the (not null) (assoc old-offset renumbering)))))))
     sorted))
 
+#+arm64
+(defun choose-zero-tn (tn)
+  (let (zero-tn)
+    (flet ((zero-tn ()
+             (or zero-tn
+                 (setf zero-tn
+                       (component-live-tn
+                        (make-wired-tn nil
+                                       sb-vm:any-reg-sc-number
+                                       sb-vm::zr-offset))))))
+      (do ((tn tn (tn-next tn)))
+          ((null tn))
+        (when (and (constant-tn-p tn)
+                   (eql (tn-value tn) 0))
+          (loop with next
+                for read = (tn-reads tn) then next
+                while read
+                do
+                (setf next (tn-ref-next read))
+                (do* ((vop (tn-ref-vop read))
+                      (info (vop-info vop))
+                      (cost (vop-info-arg-costs info) (cdr cost))
+                      (op (vop-args vop) (tn-ref-across op)))
+                     ((null cost))
+                  (when (eq op read)
+                    (when (eql (svref (car cost) sb-vm:zero-sc-number) 0)
+                      (change-tn-ref-tn read (zero-tn)))
+                    (return)))))))))
+
 ;;; This is the entry to representation selection. First we select the
 ;;; representation for all normal TNs, setting the TN-SC. After
 ;;; selecting the TN representations, we set the SC for all :ALIAS TNs
@@ -863,6 +892,10 @@
 
     (do-ir2-blocks (block component)
       (emit-moves-and-coercions block))
+
+    #+arm64
+    (choose-zero-tn (ir2-component-constant-tns 2comp))
+
     ;; Give the optimizers a second opportunity to alter newly inserted vops
     ;; by looking for patterns that have a shorter expression as a single vop.
     (run-vop-optimizers component)

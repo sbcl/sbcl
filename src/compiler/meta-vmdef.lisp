@@ -1241,7 +1241,9 @@
                       (when (sc-allowed-by-primitive-type
                              (sc-or-lose sc)
                              (primitive-type-or-lose ptype))
-                        (return t))))
+                        (return t)))
+                    #+arm64
+                    (eq sc 'sb-vm::zero))
           (warn "~:[Result~;Argument~] ~A to VOP ~S~@
                  has SC restriction ~S which is ~
                  not allowed by the operand type:~%  ~S"
