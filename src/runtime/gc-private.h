@@ -323,7 +323,7 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
 #define OS_VM_PROT_JIT_ALL OS_VM_PROT_ALL
 #endif
 
-/* This is used bu the fault handler, and potentially during GC */
+/* This is used by the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
     os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_JIT_ALL);

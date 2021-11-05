@@ -3683,20 +3683,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Scavenge the stacks' conservative roots. */
 
-    /* there are potentially two stacks for each thread: the main
-     * stack, which may contain Lisp pointers, and the alternate stack.
-     * We don't ever run Lisp code on the altstack, but it may
-     * host a sigcontext with lisp objects in it */
-
-    /* what we need to do: (1) find the stack pointer for the main
-     * stack; scavenge it (2) find the interrupt context on the
-     * alternate stack that might contain lisp values, and scavenge
-     * that */
-
-    /* we assume that none of the preceding applies to the thread that
-     * initiates GC.  If you ever call GC from inside an altstack
-     * handler, you will lose. */
-
 #if !GENCGC_IS_PRECISE
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
