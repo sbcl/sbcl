@@ -223,14 +223,15 @@
                                    n-positive-fixnum-bits)))
                      n-positive-fixnum-bits))))
 
-(define-vop (fixnump/signed-byte-64 type-predicate)
+(define-vop (fixnump/signed-byte-64)
   (:args (value :scs (signed-reg)))
+  (:policy :fast-safe)
   (:conditional :vc)
   (:info)
   (:arg-types signed-num)
   (:translate fixnump)
   (:generator 3
-    (inst adds temp value value)))
+    (inst adds zr-tn value value)))
 
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)
