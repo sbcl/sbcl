@@ -408,13 +408,6 @@
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
 
-#+gencgc
-(progn
-  (defparameter card-table-index-nbits
-    (integer-length (1- (ceiling sb-vm::default-dynamic-space-size
-                                 sb-vm::gencgc-card-bytes))))
-  (defparameter card-table-index-mask (1- (ash 1 card-table-index-nbits))))
-
 ;; Special case for dynamic space code/data segregation
 #+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type)
@@ -2769,7 +2762,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (cold-layout-id (gethash (descriptor-bits (->layout sym))
                                        *cold-layout-by-addr*)))
              ;; This is specific to x86 in either word size
-             (:gc-barrier card-table-index-mask)
+             (:gc-barrier sb-vm::gencgc-card-table-index-mask)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3560,7 +3553,7 @@ III. initially undefined function references (alphabetically):
     (mapc write-word
           `(,page-table-core-entry-type-code
             6 ; = number of words in this core header entry
-            ,card-table-index-nbits ,n-ptes ,pte-bytes ,data-page))))
+            ,sb-vm::gencgc-card-table-index-nbits ,n-ptes ,pte-bytes ,data-page))))
 
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later

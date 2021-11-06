@@ -81,7 +81,7 @@ static struct cons* private_cons_impl()
         if (PRIVATE_CONS_DEBUG)
             fprintf(stderr, "GC-private page @ %p\n", page_header);
         gc_assert(last_page == page);
-        gc_assert(!page_table[page].write_protected);
+        gc_assert(!PAGE_WRITEPROTECTED_P(page));
         page_table[page].gen = 0;
         page_table[page].type = UNBOXED_PAGE_FLAG;
         zero_dirty_pages(page, page, 0);

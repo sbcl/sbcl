@@ -1045,20 +1045,20 @@ trans_weak_pointer(lispobj object)
 
 // Two helpers to avoid invoking the memory fault signal handler.
 // For clarity, distinguish between words which *actually* need to frob
-// the page_table's write_protected bit, versus those which don't
-// but are forced to call mprotect() because of MMU-based protection.
-static inline void ensure_word_writable(__attribute__((unused)) void* addr)
-{
-#ifdef LISP_FEATURE_GENCGC
-    page_index_t index = find_page_index(addr);
-    gc_assert(index >= 0);
-    if (page_table[index].write_protected) unprotect_page_index(index);
-#endif
-}
+// physical (MMU-based) protection versus those which don't,
+// but are forced to call mprotect() because it's the only choice.
 // Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
 // the ensuing store toggles the WP bit without invoking the fault handler.
 static inline void ensure_ptr_word_writable(void* addr) {
-    ensure_word_writable(addr);
+#ifdef LISP_FEATURE_GENCGC
+    page_index_t index = find_page_index(addr);
+    gc_assert(index >= 0);
+    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page_index(index);
+#endif
+}
+static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
+{
+    ensure_ptr_word_writable(addr);
 }
 
 void smash_weak_pointers(void)
@@ -1094,7 +1094,7 @@ void smash_weak_pointers(void)
     while (vectors) {
         struct vector* vector = (struct vector*)vectors->car;
         vectors = (struct cons*)vectors->cdr;
-        ensure_word_writable(&vector->header);
+        ensure_non_ptr_word_writable(&vector->header);
         UNSET_WEAK_VECTOR_VISITED(vector);
         sword_t len = vector_len(vector);
         sword_t i;
@@ -1613,7 +1613,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             }
             kv_vector[2 * index] = empty_symbol;
             kv_vector[2 * index + 1] = empty_symbol;
-            ensure_word_writable(&hash_table->_count);
+            ensure_non_ptr_word_writable(&hash_table->_count);
             hash_table->_count -= make_fixnum(1);
 
             // Push (index . bucket) onto the table's GC culled cell list.

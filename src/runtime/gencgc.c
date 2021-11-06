@@ -158,6 +158,7 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
+char *gc_card_mark;
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
 int gc_n_stack_pins;
@@ -261,9 +262,9 @@ page_ends_contiguous_block_p(page_index_t page_index,
  * and a store is simpler than a bitwise operation */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
-    // Any C compiler worth its salt should merge these into one store
-    page_table[page].type = page_table[page].write_protected
+    page_table[page].type = page_table[page].padding
         = page_table[page].write_protected_cleared = page_table[page].pinned = 0;
+    SET_PAGE_PROTECTED(page,0);
 }
 
 /// External function for calling from Lisp.
@@ -385,7 +386,7 @@ count_generation_pages(generation_index_t generation,
     for (i = 0; i < next_free_page; i++)
         if (!page_free_p(i) && (page_table[i].gen == generation)) {
             total++;
-            if (page_table[i].write_protected)
+            if (PAGE_WRITEPROTECTED_P(i))
                 wp++;
         }
     if (n_write_protected)
@@ -1305,7 +1306,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
     boolean result =
            page_table[index].type == allocated
         && page_table[index].gen == gen
-        && !page_table[index].write_protected
+        && !PAGE_WRITEPROTECTED_P(index)
         && !page_table[index].pinned;
     return result;
 #else
@@ -1319,15 +1320,16 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
      * write_protected_cleared flag = 1 because it was at some point WP'ed.
      * Those pages are usable, so we do have to mask out the 'cleared' bit.
      *
-     *      pin -\   /--- WP
-     *            v v
-     * #b11111111_10111111
+     *      pin -\
+     *            v
+     * #b11111111_10_11111
      *             ^ ^^^^^ -- type
      *     WP-clr /
      *
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
-    return (*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|allocated);
+    return ((*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|allocated))
+      && !PAGE_WRITEPROTECTED_P(index);
 #endif
 }
 
@@ -1387,7 +1389,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             continue;
         }
 
-        gc_dcheck(!page_table[first_page].write_protected);
+        gc_dcheck(!PAGE_WRITEPROTECTED_P(first_page));
         /* page_free_p() can legally be used at index 'page_table_pages'
          * because the array dimension is 1+page_table_pages */
         for (last_page = first_page+1;
@@ -1399,7 +1401,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
              * otherwise, lossage would routinely occur in the fault handler) */
             bytes_found += GENCGC_CARD_BYTES;
             gc_dcheck(0 == page_bytes_used(last_page));
-            gc_dcheck(!page_table[last_page].write_protected);
+            gc_dcheck(!PAGE_WRITEPROTECTED_P(last_page));
         }
 
         if (bytes_found > most_bytes_found) {
@@ -1528,7 +1530,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         gc_assert(page_table[page].type == old_allocated); \
         gc_assert(page_table[page].gen == from_space); \
         gc_assert(page_scan_start_offset(page) == npage_bytes(page-first_page)); \
-        gc_assert(!page_table[page].write_protected); \
+        gc_assert(!PAGE_WRITEPROTECTED_P(page)); \
         page_table[page].gen = new_gen; \
         page_table[page].type = new_allocated
 
@@ -1561,7 +1563,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
            page_table[page].type == old_allocated &&
            page_scan_start_offset(page) == npage_bytes(page - first_page)) {
         // These pages are part of oldspace, which was un-write-protected.
-        gc_assert(!page_table[page].write_protected);
+        gc_assert(!PAGE_WRITEPROTECTED_P(page));
 
         /* Zeroing must have been done before shrinking the object.
          * (It is strictly necessary for correctness with objects other
@@ -1679,7 +1681,7 @@ scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
          * (This assertion is compiled out in a normal build,
          * so even if incorrect, it should be relatively harmless)
          */
-        gc_dcheck(!page_table[find_page_index(wp)].write_protected);
+        gc_dcheck(!PAGE_WRITEPROTECTED_P(find_page_index(wp)));
         add_to_weak_pointer_chain(wp);
     }
 
@@ -2156,7 +2158,7 @@ pin_object(lispobj object)
         /* Oldspace pages were unprotected at start of GC.
          * Assert this here, because the previous logic used to,
          * and page protection bugs are scary */
-        gc_assert(!page_table[page].write_protected);
+        gc_assert(!PAGE_WRITEPROTECTED_P(page));
         /* Mark the page as containing pinned objects. */
         page_table[page].pinned = 1;
     }
@@ -2336,7 +2338,7 @@ update_page_write_prot(page_index_t page)
      * If we had soft write protection (mark bits) instead of physical
      * protection, then we could/would protect pinned pages.
      * (See git rev 216e37a316) */
-    if (page_table[page].write_protected || !page_boxed_p(page) ||
+    if (PAGE_WRITEPROTECTED_P(page) || !page_boxed_p(page) ||
         page_table[page].pinned)
         return (0);
 
@@ -2464,7 +2466,7 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
         }
     }
     for (i = first_page; i <= last_page; i++)
-        page_table[i].write_protected = 1;
+        SET_PAGE_PROTECTED(i, 1);
 }
 
 /* Scavenge all generations from FROM to TO, inclusive, except for
@@ -2518,14 +2520,14 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                  * and scavenging skips the unboxed portion anyway.
                  * The only potential improvement would be to deal better
                  * with large hash-table storage vectors. */
-                if (!page_table[i].write_protected) {
+                if (!PAGE_WRITEPROTECTED_P(i)) {
                     scavenge((lispobj*)page_address(i) + 2,
                              GENCGC_CARD_BYTES / N_WORD_BYTES - 2);
                     update_page_write_prot(i);
                 }
                 while (!page_ends_contiguous_block_p(i, generation)) {
                     ++i;
-                    if (!page_table[i].write_protected) {
+                    if (!PAGE_WRITEPROTECTED_P(i)) {
                         scavenge((lispobj*)page_address(i),
                                  page_bytes_used(i) / N_WORD_BYTES);
                         update_page_write_prot(i);
@@ -2536,8 +2538,7 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                 boolean write_protected = 1;
                 /* Now work forward until the end of the region */
                 for (last_page = i; ; last_page++) {
-                    write_protected =
-                        write_protected && page_table[last_page].write_protected;
+                    write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
                     if (page_ends_contiguous_block_p(last_page, generation))
                         break;
                 }
@@ -2600,7 +2601,7 @@ static void newspace_full_scavenge(generation_index_t generation)
     for (i = 0; i < next_free_page; i++) {
         if ((page_table[i].gen == generation) && page_boxed_p(i)
             && (page_bytes_used(i) != 0)
-            && !page_table[i].write_protected) {
+            && !PAGE_WRITEPROTECTED_P(i)) {
             page_index_t last_page;
 
             /* The scavenge will start at the scan_start_offset of
@@ -2743,8 +2744,8 @@ unprotect_oldspace(void)
 
             /* Remove any write-protection. We should be able to rely
              * on the write-protect flag to avoid redundant calls. */
-            if (page_table[i].write_protected) {
-                page_table[i].write_protected = 0;
+            if (PAGE_WRITEPROTECTED_P(i)) {
+                SET_PAGE_PROTECTED(i, 0);
                 page_addr = page_address(i);
                 if (!region_addr) {
                     /* First region. */
@@ -2802,7 +2803,7 @@ free_oldspace(void)
             reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
             /* Should already be unprotected by unprotect_oldspace(). */
-            gc_assert(!page_table[last_page].write_protected);
+            gc_assert(!PAGE_WRITEPROTECTED_P(last_page));
             last_page++;
         }
         while ((last_page < next_free_page)
@@ -2889,15 +2890,15 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
 }
 generation_index_t gen_of(lispobj object) { return gc_gen_of(object, 8); }
 
-static boolean __attribute__((unused)) card_protected_p(void* addr)
+static boolean addr_protected_p(void* addr)
 {
     page_index_t page = find_page_index(addr);
-    if (page >= 0) return page_table[page].write_protected;
+    if (page >= 0) return PAGE_WRITEPROTECTED_P(page);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (immobile_space_p((lispobj)addr))
         return immobile_card_protected_p(addr);
 #endif
-    lose("card_protected_p(%p)", addr);
+    lose("addr_protected_p(%p)", addr);
 }
 
 // NOTE: This function can produces false failure indications,
@@ -2996,7 +2997,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     && to_gen < state->object_gen) {
                     // two things must be true:
                     // 1. the page containing object_start must not be write-protected
-                    FAIL_IF(card_protected_p(state->object_start),
+                    FAIL_IF(addr_protected_p(state->object_start),
                             "younger obj from WP'd code header page");
                     // 2. the object header must be marked as written
                     if (!header_rememberedp(*state->object_start))
@@ -3012,7 +3013,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     generation_index_t from_gen
                         = gen_of(find_page_index((lispobj*)vaddr) >= 0 ?
                                  vaddr : (lispobj)state->object_start);
-                    FAIL_IF(to_gen < from_gen && card_protected_p((lispobj*)vaddr),
+                    FAIL_IF(to_gen < from_gen && addr_protected_p((lispobj*)vaddr),
                             "younger obj from WP page");
                 }
                 int valid;
@@ -3035,7 +3036,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         if (is_lisp_immediate(thing) || widetag == NO_TLS_VALUE_MARKER_WIDETAG) {
             /* skip immediates */
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
-            lose("Unhandled widetag %d at %p", widetag, where);
+            lose("Unhandled widetag #x%02x at %p", widetag, where);
         } else if (leaf_obj_widetag_p(widetag)) {
 #ifdef LISP_FEATURE_UBSAN
             if (specialized_vector_widetag_p(widetag)) {
@@ -3137,7 +3138,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     (state->min_pointee_gen < my_gen) != rememberedp :
                     (state->min_pointee_gen < my_gen) && !rememberedp)
                     lose("object @ %p is gen%d min_pointee=gen%d %s",
-                         where, my_gen, state->min_pointee_gen,
+                         (void*)compute_lispobj(where), my_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
 #endif
                 count = code_total_nwords(code);
@@ -3298,14 +3299,14 @@ write_protect_generation_pages(generation_index_t generation)
             continue;
         }
         if (protection_mode(start) == LOGICAL) {
-            page_table[start].write_protected = 1;
+            SET_PAGE_PROTECTED(start, 1);
             ++n_sw_prot;
             ++start;
             continue;
         }
 
         /* Note the page as protected in the page tables. */
-        page_table[start].write_protected = 1;
+        SET_PAGE_PROTECTED(start, 1);
 
         /* Find the extent of pages desiring physical protection */
         for (end = start + 1; end < next_free_page; end++) {
@@ -3315,7 +3316,7 @@ write_protect_generation_pages(generation_index_t generation)
 #endif
                 )
                 break;
-            page_table[end].write_protected = 1;
+            SET_PAGE_PROTECTED(end, 1);
         }
 
         n_hw_prot += end - start;
@@ -3642,6 +3643,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         if (pin_all_dynamic_space_code) {
           /* This needs to happen before ambiguous root pinning, as the mechanisms
            * overlap in a way that all-code pinning wouldn't do the right thing if flipped.
+           * FIXME: why would it not? More explanation needed!
            * Code objects should never get into the pins table in this case */
           for (i = 0; i < next_free_page; i++) {
               if (page_table[i].gen == from_space)
@@ -4198,6 +4200,7 @@ collect_garbage(generation_index_t last_gen)
         memset(n_scav_calls, 0, sizeof n_scav_calls);
         memset(n_scav_skipped, 0, sizeof n_scav_skipped);
         garbage_collect_generation(gen, raise);
+
         if (gencgc_verbose)
             fprintf(stderr,
                     "code scavenged: %d total, %d skipped\n",
@@ -4333,20 +4336,17 @@ gc_init(void)
     extern void safepoint_init(void);
     safepoint_init();
 #endif
-    // Verify that foo_BIT constants agree with the C compiler's bit packing
-    // and that we can compute the correct adddress of the bitfields.
-    // These tests can be optimized out of the emitted code by a good compiler.
+    // Verify that WP_CLEARED_FLAG agrees with the C compiler's bit packing
+    // and that we can compute the correct adddress of the bitfield.
     struct page test;
     unsigned char *pflagbits = (unsigned char*)&test.gen - 1;
     memset(&test, 0, sizeof test);
-    *pflagbits = WRITE_PROTECTED_FLAG;
-    gc_assert(test.write_protected);
     *pflagbits = WP_CLEARED_FLAG;
     gc_assert(test.write_protected_cleared);
 }
 
-int gc_card_table_nbits;
-char *gc_card_table;
+int gc_card_table_nbits, gc_card_table_mask;
+char *gc_card_mark;
 
 static void gc_allocate_ptes()
 {
@@ -4380,7 +4380,6 @@ static void gc_allocate_ptes()
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
     int nbits = 15, num_gc_cards = 1 << nbits;
@@ -4391,8 +4390,10 @@ static void gc_allocate_ptes()
     while (num_gc_cards < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
     // If the space size is less than or equal to the number of cards
     // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
+    // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
     if (nbits > gc_card_table_nbits) {
         gc_card_table_nbits = nbits;
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
         // The value needed based on dynamic space size exceeds the value that the
         // core was compiled for, so we need to patch all code blobs.
         gcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);
@@ -4401,9 +4402,16 @@ static void gc_allocate_ptes()
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         gcbarrier_patch_code_range(VARYOBJ_SPACE_START, varyobj_free_pointer);
 #endif
-    }
-    gc_card_table = calloc(1<<nbits, 1);
 #endif
+    }
+    // Regardless of the mask implied by space size, it has to be gc_card_table_nbits wide
+    // even if that is excessive - when the core is restarted using a _smaller_ dynamic space
+    // size than saved at - otherwise lisp could overrun the mark table.
+    num_gc_cards = 1 << gc_card_table_nbits;
+    gc_card_table_mask =  num_gc_cards - 1;
+    gc_card_mark = calloc(num_gc_cards, 1);
+    // fprintf(stderr, "card mark table @ %p\n", gc_card_mark);
+
     gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
@@ -4641,11 +4649,11 @@ gencgc_handle_wp_violation(void* fault_addr)
         // concurrently for the same page are fine because they're all doing
         // the same bit operations.
         gc_assert(!(page_table[page_index].type & OPEN_REGION_PAGE_FLAG));
-        unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
-        unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
-        if (flagbits & WRITE_PROTECTED_FLAG) {
+        if (PAGE_WRITEPROTECTED_P(page_index)) {
             unprotect_page_index(page_index);
         } else if (!ignore_memoryfaults_on_unprotected_pages) {
+            unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
+            unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
             /* The only acceptable reason for this signal on a heap
              * access is that GENCGC write-protected the page.
              * However, if two CPUs hit a wp page near-simultaneously,
@@ -4672,7 +4680,7 @@ gencgc_handle_wp_violation(void* fault_addr)
                         (uintptr_t)page_scan_start_offset(page_index),
                         page_bytes_used(page_index),
                         page_table[page_index].type,
-                        page_table[page_index].write_protected,
+                        PAGE_WRITEPROTECTED_P(page_index),
                         page_table[page_index].write_protected_cleared,
                         page_table[page_index].gen);
                 if (!continue_after_memoryfault_on_unprotected_pages)
@@ -4989,11 +4997,10 @@ void gc_load_corefile_ptes(int card_table_nbits,
             }
 #endif
             if (non_protectable_page_p(start)) {
-
                 ++start;
                 continue;
             }
-            page_table[start].write_protected = 1;
+            SET_PAGE_PROTECTED(start,1);
             for (end = start + 1; end < next_free_page; end++) {
                 if (non_protectable_page_p(end)
 #ifdef LISP_FEATURE_DARWIN_JIT
@@ -5001,7 +5008,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
 #endif
                     )
                     break;
-                page_table[end].write_protected = 1;
+                SET_PAGE_PROTECTED(end,1);
             }
             os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_JIT_READ);
             start = end;
@@ -5042,7 +5049,7 @@ void gc_show_pte(lispobj obj)
         printf("page %"PAGE_INDEX_FMT" gen %d type %x ss %p used %x%s\n",
                page, page_table[page].gen, page_table[page].type,
                page_scan_start(page), page_bytes_used(page),
-               page_table[page].write_protected? " WP":"");
+               PAGE_WRITEPROTECTED_P(page)? " WP":"");
         return;
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -5051,7 +5058,7 @@ void gc_show_pte(lispobj obj)
         printf("page %ld (v) ss=%p gens %x%s\n", page,
                varyobj_scan_start(page),
                varyobj_pages[page].generations,
-               card_protected_p((void*)obj)? " WP":"");
+               addr_protected_p((void*)obj)? " WP":"");
         return;
     }
     page = find_fixedobj_page_index((void*)obj);
@@ -5059,7 +5066,7 @@ void gc_show_pte(lispobj obj)
         printf("page %ld (f) align %d gens %x%s\n", page,
                fixedobj_pages[page].attr.parts.obj_align,
                fixedobj_pages[page].attr.parts.gens_,
-               card_protected_p((void*)obj)? " WP":"");
+               addr_protected_p((void*)obj)? " WP":"");
         return;
     }
 #endif

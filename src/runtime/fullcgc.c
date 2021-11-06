@@ -636,10 +636,10 @@ void execute_full_sweep_phase()
 
     page_index_t first_page, last_page;
     for (first_page = 0; first_page < next_free_page; ++first_page)
-        if (page_table[first_page].write_protected
+        if (PAGE_WRITEPROTECTED_P(first_page)
             && protection_mode(first_page) == PHYSICAL) {
             last_page = first_page;
-            while (page_table[last_page+1].write_protected
+            while (PAGE_WRITEPROTECTED_P(last_page+1)
                    && protection_mode(last_page+1) == PHYSICAL)
                 ++last_page;
             os_protect(page_address(first_page),

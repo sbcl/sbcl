@@ -108,11 +108,7 @@ struct page {
          *
          * If the page is free, all the following fields are zero. */
         type :5,
-        /* This is set when the page is write-protected. This should
-         * always reflect the actual write_protect status of a page.
-         * (If the page is written into, we catch the exception, make
-         * the page writable, and clear this flag.) */
-        write_protected :1,
+        padding :1,
         /* This flag is set when the above write_protected flag is
          * cleared by the SIGBUS handler (or SIGSEGV handler, for some
          * OSes). This is useful for re-scavenging pages that are
@@ -131,11 +127,34 @@ struct page {
 extern struct page *page_table;
 #ifdef LISP_FEATURE_BIG_ENDIAN
 # define WP_CLEARED_FLAG      (1<<1)
-# define WRITE_PROTECTED_FLAG (1<<2)
 #else
-# define WRITE_PROTECTED_FLAG (1<<5)
 # define WP_CLEARED_FLAG      (1<<6)
 #endif
+
+/* When computing a card index we never subtract the heap base, which simplifies
+ * code generation. Because there is no alignment constraint beyond being card-aligned,
+ * the low bits can wraparound from all 1s to all 0s such that lowest numbered
+ * page index in linear order may have a higher card index.
+ * As a small example of the distinction between page index and card index:
+ *   heap base = 0xEB00, card size = 256 bytes, total cards = 8, mask = #b111
+ *
+ *     page     page      card
+ *    index     addr     index
+ *       0      EB00        3
+ *       1      EC00        4
+ *       2      ED00        5
+ *       3      EE00        6
+ *       4      EF00        7
+ *       5      F000        0
+ *       6      F100        1
+ *       7      F200        2
+ */
+extern char * gc_card_mark;
+extern int gc_card_table_mask;
+#define addr_to_card_index(addr) ((((uword_t)addr)>>GENCGC_CARD_SHIFT) & gc_card_table_mask)
+#define page_to_card_index(n) addr_to_card_index(page_address(n))
+#define PAGE_WRITEPROTECTED_P(n) (gc_card_mark[page_to_card_index(n)] & 1)
+#define SET_PAGE_PROTECTED(n,val) gc_card_mark[page_to_card_index(n)] = val
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset

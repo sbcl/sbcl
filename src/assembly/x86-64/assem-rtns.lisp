@@ -427,32 +427,17 @@
         (inst shr rax (1- (integer-length immobile-card-bytes)))
         (inst cmp rax (thread-slot-ea thread-varyobj-card-count-slot))
         (inst jmp :ae try-dynamic-space)
-        (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
+        (inst mov rdi (thread-slot-ea thread-varyobj-card-marks-slot))
         (inst bts :dword :lock (ea rdi-tn) rax)
         (inst jmp store))
 
       TRY-DYNAMIC-SPACE
-      (inst mov rax object) ; reload
-      (inst sub rax (thread-slot-ea thread-dynspace-addr-slot))
-      (inst shr rax (1- (integer-length gencgc-card-bytes)))
-      (inst cmp rax (thread-slot-ea thread-dynspace-card-count-slot))
-      (inst jmp :ae store) ; neither dynamic nor immobile space. (weird!)
-
-      ;; sizeof (struct page) depends on GENCGC-CARD-BYTES
-      ;; It's 4+2+1+1 = 8 bytes if GENCGC-CARD-BYTES is (unsigned-byte 16),
-      ;; or   4+4+1+1 = 10 bytes (rounded to 12) if wider than (unsigned-byte 16).
-      ;; See the corresponding alien structure definition in 'room.lisp'
-      (cond ((typep gencgc-card-bytes '(unsigned-byte 16))
-             (inst shl rax 3) ; multiply by 8
-             (inst add rax (thread-slot-ea thread-dynspace-pte-base-slot))
-             ;; clear WP - bit index 5 of flags byte
-             (inst and :byte :lock (ea 6 rax) (lognot (ash 1 5))))
-            (t
-             (inst lea rax (ea rax rax 2)) ; multiply by 3
-             (inst shl rax 2) ; then by 4, = 12
-             (inst add rax (thread-slot-ea thread-dynspace-pte-base-slot))
-             ;; clear WP
-             (inst and :byte :lock (ea 8 rax) (lognot (ash 1 5)))))
+      (inst mov rdi (ea (make-fixup "gc_card_mark" :foreign-dataref)))
+      (inst mov rdi (ea rdi))
+      (inst mov rax object)
+      (inst shr rax gencgc-card-shift)
+      (inst and :dword rax (make-fixup nil :gc-barrier))
+      (inst mov :byte (ea rdi rax) 0)
 
       STORE
       (inst mov rdi object)

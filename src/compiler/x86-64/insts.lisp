@@ -3340,6 +3340,8 @@
       ;; These are used for jump tables and are not recorded in code fixups.
       ;; GC knows to adjust the values if code is moved.
       (setf (sap-ref-64 sap offset) value))))
+  (when (eq flavor :gc-barrier)
+    (return-from fixup-code-object :immediate))
   #-immobile-code
   ;; Change asm routine indirect calls to not store the fixup,
   ;; because the indirect address is in static space.
@@ -3359,7 +3361,6 @@
       ((:named-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
         :assembly-routine :assembly-routine* :static-call) ; -> varyobj subspace
        (if (eq kind :absolute) :absolute))
-      (:gc-barrier :immediate)
       (:foreign
        ;; linkage-table calls using the "CALL rel32" format need to be saved,
        ;; because the linkage table resides at a fixed address.

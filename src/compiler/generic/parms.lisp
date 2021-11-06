@@ -131,7 +131,20 @@
            (or ,(or (!read-dynamic-space-size) dynamic-space-size*)
                (ecase n-word-bits
                  (32 (expt 2 29))
-                 (64 (expt 2 30)))))))))
+                 (64 (expt 2 30)))))
+         (defconstant gencgc-card-shift
+           (integer-length (1- +backend-page-bytes+)))
+         ;; This is a constant during build, but a different value
+         ;; can be patched directly into the affected machine code
+         ;; when the core is loaded based on dynamic-space-size.
+         ;; I think the C runtime does a floor operation rather than ceiling,
+         ;; but firstly there's probably no difference, and secondly it's better
+         ;; to be safe than sorry - using too many bits rather than too few.
+         (defconstant gencgc-card-table-index-nbits
+           (integer-length (1- (ceiling sb-vm::default-dynamic-space-size
+                                        sb-vm::gencgc-card-bytes))))
+         (defconstant gencgc-card-table-index-mask
+           (1- (ash 1 gencgc-card-table-index-nbits)))))))
 
 (defconstant-eqx +c-callable-fdefns+
   '(sub-gc

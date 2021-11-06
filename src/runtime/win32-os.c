@@ -1132,7 +1132,7 @@ handle_access_violation(os_context_t *ctx,
 
     /* dynamic space */
     page_index_t page = find_page_index(fault_address);
-    if (page != -1 && !page_table[page].write_protected) {
+    if (page != -1 && !PAGE_WRITEPROTECTED_P(page)) {
         os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
                          os_vm_page_size);
         return 0;

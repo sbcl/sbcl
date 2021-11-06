@@ -1137,7 +1137,7 @@ sb-vm::(define-vop (cl-user::test)
 
 (sb-vm::define-vop (trythis)
   (:generator 1
-   (sb-vm::inst mov sb-vm::rax-tn (sb-c:make-fixup nil :gc-barrier))))
+   (sb-vm::inst and sb-vm::rax-tn (sb-c:make-fixup nil :gc-barrier))))
 (defun zook ()
   (sb-sys:%primitive trythis)
   nil)

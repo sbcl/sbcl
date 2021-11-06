@@ -953,7 +953,7 @@
     (maybe-emit-operand-size-prefix segment size)
     (cond
      ((or (integerp src)
-          (and (fixup-p src) (memq (fixup-flavor src) '(:layout-id))))
+          (and (fixup-p src) (memq (fixup-flavor src) '(:gc-barrier :layout-id))))
       (cond ((and (neq size :byte) (typep src '(signed-byte 8)))
              (emit-byte segment #b10000011)
              (emit-ea segment dst opcode)

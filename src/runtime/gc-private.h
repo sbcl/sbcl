@@ -308,9 +308,10 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
  * but seems only to be a problem in fullcgc)
  */
 
+extern char* gc_card_mark;
 #define NON_FAULTING_STORE(operation, addr) { \
   page_index_t page_index = find_page_index(addr); \
-  if (page_index < 0 || !page_table[page_index].write_protected) { operation; } \
+  if (page_index < 0 || !PAGE_WRITEPROTECTED_P(page_index)) { operation; } \
   else { unprotect_page_index(page_index); \
          operation; \
          protect_page(page_address(page_index), page_index); }}
@@ -329,7 +330,7 @@ static inline void unprotect_page_index(page_index_t page_index)
     os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
-    __sync_fetch_and_and(pflagbits, ~WRITE_PROTECTED_FLAG);
+    SET_PAGE_PROTECTED(page_index, 0);
 }
 
 static inline void protect_page(void* page_addr, page_index_t page_index)
@@ -354,7 +355,7 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
      * But nothing is really gained by resetting the cleared flag.
      * It is explicitly zeroed on pages marked as free though.
      */
-    page_table[page_index].write_protected = 1;
+    SET_PAGE_PROTECTED(page_index, 1);
 }
 
 #else
