@@ -277,7 +277,25 @@ alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
 
   page = fixedobj_page_hint[size_class];
   if (!page) page = get_freeish_page(0, page_attributes);
-  gc_dcheck(fixedobj_page_address(page) < (void*)fixedobj_free_pointer);
+  /* BUG: This assertion is itself buggy and has to be commented out
+   * if running with extra debug assertions.
+   * It's only OK in single-threaded code, but consider two threads:
+   *   Thread A                          Thread B
+   *   --------                          --------
+   *   1. change attributes  of
+   *      page 483 (e.g.) from 0
+   *      to something
+   *                                     2. observe that page 483 has
+   *                                        desired page_attributes,
+   *                                        and return it from get_freeish_page
+   *                                     3. read the now-obsolete value of
+   *                                        fixedobj_free_pointer at the dcheck.
+   *   4. bump the free pointer to
+   *      the end of page 483
+   *      and return that page
+   *                                     5. FAIL the dcheck
+   *   5. pass the dcheck */
+  // gc_dcheck(fixedobj_page_address(page) < (void*)fixedobj_free_pointer);
   do {
       page_data = fixedobj_page_address(page);
       obj_ptr = page_data + fixedobj_pages[page].free_index;
