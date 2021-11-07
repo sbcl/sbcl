@@ -301,6 +301,8 @@
 ;;;; CONS, ACONS, LIST and LIST*
 (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
                                           (lowtag list-pointer-lowtag))
+             ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
+             ;; but other other GC strategies might.
              `(let ((reg
                      ;; FIXME: single-float gets placed in the boxed header
                      ;; rather than just doing an immediate store.
@@ -824,6 +826,7 @@
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
      ;; Finished with the pseudo-atomic instructions
      (when label
+       ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
        (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
        (storew temp result closure-fun-slot fun-pointer-lowtag)
        #+metaspace
@@ -845,6 +848,7 @@
              (storew header result 0 other-pointer-lowtag)))
           (t
            (alloc-other value-cell-widetag value-cell-size result node nil thread-tn)))
+    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects

@@ -313,11 +313,15 @@
                                                      vector-data-offset))
                    ,el-type)
        (:temporary (:sc unsigned-reg) val-temp)
+       (:vop-var vop)
        (:generator 4
+         ;; XXX: Is this good - we unpoison first, and then store? It seems wrong.
          ,@(unless (eq type 'simple-vector) '((unpoison-element object index addend)))
-         (gen-cell-set (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
-                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                       value val-temp)))
+         (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
+                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))))
+           ,@(when (eq type 'simple-vector)
+               '((emit-gc-store-barrier object ea val-temp (vop-nth-arg 2 vop) value)))
+           (gen-cell-set ea value val-temp))))
      (define-vop (,(symbolicate name "-C") dvset)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
@@ -330,11 +334,14 @@
                                                      vector-data-offset))
                    ,el-type)
        (:temporary (:sc unsigned-reg) val-temp)
+       (:vop-var vop)
        (:generator 3
+         ;; XXX: Is this good - we unpoison first, and then store? It seems wrong.
          ,@(unless (eq type 'simple-vector) '((unpoison-element object (+ index addend))))
-         (gen-cell-set (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag)
-                           object)
-                       value val-temp)))))
+         (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
+           ,@(when (eq type 'simple-vector)
+               '((emit-gc-store-barrier object ea val-temp (vop-nth-arg 1 vop) value)))
+           (gen-cell-set ea value val-temp))))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer+addend ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)

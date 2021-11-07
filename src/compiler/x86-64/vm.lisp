@@ -81,6 +81,12 @@
 ;;; shadow memory is pointed to by this register (RAX).
 (defconstant msan-temp-reg-number 0)
 
+;;; The encoding anomaly for r12 makes it a perfect choice for the card table base.
+;;; It will never be used with a constant displacement.
+(define-symbol-macro card-table-reg 12)
+(define-symbol-macro gc-card-table-reg-tn r12-tn)
+(define-symbol-macro card-index-mask (make-fixup nil :gc-barrier))
+
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
              `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -115,6 +121,7 @@
                     (remove-if (lambda (x)
                                  (member x `(,global-temp-reg ; if there is one
                                              ,thread-reg      ; if using a GPR
+                                             ,card-table-reg
                                              ,rsp-offset
                                              ,rbp-offset)))
                                (loop for i below 16 collect i))))))

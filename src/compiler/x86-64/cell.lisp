@@ -39,7 +39,6 @@
   (:results)
   (:vop-var vop)
   (:temporary (:sc unsigned-reg) val-temp)
-  #-ubsan (:ignore name)
   (:generator 1
     (cond #+ubsan
           ((and (eql offset sb-vm:array-fill-pointer-slot) ; half-sized slot
@@ -50,19 +49,26 @@
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
+           ;; gencgc does not need to emit the barrier for initializing a structure
+           (unless (eq name '%make-structure-instance)
+             (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value))
            (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
-         (old :scs (descriptor-reg any-reg) :target rax)
+         (old :scs (descriptor-reg any-reg) #|:target rax|#)
          (new :scs (descriptor-reg any-reg)))
+  ;; if OLD were LOCATION= to RAX then we'd clobber OLD
+  ;; while computing the EA for the barrier.
   (:temporary (:sc descriptor-reg :offset rax-offset
-                   :from (:argument 1) :to :result :target result)
+                   #|:from (:argument 1)|# :to :result :target result)
               rax)
   (:info name offset lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
   (:generator 5
+     (emit-gc-store-barrier object nil rax (vop-nth-arg 2 vop) new)
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
      (move result rax)))
@@ -80,7 +86,9 @@
          (value :scs (descriptor-reg any-reg immediate)))
   (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) val-temp)
+  (:vop-var vop)
   (:generator 4
+    (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value)
     (gen-cell-set (if (sc-is object immediate)
                       (symbol-slot-ea (tn-value object) symbol-value-slot)
                       (object-slot-ea object symbol-value-slot other-pointer-lowtag))
@@ -166,6 +174,8 @@
     ;; Even worse: don't supply old=NO-TLS-VALUE with a symbol whose
     ;; tls-index=0, because that would succeed, assigning NEW to each
     ;; symbol in existence having otherwise no thread-local value.
+      ;; Possible optimization: don't frob the card mark when storing into TLS
+      (emit-gc-store-barrier symbol nil cell (vop-nth-arg 2 vop) new)
       (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
         #+sb-thread (progn (compute-virtual-symbol)
                             (move rax old)
@@ -180,13 +190,17 @@
   (define-vop (%cas-symbol-global-value)
     (:translate %cas-symbol-global-value)
     (:args (symbol :scs (descriptor-reg immediate) :to (:result 0))
-           (old :scs (descriptor-reg any-reg) :target rax)
+           (old :scs (descriptor-reg any-reg) #|:target rax|#)
            (new :scs (descriptor-reg any-reg)))
+    ;; if OLD were LOCATION= to RAX then we'd clobber OLD
+    ;; while computing the EA for the barrier.
     (:temporary (:sc descriptor-reg :offset rax-offset
-                 :from (:argument 1) :to (:result 0)) rax)
+                 #|:from (:argument 1)|# :to (:result 0)) rax)
     (:results (result :scs (descriptor-reg any-reg)))
     (:policy :fast-safe)
+    (:vop-var vop)
     (:generator 10
+      (emit-gc-store-barrier symbol nil rax (vop-nth-arg 2 vop) new)
       (move rax old)
       (inst cmpxchg :lock
             (if (sc-is symbol immediate)
@@ -207,7 +221,10 @@
       (:temporary (:sc descriptor-reg) cell)
       (:temporary (:sc unsigned-reg) val-temp)
       #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
+      (:vop-var vop)
       (:generator 4
+        ;; Possible optimization: don't frob the card mark when storing into TLS
+        (emit-gc-store-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
@@ -456,6 +473,7 @@
   (:temporary (:sc unsigned-reg) raw)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
+    (emit-gc-store-barrier fdefn nil raw)
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     (inst cmp :byte (ea (- fun-pointer-lowtag) function)
           simple-fun-widetag)
@@ -474,6 +492,8 @@
   (:generator 38
     ;; N.B. concerning the use of pseudo-atomic here,
     ;;      refer to doc/internals-notes/fdefn-gc-safety
+    ;; No barrier here, because fdefns in immobile space rely on the SIGSEGV signal
+    ;; to manage the card marks.
     (pseudo-atomic ()
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (storew raw-word fdefn fdefn-raw-addr-slot other-pointer-lowtag)
@@ -677,12 +697,14 @@
          (value :scs (descriptor-reg any-reg)))
   (:info offset)
   (:generator 4
+    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
   (:args (object :scs (descriptor-reg)))
   (:info offset)
   (:generator 4
+    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
     (storew rbp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 ;;;; value cell hackery
@@ -755,6 +777,7 @@
       (setq use-xmm-p (or (>= (logcount zerop-mask) 3)
                           (loop for slot below max-index
                              thereis (= (ldb (byte 2 slot) zerop-mask) #b11))))
+      (emit-gc-store-barrier instance nil val-temp values)
       (when use-xmm-p
         (inst xorpd xmm-temp xmm-temp))
       (loop
@@ -935,6 +958,8 @@
          (move result-lo rax) ; move low part first
          (move result-hi rdx))))
 
+;;; TODO: these GC-STORE-BARRIERs are inadequate if the GC strategy
+;;; requires that 2 old pointees and 2 new pointees all be greyed.
 (macrolet
     ((define-dblcas (translate indexedp &rest rest)
        `(define-vop ()
@@ -950,6 +975,9 @@
           ,@rest
           (:results (result-lo :scs (descriptor-reg any-reg))
                     (result-hi :scs (descriptor-reg any-reg)))
+          ;; this is sufficiently confusing that I don't want to try reusing
+          ;; one of the other declared temps as the EA for the store barrier.
+          (:temporary (:sc unsigned-reg) temp)
           (:temporary (:sc unsigned-reg :offset rax-offset
                        :from (:argument 2) :to (:result 0)) eax)
           (:temporary (:sc unsigned-reg :offset rdx-offset
@@ -961,6 +989,7 @@
 
   (define-dblcas %cons-cas-pair nil
     (:generator 2
+      (emit-gc-store-barrier object nil temp)
       (generate-dblcas (ea (- list-pointer-lowtag) object)
                        expected-old-lo expected-old-hi new-lo new-hi
                        eax ebx ecx edx result-lo result-hi)))
@@ -971,6 +1000,7 @@
     (:generator 2
       (let ((ea (ea (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)
                     object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
+        (emit-gc-store-barrier object ea temp)
         (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi
                          eax ebx ecx edx result-lo result-hi))))
 
@@ -979,6 +1009,7 @@
   ;; (Hmm, does the constraint differ by +/- compact-instance-header?)
   (define-dblcas %instance-cas-pair t
     (:generator 2
+      (emit-gc-store-barrier object nil temp)
       (let ((ea (ea (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)
                     object index (ash n-word-bytes (- n-fixnum-tag-bits)))))
         (generate-dblcas ea expected-old-lo expected-old-hi new-lo new-hi

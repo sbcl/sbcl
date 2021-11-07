@@ -2328,6 +2328,11 @@ update_page_write_prot(page_index_t page)
 
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    // If the page is unboxed or either already protected (byte = 1),
+    // or not protected and referenced from the stack (byte = 2) then do nothing.
+    if (!page_boxed_p(page) || gc_card_mark[page_to_card_index(page)]) return 0;
+#else
     /* Skip if it's unboxed, already write-protected, or pinned */
     /* The 'pinned' check is sort of bogus but sort of necessary,
      * but doesn't completely fix the problem that it tries to, which is
@@ -2341,6 +2346,7 @@ update_page_write_prot(page_index_t page)
     if (PAGE_WRITEPROTECTED_P(page) || !page_boxed_p(page) ||
         page_table[page].pinned)
         return (0);
+#endif
 
     /* Scan the page for pointers to younger generations or the
      * temp generation, which is numerically 7 but logically younger */
@@ -2728,7 +2734,7 @@ unprotect_oldspace(void)
 {
     page_index_t i;
     char *region_addr = 0;
-    char *page_addr = 0;
+    __attribute__((unused)) char *page_addr = 0;
     uword_t region_bytes = 0;
 
 #ifndef LISP_FEATURE_ARM64
@@ -2739,6 +2745,10 @@ unprotect_oldspace(void)
 #endif
 
     for (i = 0; i < next_free_page; i++) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        if (page_bytes_used(i) && page_table[i].gen == from_space)
+            SET_PAGE_PROTECTED(i, 0);
+#else
         if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == from_space)) {
 
@@ -2763,6 +2773,7 @@ unprotect_oldspace(void)
                 }
             }
         }
+#endif
     }
     if (region_addr) {
         /* Unprotect last region. */
@@ -3281,13 +3292,27 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
 static void
 write_protect_generation_pages(generation_index_t generation)
 {
-    page_index_t start = 0, end;
-    int n_hw_prot = 0, n_sw_prot = 0;
-
     // Neither 0 nor scratch can be protected. Additionally, protection of
     // pseudo-static space is applied only in gc_load_corefile_ptes().
     gc_assert(generation != 0 && generation != SCRATCH_GENERATION
               && generation != PSEUDO_STATIC_GENERATION);
+
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    page_index_t page;
+    for (page = 0; page < next_free_page; ++page) {
+        if (page_table[page].gen == generation && page_boxed_p(page)
+            && page_bytes_used(page)
+            // must not touch a card referenced from the control stack
+            // because the next instruction executed by user code
+            // might store an old->young pointer.
+            && gc_card_mark[page_to_card_index(page)] != 2)
+            SET_PAGE_PROTECTED(page, 1);
+    }
+    return;
+#endif
+
+    page_index_t start = 0, end;
+    int n_hw_prot = 0, n_sw_prot = 0;
 
     while (start  < next_free_page) {
         if (!protect_page_p(start, generation)
@@ -3337,6 +3362,11 @@ write_protect_generation_pages(generation_index_t generation)
 
 static void unprotect_all_pages()
 {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    // This function remove physical protection only, and does not alter
+    // the WP bit, so therefore do nothing for soft card marks.
+    return;
+#endif
 #ifndef LISP_FEATURE_DARWIN_JIT
     os_protect(page_address(0), npage_bytes(next_free_page), OS_VM_PROT_ALL);
 #else
@@ -3482,9 +3512,36 @@ void pin_stack(struct thread* th) {
 }
 #endif
 
+#define STICKY_MARK 2
+
 #if !GENCGC_IS_PRECISE
+static void __attribute__((unused))
+sticky_mark_large_vector(page_index_t page, lispobj word)
+{
+    /* Given that 'page' holds a large object, if 'word' is the correctly-tagged
+     * pointer to the base of a simple-vector, then set the sticky mark on any
+     * already-marked page of the object */
+    lispobj* scan_start = page_scan_start(page);
+    switch (widetag_of(scan_start)) {
+    case CODE_HEADER_WIDETAG:
+        /* Stores to code are done pseudo-atomically with affecting the card mark.
+         * Therefore we don't need to do anything else. The "next" store
+         * won't create an old->young pointer, since it already happened */
+        return;
+    case SIMPLE_VECTOR_WIDETAG:
+        if (word != make_lispobj(scan_start, OTHER_POINTER_LOWTAG)) return;
+        generation_index_t gen = page_table[page].gen;
+        while (1) {
+            if (!PAGE_WRITEPROTECTED_P(page)) SET_PAGE_PROTECTED(page, STICKY_MARK);
+            if (page_ends_contiguous_block_p(page, gen)) return;
+            ++page;
+        }
+    }
+}
+
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
+                        __attribute__((unused)) generation_index_t gen,
                         void* stack_hot_end)
 {
     /* there are potentially two stacks for each thread: the main
@@ -3574,6 +3631,33 @@ conservative_stack_scan(struct thread* th,
         if (word >= BACKEND_PAGE_BYTES &&
             !(exclude_from <= word && word < exclude_to)) {
             preserve_pointer((void*)word);
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+            /* Additional logic for soft marks: any word that is potentially a
+             * tagged pointer to a page being written must preserve the mark regardless
+             * of what update_page_write_prot() thinks. That's because the mark is set
+             * prior to storing. If GC occurs in between setting the mark and storing,
+             * then resetting the mark would be wrong if the subsequent store
+             * creates an old->young pointer.
+             * Mark stickiness is checked only once per invocation of collect_garbge(),
+             * so it when scanning stacks for generation 0 but not higher gens.
+             * Also note the two scenarios:
+             * (1) tagged pointer to a large simple-vector, but we scan card-by-card
+             * for specifically the marked cards.  This has to be checked first
+             * so as not to fail to see subsequent pages if the first is marked.
+             * (2) tagged pointer to an object that marks only the page containing
+             * the object base */
+            page_index_t page;
+            if (gen == 0 && is_lisp_pointer(word)
+                && (page = find_page_index((void*)word)) >= 0
+                && page_boxed_p(page) // stores to raw bytes are uninteresting
+                && (word & (GENCGC_CARD_BYTES - 1)) < page_bytes_used(page)
+                && plausible_tag_p(word)) { // "plausible" is good enough
+              if (page_single_obj_p(page))
+                  sticky_mark_large_vector(page, word);
+              else if (gc_card_mark[addr_to_card_index((void*)word)] == 0)
+                  SET_PAGE_PROTECTED(page, STICKY_MARK);
+            }
+#endif
         }
     }
 }
@@ -3690,7 +3774,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (conservative_stack) {
         for_each_thread(th) {
             if (th->state_word.state != STATE_DEAD)
-                conservative_stack_scan(th, &raise);
+                conservative_stack_scan(th, generation, &raise);
         }
     }
 #else
@@ -4249,6 +4333,14 @@ collect_garbage(generation_index_t last_gen)
         }
         write_protect_generation_pages(gen_to_wp);
     }
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    {
+    page_index_t page;
+    for (page=0; page<next_free_page; ++page)
+        if (gc_card_mark[page_to_card_index(page)] == STICKY_MARK)
+            gc_card_mark[page_to_card_index(page)] = 0;
+    }
+#endif
 
     /* Set gc_alloc() back to generation 0. The global regions were
      * already asserted to be closed after each generation's collection.
@@ -4975,6 +5067,10 @@ void gc_load_corefile_ptes(int card_table_nbits,
     // write-protecting needs the current value of next_free_page
     next_free_page = n_ptes;
     if (gen != 0 && ENABLE_PAGE_PROTECTION) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        page_index_t p;
+        for (p = 0; p < next_free_page; ++p) if (page_bytes_used(p)) SET_PAGE_PROTECTED(p, 1);
+#else
         // coreparse can avoid hundreds to thousands of mprotect() calls by
         // treating the whole range from the corefile as protectable, except
         // that soft-marked code pages must NOT be subject to mprotect.
@@ -5013,6 +5109,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
             os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_JIT_READ);
             start = end;
         }
+#endif
     }
 
 #ifdef LISP_FEATURE_DARWIN_JIT

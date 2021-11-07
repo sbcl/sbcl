@@ -251,24 +251,35 @@
               (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
                                '(immediate))
                            any-reg) :to :eval)
-              (old-value :scs ,scs :target rax)
+              (old-value :scs ,scs #|:target rax|#)
               (new-value :scs ,scs))
+       (:vop-var vop)
        (:arg-types ,type tagged-num ,el-type ,el-type)
+       ;; if OLD-VALUE were LOCATION= to RAX then we'd clobber it
+       ;; while computing the EA for the barrier, or else we could use
+       ;; a separate temp.
        (:temporary (:sc descriptor-reg :offset rax-offset
-                        :from (:argument 2) :to :result :target value)  rax)
+                        #|:from (:argument 2)|# :to :result :target value)  rax)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 5
-         (move rax old-value)
-         (inst cmpxchg :lock
-               (ea (- (* (+ (if (sc-is index immediate) (tn-value index) 0) ,offset)
+         (let ((ea (ea (- (* (+ (if (sc-is index immediate) (tn-value index) 0) ,offset)
                          n-word-bytes)
                       ,lowtag)
                    object
                    (unless (sc-is index immediate) index)
-                   (ash 1 (- word-shift n-fixnum-tag-bits)))
-               new-value)
-         (move value rax)))))
+                   (ash 1 (- word-shift n-fixnum-tag-bits)))))
+           ,@(ecase name
+               (%compare-and-swap-svref
+                ;; store barrier needs the EA of the affected element
+                '((emit-gc-store-barrier object ea rax (vop-nth-arg 3 vop) new-value)))
+               (%instance-cas
+                ;; store barrier affects only the object's base address
+                '((emit-gc-store-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
+               (%raw-instance-cas/word))
+           (move rax old-value)
+           (inst cmpxchg :lock ea new-value)
+           (move value rax))))))
 
 (defun bignum-index-check (bignum index addend vop)
   (declare (ignore bignum index addend vop))
@@ -398,4 +409,6 @@
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+           ,@(when (member name '(instance-index-set %closure-index-set))
+               '((emit-gc-store-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
            (gen-cell-set ea value val-temp)))))

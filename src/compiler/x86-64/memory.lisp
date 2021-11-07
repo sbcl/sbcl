@@ -18,6 +18,99 @@
                  (+ nil-value (static-symbol-offset symbol) offset)
                  (make-fixup symbol :immobile-symbol offset)))))
 
+(defun stack-consed-p (object)
+  (let ((write (sb-c::tn-writes object))) ; list of write refs
+    (when (or (not write) ; grrrr, the only write is from a LOAD tn
+                          ; and we don't know the corresponding normal TN?
+              (tn-ref-next write)) ; can't determine if > 1 write
+      (return-from stack-consed-p nil))
+    (let ((vop (tn-ref-vop write)))
+      (when (not vop) ; wat?
+        (return-from stack-consed-p nil))
+      (when (eq (vop-name vop) 'allocate-vector-on-stack)
+        (return-from stack-consed-p t))
+      (when (and (eq (vop-name vop) 'fixed-alloc)
+                 (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+        (return-from stack-consed-p t))
+      ;; Should we try to detect a stack-consed LIST also?
+      ;; I don't think that will work.
+      ;; (And is there anything else interesting to try?)
+      (unless (member (vop-name vop) '(splat-word splat-small splat-any))
+        (return-from stack-consed-p nil))
+      (let* ((splat-input (vop-args vop))
+             (splat-input-source
+              (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
+        ;; How in the heck can there NOT be a vop??? Well, sometimes there isn't.
+        (when (and splat-input-source
+                   (eq (vop-name splat-input-source)
+                       'allocate-vector-on-stack))
+          (return-from stack-consed-p t)))))
+  nil)
+
+(define-load-time-global *store-barriers-potentially-emitted* 0)
+(define-load-time-global *store-barriers-emitted* 0)
+
+;;; TODOs:
+;;; 1. Sometimes people write constructors like
+;;;     (defun make-foo (&key a b c)
+;;;      (let ((new-foo (really-make-foo)))
+;;;        (when should-set-a (setf (foo-a new-foo) a))
+;;;        (when should-set-b (setf (foo-b new-foo) b))
+;;;        ...
+;;;    In this case, the asssignments are constructor-like. Even though
+;;;    they look mutating, the store barrier can be omitted.
+;;;    I think the general idea is that if a slot of a newly
+;;;    constructed thing receives the value of an incoming
+;;;    argument, the object in that argument can't possibly
+;;;    be younger than the newly constructed thing.
+;;; 2. hash-table k/v pair should mark once only.
+;;;    (the vector elements are certainly on the same card)
+(defun emit-gc-store-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn)
+  (incf *store-barriers-potentially-emitted*)
+  ;; If OBJECT is stack-allocated, elide the barrier
+  (when (stack-consed-p object)
+    (return-from emit-gc-store-barrier nil))
+  (flet ((potential-heap-pointer-p (tn tn-ref)
+           (when (sc-is tn any-reg) ; must be fixnum
+             (return-from potential-heap-pointer-p nil))
+           ;; If stack-allocated, elide the barrier
+           (when (stack-consed-p tn)
+             (return-from potential-heap-pointer-p nil))
+           ;; If immediate non-pointer, elide the barrier
+           (when (sc-is tn immediate)
+             (let ((value (tn-value tn)))
+               (when (sb-xc:typep value '(or character sb-xc:fixnum single-float boolean))
+                 (return-from potential-heap-pointer-p nil))))
+           ;; And elide for things like (OR FIXNUM NULL)
+           (let ((type (tn-ref-type tn-ref)))
+             (when (csubtypep type (specifier-type '(or character sb-xc:fixnum boolean single-float)))
+               (return-from potential-heap-pointer-p nil)))
+           t))
+    (cond (value-tn
+           (unless (eq (tn-ref-tn value-tn-ref) value-tn)
+             (aver (eq (tn-ref-load-tn value-tn-ref) value-tn)))
+           (unless (potential-heap-pointer-p value-tn value-tn-ref)
+             (return-from emit-gc-store-barrier nil)))
+          (value-tn-ref ; a list of refs linked through TN-REF-ACROSS
+           ;; (presumably from INSTANCE-SET-MULTIPLE)
+           (let ((any-pointer
+                  (do ((ref value-tn-ref (tn-ref-across ref)))
+                      ((null ref))
+                    (when (potential-heap-pointer-p (tn-ref-tn ref) ref)
+                      (return t)))))
+             (unless any-pointer
+               (return-from emit-gc-store-barrier nil))))))
+  (when (or (sc-is object immediate) (sc-is object constant))
+    (aver (symbolp (tn-value object))))
+  (incf *store-barriers-emitted*)
+  (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
+      (inst lea scratch-reg cell-address)
+      ;; OBJECT could be a symbol in immobile space
+      (inst mov scratch-reg (encode-value-if-immediate object)))
+  (inst shr scratch-reg gencgc-card-shift)
+  (inst and :dword scratch-reg card-index-mask)
+  (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) 0))
+
 (defun gen-cell-set (ea value val-temp)
   (sc-case value
    (immediate
@@ -55,8 +148,11 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) val-temp)
+  (:vop-var vop)
   (:generator 4
-    (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))
+    (let ((ea (object-slot-ea object offset lowtag)))
+      (emit-gc-store-barrier object ea val-temp (vop-nth-arg 1 vop) value)
+      (gen-cell-set ea value val-temp))))
 
 ;;; X86 special
 (define-vop (cell-xadd)

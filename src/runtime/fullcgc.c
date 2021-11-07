@@ -634,6 +634,9 @@ void execute_full_sweep_phase()
     if (sweeplog)
         fflush(sweeplog);
 
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    free_page = next_free_page;
+#else
     page_index_t first_page, last_page;
     for (first_page = 0; first_page < next_free_page; ++first_page)
         if (PAGE_WRITEPROTECTED_P(first_page)
@@ -647,6 +650,7 @@ void execute_full_sweep_phase()
                        OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
             first_page = last_page;
         }
+#endif
     while (free_page < page_table_pages) {
         page_table[free_page++].type = FREE_PAGE_FLAG;
     }

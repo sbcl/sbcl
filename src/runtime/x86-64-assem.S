@@ -73,6 +73,7 @@
 #define TRAP int3
 #endif
 
+#define CARD_TABLE_REG %r12
 #define THREAD_BASE_REG %r13
 
 #ifdef LISP_FEATURE_WIN32
@@ -215,6 +216,7 @@ Lzero:
 	# DW_OP_breg6 (rbp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
 	.cfi_escape 0x0f, 5, 0x76, 0, 6, 0x40, 0x22
 Lcall:
+	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
 	call	*CLOSURE_FUN_OFFSET(%rax)
 
 	/* If the function returned multiple values, the carry flag will be set.
@@ -281,6 +283,7 @@ GNAME(funcall_alien_callback):
 #else
         mov     (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
 #endif
+	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
 	call	*CLOSURE_FUN_OFFSET(%rax)
 
 /* Restore C regs */

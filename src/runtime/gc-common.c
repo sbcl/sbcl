@@ -1058,7 +1058,10 @@ static inline void ensure_ptr_word_writable(void* addr) {
 }
 static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
 {
+  // don't need to do anything if not using hardware page protection
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
     ensure_ptr_word_writable(addr);
+#endif
 }
 
 void smash_weak_pointers(void)

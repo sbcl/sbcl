@@ -432,12 +432,10 @@
         (inst jmp store))
 
       TRY-DYNAMIC-SPACE
-      (inst mov rdi (ea (make-fixup "gc_card_mark" :foreign-dataref)))
-      (inst mov rdi (ea rdi))
       (inst mov rax object)
       (inst shr rax gencgc-card-shift)
-      (inst and :dword rax (make-fixup nil :gc-barrier))
-      (inst mov :byte (ea rdi rax) 0)
+      (inst and :dword rax card-index-mask)
+      (inst mov :byte (ea gc-card-table-reg-tn rax) 0)
 
       STORE
       (inst mov rdi object)

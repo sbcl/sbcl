@@ -33,6 +33,7 @@
 #include "genesis/symbol.h"
 #include "forwarding-ptr.h"
 #include "core.h"
+#include "gc-private.h"
 
 #define INT3_INST 0xCC
 #define INTO_INST 0xCE
@@ -708,7 +709,15 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
        v->data[index] = v->data[index+1] = NIL;
        index += 2;
     }
+    // Wasn't the point of code serial# that you don't store
+    // code blob pointers into the various profiling buffers? (FIXME?)
     if (code) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        page_index_t page = find_page_index(&v->data[index]);
+        // technically this only needs to be unprotected if the generation
+        // of the code is younger, but the KISS principle pertains.
+        if (page >= 0) unprotect_page_index(page);
+#endif
         v->data[index] = make_lispobj(code, OTHER_POINTER_LOWTAG);
         v->data[index+1] = make_fixnum((lispobj)pc - (lispobj)code);
     } else {

@@ -309,12 +309,16 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
  */
 
 extern char* gc_card_mark;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+#define NON_FAULTING_STORE(operation, addr) { operation; }
+#else
 #define NON_FAULTING_STORE(operation, addr) { \
   page_index_t page_index = find_page_index(addr); \
   if (page_index < 0 || !PAGE_WRITEPROTECTED_P(page_index)) { operation; } \
   else { unprotect_page_index(page_index); \
          operation; \
          protect_page(page_address(page_index), page_index); }}
+#endif
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 #define OS_VM_PROT_JIT_READ OS_VM_PROT_READ
@@ -327,19 +331,26 @@ extern char* gc_card_mark;
 /* This is used by the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    int card = page_to_card_index(page_index);
+    if (gc_card_mark[card] == 1) gc_card_mark[card] = 0; // NEVER CHANGE '2' to '0'
+#else
     os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
     SET_PAGE_PROTECTED(page_index, 0);
+#endif
 }
 
-static inline void protect_page(void* page_addr, page_index_t page_index)
+static inline void protect_page(void* page_addr,
+                                __attribute__((unused)) page_index_t page_index)
 {
 #ifdef LISP_FEATURE_DARWIN_JIT
     if ((page_table[page_index].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE) {
       return;
     }
 #endif
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
     os_protect((void *)page_addr, GENCGC_CARD_BYTES, OS_VM_PROT_JIT_READ);
 
     /* Note: we never touch the write_protected_cleared bit when protecting
@@ -355,7 +366,8 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
      * But nothing is really gained by resetting the cleared flag.
      * It is explicitly zeroed on pages marked as free though.
      */
-    SET_PAGE_PROTECTED(page_index, 1);
+#endif
+    gc_card_mark[addr_to_card_index(page_addr)] = 1;
 }
 
 #else

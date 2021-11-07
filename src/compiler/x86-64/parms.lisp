@@ -20,20 +20,28 @@
 (defconstant-eqx +fixup-kinds+ #(:absolute :relative :absolute64)
   #'equalp)
 
-;;; KLUDGE: It would seem natural to set this by asking our C runtime
-;;; code for it, but mostly we need it for GENESIS, which doesn't in
-;;; general have our C runtime code running to ask, so instead we set
-;;; it by hand. -- WHN 2001-04-15
-;;;
-;;; Actually any information that we can retrieve C-side would be
-;;; useless in SBCL, since it's possible for otherwise binary
-;;; compatible systems to return different values for getpagesize().
-;;; -- JES, 2007-01-06
+;;; This size is supposed to indicate something about the actual granularity
+;;; at which you can map memory.  We just hardwire it, but that may or may not
+;;; be necessary any more.
 (defconstant +backend-page-bytes+ #+win32 65536 #-win32 32768)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
-;;; writes to old generations are logged.  With mprotect-based write
-;;; barriers, this must be a multiple of the OS page size.
+;;; writes to old generations are logged.
+;;; The size is a trade-off between efficiency of the allocator
+;;; and efficiency of scanning. Generally a card-marking GC will use cards
+;;; that are fairly small - The JVM used to use 512, I don't know if it still does.
+;;; I've heard of as small as 64 bytes being used in academic papers.
+;;; SBCL however has a problem with small sizes for two reasons:
+;;; (1) the size in which we claim memory in the slow-path allocator is exactly
+;;; the card size times a multiplier that does not work very well, and in fact
+;;; will work worse once I checkin a change to improve concurrency within the
+;;; slow path (2) heap scans can't begin at an arbitrary card because it might
+;;; the middle of a partly-boxed object. So we need to distinguish between
+;;; *strictly* boxed pages, and mixed-tagged/raw-word pages.
+;;; Alternatively, GC could try to skip over the cards at the start of a contiguous
+;;; block until it gets to the cards that are actully marked.
+;;; A good value here is 16384 but we have some bugs regarding assumptions
+;;; that this is identically +BACKEND-PAGE-BYTES+ as it always has been.
 (defconstant gencgc-card-bytes +backend-page-bytes+)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than

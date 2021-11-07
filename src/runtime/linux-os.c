@@ -338,6 +338,11 @@ int os_preinit(char *argv[], char *envp[])
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    // dynamic space should not have protections manipulated
+    if (find_page_index(address) >= 0)
+        lose("unexpected call to os_protect with software card marks");
+#endif
     if (mprotect(address, length, prot)) {
         if (errno == ENOMEM) {
             lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
