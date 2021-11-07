@@ -3832,7 +3832,7 @@ III. initially undefined function references (alphabetically):
       (resolve-deferred-known-funs)
       (resolve-static-call-fixups)
       (foreign-symbols-to-core)
-      #+(or x86 immobile-space)
+      #+(or x86 x86-64)
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb-vm::code-fixups-slot (repack-fixups (cdr pair))))
