@@ -667,10 +667,10 @@
 
               (cond
                 #+arm-softfp
-                ((and (proper-list-of-length-p tn 3)
-                      (symbolp (third tn)))
+                ((and (listp tn)
+                      (symbolp (car (last tn))))
                  (emit-template call block
-                                (template-or-lose (third tn))
+                                (template-or-lose (car (last tn)))
                                 (reference-tn (lvar-tn call block arg) nil)
                                 (reference-tn-list (butlast tn) t)))
                 (t
@@ -736,12 +736,12 @@
         (cond
           #+arm-softfp
           ((and lvar
-                (fourth result-tns))
+                (symbolp (car (last result-tns))))
            (emit-template call block
-                          (template-or-lose (fourth result-tns))
+                          (template-or-lose (car (last result-tns)))
                           (reference-tn-list (butlast result-tns 2) nil)
-                          (reference-tn (third result-tns) t))
-           (move-lvar-result call block (list (third result-tns)) lvar))
+                          (reference-tn (car (last result-tns 2)) t))
+           (move-lvar-result call block (list (car (last result-tns 2))) lvar))
           (t
            (move-lvar-result call block result-tns lvar)))))))
 
