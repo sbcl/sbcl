@@ -161,7 +161,6 @@
            (new :scs (descriptor-reg any-reg)))
     (:temporary (:sc descriptor-reg :offset rax-offset
                  :from (:argument 1) :to (:result 0)) rax)
-    #+sb-thread
     (:temporary (:sc descriptor-reg :to (:result 0)) cell)
     #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
     (:results (result :scs (descriptor-reg any-reg)))
