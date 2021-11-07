@@ -218,10 +218,8 @@
                        spec
                        (if (member :sb-xc sb-xc:*features*)
                            ;; If :sb-xc is present, then we're cross-compiling.
-                           ;; CROSS-TYPEP should not see any unknowns,
-                           ;; other than this kludge for #+win32.
-                           ;; (Compile-time test of a constant object, I think?)
-                           '(#+win32 two-way-stream)
+                           ;; CROSS-TYPEP should not see any unknowns.
+                           '()
                            ;; If :sb-xc is absent, then we're either running CL:COMPILE
                            ;; or CL:LOAD in make-host-1.
                            ;; It is permissible to make forward references to the following

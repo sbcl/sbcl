@@ -2596,4 +2596,131 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                   (concatenate 'string (subseq string 0 8) "...")
                   string)))))
 
-;;;; etc.
+
+;;;; initialization
+
+;;; the stream connected to the controlling terminal, or NIL if there is none
+(defvar *tty*)
+
+;;; the stream connected to the standard input (file descriptor 0)
+(defvar *stdin*)
+
+;;; the stream connected to the standard output (file descriptor 1)
+(defvar *stdout*)
+
+;;; the stream connected to the standard error output (file descriptor 2)
+(defvar *stderr*)
+
+;;; This is called when the cold load is first started up, and may also
+;;; be called in an attempt to recover from nested errors.
+(defun stream-cold-init-or-reset ()
+  (stream-reinit)
+  (setf *terminal-io* (make-synonym-stream '*tty*))
+  (setf *standard-output* (make-synonym-stream '*stdout*))
+  (setf *standard-input* (make-synonym-stream '*stdin*))
+  (setf *error-output* (make-synonym-stream '*stderr*))
+  (setf *query-io* (make-synonym-stream '*terminal-io*))
+  (setf *debug-io* *query-io*)
+  (setf *trace-output* *standard-output*)
+  (values))
+
+(defun stream-deinit ()
+  (setq *tty* nil *stdin* nil *stdout* nil *stderr* nil)
+  ;; Unbind to make sure we're not accidently dealing with it
+  ;; before we're ready (or after we think it's been deinitialized).
+  ;; This uses the internal %MAKUNBOUND because the CL: function would
+  ;; rightly complain that *AVAILABLE-BUFFERS* is proclaimed always bound.
+  (%makunbound '*available-buffers*))
+
+(defvar *streams-closed-by-slad*)
+
+(defun restore-fd-streams ()
+  (loop for (stream in bin n-bin out bout sout misc) in *streams-closed-by-slad*
+        do
+        (setf (ansi-stream-in stream) in)
+        (setf (ansi-stream-bin stream) bin)
+        (setf (ansi-stream-n-bin stream) n-bin)
+        (setf (ansi-stream-out stream) out)
+        (setf (ansi-stream-bout stream) bout)
+        (setf (ansi-stream-sout stream) sout)
+        (setf (ansi-stream-misc stream) misc)))
+
+(defun stdstream-external-format (fd)
+  #-win32 (declare (ignore fd))
+  (let* ((keyword (cond #+(and win32 sb-unicode)
+                        ((sb-win32::console-handle-p fd)
+                         :ucs-2)
+                        (t
+                         (default-external-format))))
+         (ef (get-external-format keyword))
+         (replacement (ef-default-replacement-character ef)))
+    `(,keyword :replacement ,replacement)))
+
+;;; This is called whenever a saved core is restarted.
+(defun stream-reinit (&optional init-buffers-p)
+  (when init-buffers-p
+    ;; Use the internal %BOUNDP for similar reason to that cited above-
+    ;; BOUNDP on a known global transforms to the constant T.
+    (aver (not (%boundp '*available-buffers*)))
+    (setf *available-buffers* nil))
+  (%with-output-to-string (*error-output*)
+    (multiple-value-bind (in out err)
+        #-win32 (values 0 1 2)
+        #+win32 (sb-win32::get-std-handles)
+      (labels (#+win32
+               (nul-stream (name inputp outputp)
+                 (let ((nul-handle
+                         (cond
+                           ((and inputp outputp)
+                            (sb-win32:unixlike-open "NUL" sb-unix:o_rdwr))
+                           (inputp
+                            (sb-win32:unixlike-open "NUL" sb-unix:o_rdonly))
+                           (outputp
+                            (sb-win32:unixlike-open "NUL" sb-unix:o_wronly))
+                           (t
+                            ;; Not quite sure what to do in this case.
+                            nil))))
+                   (make-fd-stream
+                    nul-handle
+                    :name name
+                    :input inputp
+                    :output outputp
+                    :buffering :line
+                    :element-type :default
+                    :serve-events inputp
+                    :auto-close t
+                    :external-format (stdstream-external-format nul-handle))))
+               (stdio-stream (handle name inputp outputp)
+                 (cond
+                   #+win32
+                   ((null handle)
+                    ;; If no actual handle was present, create a stream to NUL
+                    (nul-stream name inputp outputp))
+                   (t
+                    (make-fd-stream
+                     handle
+                     :name name
+                     :input inputp
+                     :output outputp
+                     :buffering :line
+                     :element-type :default
+                     :serve-events inputp
+                     :external-format (stdstream-external-format handle))))))
+        (setf *stdin*  (stdio-stream in  "standard input"  t   nil)
+              *stdout* (stdio-stream out "standard output" nil t)
+              *stderr* (stdio-stream err "standard error"  nil t))))
+    #+win32
+    (setf *tty* (make-two-way-stream *stdin* *stdout*))
+    #-win32
+    (let ((tty (sb-unix:unix-open "/dev/tty" sb-unix:o_rdwr #o666)))
+      (setf *tty*
+            (if tty
+                (make-fd-stream tty :name "the terminal"
+                                    :input t :output t :buffering :line
+                                    :external-format (stdstream-external-format tty)
+                                    :serve-events t
+                                    :auto-close t)
+                (make-two-way-stream *stdin* *stdout*))))
+    (princ (get-output-stream-string *error-output*) *stderr*))
+  (values))
+
