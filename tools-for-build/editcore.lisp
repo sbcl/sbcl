@@ -1900,9 +1900,9 @@
                (when (plusp nwords)
                  (push (make-space id addr data-page 0 nwords) spaces))))
             (#.page-table-core-entry-type-code
-             (aver (= len 3))
-             (symbol-macrolet ((nbytes (%vector-raw-bits core-header (1+ ptr)))
-                               (data-page (%vector-raw-bits core-header (+ ptr 2))))
+             (aver (= len 4))
+             (symbol-macrolet ((nbytes (%vector-raw-bits core-header (+ ptr 2)))
+                               (data-page (%vector-raw-bits core-header (+ ptr 3))))
                (aver (= data-page total-npages))
                (setq core-size (+ (* total-npages +backend-page-bytes+) nbytes))))))
         (incf core-size +backend-page-bytes+) ; add in core header page

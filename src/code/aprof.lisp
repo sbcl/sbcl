@@ -205,6 +205,13 @@
                                     ?free ?nbytes))
               (shr ?nbytes 4))
 
+        (acons (lea :qword ?end (ea 32 ?free))
+               (cmp :qword ?end :tlab-limit)
+               (jmp :nbe ?_)
+               (mov :qword :tlab-freeptr ?end)
+               (:repeat (mov . ignore))
+               (lea :qword ?result (ea #.(+ 16 sb-vm:list-pointer-lowtag) ?free)))
+
         ;; either non-headered object (cons) or unknown header or unknown nbytes
         (unknown-header (:or (lea :qword ?end (ea ?nbytes ?free ?nbytes-var))
                              (lea :qword ?end (ea 0 ?nbytes-var ?free))
@@ -485,6 +492,8 @@
                      (setq type (deduce-layout iterator bindings))))
                   ((eq type 'list) ; listify-rest-arg
                    (setq nbytes nil))
+                  ((eq type 'acons)
+                   (setq type 'list nbytes (* 2 sb-vm:cons-size sb-vm:n-word-bytes)))
                   ((member type '(any unknown-header))
                    (setq type (case lowtag
                                 (#.sb-vm:list-pointer-lowtag 'list)
