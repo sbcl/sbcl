@@ -980,7 +980,9 @@ static int trace_paths(void (*context_scanner)(),
                                   &targets, &visited,
                                   inverted_heap, &scratchpad,
                                   n_pins, pins, context_scanner, criterion);
-            if ((VECTOR(paths)->data[i] = path) != 0) ++n_found;
+            lispobj* elt = VECTOR(paths)->data + i;
+            ensure_ptr_word_writable(elt);
+            if ((*elt = path) != 0) ++n_found;
         }
         ++i;
     } while (weak_pointers != NIL);

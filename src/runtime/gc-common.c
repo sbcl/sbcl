@@ -1043,27 +1043,6 @@ trans_weak_pointer(lispobj object)
     return copy;
 }
 
-// Two helpers to avoid invoking the memory fault signal handler.
-// For clarity, distinguish between words which *actually* need to frob
-// physical (MMU-based) protection versus those which don't,
-// but are forced to call mprotect() because it's the only choice.
-// Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
-// the ensuing store toggles the WP bit without invoking the fault handler.
-static inline void ensure_ptr_word_writable(void* addr) {
-#ifdef LISP_FEATURE_GENCGC
-    page_index_t index = find_page_index(addr);
-    gc_assert(index >= 0);
-    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page_index(index);
-#endif
-}
-static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
-{
-  // don't need to do anything if not using hardware page protection
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    ensure_ptr_word_writable(addr);
-#endif
-}
-
 void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;

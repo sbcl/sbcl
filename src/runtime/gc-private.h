@@ -370,8 +370,30 @@ static inline void protect_page(void* page_addr,
     gc_card_mark[addr_to_card_index(page_addr)] = 1;
 }
 
+// Two helpers to avoid invoking the memory fault signal handler.
+// For clarity, distinguish between words which *actually* need to frob
+// physical (MMU-based) protection versus those which don't,
+// but are forced to call mprotect() because it's the only choice.
+// Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
+// the ensuing store toggles the WP bit without invoking the fault handler.
+static inline void ensure_ptr_word_writable(void* addr) {
+    page_index_t index = find_page_index(addr);
+    gc_assert(index >= 0);
+    if (PAGE_WRITEPROTECTED_P(index)) unprotect_page_index(index);
+}
+static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
+{
+  // don't need to do anything if not using hardware page protection
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
+    ensure_ptr_word_writable(addr);
+#endif
+}
+
 #else
 
+/* cheneygc */
+#define ensure_ptr_word_writable(dummy)
+#define ensure_non_ptr_word_writable(dummy)
 #define NON_FAULTING_STORE(operation, addr) operation
 
 #endif
