@@ -133,7 +133,7 @@
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
          (defconstant gencgc-card-shift
-           (integer-length (1- +backend-page-bytes+)))
+           (integer-length (1- sb-vm:gencgc-card-bytes)))
          ;; This is a constant during build, but a different value
          ;; can be patched directly into the affected machine code
          ;; when the core is loaded based on dynamic-space-size.

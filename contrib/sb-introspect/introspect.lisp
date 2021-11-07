@@ -802,22 +802,26 @@ Experimental: interface subject to change."
                          ;; bits are packed in the opposite order. And thankfully,
                          ;; this fix seems not to depend on whether the numbering
                          ;; scheme is MSB 0 or LSB 0, afaict.
-                         (let* ((index (sb-vm:find-page-index
+                         (let* ((wp
+                                 (let ((card-index
+                                        (logand
+                                         (ash (get-lisp-obj-address object) ; pinned above
+                                              (- (integer-length (1- sb-vm:gencgc-card-bytes))))
+                                         (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
+                                   (eql 1 (sb-sys:sap-ref-8
+                                           (sb-alien:extern-alien "gc_card_mark"
+                                                                  sb-sys:system-area-pointer)
+                                           card-index))))
+                                (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
-                                ;; The unused WP-CLR is for ease of counting
                                 #+big-endian
                                 ((type      (ldb (byte 5 3) flags))
-                                 (wp        (logbitp 2 flags))
-                                 (wp-clr    (logbitp 1 flags))
                                  (dontmove  (logbitp 0 flags)))
                                 #+little-endian
                                 ((type      (ldb (byte 5 0) flags))
-                                 (wp        (logbitp 5 flags))
-                                 (wp-clr    (logbitp 6 flags))
                                  (dontmove  (logbitp 7 flags))))
-                           (declare (ignore wp-clr))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
