@@ -231,6 +231,12 @@
 
 ;;;; indexed references
 
+(defun index-scale (element-size index-tn)
+  (if (sc-is index-tn immediate)
+      1
+      (ash element-size
+           (if (sc-is index-tn any-reg) (- n-fixnum-tag-bits) 0))))
+
 (sb-xc:deftype load/store-index (scale lowtag min-offset
                                  &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 16)
@@ -250,7 +256,7 @@
        (:args (object :scs (descriptor-reg) :to :eval)
               (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
                                '(immediate))
-                           any-reg) :to :eval)
+                           any-reg signed-reg unsigned-reg) :to :eval)
               (old-value :scs ,scs #|:target rax|#)
               (new-value :scs ,scs))
        (:vop-var vop)
@@ -268,7 +274,7 @@
                       ,lowtag)
                    object
                    (unless (sc-is index immediate) index)
-                   (ash 1 (- word-shift n-fixnum-tag-bits)))))
+                   (index-scale n-word-bytes index))))
            ,@(ecase name
                (%compare-and-swap-svref
                 ;; store barrier needs the EA of the affected element
@@ -303,7 +309,7 @@
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg)))
+              (index :scs (any-reg signed-reg unsigned-reg)))
        (:arg-types ,type tagged-num)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
@@ -312,7 +318,7 @@
          ,@(when (eq translate 'sb-bignum:%bignum-ref)
              '((bignum-index-check object index 0 vop)))
          (inst mov value (ea (- (* ,offset n-word-bytes) ,lowtag)
-                             object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+                             object index (index-scale n-word-bytes index)))))
      (define-vop (,(symbolicate name "-C"))
        (:translate ,translate)
        (:policy :fast-safe)
@@ -352,7 +358,7 @@
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg)))
+              (index :scs (any-reg signed-reg unsigned-reg)))
        (:info addend)
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement other-pointer-lowtag
@@ -364,7 +370,7 @@
          ,@(when (eq translate 'sb-bignum:%bignum-ref-with-offset)
              '((bignum-index-check object index addend vop)))
          (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
-                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))))
+                       object index (index-scale n-word-bytes index))))
            ,@(trap 'index)
            (inst mov value ea))))
      ;; This vop is really not ideal to have.  Couldn't we recombine two constants
@@ -396,7 +402,7 @@
        (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate))
+              (index :scs (any-reg immediate signed-reg unsigned-reg))
               (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
        (:vop-var vop)
@@ -408,7 +414,7 @@
                        (ea (- (* (+ ,offset (tn-value index)) n-word-bytes) ,lowtag)
                            object)
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
-                           object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+                           object index (index-scale n-word-bytes index)))))
            ,@(when (member name '(instance-index-set %closure-index-set))
                '((emit-gc-store-barrier object nil val-temp (vop-nth-arg 2 vop) value)))
            (gen-cell-set ea value val-temp)))))

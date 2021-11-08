@@ -304,7 +304,7 @@
   `(progn
      (define-vop (,name dvset)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg))
+              (index :scs (any-reg signed-reg unsigned-reg))
               (value :scs ,scs))
        (:info addend)
        (:arg-types ,type tagged-num
@@ -318,7 +318,7 @@
          ;; XXX: Is this good - we unpoison first, and then store? It seems wrong.
          ,@(unless (eq type 'simple-vector) '((unpoison-element object index addend)))
          (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
-                           object index (ash 1 (- word-shift n-fixnum-tag-bits)))))
+                           object index (index-scale n-word-bytes index))))
            ,@(when (eq type 'simple-vector)
                '((emit-gc-store-barrier object ea val-temp (vop-nth-arg 2 vop) value)))
            (gen-cell-set ea value val-temp))))
@@ -399,7 +399,7 @@
 
 (define-vop (svref-with-addend+if-eq)
    (:args (object :scs (descriptor-reg))
-          (index :scs (any-reg))
+          (index :scs (any-reg signed-reg unsigned-reg))
           (comparand :scs (any-reg descriptor-reg immediate)))
    (:info addend)
    (:arg-types simple-vector tagged-num * (:constant integer))
@@ -408,7 +408,7 @@
     (inst cmp :qword
           (ea (- (* (+ vector-data-offset addend) n-word-bytes) other-pointer-lowtag)
               object index
-              (ash 1 (- word-shift n-fixnum-tag-bits)))
+              (index-scale n-word-bytes index))
           (encode-value-if-immediate comparand))))
 
 (define-vop (data-vector-ref-with-offset/constant-simple-vector)
@@ -768,7 +768,7 @@
 
 (define-vop (data-vector-ref-with-offset/simple-array-double-float dvref)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
+         (index :scs (any-reg signed-reg unsigned-reg)))
   (:info addend)
   (:arg-types simple-array-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
@@ -776,8 +776,7 @@
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 7
-   (inst movsd value (float-ref-ea object index addend 8
-                                            :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
+   (inst movsd value (float-ref-ea object index addend 8 :scale (index-scale 8 index)))))
 
 (define-vop (data-vector-ref-c/simple-array-double-float dvref)
   (:args (object :scs (descriptor-reg)))
@@ -792,7 +791,7 @@
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float dvset)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg signed-reg unsigned-reg))
          (value :scs (double-reg)))
   (:info addend)
   (:arg-types simple-array-double-float tagged-num
@@ -801,9 +800,7 @@
               double-float)
   (:generator 20
    (unpoison-element object index addend)
-   (inst movsd (float-ref-ea object index addend 8
-                                      :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
-         value)))
+   (inst movsd (float-ref-ea object index addend 8 :scale (index-scale 8 index)) value)))
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float-c dvset)
   (:args (object :scs (descriptor-reg))
@@ -930,10 +927,10 @@
                                   operand-size
                                   `(,operand-size ,(if (eq mov-inst 'movzx) :dword :qword))))
              (n-bytes (the (member 1 2 4) (size-nbyte operand-size)))
-             ((index-sc scale)
+             ((index-scs scale)
               (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
-                  (values 'any-reg (ash n-bytes (- n-fixnum-tag-bits)))
-                  (values 'signed-reg n-bytes)))
+                  (values '(any-reg signed-reg unsigned-reg) `(index-scale ,n-bytes index))
+                  (values '(signed-reg unsigned-reg) n-bytes)))
              (ea-expr `(ea (+ (* vector-data-offset n-word-bytes)
                               (* addend ,n-bytes)
                               (- other-pointer-lowtag))
@@ -945,7 +942,7 @@
     `(progn
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype) dvref)
            (:args (object :scs (descriptor-reg))
-                  (index :scs (,index-sc)))
+                  (index :scs ,index-scs))
            (:info addend)
            (:arg-types ,ptype tagged-num
                        (:constant (constant-displacement other-pointer-lowtag
@@ -965,7 +962,7 @@
          ;; FIXME: these all need to accept immediate SC for the value
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype) dvset)
            (:args (object :scs (descriptor-reg) :to (:eval 0))
-                  (index :scs (,index-sc) :to (:eval 0))
+                  (index :scs ,index-scs :to (:eval 0))
                   (value :scs ,scs))
            (:info addend)
            (:arg-types ,ptype tagged-num
