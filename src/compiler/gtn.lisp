@@ -18,9 +18,15 @@
 ;;; passing locations and return conventions and TNs for local variables.
 (defun gtn-analyze (component)
   (setf (component-info component) (make-ir2-component))
-  (let ((funs (component-lambdas component)))
+  (let ((funs (component-lambdas component))
+        #+fp-and-pc-standard-save
+        (old-fp (make-old-fp-save-location))
+        #+fp-and-pc-standard-save
+        (old-pc (make-return-pc-save-location)))
     (dolist (fun funs)
-      (assign-ir2-physenv fun)
+      (assign-ir2-physenv fun
+                          #+fp-and-pc-standard-save old-fp
+                          #+fp-and-pc-standard-save old-pc)
       (assign-ir2-nlx-info fun)
       (assign-lambda-var-tns fun nil)
       (dolist (let (lambda-lets fun))
@@ -82,7 +88,8 @@
 ;;; Give CLAMBDA an IR2-PHYSENV structure. (And in order to
 ;;; properly initialize the new structure, we make the TNs which hold
 ;;; environment values and the old-FP/return-PC.)
-(defun assign-ir2-physenv (clambda)
+(defun assign-ir2-physenv (clambda #+fp-and-pc-standard-save old-fp
+                                   #+fp-and-pc-standard-save old-pc)
   (declare (type clambda clambda))
   (let* ((lambda-physenv (lambda-physenv clambda))
          (indirect-fp-tns)
@@ -114,9 +121,19 @@
                                  (xep-p clambda)))))
       (setf (physenv-info lambda-physenv) res)
       (setf (ir2-physenv-old-fp res)
-            (make-old-fp-save-location lambda-physenv))
+            #-fp-and-pc-standard-save
+            (make-old-fp-save-location lambda-physenv)
+            #+fp-and-pc-standard-save
+            old-fp)
       (setf (ir2-physenv-return-pc res)
-            (make-return-pc-save-location lambda-physenv))))
+            #-fp-and-pc-standard-save
+            (make-return-pc-save-location lambda-physenv)
+            #+fp-and-pc-standard-save
+            old-pc)
+      #+fp-and-pc-standard-save
+      (progn
+        (push old-fp (ir2-physenv-live-tns (physenv-info lambda-physenv)))
+        (push old-pc (ir2-physenv-live-tns (physenv-info lambda-physenv))))))
 
   (values))
 

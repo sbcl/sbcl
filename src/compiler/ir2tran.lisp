@@ -886,7 +886,7 @@
       (mapc (lambda (temp loc)
               (emit-move node block temp loc))
             temps locs))
-
+    #-fp-and-pc-standard-save
     (emit-move node block
                (ir2-physenv-return-pc this-env)
                (ir2-physenv-return-pc-pass
@@ -1461,6 +1461,7 @@
       (vop emit-label node block lab)
       (setf (ir2-physenv-cfp-saved-pc env) lab))
 
+    #-fp-and-pc-standard-save
     (emit-move node
                block
                (ir2-physenv-return-pc-pass env)

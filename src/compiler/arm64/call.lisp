@@ -44,21 +44,22 @@
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
-(defun make-old-fp-save-location (env)
+(defun make-old-fp-save-location ()
   ;; Unlike the other backends, ARM function calling is designed to
   ;; pass OLD-FP within the stack frame rather than in a register.  As
   ;; such, in order for lifetime analysis not to screw up, we need it
   ;; to be a stack TN wired to the save offset, not a normal TN with a
   ;; wired SAVE-TN.
-  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
-                                        control-stack-arg-scn
-                                        ocfp-save-offset)
-                         env))
-(defun make-return-pc-save-location (physenv)
-  (physenv-debug-live-tn
-   (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
-                  lra-save-offset)
-   physenv))
+  (let ((tn (make-wired-tn *fixnum-primitive-type*
+                           control-stack-arg-scn
+                           ocfp-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
+(defun make-return-pc-save-location ()
+  (let ((tn (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
+                           lra-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
 
 ;;; Make a TN for the standard argument count passing location.  We
 ;;; only need to make the standard location, since a count is never
@@ -802,15 +803,15 @@
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
-              (maybe-load-stack-tn old-fp-temp old-fp)
-              (maybe-load-stack-tn lip return-pc)
-              (move csp-tn cfp-tn)
-              (let ((cur-nfp (current-nfp-tn vop)))
-                (when cur-nfp
-                  (inst add nsp-tn cur-nfp (add-sub-immediate
-                                            (bytes-needed-for-non-descriptor-stack-frame)))))
-              (move cfp-tn old-fp-temp)
-              (lisp-return lip :known)))
+    (maybe-load-stack-tn old-fp-temp old-fp)
+    (maybe-load-stack-tn lip return-pc)
+    (move csp-tn cfp-tn)
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
+    (move cfp-tn old-fp-temp)
+    (lisp-return lip :known)))
 
 ;;;; Full call:
 ;;;

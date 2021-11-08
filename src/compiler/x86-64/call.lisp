@@ -46,16 +46,17 @@
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wired to the stack?
-(defun make-old-fp-save-location (physenv)
-  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
-                                        control-stack-sc-number
-                                        ocfp-save-offset)
-                         physenv))
-(defun make-return-pc-save-location (physenv)
-  (physenv-debug-live-tn
-   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
-                  sap-stack-sc-number return-pc-save-offset)
-   physenv))
+(defun make-old-fp-save-location ()
+  (let ((tn (make-wired-tn *fixnum-primitive-type*
+                           control-stack-sc-number
+                           ocfp-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
+(defun make-return-pc-save-location ()
+  (let ((tn (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
+                           sap-stack-sc-number return-pc-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
 
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
