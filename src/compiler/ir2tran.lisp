@@ -1395,7 +1395,7 @@
                   (emit-make-value-cell node block pass home)
                   (emit-move node block pass home))))
           (incf n))))
-
+    #-fp-and-pc-standard-save
     (emit-move node block (make-old-fp-passing-location)
                (ir2-physenv-old-fp env)))
 
