@@ -91,6 +91,12 @@ image."
                (if ,var
                    (progn ,@body (setq predecessor cell))
                    (rplacd predecessor (cdr cell))))))))
+     ;; Using different values here isn't great, but a 1 bit seemed
+     ;; the natural choice for "marked" which is fine for x86 which can
+     ;; store any immediate byte. But the architectures which can't
+     ;; have either a ZERO-TN or NULL-TN, and can store a byte from
+     ;; that register into the coverage mark. So they expect a 0
+     ;; in the low bit and therefore a 1 in the unmarked state.
      (empty-mark-word ()
        #+(or x86-64 x86) 0
        #-(or x86-64 x86) sb-ext:most-positive-word)
@@ -118,14 +124,18 @@ image."
 (defun reset-coverage (&optional object)
   "Reset all coverage data back to the `Not executed` state."
   (cond (object ; reset only this object
-         (multiple-value-bind (map code) (%find-coverage-map object)
+         (multiple-value-bind (map code)
+             (%find-coverage-map (the sb-kernel:code-component object))
            (when map
              #-arm64
              (sb-sys:with-pinned-objects (code)
-               (let ((sap (code-coverage-marks code)))
-                 (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
-                   (setf (sb-sys:sap-ref-word sap (ash i sb-vm:n-word-bytes))
-                         (empty-mark-word)))))
+               (sb-alien:alien-funcall
+                (sb-alien:extern-alien "memset"
+                                       (function sb-alien:void sb-sys:system-area-pointer
+                                                 sb-alien:int sb-alien:unsigned))
+                (code-coverage-marks code)
+                (logand (empty-mark-word) #xFF)
+                (length map)))
              #+arm64
              (fill (code-coverage-marks code) #xFF))))
         (t                              ; reset everything

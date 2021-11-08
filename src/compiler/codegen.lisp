@@ -369,6 +369,8 @@
     ;; Todo: can we implement the flow-based aspect of coverage mark compression
     ;; in IR2 instead of waiting until assembly generation?
     #+(or x86 x86-64) (coverage-mark-lowering-pass component asmstream)
+    ;; The #+(or x86 x86-64) case has _already_ output the mark bytes into
+    ;; the data section in lowering pass, so we don't do that here.
     #-(or x86 x86-64)
     (when coverage-map
       #+arm64
