@@ -357,7 +357,7 @@
                                       (or (symbol-always-has-tls-value-p (tn-value symbol))
                                           (symbol-always-has-tls-index-p (tn-value symbol)))))))
     (:temporary (:sc descriptor-reg) value-temp)
-    (:temporary (:sc descriptor-reg :offset r0-offset :from (:argument 1)) alloc-tls-symbol)
+    (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
     (:temporary (:sc non-descriptor-reg :offset nl1-offset) free-tls-index)
     (:temporary (:sc interior-reg) lip)
