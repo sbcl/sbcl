@@ -152,8 +152,8 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
+    (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value)
     (let ((ea (object-slot-ea object offset lowtag)))
-      (emit-gc-store-barrier object ea val-temp (vop-nth-arg 1 vop) value)
       (gen-cell-set ea value val-temp))))
 
 ;;; X86 special

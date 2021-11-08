@@ -2915,6 +2915,15 @@ static boolean addr_protected_p(void* addr)
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
+// FIXME: there's a glaring problem with the invariant checking for soft card marks
+// on non-large-object pages. The tests below are wrong, because there may be an
+// old->young pointer on a page that is logically WPed, provided that the page is part
+// of a contiguous block of pages containing at least one object whose header is on
+// a page that is not WPed. So the GC is correct, but verify_range is wrong,
+// and probably needs to be correct since we unconditionally perform a verify_range
+// in SAVE-LISP-AN-DIE. On the other hand, everything should have been promoted
+// into generation 5 by the time we do that, so it's probably OK to leave the bug
+// unfixed for a little while, at least until somebody notices it.
 static void
 verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 {
