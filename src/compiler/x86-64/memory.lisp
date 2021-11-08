@@ -81,6 +81,8 @@
              (let ((value (tn-value tn)))
                (when (sb-xc:typep value '(or character sb-xc:fixnum single-float boolean))
                  (return-from potential-heap-pointer-p nil))))
+           (when (sb-c::unbound-marker-tn-p tn)
+             (return-from potential-heap-pointer-p nil))
            ;; And elide for things like (OR FIXNUM NULL)
            (let ((type (tn-ref-type tn-ref)))
              (when (csubtypep type (specifier-type '(or character sb-xc:fixnum boolean single-float)))

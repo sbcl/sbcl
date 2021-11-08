@@ -150,6 +150,13 @@
   (unless (null args)
     (bug "Leftover args: ~S" args)))
 
+(defun unbound-marker-tn-p (tn)
+  (let ((writes (tn-writes tn)))
+    (and writes
+         (not (tn-ref-next writes)) ; is never changed
+         (let ((vop (tn-ref-vop writes)))
+           (and vop (eq (vop-name vop) 'make-unbound-marker))))))
+
 (defun emit-fixed-alloc (node block name words type lowtag result lvar)
   (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
     (when stack-allocate-p
