@@ -1757,7 +1757,7 @@
                (aver (= data-page original-total-npages))
                (aver (= (ceiling (space-nwords
                                   (find dynamic-core-space-id spaces :key #'space-id))
-                                 (/ +backend-page-bytes+ n-word-bytes))
+                                 (/ sb-vm:gencgc-card-bytes n-word-bytes))
                         n-ptes))
                (when verbose
                  (format t "PTE: page=~5x~40tbytes=~8x~%" data-page nbytes))

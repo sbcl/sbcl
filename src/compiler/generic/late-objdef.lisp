@@ -34,10 +34,13 @@
           (ash (slot-offset slot) word-shift))))
 
 #+gencgc
-(defconstant large-object-size
-  (* 4 (max +backend-page-bytes+ gencgc-card-bytes
-            gencgc-alloc-granularity)))
-
+(progn
+;;; don't change allocation granularity
+(assert (= gencgc-alloc-granularity 0))
+;;; cards are not larger than pages
+(assert (<= gencgc-card-bytes +backend-page-bytes+))
+;;; largeness does not depend on the hardware page size
+(defconstant large-object-size (* 4 gencgc-card-bytes)))
 
 ;;; Keep this (mostly) lined up with 'early-objdef' for sanity's sake!
 #+sb-xc-host
