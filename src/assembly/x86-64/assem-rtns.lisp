@@ -393,20 +393,18 @@
     (inst mov thread-tn (ea (make-fixup "all_threads" :foreign-dataref)))
     (inst mov thread-tn (ea thread-tn))))
 
-;;; Perform a store to code, updating the GC page (card) protection bits.
-;;; This is not a "good" implementation of soft card marking.
-;;; It is used *only* for pages of code. The real implementation (work in
-;;; progress) will differ in at least these ways:
-;;; - there will be no use of pseudo-atomic
-;;; - stores will be inlined without the helper routine below
-;;; - will be insensitive to the size of a page table entry
-;;; - will avoid use of a :lock prefix by allocating 1 byte per mark
-;;; - won't need to subtract the heap base or compare to the card count
-;;;   to compute the mark address, so will use fewer instructions.
-;;; It is similar in that for code objects (indeed most objects
-;;; except simple-vectors), it marks the object header which is
-;;; not always on the same GC card affected by the store operation
-;;;
+;;; Perform a store to code, updating the GC card mark bit.
+;;; This has two additional complications beyond the ordinary
+;;; generational barrier:
+;;; 1. immobile code uses its own card table which maps linearly
+;;;    with the page index, unlike the dynamic space card table
+;;;    that has a different way of computing a card address.
+;;; 2. code objects are so seldom written that it behooves us to
+;;;    track within each object whether it has been written,
+;;;    thereby avoiding scanning of unwritten objects.
+;;;    This is especially important for immobile space where
+;;;    it is likely that new code will be co-located on a page
+;;;    with old code due to the non-moving allocator.
 #+sb-assembling
 (define-assembly-routine (code-header-set (:return-style :none)) ()
   ;; stack: ret-pc, object, index, value-to-store
@@ -430,13 +428,11 @@
         (inst mov rdi (thread-slot-ea thread-varyobj-card-marks-slot))
         (inst bts :dword :lock (ea rdi-tn) rax)
         (inst jmp store))
-
       TRY-DYNAMIC-SPACE
       (inst mov rax object)
       (inst shr rax gencgc-card-shift)
       (inst and :dword rax card-index-mask)
       (inst mov :byte (ea gc-card-table-reg-tn rax) 0)
-
       STORE
       (inst mov rdi object)
       (inst mov rdx word-index)

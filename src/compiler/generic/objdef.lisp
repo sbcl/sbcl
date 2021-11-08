@@ -517,10 +517,6 @@ during backtrace.
   #+gencgc (unboxed-tlab :c-type "struct alloc_region" :length 4)
   ;; END of slots to keep near the beginning.
 
-  (dynspace-addr)
-  (dynspace-card-count)
-  (dynspace-pte-base)
-
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.
   ;; Kept here so that when the thread dies we can release the whole
