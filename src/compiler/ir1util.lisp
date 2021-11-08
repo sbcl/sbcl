@@ -2958,6 +2958,7 @@ is :ANY, the function name is not checked."
 ;;; from system lambdas.
 (defun preserve-single-use-debug-var-p (call var)
   (and (policy call (eql preserve-single-use-debug-variables 3))
+       (not (lambda-var-specvar var))
        (or (not (lambda-var-p var))
            (not (lambda-system-lambda-p (lambda-var-home var))))))
 
