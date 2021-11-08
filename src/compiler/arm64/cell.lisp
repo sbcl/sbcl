@@ -351,13 +351,11 @@
 #+sb-thread
 (progn
   (define-vop (dynbind)
-    (:args (value :scs (any-reg descriptor-reg) :to :save)
+    (:args (value :scs (any-reg descriptor-reg zero) :to :save)
            (symbol :scs (descriptor-reg)
                    :load-if (not (and (sc-is symbol constant)
                                       (or (symbol-always-has-tls-value-p (tn-value symbol))
-                                           (symbol-always-has-tls-index-p (tn-value symbol))
-                                          )))
-                   ))
+                                          (symbol-always-has-tls-index-p (tn-value symbol)))))))
     (:temporary (:sc descriptor-reg) value-temp)
     (:temporary (:sc descriptor-reg :offset r0-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
