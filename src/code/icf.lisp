@@ -60,13 +60,7 @@
                               (data-vector-ref
                                `(setf (svref ,@(cdr place)) newval touchedp t))
                               (value-cell-ref
-                               ;; pinned already because we're iterating over the heap
-                               ;; which disables GC, but maybe some day it won't.
-                               `(with-pinned-objects (object)
-                                  (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address object))
-                                                         (- (ash value-cell-value-slot word-shift)
-                                                            other-pointer-lowtag))
-                                        newval)))
+                               `(%primitive value-cell-set object newval))
                               (weak-pointer-value
                                ;; Preserve gencgc invariant that a weak pointer
                                ;; can't point to an object younger than itself.
@@ -77,12 +71,10 @@
                                        #+nil
                                        (warn "Can't update weak pointer ~s" object))
                                       (t
-                                       (with-pinned-objects (object)
-                                         (setf (sap-ref-lispobj
-                                                (int-sap (get-lisp-obj-address object))
-                                                (- (ash weak-pointer-value-slot word-shift)
-                                                   other-pointer-lowtag))
-                                               newval)))))
+                                       (%primitive set-slot object newval
+                                                   '(setf weak-pointer-value)
+                                                   weak-pointer-value-slot
+                                                   other-pointer-lowtag))))
                               (%primitive
                                (ecase (cadr place)
                                  (fast-symbol-global-value
@@ -118,6 +110,7 @@
             (let* ((oldval (%closure-fun object))
                    (newval (forward oldval)))
               (unless (eq newval oldval)
+                #+nil ; FIXME: gotta figure out GC marking situation here
                 (with-pinned-objects (object newval)
                   (setf (sap-ref-sap (int-sap (- (get-lisp-obj-address object)
                                                  fun-pointer-lowtag))
@@ -127,11 +120,7 @@
               (let* ((oldval (%closure-index-ref object i))
                      (newval (forward oldval)))
                 (unless (eq newval oldval)
-                  (with-pinned-objects (object)
-                    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address object))
-                                           (- (ash (+ i closure-info-offset) word-shift)
-                                              fun-pointer-lowtag))
-                          newval))))))
+                  (%closure-index-set object i newval)))))
            (ratio :override)
            ((complex rational) :override)
            (t
