@@ -144,7 +144,7 @@
     (:results (y :scs (complex-single-reg) :load-if (not (location= x y))))
     (:note "complex single float move")
     (:generator 0
-      (inst s-mov y x)))
+      (move-complex-double y x)))
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -154,7 +154,7 @@
   (:results (y :scs (complex-double-reg) :load-if (not (location= x y))))
   (:note "complex double float move")
   (:generator 0
-    (inst s-mov y x)))
+    (move-complex-double y x)))
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
@@ -243,7 +243,7 @@
   (:generator 2
     (sc-case y
       (complex-double-reg
-       (inst s-mov y x))
+       (move-complex-double y x))
       (complex-double-stack
        (storew x nfp (tn-offset y))))))
 (define-move-vop move-complex-double-float-arg :move-arg
