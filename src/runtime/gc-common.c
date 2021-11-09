@@ -196,8 +196,9 @@ void heap_scavenge(lispobj *start, lispobj *end)
     }
     // This assertion is usually the one that fails when something
     // is subtly wrong with the heap, so definitely always do it.
-    gc_assert_verbose(object_ptr == end, "Final object pointer %p, start %p, end %p\n",
-                      object_ptr, start, end);
+    if (object_ptr != end)
+        lose("heap_scavenge failure: Final object pointer %p, start %p, end %p",
+             object_ptr, start, end);
 }
 
 // Scavenge a block of memory from 'start' extending for 'n_words'

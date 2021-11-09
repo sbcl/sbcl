@@ -27,18 +27,10 @@
 /// Disable all assertions if NDEBUG
 #ifdef NDEBUG
 # define gc_assert(ex) ((void)0)
-# define gc_assert_verbose(ex, fmt, ...) ((void)0)
 #else
 # define gc_assert(ex)                                                 \
 do {                                                                   \
     if (!(ex)) gc_abort();                                             \
-} while (0)
-# define gc_assert_verbose(ex, fmt, ...)                               \
-do {                                                                   \
-    if (!(ex)) {                                                       \
-        fprintf(stderr, fmt, ## __VA_ARGS__);                          \
-        gc_abort();                                                    \
-    }                                                                  \
 } while (0)
 #endif
 
