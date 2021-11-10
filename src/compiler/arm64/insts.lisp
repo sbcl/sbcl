@@ -3175,6 +3175,26 @@
         (delete-stmt stmt)
         next))))
 
+(defpattern "lsl + lsl -> lsl" ((ubfm) (ubfm)) (stmt next)
+  (destructuring-bind (dst1 src1 immr1 imms1) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)
+      (when (and (/= imms1 63)
+                 (/= imms2 63)
+                 (= (1+ imms1) immr1)
+                 (= (1+ imms2) immr2)
+                 (location= dst1 src2)
+                 (stmt-delete-safe-p dst1 dst2
+                                     '(ash
+                                       sb-vm::ash-left-mod64
+                                       sb-vm::ash-left-modfx)))
+        (let ((shift (+ (- 63 imms1)
+                        (- 63 imms2))))
+          (when (<= shift 63)
+            (setf (stmt-operands next) (list dst2 src1 (mod (- shift) 64) (- 63 shift)))
+            (add-stmt-labels next (stmt-labels stmt))
+            (delete-stmt stmt)
+            next))))))
+
 ;;; An even number can be shifted right and then negated,
 ;;; and fixnums are even.
 (defpattern "neg + asr -> neg" ((sub) (sbfm)) (stmt next)
