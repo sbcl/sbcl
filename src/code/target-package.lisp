@@ -1001,6 +1001,8 @@ The default value of USE is implementation-dependent, and in this
 implementation it is ~S." *!default-package-use-list*)
   (prog ((name (stringify-string-designator name))
          (nicks (stringify-string-designators nicknames))
+         (package (%make-package (make-package-hashtable internal-symbols)
+                                 (make-package-hashtable external-symbols)))
          clobber)
    :restart
      (when (find-package name)
@@ -1017,19 +1019,13 @@ implementation it is ~S." *!default-package-use-list*)
        points. Consider moving the package creation form outside the ~
        scope of a block compilation."))
      (with-package-graph ()
-       ;; Check for race, signal the error outside the lock.
-       (when (and (not clobber) (find-package name))
-         (go :restart))
-       (let ((package
-               (%make-package
-                name
-                (make-package-hashtable internal-symbols)
-                (make-package-hashtable external-symbols))))
-
+         ;; Check for race, signal the error outside the lock.
+         (when (and (not clobber) (find-package name))
+           (go :restart))
+         (setf (package-%name package) name)
          ;; Do a USE-PACKAGE for each thing in the USE list so that checking for
          ;; conflicting exports among used packages is done.
          (use-package use package)
-
          ;; FIXME: ENTER-NEW-NICKNAMES can fail (ERROR) if nicknames are illegal,
          ;; which would leave us with possibly-bad side effects from the earlier
          ;; USE-PACKAGE (e.g. this package on the used-by lists of other packages,
@@ -1046,7 +1042,7 @@ implementation it is ~S." *!default-package-use-list*)
          (with-package-names (table)
            (%register-package table name package))
          (atomic-incf *package-names-cookie*)
-         (return package)))
+         (return package))
      (bug "never")))
 
 (flet ((remove-names (package name-table keep-primary-name)
