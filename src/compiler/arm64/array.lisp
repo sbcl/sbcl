@@ -395,6 +395,34 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
+(define-vop (data-vector-ref/simple-bit-vector-eq)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)) (index :scs (unsigned-reg)))
+  (:arg-types simple-bit-vector positive-fixnum)
+  (:conditional :eq)
+  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) temp x)
+  (:generator 20
+    (inst lsr temp index 6)
+    (inst add lip object (lsl temp word-shift))
+    (inst ldr x (@ lip (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
+    (inst lsr x x index)
+    (inst tst x 1)))
+
+(define-vop (data-vector-ref/simple-bit-vector-c-eq)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:info index)
+  (:arg-types simple-bit-vector (:constant index))
+  (:conditional :eq)
+  (:temporary (:scs (non-descriptor-reg)) x)
+  (:generator 15
+    (multiple-value-bind (index bit)
+        (floor index 64)
+      (inst ldr x (@ object (load-store-offset (+ (* index n-word-bytes)
+                                                  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))))
+      (inst tst x (ash 1 bit)))))
+
 ;;; And the float variants.
 (define-vop (data-vector-ref/simple-array-single-float)
   (:note "inline array access")

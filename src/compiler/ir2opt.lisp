@@ -143,7 +143,8 @@
      (flet ((reuse-if-eq-arg (value-if vop)
              ;; Most of the time this means:
              ;; if X is already NIL, don't load it again.
-             (when (and (eq (vop-name vop) 'if-eq)
+             (when (and vop
+                        (eq (vop-name vop) 'if-eq)
                         (constant-tn-p value-if))
                (let* ((args (vop-args vop))
                       (x-tn (tn-ref-tn args))
@@ -926,6 +927,41 @@
                            (vop-codegen-info vop))
         (delete-vop vop)))))
 
+#+arm64
+(defoptimizer (vop-optimize (sb-vm::data-vector-ref/simple-bit-vector-c
+                             sb-vm::data-vector-ref/simple-bit-vector))
+    (vop)
+  (let* ((next (next-vop vop))
+         (branch (and next
+                      (next-vop next))))
+    (when (and branch
+               (eq (vop-name next)
+                   'sb-vm::fast-if-eq-fixnum/c)
+               (eq (vop-name branch)
+                   'branch-if))
+      (let* ((result (tn-ref-tn (vop-results vop)))
+             (value (car (vop-codegen-info next))))
+        (when (and (not (tn-ref-next (tn-reads result)))
+                   (eq result (tn-ref-tn (vop-args next))))
+          (prog1
+              (emit-and-insert-vop (vop-node vop)
+                                   (vop-block vop)
+                                   (template-or-lose (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
+                                                         'sb-vm::data-vector-ref/simple-bit-vector-eq
+                                                         'sb-vm::data-vector-ref/simple-bit-vector-c-eq))
+                                   (reference-tn-refs (vop-args vop) nil)
+                                   nil
+                                   vop
+                                   (vop-codegen-info vop))
+            (setf (vop-codegen-info branch)
+                  (append
+                   (butlast (vop-codegen-info branch))
+                   (if (eq value 0)
+                       '((:eq))
+                       '((:ne)))))
+            (delete-vop vop)
+            (delete-vop next)))))))
+
 ;;; No need to reset the stack pointer just before returning.
 (defoptimizer (vop-optimize reset-stack-pointer) (vop)
   (loop for next = (next-vop vop) then (next-vop next)
@@ -1068,8 +1104,8 @@
     ;; Look for if/else chains before cmovs, because a cmov
     ;; affects whether the last if/else is recognizable.
     #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
-    (convert-cmovs component)
     (run-vop-optimizers component)
+    (convert-cmovs component)
     (delete-unused-ir2-blocks component))
 
   (values))

@@ -337,6 +337,18 @@
           (push-in tn-ref-next res (tn-reads tn))))
     res))
 
+(defun reference-tn-refs (refs write-p)
+  (when refs
+    (let* ((first (reference-tn (tn-ref-tn refs) write-p) )
+           (prev first))
+      (loop for tn-ref = (tn-ref-across refs) then (tn-ref-across tn-ref)
+            while tn-ref
+            do
+            (let ((ref (reference-tn  (tn-ref-tn tn-ref) write-p)))
+              (setf (tn-ref-across prev) ref)
+              (setq prev ref)))
+      first)))
+
 ;;; Make TN-REFS to reference each TN in TNs, linked together by
 ;;; TN-REF-ACROSS. WRITE-P is the WRITE-P value for the refs. MORE is
 ;;; stuck in the TN-REF-ACROSS of the ref for the last TN, or returned
