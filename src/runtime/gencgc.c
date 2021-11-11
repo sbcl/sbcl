@@ -2287,99 +2287,15 @@ static void __attribute__((unused)) pin_exact_root(lispobj obj)
 #define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
 #define IN_BOXED_REGION_P(a) IN_REGION_P(a,boxed)||IN_REGION_P(a,code)
 
-/* If the given page is not write-protected, then scan it for pointers
- * to younger generations or the top temp. generation, if no
- * suspicious pointers are found then the page is write-protected.
- *
- * Care is taken to check for pointers to any open allocation regions,
- * which by design contain younger objects.
- *
- * We return 1 if the page was write-protected, else 0.
- *
- * Note that because of the existence of some words which have fixnum lowtag
- * but are actually pointers, you might think it would be possible for this
- * function to go wrong, protecting a page that contains old->young pointers.
- * Indeed the edge cases are rare enough not to have manifested ever,
- * as far anyone knows.
- *
- * Suspect A is CLOSURE-FUN, which is a fixnum (on x86) which when treated
- * as a pointer indicates the entry point to call. Its function can never
- * be an object younger than itself. (An invariant of any immutable object)
- *
- * Suspect B is FDEFN-RAW-ADDRESS. This is a problem, but only under worst-case
- * assumptions. Previous remarks here mentioned pinning and/or absence of calls
- * to update_page_write_prot(). That explanation was flawed, as is almost
- * anything in GC comments mentioning the obsolete pinning code.
- * See 'doc/internals-notes/fdefn-gc-safety' for execution schedules
- * that lead to invariant loss.
- */
-static int
-update_page_write_prot(page_index_t page)
+/* Return true if 'ptr' is OK to be on a write-protected page
+ * of an object in 'gen'. That is, if the pointer does not point to a younger object */
+static boolean ptr_ok_to_writeprotect(void* ptr, generation_index_t gen)
 {
-    generation_index_t gen = page_table[page].gen;
-    sword_t j;
-    int wp_it = 1;
-    lispobj *page_addr = (lispobj*)page_address(page);
-    sword_t num_words = page_bytes_used(page) / N_WORD_BYTES;
+    page_index_t index;
+    lispobj __attribute__((unused)) header;
 
-    /* Shouldn't be a free page. */
-    gc_dcheck(!page_free_p(page)); // Implied by the next assertion
-    gc_assert(page_bytes_used(page) != 0);
-
-    if (!ENABLE_PAGE_PROTECTION) return 0;
-
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    // If the page is unboxed or either already protected (byte = 1),
-    // or not protected and referenced from the stack (byte = 2) then do nothing.
-    if (!page_boxed_p(page) || gc_card_mark[page_to_card_index(page)]) return 0;
-#else
-    /* Skip if it's unboxed, already write-protected, or pinned */
-    /* The 'pinned' check is sort of bogus but sort of necessary,
-     * but doesn't completely fix the problem that it tries to, which is
-     * passing a memory address to the OS for it to write into.
-     * An object on a never-written protected page would still fail.
-     * It's probably rare to pass boxed pages to the OS, but it could be
-     * to read fixnums into a simple-vector.
-     * If we had soft write protection (mark bits) instead of physical
-     * protection, then we could/would protect pinned pages.
-     * (See git rev 216e37a316) */
-    if (PAGE_WRITEPROTECTED_P(page) || !page_boxed_p(page) ||
-        page_table[page].pinned)
-        return (0);
-#endif
-
-    /* Scan the page for pointers to younger generations or the
-     * temp generation, which is numerically 7 but logically younger */
-
-    /* This is conservative: any word satisfying is_lisp_pointer() is
-     * assumed to be a pointer. To do otherwise would require a family
-     * of scavenge-like functions. */
-    for (j = 0; j < num_words; j++) {
-        void *ptr;
-        page_index_t index;
-        lispobj __attribute__((unused)) header;
-
-        lispobj word = page_addr[j];
-        if (is_lisp_pointer(word))
-            ptr = (void*)word;
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        else if (lowtag_of(word>>32)==INSTANCE_POINTER_LOWTAG &&
-                 (header_widetag(word)==INSTANCE_WIDETAG||
-                  header_widetag(word)==FUNCALLABLE_INSTANCE_WIDETAG)) {
-            ptr = (void*)(word >> 32);
-        }
-#endif
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        else if (!(word & LOWTAG_MASK) && (find_page_index((void*)word) >= 0)
-                 && widetag_of((lispobj*)word) == FDEFN_WIDETAG) {
-            ptr = (void*)word;
-        }
-#endif
-        else
-            continue;
-
-        /* Check that it's in the dynamic space */
-        if ((index = find_page_index(ptr)) != -1) {
+    /* Check that it's in the dynamic space */
+    if ((index = find_page_index(ptr)) != -1) {
             int pointee_gen = page_table[index].gen;
             if (/* Does it point to a younger or the temp. generation? */
                 (pointee_gen < gen || pointee_gen == SCRATCH_GENERATION) &&
@@ -2388,8 +2304,7 @@ update_page_write_prot(page_index_t page)
                 (((lispobj)ptr & (GENCGC_CARD_BYTES-1)) < page_bytes_used(index) ||
                  ((page_table[index].type & OPEN_REGION_PAGE_FLAG)
                   && (IN_BOXED_REGION_P(ptr) || IN_REGION_P(ptr,unboxed))))) {
-                wp_it = 0;
-                break;
+                return 0;
             }
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -2421,17 +2336,117 @@ update_page_write_prot(page_index_t page)
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.
             if (pointee_gen < gen || pointee_gen == SCRATCH_GENERATION) {
-                wp_it = 0;
-                break;
+                return 0;
             }
         }
 #endif
+    return 1;
+}
+
+/* Given a range of pages at least one of which is not WPed (logically or physically,
+ * depending on SOFT_CARD_MARKS), scan all those pages for pointers to younger generations.
+ * If no such pointers are found, then write-protect the range.
+ *
+ * Care is taken to check for pointers to any open allocation regions,
+ * which by design contain younger objects.
+ *
+ * Note that because of the existence of some words which have fixnum lowtag
+ * but are actually pointers, you might think it would be possible for this
+ * function to go wrong, protecting a page that contains old->young pointers.
+ * Indeed the edge cases are rare enough not to have manifested ever,
+ * as far anyone knows.
+ *
+ * Suspect A is CLOSURE-FUN, which is a fixnum (on x86) which when treated
+ * as a pointer indicates the entry point to call. Its function can never
+ * be an object younger than itself. (An invariant of any immutable object)
+ *
+ * Suspect B is FDEFN-RAW-ADDRESS. This is a problem, but only under worst-case
+ * assumptions. Previous remarks here mentioned pinning and/or absence of calls
+ * to update_page_write_prot(). That explanation was flawed, as is almost
+ * anything in GC comments mentioning the obsolete pinning code.
+ * See 'doc/internals-notes/fdefn-gc-safety' for execution schedules
+ * that lead to invariant loss.
+ */
+#define STICKY_MARK 2
+
+static void
+update_writeprotection(page_index_t first_page, page_index_t last_page,
+                       lispobj* start, lispobj* limit)
+{
+    /* Shouldn't be a free page. */
+    gc_dcheck(!page_free_p(first_page)); // Implied by the next assertion
+    gc_assert(page_bytes_used(first_page) != 0);
+
+    if (!ENABLE_PAGE_PROTECTION) return;
+    if (!page_boxed_p(first_page)) return;
+
+    {
+    page_index_t page;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    /* If any page is referenced from the stack (mark byte = 2), then we're
+     * can not apply protection even if we see no witness, because the
+     * absence of synchronization between mutator and GC means that the next
+     * instruction issued when the mutator resumes might create the witness,
+     * and it thinks it already marked a card */
+    for (page = first_page; page <= last_page; ++page)
+        if (gc_card_mark[page_to_card_index(page)] == STICKY_MARK) return;
+#else
+    /* Skip if any page is pinned.
+     * The 'pinned' check is sort of bogus but sort of necessary,
+     * but doesn't completely fix the problem that it tries to, which is
+     * passing a memory address to the OS for it to write into.
+     * An object on a never-written protected page would still fail.
+     * It's probably rare to pass boxed pages to the OS, but it could be
+     * to read fixnums into a simple-vector. */
+    for (page = first_page; page <= last_page; ++page)
+        if (page_table[page].pinned) return;
+#endif
     }
 
-    if (wp_it == 1)
-        protect_page(page_addr, page);
+    /* Now we attempt to find any 1 "witness" that the pages should NOT be protected.
+     * If such witness is found, then return without doing anything, otherwise
+     * apply protection to the range. */
 
-    return (wp_it);
+    /* Scan the page for pointers to younger generations or the
+     * temp generation, which is numerically 7 but logically younger */
+
+    /* This is conservative: any word satisfying is_lisp_pointer() is
+     * assumed to be a pointer. To do otherwise would require a family
+     * of scavenge-like functions. FIXME: we might actually benefit
+     * from being precise, now that we do know the entire valid range */
+    generation_index_t gen = page_table[first_page].gen;
+    lispobj* where;
+    for (where = start; where < limit; ++where) {
+        lispobj word = *where;
+        void* ptr;
+        if (is_lisp_pointer(word))
+            ptr = (void*)word;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+        else if (lowtag_of(word>>32)==INSTANCE_POINTER_LOWTAG &&
+                 (header_widetag(word)==INSTANCE_WIDETAG||
+                  header_widetag(word)==FUNCALLABLE_INSTANCE_WIDETAG)) {
+            ptr = (void*)(word >> 32);
+        }
+#endif
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+        else if (!(word & LOWTAG_MASK) && (find_page_index((void*)word) >= 0)
+                 && widetag_of((lispobj*)word) == FDEFN_WIDETAG) {
+            ptr = (void*)word;
+        }
+#endif
+        else
+            continue;
+        if (!ptr_ok_to_writeprotect(ptr, gen)) return;
+      }
+
+    page_index_t page;
+    for (page = first_page; page <= last_page; ++page)
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        protect_page(page_address(page), page); // just do it, there's zero overhead
+#else
+      if (!PAGE_WRITEPROTECTED_P(page)) // Try to avoid a system call
+          protect_page(page_address(page), page);
+#endif
 }
 
 /* Is this page holding a normal (non-weak, non-hashtable) large-object
@@ -2447,6 +2462,31 @@ static inline boolean large_simple_vector_p(page_index_t page) {
     // ratio of HWM to total size warrants it, we should prefer to use the
     // large_simple_vector optimization instead.
     return ordinary_simple_vector_p(header);
+}
+
+void update_large_vector_writeprotection(page_index_t page)
+{
+    if (!ENABLE_PAGE_PROTECTION) return;
+
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    // If the page is either already protected (byte = 1),
+    // or not protected and referenced from the stack (byte = 2) then do nothing.
+    if (gc_card_mark[page_to_card_index(page)]) return;
+#else
+    /* Same idea as in update_writeprotection */
+    if (PAGE_WRITEPROTECTED_P(page) || page_table[page].pinned) return;
+#endif
+    /* Since this is a SIMPLE-VECTOR, there are no raw words as elements,
+     * nor complications such as untagged fdefn pointers or LAYOUT pointers.
+     * Therefore this scan for young objects is 100% precise */
+    lispobj *where = (lispobj*)page_address(page);
+    lispobj *limit = (lispobj*)(page_bytes_used(page) + (char*)where);
+    generation_index_t gen = page_table[page].gen;
+    for ( ; where < limit; ++where) {
+        lispobj word = *where;
+        if (is_lisp_pointer(word) && !ptr_ok_to_writeprotect((void*)word, gen)) return;
+    }
+    protect_page(page_address(page), page);
 }
 
 /* Attempt to re-protect code from first_page to last_page inclusive.
@@ -2529,14 +2569,14 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                 if (!PAGE_WRITEPROTECTED_P(i)) {
                     scavenge((lispobj*)page_address(i) + 2,
                              GENCGC_CARD_BYTES / N_WORD_BYTES - 2);
-                    update_page_write_prot(i);
+                    update_large_vector_writeprotection(i);
                 }
                 while (!page_ends_contiguous_block_p(i, generation)) {
                     ++i;
                     if (!PAGE_WRITEPROTECTED_P(i)) {
                         scavenge((lispobj*)page_address(i),
                                  page_bytes_used(i) / N_WORD_BYTES);
-                        update_page_write_prot(i);
+                        update_large_vector_writeprotection(i);
                     }
                 }
             } else {
@@ -2555,13 +2595,10 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                     heap_scavenge(start, limit);
                     /* Now scan the pages and write protect those that
                      * don't have pointers to younger generations. */
-                    if (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[i].type)) {
+                    if (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[i].type))
                         update_code_writeprotection(i, last_page, start, limit);
-                    } else {
-                        page_index_t j;
-                        for (j = i; j <= last_page; j++) // scan by page
-                            update_page_write_prot(j);
-                    }
+                    else
+                        update_writeprotection(i, last_page, start, limit);
                 }
                 i = last_page;
             }
@@ -2912,18 +2949,44 @@ static boolean addr_protected_p(void* addr)
     lose("addr_protected_p(%p)", addr);
 }
 
+static boolean addr_range_protected_p(lispobj* addr)
+{
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p((lispobj)addr))
+        return immobile_card_protected_p(addr);
+#endif
+    /* Large simple-vectors on single-object pages will scan exactly the pages
+     * which have been marked. Therefore we test only the page containing 'addr'
+     * for whether it was marked */
+    page_index_t page = find_page_index(addr);
+    lispobj* base = page_scan_start(page);
+    if (page_single_obj_p(page) && widetag_of(base) == SIMPLE_VECTOR_WIDETAG)
+        return PAGE_WRITEPROTECTED_P(page);
+
+    /* Otherwise, use the same logic as scavenge_root_gens() to decide whether any
+     * of the pages in a contiguous range containing 'addr' were touched */
+    page_index_t i = find_page_index(base);
+    generation_index_t generation = page_table[i].gen;
+    page_index_t last_page;
+    boolean write_protected = 1;
+    /* Now work forward until the end of the region */
+    for (last_page = i; ; last_page++) {
+        write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
+        if (page_ends_contiguous_block_p(last_page, generation))
+          break;
+    }
+    return write_protected;
+#else
+    // no soft card marks - the protection state is the physical protection
+    // of the specified address.
+    return addr_protected_p(addr);
+#endif
+}
+
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
-// FIXME: there's a glaring problem with the invariant checking for soft card marks
-// on non-large-object pages. The tests below are wrong, because there may be an
-// old->young pointer on a page that is logically WPed, provided that the page is part
-// of a contiguous block of pages containing at least one object whose header is on
-// a page that is not WPed. So the GC is correct, but verify_range is wrong,
-// and probably needs to be correct since we unconditionally perform a verify_range
-// in SAVE-LISP-AN-DIE. On the other hand, everything should have been promoted
-// into generation 5 by the time we do that, so it's probably OK to leave the bug
-// unfixed for a little while, at least until somebody notices it.
 static void
 verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 {
@@ -3033,7 +3096,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     generation_index_t from_gen
                         = gen_of(find_page_index((lispobj*)vaddr) >= 0 ?
                                  vaddr : (lispobj)state->object_start);
-                    FAIL_IF(to_gen < from_gen && addr_protected_p((lispobj*)vaddr),
+                    FAIL_IF(to_gen < from_gen && addr_range_protected_p((lispobj*)vaddr),
                             "younger obj from WP page");
                 }
                 int valid;
@@ -3520,8 +3583,6 @@ void pin_stack(struct thread* th) {
 
 }
 #endif
-
-#define STICKY_MARK 2
 
 #if !GENCGC_IS_PRECISE
 static void __attribute__((unused))
