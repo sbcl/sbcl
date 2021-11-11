@@ -933,14 +933,20 @@
     (vop)
   (let* ((next (next-vop vop))
          (branch (and next
-                      (next-vop next))))
+                      (next-vop next)))
+         plusp)
     (when (and branch
-               (eq (vop-name next)
-                   'sb-vm::fast-if-eq-fixnum/c)
+               (or
+                (eq (vop-name next) 'sb-vm::fast-if-eq-fixnum/c)
+                (and (eq (vop-name next) 'sb-vm::fast-if->-c/fixnum)
+                     (equal (vop-codegen-info next) '(0))
+                     (setf plusp t)))
                (eq (vop-name branch)
                    'branch-if))
       (let* ((result (tn-ref-tn (vop-results vop)))
-             (value (car (vop-codegen-info next))))
+             (value (if plusp
+                        1
+                        (car (vop-codegen-info next)))))
         (when (and (not (tn-ref-next (tn-reads result)))
                    (eq result (tn-ref-tn (vop-args next))))
           (prog1
