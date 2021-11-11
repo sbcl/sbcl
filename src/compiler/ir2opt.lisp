@@ -543,6 +543,8 @@
             (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
                   for arg in (nreverse (vop-arg-list prev))
                   do (change-tn-ref-tn tn-ref arg)))
+          (setf (sb-assem::label-comment (car (vop-codegen-info branch-if)))
+                :merged-ifs)
           (delete-vop next))))))
 
 (defun next-start-vop (block)

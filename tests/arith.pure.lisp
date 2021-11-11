@@ -978,3 +978,14 @@
          (zerop (ash a m)))
     ((1 0) nil)
     ((0 1) t)))
+
+(with-test (:name :signum-merged-branch-if)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a y)
+      (declare (fixnum a y))
+      (when (< y 10)
+        (signum a)))
+   ((1 5) 1)
+   ((0 5) 0)
+   ((-1 5) -1)))

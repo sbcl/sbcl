@@ -2999,25 +2999,26 @@
         (when (and (eql cmp 0)
                    (eq target zr-tn))
           (destructuring-bind (flag label) (stmt-operands next)
-            (when (case flag
-                    (:eq
-                     (setf (stmt-mnemonic stmt) 'cbz
-                           (stmt-operands stmt)
-                           (list value label)))
-                    (:ne
-                     (setf (stmt-mnemonic stmt) 'cbnz
-                           (stmt-operands stmt)
-                           (list value label)))
-                    (:ge
-                     (setf (stmt-mnemonic stmt) 'tbz*
-                           (stmt-operands stmt)
-                           (list value (1- n-word-bits) label)))
-                    (:lt
-                     (setf (stmt-mnemonic stmt) 'tbnz*
-                           (stmt-operands stmt)
-                           (list value (1- n-word-bits) label))))
-              (delete-stmt next)
-              next-next)))))))
+            (unless (eq (sb-assem::label-comment label) :merged-ifs)
+              (when (case flag
+                      (:eq
+                       (setf (stmt-mnemonic stmt) 'cbz
+                             (stmt-operands stmt)
+                             (list value label)))
+                      (:ne
+                       (setf (stmt-mnemonic stmt) 'cbnz
+                             (stmt-operands stmt)
+                             (list value label)))
+                      (:ge
+                       (setf (stmt-mnemonic stmt) 'tbz*
+                             (stmt-operands stmt)
+                             (list value (1- n-word-bits) label)))
+                      (:lt
+                       (setf (stmt-mnemonic stmt) 'tbnz*
+                             (stmt-operands stmt)
+                             (list value (1- n-word-bits) label))))
+                (delete-stmt next)
+                next-next))))))))
 
 (defpattern "tst one bit + branch" ((ands) (b)) (stmt next)
   (let ((next-next (stmt-next next)))
