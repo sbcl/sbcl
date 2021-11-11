@@ -94,6 +94,7 @@
                    (:layout (get-lisp-obj-address
                              (wrapper-friend (if (symbolp name) (find-layout name) name))))
                    (:layout-id (layout-id name))
+                   #+gencgc
                    (:gc-barrier
                     ;; in theory this would depend on the particular backend
                     ;; and gc strategy. Just kludge it for now.
