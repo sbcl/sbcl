@@ -188,65 +188,6 @@
                (ash header-word (- hash-slot-present-flag))
                1))))
 
-;;; * If symbols are 7 words incl header, as they are on 32-bit w/threads,
-;;;   then the part of NIL that manifests as symbol slots consumes 6 words
-;;;   (less the header) because NIL's symbol widetag precedes it by 1 word.
-;;;   So, there are 6 post-header words and 2 pre-header: one containing
-;;;   the widetag (not that it is ever read), and one 0 word.
-;;; * If symbols are 6 words incl header, as they are on 64-bit and
-;;;   32-bit w/o threads, then the symbol-like part of NIL is 5 words,
-;;;   which aligns up to 6, plus the two pre-header words.
-;;; So either way, NIL's alignment padding makes it come out to 8 words in total.
-(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
-
-;;; It's unclear to me whether reinventing sizetab[] in lisp is strictly
-;;; an improvement over doing the obvious:
-;;;  (WITH-PINNED-OBJECTS (object) (alien-funcall "ext_lispboj_size" ...))
-;;; It certainly doesn't feel that it's better, but it has significantly less overhead
-;;; at least on cheneygc if not also on the precise gencgc platforms.
-;;; But see WITH-PINNED-OBJECT-ITERATOR in 'target-hash-table' which offers
-;;; a way to mitigate the need to bind/unbind a special var when doing a massive
-;;; numbers of WITH-PINNED-OBJECT operations.
-(defun primitive-object-size (object)
-  "Return number of bytes of heap or stack directly consumed by OBJECT"
-  (unless (is-lisp-pointer (get-lisp-obj-address object))
-    (return-from primitive-object-size 0))
-  (let ((words
-         ;; This should pick off the most frequently-occurring things first.
-         ;; CONS and INSTANCE of course top the list.
-         (typecase object
-           (list (if object 2 sizeof-nil-in-words))
-           (instance (1+ (instance-length object)))
-           (function
-            (when (= (%fun-pointer-widetag object) simple-fun-widetag)
-              (return-from primitive-object-size
-                (code-object-size (fun-code-header (truly-the simple-fun object)))))
-            (1+ (get-closure-length object)))
-           ;; Must be an OTHER pointer now
-           (code-component
-            (return-from primitive-object-size (code-object-size object)))
-           (fdefn 4) ; constant length not stored in the header
-           ((satisfies array-header-p)
-            (+ array-dimensions-offset (array-rank object)))
-           ((simple-array nil (*)) 2) ; no payload
-           (bignum
-            #+bignum-assertions
-            (+ (* (sb-bignum:%bignum-length object) 2) 2)
-            #-bignum-assertions
-            ;; 64-bit machines might want to store the bignum length in the upper 4
-            ;; bytes of the header which would simplify %bignum-set-length.
-            (1+ (sb-bignum:%bignum-length object)))
-           (t
-            (let ((room-info (aref *room-info* (%other-pointer-widetag object))))
-              (if (typep room-info 'specialized-array-element-type-properties)
-                  (let ((n-data-octets (vector-n-data-octets object room-info)))
-                    (+ (ceiling n-data-octets n-word-bytes) ; N data words
-                       vector-data-offset))
-                  ;; GET-HEADER-DATA works for everything that's left
-                  (1+ (logand (get-header-data object)
-                              (room-info-mask room-info)))))))))
-        (* (align-up words 2) n-word-bytes)))
-
 ;;; Macros not needed after this file (and avoids a redefinition warning this way)
 (eval-when (:compile-toplevel)
 (defmacro widetag@baseptr (sap)
@@ -304,25 +245,6 @@
        (alien-funcall (extern-alien "ldb_monitor" (function void))))
      #-sb-devel
      (aver (sap= start end)))))
-
-;;; Test the sizing function ASAP, because if it's broken, then MAP-ALLOCATED-OBJECTS
-;;; is too, and then creating the initial core will crash because of the various heap
-;;; traversals performed in SAVE-LISP-AND-DIE. Don't delay a crash.
-(dovector (saetp *specialized-array-element-type-properties*)
-  (let ((length 0) (et (saetp-specifier saetp)))
-    (loop (let* ((array (make-array length :element-type et))
-                 (size-from-lisp (primitive-object-size array))
-                 (size-from-c
-                  (with-pinned-objects (array)
-                    (alien-funcall (extern-alien "ext_lispobj_size" (function unsigned unsigned))
-                                   (logandc2 (get-lisp-obj-address array) lowtag-mask)))))
-            (unless (= size-from-lisp size-from-c)
-              (bug "size calculation mismatch on ~S" array))
-            ;; Stop after enough trials to hit all the edge case
-            (when (or (>= size-from-lisp (* 8 sb-vm:n-word-bytes))
-                      (and (eq et nil) (>= length 4))) ; always 2 words
-              (return))
-            (incf length)))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS

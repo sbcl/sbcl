@@ -2519,6 +2519,7 @@ void gc_heapsort_uwords(heap array, int length)
 }
 
 /// External function for calling from Lisp.
-page_index_t ext_lispobj_size(lispobj *addr) {
+uword_t primitive_object_size(lispobj ptr) {
+    lispobj* addr = native_pointer(ptr);
     return OBJECT_SIZE(*addr,addr) * N_WORD_BYTES;
 }

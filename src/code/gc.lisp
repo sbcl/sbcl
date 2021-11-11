@@ -77,6 +77,27 @@ SB-PROFILE package does), or to design a more microefficient interface
 and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
+
+;;; * If symbols are 7 words incl header, as they are on 32-bit w/threads,
+;;;   then the part of NIL that manifests as symbol slots consumes 6 words
+;;;   (less the header) because NIL's symbol widetag precedes it by 1 word.
+;;;   So, there are 6 post-header words and 2 pre-header: one containing
+;;;   the widetag (not that it is ever read), and one 0 word.
+;;; * If symbols are 6 words incl header, as they are on 64-bit and
+;;;   32-bit w/o threads, then the symbol-like part of NIL is 5 words,
+;;;   which aligns up to 6, plus the two pre-header words.
+;;; So either way, NIL's alignment padding makes it come out to 8 words in total.
+(defconstant sb-vm::sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
+
+(defun primitive-object-size (object)
+  "Return number of bytes of heap or stack directly consumed by OBJECT"
+  (cond ((not (sb-vm:is-lisp-pointer (get-lisp-obj-address object))) 0)
+        ((eq object nil) (ash sb-vm::sizeof-nil-in-words sb-vm:word-shift))
+        ((simple-fun-p object) (code-object-size (fun-code-header object)))
+        (t
+         (with-alien ((sizer (function unsigned unsigned) :extern "primitive_object_size"))
+           (with-pinned-objects (object)
+             (alien-funcall sizer (get-lisp-obj-address object)))))))
 
 ;;;; GC hooks
 
