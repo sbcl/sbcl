@@ -1170,11 +1170,12 @@ implementation it is ~S." *!default-package-use-list*)
                   (dolist (used (package-use-list package))
                     (unuse-package used package))
                   (setf (package-%local-nicknames package) nil)
-                  ;; FIXME: lacking a way to advise UNINTERN that this package
-                  ;; is pending deletion, a large package conses successively
-                  ;; many smaller tables for no good reason.
-                  (do-symbols (sym package)
-                    (unintern sym package))
+                  (flet ((nullify-home (symbols)
+                           (dovector (x (package-hashtable-cells symbols))
+                             (when (and (symbolp x) (eq (symbol-package x) package))
+                               (%set-symbol-package x nil)))))
+                    (nullify-home (package-internal-symbols package))
+                    (nullify-home (package-external-symbols package)))
                   (with-package-names (table)
                     (remove-names package table nil)
                     (setf (package-%name package) nil
