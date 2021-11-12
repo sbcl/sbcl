@@ -18,12 +18,7 @@
   (defknown symbol-extra (t) t (flushable))
   (def-reffer 'symbol-extra symbol-size other-pointer-lowtag)
   (defknown (setf symbol-extra) (t t) t ())
-  (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag)
-  ;; I don't feel a pressing need to add even more syntax to DEFINE-PRIMITIVE-OBJECT
-  ;; informing it not to generate code automatically for :SET-KNOWN on this slot.
-  ;; Just clear the IR2-CONVERT handler.
-  #+(or x86 x86-64)
-  (setf (sb-c::fun-info-ir2-convert (info :function :info '(setf %code-debug-info))) nil))
+  (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
 
 (defconstant extended-symbol-size (1+ symbol-size))
 

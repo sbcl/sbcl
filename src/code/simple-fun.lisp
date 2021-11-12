@@ -370,14 +370,14 @@
 
 ;;;; CODE-COMPONENT
 
-#+(or x86 x86-64)
-(progn ; software mark bits require that these go through the CODE-HEADER-SET vop
+;;; software mark bits on pages of code require that all assignments to
+;;; header slots go through the CODE-HEADER-SET vop,
+;;; which is slightly different from the general soft card mark implementation
+;;; for historical reasons.
+#-darwin-jit
 (defun (setf %code-debug-info) (newval code)
   (code-header-set code sb-vm::code-debug-info-slot newval)
   newval)
-(defun (setf sb-vm::%code-fixups) (newval code)
-  (code-header-set code sb-vm::code-fixups-slot newval)
-  newval))
 
 (defun %code-debug-info (code-obj)
   ;; Extract the unadulterated debug-info emitted by the compiler. The slot
@@ -387,6 +387,11 @@
         (car info)
         ;; return it unchanged in all other cases
         info)))
+
+#+(or x86 x86-64)
+(defun (setf sb-vm::%code-fixups) (newval code)
+  (code-header-set code sb-vm::code-fixups-slot newval)
+  newval)
 
 (declaim (inline code-obj-is-filler-p))
 (defun code-obj-is-filler-p (code-obj)

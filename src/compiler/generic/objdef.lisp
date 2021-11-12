@@ -196,12 +196,11 @@ during backtrace.
   ;; for the assembler code component, a cons holding a hash-table.
   ;; (the cons points from read-only to static space, but the hash-table
   ;; wants to be in dynamic space)
+  ;; The corresponding SETF function is defined using code-header-set
+  ;; on the slot index; and there's a special variant if #+darwin-jit.
   (debug-info :type t
               :ref-known (flushable)
-              :ref-trans %%code-debug-info
-              :set-known ()
-              :set-trans (setf #-darwin-jit %code-debug-info
-                               #+darwin-jit %%code-debug-info))
+              :ref-trans %%code-debug-info)
   ;; Define this slot if the architecture might ever use fixups.
   ;; x86-64 doesn't necessarily use them, depending on the feature set,
   ;; but this keeps things consistent.
