@@ -1481,43 +1481,29 @@
     ;; For non-x86 ports the presence of a save-tn associated with a
     ;; tn is used to identify the old-fp and return-pc tns. It depends
     ;; on the old-fp and return-pc being passed in registers.
-    #-fp-and-pc-standard-save
-    (when (and (not (eq (tn-kind tn) :specified-save))
+    (when (and #-fp-and-pc-standard-save
+               (not (eq (tn-kind tn) :specified-save))
                (conflicts-in-sc original sc offset))
-      (error "~S is wired to a location that it conflicts with." tn))
+      (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
+             tn offset sc (tn-kind tn)))
 
     ;; Use the above check, but only print a verbose warning. This can
     ;; be helpful for debugging the x86 port.
     #+nil
     (when (and (not (eq (tn-kind tn) :specified-save))
                (conflicts-in-sc original sc offset))
-          (format t "~&* Pack-wired-tn possible conflict:~%  ~
+      (format t "~&* Pack-wired-tn possible conflict:~%  ~
                      tn: ~S; tn-kind: ~S~%  ~
                      sc: ~S~%  ~
                      sb: ~S; sb-name: ~S; sb-kind: ~S~%  ~
                      offset: ~S; end: ~S~%  ~
                      original ~S~%  ~
                      tn-save-tn: ~S; tn-kind of tn-save-tn: ~S~%"
-                  tn (tn-kind tn) sc
-                  sb (sb-name sb) (sb-kind sb)
-                  offset end
-                  original
-                  (tn-save-tn tn) (tn-kind (tn-save-tn tn))))
-
-    ;; On the x86 ports the old-fp and return-pc are often passed on
-    ;; the stack so the above hack for the other ports does not always
-    ;; work. Here the old-fp and return-pc tns are identified by being
-    ;; on the stack in their standard save locations.
-    #+fp-and-pc-standard-save
-    (when (and (not (and
-                     (= (sc-number sc) #.(sc+offset-scn old-fp-passing-offset))
-                     (= offset #.(sc+offset-offset old-fp-passing-offset))))
-               (not (and
-                     (= (sc-number sc) #.(sc+offset-scn return-pc-passing-offset))
-                     (= offset #.(sc+offset-offset return-pc-passing-offset))))
-               (conflicts-in-sc original sc offset))
-      (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
-             tn offset sc (tn-kind tn)))
+              tn (tn-kind tn) sc
+              sb (sb-name sb) (sb-kind sb)
+              offset end
+              original
+              (tn-save-tn tn) (tn-kind (tn-save-tn tn))))
 
     (unless (eq (sb-kind sb) :unbounded)
       (setf (ldb (byte 1 (truly-the sb-vm:finite-sc-offset offset))
