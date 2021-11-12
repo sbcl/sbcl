@@ -989,3 +989,17 @@
    ((1 5) 1)
    ((0 5) 0)
    ((-1 5) -1)))
+
+(with-test (:name :cmov-merged-branch-if)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (declare (type (integer 0 7711851432375361987) b))
+      (declare (type (integer -2 0) c))
+      (let ((v9 c))
+        (if (< c v9)
+            c
+            (if (= v9 c)
+                v9
+                b))))
+   ((0 -1) -1)))

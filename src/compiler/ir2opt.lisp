@@ -176,63 +176,53 @@
     (vop branch node 2block label)
     (update-block-succ 2block (list label)))
 
-;; Since conditional branches are always at the end of blocks,
-;; it suffices to look at the last VOP in each block.
-(defun maybe-convert-one-cmov (2block)
-  (let ((vop (or (ir2-block-last-vop 2block)
-                 (return-from maybe-convert-one-cmov))))
-    (unless (eq (vop-name vop) 'branch-if)
-      (return-from maybe-convert-one-cmov))
-    ;; The test and branch-if may be split between two IR1 blocks
-    ;; due to cleanups, can't use bloc-succ of the ir2-block-block
-    (let* ((node (vop-node vop))
-           (succ (block-succ (node-block node)))
-           (a    (first succ))
-           (b    (second succ)))
+(defun maybe-convert-one-cmov (vop)
+  ;; The test and branch-if may be split between two IR1 blocks
+  ;; due to cleanups, can't use bloc-succ of the ir2-block-block
+  (let* ((node (vop-node vop))
+         (succ (block-succ (node-block node)))
+         (a    (first succ))
+         (b    (second succ)))
 
-      (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
-        (multiple-value-bind (label target value-a value-b)
-            (cmovp jump-target a b)
-          (unless label
+    (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
+      (multiple-value-bind (label target value-a value-b)
+          (cmovp jump-target a b)
+        (unless label
+          (return-from maybe-convert-one-cmov))
+        (multiple-value-bind (cmove-vop arg-a arg-b res info)
+            (convert-conditional-move-p node target value-a value-b)
+          (unless cmove-vop
             (return-from maybe-convert-one-cmov))
-          (multiple-value-bind (cmove-vop arg-a arg-b res info)
-              (convert-conditional-move-p node target value-a value-b)
-            (unless cmove-vop
-              (return-from maybe-convert-one-cmov))
-            (when not-p
-              (rotatef value-a value-b)
-              (rotatef arg-a arg-b))
-            (flet ((safe-coercion-p (from to)
-                     (let ((from (tn-primitive-type from))
-                           (to (tn-primitive-type to)))
-                       ;; These moves will be repositioned before the test VOP,
-                       ;; which may be restricting their type.
-                       ;; Avoid the moves that may touch memory and
-                       ;; thus fail on immediate values.
-                       (not (and (eq from *backend-t-primitive-type*)
-                                 (memq (primitive-type-name to)
-                                       '(#+64-bit sb-vm::unsigned-byte-64
-                                         #+64-bit sb-vm::unsigned-byte-63
-                                         #+64-bit sb-vm::signed-byte-64
-                                         #-64-bit sb-vm::unsigned-byte-32
-                                         #-64-bit sb-vm::unsigned-byte-31
-                                         #-64-bit sb-vm::signed-byte-32
-                                         #-64-bit single-float
-                                         double-float
-                                         complex-single-float
-                                         complex-double-float
-                                         system-area-pointer)))))))
-              (if (and (safe-coercion-p value-a arg-a)
+          (when not-p
+            (rotatef value-a value-b)
+            (rotatef arg-a arg-b))
+          (flet ((safe-coercion-p (from to)
+                   (let ((from (tn-primitive-type from))
+                         (to (tn-primitive-type to)))
+                     ;; These moves will be repositioned before the test VOP,
+                     ;; which may be restricting their type.
+                     ;; Avoid the moves that may touch memory and
+                     ;; thus fail on immediate values.
+                     (not (and (eq from *backend-t-primitive-type*)
+                               (memq (primitive-type-name to)
+                                     '(#+64-bit sb-vm::unsigned-byte-64
+                                       #+64-bit sb-vm::unsigned-byte-63
+                                       #+64-bit sb-vm::signed-byte-64
+                                       #-64-bit sb-vm::unsigned-byte-32
+                                       #-64-bit sb-vm::unsigned-byte-31
+                                       #-64-bit sb-vm::signed-byte-32
+                                       #-64-bit single-float
+                                       double-float
+                                       complex-single-float
+                                       complex-double-float
+                                       system-area-pointer)))))))
+            (when (and (safe-coercion-p value-a arg-a)
                        (safe-coercion-p value-b arg-b))
-                  (convert-one-cmov cmove-vop value-a arg-a
-                                    value-b arg-b
-                                    target  res
-                                    flags info
-                                    label vop node 2block)))))))))
-
-(defun convert-cmovs (component)
-  (do-ir2-blocks (2block component (values))
-    (maybe-convert-one-cmov 2block)))
+              (convert-one-cmov cmove-vop value-a arg-a
+                                value-b arg-b
+                                target  res
+                                flags info
+                                label vop node (vop-block vop)))))))))
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
@@ -462,6 +452,18 @@
               ((ir2-block-start-vop 2block)
                (return (ir2-block-start-vop 2block)))))))
 
+(defun prev-vop (vop)
+  (or (vop-prev vop)
+      (do* ((2block (vop-block vop) prev)
+            (prev (ir2-block-prev 2block)
+                  (ir2-block-prev 2block)))
+           ((null prev) nil)
+        (cond ((or (ir2-block-%trampoline-label 2block)
+                   (ir2-block-%label 2block))
+               (return))
+              ((ir2-block-last-vop prev)
+               (return (ir2-block-last-vop prev)))))))
+
 (defun immediate-templates (fun &optional (constants t))
   (let ((primitive-types (list (primitive-type-or-lose 'character)
                                (primitive-type-or-lose 'fixnum)
@@ -520,32 +522,36 @@
                args1)
            args2)))
 
-;;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
-;;; into CMP X,Y BRANCH-IF M BRANCH-IF N
-;; while it's portable the VOPs are not validated for
-;; compatibility on other backends yet.
-#+(or arm arm64 x86 x86-64)
 (defoptimizer (vop-optimize branch-if) (branch-if)
-  (let ((prev (vop-prev branch-if)))
-    (when (and prev
-               (memq (vop-name prev) *comparison-vops*))
-      (let ((next (next-vop branch-if))
-            transpose)
-        (when (and next
-                   (memq (vop-name next) *comparison-vops*)
-                   (or (vop-args-equal prev next)
-                       (and (or (setf transpose
-                                      (memq (vop-name prev) *commutative-comparison-vops*))
-                                (memq (vop-name next) *commutative-comparison-vops*))
-                            (vop-args-equal prev next t))))
-          (when transpose
-            ;; Could flip the flags for non-commutative operations
-            (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
-                  for arg in (nreverse (vop-arg-list prev))
-                  do (change-tn-ref-tn tn-ref arg)))
-          (setf (sb-assem::label-comment (car (vop-codegen-info branch-if)))
-                :merged-ifs)
-          (delete-vop next))))))
+  (cond ((boundp '*2block-info)
+         (maybe-convert-one-cmov branch-if))
+        #+(or arm arm64 x86 x86-64)
+        (t
+         ;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
+         ;; into CMP X,Y BRANCH-IF M BRANCH-IF N
+         ;; Run it after CMOVs are converted.
+         ;; While it's portable the VOPs are not validated for
+         ;; compatibility on other backends yet.
+         (let ((prev (vop-prev branch-if)))
+           (when (and prev
+                      (memq (vop-name prev) *comparison-vops*))
+             (let ((next (next-vop branch-if))
+                   transpose)
+               (when (and next
+                          (memq (vop-name next) *comparison-vops*)
+                          (or (vop-args-equal prev next)
+                              (and (or (setf transpose
+                                             (memq (vop-name prev) *commutative-comparison-vops*))
+                                       (memq (vop-name next) *commutative-comparison-vops*))
+                                   (vop-args-equal prev next t))))
+                 (when transpose
+                   ;; Could flip the flags for non-commutative operations
+                   (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
+                         for arg in (nreverse (vop-arg-list prev))
+                         do (change-tn-ref-tn tn-ref arg)))
+                 (setf (sb-assem::label-comment (car (vop-codegen-info branch-if)))
+                       :merged-ifs)
+                 (delete-vop next))))))))
 
 (defun next-start-vop (block)
   (loop for 2block = block then (ir2-block-next 2block)
@@ -1113,7 +1119,6 @@
     ;; affects whether the last if/else is recognizable.
     #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
     (run-vop-optimizers component)
-    (convert-cmovs component)
     (delete-unused-ir2-blocks component))
 
   (values))
