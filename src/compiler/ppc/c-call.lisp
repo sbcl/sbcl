@@ -384,10 +384,9 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
-    (inst lr addr (make-fixup foreign-symbol :foreign-dataref))
-    (loadw res addr)))
+    (inst lr res (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res res)))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)

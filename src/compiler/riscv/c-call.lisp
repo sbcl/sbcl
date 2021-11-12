@@ -170,13 +170,12 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
     ;; This probably has to be 3 instructions unless we can put some linkage entries
     ;; near enough to NULL-TN. Would only make a difference when compiling to memory
     ;; since compiling to file has to assume worst case.
-    (inst li addr (make-fixup foreign-symbol :foreign-dataref))
-    (loadw res addr)))
+    (inst li res (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res res)))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
