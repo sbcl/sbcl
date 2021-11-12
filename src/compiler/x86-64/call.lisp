@@ -14,28 +14,8 @@
 (defconstant arg-count-sc (make-sc+offset any-reg-sc-number rcx-offset))
 (defconstant closure-sc (make-sc+offset any-reg-sc-number rax-offset))
 
-;;; Make a passing location TN for a local call return PC.
-;;;
-;;; Always wire the return PC location to the stack in its standard
-;;; location.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
-  (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
-                 sap-stack-sc-number return-pc-save-offset))
-
 (defconstant return-pc-passing-offset
   (make-sc+offset sap-stack-sc-number return-pc-save-offset))
-
-;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass OLD-FP in.
-;;;
-;;; This is wired in both the standard and the local-call conventions,
-;;; because we want to be able to assume it's always there. Besides,
-;;; the x86 doesn't have enough registers to really make it profitable
-;;; to pass it in a register.
-(defun make-old-fp-passing-location ()
-  (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-                 ocfp-save-offset))
 
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))

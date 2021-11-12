@@ -14,29 +14,8 @@
 (defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
-;;; Make a passing location TN for a local call return PC.  If
-;;; standard is true, then use the standard (full call) location,
-;;; otherwise use any legal location.  Even in the non-standard case,
-;;; this may be restricted by a desire to use a subroutine call
-;;; instruction.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
-  (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
-                 lra-save-offset))
-
 (defconstant return-pc-passing-offset
   (make-sc+offset control-stack-sc-number lra-save-offset))
-
-;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass OLD-FP in.
-;;;
-;;; This is wired in both the standard and the local-call conventions,
-;;; because we want to be able to assume it's always there. Besides,
-;;; the ARM doesn't have enough registers to really make it profitable
-;;; to pass it in a register.
-(defun make-old-fp-passing-location ()
-  (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-                 ocfp-save-offset))
 
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))

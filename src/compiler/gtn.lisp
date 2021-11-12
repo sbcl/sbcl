@@ -117,8 +117,10 @@
                           (make-normal-tn *backend-t-primitive-type*)))))))
     (let ((res (make-ir2-physenv
                 :closure ir2-physenv-alist
-                :return-pc-pass (make-return-pc-passing-location
-                                 (xep-p clambda)))))
+                :return-pc-pass #+fp-and-pc-standard-save
+                                old-pc
+                                #-fp-and-pc-standard-save
+                                (make-return-pc-passing-location (xep-p clambda)))))
       (setf (physenv-info lambda-physenv) res)
       (setf (ir2-physenv-old-fp res)
             #-fp-and-pc-standard-save
