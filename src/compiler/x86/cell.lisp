@@ -465,18 +465,32 @@
   (:translate code-header-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg))
+         (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
-  (:arg-types * unsigned-num *)
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax) ; for the asm routine
-  (:temporary (:sc unsigned-reg :offset edx-offset) edx)
-  (:temporary (:sc unsigned-reg :offset edi-offset) edi)
-  (:ignore eax edx edi)
+  (:arg-types * tagged-num *)
+  (:temporary (:sc unsigned-reg) table card)
   (:generator 10
-    (inst push value)
-    (inst push index)
-    (inst push object)
-    (inst call (make-fixup 'code-header-set :assembly-routine))))
+    ;; Find card mark table base. If the linkage entry contained the
+    ;; *value* of gc_card_mark pointer, we could eliminate one deref.
+    ;; Putting it in a statc symbol would also work, but this vop is
+    ;; not performance-critical by any stretch of the imagination.
+    (inst mov table (make-ea :dword :disp (make-fixup "gc_card_mark" :foreign-dataref)))
+    (inst mov table (make-ea :dword :base table))
+    (pseudo-atomic ()
+      ;; Compute card mark index and touch the mark byte
+      (inst mov card object)
+      (inst shr card gencgc-card-shift)
+      (inst and card (make-fixup nil :gc-barrier))
+      (inst mov (make-ea :byte :base table :index card) 0)
+      ;; set 'written' flag in the code header
+      ;; this doesn't need to use :LOCK because the only other writer
+      ;; would be a GCing thread, but we're pseudo-atomic here.
+      ;; If two threads actually did write the byte, then they would write
+      ;; the same value, and that works fine.
+      (inst or (make-ea :byte :base object :disp (- 3 other-pointer-lowtag)) #x40)
+      ;; store
+      (inst mov (make-ea :dword :base object :index index :disp (- other-pointer-lowtag))
+            value))))
 
 ;;;; raw instance slot accessors
 

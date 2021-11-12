@@ -286,8 +286,46 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-ref)
 
-(define-full-setter code-header-set * 0 other-pointer-lowtag
-  (descriptor-reg any-reg null) * code-header-set)
+(define-vop (code-header-set)
+  (:translate code-header-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num *)
+  (:temporary (:scs (non-descriptor-reg)) temp card)
+  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:generator 10
+    (let ((mask-fixup-label (gen-label))
+          (table-fixup-label (gen-label)))
+      (inst load-from-label temp lip mask-fixup-label)
+      (inst ldr temp (@ temp))
+      (inst ldr temp (@ temp))
+      (pseudo-atomic (pa-flag)
+        ;; Compute card mark index
+        (inst mov card (lsr object gencgc-card-shift))
+        (inst and card card temp)
+        ;; Load mark table base
+        (inst load-from-label temp lip table-fixup-label)
+        (inst ldr temp (@ temp))
+        (inst ldr temp (@ temp))
+        ;; Touch the card mark byte.
+        (inst mov lip 0)
+        (inst strb lip (@ temp card))
+        ;; set 'written' flag in the code header
+        ;; If two threads get here at the same time, they'll write the same byte.
+        (let ((byte (- #+little-endian 3 other-pointer-lowtag)))
+          (inst ldrb temp (@ object byte))
+          (inst orr temp temp #x40)
+          (inst strb temp (@ object byte)))
+        (inst sub temp index other-pointer-lowtag)
+        (inst str value (@ object temp)))
+      (assemble (:elsewhere)
+        (emit-label mask-fixup-label)
+        (inst word (make-fixup "gc_card_table_mask" :foreign-dataref))
+        (emit-label table-fixup-label)
+        (inst word (make-fixup "gc_card_mark" :foreign-dataref))))))
 
 ;;;; raw instance slot accessors
 

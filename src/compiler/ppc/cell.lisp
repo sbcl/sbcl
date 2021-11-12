@@ -459,12 +459,39 @@
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))
 
-(define-vop (code-header-set word-index-set)
+(define-vop (code-header-set)
   (:translate code-header-set)
   (:policy :fast-safe)
-  (:variant 0 other-pointer-lowtag))
-
-
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num *)
+  (:temporary (:scs (non-descriptor-reg)) temp card)
+  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
+  (:generator 10
+    ;; Load the card mask
+    (inst lr temp (make-fixup "gc_card_table_mask" :foreign-dataref)) ; address of linkage entry
+    (loadw temp temp)      ; address of gc_card_table_mask
+    (inst lwz temp temp 0) ; value of gc_card_table_mask
+    (pseudo-atomic (pa-flag)
+      ;; Compute card mark index
+      ;; Maybe these 2 steps should be one RLWINM, but I'm not that clever.
+      (inst srawi card object gencgc-card-shift)
+      (inst and card card temp)
+      ;; Load mark table base
+      (inst lr temp (make-fixup "gc_card_mark" :foreign-dataref)) ; address of linkage entry
+      (loadw temp temp) ; address of gc_card_mark
+      (loadw temp temp) ; value of gc_card_mark
+      ;; Touch the card mark byte.
+      (inst stbx zero-tn temp card)
+      ;; set 'written' flag in the code header
+      ;; If two threads get here at the same time, they'll write the same byte.
+      (let ((byte #+big-endian (- other-pointer-lowtag) #+little-endian (bug "Wat")))
+        (inst lbz temp object byte)
+        (inst ori temp temp #x40)
+        (inst stb temp object byte))
+      (inst addi temp index (- other-pointer-lowtag))
+      (inst stwx value object temp))))
 
 ;;;; raw instance slot accessors
 

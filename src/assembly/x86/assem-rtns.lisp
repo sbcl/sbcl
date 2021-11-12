@@ -482,36 +482,6 @@
   (inst mov eax-tn 1) ;; exception-continue-search
   (inst ret))
 
-#+sb-assembling
-(define-assembly-routine (code-header-set (:return-style :none)) ()
-  ;; stack: ret-pc, object, index, value-to-store
-  (symbol-macrolet ((object (make-ea :dword :base esp-tn :disp 4))
-                    (word-index (make-ea :dword :base esp-tn :disp 8))
-                    (newval (make-ea :dword :base esp-tn :disp 12)))
-    (pseudo-atomic ()
-          ;; Find card mark table base. If the linkage entry contained the
-          ;; *value* of gc_card_mark pointer, we could eliminate one deref.
-          (inst mov edi-tn (make-ea :dword :disp (make-fixup "gc_card_mark" :foreign-dataref)))
-          (inst mov edi-tn (make-ea :dword :base edi-tn))
-          ;; Compute card mark index and touch the mark byte
-          (inst mov eax-tn object)
-          (inst shr eax-tn gencgc-card-shift)
-          (inst and eax-tn (make-fixup nil :gc-barrier))
-          (inst mov (make-ea :byte :base edi-tn :index eax-tn) 0)
-          ;; store
-          (inst mov edi-tn object)
-          (inst mov edx-tn word-index)
-          (inst mov eax-tn newval)
-          ;; set 'written' flag in the code header
-          (inst or (make-ea :byte :base edi-tn :disp (- 3 other-pointer-lowtag))
-                #x40 :lock)
-          ;; store newval into object
-          (inst mov (make-ea :dword :base edi-tn
-                             :index edx-tn :scale (ash 1 word-shift)
-                             :disp (- other-pointer-lowtag))
-                eax-tn)))
-  (inst ret 12)) ; remove 3 stack args
-
 #|
     Turns out that setting the direction flag not only requires trapping
     into microcode, but also prevents the processor from using its fast REP
