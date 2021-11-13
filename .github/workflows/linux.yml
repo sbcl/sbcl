@@ -6,14 +6,15 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy: 
       matrix: 
-        options: [--with-sb-thread, --without-sb-thread]
+        options: [--with-sb-thread, --without-sb-thread, --without-sb-unicode]
         arch: [x86, x86-64]
         subfeatures: ['']
         include:
           - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread }
+          - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval }
 
       fail-fast: false
 
@@ -37,5 +38,11 @@ jobs:
       run: ./make.sh ${{ matrix.options }} --xc-host='sbcl --dynamic-space-size 500MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
     - name: test
       run: cd tests; ./run-tests.sh
+    - name: test
+      if: matrix.subfeatures == 'fasteval'
+      run: cd tests; ./run-tests.sh --evaluator-mode interpret
     - name: ansi-test
       run: cd tests; ./ansi-tests.sh
+    - name: crossbuild
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh
