@@ -152,7 +152,8 @@
                 (sb-kernel:get-lisp-obj-address string-one)
                 (sb-kernel:get-lisp-obj-address string-two)))))
 #+gencgc
-(with-test (:name :pin-all-code-with-gc-enabled)
+(with-test (:name :pin-all-code-with-gc-enabled
+                  :skipped-on :interpreter)
   #+sb-thread (sb-thread:join-thread (sb-thread:make-thread #'make-some-objects))
   #-sb-thread (progn (make-some-objects) (sb-sys:scrub-control-stack))
   (sb-sys:with-code-pages-pinned (:dynamic) (gc))
