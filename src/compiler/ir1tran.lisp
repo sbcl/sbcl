@@ -1176,8 +1176,7 @@
                        (when (show-transform-p *show-transforms-p* name)
                          (show-transform "src" name transformed))
                        (let ((*transforming* (1+ *transforming*)))
-                         (unless (or (memq 'transformed *current-path*)
-                                     (memq 'inlined *current-path*))
+                         (when (eq (car *current-path*) 'original-source-start)
                            (setf (ctran-source-path start) *current-path*))
                          (ir1-convert start next result transformed)))))
               (ir1-convert-maybe-predicate start next result

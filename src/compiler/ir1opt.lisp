@@ -1368,8 +1368,7 @@
                       ;; It has already been processed by locall,
                       ;; inline again.
                       (functional-kind fun))
-                  (unless (or (memq 'transformed *current-path*)
-                              (memq 'inlined *current-path*))
+                  (when (eq (car *current-path*) 'original-source-start)
                     (setf (ctran-source-path (node-prev call)) *current-path*))
                   ;; Convert.
                   (let* ((name (leaf-source-name leaf))
@@ -2191,17 +2190,9 @@
   (let ((call (let-combination clambda))
         (bind (lambda-bind clambda)))
     (flush-dest (basic-combination-fun call))
-
-    (let ((next (or (node-next bind)
-                    (block-start (car (block-succ (node-block bind)))))))
-      (when next
-        (setf (ctran-source-path next)
-              (ctran-source-path (node-prev call)))))
-    (unless (or (memq 'transformed (node-source-path bind))
-                (memq 'inlined (node-source-path bind)))
+    (when (eq (car (node-source-path bind)) 'original-source-start)
       (setf (ctran-source-path (node-prev (car (leaf-refs clambda))))
             (node-source-path bind)))
-
     (unlink-node call)
     (unlink-node bind)
     (setf (lambda-bind clambda) nil))
