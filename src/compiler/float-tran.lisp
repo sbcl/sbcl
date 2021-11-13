@@ -844,12 +844,6 @@
        (list (interval-expt-> x y-)
              (interval-expt-> x y+))))))
 
-(defun negate-interval (interval)
-  (let ((high (interval-high interval))
-        (low (interval-low interval)))
-    (make-interval :high (and low (- low))
-                   :low (and high (- high)))))
-
 ;;; Handle the case when 0 <= x <= 1
 (defun interval-expt-< (x y)
   (case (interval-range-info x $0d0)
@@ -882,12 +876,12 @@
     (-
      ;; The case where x <= 0. Y MUST be an INTEGER for this to work!
      ;; The calling function must insure this!
-     (loop for interval in (flatten-list (interval-expt (negate-interval x) y))
+     (loop for interval in (flatten-list (interval-expt (interval-neg x) y))
            for low = (interval-low interval)
            for high = (interval-high interval)
            collect interval
            when (or high low)
-           collect (negate-interval interval)))
+           collect (interval-neg interval)))
     (t
      (destructuring-bind (neg pos)
          (interval-split 0 x t t)
