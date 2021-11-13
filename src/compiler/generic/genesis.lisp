@@ -3340,7 +3340,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (dotimes (i (length sections))
         (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
-    (format t "I. assembler routines defined in core image:~2%")
+    (format t "I. assembler routines defined in core image: (base=~x)~2%"
+            (descriptor-bits *cold-assembler-obj*))
     (dolist (routine *cold-assembler-routines*)
       (let ((name (car routine)))
         (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))

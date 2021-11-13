@@ -18,24 +18,22 @@
 
 ;;; the number of bytes used by the code object header
 
-#-sb-xc-host
-(defun component-header-length (&optional
-                                (component *component-being-compiled*))
-  (let* ((2comp (component-info component))
-         (constants (ir2-component-constants 2comp)))
-    (ash (align-up (length constants) code-boxed-words-align) sb-vm:word-shift)))
-
-;;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
-;;; knowing the boxed code header length. But there is no compiler IR2 metaobject,
-;;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
-#+sb-xc-host
-(defun component-header-length ()
-  (if (boundp '*component-being-compiled*)
-      (let ((component *component-being-compiled*))
-        (let* ((2comp (component-info component))
-               (constants (ir2-component-constants 2comp)))
-          (ash (align-up (length constants) code-boxed-words-align) sb-vm:word-shift)))
-      (* sb-vm:n-word-bytes 4))) ; FIXME: what is 4 ?
+(macrolet ((header-length-in-bytes (comp)
+             `(let* ((2comp (component-info ,comp))
+                     (constants (ir2-component-constants 2comp)))
+                (ash (align-up (length constants) code-boxed-words-align)
+                     sb-vm:word-shift))))
+  #-sb-xc-host
+  (defun component-header-length (&optional (component *component-being-compiled*))
+    (header-length-in-bytes component))
+  ;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
+  ;; knowing the boxed code header length. But there is no compiler IR2 metaobject,
+  ;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
+  #+sb-xc-host
+  (defun component-header-length ()
+    (if (boundp '*component-being-compiled*)
+        (header-length-in-bytes *component-being-compiled*)
+        (* sb-vm:n-word-bytes (align-up sb-vm:code-constants-offset 2)))))
 
 ;;; the size of the NAME'd SB in the currently compiled component.
 ;;; This is useful mainly for finding the size for allocating stack
