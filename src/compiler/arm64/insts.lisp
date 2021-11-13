@@ -3043,7 +3043,7 @@
               next-next)))))))
 
 (defun stmt-delete-safe-p (dst1 dst2 &optional safe-translates
-                                              safe-vops)
+                                               safe-vops)
   (or (location= dst1 dst2)
       (and
        (not (tn-ref-next (sb-c::tn-reads dst1)))
@@ -3080,6 +3080,21 @@
                  (= immr 63)
                  (= imms 62)
                  (stmt-delete-safe-p dst1 dst2 '(logand)))
+        (setf (stmt-mnemonic next) 'ubfm
+              (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
+;;; Helps with SBIT
+(defpattern "and + lsl -> ubfiz" ((and) (ubfm)) (stmt next)
+  (destructuring-bind (dst1 src1 mask) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr imms) (stmt-operands next)
+      (when (and (location= dst1 src2)
+                 (untagged-mask-p mask)
+                 (= immr 63)
+                 (= imms 62)
+                 (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-from-word/fixnum)))
         (setf (stmt-mnemonic next) 'ubfm
               (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
         (add-stmt-labels next (stmt-labels stmt))
