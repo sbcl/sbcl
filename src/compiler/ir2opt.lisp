@@ -523,7 +523,7 @@
            args2)))
 
 (defoptimizer (vop-optimize branch-if) (branch-if)
-  (cond ((boundp '*2block-info)
+  (cond ((boundp '*2block-info*)
          (maybe-convert-one-cmov branch-if))
         #+(or arm arm64 x86 x86-64)
         (t
