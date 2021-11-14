@@ -2428,12 +2428,6 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
             ptr = (void*)(word >> 32);
         }
 #endif
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        else if (!(word & LOWTAG_MASK) && (find_page_index((void*)word) >= 0)
-                 && widetag_of((lispobj*)word) == FDEFN_WIDETAG) {
-            ptr = (void*)word;
-        }
-#endif
         else
             continue;
         if (!ptr_ok_to_writeprotect(ptr, gen)) return;
@@ -5292,9 +5286,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
 
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         // Process each untagged fdefn pointer.
-        // If CODE_PAGES_USE_SOFT_PROTECTION were enabled along with untagged fdefns,
-        // then the generation check at the bottom of this function would have to be
-        // modified to take into account untagged pointers.
+        // TODO: assert that the generation of any fdefn is older than that of 'code'.
         lispobj* fdefns_start = code->constants + code_n_funs(code)
                                 * CODE_SLOTS_PER_SIMPLE_FUN;
         int n_fdefns = code_n_named_calls(code);

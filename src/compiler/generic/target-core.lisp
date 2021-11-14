@@ -274,11 +274,25 @@
          (2comp (component-info component))
          (constants (ir2-component-constants 2comp))
          (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
-         (code-obj (allocate-code-object
-                    (component-mem-space component)
-                    (count-if (lambda (x) (typep x '(cons (eql :named-call))))
-                              constants)
-                    nboxed length))
+         (n-named-calls
+          ;; Pre-scan for fdefinitions to ensure their existence.
+          ;; Doing so guarantees that storing them into the boxed header now
+          ;; can't create any old->young pointer, which is important since gencgc
+          ;; does not deal with untagged pointers when looking for old->young.
+          (do ((count 0)
+               (index (+ sb-vm:code-constants-offset
+                         (* (length (ir2-component-entries 2comp))
+                            sb-vm:code-slots-per-simple-fun))
+                      (1+ index)))
+              ((>= index (length constants)) count)
+            (let* ((const (aref constants index))
+                   (kind (if (listp const) (car const) const)))
+              (case kind
+                ((member :named-call :fdefinition)
+                 (setf (second const) (find-or-create-fdefn (second const)))
+                 (when (eq kind :named-call) (incf count)))))))
+         (code-obj (allocate-code-object (component-mem-space component)
+                                         n-named-calls nboxed length))
          (named-call-fixups
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
@@ -357,8 +371,7 @@
           (t
            (let ((referent
                   (etypecase kind
-                   ((member :named-call :fdefinition)
-                    (find-or-create-fdefn (cadr const)))
+                   ((member :named-call :fdefinition) (cadr const))
                    ((eql :known-fun)
                     (%coerce-name-to-fun (cadr const)))
                    (constant

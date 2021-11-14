@@ -2594,7 +2594,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
   #-untagged-fdefns (write-wordindexed code index fdefn))
 
 (define-cold-fop (fop-load-code (header code-size n-fixups))
-  (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+  (let* ((n-entries (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
          (immobile (oddp header)) ; decode the representation used by dump
          ;; The number of constants is rounded up to even (if required)
          ;; to ensure that the code vector will be properly aligned.
@@ -2615,6 +2616,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
            (end (+ start code-size)))
       (read-bigvec-as-sequence-or-die (descriptor-mem des) (fasl-input-stream)
                                       :start start :end end)
+      (aver (= (code-n-entries des) n-entries))
       (let ((jumptable-word (read-bits-wordindexed des aligned-n-boxed-words)))
         (aver (zerop (ash jumptable-word -14)))
         ;; assign serialno

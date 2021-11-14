@@ -1168,6 +1168,9 @@
                 code-length n-fixups)
       ;; Fasl dumper/loader convention allows at most 3 integer args.
       ;; Others have to be written with explicit calls.
+      (dump-integer-as-n-bytes (length (sb-c::ir2-component-entries 2comp))
+                               4 ; output 4 bytes
+                               fasl-output)
       (dump-integer-as-n-bytes (the (unsigned-byte 22) n-named-calls)
                                4 ; output 4 bytes
                                fasl-output)
