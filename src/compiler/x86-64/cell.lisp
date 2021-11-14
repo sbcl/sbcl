@@ -49,8 +49,9 @@
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           (t
-           ;; gencgc does not need to emit the barrier for initializing a structure
-           (unless (eq name '%make-structure-instance)
+           ;; gencgc does not need to emit the barrier for constructors
+           (unless (member name '(%make-structure-instance make-weak-pointer
+                                  %make-ratio %make-complex))
              (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value))
            (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))))
 
