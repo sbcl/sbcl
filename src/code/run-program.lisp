@@ -1328,6 +1328,9 @@ Users Manual for details about the PROCESS structure.
   (or sb-sys::*software-version*
       (setf sb-sys::*software-version*
             (possibly-base-stringize
+             #+linux
+             (with-open-file (f "/proc/sys/kernel/osrelease") (read-line f))
+             #-linux
              (string-trim '(#\newline)
                           (%with-output-to-string (stream)
                            (run-program "/bin/uname"
