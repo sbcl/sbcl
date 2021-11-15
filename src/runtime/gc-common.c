@@ -520,7 +520,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
     lispobj copy = copy_instance(object);
     *where = copy;
 
-    struct instance* node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+    struct instance* node = INSTANCE(copy);
     lispobj layout = instance_layout((lispobj*)node);
     if (layout) {
         if (forwarding_pointer_p((lispobj*)LAYOUT(layout)))
@@ -534,7 +534,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
                    && !forwarding_pointer_p(native_pointer(object))) {
                 copy = copy_instance(object);
                 node->slots[INSTANCE_DATA_START] = copy;
-                node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+                node = INSTANCE(copy);
                 // We don't have to stop upon seeing an instance with a different layout.
                 // The only other object in the 'next' chain could be *TAIL-ATOM* if we reach
                 // the end. It's possible that all of the tests in the 'while' loop are met

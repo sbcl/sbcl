@@ -131,7 +131,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 
 /* FIXME: there are 10+ variants of the skeleton of an object traverser.
  * Pick one and try to make it customizable. I tried a callback-based approach,
- * but it's too slow. Next best thing is a ".inc" file which defines the shape
+ * but it's way too slow. Next best thing is a ".inc" file which defines the shape
  * of the function, with pieces inserted by #define.
  *
  * (1) gc-common's table-based mechanism
@@ -148,6 +148,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * (10) do-referenced-object which thank goodness is common to 2 uses
  * and if you want to count 'print.c' as another, there's that.
  * There's also cheneygc's print_garbage() which uses the dispatch tables.
+ * And now there's update_writeprotection() which is also ad-hoc.
  */
 
 static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)

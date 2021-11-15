@@ -421,7 +421,7 @@ char * simple_base_stringize(struct vector * string)
 
 static void brief_struct(lispobj obj)
 {
-    struct instance *instance = (struct instance *)native_pointer(obj);
+    struct instance *instance = INSTANCE(obj);
     extern struct vector * instance_classoid_name(lispobj*);
     struct vector * classoid_name;
     classoid_name = instance_classoid_name((lispobj*)instance);
@@ -464,7 +464,7 @@ static boolean tagged_slot_p(struct layout *layout, int slot_index)
 
 static void print_struct(lispobj obj)
 {
-    struct instance *instance = (struct instance *)native_pointer(obj);
+    struct instance *instance = INSTANCE(obj);
     short int i;
     char buffer[16];
     lispobj layout = instance_layout(native_pointer(obj));
