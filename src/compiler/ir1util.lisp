@@ -567,6 +567,7 @@
 ;;; the LEXENV-LAMBDA may be deleted, we must chain up the
 ;;; LAMBDA-CALL-LEXENV thread until we find a CLAMBDA that isn't
 ;;; deleted, and then return its home.
+(declaim (maybe-inline node-home-lambda))
 (defun node-home-lambda (node)
   (declare (type node node))
   (do ((fun (lexenv-lambda (node-lexenv node))
@@ -579,12 +580,14 @@
 (defun lambda-parent (lambda)
   (lexenv-lambda (lambda-lexenv lambda)))
 
-(declaim (ftype (sfunction (node) component) node-component))
 (defun node-component (node)
-  (block-component (node-block node)))
-(declaim (ftype (sfunction (node) physenv) node-physenv))
-(defun node-physenv (node)
-  (lambda-physenv (node-home-lambda node)))
+  (declare (type node node))
+  (the component (block-component (node-block node))))
+
+(declaim (maybe-inline node-environment))
+(defun node-environment (node)
+  (declare (type node node) #-sb-xc-host (inline node-home-lambda))
+  (the environment (lambda-environment (node-home-lambda node))))
 
 (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
@@ -666,6 +669,7 @@
 ;;; actually correspond to code which will be written anywhere.
 (declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
 (defun block-home-lambda-or-null (block)
+  #-sb-xc-host (declare (inline node-home-lambda))
   (if (node-p (block-last block))
       ;; This is the old CMU CL way of doing it.
       (node-home-lambda (block-last block))
@@ -695,14 +699,14 @@
             nil))))
 
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
-(declaim (ftype (sfunction (cblock) clambda) block-home-lambda))
 (defun block-home-lambda (block)
-  (block-home-lambda-or-null block))
+  (declare (type cblock block))
+  (the clambda (block-home-lambda-or-null block)))
 
-;;; Return the IR1 physical environment for BLOCK.
-(declaim (ftype (sfunction (cblock) physenv) block-physenv))
-(defun block-physenv (block)
-  (lambda-physenv (block-home-lambda block)))
+;;; Return the IR1 environment for BLOCK.
+(defun block-environment (block)
+  (declare (type cblock block))
+  (lambda-environment (block-home-lambda block)))
 
 ;;;; DYNAMIC-EXTENT related
 
@@ -2556,7 +2560,7 @@ is :ANY, the function name is not checked."
   (let* ((entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
         (block (first (block-succ (node-block exit)))))
-    (dolist (nlx (physenv-nlx-info (node-physenv entry)) nil)
+    (dolist (nlx (environment-nlx-info (node-environment entry)) nil)
       (when (and (eq (nlx-info-block nlx) block)
                  (eq (nlx-info-cleanup nlx) cleanup))
         (return nlx)))))

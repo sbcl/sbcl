@@ -130,7 +130,7 @@
 
 ;;; Make an environment-live stack TN for saving the SP for NLX entry.
 (defun make-nlx-sp-tn (env)
-  (physenv-live-tn
+  (environment-live-tn
    (make-representation-tn *fixnum-primitive-type* any-reg-sc-number)
    env))
 

@@ -326,9 +326,9 @@
   ;; top level form containing the original source.
   (source-path *current-path* :type list)
   ;; If this node is in a tail-recursive position, then this is set to
-  ;; T. At the end of IR1 (in physical environment analysis) this is
-  ;; computed for all nodes (after cleanup code has been emitted).
-  ;; Before then, a non-null value indicates that IR1 optimization has
+  ;; T. At the end of IR1 (in environment analysis) this is computed
+  ;; for all nodes (after cleanup code has been emitted).  Before
+  ;; then, a non-null value indicates that IR1 optimization has
   ;; converted a tail local call to a direct transfer.
   ;;
   ;; If the back-end breaks tail-recursion for some reason, then it
@@ -499,9 +499,9 @@
   ;; what macroexpansions and source transforms happened "in" this block, used
   ;; for xref
   (xrefs nil :type list)
-  ;; Cache the physenv of a block during lifetime analysis. :NONE if
-  ;; no cached value has been stored yet.
-  (physenv-cache :none :type (or null physenv (member :none))))
+  ;; Cache the environment of a block during lifetime analysis. :NONE
+  ;; if no cached value has been stored yet.
+  (environment-cache :none :type (or null environment (member :none))))
 (defmethod print-object ((cblock cblock) stream)
   (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)
@@ -580,9 +580,9 @@
   ;; Entry/exit points have these blocks as their
   ;; predecessors/successors. The start and return from each
   ;; non-deleted function is linked to the component head and
-  ;; tail. Until physical environment analysis links NLX entry stubs
-  ;; to the component head, every successor of the head is a function
-  ;; start (i.e. begins with a BIND node.)
+  ;; tail. Until environment analysis links NLX entry stubs to the
+  ;; component head, every successor of the head is a function start
+  ;; (i.e. begins with a BIND node.)
   (head (missing-arg) :type cblock)
   (tail (missing-arg) :type cblock)
   ;; New blocks are inserted before this.
@@ -634,7 +634,7 @@
   (reanalyze-functionals nil :type list)
   (delete-blocks nil :type list)
   (nlx-info-generated-p nil :type boolean)
-  ;; this is filled by physical environment analysis
+  ;; this is filled by environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
@@ -686,59 +686,38 @@
   (mess-up nil :type (or node null))
   ;; For all kinds, except :DYNAMIC-EXTENT: a list of all the NLX-INFO
   ;; structures whose NLX-INFO-CLEANUP is this cleanup. This is filled
-  ;; in by physical environment analysis.
+  ;; in by environment analysis.
   ;;
   ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
   ;; cleanup. This is filled when the cleanup is created (now by
-  ;; locall call analysis) and is rechecked by physical environment
+  ;; locall call analysis) and is rechecked by environment
   ;; analysis. (For closures this is a list of the enclose node during
-  ;; IR1, and a list of the LVAR of the enclose after physical
-  ;; environment analysis.)
+  ;; IR1, and a list of the LVAR of the enclose after environment
+  ;; analysis.)
   (info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
   (info :test info))
 
-;;; A PHYSENV represents the result of physical environment analysis.
-;;;
-;;; As far as I can tell from reverse engineering, this IR1 structure
-;;; represents the physical environment (which is probably not the
-;;; standard Lispy term for this concept, but I dunno what is the
-;;; standard term): those things in the lexical environment which a
-;;; LAMBDA actually interacts with. Thus in
-;;;   (DEFUN FROB-THINGS (THINGS)
-;;;     (DOLIST (THING THINGS)
-;;;       (BLOCK FROBBING-ONE-THING
-;;;         (MAPCAR (LAMBDA (PATTERN)
-;;;                   (WHEN (FITS-P THING PATTERN)
-;;;                     (RETURN-FROM FROB-THINGS (LIST :FIT THING PATTERN))))
-;;;                 *PATTERNS*))))
-;;; the variables THINGS, THING, and PATTERN and the block names
-;;; FROB-THINGS and FROBBING-ONE-THING are all in the inner LAMBDA's
-;;; lexical environment, but of those only THING, PATTERN, and
-;;; FROB-THINGS are in its physical environment. In IR1, we largely
-;;; just collect the names of these things; in IR2 an IR2-PHYSENV
-;;; structure is attached to INFO and used to keep track of
-;;; associations between these names and less-abstract things (like
-;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
-(defstruct (physenv (:copier nil))
-  ;; the function that allocates this physical environment
+;;; The ENVIRONMENT structure represents the result of environment analysis.
+(defstruct (environment (:copier nil))
+  ;; the function that allocates this environment
   (lambda (missing-arg) :type clambda :read-only t)
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
   ;; NLX-INFOs needed from enclosing environments by code in this
-  ;; physical environment. In the meantime, it may be
+  ;; environment. In the meantime, it may be
   ;;   * NIL at object creation time
   ;;   * a superset of the correct result, generated somewhat later
   ;;   * smaller and smaller sets converging to the correct result as
   ;;     we notice and delete unused elements in the superset
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
-  ;; into this physical environment
+  ;; into this environment
   (nlx-info nil :type list)
   ;; some kind of info used by the back end
   (info nil))
-(defprinter (physenv :identity t)
+(defprinter (environment :identity t)
   lambda
   (closure :test closure)
   (nlx-info :test nlx-info))
@@ -773,7 +752,7 @@
 ;;; An NLX-INFO structure is used to collect various information about
 ;;; non-local exits. This is effectively an annotation on the
 ;;; continuation, although it is accessed by searching in the
-;;; PHYSENV-NLX-INFO.
+;;; ENVIRONMENT-NLX-INFO.
 (defstruct (nlx-info
             (:copier nil)
             (:constructor make-nlx-info
@@ -786,7 +765,7 @@
   (cleanup (missing-arg) :type cleanup)
   ;; the ``continuation'' exited to (the block, succeeding the EXIT
   ;; nodes). If this exit is from an escape function (CATCH or
-  ;; UNWIND-PROTECT), then physical environment analysis deletes the
+  ;; UNWIND-PROTECT), then environment analysis deletes the
   ;; escape function and instead has the %NLX-ENTRY use this
   ;; continuation.
   ;;
@@ -795,9 +774,9 @@
   ;; ENTRY must also be used to disambiguate, since exits to different
   ;; places may deliver their result to the same continuation.
   (block (missing-arg) :type cblock)
-  ;; the entry stub inserted by physical environment analysis. This is
-  ;; a block containing a call to the %NLX-ENTRY funny function that
-  ;; has the original exit destination as its successor. Null only
+  ;; the entry stub inserted by environment analysis. This is a block
+  ;; containing a call to the %NLX-ENTRY funny function that has the
+  ;; original exit destination as its successor. Null only
   ;; temporarily.
   (target nil :type (or cblock null))
   ;; for a lexical exit it determines whether tag existence check is
@@ -1239,9 +1218,9 @@
   (tail-set nil :type (or tail-set null))
   ;; the structure which represents the phsical environment that this
   ;; function's variables are allocated in. This is filled in by
-  ;; physical environment analysis. In a LET, this is EQ to our home's
-  ;; physical environment.
-  (physenv nil :type (or physenv null))
+  ;; environment analysis. In a LET, this is EQ to our home's
+  ;; environment.
+  (environment nil :type (or environment null))
   ;; In a LET, this is the NODE-LEXENV of the combination node. We
   ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
@@ -1390,26 +1369,26 @@
 ;;; lambda arguments which may ultimately turn out not to be simple
 ;;; and lexical.
 ;;;
-;;; LAMBDA-VARs with no REFs are considered to be deleted; physical
-;;; environment analysis isn't done on these variables, so the back
-;;; end must check for and ignore unreferenced variables. Note that a
-;;; deleted LAMBDA-VAR may have sets; in this case the back end is
-;;; still responsible for propagating the SET-VALUE to the set's CONT.
+;;; LAMBDA-VARs with no REFs are considered to be deleted; environment
+;;; analysis isn't done on these variables, so the back end must check
+;;; for and ignore unreferenced variables. Note that a deleted
+;;; LAMBDA-VAR may have sets; in this case the back end is still
+;;; responsible for propagating the SET-VALUE to the set's CONT.
 (!def-boolean-attribute lambda-var
   ;; true if this variable has been declared IGNORE
   ignore
-  ;; This is set by physical environment analysis if it chooses an
-  ;; indirect (value cell) representation for this variable because it
-  ;; is both set and closed over.
+  ;; This is set by environment analysis if it chooses an indirect
+  ;; (value cell) representation for this variable because it is both
+  ;; set and closed over.
   indirect
   ;; true if the last reference has been deleted (and new references
   ;; should not be made)
   deleted
-  ;; This is set by physical environment analysis if, should it be an
-  ;; indirect lambda-var, an actual value cell object must be
-  ;; allocated for this variable because one or more of the closures
-  ;; that refer to it are not dynamic-extent.  Note that both
-  ;; attributes must be set for the value-cell object to be created.
+  ;; This is set by environment analysis if, should it be an indirect
+  ;; lambda-var, an actual value cell object must be allocated for
+  ;; this variable because one or more of the closures that refer to
+  ;; it are not dynamic-extent.  Note that both attributes must be set
+  ;; for the value-cell object to be created.
   explicit-value-cell
   ;; Do not propagate constraints for this var
   no-constraints
@@ -1708,8 +1687,8 @@
 ;;; continuation and the exit continuation's DEST. Instead of using
 ;;; the returned value being delivered directly to the exit
 ;;; continuation, it is delivered to our VALUE lvar. The original exit
-;;; lvar is the exit node's LVAR; physenv analysis also makes it the
-;;; lvar of %NLX-ENTRY call.
+;;; lvar is the exit node's LVAR; environment analysis also makes it
+;;; the lvar of %NLX-ENTRY call.
 (defstruct (exit (:include valued-node)
                  (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
@@ -1796,4 +1775,4 @@
 ;;;; Freeze some structure types to speed type testing.
 
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      physenv tail-set nlx-info leaf))
+                      environment tail-set nlx-info leaf))

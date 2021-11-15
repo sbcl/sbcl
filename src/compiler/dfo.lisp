@@ -93,7 +93,7 @@
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component))
     (when (component-nlx-info-generated-p component)
-      ;; FIXME: We also need (and do) this walk before physenv
+      ;; FIXME: We also need (and do) this walk before environment
       ;; analysis, but at that time we are probably not very
       ;; interested in the actual DF order.
       ;;
@@ -200,10 +200,10 @@
 
 ;;; If CLAMBDA is already in COMPONENT, just return that
 ;;; component. Otherwise, move the code for CLAMBDA and all lambdas it
-;;; physically depends on (either because of calls or because of
-;;; closure relationships) into COMPONENT, or possibly into another
-;;; COMPONENT that we find to be related. Return whatever COMPONENT we
-;;; actually merged into.
+;;; depends on (either because of calls or because of closure
+;;; relationships) into COMPONENT, or possibly into another COMPONENT
+;;; that we find to be related. Return whatever COMPONENT we actually
+;;; merged into.
 ;;;
 ;;; (Note: The analogous CMU CL code only scavenged call-based
 ;;; dependencies, not closure dependencies. That seems to've been by
@@ -277,8 +277,8 @@
                  ;; CLAMBDA, then the home lambda should be in the
                  ;; same component as CLAMBDA. (sbcl-0.6.13, and CMU
                  ;; CL, didn't do this, leading to the occasional
-                 ;; failure when physenv analysis, which is local to
-                 ;; each component, would bogusly conclude that a
+                 ;; failure when environment analysis, which is local
+                 ;; to each component, would bogusly conclude that a
                  ;; closed-over variable was unused and thus delete
                  ;; it. See e.g. cmucl-imp 2001-11-29.)
                  (scavenge-closure-var (var)
@@ -424,7 +424,7 @@
   (setf (functional-kind lambda) :deleted)
   (dolist (let (lambda-lets lambda))
     (setf (lambda-home let) result-lambda)
-    (setf (lambda-physenv let) (lambda-physenv result-lambda))
+    (setf (lambda-environment let) (lambda-environment result-lambda))
     (push let (lambda-lets result-lambda)))
   (setf (lambda-entries result-lambda)
         (nconc (lambda-entries result-lambda)

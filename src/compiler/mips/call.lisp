@@ -39,7 +39,7 @@
 ;;; them at a known location.
 (defun make-old-fp-save-location (env)
   (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
                   control-stack-arg-scn
                   ocfp-save-offset)))
@@ -47,7 +47,7 @@
 (defun make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
-     (physenv-debug-live-tn (make-normal-tn ptype) env)
+     (environment-debug-live-tn (make-normal-tn ptype) env)
      (make-wired-tn ptype control-stack-arg-scn lra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location.  We only
@@ -148,7 +148,7 @@
     (move res csp-tn)
     (inst addu csp-tn csp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (inst addu nsp-tn nsp-tn
             (- (bytes-needed-for-non-descriptor-stack-frame)))
       (move nfp nsp-tn))))

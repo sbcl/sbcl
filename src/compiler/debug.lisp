@@ -780,13 +780,13 @@
 ;;; TNs to access the full call passing locations.
 (defun check-environment-lifetimes (component)
   (dolist (fun (component-lambdas component))
-    (let* ((env (lambda-physenv fun))
-           (2env (physenv-info env))
+    (let* ((env (lambda-environment fun))
+           (2env (environment-info env))
            (vars (lambda-vars fun))
-           (closure (ir2-physenv-closure 2env))
-           (pc (ir2-physenv-return-pc-pass 2env))
-           (fp (ir2-physenv-old-fp 2env))
-           (2block (block-info (lambda-block (physenv-lambda env)))))
+           (closure (ir2-environment-closure 2env))
+           (pc (ir2-environment-return-pc-pass 2env))
+           (fp (ir2-environment-old-fp 2env))
+           (2block (block-info (lambda-block (environment-lambda env)))))
       (do ((conf (ir2-block-global-tns 2block)
                  (global-conflicts-next-blockwise conf)))
           ((null conf))
@@ -1131,7 +1131,7 @@
                  ;; depending on the call context. Resetting depth to 0 seems
                  ;; like the best way to get consistent output.
                  ;; We shouldn't bind the printer limits to NIL, because
-                 ;; hairy internal objects such as PHYSENV can be printed.
+                 ;; hairy internal objects such as ENVIRONMENT can be printed.
                  ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
                  (let (#-sb-xc-host (*current-level-in-print* 0)
                        (*print-level* 2)

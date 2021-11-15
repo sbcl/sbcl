@@ -77,10 +77,10 @@
                          (- posn (segment-header-skew segment))))))
   (values))
 
-(declaim (inline ir2-block-physenv))
-(defun ir2-block-physenv (2block)
+(declaim (inline ir2-block-environment))
+(defun ir2-block-environment (2block)
   (declare (type ir2-block 2block))
-  (block-physenv (ir2-block-block 2block)))
+  (block-environment (ir2-block-block 2block)))
 
 (defun make-lexenv-var-cache (lexenv)
   (or (lexenv-var-cache lexenv)
@@ -314,13 +314,13 @@
   (let ((*previous-location* 0)
         *previous-live*
         *previous-form-number*
-        (physenv (lambda-physenv fun))
+        (env (lambda-environment fun))
         (byte-buffer *byte-buffer*)
         prev-block
         locations
         elsewhere-locations)
     (setf (fill-pointer byte-buffer) 0)
-    (do-physenv-ir2-blocks (2block physenv)
+    (do-environment-ir2-blocks (2block env)
       (let ((block (ir2-block-block 2block)))
         (when (eq (block-info block) 2block)
           (when prev-block
@@ -447,8 +447,8 @@
          (info (lambda-var-arg-info var))
          (indirect (and (lambda-var-indirect var)
                         (not (lambda-var-explicit-value-cell var))
-                        (neq (lambda-physenv fun)
-                             (lambda-physenv (lambda-var-home var)))))
+                        (neq (lambda-environment fun)
+                             (lambda-environment (lambda-var-home var)))))
          ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
          (large-fixnums (>= (integer-length most-positive-fixnum) 62))
          more)
@@ -552,7 +552,7 @@
                  (frob-leaf leaf (leaf-info leaf) gensym-p))))
       (frob-lambda fun t)
       (when (>= level 1)
-        (dolist (x (ir2-physenv-closure (physenv-info (lambda-physenv fun))))
+        (dolist (x (ir2-environment-closure (environment-info (lambda-environment fun))))
           (let ((thing (car x)))
             (when (lambda-var-p thing)
               (frob-leaf thing (cdr x) (>= level 2)))))
@@ -662,7 +662,7 @@
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
 (defun dfun-from-fun (fun)
   (declare (type clambda fun))
-  (let* ((2env (physenv-info (lambda-physenv fun)))
+  (let* ((2env (environment-info (lambda-environment fun)))
          (dispatch (lambda-optional-dispatch fun))
          (main-p (and dispatch
                       (eq fun (optional-dispatch-main-entry dispatch))))
@@ -685,26 +685,26 @@
     (funcall (compiled-debug-fun-ctor kind)
              :name name
              #-fp-and-pc-standard-save :return-pc
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-return-pc 2env))
              #-fp-and-pc-standard-save :return-pc-pass
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc-pass 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-return-pc-pass 2env))
              #-fp-and-pc-standard-save :old-fp
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-old-fp 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-old-fp 2env))
              :encoded-locs
              (cdf-encode-locs
-              (label-position (ir2-physenv-environment-start 2env))
-              (label-position (ir2-physenv-elsewhere-start 2env))
+              (label-position (ir2-environment-environment-start 2env))
+              (label-position (ir2-environment-elsewhere-start 2env))
               (source-path-form-number (node-source-path (lambda-bind fun)))
               (label-position (block-label (lambda-block fun)))
-              (when (ir2-physenv-closure-save-tn 2env)
-                (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
+              (when (ir2-environment-closure-save-tn 2env)
+                (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
               #+unwind-to-frame-and-call-vop
-              (when (ir2-physenv-bsp-save-tn 2env)
-                (tn-sc+offset (ir2-physenv-bsp-save-tn 2env)))
+              (when (ir2-environment-bsp-save-tn 2env)
+                (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
               #-fp-and-pc-standard-save
-              (label-position (ir2-physenv-lra-saved-pc 2env))
+              (label-position (ir2-environment-lra-saved-pc 2env))
               #-fp-and-pc-standard-save
-              (label-position (ir2-physenv-cfp-saved-pc 2env))))))
+              (label-position (ir2-environment-cfp-saved-pc 2env))))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
@@ -763,8 +763,8 @@
      (eq start (ir2-block-last-vop 2block))
      (eq (vop-name start) 'note-environment-start)
      next
-     (neq (ir2-block-physenv 2block)
-          (ir2-block-physenv next)))))
+     (neq (ir2-block-environment 2block)
+          (ir2-block-environment next)))))
 
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.

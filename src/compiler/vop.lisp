@@ -134,8 +134,8 @@
 ;;;    environment pointer should be saved after the binding is
 ;;;    instantiated.
 ;;;
-;;; PHYSENV-INFO
-;;;    Holds the IR2-PHYSENV structure.
+;;; ENVIRONMENT-INFO
+;;;    Holds the IR2-ENVIRONMENT structure.
 ;;;
 ;;; TAIL-SET-INFO
 ;;;    Holds the RETURN-INFO structure.
@@ -404,16 +404,16 @@
         (xref (entry-info-xref entry)))
     (if (and type xref) (cons type xref) (or type xref))))
 
-;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
-;;; passing locations. It is stored in the PHYSENV-INFO.
-(defstruct (ir2-physenv (:copier nil))
+;;; An IR2-ENVIRONMENT is used to annotate non-LET LAMBDAs with their
+;;; passing locations. It is stored in the ENVIRONMENT-INFO.
+(defstruct (ir2-environment (:copier nil))
   ;; TN info for closed-over things within the function: an alist
   ;; mapping from NLX-INFOs and LAMBDA-VARs to TNs holding the
   ;; corresponding thing within this function
   ;;
   ;; Elements of this list have a one-to-one correspondence with
-  ;; elements of the PHYSENV-CLOSURE list of the PHYSENV object that
-  ;; links to us.
+  ;; elements of the ENVIRONMENT-CLOSURE list of the ENVIRONMENT
+  ;; object that links to us.
   (closure (missing-arg) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,
@@ -455,7 +455,7 @@
   #+unwind-to-frame-and-call-vop
   (bsp-save-tn nil :type (or tn null)))
 
-(defprinter (ir2-physenv)
+(defprinter (ir2-environment)
   closure
   old-fp
   return-pc
@@ -1092,8 +1092,8 @@
   ;; some kind of info about how important this TN is
   (cost 0 :type fixnum)
   ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the
-  ;; physical environment that the TN is live throughout.
-  (physenv nil :type (or physenv null))
+  ;; environment that the TN is live throughout.
+  (environment nil :type (or environment null))
   ;; Used by pack-iterative
   (vertex nil))
 

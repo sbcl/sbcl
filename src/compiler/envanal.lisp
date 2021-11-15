@@ -1,8 +1,8 @@
 ;;;; This file implements the environment analysis phase for the
 ;;;; compiler. This phase annotates IR1 with a hierarchy environment
-;;;; structures, determining the physical environment that each LAMBDA
+;;;; structures, determining the environment that each LAMBDA
 ;;;; allocates its variables and finding what values are closed over
-;;;; by each physical environment.
+;;;; by each environment.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -17,16 +17,16 @@
 
 ;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
-;;;  1. Make a PHYSENV structure for each non-LET LAMBDA, assigning
-;;;     the LAMBDA-PHYSENV for all LAMBDAs.
+;;;  1. Make an ENVIRONMENT structure for each non-LET LAMBDA, assigning
+;;;     the LAMBDA-ENVIRONMENT for all LAMBDAs.
 ;;;  2. Find all values that need to be closed over by each
-;;;     physical environment.
+;;;     environment.
 ;;;  3. Scan the blocks in the component closing over non-local-exit
 ;;;     continuations.
 ;;;  4. Delete all non-top-level functions with no references. This
 ;;;     should only get functions with non-NULL kinds, since normal
 ;;;     functions are deleted when their references go to zero.
-(defun physenv-analyze (component)
+(defun environment-analyze (component)
   (declare (type component component))
   (aver (every (lambda (x)
                  (eq (functional-kind x) :deleted))
@@ -53,28 +53,22 @@
   (setf (component-nlx-info-generated-p component) t)
   (values))
 
-;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
-;;; and return that.
-(defun get-lambda-physenv (clambda)
-  (declare (type clambda clambda))
-  (let ((homefun (lambda-home clambda)))
-    (or (lambda-physenv homefun)
-        (let ((res (make-physenv :lambda homefun)))
-          (setf (lambda-physenv homefun) res)
-          ;; All the LETLAMBDAs belong to HOMEFUN, and share the same
-          ;; PHYSENV. Thus, (1) since HOMEFUN's PHYSENV was NIL,
-          ;; theirs should be NIL too, and (2) since we're modifying
-          ;; HOMEFUN's PHYSENV, we should modify theirs, too.
-          (dolist (letlambda (lambda-lets homefun))
-            (aver (eql (lambda-home letlambda) homefun))
-            (aver (null (lambda-physenv letlambda)))
-            (setf (lambda-physenv letlambda) res))
+;;; If FUN has an environment, return it, otherwise assign an empty
+;;; one and return that.
+(defun get-lambda-environment (fun)
+  (declare (type clambda fun))
+  (let ((fun (lambda-home fun)))
+    (or (lambda-environment fun)
+        (let ((res (make-environment :lambda fun)))
+          (setf (lambda-environment fun) res)
+          (dolist (lambda (lambda-lets fun))
+            (setf (lambda-environment lambda) res))
           res))))
 
 ;;; Get NODE's environment, assigning one if necessary.
-(defun get-node-physenv (node)
+(defun get-node-environment (node)
   (declare (type node node))
-  (get-lambda-physenv (node-home-lambda node)))
+  (get-lambda-environment (node-home-lambda node)))
 
 ;;; private guts of ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES
 ;;;
@@ -86,17 +80,17 @@
 ;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
 ;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
 (defun %add-lambda-vars-to-closures (clambda)
-  (let ((physenv (get-lambda-physenv clambda))
+  (let ((env (get-lambda-environment clambda))
         (did-something nil))
     (note-unreferenced-fun-vars clambda)
     (dolist (var (lambda-vars clambda))
       (dolist (ref (leaf-refs var))
-        (let ((ref-physenv (get-node-physenv ref)))
-          (unless (eq ref-physenv physenv)
+        (let ((ref-env (get-node-environment ref)))
+          (unless (eq ref-env env)
             (when (lambda-var-sets var)
               (setf (lambda-var-indirect var) t))
             (setq did-something t)
-            (close-over var ref-physenv physenv))))
+            (close-over var ref-env env))))
       (dolist (set (basic-var-sets var))
 
         ;; Variables which are set but never referenced can be
@@ -109,11 +103,11 @@
         ;; here.)
         (unless (null (leaf-refs var))
 
-          (let ((set-physenv (get-node-physenv set)))
-            (unless (eq set-physenv physenv)
+          (let ((set-env (get-node-environment set)))
+            (unless (eq set-env env)
               (setf did-something t
                     (lambda-var-indirect var) t)
-              (close-over var set-physenv physenv))))))
+              (close-over var set-env env))))))
     did-something))
 
 ;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
@@ -141,26 +135,26 @@
   (let ((entry (functional-entry-fun xep)))
     (functional-enclose entry)))
 
-;;; Make sure that THING is closed over in REF-PHYSENV and in all
-;;; PHYSENVs for the functions that reference REF-PHYSENV's function
-;;; (not just calls). HOME-PHYSENV is THING's home environment. When we
+;;; Make sure that THING is closed over in REF-ENV and in all
+;;; environments for the functions that reference REF-ENV's function
+;;; (not just calls). HOME-ENV is THING's home environment. When we
 ;;; reach the home environment, we stop propagating the closure.
-(defun close-over (thing ref-physenv home-physenv)
-  (declare (type physenv ref-physenv home-physenv))
-  (let ((flooded-physenvs nil))
-    (labels ((flood (flooded-physenv)
-               (unless (or (eql flooded-physenv home-physenv)
-                           (member flooded-physenv flooded-physenvs))
-                 (push flooded-physenv flooded-physenvs)
-                 (unless (memq thing (physenv-closure flooded-physenv))
-                   (push thing (physenv-closure flooded-physenv))
-                   (let ((lambda (physenv-lambda flooded-physenv)))
+(defun close-over (thing ref-env home-env)
+  (declare (type environment ref-env home-env))
+  (let ((flooded-envs nil))
+    (labels ((flood (flooded-env)
+               (unless (or (eql flooded-env home-env)
+                           (member flooded-env flooded-envs))
+                 (push flooded-env flooded-envs)
+                 (unless (memq thing (environment-closure flooded-env))
+                   (push thing (environment-closure flooded-env))
+                   (let ((lambda (environment-lambda flooded-env)))
                      (cond ((eq (functional-kind lambda) :external)
-                            (let ((enclose-physenv (get-node-physenv (xep-enclose lambda))))
-                              (flood enclose-physenv)
+                            (let ((enclose-env (get-node-environment (xep-enclose lambda))))
+                              (flood enclose-env)
                               (dolist (ref (leaf-refs lambda))
                                 (close-over lambda
-                                            (get-node-physenv ref) enclose-physenv))))
+                                            (get-node-environment ref) enclose-env))))
                            (t (dolist (ref (leaf-refs lambda))
                                 ;; FIXME: This assertion looks
                                 ;; reasonable, but does not work for
@@ -169,8 +163,8 @@
                                 (let ((dest (node-dest ref)))
                                   (aver (basic-combination-p dest))
                                   (aver (eq (basic-combination-kind dest) :local)))
-                                (flood (get-node-physenv ref))))))))))
-      (flood ref-physenv)))
+                                (flood (get-node-environment ref))))))))))
+      (flood ref-env)))
   (values))
 
 ;;; Find LAMBDA-VARs that are marked as needing to support indirect
@@ -204,7 +198,7 @@
                   ;; off the non-XEP case here.
                   (not entry-fun)
                   (leaf-dynamic-extent entry-fun))
-        (let ((closure (physenv-closure (lambda-physenv fun))))
+        (let ((closure (environment-closure (lambda-environment fun))))
           (dolist (var closure)
             (when (and (lambda-var-p var)
                        (lambda-var-indirect var))
@@ -279,7 +273,7 @@
       t)))
 
 ;;; Insert the entry stub before the original exit target, and add a
-;;; new entry to the PHYSENV-NLX-INFO. The %NLX-ENTRY call in the
+;;; new entry to the ENVIRONMENT-NLX-INFO. The %NLX-ENTRY call in the
 ;;; stub is passed the NLX-INFO as an argument so that the back end
 ;;; knows what entry is being done.
 ;;;
@@ -295,7 +289,7 @@
 ;;; actually exiting the scope (i.e. a BLOCK), and will also do any
 ;;; other cleanups that may have to be done on the way.
 (defun insert-nlx-entry-stub (exit env)
-  (declare (type physenv env) (type exit exit))
+  (declare (type environment env) (type exit exit))
   (let* ((exit-block (node-block exit))
          (next-block (first (block-succ exit-block)))
          (entry (exit-entry exit))
@@ -313,7 +307,7 @@
     (setf (exit-nlx-info exit) info)
     (setf (nlx-info-target info) new-block)
     (setf (nlx-info-safe-p info) (exit-should-check-tag-p exit))
-    (push info (physenv-nlx-info env))
+    (push info (environment-nlx-info env))
     (push info (cleanup-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
       (setf (node-lexenv (block-last new-block))
@@ -339,7 +333,7 @@
 ;;;    will be a use to represent the NLX use; 2) make life easier for
 ;;;    the stack analysis.
 (defun note-non-local-exit (env exit)
-  (declare (type physenv env) (type exit exit))
+  (declare (type environment env) (type exit exit))
   (let ((lvar (node-lvar exit))
         (exit-fun (node-home-lambda exit))
         (info (find-nlx-info exit)))
@@ -356,7 +350,7 @@
            (insert-nlx-entry-stub exit env)
            (setq info (exit-nlx-info exit))
            (aver info)))
-    (close-over info (node-physenv exit) env)
+    (close-over info (node-environment exit) env)
     (when (eq (functional-kind exit-fun) :escape)
       (mapc (lambda (x)
               (setf (node-derived-type x) *wild-type*))
@@ -377,10 +371,10 @@
   (let ((*functional-escape-info* nil))
     (dolist (lambda (component-lambdas component))
       (dolist (entry (lambda-entries lambda))
-        (let ((target-physenv (node-physenv entry)))
+        (let ((target-env (node-environment entry)))
           (dolist (exit (entry-exits entry))
-            (aver (neq (node-physenv exit) target-physenv))
-            (note-non-local-exit target-physenv exit))))))
+            (aver (neq (node-environment exit) target-env))
+            (note-non-local-exit target-env exit))))))
   (values))
 
 ;;;; final decision on stack allocation of dynamic-extent structures
@@ -416,7 +410,7 @@
                        (when (leaf-dynamic-extent fun)
                          (let ((xep (functional-entry-fun fun)))
                            (when xep
-                             (cond ((physenv-closure (get-lambda-physenv xep))
+                             (cond ((environment-closure (get-lambda-environment xep))
                                     (setq dx t))
                                    (t
                                     (setf (leaf-extent fun) nil)))))))
@@ -508,11 +502,11 @@
   (declare (type component component))
   (do-blocks (block1 component)
     (unless (block-to-be-deleted-p block1)
-      (let ((env1 (block-physenv block1))
+      (let ((env1 (block-environment block1))
             (cleanup1 (block-end-cleanup block1)))
         (dolist (block2 (block-succ block1))
           (when (block-start block2)
-            (let ((env2 (block-physenv block2))
+            (let ((env2 (block-environment block2))
                   (cleanup2 (block-start-cleanup block2)))
               (unless (or (not (eq env2 env1))
                           (eq cleanup1 cleanup2)
@@ -530,7 +524,7 @@
                                               (and
                                                (block-start pred)
                                                (eq (block-end-cleanup pred) cleanup1)
-                                               (eq (block-physenv pred) env2)))
+                                               (eq (block-environment pred) env2)))
                                      collect pred)
                                block2))))))))
   (values))

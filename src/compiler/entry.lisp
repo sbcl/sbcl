@@ -52,7 +52,7 @@
   (let ((bind (lambda-bind fun))
         (internal-fun (functional-entry-fun fun)))
     (setf (entry-info-closure-tn info)
-          (if (physenv-closure (lambda-physenv fun))
+          (if (environment-closure (lambda-environment fun))
               (make-normal-tn *backend-t-primitive-type*)
               nil))
     (setf (entry-info-offset info) (gen-label))
@@ -156,7 +156,7 @@ missing MAKE-LOAD-FORM methods?")
                             ;; It may have been deleted due to none of
                             ;; the optional entries reaching it.
                             (neq (functional-kind main-entry) :deleted)
-                            (physenv-closure (lambda-physenv main-entry)))))
+                            (environment-closure (lambda-environment main-entry)))))
              (dolist (ref (leaf-refs lambda))
                (let ((ref-component (node-component ref)))
                  (cond ((eq ref-component component))

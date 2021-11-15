@@ -436,7 +436,7 @@
  ("src/compiler/{arch}/show")
  ("src/compiler/{arch}/array")
  ("src/compiler/generic/type-error")
- ("src/compiler/physenvanal")
+ ("src/compiler/envanal")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a

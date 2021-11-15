@@ -2326,7 +2326,7 @@
                            x)))
     (assert (= a (random most-positive-fixnum)))))
 
-;;; MISC.641: LET-conversion after physical environment analysis lost NLX-INFOs
+;;; MISC.641: LET-conversion after environment analysis lost NLX-INFOs
 (with-test (:name (compile let :conversion :lost :nlx-infos :misc.641))
   (checked-compile-and-assert (:allow-style-warnings t :optimize nil)
       `(lambda ()

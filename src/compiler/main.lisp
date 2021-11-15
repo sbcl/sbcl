@@ -743,9 +743,9 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (ir1-phases component)
 
-    ;; This should happen at some point before PHYSENV-ANALYZE, and
-    ;; after RECORD-COMPONENT-XREFS.  Beyond that, I haven't really
-    ;; thought things through.  -- AJB, 2014-Jun-08
+    ;; This should happen at some point before ENVIRONMENT-ANALYZE,
+    ;; and after RECORD-COMPONENT-XREFS.  Beyond that, I haven't
+    ;; really thought things through.  -- AJB, 2014-Jun-08
     (eliminate-dead-code component)
 
     (when *loop-analyze*
@@ -770,7 +770,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     |#
 
     (maybe-mumble "Env ")
-    (physenv-analyze component)
+    (environment-analyze component)
     (dfo-as-needed component)
 
     (delete-if-no-entries component)

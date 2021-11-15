@@ -134,7 +134,7 @@
      (* (max 1 (sb-allocated-size 'control-stack))
         n-word-bytes))
     (store-csp nfp)
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
         (inst sub nfp nsp-tn nbytes)
         (inst mov nsp-tn nfp)))))

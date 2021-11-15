@@ -123,7 +123,7 @@
     (move res csp-tn)
     (inst add csp-tn csp-tn (add-sub-immediate
                              (* (max 1 (sb-allocated-size 'control-stack)) n-word-bytes)))
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (inst sub nfp nsp-tn (add-sub-immediate
                             (bytes-needed-for-non-descriptor-stack-frame)))
       (inst mov-sp nsp-tn nfp))))

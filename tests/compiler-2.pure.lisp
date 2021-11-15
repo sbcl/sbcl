@@ -932,7 +932,7 @@
          (sb-kernel:symeval nil))
     (() nil)))
 
-(with-test (:name (:physenv-analyze :deleted-lambda))
+(with-test (:name (:environment-analyze :deleted-lambda))
   (checked-compile-and-assert
       ()
       `(lambda (log)

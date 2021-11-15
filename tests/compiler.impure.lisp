@@ -72,7 +72,7 @@
 
 ;;; As reported by Alexey Dejneka (sbcl-devel 2002-01-30), in
 ;;; sbcl-0.7.1 plus his patch (i.e. essentially sbcl-0.7.1.2), the
-;;; compiler barfed on this, blowing up in FIND-IN-PHYSENV looking for
+;;; compiler barfed on this, blowing up in FIND-IN-ENVIRONMENT looking for
 ;;; the LAMBDA-VAR named NUM. That was fixed in sbcl-0.7.1.3.
 (defun parse-num (index)
   (let (num x)
@@ -1045,7 +1045,7 @@
 
 (with-test (:name :bug-405)
   ;; These used to break with a TYPE-ERROR
-  ;;     The value NIL is not of type SB-C::PHYSENV.
+  ;;     The value NIL is not of type SB-C::ENVIRONMENT.
   ;; in MERGE-LETS.
   (ctu:file-compile
    '((LET (outer-let-var)
