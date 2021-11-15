@@ -131,17 +131,21 @@
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
 ;;; is the number of arguments passed.  If no stack arguments are passed, then
 ;;; we don't have to do anything.
+;;; LR and CFP are always saved on the stack, but it's safe to have two words above CSP.
 (define-vop (allocate-full-call-frame)
   (:info nargs)
   (:results (res :scs (any-reg)))
   (:generator 2
-    (move res csp-tn)
-        (let ((size (add-sub-immediate (* (max 2 nargs) n-word-bytes))))
-      (cond ((typep size '(signed-byte 9))
-             (inst str cfp-tn (@ csp-tn size :post-index)))
-            (t
-             (inst add csp-tn csp-tn size)
-             (storew cfp-tn res ocfp-save-offset))))))
+    (if (<= nargs register-arg-count)
+        ;; Don't touch RES, the call vops would use CSP-TN in this case.
+        (storew cfp-tn csp-tn ocfp-save-offset)
+        (let ((size (add-sub-immediate (* nargs n-word-bytes))))
+          (move res csp-tn)
+          (cond ((typep size '(signed-byte 9))
+                 (inst str cfp-tn (@ csp-tn size :post-index)))
+                (t
+                 (inst add csp-tn csp-tn size)
+                 (storew cfp-tn res ocfp-save-offset)))))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  VALUES is the head of the TN-REF
@@ -961,7 +965,12 @@
                                       `((:frob-nfp
                                          (store-stack-tn nfp-save cur-nfp))
                                         (:load-fp
-                                         (move cfp-tn new-fp))))
+                                         (move cfp-tn (cond ,@(and
+                                                               (not variable)
+                                                               '(((<= nargs register-arg-count)
+                                                                  csp-tn)))
+                                                            (t
+                                                             new-fp))))))
                                 ((nil)))))
                           (insert-step-instrumenting ()
                             ;; Conditionally insert a conditional trap:
