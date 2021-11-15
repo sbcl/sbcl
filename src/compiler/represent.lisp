@@ -833,6 +833,24 @@
                       (change-tn-ref-tn read (zero-tn)))
                     (return)))))))))
 
+;;; The call VOPs allocate a temporary register wired to
+;;; nfp-save-offset, but don't use it if there's no nfp-tn in the
+;;; current frame, but the stack space is still allocated.
+#-c-stack-is-control-stack
+(defun unwire-nfp-save-tn (2comp)
+  (unless (ir2-component-nfp 2comp)
+    (do ((prev)
+         (tn (ir2-component-wired-tns 2comp) (tn-next tn)))
+        ((null tn))
+      (cond ((and (sc-is tn sb-vm::control-stack)
+                  (eql (tn-offset tn) sb-vm:nfp-save-offset))
+             (setf (tn-kind tn) :unused)
+             (if prev
+                 (setf (tn-next prev) (tn-next tn))
+                 (setf (ir2-component-wired-tns 2comp) (tn-next tn))))
+            (t
+             (setf prev tn))))))
+
 ;;; This is the entry to representation selection. First we select the
 ;;; representation for all normal TNs, setting the TN-SC. After
 ;;; selecting the TN representations, we set the SC for all :ALIAS TNs
@@ -906,5 +924,7 @@
                     (note-if-number-stack tn 2comp ,restricted))))
       (frob ir2-component-normal-tns nil)
       (frob ir2-component-wired-tns t)
-      (frob ir2-component-restricted-tns t)))
+      (frob ir2-component-restricted-tns t)
+      #-c-stack-is-control-stack
+      (unwire-nfp-save-tn 2comp)))
   (values))
