@@ -56,17 +56,15 @@
 ;;; and there is no case in which left-shift is required.
 (defmacro define-indexer (name shift write-p ri-op rr-op &key sign-extend-byte
                                                               multiple-of-four
-                          &aux (net-shift (- shift n-fixnum-tag-bits))
-                               (result (not write-p)))
+                          &aux (net-shift (- shift n-fixnum-tag-bits)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate))
-            ,@(when write-p
-                `((value :scs (any-reg descriptor-reg) ,@(when result '(:target result))))))
+            ,@(when write-p '((value :scs (any-reg descriptor-reg)))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
      (:temporary (:scs (non-descriptor-reg)) temp)
-     ,@(when result
-         `((:results (,(if write-p 'result 'value) :scs (any-reg descriptor-reg)))
+     ,@(unless write-p
+         `((:results (value :scs (any-reg descriptor-reg)))
            (:result-types *)))
      (:variant-vars offset lowtag)
      (:policy :fast-safe)
@@ -93,9 +91,7 @@
                 (- (ash offset word-shift) lowtag))
           (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
-           `((inst extsb value value)))
-       ,@(when (and write-p result)
-           '((move result value))))))
+           `((inst extsb value value))))))
 
 (define-indexer word-index-ref           3 nil ld  ldx) ;; Word means Lisp Word
 (define-indexer 32-bits-index-ref        2 nil lwz lwzx)

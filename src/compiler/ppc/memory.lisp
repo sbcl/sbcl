@@ -34,17 +34,15 @@
 ;;;; Indexed references:
 
 ;;; Define some VOPs for indexed memory reference.
-(defmacro define-indexer (name write-p ri-op rr-op shift &key sign-extend-byte
-                                                         &aux (result (not write-p)))
+(defmacro define-indexer (name write-p ri-op rr-op shift &key sign-extend-byte)
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg zero immediate))
-            ,@(when write-p
-                `((value :scs (any-reg descriptor-reg) ,@(when result '(:target result))))))
+            ,@(when write-p '((value :scs (any-reg descriptor-reg)))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
      (:temporary (:scs (non-descriptor-reg)) temp)
-     ,@(when result
-         `((:results (,(if write-p 'result 'value) :scs (any-reg descriptor-reg)))
+     ,@(unless write-p
+         `((:results (value :scs (any-reg descriptor-reg)))
            (:result-types *)))
      (:variant-vars offset lowtag)
      (:policy :fast-safe)
@@ -70,9 +68,7 @@
                 (- (ash offset word-shift) lowtag))
           (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
-           `((inst extsb value value)))
-       ,@(when (and write-p result)
-           '((move result value))))))
+           `((inst extsb value value))))))
 
 (define-indexer word-index-ref            nil lwz lwzx 0)
 (define-indexer halfword-index-ref        nil lhz lhzx 1)
