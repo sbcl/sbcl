@@ -412,9 +412,7 @@
               ;; And make the call.
               (load-address-into
                r0
-               (foreign-symbol-address
-                #-sb-thread "funcall3"
-                #+sb-thread "callback_wrapper_trampoline"))
+               (foreign-symbol-address "callback_wrapper_trampoline"))
               (inst mtlr r0)
               (inst blrl)
 

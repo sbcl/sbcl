@@ -81,18 +81,15 @@
   (:vop-var vop)
   (:generator 15
     (inst sync)
-    #+sb-thread
-    (assemble ()
-      (load-tls-index temp symbol)
-      ;; Thread-local area, no synchronization needed.
-      (inst ldx result thread-base-tn temp)
-      (inst cmpd result old)
-      (inst bne DONT-STORE-TLS)
-      (inst stdx new thread-base-tn temp)
-      DONT-STORE-TLS
-
-      (inst cmpdi result no-tls-value-marker-widetag)
-      (inst bne CHECK-UNBOUND))
+    (load-tls-index temp symbol)
+    ;; Thread-local area, no synchronization needed.
+    (inst ldx result thread-base-tn temp)
+    (inst cmpd result old)
+    (inst bne DONT-STORE-TLS)
+    (inst stdx new thread-base-tn temp)
+    DONT-STORE-TLS
+    (inst cmpdi result no-tls-value-marker-widetag)
+    (inst bne CHECK-UNBOUND)
 
     (inst li temp (- (* symbol-value-slot n-word-bytes)
                      other-pointer-lowtag))
@@ -153,77 +150,66 @@
     (move value object)
     DONE))
 
-#+sb-thread
-(progn
-  (define-vop (set)
-    (:args (symbol :scs (descriptor-reg))
-           (value :scs (descriptor-reg any-reg)))
-    (:temporary (:sc any-reg) tls-slot temp)
-    (:generator 4
-      (load-tls-index tls-slot symbol)
-      (inst ldx temp thread-base-tn tls-slot)
-      (inst cmpdi temp no-tls-value-marker-widetag)
-      (inst beq GLOBAL-VALUE)
-      (inst stdx value thread-base-tn tls-slot)
-      (inst b DONE)
-      GLOBAL-VALUE
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
-      DONE))
+(define-vop (set)
+  (:args (symbol :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
+  (:temporary (:sc any-reg) tls-slot temp)
+  (:generator 4
+    (load-tls-index tls-slot symbol)
+    (inst ldx temp thread-base-tn tls-slot)
+    (inst cmpdi temp no-tls-value-marker-widetag)
+    (inst beq GLOBAL-VALUE)
+    (inst stdx value thread-base-tn tls-slot)
+    (inst b DONE)
+    GLOBAL-VALUE
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    DONE))
 
-  ;; With Symbol-Value, we check that the value isn't the trap object. So
-  ;; Symbol-Value of NIL is NIL.
-  (define-vop (symbol-value)
-    (:translate symeval)
-    (:policy :fast-safe)
-    (:args (object :scs (descriptor-reg) :to (:result 1)))
-    (:results (value :scs (descriptor-reg any-reg)))
-    (:vop-var vop)
-    (:save-p :compute-only)
-    (:generator 9
-      (inst cmpld object null-tn)
-      (inst beq NULL)
-      (load-tls-index value object)
-      (inst ldx value thread-base-tn value)
-      (inst cmpdi value no-tls-value-marker-widetag)
-      (inst bne CHECK-UNBOUND)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      CHECK-UNBOUND
-      (inst cmpdi value unbound-marker-widetag)
-      (inst beq (generate-error-code vop 'unbound-symbol-error object))
-      (inst b DONE)
-      NULL
-      (move value object)
-      DONE))
+;; With Symbol-Value, we check that the value isn't the trap object. So
+;; Symbol-Value of NIL is NIL.
+(define-vop (symbol-value)
+  (:translate symeval)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 9
+    (inst cmpld object null-tn)
+    (inst beq NULL)
+    (load-tls-index value object)
+    (inst ldx value thread-base-tn value)
+    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst bne CHECK-UNBOUND)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    CHECK-UNBOUND
+    (inst cmpdi value unbound-marker-widetag)
+    (inst beq (generate-error-code vop 'unbound-symbol-error object))
+    (inst b DONE)
+    NULL
+    (move value object)
+    DONE))
 
-  (define-vop (fast-symbol-value symbol-value)
-    ;; KLUDGE: not really fast, in fact, because we're going to have to
-    ;; do a full lookup of the thread-local area anyway.  But half of
-    ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
-    ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
-    ;; CSR, 2003-04-22
-    (:policy :fast)
-    (:translate symeval)
-    (:generator 8
-      (inst cmpld object null-tn)
-      (inst beq NULL)
-      (load-tls-index value object)
-      (inst ldx value thread-base-tn value)
-      (inst cmpdi value no-tls-value-marker-widetag)
-      (inst bne DONE)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      (inst b DONE)
-      NULL
-      (move value object)
-      DONE)))
-
-;;; On unithreaded builds these are just copies of the global versions.
-#-sb-thread
-(progn
-  (define-vop (symbol-value symbol-global-value)
-    (:translate symeval))
-  (define-vop (fast-symbol-value fast-symbol-global-value)
-    (:translate symeval))
-  (define-vop (set %set-symbol-global-value)))
+(define-vop (fast-symbol-value symbol-value)
+  ;; KLUDGE: not really fast, in fact, because we're going to have to
+  ;; do a full lookup of the thread-local area anyway.  But half of
+  ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
+  ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
+  ;; CSR, 2003-04-22
+  (:policy :fast)
+  (:translate symeval)
+  (:generator 8
+    (inst cmpld object null-tn)
+    (inst beq NULL)
+    (load-tls-index value object)
+    (inst ldx value thread-base-tn value)
+    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst bne DONE)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    (inst b DONE)
+    NULL
+    (move value object)
+    DONE))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
 ;;; is bound.
@@ -234,7 +220,6 @@
   (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
-  #+sb-thread
   (:generator 9
     (inst cmpld object null-tn)
     (inst beq (if not-p out target))
@@ -246,12 +231,7 @@
     CHECK-UNBOUND
     (inst cmpdi value unbound-marker-widetag)
     (inst b? (if not-p :eq :ne) target)
-    OUT)
-  #-sb-thread
-  (:generator 9
-    (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst cmpwi value unbound-marker-widetag)
-    (inst b? (if not-p :eq :ne) target)))
+    OUT))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
@@ -378,7 +358,6 @@
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
-#+sb-thread
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -393,19 +372,6 @@
      (storew tls-index bsp-tn (- binding-symbol-slot binding-size))
      (inst stdx val thread-base-tn tls-index))))
 
-#-sb-thread
-(define-vop (dynbind)
-  (:args (val :scs (any-reg descriptor-reg))
-         (symbol :scs (descriptor-reg)))
-  (:temporary (:scs (descriptor-reg)) temp)
-  (:generator 5
-    (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst addi bsp-tn bsp-tn (* binding-size n-word-bytes))
-    (storew temp bsp-tn (- binding-value-slot binding-size))
-    (storew symbol bsp-tn (- binding-symbol-slot binding-size))
-    (storew val symbol symbol-value-slot other-pointer-lowtag)))
-
-#+sb-thread
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) tls-index value)
   (:temporary (:scs (any-reg)) zero)
@@ -417,20 +383,6 @@
     (storew zero bsp-tn (- binding-symbol-slot binding-size))
     (storew zero bsp-tn (- binding-value-slot binding-size))
     (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
-
-#-sb-thread
-(define-vop (unbind)
-  (:temporary (:scs (descriptor-reg)) symbol value)
-  (:temporary (:scs (any-reg)) zero)
-  (:generator 0
-    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-    (loadw value bsp-tn (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (inst li zero 0)
-    (storew zero bsp-tn (- binding-symbol-slot binding-size))
-    (storew zero bsp-tn (- binding-value-slot binding-size))
-    (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
-
 
 (define-vop (unbind-to-here)
   (:args (arg :scs (descriptor-reg any-reg) :target where))
@@ -447,10 +399,7 @@
       (inst cmpdi symbol 0)
       (inst beq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
-      #+sb-thread
       (inst stdx value thread-base-tn symbol)
-      #-sb-thread
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero bsp-tn (- binding-symbol-slot binding-size))
 
       SKIP

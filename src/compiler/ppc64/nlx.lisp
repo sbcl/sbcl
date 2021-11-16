@@ -42,7 +42,7 @@
   (:args (catch :scs (descriptor-reg))
          (nfp :scs (descriptor-reg))
          (nsp :scs (descriptor-reg)))
-  #+sb-thread (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (any-reg)) temp)
   (:vop-var vop)
   (:generator 10
     (store-tl-symbol-value catch *current-catch-block* temp)
@@ -126,7 +126,7 @@
 ;;;
 (define-vop (set-unwind-protect)
   (:args (uwp :scs (any-reg)))
-  #+sb-thread (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (any-reg)) temp)
   (:generator 7
     (store-tl-symbol-value uwp *current-unwind-protect-block* temp)))
 
@@ -135,7 +135,7 @@
   (:args (current-block))
   (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
-  #+sb-thread (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
@@ -146,7 +146,7 @@
   (:args (current-block))
   (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
-  #+sb-thread (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)

@@ -35,12 +35,10 @@
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
 
-#+sb-thread
-(progn
-  (defun load-tls-index (reg symbol)
-    (inst lwz reg symbol (- #+little-endian 4 other-pointer-lowtag)))
-  (defun store-tls-index (reg symbol)
-    (inst stw reg symbol (- #+little-endian 4 other-pointer-lowtag))))
+(defun load-tls-index (reg symbol)
+  (inst lwz reg symbol (- #+little-endian 4 other-pointer-lowtag)))
+(defun store-tls-index (reg symbol)
+  (inst stw reg symbol (- #+little-endian 4 other-pointer-lowtag)))
 
 (defmacro load-symbol-value (reg symbol)
   ;; Work around the usual lowtag subtraction problem.
@@ -61,8 +59,6 @@
 ;; cross-compile time so we can just use a fixed offset within the
 ;; TLS block instead of mucking about with the extra memory access
 ;; (and temp register, for stores)?
-#+sb-thread
-(progn
 (defmacro load-tl-symbol-value (reg symbol)
   `(progn
      (inst lwz ,reg null-tn (+ (static-symbol-offset ',symbol)
@@ -72,14 +68,7 @@
   `(progn
      (inst lwz ,temp null-tn (+ (static-symbol-offset ',symbol)
                                 (- #+little-endian 4 other-pointer-lowtag)))
-     (inst stdx ,reg thread-base-tn ,temp))))
-#-sb-thread
-(progn
-(defmacro load-tl-symbol-value (reg symbol)
-  `(load-symbol-value ,reg ,symbol))
-(defmacro store-tl-symbol-value (reg symbol temp)
-  (declare (ignore temp))
-  `(store-symbol-value ,reg ,symbol)))
+     (inst stdx ,reg thread-base-tn ,temp)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -188,18 +177,7 @@
   (declare (ignore stack-p node))
   (binding* ((imm-size (typep size '(unsigned-byte 15)))
              ((region-base-tn field-offset)
-               #-sb-thread (values thread-base-tn ; will be STATIC-SPACE-START
-                                   ;; skip over the array header
-                                   (* 2 n-word-bytes))
-               #+sb-thread (values thread-base-tn
-                                   (* thread-boxed-tlab-slot n-word-bytes))))
-
-    ;; use a spare register because of the usual problem that lw & sw only allow
-    ;; displacements that are a multiple of 4. Otherwise NULL-TN would do.
-    ;; STATIC-SPACE-START can be put into the register using exactly 1 instruction
-    ;; without referencing a code constant, whereas computing the actual base
-    ;; address of the struct would use an LIS + ORI.
-    #-sb-thread (inst lr thread-base-tn static-space-start)
+              (values thread-base-tn (* thread-boxed-tlab-slot n-word-bytes))))
 
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)
@@ -337,7 +315,6 @@
   `(progn
      (inst ori alloc-tn alloc-tn pseudo-atomic-flag)
      ,@forms
-     #+sb-thread
      (when ,sync
        (inst sync))
      (without-scheduling ()
