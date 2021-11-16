@@ -383,8 +383,9 @@
                         dstate))))
 
 (defun annotate-ldr-str-pair (value stream dstate)
-  (declare (ignore stream))
+  (declare (ignore stream) (ignorable dstate))
   (destructuring-bind (reg offset) value
+    (declare (ignorable offset))
     (case reg
       #+sb-thread
       (#.sb-vm::thread-offset
