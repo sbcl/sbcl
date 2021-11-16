@@ -2429,7 +2429,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
             lispobj layout;
             if (leaf_obj_widetag_p(widetag)) {
             }
-#ifdef CODE_PAGES_USE_SOFT_PROTECTION
+#if CODE_PAGES_USE_SOFT_PROTECTION
             /* This function will never be called on a page of code, hence if we
              * see genuine (non-filler) code, that's wrong. Otherwise, just do the
              * the switch { } below and we'll scan too many words of the object,
@@ -2807,12 +2807,10 @@ unprotect_oldspace(void)
     __attribute__((unused)) char *page_addr = 0;
     uword_t region_bytes = 0;
 
-#ifndef LISP_FEATURE_ARM64
     // should never have protection applied to gen0, do so nothing.
     // But I don't know enough about how arm64 + darwin works.
     // Somebody else can try removing the preceding #ifndef.
     if (from_space == 0) return;
-#endif
 
     for (i = 0; i < next_free_page; i++) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
@@ -2826,20 +2824,22 @@ unprotect_oldspace(void)
              * on the write-protect flag to avoid redundant calls. */
             if (PAGE_WRITEPROTECTED_P(i)) {
                 SET_PAGE_PROTECTED(i, 0);
-                page_addr = page_address(i);
-                if (!region_addr) {
-                    /* First region. */
-                    region_addr = page_addr;
-                    region_bytes = GENCGC_CARD_BYTES;
-                } else if (region_addr + region_bytes == page_addr) {
-                    /* Region continue. */
-                    region_bytes += GENCGC_CARD_BYTES;
-                } else {
-                    /* Unprotect previous region. */
-                    os_protect(region_addr, region_bytes, OS_VM_PROT_JIT_ALL);
-                    /* First page in new region. */
-                    region_addr = page_addr;
-                    region_bytes = GENCGC_CARD_BYTES;
+                if (protection_mode(i) == PHYSICAL) {
+                    page_addr = page_address(i);
+                    if (!region_addr) {
+                        /* First region. */
+                        region_addr = page_addr;
+                        region_bytes = GENCGC_CARD_BYTES;
+                    } else if (region_addr + region_bytes == page_addr) {
+                        /* Region continue. */
+                        region_bytes += GENCGC_CARD_BYTES;
+                    } else {
+                        /* Unprotect previous region. */
+                        os_protect(region_addr, region_bytes, OS_VM_PROT_JIT_ALL);
+                        /* First page in new region. */
+                        region_addr = page_addr;
+                        region_bytes = GENCGC_CARD_BYTES;
+                    }
                 }
             }
         }
@@ -3420,11 +3420,7 @@ write_protect_generation_pages(generation_index_t generation)
     int n_hw_prot = 0, n_sw_prot = 0;
 
     while (start  < next_free_page) {
-        if (!protect_page_p(start, generation)
-#ifdef LISP_FEATURE_DARWIN_JIT
-            || is_code(page_table[start].type)
-#endif
-            ) {
+        if (!protect_page_p(start, generation)) {
             ++start;
             continue;
         }
@@ -3440,11 +3436,7 @@ write_protect_generation_pages(generation_index_t generation)
 
         /* Find the extent of pages desiring physical protection */
         for (end = start + 1; end < next_free_page; end++) {
-            if (!protect_page_p(end, generation) || protection_mode(end) == LOGICAL
-#ifdef LISP_FEATURE_DARWIN_JIT
-                || is_code(page_table[end].type)
-#endif
-                )
+            if (!protect_page_p(end, generation) || protection_mode(end) == LOGICAL)
                 break;
             SET_PAGE_PROTECTED(end, 1);
         }
@@ -5179,7 +5171,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
 #ifdef LISP_FEATURE_DARWIN_JIT
             if(is_code(page_table[start].type)) {
                 for (end = start + 1; end < next_free_page; end++) {
-                    if (non_protectable_page_p(end) || !is_code(page_table[end].type))
+                    if (!page_bytes_used(end) || !is_code(page_table[end].type))
                         break;
                 }
                 os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_ALL);

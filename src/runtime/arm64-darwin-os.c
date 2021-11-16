@@ -1,5 +1,6 @@
 #include "thread.h"
-
+#include "gc-internal.h"
+#include "gc-private.h"
 void set_thread_stack(void *address) {
     /* KLUDGE: There is no interface to change the stack location of
        the initial thread, and without that backtrace(3) returns zero
@@ -47,6 +48,14 @@ void jit_memcpy(void* dst, void* src, size_t n) {
     memcpy(dst, src, n);
     THREAD_JIT(1);
 }
+void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
+    THREAD_JIT(0);
+    gc_card_mark[addr_to_card_index(code)] = 0;
+    SET_WRITTEN_FLAG(native_pointer(code));
+    native_pointer(code)[index] = value;
+    THREAD_JIT(1);
+}
+
 
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)

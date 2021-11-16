@@ -374,9 +374,8 @@
 ;;; header slots go through the CODE-HEADER-SET vop,
 ;;; which is slightly different from the general soft card mark implementation
 ;;; for historical reasons.
-#-darwin-jit
 (defun (setf %code-debug-info) (newval code)
-  (code-header-set code sb-vm::code-debug-info-slot newval)
+  (setf (code-header-ref code sb-vm:code-debug-info-slot) newval)
   newval)
 
 (defun %code-debug-info (code-obj)

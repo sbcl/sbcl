@@ -115,6 +115,12 @@
     (address unsigned)
     (value unsigned))
 
+  (define-alien-routine jit-patch-code
+    void
+    (code unsigned)
+    (value unsigned)
+    (index unsigned))
+
   (define-alien-routine jit-patch-int
     void
     (address unsigned)
@@ -156,15 +162,7 @@
 
   (defun (setf code-header-ref) (value code index)
     (with-pinned-objects (code value)
-      (jit-patch (+ (get-lisp-obj-address code)
-                    (- other-pointer-lowtag)
-                    (* index n-word-bytes))
-                 (get-lisp-obj-address value)))
-    value)
-
-  (defun (setf %code-debug-info) (value code)
-    (with-pinned-objects (code value)
-      (jit-patch (+ (get-lisp-obj-address code)
-                    (- other-pointer-lowtag)
-                    (* code-debug-info-slot n-word-bytes))
-                 (get-lisp-obj-address value)))))
+      (jit-patch-code (get-lisp-obj-address code)
+                      (get-lisp-obj-address value)
+                      index))
+    value))
