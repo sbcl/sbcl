@@ -93,6 +93,7 @@
 ;;; signals
 (defconstant sizeof-sigset_t 128) ; #x80
 (defconstant sig_setmask 2) ; #x2
+(defconstant sig_unblock 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 10) ; #xa
 (defconstant sigchld 20) ; #x14
@@ -152,3 +153,4 @@
 
 ;;; Our runtime types
 (define-alien-type os-vm-size-t (unsigned 32))
+

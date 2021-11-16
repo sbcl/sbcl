@@ -43,6 +43,31 @@ jobs:
       run: cd tests; ./run-tests.sh --evaluator-mode interpret
     - name: ansi-test
       run: cd tests; ./ansi-tests.sh
-    - name: crossbuild
+
+    - name: crossbuild arm
       if: matrix.subfeatures == 'sse4'
-      run: crossbuild-runner/build-all.sh
+      run: crossbuild-runner/build-all.sh arm
+    - name: crossbuild arm64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh arm64
+    - name: crossbuild mips
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh mips
+    - name: crossbuild ppc
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh ppc
+    - name: crossbuild ppc64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh ppc64
+    - name: crossbuild riscv
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh riscv
+    - name: crossbuild sparc
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh sparc
+    - name: crossbuild x86
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh x86
+    - name: crossbuild x86-64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh x86-64
