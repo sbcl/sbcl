@@ -3556,6 +3556,34 @@ move_pinned_pages_to_newspace()
     }
 }
 
+#ifdef LISP_FEATURE_PPC64
+static void semiconservative_pin_stack(struct thread* th) {
+    /* TODO: This could be made slightly less conservative.
+     * - registers (interrupt contexts) should pin what they point to
+     * - stack should NOT pin any object except code */
+    lispobj *object_ptr;
+    for (object_ptr = th->control_stack_start;
+         object_ptr < access_control_stack_pointer(th);
+         object_ptr++)
+        preserve_pointer((void*)*object_ptr);
+    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    for (i = i - 1; i >= 0; --i) {
+        os_context_t* context = nth_interrupt_context(i, th);
+        int j;
+        // FIXME: if we pick a register to consistently use with m[ft]lr
+        // then we would only need to examine that, and LR and CTR here.
+        // We may already be consistent, I just don't what the consistency is.
+        static int boxed_registers[] = BOXED_REGISTERS;
+        int __attribute__((unused)) ct = 0;
+        for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j)
+            preserve_pointer((void*)*os_context_register_addr(context,
+                                                              boxed_registers[j]));
+        preserve_pointer((void*)*os_context_lr_addr(context));
+        preserve_pointer((void*)*os_context_ctr_addr(context));
+    }
+}
+#endif
+
 #if GENCGC_IS_PRECISE && !defined(reg_CODE)
 
 lispobj *
@@ -3571,7 +3599,7 @@ dynamic_space_code_from_pc(char *pc)
     return NULL;
 }
 
-void maybe_pin_code(lispobj addr) {
+static void maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
     if (page < 0) return;
@@ -3583,11 +3611,7 @@ void maybe_pin_code(lispobj addr) {
     }
 }
 
-void pin_stack(struct thread* th) {
-
-    if(!conservative_stack)
-        return;
-
+static void pin_stack(struct thread* th) {
     lispobj *cfp = access_control_frame_pointer(th);
 
     if (cfp) {
@@ -3862,63 +3886,30 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     }
 
-    /* Scavenge the stacks' conservative roots. */
+    /* Possibly pin stack roots and/or *PINNED-OBJECTS*, unless saving a core.
+     * Scavenging (fixing up pointers) will occur later on */
 
-#if !GENCGC_IS_PRECISE
-    /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
-            if (th->state_word.state != STATE_DEAD)
-                conservative_stack_scan(th, generation, &raise);
-        }
-    }
+            if (th->state_word.state == STATE_DEAD) continue;
+#if !GENCGC_IS_PRECISE
+            /* Pin everything in fromspace with a stack root, and also set the
+             * sticky card mark on any page (in any generation)
+             * referenced from the stack. */
+            conservative_stack_scan(th, generation, &raise);
 #else
-    /* Non-x86oid systems don't have "conservative roots" as such, but
-     * the same mechanism is used for objects pinned for use by alien
-     * code. */
-    for_each_thread(th) {
-#if GENCGC_IS_PRECISE && !defined(reg_CODE)
-        pin_stack(th);
+            // Pin code if needed, and then *PINNED-OBJECTS*
+#  ifdef LISP_FEATURE_PPC64
+            semiconservative_pin_stack(th);
+#  elif !defined(reg_CODE)
+            pin_stack(th);
+#  endif
+            lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
+            for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr )
+                pin_exact_root(CONS(pin_list)->car);
 #endif
-        lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
-        while (pin_list != NIL) {
-            pin_exact_root(CONS(pin_list)->car);
-            pin_list = CONS(pin_list)->cdr;
         }
-#ifdef LISP_FEATURE_PPC64
-        // Scan the control stack and interrupt contexts for ambiguous code roots.
-        // Doing it in gc-common would be too late, since all pinned objects have
-        // to be discovered before transporting anything.
-        // I think we never store reg_CODE on the control stack (yet) - it will only
-        // appear in an interrupt context - so this is probably unnecessary for now.
-        // However, I'd like to eliminate LRAs (at least on the PPC64 backend),
-        // in which case all the looks-like-fixnum return PCs on the control stack,
-        // will need to enliven what they point to.
-        // So we will end up doubly traversing the control stack(s), but it should
-        // be a performance gain to avoid all the PC adjustments for call/return.
-        lispobj *object_ptr;
-        for (object_ptr = th->control_stack_start;
-             object_ptr < access_control_stack_pointer(th);
-             object_ptr++)
-            preserve_pointer((void*)*object_ptr);
-        int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-        for (i = i - 1; i >= 0; --i) {
-            os_context_t* context = nth_interrupt_context(i, th);
-            int j;
-            // FIXME: if we pick a register to consistently use with m[ft]lr
-            // then we would only need to examine that, and LR and CTR here.
-            // We may already be consistent, I just don't what the consistency is.
-            static int boxed_registers[] = BOXED_REGISTERS;
-            int __attribute__((unused)) ct = 0;
-            for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j)
-                preserve_pointer((void*)*os_context_register_addr(context,
-                                                                  boxed_registers[j]));
-            preserve_pointer((void*)*os_context_lr_addr(context));
-            preserve_pointer((void*)*os_context_ctr_addr(context));
-        }
-#endif // PPC64
     }
-#endif
 
     // Thread creation optionally no longer synchronizes the creating and
     // created thread. When synchronized, the parent thread is responsible
