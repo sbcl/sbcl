@@ -63,19 +63,18 @@
       (inst nop))))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
-(define-vop (boundp-frob)
+(define-vop (boundp)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
-  (:temporary (:scs (descriptor-reg)) value)
-  (:temporary (:scs (non-descriptor-reg)) temp))
-
-(define-vop (boundp boundp-frob)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate boundp)
   (:generator 9
-    (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst xor temp value unbound-marker-widetag)
+    (inst lb temp object (+ (- (ash symbol-value-slot word-shift) other-pointer-lowtag)
+                            #+big-endian 3))
+    (inst nop)
+    (inst xor temp temp unbound-marker-widetag)
     (if not-p
         (inst beq temp target)
         (inst bne temp target))

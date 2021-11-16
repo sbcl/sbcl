@@ -149,18 +149,16 @@
       (inst beq temp zero-tn err-lab))))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
-(define-vop (boundp-frob)
+(define-vop (boundp)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
-  (:temporary (:scs (non-descriptor-reg)) temp))
-
-#+sb-thread
-(define-vop (boundp boundp-frob)
-  (:temporary (:scs (interior-reg)) lip)
+  #+sb-thread (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate boundp)
+  #+sb-thread
   (:generator 9
     (load-tls-index value object)
     (inst add lip thread-base-tn value)
@@ -172,11 +170,8 @@
     (inst xori temp value unbound-marker-widetag)
     (if not-p
         (inst beq temp zero-tn target)
-        (inst bne temp zero-tn target))))
-
-#-sb-thread
-(define-vop (boundp boundp-frob)
-  (:translate boundp)
+        (inst bne temp zero-tn target)))
+  #-sb-thread
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst xori temp value unbound-marker-widetag)

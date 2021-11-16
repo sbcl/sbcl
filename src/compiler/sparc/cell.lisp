@@ -59,14 +59,12 @@
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
 ;;; is bound.
-(define-vop (boundp-frob)
+(define-vop (boundp)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
-  (:temporary (:scs (descriptor-reg)) value))
-
-(define-vop (boundp boundp-frob)
+  (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)

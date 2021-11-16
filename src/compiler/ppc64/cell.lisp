@@ -227,16 +227,14 @@
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
 ;;; is bound.
-(define-vop (boundp-frob)
+(define-vop (boundp)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
-  (:temporary (:scs (descriptor-reg)) value))
-
-#+sb-thread
-(define-vop (boundp boundp-frob)
+  (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
+  #+sb-thread
   (:generator 9
     (inst cmpld object null-tn)
     (inst beq (if not-p out target))
@@ -248,11 +246,8 @@
     CHECK-UNBOUND
     (inst cmpdi value unbound-marker-widetag)
     (inst b? (if not-p :eq :ne) target)
-    OUT))
-
-#-sb-thread
-(define-vop (boundp boundp-frob)
-  (:translate boundp)
+    OUT)
+  #-sb-thread
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst cmpwi value unbound-marker-widetag)

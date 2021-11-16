@@ -67,13 +67,6 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only))
-;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
-(define-vop (boundp-frob)
-  (:args (object :scs (descriptor-reg)))
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:temporary (:scs (descriptor-reg)) value))
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.  So
 ;;; Symbol-Value of NIL is NIL.
@@ -141,20 +134,7 @@
   (define-vop (fast-symbol-value symbol-value)
     (:policy :fast)
     (:variant nil)
-    (:variant-cost 5))
-
-  (define-vop (boundp boundp-frob)
-    (:translate boundp)
-    (:temporary (:sc any-reg) tls-index)
-    (:generator 9
-      (inst ldr (32-bit-reg tls-index) (tls-index-of object))
-      (inst ldr value (@ thread-tn tls-index))
-      (inst cmp value no-tls-value-marker-widetag)
-      (inst b :ne LOCAL)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      LOCAL
-      (inst cmp value unbound-marker-widetag)
-      (inst b (if not-p :eq :ne) target))))
+    (:variant-cost 5)))
 
 #-sb-thread
 (progn
@@ -170,14 +150,30 @@
   (define-vop (fast-symbol-value cell-ref)
     (:variant symbol-value-slot other-pointer-lowtag)
     (:policy :fast)
-    (:translate symeval))
+    (:translate symeval)))
 
-  (define-vop (boundp boundp-frob)
-    (:translate boundp)
-    (:generator 9
+(define-vop (boundp)
+  (:args (object :scs (descriptor-reg)))
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:temporary (:scs (descriptor-reg)) value)
+  (:translate boundp)
+  #+sb-thread
+  (:generator 9
+      (inst ldr (32-bit-reg value) (tls-index-of object))
+      (inst ldr value (@ thread-tn value))
+      (inst cmp value no-tls-value-marker-widetag)
+      (inst b :ne LOCAL)
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      LOCAL
+      (inst cmp value unbound-marker-widetag)
+      (inst b (if not-p :eq :ne) target))
+  #-sb-thread
+  (:generator 9
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (inst cmp value unbound-marker-widetag)
-      (inst b (if not-p :eq :ne) target))))
+      (inst b (if not-p :eq :ne) target)))
 
 (define-vop (%set-symbol-global-value cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
