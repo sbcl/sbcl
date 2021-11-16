@@ -4812,18 +4812,19 @@ gencgc_handle_wp_violation(void* fault_addr)
         /* not within the dynamic space -- not our responsibility */
         return 0;
 
-    } else {
-#ifdef LISP_FEATURE_DARWIN_JIT
-        gc_assert(!is_code(page_table[page_index].type));
-#endif
-        // There can not be an open region. gc_close_region() does not attempt
-        // to flip that bit atomically. Other threads in the wp violation handler
-        // concurrently for the same page are fine because they're all doing
-        // the same bit operations.
-        gc_assert(!(page_table[page_index].type & OPEN_REGION_PAGE_FLAG));
-        if (PAGE_WRITEPROTECTED_P(page_index)) {
+    }
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    lose("misuse of mprotect() on dynamic space @ %p", fault_addr);
+#else
+    gc_assert(!is_code(page_table[page_index].type));
+    // There can not be an open region. gc_close_region() does not attempt
+    // to flip that bit atomically. Other threads in the wp violation handler
+    // concurrently for the same page are fine because they're all doing
+    // the same bit operations.
+    gc_assert(!(page_table[page_index].type & OPEN_REGION_PAGE_FLAG));
+    if (PAGE_WRITEPROTECTED_P(page_index)) {
             unprotect_page_index(page_index);
-        } else if (!ignore_memoryfaults_on_unprotected_pages) {
+    } else if (!ignore_memoryfaults_on_unprotected_pages) {
             unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
             unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
             /* The only acceptable reason for this signal on a heap
@@ -4858,10 +4859,10 @@ gencgc_handle_wp_violation(void* fault_addr)
                 if (!continue_after_memoryfault_on_unprotected_pages)
                     lose("Feh.");
             }
-        }
-        /* Don't worry, we can handle it. */
-        return 1;
     }
+#endif
+    /* Don't worry, we can handle it. */
+    return 1;
 }
 /* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
  * it's not just a case of the program hitting the write barrier, and
