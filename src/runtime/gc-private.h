@@ -398,14 +398,10 @@ static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* ad
 
 #endif
 
-#if defined LISP_FEATURE_ARM \
-  || (defined LISP_FEATURE_ARM64 && !defined LISP_FEATURE_DARWIN) \
-  || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 \
-  || defined LISP_FEATURE_SPARC \
-  || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
-# define CODE_PAGES_USE_SOFT_PROTECTION 1
-#else
+#if defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_DARWIN
 # define CODE_PAGES_USE_SOFT_PROTECTION 0
+#else
+# define CODE_PAGES_USE_SOFT_PROTECTION 1
 #endif
 
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])

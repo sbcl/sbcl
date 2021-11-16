@@ -2428,9 +2428,17 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
             sword_t index;
             lispobj layout;
             if (leaf_obj_widetag_p(widetag)) {
-            } else if (widetag == CODE_HEADER_WIDETAG) {
+            }
+#ifdef CODE_PAGES_USE_SOFT_PROTECTION
+            /* This function will never be called on a page of code, hence if we
+             * see genuine (non-filler) code, that's wrong. Otherwise, just do the
+             * the switch { } below and we'll scan too many words of the object,
+             * but that's merely inefficient, not a fatal flaw */
+            else if (widetag == CODE_HEADER_WIDETAG) {
                 if (!filler_obj_p(where)) lose("code @ %p on non-code page", where);
-            } else switch (widetag) {
+            }
+#endif
+            else switch (widetag) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             case INSTANCE_WIDETAG: case FUNCALLABLE_INSTANCE_WIDETAG:
                 // instance_layout works on funcallable or regular instances
