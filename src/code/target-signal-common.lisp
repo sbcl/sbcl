@@ -53,37 +53,3 @@
                         #+sb-safepoint *thruption-pending*))
            (receive-pending-interrupt))
          (funcall function))))
-
-
-(defun invoke-interruption (function)
-  (without-interrupts
-    ;; Reset signal mask: the C-side handler has blocked all
-    ;; deferrable signals before funcalling into lisp. They are to be
-    ;; unblocked the first time interrupts are enabled. With this
-    ;; mechanism there are no extra frames on the stack from a
-    ;; previous signal handler when the next signal is delivered
-    ;; provided there is no WITH-INTERRUPTS.
-    (let ((*unblock-deferrables-on-enabling-interrupts-p* t)
-          (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'invoke-interruption)))
-      (with-interrupt-bindings
-        (sb-thread::without-thread-waiting-for (:already-without-interrupts t)
-          (allow-with-interrupts
-            (nlx-protect (funcall function)
-              ;; We've been running with deferrables
-              ;; blocked in Lisp called by a C signal
-              ;; handler. If we return normally the sigmask
-              ;; in the interrupted context is restored.
-              ;; However, if we do an nlx the operating
-              ;; system will not restore it for us.
-              (when *unblock-deferrables-on-enabling-interrupts-p*
-                ;; This means that storms of interrupts
-                ;; doing an nlx can still run out of stack.
-                (unblock-deferrable-signals)))
-            ;; The return value doesn't matter, just return 0
-            0))))))
-
-(defmacro in-interruption ((&key) &body body)
-  "Convenience macro on top of INVOKE-INTERRUPTION."
-  `(dx-flet ((interruption () ,@body))
-     (invoke-interruption #'interruption)))
-

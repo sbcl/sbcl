@@ -62,6 +62,20 @@
     (alien-funcall %unblock-gc-signals)
     nil))
 
+(defmacro pthread-sigmask (how new old)
+  `(let ((how ,how) (new ,new) (old ,old))
+     (alien-funcall (extern-alien
+                     #+sb-thread ,(or #+unix "pthread_sigmask" #-unix "sb_pthread_sigmask")
+                     #-sb-thread ,(or #+netbsd "sb_sigprocmask" #-netbsd "sigprocmask")
+                     (function void int system-area-pointer system-area-pointer))
+                    how
+                    (cond ((system-area-pointer-p new) new)
+                          (new (vector-sap new))
+                          (t (int-sap 0)))
+                    (cond ((system-area-pointer-p old) old)
+                          (old (vector-sap old))
+                          (t (int-sap 0))))))
+
 
 ;;;; interface to installing signal handlers
 
@@ -92,7 +106,9 @@
     (flet ((run-handler (signo info-sap context-sap)
              #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
              (unblock-gc-signals)
-             (in-interruption () (funcall handler signo info-sap context-sap))))
+             (dx-flet ((interruption ()
+                                     (funcall handler signo info-sap context-sap)))
+               (invoke-interruption #'interruption))))
       (with-pinned-objects (#'run-handler)
         (alien-funcall %sigaction signal
                        (case handler
@@ -100,6 +116,35 @@
                          (:ignore 1)
                          (t (sb-kernel:get-lisp-obj-address #'run-handler)))))))
   nil)
+
+(defun invoke-interruption (function)
+  (without-interrupts
+    ;; Reset signal mask: the C-side handler has blocked all
+    ;; deferrable signals before funcalling into lisp. They are to be
+    ;; unblocked the first time interrupts are enabled. With this
+    ;; mechanism there are no extra frames on the stack from a
+    ;; previous signal handler when the next signal is delivered
+    ;; provided there is no WITH-INTERRUPTS.
+    (let ((*unblock-deferrables-on-enabling-interrupts-p* t)
+          (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'invoke-interruption)))
+      (with-interrupt-bindings
+        (sb-thread::without-thread-waiting-for (:already-without-interrupts t)
+          (allow-with-interrupts
+            (nlx-protect (funcall function)
+              ;; We've been running with blockable
+              ;; blocked in Lisp called by a C signal
+              ;; handler. If we return normally the sigmask
+              ;; in the interrupted context is restored.
+              ;; However, if we do an nlx the operating
+              ;; system will not restore it for us.
+              (when *unblock-deferrables-on-enabling-interrupts-p*
+                ;; This means that storms of interrupts
+                ;; doing an nlx can still run out of stack.
+                (pthread-sigmask SIG_UNBLOCK
+                                 (foreign-symbol-sap "blockable_sigset" t)
+                                 nil)))
+            ;; The return value doesn't matter, just return 0
+            0))))))
 
 ;;;; default LISP signal handlers
 ;;;;
@@ -190,20 +235,6 @@
 (defun sigchld-handler  (signal code context)
   (declare (ignore signal code context))
   (sb-impl::get-processes-status-changes))
-
-(defmacro pthread-sigmask (how new old)
-  `(let ((how ,how) (new ,new) (old ,old))
-     (alien-funcall (extern-alien
-                     #+sb-thread ,(or #+unix "pthread_sigmask" #-unix "sb_pthread_sigmask")
-                     #-sb-thread ,(or #+netbsd "sb_sigprocmask" #-netbsd "sigprocmask")
-                     (function void int system-area-pointer system-area-pointer))
-                    how
-                    (cond ((system-area-pointer-p new) new)
-                          (new (vector-sap new))
-                          (t (int-sap 0)))
-                    (cond ((system-area-pointer-p old) old)
-                          (old (vector-sap old))
-                          (t (int-sap 0))))))
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
