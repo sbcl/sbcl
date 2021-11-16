@@ -89,17 +89,18 @@ static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t
 
 #endif
 
+// If *all* pages use soft card marks, then protection_mode() is not a thing.
+// Otherwise, only pages of code use soft card marks; return an enum indicating
+// whether the page protection for the specified page is applied in harware.
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
 enum prot_mode { PHYSICAL, LOGICAL };
 static inline enum prot_mode protection_mode(page_index_t page) {
-#if CODE_PAGES_USE_SOFT_PROTECTION
     // code pages can be marked as logically read-only without OS protection,
     // and everything else uses hardware-based protection where applicable.
     return ((page_table[page].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
         ? LOGICAL : PHYSICAL;
-#else
-    return PHYSICAL; // all pages, if protected, use hardware-based protection
-#endif
 }
+#endif
 
 #ifndef LISP_FEATURE_SB_THREAD
 #define SINGLE_THREAD_BOXED_REGION (struct alloc_region*)(STATIC_SPACE_START + 2*N_WORD_BYTES)

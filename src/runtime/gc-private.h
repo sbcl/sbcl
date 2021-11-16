@@ -398,8 +398,6 @@ static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* ad
 
 #endif
 
-#define CODE_PAGES_USE_SOFT_PROTECTION 1
-
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]
 

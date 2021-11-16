@@ -2429,7 +2429,6 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
             lispobj layout;
             if (leaf_obj_widetag_p(widetag)) {
             }
-#if CODE_PAGES_USE_SOFT_PROTECTION
             /* This function will never be called on a page of code, hence if we
              * see genuine (non-filler) code, that's wrong. Otherwise, just do the
              * the switch { } below and we'll scan too many words of the object,
@@ -2437,7 +2436,6 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
             else if (widetag == CODE_HEADER_WIDETAG) {
                 if (!filler_obj_p(where)) lose("code @ %p on non-code page", where);
             }
-#endif
             else switch (widetag) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             case INSTANCE_WIDETAG: case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -2628,7 +2626,7 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                     heap_scavenge(start, limit);
                     /* Now scan the pages and write protect those that
                      * don't have pointers to younger generations. */
-                    if (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[i].type))
+                    if (is_code(page_table[i].type))
                         update_code_writeprotection(i, last_page, start, limit);
                     else
                         update_writeprotection(i, last_page, start, limit);
@@ -3107,8 +3105,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 FAIL_IF((READ_ONLY_SPACE_START <= (uword_t)where &&
                          where < read_only_space_free_pointer),
                         "dynamic space from RO space");
-                if (CODE_PAGES_USE_SOFT_PROTECTION
-                    && state->widetag == CODE_HEADER_WIDETAG
+                if (state->widetag == CODE_HEADER_WIDETAG
                     && ! is_in_static_space(state->object_start)
                     && to_gen < state->object_gen) {
                     // two things must be true:
@@ -3239,7 +3236,6 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     gc_assert(!layout || layout == LAYOUT_OF_FUNCTION);
 #endif
                 });
-#if CODE_PAGES_USE_SOFT_PROTECTION
                 generation_index_t my_gen = gen_of((lispobj)where);
                 boolean rememberedp = header_rememberedp(*where);
                 /* The remembered set invariant is that an object is marked "written"
@@ -3256,7 +3252,6 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     lose("object @ %p is gen%d min_pointee=gen%d %s",
                          (void*)compute_lispobj(where), my_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
-#endif
                 count = code_total_nwords(code);
                 break;
                 }
@@ -3410,12 +3405,10 @@ write_protect_generation_pages(generation_index_t generation)
             // must not touch a card referenced from the control stack
             // because the next instruction executed by user code
             // might store an old->young pointer.
-            && gc_card_mark[page_to_card_index(page)] != 2)
+            && gc_card_mark[page_to_card_index(page)] != STICKY_MARK)
             SET_PAGE_PROTECTED(page, 1);
     }
-    return;
-#endif
-
+#else
     page_index_t start = 0, end;
     int n_hw_prot = 0, n_sw_prot = 0;
 
@@ -3455,6 +3448,7 @@ write_protect_generation_pages(generation_index_t generation)
                "/write protected %d of %d pages in generation %d\n",
                n_protected, n_total, generation));
     }
+#endif
 }
 
 static void unprotect_all_pages()
@@ -4819,9 +4813,8 @@ gencgc_handle_wp_violation(void* fault_addr)
         return 0;
 
     } else {
-#if CODE_PAGES_USE_SOFT_PROTECTION || defined (LISP_FEATURE_DARWIN_JIT)
+#ifdef LISP_FEATURE_DARWIN_JIT
         gc_assert(!is_code(page_table[page_index].type));
-
 #endif
         // There can not be an open region. gc_close_region() does not attempt
         // to flip that bit atomically. Other threads in the wp violation handler
@@ -5163,8 +5156,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
         // that soft-marked code pages must NOT be subject to mprotect.
         // So just watch out for empty pages and code.  Unboxed object pages
         // will get unprotected on demand.
-#define non_protectable_page_p(x) !page_bytes_used(x) || \
-          (CODE_PAGES_USE_SOFT_PROTECTION && is_code(page_table[x].type))
+#define non_protectable_page_p(x) !page_bytes_used(x) || is_code(page_table[x].type)
         page_index_t start = 0, end;
         // cf. write_protect_generation_pages()
         while (start  < next_free_page) {
@@ -5296,8 +5288,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
     // that got copied as written, which would allow dropping the second half
     // of the OR condition. As is, we scavenge "too much" of newspace which
     // is not an issue of correctness but rather efficiency.
-    if (!CODE_PAGES_USE_SOFT_PROTECTION ||
-        header_rememberedp(header) || (my_gen == new_space) ||
+    if (header_rememberedp(header) || (my_gen == new_space) ||
         ((uword_t)object >= STATIC_SPACE_START && object < static_space_free_pointer)) {
         // FIXME: We sometimes scavenge protected pages.
         // This assertion fails, but things work nonetheless.
@@ -5350,7 +5341,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
          * pointers. If my_gen is newspace, there can be no such pointers
          * because newspace is the lowest numbered generation post-GC
          * (regardless of whether this is a promotion cycle) */
-        if (CODE_PAGES_USE_SOFT_PROTECTION && my_gen != new_space) {
+        if (my_gen != new_space) {
             lispobj *where, *end = object + n_header_words, ptr;
             for (where= object + 2; where < end; ++where)
                 if (is_lisp_pointer(ptr = *where) && obj_gen_lessp(ptr, my_gen))
