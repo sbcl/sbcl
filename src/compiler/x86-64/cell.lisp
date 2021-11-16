@@ -594,6 +594,7 @@
     (store-binding-stack-pointer bsp)
     (storew temp bsp (- binding-value-slot binding-size))
     (storew symbol bsp (- binding-symbol-slot binding-size))
+    (emit-gc-store-barrier symbol nil temp)
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
 #+sb-thread
@@ -623,6 +624,7 @@
   (:generator 0
     (load-binding-stack-pointer bsp)
     (loadw symbol bsp (- binding-symbol-slot binding-size))
+    (emit-gc-store-barrier symbol nil value) ; VALUE is the card-mark temp
     (loadw value bsp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (storew 0 bsp (- binding-symbol-slot binding-size))
@@ -650,12 +652,11 @@
       (loadw symbol bsp binding-symbol-slot)
       (inst test symbol symbol))
     (inst jmp :z SKIP)
-    (loadw value bsp binding-value-slot)
-    #-sb-thread
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
-    #+sb-thread
-    (inst mov (thread-tls-ea symbol) value)
-
+    #-sb-thread (progn (emit-gc-store-barrier symbol nil value) ; VALUE is the card-mark temp
+                       (loadw value bsp binding-value-slot)
+                       (storew value symbol symbol-value-slot other-pointer-lowtag))
+    #+sb-thread (progn (loadw value bsp binding-value-slot)
+                       (inst mov (thread-tls-ea symbol) value))
     SKIP
     (inst movapd (ea bsp) zero)
 
