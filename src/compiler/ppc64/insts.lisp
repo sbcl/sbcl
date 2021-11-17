@@ -457,13 +457,10 @@
 (def-ppc-iformat (x-4 '(:name :tab rt))
   rt (xo xo21-30))
 
-(def-ppc-iformat (x-5 '(:name :tab ra "," rs "," rb))
+(def-ppc-iformat (x-5 '(:name :tab rs "," ra "," rb))
   rs ra rb (xo xo21-30) rc)
 
-(def-ppc-iformat (x-7 '(:name :tab ra "," rs "," rb))
-  rs ra rb (xo xo21-30))
-
-(def-ppc-iformat (x-8 '(:name :tab ra "," rs "," nb))
+(def-ppc-iformat (x-8 '(:name :tab rs "," ra "," nb))
   rs ra nb (xo xo21-30))
 
 (def-ppc-iformat (x-9 '(:name :tab ra "," rs "," sh))
@@ -493,7 +490,7 @@
 (def-ppc-iformat (x-22 '(:name :tab frt))
   frt (xo xo21-30) rc)
 
-(def-ppc-iformat (x-23 '(:name :tab ra "," frs "," rb))
+(def-ppc-iformat (x-23 '(:name :tab frs "," ra "," rb))
   frs ra rb (xo xo21-30))
 
 (def-ppc-iformat (x-24 '(:name :tab bt))
