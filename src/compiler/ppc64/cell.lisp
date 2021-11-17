@@ -541,24 +541,16 @@
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
-  (:temporary (:scs (non-descriptor-reg)) temp card zero)
+  (:temporary (:scs (non-descriptor-reg)) temp card)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 10
-    ;; Load the card mask
-    (inst lr temp (make-fixup "gc_card_table_mask" :foreign-dataref)) ; address of linkage entry
-    (loadw temp temp)      ; address of gc_card_table_mask
-    (inst lwz temp temp 0) ; value of gc_card_table_mask (4-byte int)
-    (inst li zero 0)
+    ;; Load mark table base
+    (inst ld temp thread-base-tn (ash thread-card-table-slot word-shift))
     (pseudo-atomic (pa-flag)
       ;; Compute card mark index
-      (inst sradi card object gencgc-card-shift)
-      (inst and card card temp)
-      ;; Load mark table base
-      (inst lr temp (make-fixup "gc_card_mark" :foreign-dataref)) ; address of linkage entry
-      (loadw temp temp) ; address of gc_card_mark
-      (loadw temp temp) ; value of gc_card_mark
+      (inst rldicl card object (- 64 gencgc-card-shift) (make-fixup nil :gc-barrier))
       ;; Touch the card mark byte.
-      (inst stbx zero temp card)
+      (inst stbx thread-base-tn temp card) ; THREAD-TN's low byte is 0
       ;; set 'written' flag in the code header
       ;; If two threads get here at the same time, they'll write the same byte.
       (let ((byte (- #+big-endian 4 #+little-endian 3 other-pointer-lowtag)))

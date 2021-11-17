@@ -60,6 +60,7 @@
 #include "genesis/cons.h"
 #include "forwarding-ptr.h"
 #include "lispregs.h"
+#include "var-io.h"
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
@@ -4528,6 +4529,31 @@ gc_init(void)
 int gc_card_table_nbits, gc_card_table_mask;
 char *gc_card_mark;
 
+static void gcbarrier_patch_code_range(uword_t start, void* limit)
+{
+    extern void gcbarrier_patch_code(void*, int);
+    struct varint_unpacker unpacker;
+    struct code* code;
+    lispobj *where = (lispobj*)start;
+    while (where < (lispobj*)limit) {
+        if (widetag_of(where) == CODE_HEADER_WIDETAG && ((struct code*)where)->fixups) {
+            code = (struct code*)where;
+            varint_unpacker_init(&unpacker, code->fixups);
+            // There are two other data streams preceding the one we want
+            skip_data_stream(&unpacker);
+            skip_data_stream(&unpacker);
+            char* instructions = code_text_start(code);
+            int prev_loc = 0, loc;
+            while (varint_unpack(&unpacker, &loc) && loc != 0) {
+                loc += prev_loc;
+                prev_loc = loc;
+                void* patch_where = instructions + loc;
+                gcbarrier_patch_code(patch_where, gc_card_table_nbits);
+            }
+        }
+        where += OBJECT_SIZE(*where, where);
+    }
+}
 static void gc_allocate_ptes()
 {
     page_index_t i;
@@ -4562,18 +4588,20 @@ static void gc_allocate_ptes()
 
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
-    int nbits = 15, num_gc_cards = 1 << nbits;
+    int nbits = 14, num_gc_cards = 1 << nbits;
 
-    extern void gcbarrier_patch_code_range(uword_t start, void* limit);
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
     while (num_gc_cards < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+    // 2 Gigacards should suffice for now. That would span 2TiB of memory
+    // using 1Kb card size, or more if larger card size.
+    gc_assert(nbits < 32);
     // If the space size is less than or equal to the number of cards
     // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
     // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
     if (nbits > gc_card_table_nbits) {
         gc_card_table_nbits = nbits;
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
         // The value needed based on dynamic space size exceeds the value that the
         // core was compiled for, so we need to patch all code blobs.
         gcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);

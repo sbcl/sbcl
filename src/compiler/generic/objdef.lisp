@@ -201,12 +201,10 @@ during backtrace.
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %%code-debug-info)
-  ;; Define this slot if the architecture might ever use fixups.
-  ;; x86-64 doesn't necessarily use them, depending on the feature set,
-  ;; but this keeps things consistent.
+  ;; Not all architectures use fixups. The slot is always present for consistency.
   ;; The corresponding SETF function is defined using code-header-set
   ;; on the slot index.
-  #+(or x86 x86-64) (fixups :type t :ref-known (flushable) :ref-trans %code-fixups)
+  (fixups :type t :ref-known (flushable) :ref-trans %code-fixups)
   (constants :rest-p t))
 
 (define-primitive-object (fdefn :type fdefn
@@ -560,6 +558,7 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
+  #+ppc64 (card-table)
 
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)

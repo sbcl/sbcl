@@ -2763,8 +2763,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:layout-id ; SYM is a #<WRAPPER>
               (cold-layout-id (gethash (descriptor-bits (->layout sym))
                                        *cold-layout-by-addr*)))
-             ;; This is specific to x86 in either word size
-             #+gencgc (:gc-barrier sb-vm::gencgc-card-table-index-mask)
+             ;; The machine-dependent code decides how to patch in 'nbits'
+             #+gencgc (:gc-barrier sb-vm::gencgc-card-table-index-nbits)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3835,7 +3835,6 @@ III. initially undefined function references (alphabetically):
       (resolve-deferred-known-funs)
       (resolve-static-call-fixups)
       (foreign-symbols-to-core)
-      #+(or x86 x86-64)
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb-vm::code-fixups-slot (repack-fixups (cdr pair))))

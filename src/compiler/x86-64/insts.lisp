@@ -3312,9 +3312,13 @@
 ;;; with things (like code instructions) that have to refer to them.
 ;;; Return KIND if the fixup needs to be recorded in %CODE-FIXUPS.
 ;;; The code object we're fixing up is pinned whenever this is called.
-(defun sb-vm:fixup-code-object (code offset value kind flavor)
+(defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
   (sb-vm::with-code-instructions (sap code)
+    (when (eq flavor :gc-barrier)
+      ;; the VALUE is nbits, so convert it to an AND mask
+      (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
+      (return-from fixup-code-object :immediate))
     ;; All x86-64 fixup locations contain an implicit addend at the location
     ;; to be fixed up. The addend is always zero for certain <KIND,FLAVOR> pairs,
     ;; but we don't need to assert that.
@@ -3340,8 +3344,6 @@
       ;; These are used for jump tables and are not recorded in code fixups.
       ;; GC knows to adjust the values if code is moved.
       (setf (sap-ref-64 sap offset) value))))
-  (when (eq flavor :gc-barrier)
-    (return-from fixup-code-object :immediate))
   #-immobile-code
   ;; Change asm routine indirect calls to not store the fixup,
   ;; because the indirect address is in static space.

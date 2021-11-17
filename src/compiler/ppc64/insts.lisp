@@ -1470,9 +1470,12 @@
 
   (macrolet ((def (mnemonic op Rc)
                `(define-instruction ,mnemonic (segment ra rs sh m)
-                  (:declare (type (integer 0 63) sh m))
+                  (:declare (type (integer 0 63) sh) (type (or (integer 0 63) fixup) m))
                   (:printer md-form ((op 30) (subop ,op) (rc ,rc)))
                   (:emitter
+                   (when (and (fixup-p m) (eq (fixup-flavor m) :gc-barrier))
+                     (note-fixup segment :rldic-m m)
+                     (setq m 0))
                    (emit-md-form-inst segment 30
                                       (reg-tn-encoding rs) (reg-tn-encoding ra)
                                       (ldb (byte 5 0) sh)
@@ -2404,6 +2407,10 @@
       (:layout-id
        (aver (zerop (sap-ref-32 sap offset)))
        (setf (signed-sap-ref-32 sap offset) (the layout-id value)))
+      (:rldic-m ; This is the M (mask) immediate operand to RLDIC{L,R} which
+       ;; appears in (byte 6 5) of the instruction. See EMIT-MD-FORM-INST.
+       (setf (ldb (byte 6 5) (sap-ref-32 sap offset)) (encode-mask6 (- 64 value)))
+       (return-from fixup-code-object :immediate))
       (:b
        (error "Can't deal with CALL fixups, yet."))
       (:ba

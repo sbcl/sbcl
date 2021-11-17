@@ -387,7 +387,6 @@
         ;; return it unchanged in all other cases
         info)))
 
-#+(or x86 x86-64)
 (defun (setf sb-vm::%code-fixups) (newval code)
   (code-header-set code sb-vm::code-fixups-slot newval)
   newval)

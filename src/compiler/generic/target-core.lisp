@@ -94,11 +94,7 @@
                    (:layout (get-lisp-obj-address
                              (wrapper-friend (if (symbolp name) (find-layout name) name))))
                    (:layout-id (layout-id name))
-                   #+gencgc
-                   (:gc-barrier
-                    ;; in theory this would depend on the particular backend
-                    ;; and gc strategy. Just kludge it for now.
-                    (1- (ash 1 (extern-alien "gc_card_table_nbits" int))))
+                   #+gencgc (:gc-barrier (extern-alien "gc_card_table_nbits" int))
                    (:immobile-symbol (get-lisp-obj-address name))
                    ;; It is legal to take the address of symbol-value only if the
                    ;; value is known to be an immobile object
@@ -119,14 +115,16 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         ;; PRESERVED-LISTS is machine-dependent; it would be nice to delegate
-         ;; handling it to the architecture-specific code.
-         #+(or x86 x86-64)
+         ;; PRESERVED-LISTS are somewhat backend-dependent, but essentially
+         ;; you get to store three lists that might as well have been named
+         ;; Larry, Moe, and Curly.
          (let ((rel-fixups (elt preserved-lists 1))
                (abs-fixups (elt preserved-lists 2))
                (gc-barrier-fixups (elt preserved-lists 3))
                (abs64-fixups (elt preserved-lists 4)))
-           (aver (not abs64-fixups)) ; no preserved 64-bit fixups
+           ;; the fixup list packer only preserves at most 3 lists.
+           ;; And it's not clear that this is the best way to represent them.
+           (aver (not abs64-fixups))
            (when (or abs-fixups rel-fixups gc-barrier-fixups)
              (setf (sb-vm::%code-fixups code-obj)
                    (sb-c:pack-code-fixup-locs abs-fixups rel-fixups gc-barrier-fixups))))

@@ -11,7 +11,8 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :absolute64 :layout-id :b :ba :ha :l) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :absolute64 :layout-id :b :ba :ha :l :rldic-m)
+  #'equalp)
 
 ;;; NUMBER-STACK-DISPLACEMENT
 ;;;

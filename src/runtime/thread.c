@@ -1044,6 +1044,11 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #if GENCGC_IS_PRECISE
     thread_interrupt_data(th).allocation_trap_context = 0;
 #endif
+#if defined LISP_FEATURE_PPC64
+    // the low byte of THREAD-BASE-TN is used as a constant 0 byte
+    gc_assert(((lispobj)th & 0xFF) == 0);
+    th->card_table = (lispobj)gc_card_mark;
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 // This macro is the same as "write_TLS(sym,val,th)" but can't be spelled thus.

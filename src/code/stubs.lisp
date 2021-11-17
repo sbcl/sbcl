@@ -112,7 +112,7 @@
   (def value-cell-ref)
   (def %caller-frame ())
   (def %caller-pc ())
-  #+(or x86 x86-64) (def sb-vm::%code-fixups)
+  (def sb-vm::%code-fixups)
   #+x86-64 (def pointerp)
 
   ;; instances
