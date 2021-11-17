@@ -3550,84 +3550,6 @@ move_pinned_pages_to_newspace()
     }
 }
 
-#ifdef LISP_FEATURE_PPC64
-static void semiconservative_pin_stack(struct thread* th) {
-    /* TODO: This could be made slightly less conservative.
-     * - registers (interrupt contexts) should pin what they point to
-     * - stack should NOT pin any object except code */
-    lispobj *object_ptr;
-    for (object_ptr = th->control_stack_start;
-         object_ptr < access_control_stack_pointer(th);
-         object_ptr++)
-        preserve_pointer((void*)*object_ptr);
-    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-    for (i = i - 1; i >= 0; --i) {
-        os_context_t* context = nth_interrupt_context(i, th);
-        int j;
-        // FIXME: if we pick a register to consistently use with m[ft]lr
-        // then we would only need to examine that, and LR and CTR here.
-        // We may already be consistent, I just don't what the consistency is.
-        static int boxed_registers[] = BOXED_REGISTERS;
-        int __attribute__((unused)) ct = 0;
-        for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j)
-            preserve_pointer((void*)*os_context_register_addr(context,
-                                                              boxed_registers[j]));
-        preserve_pointer((void*)*os_context_lr_addr(context));
-        preserve_pointer((void*)*os_context_ctr_addr(context));
-    }
-}
-#endif
-
-#if GENCGC_IS_PRECISE && !defined(reg_CODE)
-
-lispobj *
-dynamic_space_code_from_pc(char *pc)
-{
-    /* Only look at untagged pointers, otherwise they won't be in the PC. */
-    if((long)pc % 4 == 0 && is_code(page_table[find_page_index(pc)].type)) {
-        lispobj *object = search_dynamic_space(pc);
-        if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
-            return object;
-    }
-
-    return NULL;
-}
-
-static void maybe_pin_code(lispobj addr) {
-    page_index_t page = find_page_index((char*)addr);
-
-    if (page < 0) return;
-    if (not_condemned_p(page)) return;
-
-    struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
-    if (code) {
-        pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
-    }
-}
-
-static void pin_stack(struct thread* th) {
-    lispobj *cfp = access_control_frame_pointer(th);
-
-    if (cfp) {
-      while (1) {
-        lispobj* ocfp = (lispobj *) cfp[0];
-        lispobj lr = cfp[1];
-        if (ocfp == 0)
-          break;
-        maybe_pin_code(lr);
-        cfp = ocfp;
-      }
-    }
-    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-    for (i = i - 1; i >= 0; --i) {
-        os_context_t* context = nth_interrupt_context(i, th);
-        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
-    }
-
-}
-#endif
-
-#if !GENCGC_IS_PRECISE
 static void __attribute__((unused))
 sticky_mark_large_vector(page_index_t page, lispobj word)
 {
@@ -3652,6 +3574,117 @@ sticky_mark_large_vector(page_index_t page, lispobj word)
     }
 }
 
+static void __attribute__((unused)) sticky_mark_card_if_marked(lispobj word)
+{
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    /* Additional logic for soft marks: any word that is potentially a
+     * tagged pointer to a page being written must preserve the mark regardless
+     * of what update_write_protection() thinks. That's because the mark is set
+     * prior to storing. If GC occurs in between setting the mark and storing,
+     * then resetting the mark would be wrong if the subsequent store
+     * creates an old->young pointer.
+     * Mark stickiness is checked only once per invocation of collect_garbge(),
+     * so it when scanning stacks for generation 0 but not higher gens.
+     * Also note the two scenarios:
+     * (1) tagged pointer to a large simple-vector, but we scan card-by-card
+     * for specifically the marked cards.  This has to be checked first
+     * so as not to fail to see subsequent pages if the first is marked.
+     * (2) tagged pointer to an object that marks only the page containing
+     * the object base */
+    page_index_t page = find_page_index((void*)word);
+    if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
+        && (word & (GENCGC_CARD_BYTES - 1)) < page_bytes_used(page)
+        && plausible_tag_p(word)) { // "plausible" is good enough
+        if (page_single_obj_p(page))
+            sticky_mark_large_vector(page, word);
+        else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
+            SET_PAGE_PROTECTED(page, STICKY_MARK);
+        }
+    }
+#endif
+}
+
+lispobj *
+dynamic_space_code_from_pc(char *pc)
+{
+    /* Only look at untagged pointers, otherwise they won't be in the PC.
+     * (which is a valid precondition for fixed-length 4-byte instructions,
+     * not variable-length) */
+    if((long)pc % 4 == 0 && is_code(page_table[find_page_index(pc)].type)) {
+        lispobj *object = search_dynamic_space(pc);
+        if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
+            return object;
+    }
+
+    return NULL;
+}
+
+static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
+    page_index_t page = find_page_index((char*)addr);
+
+    if (page < 0) return;
+    if (not_condemned_p(page)) return;
+
+    struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
+    if (code) {
+        pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
+    }
+}
+
+#ifdef LISP_FEATURE_PPC64
+static void semiconservative_pin_stack(struct thread* th) {
+    /* Stack can only pin code, since it contains return addresses.
+     * Non-code pointers on stack do *not* pin anything, and may be updated
+     * when scavenging.
+     * Interrupt contexts' boxed registers do pin their referents */
+    lispobj *object_ptr;
+    for (object_ptr = th->control_stack_start;
+         object_ptr < access_control_stack_pointer(th);
+         object_ptr++)
+        maybe_pin_code(*object_ptr);
+    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    for (i = i - 1; i >= 0; --i) {
+        os_context_t* context = nth_interrupt_context(i, th);
+        int j;
+        // FIXME: if we pick a register to consistently use with m[ft]lr
+        // then we would only need to examine that, and LR and CTR here.
+        // We may already be consistent, I just don't what the consistency is.
+        static int boxed_registers[] = BOXED_REGISTERS;
+        for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
+            lispobj word = *os_context_register_addr(context, boxed_registers[j]);
+            preserve_pointer((void*)word); // maybe pin something, tagged pointer or not
+        }
+        preserve_pointer((void*)*os_context_lr_addr(context));
+        preserve_pointer((void*)*os_context_ctr_addr(context));
+    }
+}
+#endif
+
+#if GENCGC_IS_PRECISE && !defined(reg_CODE)
+
+static void pin_stack(struct thread* th) {
+    lispobj *cfp = access_control_frame_pointer(th);
+
+    if (cfp) {
+      while (1) {
+        lispobj* ocfp = (lispobj *) cfp[0];
+        lispobj lr = cfp[1];
+        if (ocfp == 0)
+          break;
+        maybe_pin_code(lr);
+        cfp = ocfp;
+      }
+    }
+    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    for (i = i - 1; i >= 0; --i) {
+        os_context_t* context = nth_interrupt_context(i, th);
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
+    }
+
+}
+#endif
+
+#if !GENCGC_IS_PRECISE
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
@@ -3744,33 +3777,7 @@ conservative_stack_scan(struct thread* th,
         if (word >= BACKEND_PAGE_BYTES &&
             !(exclude_from <= word && word < exclude_to)) {
             preserve_pointer((void*)word);
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-            /* Additional logic for soft marks: any word that is potentially a
-             * tagged pointer to a page being written must preserve the mark regardless
-             * of what update_write_protection() thinks. That's because the mark is set
-             * prior to storing. If GC occurs in between setting the mark and storing,
-             * then resetting the mark would be wrong if the subsequent store
-             * creates an old->young pointer.
-             * Mark stickiness is checked only once per invocation of collect_garbge(),
-             * so it when scanning stacks for generation 0 but not higher gens.
-             * Also note the two scenarios:
-             * (1) tagged pointer to a large simple-vector, but we scan card-by-card
-             * for specifically the marked cards.  This has to be checked first
-             * so as not to fail to see subsequent pages if the first is marked.
-             * (2) tagged pointer to an object that marks only the page containing
-             * the object base */
-            page_index_t page;
-            if (gen == 0 && is_lisp_pointer(word)
-                && (page = find_page_index((void*)word)) >= 0
-                && page_boxed_p(page) // stores to raw bytes are uninteresting
-                && (word & (GENCGC_CARD_BYTES - 1)) < page_bytes_used(page)
-                && plausible_tag_p(word)) { // "plausible" is good enough
-              if (page_single_obj_p(page))
-                  sticky_mark_large_vector(page, word);
-              else if (gc_card_mark[addr_to_card_index((void*)word)] == 0)
-                  SET_PAGE_PROTECTED(page, STICKY_MARK);
-            }
-#endif
+            if (gen == 0 && is_lisp_pointer(word)) sticky_mark_card_if_marked(word);
         }
     }
 }
