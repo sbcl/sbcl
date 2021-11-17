@@ -1,7 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.10:
-  * enhancement: improved reporting of code deletion notes. 
+  * enhancement: improved reporting of code deletion notes.
+  * minor change: *COMPILE-PRINT* now defaults to NIL. T gives the old
+    behavior of echoing top level forms. Users who want to see a report of the
+    phases of compilation can use *COMPILE-PROGRESS* and the corresponding
+    COMPILE-FILE :PROGRESS argument.
 
 changes in sbcl-2.1.10 relative to sbcl-2.1.9:
   * incompatible change: simd-pack without a specific element-type is no
