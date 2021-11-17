@@ -76,8 +76,7 @@ int varint_unpack(struct varint_unpacker* unpacker, int* result)
         // but that seems less intuitive on the Lisp side.
         int word_index = unpacker->index / N_WORD_BYTES;
         int byte_index = unpacker->index % N_WORD_BYTES;
-        int byte = (((unsigned int*)unpacker->data)[word_index]
-                    >> (byte_index * 8)) & 0xFF;
+        int byte = (((uword_t*)unpacker->data)[word_index] >> (byte_index * 8)) & 0xFF;
 #endif
         ++unpacker->index;
         accumulator |= (byte & 0x7F) << shift;
