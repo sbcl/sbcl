@@ -367,7 +367,7 @@
            ;; as soon as any unknown is present.
            `(classoid-cell-typep ,(find-classoid-cell spec :create t) ,object))
           ((unknown-type-p type)
-           #+sb-xc-host
+           #+(and sb-xc-host (not sb-devel))
            (warn "can't open-code test of unknown type ~S"
                  (type-specifier type))
            ;; This is not a policy-based decision to notify here,

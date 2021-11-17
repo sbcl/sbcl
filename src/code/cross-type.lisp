@@ -82,7 +82,7 @@
 ;;; The logic is a mixture of the code for CTYPEP and %%TYPEP
 ;;; because it handles both.
 ;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
-(defvar *xtypep-uncertainty-action* 'warn) ; {BREAK WARN STYLE-WARN ERROR NIL}
+(defvar *xtypep-uncertainty-action* #-sb-devel 'warn #+sb-devel nil) ; {BREAK WARN STYLE-WARN ERROR NIL}
 (macrolet ((unimplemented ()
              '(bug "Incomplete implementation of ~S ~S ~S" caller obj type))
            (uncertain ()
@@ -313,6 +313,7 @@
             (and (boundp 'sb-c::*compilation*)
                  (eq (sb-c::block-compile sb-c::*compilation*) t)))
         (values answer certain)
+        #-sb-devel
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
 (defun ctype-of (x)

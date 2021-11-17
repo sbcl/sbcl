@@ -275,7 +275,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                   (ash y -1) (aref state (logand y 1)))))
   (values))
 
-#-sb-devel
 (declaim (start-block random %random-single-float %random-double-float
                       random-chunk big-random-chunk))
 

@@ -9,7 +9,7 @@
 
 (in-package "SB-KERNEL")
 
-#-sb-devel(declaim (start-block))
+(declaim (start-block))
 
 ;;; (Note that when cross-compiling, SB-XC:TYPEP is interpreted as a
 ;;; test that the host Lisp object OBJECT translates to a target SBCL

@@ -509,10 +509,11 @@
                                     (ftype #'proclaim-ftype))
                             ctype type :declared)))
              (push raw-form *queued-proclaims*)))
-        #-sb-fluid
         (freeze-type
+         #-sb-fluid
          (map-args #'process-freeze-type-declaration))
         ((start-block end-block)
+         #-(and sb-devel sb-xc-host)
          (when (and *compile-time-eval* (boundp '*compilation*))
            (if (eq *block-compile-argument* :specified)
                (process-block-compile-declaration args kind)

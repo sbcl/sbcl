@@ -389,7 +389,6 @@
 
 ;;;; IR1-OPTIMIZE
 
-#-sb-devel
 (declaim (start-block ir1-optimize ir1-optimize-last-effort))
 
 ;;; Do one forward pass over COMPONENT, deleting unreachable blocks
@@ -694,7 +693,6 @@
 
 ;;;; IF optimization
 
-#-sb-devel
 (declaim (start-block ir1-optimize-if))
 
 ;;; Check whether the predicate is known to be true or false,
@@ -989,7 +987,6 @@
 
 ;;;; combination IR1 optimization
 
-#-sb-devel
 (declaim (start-block ir1-optimize-combination maybe-terminate-block
                       validate-call-type))
 
@@ -1130,8 +1127,8 @@
      combination info)))
 
 ;;; Do IR1 optimizations on a COMBINATION node.
-(declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
+  (declare (type combination node))
   (when (lvar-reoptimize (basic-combination-fun node))
     (propagate-fun-change node)
     (when (node-deleted node)
@@ -1826,7 +1823,6 @@
 
 ;;;; local call optimization
 
-#-sb-devel
 (declaim (start-block ir1-optimize-set constant-reference-p delete-let
                       propagate-let-args propagate-local-call-args
                       propagate-to-refs propagate-from-sets

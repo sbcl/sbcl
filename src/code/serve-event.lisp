@@ -192,7 +192,6 @@
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
 
-#-sb-devel
 (declaim (start-block wait-until-fd-usable serve-event serve-all-events compute-pollfds))
 
 ;;; When a *periodic-polling-function* is defined the server will not

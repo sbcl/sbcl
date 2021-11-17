@@ -418,7 +418,6 @@
 
 ;;;; register saving
 
-#-sb-devel
 (declaim (start-block optimized-emit-saves emit-saves assign-tn-costs
                       pack-save-tn))
 
@@ -841,7 +840,6 @@
 
 ;;;; load TN packing
 
-#-sb-devel
 (declaim (start-block pack-load-tns load-tn-conflicts-in-sc))
 
 ;;; These variables indicate the last location at which we computed
@@ -1261,7 +1259,6 @@
 
 ;;;; targeting
 
-#-sb-devel
 (declaim (start-block pack pack-tn target-if-desirable
                       ;; needed for pack-iterative
                       pack-wired-tn))

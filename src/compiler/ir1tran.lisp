@@ -168,7 +168,54 @@
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
-#-sb-devel
+
+;;;; code coverage
+
+;;; Check the policy for whether we should generate code coverage
+;;; instrumentation. If not, just return the original START
+;;; ctran. Otherwise insert code coverage instrumentation after
+;;; START, and return the new ctran.
+(defun instrument-coverage (start mode form
+                            &aux (metadata (coverage-metadata *compilation*)))
+  ;; We don't actually use FORM for anything, it's just convenient to
+  ;; have around when debugging the instrumentation.
+  (declare (ignore form))
+  (if (and metadata
+           (policy *lexenv* (> store-coverage-data 0))
+           *allow-instrumenting*)
+      (let ((path (source-path-original-source *current-path*)))
+        (when mode
+          (push mode path))
+        (if (member (ctran-block start)
+                    (gethash path (code-coverage-blocks metadata)))
+            ;; If this source path has already been instrumented in
+            ;; this block, don't instrument it again.
+            start
+            (let ((next (make-ctran))
+                  (*allow-instrumenting* nil))
+              (ensure-gethash path (code-coverage-records metadata)
+                              (cons path +code-coverage-unmarked+))
+              (push (ctran-block start)
+                    (gethash path (code-coverage-blocks metadata)))
+              (ir1-convert start next nil `(%primitive mark-covered ',path))
+              next)))
+      start))
+
+;;; In contexts where we don't have a source location for FORM
+;;; e.g. due to it not being a cons, but where we have a source
+;;; location for the enclosing cons, use the latter source location if
+;;; available. This works pretty well in practice, since many PROGNish
+;;; macroexpansions will just directly splice a block of forms into
+;;; some enclosing form with `(progn ,@body), thus retaining the
+;;; EQness of the conses.
+(defun maybe-instrument-progn-like (start forms form)
+  (or (when (and *allow-instrumenting*
+                 (not (get-source-path form)))
+        (let ((*current-path* (get-source-path forms)))
+          (when *current-path*
+            (instrument-coverage start nil form))))
+      start))
+
 (declaim (start-block find-free-fun find-lexically-apparent-fun
                       ;; needed by ir1-translators
                       find-global-fun))
@@ -459,6 +506,23 @@
 
 ;;;; some flow-graph hacking utilities
 
+;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws out of the
+;; body and converts a condition signalling form instead. The source
+;; form is converted to a string since it may contain arbitrary
+;; non-externalizable objects.
+(defmacro ir1-error-bailout ((start next result form) &body body)
+  (with-unique-names (skip condition)
+    `(block ,skip
+       (let ((,condition (catch 'ir1-error-abort
+                           (let ((*compiler-error-bailout*
+                                   (lambda (&optional e)
+                                     (throw 'ir1-error-abort e))))
+                             ,@body
+                             (return-from ,skip nil)))))
+         (ir1-convert ,start ,next ,result
+                      (make-compiler-error-form ,condition
+                                                ,form))))))
+
 ;;; This function sets up the back link between the node and the
 ;;; ctran which continues at it.
 (defun link-node-to-previous-ctran (node ctran)
@@ -619,64 +683,53 @@
          (frob)
          (setq trail (cdr trail)))))))
 
+
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
-(declaim (ftype (sfunction (ctran ctran (or lvar null) t)
-                           (values))
-                ir1-convert))
-(macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
-           ;; out of the body and converts a condition signalling form
-           ;; instead. The source form is converted to a string since it
-           ;; may contain arbitrary non-externalizable objects.
-           (ir1-error-bailout ((start next result form) &body body)
-             (with-unique-names (skip condition)
-               `(block ,skip
-                  (let ((,condition (catch 'ir1-error-abort
-                                      (let ((*compiler-error-bailout*
-                                              (lambda (&optional e)
-                                                (throw 'ir1-error-abort e))))
-                                        ,@body
-                                        (return-from ,skip nil)))))
-                    (ir1-convert ,start ,next ,result
-                                 (make-compiler-error-form ,condition
-                                                           ,form)))))))
 
-  ;; Translate FORM into IR1. The code is inserted as the NEXT of the
-  ;; CTRAN START. RESULT is the LVAR which receives the value of the
-  ;; FORM to be translated. The translators call this function
-  ;; recursively to translate their subnodes.
-  ;;
-  ;; As a special hack to make life easier in the compiler, a LEAF
-  ;; IR1-converts into a reference to that LEAF structure. This allows
-  ;; the creation using backquote of forms that contain leaf
-  ;; references, without having to introduce dummy names into the
-  ;; namespace.
-  (defun ir1-convert (start next result form)
-    (let* ((*current-path* (ensure-source-path form))
-           (start (instrument-coverage start nil form)))
-      (ir1-error-bailout (start next result form)
-        (cond ((atom form)
-               (cond ((and (symbolp form) (not (keywordp form)))
-                      (ir1-convert-var start next result form))
-                     ((leaf-p form)
-                      (reference-leaf start next result form))
-                     (t
-                      (reference-constant start next result form))))
-              (t
-               (ir1-convert-functoid start next result form)))))
-    (values))
+(declaim (start-block ir1-convert ir1-convert-progn-body
+                      ir1-convert-combination-args reference-leaf
+                      reference-constant
+                      expand-compiler-macro
+                      maybe-reanalyze-functional))
 
-  ;; Generate a reference to a manifest constant, creating a new leaf
-  ;; if necessary.
-  (defun reference-constant (start next result value)
-    (declare (type ctran start next)
-             (type (or lvar null) result))
-    (ir1-error-bailout (start next result value)
-      (let* ((leaf (find-constant value))
-             (res (make-ref leaf)))
-        (push res (leaf-refs leaf))
-        (link-node-to-previous-ctran res start)
-        (use-continuation res next result)))
-    (values)))
+;; Translate FORM into IR1. The code is inserted as the NEXT of the
+;; CTRAN START. RESULT is the LVAR which receives the value of the
+;; FORM to be translated. The translators call this function
+;; recursively to translate their subnodes.
+;;
+;; As a special hack to make life easier in the compiler, a LEAF
+;; IR1-converts into a reference to that LEAF structure. This allows
+;; the creation using backquote of forms that contain leaf references,
+;; without having to introduce dummy names into the namespace.
+(defun ir1-convert (start next result form)
+  (declare (type ctran start next)
+           (type (or lvar null) result))
+  (let* ((*current-path* (ensure-source-path form))
+         (start (instrument-coverage start nil form)))
+    (ir1-error-bailout (start next result form)
+                       (cond ((atom form)
+                              (cond ((and (symbolp form) (not (keywordp form)))
+                                     (ir1-convert-var start next result form))
+                                    ((leaf-p form)
+                                     (reference-leaf start next result form))
+                                    (t
+                                     (reference-constant start next result form))))
+                             (t
+                              (ir1-convert-functoid start next result form)))))
+  (values))
+
+;; Generate a reference to a manifest constant, creating a new leaf if
+;; necessary.
+(defun reference-constant (start next result value)
+  (declare (type ctran start next)
+           (type (or lvar null) result))
+  (ir1-error-bailout (start next result value)
+                     (let* ((leaf (find-constant value))
+                            (res (make-ref leaf)))
+                       (push res (leaf-refs leaf))
+                       (link-node-to-previous-ctran res start)
+                       (use-continuation res next result)))
+  (values))
 
 ;;; Add FUNCTIONAL to the COMPONENT-REANALYZE-FUNCTIONALS, unless it's
 ;;; some trivial type for which reanalysis is a trivial no-op.
@@ -964,9 +1017,10 @@
 
 ;;; Convert a bunch of forms, discarding all the values except the
 ;;; last. If there aren't any forms, then translate a NIL.
-(declaim (ftype (sfunction (ctran ctran (or lvar null) list) (values))
-                ir1-convert-progn-body))
 (defun ir1-convert-progn-body (start next result body)
+  (declare (type ctran start next)
+           (type (or lvar null) result)
+           (type list body))
   (if (endp body)
       (reference-constant start next result nil)
       (let ((this-start start)
@@ -984,53 +1038,6 @@
                     forms (cdr forms)))))))
   (values))
 
-
-;;;; code coverage
-
-;;; Check the policy for whether we should generate code coverage
-;;; instrumentation. If not, just return the original START
-;;; ctran. Otherwise insert code coverage instrumentation after
-;;; START, and return the new ctran.
-(defun instrument-coverage (start mode form
-                            &aux (metadata (coverage-metadata *compilation*)))
-  ;; We don't actually use FORM for anything, it's just convenient to
-  ;; have around when debugging the instrumentation.
-  (declare (ignore form))
-  (if (and metadata
-           (policy *lexenv* (> store-coverage-data 0))
-           *allow-instrumenting*)
-      (let ((path (source-path-original-source *current-path*)))
-        (when mode
-          (push mode path))
-        (if (member (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-            ;; If this source path has already been instrumented in
-            ;; this block, don't instrument it again.
-            start
-            (let ((next (make-ctran))
-                  (*allow-instrumenting* nil))
-              (ensure-gethash path (code-coverage-records metadata)
-                              (cons path +code-coverage-unmarked+))
-              (push (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-              (ir1-convert start next nil `(%primitive mark-covered ',path))
-              next)))
-      start))
-
-;;; In contexts where we don't have a source location for FORM
-;;; e.g. due to it not being a cons, but where we have a source
-;;; location for the enclosing cons, use the latter source location if
-;;; available. This works pretty well in practice, since many PROGNish
-;;; macroexpansions will just directly splice a block of forms into
-;;; some enclosing form with `(progn ,@body), thus retaining the
-;;; EQness of the conses.
-(defun maybe-instrument-progn-like (start forms form)
-  (or (when (and *allow-instrumenting*
-                 (not (get-source-path form)))
-        (let ((*current-path* (get-source-path forms)))
-          (when *current-path*
-            (instrument-coverage start nil form))))
-      start))
 
 ;;;; converting combinations
 
@@ -1060,9 +1067,12 @@
 ;;; Convert a function call where the function FUN is a LEAF. FORM is
 ;;; the source for the call. We return the COMBINATION node so that
 ;;; the caller can poke at it if it wants to.
-(declaim (ftype (sfunction (ctran ctran (or lvar null) list leaf) combination)
-                ir1-convert-combination))
 (defun ir1-convert-combination (start next result form fun)
+  (declare (type ctran start next)
+           (type (or lvar null) result)
+           (type list form)
+           (type leaf fun)
+           #-sb-xc-host (values combination))
   (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
     (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
@@ -1089,7 +1099,7 @@
   (declare (type ctran start next)
            (type lvar fun-lvar)
            (type (or lvar null) result)
-           (list args))
+           (type list args))
   (let ((node (make-combination fun-lvar)))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
@@ -1113,38 +1123,6 @@
         (use-continuation node next result)
         (setf (combination-args node) (arg-lvars))))
     node))
-
-(defun show-transform-p (showp fun-name)
-  (or (and (listp showp) (member fun-name showp :test 'equal))
-      (eq showp t)))
-(defun show-transform (kind name new-form &optional combination)
-  (let ((*print-length* 100)
-        (*print-level* 50)
-        (*print-right-margin* 128))
-    (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
-            kind
-            (if combination
-                (cons name
-                      (loop for arg in (combination-args combination)
-                            collect (if (constant-lvar-p arg)
-                                        (lvar-value arg)
-                                        (type-specifier (lvar-type arg)))))
-                name)
-            new-form)))
-
-(defun show-type-derivation (combination type)
-  (let ((*print-length* 100)
-        (*print-level* 50)
-        (*print-right-margin* 128))
-    (unless (type= (node-derived-type combination)
-                   (coerce-to-values type))
-      (format *trace-output* "~&~a derived to ~a"
-              (cons (combination-fun-source-name combination)
-                    (loop for arg in (combination-args combination)
-                          collect (if (constant-lvar-p arg)
-                                      (lvar-value arg)
-                                      (type-specifier (lvar-type arg)))))
-              (type-specifier type)))))
 
 ;;; Convert a call to a global function. If not NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
@@ -1247,7 +1225,6 @@
 
 ;;;; PROCESS-DECLS
 
-#-sb-devel
 (declaim (start-block process-decls make-new-inlinep
                       find-in-bindings
                       process-muffle-decls
@@ -1257,9 +1234,9 @@
 ;;; LAMBDA-VAR for that name, or NIL if it isn't found. We return the
 ;;; *last* variable with that name, since LET* bindings may be
 ;;; duplicated, and declarations always apply to the last.
-(declaim (ftype (sfunction (list symbol) (or lambda-var list))
-                find-in-bindings))
 (defun find-in-bindings (vars name)
+  (declare (list vars) (symbol name)
+           #-sb-xc-host (values (or lambda-var list)))
   (let ((found nil))
     (dolist (var vars)
       (cond ((leaf-p var)

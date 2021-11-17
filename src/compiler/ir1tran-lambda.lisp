@@ -20,7 +20,6 @@
 ;;;; Note: Take a look at the compiler-overview.tex section on "Hairy
 ;;;; function representation" before you seriously mess with this
 ;;;; stuff.
-#-sb-devel
 (declaim (start-block ir1-convert-lambda ir1-convert-lambda-body
                       ir1-convert-aux-bindings varify-lambda-arg
                       ir1-convert-lambdalike))
@@ -1072,7 +1071,6 @@
             (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
         (careful-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
-#-sb-devel
 (declaim (start-block maybe-inline-syntactic-closure))
 
 ;;; Take the lexenv surrounding an inlined function and extract things
@@ -1187,7 +1185,6 @@
 
 (declaim (end-block))
 
-#-sb-devel
 (declaim (start-block ir1-convert-inline-lambda))
 
 ;;; Convert the forms produced by RECONSTRUCT-LEXENV to LEXENV

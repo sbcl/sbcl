@@ -1165,7 +1165,6 @@
 (defun ctype-interned-p (ctype)
   (logtest (type-hash-value ctype) +type-internedp+))
 
-#-sb-devel
 (declaim (start-block))
 
 ;;; If two types are definitely equivalent, return true. The second

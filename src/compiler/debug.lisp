@@ -1340,3 +1340,36 @@
                   (block-number block)
                   (block-number (nle-block-entry-block block))))))
     (write-line "}" stream)))
+
+(defun show-transform-p (showp fun-name)
+  (or (and (listp showp) (member fun-name showp :test 'equal))
+      (eq showp t)))
+
+(defun show-transform (kind name new-form &optional combination)
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
+    (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
+            kind
+            (if combination
+                (cons name
+                      (loop for arg in (combination-args combination)
+                            collect (if (constant-lvar-p arg)
+                                        (lvar-value arg)
+                                        (type-specifier (lvar-type arg)))))
+                name)
+            new-form)))
+
+(defun show-type-derivation (combination type)
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
+    (unless (type= (node-derived-type combination)
+                   (coerce-to-values type))
+      (format *trace-output* "~&~a derived to ~a"
+              (cons (combination-fun-source-name combination)
+                    (loop for arg in (combination-args combination)
+                          collect (if (constant-lvar-p arg)
+                                      (lvar-value arg)
+                                      (type-specifier (lvar-type arg)))))
+              (type-specifier type)))))
