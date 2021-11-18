@@ -71,10 +71,7 @@
                   for var in (lambda-vars fun)
                   for dx = (leaf-dynamic-extent var)
                   when (and dx arg (not (lvar-dynamic-extent arg)))
-                    append (if (lvar-good-for-dx-p arg dx)
-                               (handle-nested-dynamic-extent-lvars dx arg)
-                               (progn (note-no-stack-allocation arg)
-                                      nil)))))
+                    append (handle-nested-dynamic-extent-lvars dx arg))))
       (when dx-lvars
         ;; Stack analysis requires that the CALL ends the block, so
         ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
