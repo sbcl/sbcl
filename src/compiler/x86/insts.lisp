@@ -2411,15 +2411,16 @@
   (declare (type index offset))
   #+sb-xc-host (declare (notinline code-object-size)) ; forward ref
   (sb-vm::with-code-instructions (sap code)
+    (when (eq flavor :gc-barrier)
+      ;; the VALUE is nbits, so convert it to an AND mask
+      (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
+      (return-from fixup-code-object :immediate))
     (ecase kind
       (:absolute
        (case flavor
          (:layout-id
           (setf (signed-sap-ref-32 sap offset) value)
           nil) ; do not record this
-         (:gc-barrier
-          (setf (signed-sap-ref-32 sap offset) value)
-          :immediate)
          (t
           ;; Word at sap + offset contains a value to be replaced by
           ;; adding that value to fixup.
