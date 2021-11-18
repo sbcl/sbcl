@@ -210,6 +210,81 @@
        (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                       (specifier-type '(eql nil))))))
 
+(defun stack-consed-p (object)
+  (let ((write (sb-c::tn-writes object))) ; list of write refs
+    (when (or (not write) ; grrrr, the only write is from a LOAD tn
+                          ; and we don't know the corresponding normal TN?
+              (tn-ref-next write)) ; can't determine if > 1 write
+      (return-from stack-consed-p nil))
+    (let ((vop (tn-ref-vop write)))
+      (when (not vop) ; wat?
+        (return-from stack-consed-p nil))
+      (when (eq (vop-name vop) 'allocate-vector-on-stack)
+        (return-from stack-consed-p t))
+      (when (and (eq (vop-name vop) 'fixed-alloc)
+                 (fifth (vop-codegen-info vop))) ; STACK-ALLOCATE-P
+        (return-from stack-consed-p t))
+      ;; Should we try to detect a stack-consed LIST also?
+      ;; I don't think that will work.
+      ;; (And is there anything else interesting to try?)
+      (unless (member (vop-name vop) '(splat-word splat-small splat-any))
+        (return-from stack-consed-p nil))
+      (let* ((splat-input (vop-args vop))
+             (splat-input-source
+              (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
+        ;; How in the heck can there NOT be a vop??? Well, sometimes there isn't.
+        (when (and splat-input-source
+                   (eq (vop-name splat-input-source)
+                       'allocate-vector-on-stack))
+          (return-from stack-consed-p t)))))
+  nil)
+
+;;; Just gathering some data to see where we can improve
+(define-load-time-global *store-barriers-potentially-emitted* 0)
+(define-load-time-global *store-barriers-emitted* 0)
+
+(defun require-gc-store-barrier-p (object value-tn-ref value-tn)
+  (incf *store-barriers-potentially-emitted*)
+  ;; If OBJECT is stack-allocated, elide the barrier
+  (when (stack-consed-p object)
+    (return-from require-gc-store-barrier-p nil))
+  (flet ((potential-heap-pointer-p (tn tn-ref)
+           (when (sc-is tn any-reg) ; must be fixnum
+             (return-from potential-heap-pointer-p nil))
+           ;; If stack-allocated, elide the barrier
+           (when (stack-consed-p tn)
+             (return-from potential-heap-pointer-p nil))
+           ;; If immediate non-pointer, elide the barrier
+           (when (sc-is tn immediate)
+             (let ((value (tn-value tn)))
+               (when (sb-xc:typep value '(or character sb-xc:fixnum boolean
+                                             #+64-bit single-float))
+                 (return-from potential-heap-pointer-p nil))))
+           (when (sb-c::unbound-marker-tn-p tn)
+             (return-from potential-heap-pointer-p nil))
+           ;; And elide for things like (OR FIXNUM NULL)
+           (let ((type (tn-ref-type tn-ref)))
+             (when (csubtypep type (specifier-type '(or character sb-xc:fixnum boolean
+                                                        #+64-bit single-float)))
+               (return-from potential-heap-pointer-p nil)))
+           t))
+    (cond (value-tn
+           (unless (eq (tn-ref-tn value-tn-ref) value-tn)
+             (aver (eq (tn-ref-load-tn value-tn-ref) value-tn)))
+           (unless (potential-heap-pointer-p value-tn value-tn-ref)
+             (return-from require-gc-store-barrier-p nil)))
+          (value-tn-ref ; a list of refs linked through TN-REF-ACROSS
+           ;; (presumably from INSTANCE-SET-MULTIPLE)
+           (let ((any-pointer
+                  (do ((ref value-tn-ref (tn-ref-across ref)))
+                      ((null ref))
+                    (when (potential-heap-pointer-p (tn-ref-tn ref) ref)
+                      (return t)))))
+             (unless any-pointer
+               (return-from require-gc-store-barrier-p nil))))))
+  (incf *store-barriers-emitted*)
+  t)
+
 (defun vop-nth-arg (n vop)
   (let ((ref (vop-args vop)))
     (dotimes (i n ref) (setq ref (tn-ref-across ref)))))

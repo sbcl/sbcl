@@ -1045,8 +1045,11 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     thread_interrupt_data(th).allocation_trap_context = 0;
 #endif
 #if defined LISP_FEATURE_PPC64
-    // the low byte of THREAD-BASE-TN is used as a constant 0 byte
-    gc_assert(((lispobj)th & 0xFF) == 0);
+    /* Storing a 0 into code coverage mark bytes or GC card mark bytes
+     * can be done from the low byte of the thread base register.
+     * The thread alignment is BACKEND_PAGE_BYTES (from thread.h), but seeing as this is
+     * a similar-but-different requirement, it pays to double-check */
+    if ((lispobj)th & 0xFF) lose("Thread struct not at least 256-byte-aligned");
     th->card_table = (lispobj)gc_card_mark;
 #endif
 
