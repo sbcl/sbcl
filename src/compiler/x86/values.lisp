@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (define-vop (reset-stack-pointer)
-  (:args (ptr :scs (any-reg)))
+  (:args (ptr :scs (any-reg control-stack)))
   (:generator 1
     (move esp-tn ptr)))
 
