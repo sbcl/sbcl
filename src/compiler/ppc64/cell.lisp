@@ -498,31 +498,22 @@
 
 ;;;; Code object frobbing.
 
-(define-vop (code-header-ref-any)
+(define-vop (code-header-ref+tag)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * tagged-num)
+  (:info implied-lowtag)
+  ;; conservative_root_p() in gencgc treats untagged pointers to fdefns
+  ;; as implicitly pinned. It has to be in a boxed register.
   (:results (value :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 2
     ;; ASSUMPTION: N-FIXNUM-TAG-BITS = 3
     (inst addi temp index (- other-pointer-lowtag))
-    (inst ldx value object temp)))
-
-(define-vop (code-header-ref-fdefn)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types * tagged-num)
-  (:results (value :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 3
-    ;; ASSUMPTION: N-FIXNUM-TAG-BITS = 3
-    (inst addi temp index (- other-pointer-lowtag))
-    ;; Loaded value is automatically pinned.
     (inst ldx value object temp)
-    (inst ori value value other-pointer-lowtag)))
+    (unless (zerop implied-lowtag)
+      (inst ori value value implied-lowtag))))
 
 #-sb-xc-host
 (defun code-header-ref (code index)
@@ -530,9 +521,10 @@
   (let ((fdefns-start (sb-impl::code-fdefns-start-index code))
         (count (code-n-named-calls code)))
     (declare ((unsigned-byte 16) fdefns-start count))
+    (values
     (if (and (>= index fdefns-start) (< index (+ fdefns-start count)))
-        (%primitive code-header-ref-fdefn code index)
-        (%primitive code-header-ref-any code index))))
+        (%primitive code-header-ref+tag code index other-pointer-lowtag)
+        (%primitive code-header-ref+tag code index 0)))))
 
 (define-vop (code-header-set)
   (:translate code-header-set)
