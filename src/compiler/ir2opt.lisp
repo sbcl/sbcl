@@ -935,9 +935,13 @@
                            (vop-codegen-info vop))
         (delete-vop vop)))))
 
-#+arm64
-(defoptimizer (vop-optimize (sb-vm::data-vector-ref/simple-bit-vector-c
-                             sb-vm::data-vector-ref/simple-bit-vector))
+#+(or arm64 x86-64)
+(defoptimizer (vop-optimize #+arm64
+                            (sb-vm::data-vector-ref/simple-bit-vector-c
+                             sb-vm::data-vector-ref/simple-bit-vector)
+                            #+x86-64
+                            (sb-vm::data-vector-ref-with-offset/simple-bit-vector-c
+                             sb-vm::data-vector-ref-with-offset/simple-bit-vector))
     (vop)
   (let* ((next (next-vop vop))
          (branch (and next
@@ -957,24 +961,31 @@
                         (car (vop-codegen-info next)))))
         (when (and (not (tn-ref-next (tn-reads result)))
                    (eq result (tn-ref-tn (vop-args next))))
-          (prog1
-              (emit-and-insert-vop (vop-node vop)
-                                   (vop-block vop)
-                                   (template-or-lose (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
-                                                         'sb-vm::data-vector-ref/simple-bit-vector-eq
-                                                         'sb-vm::data-vector-ref/simple-bit-vector-c-eq))
-                                   (reference-tn-refs (vop-args vop) nil)
-                                   nil
-                                   vop
-                                   (vop-codegen-info vop))
-            (setf (vop-codegen-info branch)
-                  (append
-                   (butlast (vop-codegen-info branch))
-                   (if (eq value 0)
-                       '((:eq))
-                       '((:ne)))))
-            (delete-vop vop)
-            (delete-vop next)))))))
+          (check-type value bit)
+          (let ((template (template-or-lose #+arm64
+                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref/simple-bit-vector)
+                                                'sb-vm::data-vector-ref/simple-bit-vector-eq
+                                                'sb-vm::data-vector-ref/simple-bit-vector-c-eq)
+                                            #+x86-64
+                                            (if (eq (vop-name vop) 'sb-vm::data-vector-ref-with-offset/simple-bit-vector)
+                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-eq
+                                                'sb-vm::data-vector-ref-with-offset/simple-bit-vector-c-eq))))
+            (prog1
+                (emit-and-insert-vop (vop-node vop)
+                                     (vop-block vop)
+                                     template
+                                     (reference-tn-refs (vop-args vop) nil)
+                                     nil
+                                     vop
+                                     (vop-codegen-info vop))
+              ;; copy the condition flag
+              (setf (third (vop-codegen-info branch))
+                    (cdr (template-result-types template)))
+              (when (eq value 1)
+                (setf (second (vop-codegen-info branch))
+                      (not (second (vop-codegen-info branch)))))
+              (delete-vop vop)
+              (delete-vop next))))))))
 
 ;;; No need to reset the stack pointer just before returning.
 (defoptimizer (vop-optimize reset-stack-pointer) (vop)
