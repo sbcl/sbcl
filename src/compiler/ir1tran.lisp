@@ -682,8 +682,8 @@
          (frob)
          (frob)
          (setq trail (cdr trail)))))))
-
 
+
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
 (declaim (start-block ir1-convert ir1-convert-progn-body
@@ -692,15 +692,16 @@
                       expand-compiler-macro
                       maybe-reanalyze-functional))
 
-;; Translate FORM into IR1. The code is inserted as the NEXT of the
-;; CTRAN START. RESULT is the LVAR which receives the value of the
-;; FORM to be translated. The translators call this function
-;; recursively to translate their subnodes.
-;;
-;; As a special hack to make life easier in the compiler, a LEAF
-;; IR1-converts into a reference to that LEAF structure. This allows
-;; the creation using backquote of forms that contain leaf references,
-;; without having to introduce dummy names into the namespace.
+;;; Translate FORM into IR1. The code is inserted as the NEXT of the
+;;; CTRAN START. RESULT is the LVAR which receives the value of the
+;;; FORM to be translated. The translators call this function
+;;; recursively to translate their subnodes.
+;;;
+;;; As a special hack to make life easier in the compiler, a LEAF
+;;; IR1-converts into a reference to that LEAF structure. This allows
+;;; the creation using backquote of forms that contain leaf
+;;; references, without having to introduce dummy names into the
+;;; namespace.
 (defun ir1-convert (start next result form)
   (declare (type ctran start next)
            (type (or lvar null) result))
@@ -718,8 +719,8 @@
                               (ir1-convert-functoid start next result form)))))
   (values))
 
-;; Generate a reference to a manifest constant, creating a new leaf if
-;; necessary.
+;;; Generate a reference to a manifest constant, creating a new leaf
+;;; if necessary.
 (defun reference-constant (start next result value)
   (declare (type ctran start next)
            (type (or lvar null) result))

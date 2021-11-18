@@ -53,34 +53,46 @@
              (setf (car args) nil)))
   (values))
 
+;;; Given a local call CALL to FUN, find the associated argument LVARs
+;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
+;;; note them as dynamic extent LVARs. This operation is transitive,
+;;; because dynamic extent is contagious. In particular, the arguments
+;;; of any COMBINATIONs returning a stack-allocatable object in a
+;;; dynamic extent LVAR are dynamic extent as well if the argument
+;;; LVARs contain otherwise-inaccessible stack-allocatable subobjects
+;;; themselves.
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
-  (loop for arg in (basic-combination-args call)
-        for var in (lambda-vars fun)
-        for dx = (leaf-dynamic-extent var)
-        when (and dx arg (not (lvar-dynamic-extent arg)))
-        append (handle-nested-dynamic-extent-lvars dx arg) into dx-lvars
-        ;; The block may end up being deleted due to cast optimization
-        ;; caused by USE-GOOD-FOR-DX-P
-        when (node-to-be-deleted-p call) return nil
-        finally (when dx-lvars
-                  ;; Stack analysis requires that the CALL ends the block, so
-                  ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
-                  (node-ends-block call)
-                  (let* ((entry (with-ir1-environment-from-node call
-                                  (make-entry)))
-                         (cleanup (make-cleanup :kind :dynamic-extent
-                                                :mess-up entry
-                                                :info dx-lvars)))
-                    (setf (entry-cleanup entry) cleanup)
-                    (insert-node-before call entry)
-                    (ensure-block-start (node-prev entry))
-                    (setf (node-lexenv call)
-                          (make-lexenv :default (node-lexenv call)
-                                       :cleanup cleanup))
-                    (push entry (lambda-entries (node-home-lambda entry)))
-                    (dolist (cell dx-lvars)
-                      (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))
+  ;; The block may end up being deleted due to cast optimization
+  ;; caused by USE-GOOD-FOR-DX-P
+  (unless (node-to-be-deleted-p call)
+    (let ((dx-lvars
+            (loop for arg in (basic-combination-args call)
+                  for var in (lambda-vars fun)
+                  for dx = (leaf-dynamic-extent var)
+                  when (and dx arg (not (lvar-dynamic-extent arg)))
+                    append (if (lvar-good-for-dx-p arg dx)
+                               (handle-nested-dynamic-extent-lvars dx arg)
+                               (progn (note-no-stack-allocation arg)
+                                      nil)))))
+      (when dx-lvars
+        ;; Stack analysis requires that the CALL ends the block, so
+        ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
+        (node-ends-block call)
+        (let* ((entry (with-ir1-environment-from-node call
+                        (make-entry)))
+               (cleanup (make-cleanup :kind :dynamic-extent
+                                      :mess-up entry
+                                      :info dx-lvars)))
+          (setf (entry-cleanup entry) cleanup)
+          (insert-node-before call entry)
+          (ensure-block-start (node-prev entry))
+          (setf (node-lexenv call)
+                (make-lexenv :default (node-lexenv call)
+                             :cleanup cleanup))
+          (push entry (lambda-entries (node-home-lambda entry)))
+          (dolist (cell dx-lvars)
+            (setf (lvar-dynamic-extent (cdr cell)) cleanup))))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially

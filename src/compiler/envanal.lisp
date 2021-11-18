@@ -391,12 +391,12 @@
                   (cons
                    (let ((dx (car what))
                          (lvar (cdr what)))
-                     (cond ((lvar-good-for-dx-p lvar dx component)
+                     (cond ((lvar-good-for-dx-p lvar dx)
                             ;; Since the above check does deep
                             ;; checks. we need to deal with the deep
                             ;; results in here as well.
                             (dolist (cell (handle-nested-dynamic-extent-lvars
-                                           dx lvar component))
+                                           dx lvar))
                               (let ((real (principal-lvar (cdr cell))))
                                 (setf (lvar-dynamic-extent real) cleanup)
                                 (pushnew real real-dx-lvars))))

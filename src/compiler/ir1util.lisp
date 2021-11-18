@@ -764,35 +764,28 @@
               (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
                                (find-original-source (node-source-path use)))))))))
 
-(defun use-good-for-dx-p (use dx &optional component)
-  ;; FIXME: Can casts point to LVARs in other components?
-  ;; RECHECK-DYNAMIC-EXTENT-LVARS assumes that they can't -- that is, that the
-  ;; PRINCIPAL-LVAR is always in the same component as the original one. It
-  ;; would be either good to have an explanation of why casts don't point
-  ;; across components, or an explanation of when they do it. ...in the
-  ;; meanwhile AVER that our assumption holds true.
-  (aver (or (not component) (eq component (node-component use))))
+(defun use-good-for-dx-p (use dx)
   (and (not (node-to-be-deleted-p use))
        (or (dx-combination-p use dx)
            (and (cast-p use)
                 (not (cast-type-check use))
-                (lvar-good-for-dx-p (cast-value use) dx component))
+                (lvar-good-for-dx-p (cast-value use) dx))
            (and (trivial-lambda-var-ref-p use)
                 (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
                   (or (eq use uses)
-                      (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx component)))))))
+                      (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx)))))))
 
-(defun lvar-good-for-dx-p (lvar dx &optional component)
+(defun lvar-good-for-dx-p (lvar dx)
   (let ((uses (lvar-uses lvar)))
     (cond
       ((null uses)
        nil)
       ((consp uses)
        (every (lambda (use)
-                (use-good-for-dx-p use dx component))
+                (use-good-for-dx-p use dx))
               uses))
       (t
-       (use-good-for-dx-p uses dx component)))))
+       (use-good-for-dx-p uses dx)))))
 
 (defun known-dx-combination-p (use dx)
   (and (eq (combination-kind use) :known)
@@ -926,7 +919,7 @@
                 return arg))))))
 
 ;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
-(defun handle-nested-dynamic-extent-lvars (dx lvar &optional recheck-component)
+(defun handle-nested-dynamic-extent-lvars (dx lvar)
   (let ((uses (lvar-uses lvar)))
     ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
     ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
@@ -941,25 +934,25 @@
              (etypecase use
                (cast
                 (handle-nested-dynamic-extent-lvars
-                 dx (cast-value use) recheck-component))
+                 dx (cast-value use)))
                (combination
                 (loop for arg in (combination-args use)
                       ;; deleted args show up as NIL here
                       when (and arg
-                                (lvar-good-for-dx-p arg dx recheck-component))
+                                (lvar-good-for-dx-p arg dx))
                       append (handle-nested-dynamic-extent-lvars
-                              dx arg recheck-component)))
+                              dx arg)))
                (ref
                 (let* ((other (trivial-lambda-var-ref-lvar use)))
                   (unless (eq other lvar)
                     (handle-nested-dynamic-extent-lvars
-                     dx other recheck-component)))))))
+                     dx other)))))))
       (cons (cons dx lvar)
             (if (listp uses)
                 (loop for use in uses
-                      when (use-good-for-dx-p use dx recheck-component)
+                      when (use-good-for-dx-p use dx)
                       nconc (recurse use))
-                (when (use-good-for-dx-p uses dx recheck-component)
+                (when (use-good-for-dx-p uses dx)
                   (recurse uses)))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
