@@ -471,11 +471,10 @@ lra:
 	obtain a tagged pointer to the enclosing code component.
 	Code pointers have no tag, so we have have to subtract
 	OTHER_POINTER_LOWTAG as well as account for the number of
-	boxed words (see calculation for RETURN_PC_WIDETAG, above).
-	Restoring reg_CODE doesn't appear to be strictly necessary
-	here, but let's observe the niceties.*/
-        /* KLUDGE: the extra 2 words are for the jump table prefix and padding. */
-	addi reg_CODE, reg_LRA, (2+((CODE_SIZE+1)&~1))*-N_WORD_BYTES-OTHER_POINTER_LOWTAG
+	boxed words (see calculation for RETURN_PC_WIDETAG, above). */
+        /* KLUDGE: I have no idea why CODE_SIZE+4 is correct here,
+	let alone the general formula for keeping this maintenance-free */
+	addi reg_CODE, reg_LRA, (CODE_SIZE+4)*-N_WORD_BYTES-OTHER_POINTER_LOWTAG
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */
