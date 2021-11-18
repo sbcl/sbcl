@@ -211,6 +211,9 @@ indirect_ptr(all_threads)
 	ld reg_A2,16(reg_CFP)
 	ld reg_A3,24(reg_CFP)
 
+        /* load card table base */
+        ld reg_NL5, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
+
 	/* Calculate LRA */
 	lis reg_LRA,lra@h
 	ori reg_LRA,reg_LRA,lra@l
@@ -444,6 +447,9 @@ lra:
 	/* Reset the lisp stack. */
 	mr reg_CSP,reg_CFP
 	mr reg_CFP,reg_OCFP
+
+        /* load card table base */
+        ld reg_NL5, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
 
 	/* And back into Lisp. */
 	blr
