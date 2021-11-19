@@ -106,7 +106,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
+    *os_context_pc_addr(context) = (uword_t) handle_fun_end_breakpoint(context);
 }
 
 void
@@ -122,8 +122,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
     unsigned code = trap_instruction >> 5 & 0xFF;
     if ((trap_instruction >> 21) != 0x6A1) {
-        lose("Unrecognized trap instruction %08lx in sigtrap_handler() (PC: %p)",
-             trap_instruction, *os_context_pc_addr(context));
+        lose("Unrecognized trap instruction %08x in sigtrap_handler() (PC: %p)",
+             trap_instruction, (void*) *os_context_pc_addr(context));
     }
 
     handle_trap(context, code);
@@ -131,7 +131,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", *os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*) *os_context_pc_addr(context));
 }
 
 void arch_install_interrupt_handlers()
