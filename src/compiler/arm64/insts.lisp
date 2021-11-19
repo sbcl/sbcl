@@ -3211,6 +3211,19 @@
             (delete-stmt stmt)
             next))))))
 
+(defpattern "asr + asr -> asr" ((sbfm) (sbfm)) (stmt next)
+  (destructuring-bind (dst1 src1 immr1 imms1) (stmt-operands stmt)
+    (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)
+      (when (and (= imms1 imms2 63)
+                 (location= dst1 src2)
+                 (stmt-delete-safe-p dst1 dst2
+                                     nil '(sb-vm::move-to-word/fixnum)))
+        (setf (stmt-operands next)
+              (list dst2 src1 (min (+ immr1 immr2) 63) 63))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
 ;;; An even number can be shifted right and then negated,
 ;;; and fixnums are even.
 (defpattern "neg + asr -> neg" ((sub) (sbfm)) (stmt next)
