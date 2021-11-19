@@ -30,7 +30,7 @@
 #endif
 
 extern char *page_address(page_index_t);
-int gencgc_handle_wp_violation(void *, void *);
+int gencgc_handle_wp_violation(void *);
 
 
 #if N_WORD_BITS == 64
