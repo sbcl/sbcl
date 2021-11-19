@@ -1003,3 +1003,12 @@
                 v9
                 b))))
    ((0 -1) -1)))
+
+(with-test (:name :ash-amount-unsigned-comparison)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type (integer -581 900) a))
+      (ash 3 (ash (ash a -50) (1- sb-vm:n-word-bits))))
+   ((-1) 0)
+   ((1) 3)))

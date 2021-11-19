@@ -300,7 +300,7 @@
       (inst cmpdi amount 0)
       (inst neg ndesc amount)
       (inst bge positive)
-      (inst cmpdi ndesc 63)
+      (inst cmpldi ndesc 63)
       (inst srd result number ndesc)
       (inst ble done)
       (inst li result 0)
@@ -347,7 +347,7 @@
          (inst cmpdi amount 0)
          (inst neg ndesc amount)
          (inst bge positive)
-         (inst cmpdi ndesc 63)
+         (inst cmpldi ndesc 63)
          (inst srad result number ndesc)
          (inst ble done)
          ;; smear the sign bit into all bits
