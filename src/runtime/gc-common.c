@@ -451,23 +451,25 @@ static inline lispobj copy_instance(lispobj object)
 
     int page_type = BOXED_PAGE_FLAG;
 #ifdef LISP_FEATURE_GENCGC
-    lispobj layout = instance_layout((lispobj*)(object - INSTANCE_POINTER_LOWTAG));
-    generation_index_t gen = 0;
-    // If the layout is pseudo-static and the bitmap is 0 then this instance can go
-    // on an unboxed page to avoid further pointer tracing.
-    // And it could never be a valid argument to CHANGE-CLASS.
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (find_fixedobj_page_index((void*)layout))
-        gen = immobile_obj_generation((lispobj*)LAYOUT(layout));
-#else
-    page_index_t p = find_page_index((void*)layout);
-    if (p >= 0) gen = page_table[p].gen;
-#endif
-    if (gen == PSEUDO_STATIC_GENERATION) {
-        struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
-        if (bitmap.nwords == 1 && !bitmap.bits[0]) {
-            page_type = UNBOXED_PAGE_FLAG;
-            ++n_unboxed_instances;
+    lispobj layout = instance_layout(INSTANCE(object));
+    if (layout) {
+        generation_index_t gen = 0;
+        // If the layout is pseudo-static and the bitmap is 0 then this instance can go
+        // on an unboxed page to avoid further pointer tracing.
+        // And it could never be a valid argument to CHANGE-CLASS.
+    #ifdef LISP_FEATURE_IMMOBILE_SPACE
+        if (find_fixedobj_page_index((void*)layout))
+            gen = immobile_obj_generation((lispobj*)LAYOUT(layout));
+    #else
+        page_index_t p = find_page_index((void*)layout);
+        if (p >= 0) gen = page_table[p].gen;
+    #endif
+        if (gen == PSEUDO_STATIC_GENERATION) {
+            struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+            if (bitmap.nwords == 1 && !bitmap.bits[0]) {
+                page_type = UNBOXED_PAGE_FLAG;
+                // ++n_unboxed_instances; // for metrics gathering
+            }
         }
     }
 #endif

@@ -4824,8 +4824,7 @@ boolean ignore_memoryfaults_on_unprotected_pages = 0;
 extern boolean continue_after_memoryfault_on_unprotected_pages;
 boolean continue_after_memoryfault_on_unprotected_pages = 0;
 
-int
-gencgc_handle_wp_violation(void* fault_addr)
+int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* fault_addr)
 {
     page_index_t page_index = find_page_index(fault_addr);
 
