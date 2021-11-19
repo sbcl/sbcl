@@ -168,7 +168,7 @@
 ;;; ASSIGN-VECTOR-FLAGSS assign all and only the flags byte.
 ;;; RESET- performs LOGANDC2 and returns no value.
 (defknown (assign-vector-flags reset-header-bits)
-  (t (unsigned-byte 8)) (values)
+  (t (unsigned-byte 16)) (values)
   (#+x86-64 always-translatable))
 (defknown (test-header-bit)
   (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (boolean)

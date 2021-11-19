@@ -327,7 +327,7 @@ distinct from the global value. Can also be SETF."
 #+immobile-space
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
-  (logior-header-bits name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
+  (logior-array-flags name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
   (if #-immobile-symbols
       (or (eql kind 1) ; keyword
           (and (eql kind 2) ; random interned symbol

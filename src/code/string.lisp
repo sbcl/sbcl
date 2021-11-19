@@ -621,7 +621,7 @@ new string COUNT long filled with the fill character."
   ;; coalescing of strings used as literals in code compiled to memory,
   ;; the string is shareable.
   (when (eq (heap-allocated-p vector) :dynamic)
-    (logior-header-bits (the (simple-array * 1) vector)
+    (logior-array-flags (the (simple-array * 1) vector)
                         (if always-shareable
                             sb-vm:+vector-shareable+
                             sb-vm:+vector-shareable-nonstd+)))

@@ -832,7 +832,7 @@
                        (if (eq has-fill-pointer :maybe)
                            `(let ((%array ,array-header))
                               (when fill-pointer
-                                (logior-header-bits %array sb-vm:+array-fill-pointer-p+))
+                                (logior-array-flags %array sb-vm:+array-fill-pointer-p+))
                               %array)
                            array-header))))))
       (cond ;; Case (1) - :INITIAL-ELEMENT
@@ -1516,7 +1516,8 @@
              ;; chances to run.
              (delay-ir1-transform node :ir1-phases))
            (if (vop-existsp :named test-header-bit)
-               `(test-header-bit array sb-vm:+array-fill-pointer-p+)
+               `(test-header-bit array
+                                 (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))
                `(logtest (get-header-data array)
                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
 

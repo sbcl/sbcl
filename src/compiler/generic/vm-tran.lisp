@@ -37,7 +37,7 @@
 (define-source-transform %make-symbol (kind string)
   (declare (ignore kind))
   ;; Set "logically read-only" bit in pname.
-  `(sb-vm::%%make-symbol (logior-header-bits ,string ,sb-vm:+vector-shareable+)))
+  `(sb-vm::%%make-symbol (logior-array-flags ,string ,sb-vm:+vector-shareable+)))
 
 ;;; We don't want to clutter the bignum code.
 #+(and (or x86 x86-64) (not bignum-assertions))

@@ -31,12 +31,17 @@
   (defun assign-vector-flags (vector flags)
     (set-header-data vector (dpb flags (byte 8 #.array-flags-data-position) (get-header-data vector)))
     (values))
-  (defun logior-header-bits (vector bits)
-    (set-header-data vector (logior (get-header-data vector) (ash bits #.array-flags-data-position)))
-    vector)
-  (defun reset-header-bits (vector bits)
-    (set-header-data vector (logand (get-header-data vector) (lognot (ash bits #.array-flags-data-position))))
+  (defun logior-header-bits (object bits)
+    (set-header-data object (logior (get-header-data object) bits))
+    object)
+  (defun reset-header-bits (object bits)
+    (set-header-data object (logand (get-header-data object) (lognot bits)))
     (values)))
+
+(defmacro logior-array-flags (array flags)
+  `(logior-header-bits ,array (ash ,flags #.array-flags-data-position)))
+(defmacro reset-array-flags (array flags)
+  `(reset-header-bits ,array (ash ,flags #.array-flags-data-position)))
 
 (in-package "SB-IMPL")
 

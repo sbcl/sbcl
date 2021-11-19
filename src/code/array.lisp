@@ -543,11 +543,11 @@
                                 (t complex-array-widetag))
                           array-rank)))
              (cond (fill-pointer
-                    (logior-header-bits array +array-fill-pointer-p+)
+                    (logior-array-flags array +array-fill-pointer-p+)
                     (setf (%array-fill-pointer array)
                           (if (eq fill-pointer t) total-size fill-pointer)))
                    (t
-                    (reset-header-bits array +array-fill-pointer-p+)
+                    (reset-array-flags array +array-fill-pointer-p+)
                     (setf (%array-fill-pointer array) total-size)))
              (setf (%array-available-elements array) total-size)
              (setf (%array-data array) data)
@@ -1500,10 +1500,10 @@ of specialized arrays is supported."
     (setf (%array-available-elements array) length)
     (cond (fill-pointer
            (setf (%array-fill-pointer array) fill-pointer)
-           (logior-header-bits array +array-fill-pointer-p+))
+           (logior-array-flags array +array-fill-pointer-p+))
           (t
            (setf (%array-fill-pointer array) length)
-           (reset-header-bits array +array-fill-pointer-p+)))
+           (reset-array-flags array +array-fill-pointer-p+)))
     (setf (%array-displacement array) displacement)
     (populate-dimensions array dimensions (array-rank array))
     (setf (%array-displaced-p array) displacedp)
@@ -1903,5 +1903,5 @@ function to be removed without further warning."
 
 (defun weak-vector-p (x)
   (and (simple-vector-p x)
-       #+(or x86 x86-64) (test-header-bit x vector-weak-flag)
+       #+(or x86 x86-64) (test-header-bit x (ash vector-weak-flag array-flags-data-position))
        #-(or x86 x86-64) (logtest (get-header-data x) (ash vector-weak-flag array-flags-data-position))))
