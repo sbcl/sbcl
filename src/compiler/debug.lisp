@@ -948,7 +948,11 @@
   (values))
 (defun print-lvar (cont)
   (declare (type lvar cont))
-  (format t "v~D " (cont-num cont))
+  (if (and (lvar-info cont)
+           (eq (ir2-lvar-kind (lvar-info cont))
+               :unknown))
+      (format t "uv~D " (cont-num cont))
+      (format t "v~D " (cont-num cont)))
   (values))
 
 (defun print-lvar-stack (stack &optional (stream *standard-output*))
@@ -1312,35 +1316,6 @@
          (vop (ir2-block-start-vop block) (vop-next vop)))
         ((= i n) vop))))
 
-(defun ir1-to-dot (component output-file)
-  (with-open-file (stream output-file :if-exists :supersede
-                                      :if-does-not-exist :create
-                                      :direction :output)
-    (write-line "digraph G {" stream)
-    (do-blocks (block component)
-      (when (typep (block-out block) '(cons (eql :graph) cons))
-        (format stream "~a[style=filled color=~a];~%"
-                (block-number block)
-                (case (cadr (block-out block))
-                  (:marked "green")
-                  (:remarked "aquamarine")
-                  (:start "lightblue")
-                  (:end "red"))))
-      (let ((succ (block-pred block)))
-        (when succ
-          (loop for succ in succ
-                for attr = "[style=bold]" then ""
-                do
-                (format stream "~a -> ~a~a;~%"
-                        (block-number block)
-                        (block-number succ)
-                        attr)))
-        (when (nle-block-p block)
-          (format stream "~a -> ~a [style=dotted];~%"
-                  (block-number block)
-                  (block-number (nle-block-entry-block block))))))
-    (write-line "}" stream)))
-
 (defun show-transform-p (showp fun-name)
   (or (and (listp showp) (member fun-name showp :test 'equal))
       (eq showp t)))
@@ -1373,3 +1348,56 @@
                                       (lvar-value arg)
                                       (type-specifier (lvar-type arg)))))
               (type-specifier type)))))
+
+;;;; producing a graphviz file
+
+(defun replace-all (string part replacement &key (test #'char=))
+  "Returns a new string in which all the occurences of the part
+is replaced with replacement."
+  (with-output-to-string (out)
+    (loop with part-length = (length part)
+          for old-pos = 0 then (+ pos part-length)
+          for pos = (search part string
+                            :start2 old-pos
+                            :test test)
+          do (write-string string out
+                           :start old-pos
+                           :end (or pos (length string)))
+          when pos do (write-string replacement out)
+            while pos)))
+
+(defun ir1-to-dot (component output-file)
+  (with-open-file (stream output-file :if-exists :supersede
+                                      :if-does-not-exist :create
+                                      :direction :output)
+    (write-line "digraph G {" stream)
+    (write-line "node [fontname = \"monospace\"];" stream)
+    (write-line "node [shape=box];" stream)
+    (do-blocks (block component :both)
+      (cond ((eq block (component-head component))
+             (format stream "~a [label=head];"
+                     (block-number block)))
+            ((eq block (component-tail component))
+             (format stream "~a [label=tail];"
+                     (block-number block)))
+            (t
+             (format stream "~a [label=\"~a\"];~%"
+                     (block-number block)
+                     (replace-all (with-output-to-string (*standard-output*)
+                                    (print-nodes block))
+                                  (format nil "~%")
+                                  "\\l"))))
+      (let ((succ (block-succ block)))
+        (when succ
+          (loop for succ in succ
+                for attr = "[style=bold]" then ""
+                do
+                (format stream "~a -> ~a~a;~%"
+                        (block-number block)
+                        (block-number succ)
+                        attr)))
+        (when (nle-block-p block)
+          (format stream "~a -> ~a [style=dotted];~%"
+                  (block-number block)
+                  (block-number (nle-block-entry-block block))))))
+    (write-line "}" stream)))

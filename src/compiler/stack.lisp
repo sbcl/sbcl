@@ -232,13 +232,13 @@
 
     (setf (ir2-block-end-stack 2block) new-end)
 
-    ;; If a block starts with an "entry DX" node (the start of a DX
+    ;; If a block has an "entry DX" node (the start of a DX
     ;; environment) then we need to back-propagate the DX LVARs to
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
-    (let ((first-node (ctran-next (block-start block))))
-      (when (typep first-node 'entry)
-        (let ((cleanup (entry-cleanup first-node)))
+    (do-nodes (node nil block)
+      (when (typep node 'entry)
+        (let ((cleanup (entry-cleanup node)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
             (back-propagate-dx-lvars block (cleanup-info cleanup))))))
 
@@ -247,7 +247,7 @@
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
 
       ;; We cannot delete unused UVLs during NLX, so all UVLs live at
-      ;; ENTRY will be actually live at NLE.
+      ;; ENTRY which are not popped will be actually live at NLE.
       ;;
       ;; BUT, UNWIND-PROTECTor is called in the environment, which has
       ;; nothing in common with the environment of its entry. So we
@@ -262,7 +262,9 @@
                (cleanup (nlx-info-cleanup nlx-info)))
           (unless (eq (cleanup-kind cleanup) :unwind-protect)
             (let* ((entry-block (node-block (cleanup-mess-up cleanup)))
-                   (entry-stack (ir2-block-start-stack (block-info entry-block))))
+                   (entry-stack (set-difference
+                                 (ir2-block-start-stack (block-info entry-block))
+                                 (ir2-block-popped (block-info entry-block)))))
               (setq start (merge-uvl-live-sets start entry-stack))))))
 
       (when *check-consistency*
@@ -509,7 +511,7 @@
         (when (and (block-start succ)
                    (not (eq (ir2-block-start-stack (block-info succ))
                             top)))
-          ;; Return reset the stack, no need to clean anything
+          ;; Return resets the stack, so no need to clean anything.
           (unless (return-p (block-last succ))
             (insert-stack-cleanups block succ))))))
 

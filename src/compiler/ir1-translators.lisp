@@ -102,7 +102,6 @@ Evaluate the FORMS as a PROGN. Within the lexical scope of the body,
 RETURN-FROM can be used to exit the form."
   (unless (symbolp name)
     (compiler-error "The block name ~S is not a symbol." name))
-  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
          (entry (make-entry))
@@ -201,7 +200,6 @@ TAGS, and NIL is returned. If a statement contains a GO to a defined TAG
 within the lexical scope of the form, then control is transferred to the next
 statement following that tag. A TAG must be an integer or a symbol. A
 STATEMENT must be a list. Other objects are illegal within the body."
-  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
          (entry (make-entry))
@@ -1294,16 +1292,13 @@ the thrown values will be returned."
   ;; We represent the possibility of the control transfer by making an
   ;; "escape function" that does a lexical exit, and instantiate the
   ;; cleanup using %WITHIN-CLEANUP.
-  (let* ((tag-ctran (make-ctran))
-         (tag-lvar (make-lvar)))
-    (ir1-convert start tag-ctran tag-lvar tag)
-    (ir1-convert
-     tag-ctran next result
-     (with-unique-names (exit-block)
-       `(block ,exit-block
-          (%within-cleanup
-           :catch (%catch (%escape-fun ,exit-block) ,tag-lvar)
-           ,@body))))))
+  (ir1-convert
+   start next result
+   (with-unique-names (exit-block)
+     `(block ,exit-block
+        (%within-cleanup
+         :catch (%catch (%escape-fun ,exit-block) ,tag)
+         ,@body)))))
 
 ;;; Since NSP is restored on unwind we only need to protect against
 ;;; local transfers of control, basically the same as special

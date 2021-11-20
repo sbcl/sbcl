@@ -294,7 +294,7 @@
          (next-block (first (block-succ exit-block)))
          (entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
-         (info (make-nlx-info cleanup exit))
+         (info (make-nlx-info cleanup (first (block-succ exit-block))))
          (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
                                          `(%nlx-entry ,(opaquely-quote info))

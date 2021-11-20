@@ -453,24 +453,6 @@
        (node-ends-block (ctran-use ctran)))))
   (values))
 
-;;; CTRAN must be the last ctran in an incomplete block; finish the
-;;; block and start a new one if necessary.
-(defun start-block (ctran)
-  (declare (type ctran ctran))
-  (aver (not (ctran-next ctran)))
-  (ecase (ctran-kind ctran)
-    (:inside-block
-     (let ((block (ctran-block ctran))
-           (node (ctran-use ctran)))
-       (aver (not (block-last block)))
-       (aver node)
-       (setf (block-last block) node)
-       (setf (node-next node) nil)
-       (setf (ctran-use ctran) nil)
-       (setf (ctran-kind ctran) :unused)
-       (setf (ctran-block ctran) nil)
-       (link-blocks block (ctran-starts-block ctran))))
-    (:block-start)))
 
 ;;;;
 

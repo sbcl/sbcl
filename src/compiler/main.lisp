@@ -599,9 +599,6 @@ necessary, since type inference may take arbitrarily long to converge.")
             (maybe-mumble "Copy ")
             (copy-propagate component))
 
-          (when *compiler-trace-output*
-            (format *compiler-trace-output*
-                    "~|~%;;;; component: ~S~2%" (component-name component)))
           (ir2-optimize component)
 
           (select-representations component)
@@ -641,10 +638,9 @@ necessary, since type inference may take arbitrarily long to converge.")
           (optimize-constant-loads component)
           (when *compiler-trace-output*
             (when (memq :ir1 *compile-trace-targets*)
-              (let ((*standard-output* *compiler-trace-output*))
-                (print-all-blocks component)))
+              (describe-component component *compiler-trace-output*))
             (when (memq :ir2 *compile-trace-targets*)
-             (describe-ir2-component component *compiler-trace-output*)))
+              (describe-ir2-component component *compiler-trace-output*)))
 
           (maybe-mumble "Code ")
           (multiple-value-bind (segment text-length fun-table
@@ -829,6 +825,13 @@ necessary, since type inference may take arbitrarily long to converge.")
   (values))
 
 ;;;; trace output
+
+;;; Print out some useful info about COMPONENT to STREAM.
+(defun describe-component (component *standard-output*)
+  (declare (type component component))
+  (format t "~|~%;;;; component: ~S~2%" (component-name component))
+  (print-blocks component)
+  (values))
 
 (defun describe-ir2-component (component *standard-output*)
   (format t "~%~|~%;;;; IR2 component: ~S~2%" (component-name component))

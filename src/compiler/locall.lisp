@@ -83,7 +83,6 @@
                                       :info dx-lvars)))
           (setf (entry-cleanup entry) cleanup)
           (insert-node-before call entry)
-          (ensure-block-start (node-prev entry))
           (setf (node-lexenv call)
                 (make-lexenv :default (node-lexenv call)
                              :cleanup cleanup))

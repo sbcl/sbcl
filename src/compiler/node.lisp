@@ -755,8 +755,7 @@
 ;;; ENVIRONMENT-NLX-INFO.
 (defstruct (nlx-info
             (:copier nil)
-            (:constructor make-nlx-info
-                (cleanup exit &aux (block (first (block-succ (node-block exit)))))))
+            (:constructor make-nlx-info (cleanup block)))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
