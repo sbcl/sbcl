@@ -75,8 +75,10 @@
     (flet ((gpr-save/restore (operation except)
              (declare (type (member push pop) operation))
              (let ((registers (ecase convention
+                               ;; RBX and R12..R15 are preserved across C call
                                (c '#1=(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn))
-                               (lisp '(rbx-tn r12-tn r14-tn r15-tn . #1#)))))
+                               ;; all GPRs are potentially destroyed across lisp call
+                               (lisp '(rbx-tn r12-tn #-sb-thread r13-tn r14-tn r15-tn . #1#)))))
                (when except
                  (setf registers (remove except registers)))
                ;; Preserve alignment
