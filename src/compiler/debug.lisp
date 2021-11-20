@@ -498,7 +498,11 @@
      (dolist (exit (entry-exits node))
        (unless (node-deleted exit)
          (check-node-reached node))))
-    (enclose)
+    (enclose
+     (dolist (fun (enclose-funs node))
+       (let ((enclose (functional-enclose fun)))
+         (unless (eq node enclose)
+           (barf "~S is not the ENCLOSE for its FUN ~S." node enclose)))))
     (exit
      (let ((entry (exit-entry node))
            (value (exit-value node)))

@@ -2713,8 +2713,7 @@
 
 (defun may-delete-cast (cast)
   (typecase cast
-    (vestigial-exit-cast
-     nil)
+    (delay nil)
     (bound-cast
      (may-delete-bound-cast cast))
     (t t)))

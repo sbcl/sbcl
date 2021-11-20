@@ -1639,12 +1639,16 @@
   asserted-type
   type-to-check)
 
-;;; A filter to help order the value semantics of MULTIPLE-VALUE-PROG1
-(defstruct (vestigial-exit-cast (:include cast
-                                          (%type-check nil)
-                                          (asserted-type *wild-type*)
-                                          (type-to-check *wild-type*))
-                                (:copier nil)))
+;;; The DELAY node is interposed between a VALUE's USE and its DEST in
+;;; order to allow the value to be immediately used. This is necessary
+;;; for implementing multiple-use unknown values LVARs, as otherwise,
+;;; a non-moveable dynamic extent object may be allocated between the
+;;; DEST and one of the LVAR's uses but not the others.
+(defstruct (delay (:include cast
+                   (%type-check nil)
+                   (asserted-type *wild-type*)
+                   (type-to-check *wild-type*))
+                  (:copier nil)))
 
 ;;; A cast that always follows %check-bound and they are deleted together.
 ;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.

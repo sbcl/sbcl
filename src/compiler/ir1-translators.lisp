@@ -1468,6 +1468,15 @@ values from the first VALUES-FORM making up the first argument, etc."
         (use-continuation node next result)
         (setf (basic-combination-args node) (arg-lvars))))))
 
+;;; MULTIPLE-VALUE-PROG1 is represented in IR1 by having the
+;;; VALUES-FORM code use a VALUE lvar that gets handed off to
+;;; RESULT. In other words, as the result continuation isn't
+;;; IMMEDIATELY-USED-P by the nodes that compute the result, we have
+;;; to interpose a DELAY node using RESULT immediately so that the
+;;; result continuation can assume that it is immediately used. This
+;;; is important here because MULTIPLE-VALUE-PROG1 is the only special
+;;; form which receives unknown values with multiple uses, some (in
+;;; this case one) of which are not immediate.
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
   "MULTIPLE-VALUE-PROG1 values-form form*
@@ -1477,17 +1486,13 @@ VALUES-FORM."
   (let* ((value-ctran (make-ctran))
          (forms-ctran (make-ctran))
          (value-lvar (make-lvar))
-         ;; This is to avoid writing in the RESULT LVAR before the
-         ;; body is executed, because the body may overwrite it.
-         ;; See MAY-DELETE-VESTIGIAL-EXIT.
-         (cast (make-vestigial-exit-cast
-                :value value-lvar)))
+         (delay (make-delay :value value-lvar)))
     (ctran-starts-block value-ctran)
     (ir1-convert start value-ctran value-lvar values-form)
     (ir1-convert-progn-body value-ctran forms-ctran nil forms)
-    (link-node-to-previous-ctran cast forms-ctran)
-    (setf (lvar-dest value-lvar) cast)
-    (use-continuation cast next result)))
+    (link-node-to-previous-ctran delay forms-ctran)
+    (setf (lvar-dest value-lvar) delay)
+    (use-continuation delay next result)))
 
 
 ;;;; interface to defining macros
