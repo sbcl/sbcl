@@ -1055,8 +1055,6 @@
                      (if (cast-%type-check node) #\+ #\-)
                      (cast-type-to-check node)
                      (cast-asserted-type node))))
-          (no-op
-           (princ "no-op"))
           (enclose
            (write-string "enclose ")
            (dolist (leaf (enclose-funs node))

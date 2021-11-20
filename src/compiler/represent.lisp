@@ -619,7 +619,7 @@
                   (succ (ir2-block-block 2block))
                   (start (make-ctran))
                   (block (ctran-starts-block start))
-                  (no-op-node (make-no-op))
+                  (no-op-node (make-exit))
                   (new-2block (make-ir2-block block))
                   (vop-next (vop-next vop)))
              (link-node-to-previous-ctran no-op-node start)

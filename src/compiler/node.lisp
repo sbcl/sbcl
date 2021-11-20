@@ -1707,9 +1707,6 @@
   (entry :test entry)
   (value :test value))
 
-(defstruct (no-op (:include node)
-                  (:copier nil)))
-
 ;;; The ENCLOSE node marks the place at which closure allocation code
 ;;; would be emitted, if necessary.
 (defstruct (enclose (:include valued-node) ; this node uses a dummy lvar for dx analysis

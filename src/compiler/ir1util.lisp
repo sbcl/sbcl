@@ -1879,8 +1879,7 @@
                (delete node (basic-var-sets var)))))
       (cast
        (flush-dest (cast-value node)))
-      (enclose)
-      (no-op)))
+      (enclose)))
 
   (remove-from-dfo block)
   (values))
