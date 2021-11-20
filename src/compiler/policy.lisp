@@ -202,11 +202,10 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
 (defun policy-quality-deprecation-warning (quality)
   (case quality
     ((stack-allocate-dynamic-extent stack-allocate-vector stack-allocate-value-cells)
-     (deprecation-warn :late "SBCL" "1.0.19.7" 'policy quality '*stack-allocate-dynamic-extent*
-                       :runtime-error nil)
+     (deprecation-warn :final "SBCL" "1.0.19.7" 'policy quality '*stack-allocate-dynamic-extent*)
      t)
     ((merge-tail-calls)
-     (deprecation-warn :early "SBCL" "1.0.53.74" 'policy quality nil :runtime-error nil)
+     (deprecation-warn :late "SBCL" "1.0.53.74" 'policy quality nil :runtime-error nil)
      t)
     (otherwise
      nil)))
