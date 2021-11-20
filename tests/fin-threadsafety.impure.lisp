@@ -39,6 +39,12 @@
   (let ((fun (sb-kernel:%make-funcallable-instance 0))
         (stop nil)
         (condition nil))
+    ;; It doesn't matter what this layout is, but it has to be something.
+    ;; GC checks for a layout before fixing up any other slots. That's required
+    ;; because immobile funcallable-instances contain raw bytes comprising the
+    ;; self-contained trampoline. For some reason FUNCALLABLE-INSTANCE claims
+    ;; to have a 0 bitmap which implies 0 tagged slots. I don't like that.
+    (sb-kernel:%set-fun-layout fun (sb-kernel:find-layout 'function))
     (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
     (flet ((changer ()
              (loop (sb-thread:barrier (:read))
