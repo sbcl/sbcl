@@ -1049,6 +1049,9 @@
                     (format t "exit <no value>"))
                    (t
                     (format t "exit <degenerate>")))))
+          (delay
+           (write-string "delay ")
+           (print-lvar (delay-value node)))
           (cast
            (let ((value (cast-value node)))
              (format t "cast v~D ~A[~S -> ~S]" (cont-num value)
