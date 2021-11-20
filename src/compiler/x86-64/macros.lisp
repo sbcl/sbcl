@@ -233,7 +233,8 @@
          (inst jmp :z ,label)
          ;; if PAI was set, interrupts were disabled at the same time
          ;; using the process signal mask.
-         (inst break pending-interrupt-trap)
+         #+linux (inst icebp)
+         #-linux (inst break pending-interrupt-trap)
          (emit-label ,label))))))
 
 ;;;; indexed references

@@ -376,6 +376,12 @@ sigtrap_handler(int __attribute__((unused)) signal,
                 siginfo_t __attribute__((unused)) *info,
                 os_context_t *context)
 {
+#ifdef LISP_FEATURE_LINUX
+    // ICEBP instruction = handle-pending-interrupt following pseudo-atomic
+    if (((unsigned char*)*os_context_pc_addr(context))[-1] == 0xF1)
+        return interrupt_handle_pending(context);
+#endif
+
     unsigned int trap;
 
     if (single_stepping) {

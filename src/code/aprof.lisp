@@ -394,7 +394,7 @@
                   #-sb-safepoint
                   `((xor :qword ,p-a-flag ,(get-gpr :qword thread-reg))
                     (jmp :eq ?_)
-                    (break . ignore)
+                    #+linux (icebp) #-linux (break . ignore)
                     (mov :dword (ea 1 ?result) ?layout))
                   t)
                  bindings)))
