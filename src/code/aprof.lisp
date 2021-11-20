@@ -66,7 +66,7 @@
   (:use #:cl #:sb-ext #:sb-alien #:sb-sys #:sb-int #:sb-kernel)
   (:export #:aprof-run #:aprof-show #:aprof-reset)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
-  (:import-from #:sb-vm #:rbp-offset)
+  (:import-from #:sb-vm #:thread-reg)
   (:import-from #:sb-x86-64-asm
                 #:register-p #:get-gpr #:reg #:reg-num
                 #:machine-ea #:machine-ea-p
@@ -392,7 +392,7 @@
                           (ea ,(- sb-vm:static-space-start sb-vm:gc-safepoint-trap-offset) nil))
                     (mov :dword (ea 1 ?result) ?layout))
                   #-sb-safepoint
-                  `((xor :qword ,p-a-flag ,(get-gpr :qword rbp-offset))
+                  `((xor :qword ,p-a-flag ,(get-gpr :qword thread-reg))
                     (jmp :eq ?_)
                     (break . ignore)
                     (mov :dword (ea 1 ?result) ?layout))
@@ -448,7 +448,7 @@
     ;; Expect a store to the pseudo-atomic flag
     #-sb-safepoint
     (when (eq (matchp iterator
-                      (load-time-value `((mov :qword ,p-a-flag ,(get-gpr :qword rbp-offset))) t)
+                      (load-time-value `((mov :qword ,p-a-flag ,(get-gpr :qword thread-reg))) t)
                       nil) :fail)
       (return-from deduce-type (values nil nil)))
 
