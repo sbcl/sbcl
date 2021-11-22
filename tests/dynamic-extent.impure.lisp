@@ -1601,8 +1601,7 @@
 ;;; analysis.
 (with-test (:name :uvl-preserved-by-dx-too-long)
   (checked-compile
-   '(lambda (f1 a test)
-     (let ((a (f2 a)))
-       (flet ((f3 (&rest m) (apply test m)))
-         (declare (dynamic-extent #'f3))
-         (apply f1 #'f3 args))))))
+   '(lambda (f1 test args)
+     (flet ((f3 (&rest m) (apply test m)))
+       (declare (dynamic-extent #'f3))
+       (apply f1 #'f3 args)))))
