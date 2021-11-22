@@ -2948,6 +2948,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                  sb-vm:n-lowtag-bits sb-vm:lowtag-mask
                  sb-vm:n-widetag-bits sb-vm:widetag-mask
                  sb-vm:n-fixnum-tag-bits sb-vm:fixnum-tag-mask
+                 sb-vm:instance-length-mask
                  sb-vm:dsd-raw-type-mask
                  sb-vm:short-header-max-words
                  sb-vm:array-flags-position

@@ -581,8 +581,7 @@ lispobj symbol_function(lispobj* symbol)
         // Do the same thing as PACKED-INFO-FDEFN
         lispobj elt = info->slots[INSTANCE_DATA_START];
         if (fixnump(elt) && (fixnum_value(elt) & 07777) >= 07701) {
-            // FIXME: genesis should be writing a #define for INSTANCE_LENGTH_MASK
-            int len = (info->header >> INSTANCE_LENGTH_SHIFT) & 0x3FF;
+            int len = (info->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
             lispobj fdefn = info->slots[len-1];
             if (lowtag_of(fdefn) == OTHER_POINTER_LOWTAG)
                 return FDEFN(fdefn)->fun;

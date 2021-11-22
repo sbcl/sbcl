@@ -135,6 +135,19 @@ distinct from the global value. Can also be SETF."
     (let ((fdefn (find-or-create-fdefn symbol)))
       (setf (fdefn-fun fdefn) new-value))))
 
+;;; Incredibly bogus kludge: the :CAS-TRANS option in objdef makes no indication
+;;; that you can not use it on certain platforms, so then you do try to use it,
+;;; and you silently get no automatic IR2 conversion. The workaround in src/code/cas
+;;; is unnecessary imho - why are we comparing the old value?
+;;; To catch programming errors that occur only for non-threads apparently?
+;;; The flaw is that it's dissociated from objdef, which ought to you give you
+;;; the stub automatically somehow.
+;;; Furthermore it's annoying that you can't name the CAS function (CAS fn).
+#-compare-and-swap-vops
+(defun cas-symbol-%info (symbol old new)
+  (setf (symbol-%info symbol) new)
+  old)
+
 ;;; Accessors for the dual-purpose info/plist slot
 
 ;; A symbol's INFO slot is always in one of three states:
