@@ -197,6 +197,14 @@ darwin_reinit() {
     setup_mach_exception_handling_thread();
     mach_lisp_thread_init(all_threads);
 #endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+    struct extra_thread_data *extra_data = thread_extra_data(get_sb_vm_thread());
+    os_sem_init(&extra_data->state_sem, 1);
+    os_sem_init(&extra_data->state_not_running_sem, 0);
+    os_sem_init(&extra_data->state_not_stopped_sem, 0);
+    os_sem_init(&extra_data->sprof_sem, 0);
+#endif
 }
 
 void darwin_init(void)
