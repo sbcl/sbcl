@@ -1245,13 +1245,12 @@
               ;; thus the control transfer is a non-local exit.
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
-              ;; Stack analysis phase wants ENTRY to start a block...
-              (entry-p (block-start-node next))
               (let ((last (block-last block)))
                 (and (valued-node-p last)
                      (awhen (node-lvar last)
                        (or
-                        ;; ... and a DX-allocator to end a block.
+                        ;; stack analysis wants DX-allocators to end
+                        ;; their blocks.
                         (lvar-dynamic-extent it)
                         ;; ... and for there to be no chance of there
                         ;; being two successive USEs of the same
