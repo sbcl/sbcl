@@ -232,13 +232,13 @@
 
     (setf (ir2-block-end-stack 2block) new-end)
 
-    ;; If a block has an "entry DX" node (the start of a DX
+    ;; If a block starts with an "entry DX" node (the start of a DX
     ;; environment) then we need to back-propagate the DX LVARs to
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
-    (do-nodes (node nil block)
-      (when (typep node 'entry)
-        (let ((cleanup (entry-cleanup node)))
+    (let ((first-node (ctran-next (block-start block))))
+      (when (typep first-node 'entry)
+        (let ((cleanup (entry-cleanup first-node)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
             (back-propagate-dx-lvars block (cleanup-info cleanup))))))
 

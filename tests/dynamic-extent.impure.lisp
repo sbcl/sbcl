@@ -1596,3 +1596,13 @@
         (funcall f l)))
    (((lambda (l) (equal l '((1)))) nil nil) t)
    (((lambda (l) (equal l nil)) t nil) t)))
+
+;;; Test that we don't preserve UVLs too long because of DX in stack
+;;; analysis.
+(with-test (:name :uvl-preserved-by-dx-too-long)
+  (checked-compile
+   '(lambda (f1 a test)
+     (let ((a (f2 a)))
+       (flet ((f3 (&rest m) (apply test m)))
+         (declare (dynamic-extent #'f3))
+         (apply f1 #'f3 args))))))
