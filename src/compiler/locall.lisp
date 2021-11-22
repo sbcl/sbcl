@@ -1443,7 +1443,8 @@
                                    (node-home-lambda dest))
                                  (dest-cleanup
                                    (node-enclosing-cleanup dest)))
-                             (cond (outside-calls-ctran
+                             (aver dest-env)
+                             (cond (outside-calls-env
                                     ;; We can only convert multiple
                                     ;; outside calls when they are all
                                     ;; in the same environment, so we
