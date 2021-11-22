@@ -400,7 +400,8 @@
                  (push fun (component-lambdas component)))
                (locall-analyze-fun-1 fun)
                (when (lambda-p fun)
-                 (maybe-let-convert fun component)))))))
+                 (or (maybe-let-convert fun component)
+                     (maybe-convert-to-assignment fun))))))))
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
@@ -518,8 +519,11 @@
                    (let-convertable-p call fun))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
+        ;;; The function may have already been converted to an
+        ;;; :ASSIGNMENT lambda through the local call conversion of
+        ;;; another local call.
         (aver (member (functional-kind fun)
-                      '(nil :escape :cleanup :optional)))
+                      '(nil :escape :cleanup :optional :assignment)))
         (cond ((mv-combination-p call)
                (convert-mv-call ref call fun))
               ((lambda-p fun)
@@ -1380,53 +1384,105 @@
         (values t (maybe-convert-to-assignment fun))))))
 
 ;;; This is called when we believe it might make sense to convert
-;;; CLAMBDA to an assignment. All this function really does is
+;;; FUN to an assignment. All this function really does is
 ;;; determine when a function with more than one call can still be
 ;;; combined with the calling function's environment. We can convert
 ;;; when:
 ;;; -- The function is a normal, non-entry function, and
-;;; -- Except for one call, all calls must be tail recursive calls
-;;;    in the called function (i.e. are self-recursive tail calls)
+;;; -- All calls must return to the same place, so some
+;;;    may be tail recursive calls in the called function (i.e. are
+;;;    self-recursive tail calls)
 ;;; -- OK-INITIAL-CONVERT-P is true.
 ;;;
-;;; There may be one outside call, and it need not be tail-recursive.
-;;; Since all tail local calls have already been converted to direct
-;;; transfers, the only control semantics needed are to splice in the
-;;; body at the non-tail call. If there is no non-tail call, then we
-;;; need only merge the environments. Both cases are handled by
-;;; LET-CONVERT.
+;;; There may be any number of outside calls, and they need not be
+;;; tail-recursive. The only constraint is that they return to the
+;;; same place (taking into account cleanup actions). Note that in
+;;; particular, this is also satisfied when the calls to FUN are
+;;; derived to not return at all. Since all tail local calls have
+;;; already been converted to direct transfers, the only control
+;;; semantics needed are to splice in the body at some non-tail
+;;; call. If there is no non-tail call, then we need only merge the
+;;; environments. Both cases are handled by LET-CONVERT.
 ;;;
 ;;; ### It would actually be possible to allow any number of outside
 ;;; calls as long as they all return to the same place (i.e. have the
-;;; same conceptual continuation.) A special case of this would be
-;;; when all of the outside calls are tail recursive.
-(defun maybe-convert-to-assignment (clambda)
-  (declare (type clambda clambda))
-  (when (and (not (functional-kind clambda))
-             (not (functional-entry-fun clambda))
-             (not (functional-has-external-references-p clambda)))
-    (let ((outside-non-tail-call nil)
-          (outside-call nil))
-      (when (and (dolist (ref (leaf-refs clambda) t)
+;;; same conceptual continuation.) Some currently unhandled cases of
+;;; this are outside tail calls from multiple functions which
+;;; themselves return to the same place transitively. The paper
+;;; "Contification using dominators" by Fluet and Weeks describes a
+;;; maximal algorithm for detecting all such calls returning to the
+;;; same place.
+(defun maybe-convert-to-assignment (fun)
+  (declare (type clambda fun))
+  (when (and (not (functional-kind fun))
+             (not (functional-entry-fun fun))
+             (not (functional-has-external-references-p fun))
+             ;; If a functional is explicitly inlined, we don't want
+             ;; to assignment convert it, as more call-site
+             ;; specialization can be done with inlining.
+             (not (functional-inlinep fun)))
+    (let ((outside-calls nil)
+          (outside-calls-ctran nil)
+          (outside-calls-env nil)
+          (outside-calls-cleanup nil))
+      (when (and (dolist (ref (leaf-refs fun) t)
                    (let ((dest (node-dest ref)))
                      (when (or (not dest)
                                (node-to-be-deleted-p ref)
                                (node-to-be-deleted-p dest))
                        (return nil))
                      (let ((home (node-home-lambda ref)))
-                       (unless (eq home clambda)
-                         (when outside-call
-                           (return nil))
-                         (setq outside-call dest))
-                       (unless (node-tail-p dest)
-                         (when (or outside-non-tail-call (eq home clambda))
-                           (return nil))
-                         (setq outside-non-tail-call dest)))))
-                 (ok-initial-convert-p clambda))
-        (cond (outside-call (setf (functional-kind clambda) :assignment)
-                            (let-convert clambda outside-call)
-                            (when outside-non-tail-call
-                              (reoptimize-call outside-non-tail-call))
-                            t)
-              (t (delete-lambda clambda)
-                 nil))))))
+                       (if (eq home fun)
+                           (unless (node-tail-p dest)
+                             (return nil))
+                           (let ((dest-ctran
+                                   (or (node-next dest)
+                                       (block-start (first (block-succ (node-block dest))))))
+                                 (dest-env
+                                   (node-home-lambda dest))
+                                 (dest-cleanup
+                                   (node-enclosing-cleanup dest)))
+                             (cond (outside-calls-ctran
+                                    ;; We can only convert multiple
+                                    ;; outside calls when they are all
+                                    ;; in the same environment, so we
+                                    ;; don't muck up tail sets. This
+                                    ;; is not a conceptual restriction
+                                    ;; though; it may be possible to
+                                    ;; lift this if things are
+                                    ;; reworked. The cleanup checking
+                                    ;; here is also overly
+                                    ;; conservative. A better approach
+                                    ;; would be to check for harmful
+                                    ;; cleanups with respect to the
+                                    ;; messiest common ancestor.
+                                    (unless (and (or (eq (node-derived-type dest) *empty-type*)
+                                                     (and (eq outside-calls-ctran dest-ctran)))
+                                                 (eq outside-calls-env dest-env)
+                                                 (eq outside-calls-cleanup dest-cleanup))
+                                      (return nil)))
+                                   (t
+                                    (setq outside-calls-env dest-env)
+                                    (setq outside-calls-ctran dest-ctran)
+                                    (setq outside-calls-cleanup dest-cleanup)))
+                             (push dest outside-calls))))))
+                 (ok-initial-convert-p fun))
+        (cond (outside-calls
+               (setf (functional-kind fun) :assignment)
+               ;; The only time OUTSIDE-CALLS contains a mix of both
+               ;; tail and non-tail calls is when calls to FUN are
+               ;; derived to not return, in which case it doesn't
+               ;; matter whether a given call is tail.
+               (let-convert fun (first outside-calls))
+               (dolist (outside-call outside-calls)
+                 ;; Splice in the other calls, without the rest of the
+                 ;; let converting return semantics machinery, since
+                 ;; we've already let converted the function.
+                 (insert-let-body fun outside-call)
+                 (delete-lvar-use outside-call)
+                 (unless (node-tail-p outside-call)
+                   (reoptimize-call outside-call)))
+               t)
+              (t
+               (delete-lambda fun)
+               nil))))))

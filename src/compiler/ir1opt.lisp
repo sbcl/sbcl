@@ -1467,7 +1467,8 @@
     (case (combination-kind call)
       (:local
        (let ((fun (combination-lambda call)))
-         (maybe-let-convert fun)
+         (or (maybe-let-convert fun)
+             (maybe-convert-to-assignment fun))
          (unless (member (functional-kind fun) '(:let :assignment :deleted))
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
@@ -2344,7 +2345,8 @@
          (let ((lambda (combination-lambda node)))
            (when (lvar-reoptimize fun)
              (setf (lvar-reoptimize fun) nil)
-             (maybe-let-convert lambda))
+             (or (maybe-let-convert lambda)
+                 (maybe-convert-to-assignment lambda)))
            (cond ((neq (functional-kind lambda) :mv-let)
                   (loop for arg in (basic-combination-args node)
                         do
@@ -2367,7 +2369,8 @@
                (when (and (ref-p use) (functional-p (ref-leaf use)))
                  (convert-call-if-possible use node)
                  (when (eq (basic-combination-kind node) :local)
-                   (maybe-let-convert (ref-leaf use))))))
+                   (or (maybe-let-convert (ref-leaf use))
+                       (maybe-convert-to-assignment (ref-leaf use)))))))
            (unless (or (eq (basic-combination-kind node) :local)
                        (eq (lvar-fun-name fun) '%throw))
              (ir1-optimize-mv-call node))))
