@@ -2137,7 +2137,7 @@ core and return a descriptor to it."
                      (map 'list (lambda (elt)
                                   (etypecase elt
                                     (symbol (cold-intern elt))
-                                    (fixnum (make-fixnum-descriptor elt))
+                                    (sb-xc:fixnum (make-fixnum-descriptor elt))
                                     (descriptor elt)))
                           (sb-impl::packed-info-cells info))))))
 
