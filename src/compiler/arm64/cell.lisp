@@ -200,7 +200,7 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:args-var args)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
@@ -208,8 +208,9 @@
     ;; car slot, so we have to strip off the fixnum-tag-mask to make sure
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
-    (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
-    (inst and res temp (bic-mask fixnum-tag-mask))))
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (unless (not-nil-tn-ref-p args)
+      (inst and res res (bic-mask fixnum-tag-mask)))))
 
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
