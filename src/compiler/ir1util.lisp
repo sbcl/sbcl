@@ -1247,19 +1247,9 @@
               (let ((last (block-last block)))
                 (and (valued-node-p last)
                      (awhen (node-lvar last)
-                       (or
-                        ;; stack analysis wants DX-allocators to end
-                        ;; their blocks.
-                        (lvar-dynamic-extent it)
-                        ;; ... and for there to be no chance of there
-                        ;; being two successive USEs of the same
-                        ;; multi-valued LVAR in the same block (since
-                        ;; we can only insert cleanup code at block
-                        ;; boundaries, but need to discard
-                        ;; multi-valued LVAR contents before they are
-                        ;; overwritten).
-                        (and (consp (lvar-uses it))
-                             (not (lvar-single-value-p it)))))))
+                       ;; stack analysis wants DX-allocators to end
+                       ;; their blocks.
+                       (lvar-dynamic-extent it))))
               (neq (block-type-check block)
                    (block-type-check next)))
              nil)
