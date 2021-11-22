@@ -919,14 +919,19 @@
     (constant (format stream "'~S" (constant-value leaf)))
     (global-var
      (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
+    (clambda
+     (format stream "lambda ~@[~S ~]~:S"
+             (and (leaf-has-source-name-p leaf)
+                  (functional-debug-name leaf))
+             (mapcar #'leaf-debug-name (lambda-vars leaf))))
+    (optional-dispatch
+     (format stream "optional-dispatch ~S" (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))
     (functional
-     (format stream "~S ~S ~S" (type-of leaf) (functional-debug-name leaf)
-             (mapcar #'leaf-debug-name
-                     (typecase leaf
-                       (clambda
-                        (lambda-vars leaf))
-                       (optional-dispatch
-                        (optional-dispatch-arglist leaf))))))))
+     (case (functional-kind leaf)
+       (:toplevel-xep
+        (format stream "TL-XEP ~S" (entry-info-name (leaf-info leaf))))
+       (t
+        (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (sfunction (t) cblock) block-or-lose))
@@ -1388,10 +1393,13 @@ is replaced with replacement."
             (t
              (format stream "~a [label=\"~a\"];~%"
                      (block-number block)
-                     (replace-all (with-output-to-string (*standard-output*)
-                                    (print-nodes block))
-                                  (format nil "~%")
-                                  "\\l"))))
+                     (replace-all
+                      (replace-all (with-output-to-string (*standard-output*)
+                                     (print-nodes block))
+                                   (string #\Newline)
+                                   "\\l")
+                      "\""
+                      "\\"))))
       (let ((succ (block-succ block)))
         (when succ
           (loop for succ in succ
