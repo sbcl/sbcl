@@ -164,8 +164,6 @@
   ;; the basic block this continuation is in. This is null only in
   ;; :UNUSED continuations.
   (block nil :type (or cblock null))
-  ;; Entries created by the BLOCK special operator
-  (entries nil :type list)
   ;; Use for reporting notes for the following node,
   ;; which can be transformed and lose its original source code.
   (source-path nil :type list))

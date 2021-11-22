@@ -115,7 +115,6 @@ RETURN-FROM can be used to exit the form."
     (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
                                   :cleanup cleanup)))
-      (push env-entry (ctran-entries next))
       (ir1-convert-progn-body dummy next result forms))))
 
 (def-ir1-translator return-from ((name &optional value) start next result)
