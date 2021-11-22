@@ -51,7 +51,7 @@
          (info '((bork 42))))
     (import s "CL-USER")
     (set s 'hi)
-    (setf (symbol-info s) info)
+    (setf (symbol-%info s) info)
     (walk-slots-test s `(hi ,info ,name ,(find-package "CL-USER")))))
 
 (test-util:with-test (:name :walk-slots-closure)

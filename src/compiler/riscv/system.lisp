@@ -232,38 +232,6 @@
     (inst add ndescr ndescr offset)
     (inst subi ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
-;;;
-(define-vop (symbol-info-vector)
-  (:policy :fast-safe)
-  (:translate symbol-info-vector)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-    (inst andi temp res lowtag-mask)
-    (inst xori temp temp list-pointer-lowtag)
-    (inst bne temp zero-tn not-equal)
-    (loadw res res cons-cdr-slot list-pointer-lowtag)
-    NOT-EQUAL))
-
-(define-vop (symbol-plist)
-  (:policy :fast-safe)
-  (:translate symbol-plist)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
-    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
-    (loadw res res cons-car-slot list-pointer-lowtag)
-    (inst andi temp res fixnum-tag-mask)
-    (inst bne temp zero-tn not-equal)
-    (move res null-tn)
-    NOT-EQUAL))
-
 
 ;;;; Other random VOPs.
 

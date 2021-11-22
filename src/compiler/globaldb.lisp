@@ -51,9 +51,9 @@
 ;;; sources partway through bootstrapping, tch tch, overwriting its
 ;;; version with our version would be unlikely to help, because that
 ;;; would make the cross-compiler very confused.)
-(defun !register-meta-info (metainfo)
+(defun register-meta-info (metainfo)
   (let* ((name (meta-info-kind metainfo))
-         (list (!get-meta-infos name)))
+         (list (get-meta-infos name)))
     (set-info-value name +info-metainfo-type-num+
                     (cond ((not list) metainfo) ; unique, just store it
                           ((listp list) (cons metainfo list)) ; prepend to the list
@@ -67,7 +67,7 @@
     (return-from !%define-info-type it)) ; do nothing
   (let ((id (or id (position nil *info-types* :start 1)
                    (error "no more INFO type numbers available"))))
-    (!register-meta-info
+    (register-meta-info
      (setf (aref *info-types* id)
            (!make-meta-info id category kind type-spec type-checker
                             validate-function default)))))
@@ -107,7 +107,7 @@
           '#'identity
           `(named-lambda "check-type" (x) (the ,type-spec x)))
      ,validate-function ,default
-     ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
+     ;; Rationale for hardcoding here is explained at PACKED-INFO-FDEFN.
      ,(or (and (eq category :function) (eq kind :definition)
                +fdefn-info-num+)
           #+sb-xc (meta-info-number (meta-info category kind))))))
@@ -204,18 +204,18 @@
          (hookp (and (and hook
                           (not (eql 0 (car hook)))
                           (logbitp info-number (car hook))))))
-    (multiple-value-bind (vector aux-key)
+    (multiple-value-bind (packed-info aux-key)
         (let ((name (uncross name)))
           (with-globaldb-name (key1 key2) name
            ;; In the :simple branch, KEY1 is no doubt a symbol,
            ;; but constraint propagation isn't informing the compiler here.
-           :simple (values (symbol-info-vector (truly-the symbol key1)) key2)
+           :simple (values (symbol-dbinfo (truly-the symbol key1)) key2)
            :hairy (values (info-gethash name *info-environment*)
                           +no-auxiliary-key+)))
-      (when vector
-        (let ((index (packed-info-value-index vector aux-key info-number)))
+      (when packed-info
+        (let ((index (packed-info-value-index packed-info aux-key info-number)))
           (when index
-            (let ((answer (svref vector index)))
+            (let ((answer (%info-ref packed-info index)))
               (when hookp
                 (funcall (truly-the function (cdr hook))
                          name info-number answer t))
@@ -583,7 +583,7 @@
 
 ;; This is for the SB-INTROSPECT contrib module, and debugging.
 (defun call-with-each-info (function symbol)
-  (awhen (symbol-info-vector symbol)
+  (awhen (symbol-dbinfo symbol)
     (%call-with-each-info function it symbol)))
 
 ;; This is for debugging at the REPL.

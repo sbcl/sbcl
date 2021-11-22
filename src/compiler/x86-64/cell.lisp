@@ -718,18 +718,24 @@
 
 ;;;; structure hackery
 
+(defun load-instance-length (result instance taggedp)
+  (inst mov :dword result (ea (- instance-pointer-lowtag) instance))
+  ;; Returning fixnum/any-reg elides some REX prefixes due to the shifts
+  ;; being small. Maybe the asm optimizer could figure it out now?
+  (cond (taggedp
+         (inst shr :dword result (- instance-length-shift n-fixnum-tag-bits))
+         (inst and :dword result (fixnumize instance-length-mask)))
+        (t
+         (inst shr :dword result instance-length-shift)
+         (inst and :dword result instance-length-mask))))
+
 (define-vop ()
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:generator 4
-    (inst mov :dword res (ea (- instance-pointer-lowtag) struct))
-    ;; Returning fixnum/any-reg elides some REX prefixes due to the shifts
-    ;; being small. Maybe the asm optimizer could figure it out now?
-    (inst shr :dword res (- instance-length-shift n-fixnum-tag-bits))
-    (inst and :dword res (fixnumize instance-length-mask))))
+  (:generator 4 (load-instance-length res struct t)))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)

@@ -327,10 +327,11 @@ Please check that all strings which were not recognizable to the compiler
   ;; such that it now has neither properties nor globaldb info,
   ;; can have the slot set back to NIL if it wasn't already.
   (do-all-symbols (symbol)
-    (when (and (sb-kernel:symbol-info symbol)
-               (null (sb-kernel:symbol-info-vector symbol))
+    (when (and (sb-kernel:symbol-%info symbol) ; "raw" value is something
+               ;; but both "cooked" values are empty
+               (null (sb-kernel:symbol-dbinfo symbol))
                (null (symbol-plist symbol)))
-      (setf (sb-kernel:symbol-info symbol) nil)))
+      (setf (sb-kernel:symbol-%info symbol) nil)))
 )
 
 (sb-ext:gc :full t)
@@ -395,7 +396,7 @@ Please check that all strings which were not recognizable to the compiler
    #+sb-devel
    (lambda (symbol accessibility)
      (declare (ignore accessibility))
-     (or (sb-kernel:symbol-info symbol)
+     (or (sb-kernel:symbol-%info symbol)
          (and (boundp symbol) (not (keywordp symbol)))))
    ;; Release mode: retain all symbols satisfying this intricate test
    #-sb-devel
@@ -448,7 +449,7 @@ Please check that all strings which were not recognizable to the compiler
                sb-assem::*backend-instruction-set-package*)
            (or (eq accessibility :external) (asm-inst-p symbol))
            ;; By default, retain any symbol with any attachments
-           (or (sb-kernel:symbol-info symbol)
+           (or (sb-kernel:symbol-%info symbol)
                (and (boundp symbol) (not (keywordp symbol))))))))
    :verbose nil :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl)

@@ -9,14 +9,27 @@
 
 (in-package "SB-IMPL")
 
-;; Call FUNCTION once for each Name in globaldb that has information associated
-;; with it, passing the function the Name as its only argument.
-;;
 ;; This is in its own file to avoid creating an early dependency on
 ;; target-package iterators.
 (macrolet
     ((def (&rest situations)
        `(eval-when ,situations
+          ;; Return all function names that are stored in SYMBOL's packe-info.
+          ;; As an example, (INFO-NAME-LIST 'SB-PCL::DIRECT-SUPERCLASSES) =>
+          ;; ((SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::READER)
+          ;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES BOUNDP)
+          ;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::WRITER))
+          (defun info-name-list (symbol)
+            (let ((packed-info (symbol-dbinfo symbol))
+                  (list))
+              (when packed-info
+                (do-packed-info-aux-key (packed-info key-index)
+                  (push (construct-globaldb-name (%info-ref packed-info key-index) symbol)
+                        list))
+                (nconc (and (plusp (packed-info-field packed-info 0 0)) (list symbol))
+                       (nreverse list)))))
+          ;; Call FUNCTION once for each Name in globaldb that has information associated
+          ;; with it, passing the function the Name as its only argument.
           (defun call-with-each-globaldb-name (fun-designator)
             (let ((function (cl:coerce fun-designator 'function)))
               (with-package-iterator (iter (list-all-packages) :internal :external)
@@ -28,7 +41,7 @@
                         ;; always keep it since we can't know if it has been seen once.
                         (when (or (not (sb-xc:symbol-package symbol))
                                   (eq package (sb-xc:symbol-package symbol)))
-                          (dolist (name (info-vector-name-list symbol))
+                          (dolist (name (info-name-list symbol))
                             (funcall function name))))))
               ,@(unless (equal situations '(:compile-toplevel))
                   `((dovector (obj (car *fdefns*))

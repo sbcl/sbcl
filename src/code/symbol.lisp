@@ -149,14 +149,6 @@ distinct from the global value. Can also be SETF."
 ;; State 2 transitions to state 3 via ({SETF|CAS} SYMBOL-PLIST).
 ;; There are *no* other permissible state transitions.
 
-(defun symbol-info (symbol)
-  (symbol-info symbol))
-
-;; An "interpreter stub" for an operation that is only implemented for
-;; the benefit of platforms without compare-and-swap-vops.
-(defun (setf symbol-info) (new-info symbol)
-  (setf (symbol-info symbol) new-info))
-
 ;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
 ;; The vector is computed by calling UPDATE-FN on the old vector,
 ;; repeatedly as necessary, until no conflict happens with other updaters.
@@ -164,25 +156,25 @@ distinct from the global value. Can also be SETF."
 (defun update-symbol-info (symbol update-fn)
   (declare (symbol symbol)
            (type (function (t) t) update-fn))
-  (prog ((info-holder (symbol-info symbol))
-         (current-vect))
+  (prog ((info-holder (symbol-%info symbol))
+         (current-info)) ; a PACKED-INFO or NIL
    outer-restart
-    ;; Do not use SYMBOL-INFO-VECTOR - this must not perform a slot read again.
-    (setq current-vect (if (listp info-holder) (cdr info-holder) info-holder))
+    ;; This _must_ _not_ perform another read of the INFO slot here.
+    (setq current-info (if (listp info-holder) (cdr info-holder) info-holder))
    inner-restart
-    (let ((new-vect (funcall update-fn (or current-vect +nil-packed-infos+))))
-      (unless (simple-vector-p new-vect)
-        (aver (null new-vect))
+    (let ((new-info (funcall update-fn (or current-info +nil-packed-infos+))))
+      (unless (%instancep new-info)
+        (aver (null new-info))
         (return)) ; nothing to do
       (if (consp info-holder) ; State 3: exchange the CDR
-          (let ((old (%compare-and-swap-cdr info-holder current-vect new-vect)))
-            (when (eq old current-vect) (return t)) ; win
-            (setq current-vect old) ; Don't touch holder- it's still a cons
+          (let ((old (cas (cdr info-holder) current-info new-info)))
+            (when (eq old current-info) (return t)) ; win
+            (setq current-info old) ; Don't touch holder- it's still a cons
             (go inner-restart)))
-      ;; State 1 or 2: info-holder is NIL or a vector.
-      ;; Exchange the contents of the info slot. Type-inference derives
-      ;; SIMPLE-VECTOR-P on the args to CAS, so no extra checking.
-      (let ((old (%compare-and-swap-symbol-info symbol info-holder new-vect)))
+      ;; State 1 or 2: info-holder is NIL or a PACKED-INFO.
+      ;; Exchange the contents of the info slot. Type-inference should have
+      ;; derived that NEW-INFO satisfies the slot type restriction (I hope).
+      (let ((old (cas-symbol-%info symbol info-holder new-info)))
         (when (eq old info-holder) (return t)) ; win
         ;; Check whether we're in state 2 or 3 now.
         ;; Impossible to be in state 1: nobody ever puts NIL in the slot.
@@ -190,38 +182,25 @@ distinct from the global value. Can also be SETF."
         (setq info-holder old)
         (go outer-restart)))))
 
-(eval-when (:compile-toplevel)
-  ;; If we're in state 1 or state 3, we can take (CAR (SYMBOL-INFO S))
-  ;; to get the property list. If we're in state 2, this same access
-  ;; gets the fixnum which is the VECTOR-LENGTH of the info vector.
-  ;; So all we have to do is turn any fixnum to NIL, and we have a plist.
-  ;; Ensure that this pun stays working.
-  #-ppc64 ; ppc64 has unevenly spaced lowtags
-  (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
-                sb-vm:list-pointer-lowtag)
-             (- (* sb-vm:n-word-bytes sb-vm:vector-length-slot)
-                sb-vm:other-pointer-lowtag))))
-
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
-  (if (sb-c::vop-existsp :translate cl:symbol-plist)
-      (symbol-plist symbol)
-      (let ((list (car (truly-the list (symbol-info symbol))))) ; a harmless lie
-        ;; Just ensure the result is not a fixnum, and we're done.
-        (if (fixnump list) nil list))))
+  (let ((list (symbol-%info symbol)))
+    ;; See the comments above UPDATE-SYMBOL-INFO for a
+    ;; reminder as to why this logic is right.
+    (if (%instancep list) nil (car list))))
 
 (declaim (ftype (sfunction (symbol t) cons) %ensure-plist-holder)
          (inline %ensure-plist-holder))
 
 ;; When a plist update (setf or cas) is first performed on a symbol,
 ;; a one-time allocation of an extra cons is done which creates two
-;; "slots" from one: a slot for the info-vector and a slot for the plist.
+;; "slots" from one: a slot for the PACKED-INFO and a slot for the plist.
 ;; This avoids complications in the implementation of the user-facing
 ;; (CAS SYMBOL-PLIST) function, which should not have to be aware of
 ;; competition from globaldb mutators even if no other threads attempt
 ;; to manipulate the plist per se.
 
-;; Given a SYMBOL and its current INFO of type (OR LIST SIMPLE-VECTOR)
+;; Given a SYMBOL and its current INFO of type (OR LIST INSTANCE)
 ;; ensure that SYMBOL's current info is a cons, and return that.
 ;; If racing with multiple threads, at most one thread will install the cons.
 (defun %ensure-plist-holder (symbol info)
@@ -233,54 +212,55 @@ distinct from the global value. Can also be SETF."
         ;; The pointer from the new cons to the old info must be persisted
         ;; to memory before the symbol's info slot points to the cons.
         ;; [x86oid doesn't need the barrier, others might]
-        (sb-thread:barrier (:write)
-          (setq newcell (cons nil info)))
-        (loop (let ((old (%compare-and-swap-symbol-info symbol info newcell)))
+        (setq newcell (cons nil info))
+        (sb-thread:barrier (:write)) ; oh such ghastly syntax
+        (loop (let ((old (cas-symbol-%info symbol info newcell)))
                 (cond ((eq old info) (return newcell)) ; win
                       ((consp old) (return old))) ; somebody else made a cons!
                 (setq info old)
-                (sb-thread:barrier (:write) ; Retry using same newcell
-                  (rplacd newcell info)))))))
+                (rplacd newcell info)
+                (sb-thread:barrier (:write))))))) ; Retry using same newcell
 
-(declaim (inline (cas symbol-plist) %set-symbol-plist))
+(declaim (inline (cas symbol-plist) (setf symbol-plist)))
 
 (defun (cas symbol-plist) (old new symbol)
   ;; If SYMBOL's info cell is a cons, we can do (CAS CAR). Otherwise punt.
   (declare (symbol symbol) (list old new))
-  (let ((cell (symbol-info symbol)))
+  (let ((cell (symbol-%info symbol)))
     (if (consp cell)
         (%compare-and-swap-car cell old new)
-        (%compare-and-swap-symbol-plist old new symbol))))
+        (%cas-symbol-plist old new symbol))))
 
-(defun %compare-and-swap-symbol-plist (old new symbol)
+(defun %cas-symbol-plist (old new symbol)
   ;; This is just the second half of a partially-inline function, to avoid
   ;; code bloat in the exceptional case.  Type assertions should have been
   ;; done - or not, per policy - by the caller of %COMPARE-AND-SWAP-SYMBOL-PLIST
   ;; so now use TRULY-THE to avoid further type checking.
   (%compare-and-swap-car (%ensure-plist-holder (truly-the symbol symbol)
-                                               (symbol-info symbol))
+                                               (symbol-%info symbol))
                          old new))
 
-(defun %set-symbol-plist (symbol new-value)
-  ;; This is the entry point into which (SETF SYMBOL-PLIST) is transformed.
+(defun (setf symbol-plist) (new-value symbol)
   ;; If SYMBOL's info cell is a cons, we can do (SETF CAR). Otherwise punt.
   (declare (symbol symbol) (list new-value))
-  (let ((cell (symbol-info symbol)))
+  (let ((cell (symbol-%info symbol)))
     (if (consp cell)
         (setf (car cell) new-value)
-        (%%set-symbol-plist symbol new-value))))
+        (%set-symbol-plist symbol new-value))))
 
-(defun %%set-symbol-plist (symbol new-value)
-  ;; Same considerations as for %%COMPARE-AND-SWAP-SYMBOL-PLIST,
+(defun %set-symbol-plist (symbol new-value)
+  ;; Same considerations as for %CAS-SYMBOL-PLIST,
   ;; with a slight efficiency hack: if the symbol has no plist holder cell
   ;; and the NEW-VALUE is NIL, try to avoid creating a holder cell.
   ;; Yet we must write something, because omitting a memory operation
   ;; could have a subtle effect in the presence of multi-threading.
-  (let ((info (symbol-info (truly-the symbol symbol))))
+  (let ((info (symbol-%info (truly-the symbol symbol))))
     (when (and (not new-value) (atom info)) ; try to treat this as a no-op
-      (let ((old (%compare-and-swap-symbol-info symbol info info)))
+      ;; INFO is either an INSTANCE (a PACKED-INFO) or NIL.
+      ;; Write the same thing back, to say we set the plist to NIL.
+      (let ((old (cas-symbol-%info symbol info info)))
         (if (eq old info) ; good enough
-            (return-from %%set-symbol-plist new-value) ; = nil
+            (return-from %set-symbol-plist new-value) ; = nil
             (setq info old))))
     (setf (car (%ensure-plist-holder symbol info)) new-value)))
 

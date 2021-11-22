@@ -1929,7 +1929,7 @@ core and return a descriptor to it."
      (sort (%hash-table-alist *cold-package-symbols*)
            #'string< :key #'car)))) ; Sort by package-name
 
-  (dump-symbol-info-vectors
+  (dump-symbol-infos
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
 
@@ -2101,7 +2101,7 @@ core and return a descriptor to it."
 ;;
 (defun attach-fdefinitions-to-symbols (hashtable)
     ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
-    ;; using the host's code for manipulating a packed info-vector.
+    ;; using the host's code for manipulating a packed-info.
     (maphash (lambda (warm-name cold-fdefn)
                (with-globaldb-name (key1 key2) warm-name
                  :hairy (error "Hairy fdefn name in genesis: ~S" warm-name)
@@ -2113,24 +2113,33 @@ core and return a descriptor to it."
               *cold-fdefn-objects*)
     hashtable)
 
-(defun dump-symbol-info-vectors (hashtable)
-    ;; Emit in the same order symbols reside in core to avoid
-    ;; sensitivity to the iteration order of host's maphash.
-    (loop for (warm-sym . info)
+(defun dump-packed-info (list)
+  ;; Payload length is the element count + LAYOUT slot if necessary.
+  ;; Header word is added automatically by ALLOCATE-STRUCT
+  (let ((s (allocate-struct (+ sb-vm:instance-data-start (length list))
+                            (cold-layout-descriptor (gethash 'packed-info *cold-layouts*)))))
+    (loop for i from (+ sb-vm:instance-slots-offset sb-vm:instance-data-start)
+          for elt in list do (write-wordindexed s i elt))
+    s))
+(defun dump-symbol-infos (hashtable)
+  (cold-set 'sb-impl::+nil-packed-infos+
+            (dump-packed-info (list (make-fixnum-descriptor 0))))
+  ;; Emit in the same order symbols reside in core to avoid
+  ;; sensitivity to the iteration order of host's maphash.
+  (loop for (warm-sym . info)
           in (sort (%hash-table-alist hashtable) #'<
                    :key (lambda (x) (descriptor-bits (cold-intern (car x)))))
           do (write-wordindexed
               (cold-intern warm-sym) sb-vm:symbol-info-slot
-              ;; Each vector will have one fixnum, possibly the symbol SETF,
+              (dump-packed-info
+              ;; Each packed-info will have one fixnum, possibly the symbol SETF,
               ;; and one or two #<fdefn> objects in it, and/or a classoid-cell.
-              (vector-in-core
                      (map 'list (lambda (elt)
                                   (etypecase elt
                                     (symbol (cold-intern elt))
                                     (fixnum (make-fixnum-descriptor elt))
                                     (descriptor elt)))
-                          info)))))
-
+                          (sb-impl::packed-info-cells info))))))
 
 ;;;; fixups and related stuff
 
@@ -3410,7 +3419,7 @@ III. initially undefined function references (alphabetically):
       (dolist (classoid dumped-classoids)
         (let ((nwords (logand (ash (read-bits-wordindexed classoid 0)
                                    (- sb-vm:instance-length-shift))
-                              sb-vm::instance-length-mask)))
+                              sb-vm:instance-length-mask)))
           (format t "Classoid @ ~x, ~d words:~%" (descriptor-bits classoid) (1+ nwords))
           (dotimes (i (1+ nwords)) ; include the header word in output
             (format t "~2d: ~10x~%" i (read-bits-wordindexed classoid i)))

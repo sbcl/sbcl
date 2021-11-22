@@ -39,7 +39,6 @@
   (def %raw-instance-cas/signed-word (instance index)
        %raw-instance-ref/signed-word
        %raw-instance-set/signed-word)
-  (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
 

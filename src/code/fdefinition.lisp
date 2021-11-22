@@ -37,14 +37,14 @@
   #+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
   #-immobile-code (setf (fdefn-fun fdefn) fun))
 
-;; Given Info-Vector VECT, return the fdefn that it contains for its root name,
+;; Given PACKED-INFO, return the fdefn that it contains for its root name,
 ;; or nil if there is no value. NIL input is acceptable and will return NIL.
 ;; (see src/compiler/info-vector for more details)
-(declaim (inline info-vector-fdefn))
-(defun info-vector-fdefn (vect)
-  (when vect
-    ;; This is safe: Info-Vector invariant requires that it have length >= 1.
-    (let ((word (the fixnum (svref vect 0))))
+(declaim (inline packed-info-fdefn))
+(defun packed-info-fdefn (packed-info)
+  (when packed-info
+    ;; This is safe: PACKED-INFO invariant requires that it have length >= 1.
+    (let ((word (the fixnum (%info-ref packed-info 0))))
       ;; Test that the first info-number is +fdefn-info-num+ and its n-infos
       ;; field is nonzero. These conditions can be tested simultaneously
       ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
@@ -52,16 +52,15 @@
       ;; as a 12-bit unsigned integer it must be >= #b111111000001
       (when (>= (ldb (byte (* info-number-bits 2) 0) word)
                 (1+ (ash +fdefn-info-num+ info-number-bits)))
-        ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
-        ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
-        ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
-        (aref vect (1- (truly-the (integer 1 *) (length vect))))))))
+        (%info-ref packed-info
+                   (1- (truly-the (integer 1 *)
+                                  (packed-info-len packed-info))))))))
 
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefn (symbol)
   (declare (optimize (safety 0)))
-  (info-vector-fdefn (symbol-info-vector symbol)))
+  (packed-info-fdefn (symbol-dbinfo symbol)))
 
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
 ;; Signal an error if name isn't valid.
@@ -80,7 +79,7 @@
         (return-from find-fdefn it))
       :simple
       (progn
-        (awhen (symbol-info-vector key1)
+        (awhen (symbol-dbinfo key1)
           (multiple-value-bind (data-idx descriptor-idx field-idx)
               (info-find-aux-key/packed it key2)
             (declare (type index descriptor-idx)
@@ -93,7 +92,7 @@
               (when (eql (packed-info-field it descriptor-idx field-idx)
                          +fdefn-info-num+)
                 (return-from find-fdefn
-                  (aref it (1- (the index data-idx))))))))
+                  (%info-ref it (1- (the index data-idx))))))))
         (when (eq key1 'setf) ; bypass the legality test
           (return-from find-fdefn nil))))
   (legal-fun-name-or-type-error name))

@@ -38,7 +38,8 @@
 
   ;; removing the one info shrinks the vector to nothing
   ;; and all values of nothing are EQ
-  (assert (equalp #(0) (packed-info-remove foo-iv +no-auxiliary-key+ '(5))))
+  (assert (equalp (packed-info-remove foo-iv +no-auxiliary-key+ '(5))
+                  +nil-packed-infos+))
   (assert (eq (packed-info-remove foo-iv +no-auxiliary-key+ '(5))
               (packed-info-remove bar-iv +no-auxiliary-key+ '(6))))
   (assert (eq (packed-info-remove foo-iv +no-auxiliary-key+ '(5))

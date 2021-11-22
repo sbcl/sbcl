@@ -1039,7 +1039,7 @@ We could try a few things to mitigate this:
             ,.(make-case 'array)
             ,.(make-case* 'symbol
                `(,functoid (%primitive sb-c:fast-symbol-global-value ,obj) ,@more)
-               `(,functoid (symbol-info ,obj) ,@more)
+               `(,functoid (symbol-%info ,obj) ,@more)
                `(,functoid (symbol-name ,obj) ,@more)
                `(,functoid (symbol-package ,obj) ,@more)
                `(when (symbol-extra-slot-p ,obj)

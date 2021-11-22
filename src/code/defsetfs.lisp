@@ -167,7 +167,6 @@
   bits)
 (defsetf symbol-value set)
 (defsetf symbol-global-value set-symbol-global-value)
-(defsetf symbol-plist %set-symbol-plist)
 (defsetf fill-pointer %set-fill-pointer)
 (defsetf subseq (sequence start &optional end) (v)
   `(progn (replace ,sequence ,v :start1 ,start :end1 ,end) ,v))

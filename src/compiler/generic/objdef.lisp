@@ -374,11 +374,20 @@ during backtrace.
          :set-trans %set-symbol-global-value
          :set-known ())
 
-  (info :ref-trans symbol-info :ref-known (flushable)
-        :set-trans (setf symbol-info)
+  ;; The private accessor for INFO reads the slot verbatim.
+  ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
+  ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
+  ;; of the user's PLIST and a PACKED-INFO or just a PACKED-INFO.
+  ;; It can't hold a PLIST alone without wrapping in an extra cons cell.
+  (info :ref-trans symbol-%info :ref-known (flushable)
+        :set-trans (setf symbol-%info)
         :set-known ()
-        :cas-trans %compare-and-swap-symbol-info
-        :type (or simple-vector list)
+        ;; IR2-CONVERT-CASSER only knows the arg order as (OBJECT OLD NEW),
+        ;; so as much as I'd like to name this (CAS SYMBOL-%INFO),
+        ;; it can't be that, because it'd need args of (OLD NEW OBJECT).
+        ;; This is a pretty close approximation of the desired name.
+        :cas-trans sb-impl::cas-symbol-%info
+        :type (or instance list)
         :init :null)
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans sb-xc:symbol-package

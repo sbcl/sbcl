@@ -535,7 +535,7 @@
             (cond ((not s)
                    (push (cons pkg string) nonexistent))
                   ((and (not (boundp s))
-                        (not (sb-kernel:symbol-info s))
+                        (not (sb-kernel:symbol-%info s))
                         (not (gethash s sb-c::*backend-parsed-vops*)))
                    (push s uninteresting))))))))
   (format t "~&Nonexistent:~%")

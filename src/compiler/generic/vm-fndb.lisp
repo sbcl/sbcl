@@ -123,7 +123,12 @@
 (defknown %set-symbol-hash (symbol hash-code)
   t ())
 
-(defknown symbol-info-vector (symbol) (or null simple-vector))
+;;; TODOD: I'd like to eliminate the (OR NULL) from this return type.
+;;; For that to happen, I probably need +nil-packed-infos+ to become
+;;; placed in static space because assembly routines may need it.
+;;; On the other hand, they may not, because there is no special case
+;;; code needed when reading from it, which is entire point.
+(defknown symbol-dbinfo (symbol) (or null packed-info))
 
 (defknown initialize-vector ((simple-array * (*)) &rest t)
   (simple-array * (*))

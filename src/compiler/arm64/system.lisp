@@ -225,7 +225,7 @@
     (inst add func code ndescr)))
 ;;;
 
-(defun load-symbol-info-vector (result symbol temp)
+(defun load-symbol-dbinfo (result symbol temp)
   (assemble ()
     (loadw result symbol symbol-info-slot other-pointer-lowtag)
     ;; If RESULT has list-pointer-lowtag, take its CDR. If not, use it as-is.
@@ -235,27 +235,14 @@
     (loadw result result cons-cdr-slot list-pointer-lowtag)
     NE))
 
-(define-vop (symbol-info-vector)
+(define-vop (symbol-dbinfo)
   (:policy :fast-safe)
-  (:translate symbol-info-vector)
+  (:translate symbol-dbinfo)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp)
   (:generator 1
-    (load-symbol-info-vector res x temp)))
-
-(define-vop (symbol-plist)
-  (:policy :fast-safe)
-  (:translate symbol-plist)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
-    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
-    (loadw res res cons-car-slot list-pointer-lowtag)
-    (inst tst res fixnum-tag-mask)
-    (inst csel res null-tn res :eq)))
+    (load-symbol-dbinfo res x temp)))
 
 ;;;; other miscellaneous VOPs
 

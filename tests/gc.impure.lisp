@@ -44,7 +44,7 @@
 (with-test (:name :map-referencing-objs)
   (sb-vm::map-referencing-objects (lambda (x) (assert (not (typep x 'afoo))))
                                   :dynamic '*posix-argv*)
-  (let ((v (sb-kernel:symbol-info 'satisfies)) referers)
+  (let ((v (sb-kernel:symbol-%info 'satisfies)) referers)
     (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
                                     #+gencgc :dynamic #-gencgc :static v)
     #+immobile-space

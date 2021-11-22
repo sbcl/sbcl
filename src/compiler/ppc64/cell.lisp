@@ -18,14 +18,13 @@
 ;;; temp-reg-tn to access symbol slots.
 ;;; Since the NIL-as-CONS is necessary, and efficient accessor to lists and
 ;;; instances is desirable, we lose a little on symbol access by being forced
-;;; to pre-check for NIL. There is trick that can get back some performance
-;;; on SYMBOL-VALUE which I plan to implement after this much works right.
+;;; to pre-check for NIL.
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (cond ((member name '(symbol-name symbol-info sb-xc:symbol-package))
+    (cond ((member name '(symbol-name symbol-%info sb-xc:symbol-package))
            (let ((null-label (gen-label))
                  (done-label (gen-label)))
              (inst cmpld object null-tn)
@@ -260,27 +259,6 @@
     (inst b DONE)
     NULL
     (inst addi res null-tn (- (logand sb-vm:nil-value sb-vm:fixnum-tag-mask)))
-    DONE))
-(define-vop (symbol-plist)
-  (:policy :fast-safe)
-  (:translate symbol-plist)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:scs (unsigned-reg)) temp)
-  (:generator 6
-    (inst cmpld symbol null-tn)
-    (inst beq NULL)
-    (loadw res symbol symbol-info-slot other-pointer-lowtag)
-    (inst andi. temp res lowtag-mask)
-    (inst cmpwi temp list-pointer-lowtag)
-    (inst beq take-car)
-    (move res null-tn) ; if INFO is a non-list, then the PLIST is NIL
-    (inst b DONE)
-    NULL
-    (loadw res symbol (1- symbol-info-slot) list-pointer-lowtag)
-    ;; fallthru. NULL's info slot always holds a cons
-    TAKE-CAR
-    (loadw res res cons-car-slot list-pointer-lowtag)
     DONE))
 
 ;;;; Fdefinition (fdefn) objects.

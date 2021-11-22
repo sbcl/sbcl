@@ -1990,8 +1990,11 @@
 (defknown %scharset ((modifying simple-string) index character) character ())
 (defknown %set-symbol-value (symbol t) t ())
 (defknown (setf symbol-function) (function symbol) function ())
-(defknown %set-symbol-plist (symbol list) list ()
-  :derive-type #'result-type-last-arg)
+;; Does this really need a type deriver? It's inline, and returns its 1st arg,
+;; i.e. we know exactly what object it returns, which is more precise than
+;; just knowing the type.
+(defknown (setf symbol-plist) (list symbol) list ()
+  :derive-type #'result-type-first-arg)
 (defknown %setnth (unsigned-byte (modifying list) t) t ()
   :derive-type #'result-type-last-arg)
 (defknown %set-fill-pointer ((modifying complex-vector) index) index ()

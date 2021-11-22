@@ -212,7 +212,7 @@
             ;; the mask word indefinitely. Most bitmaps will have only 1 word,
             ;; so this is almost always MOST-POSITIVE-FIXNUM.
             (,nbits (if (= ,bitmap-index ,bitmap-limit)
-                        sb-vm::instance-length-mask
+                        sb-vm:instance-length-mask
                         (- sb-vm:n-word-bits sb-vm:instance-data-start))))
        (declare (type sb-vm:signed-word ,mask)
                 (type fixnum ,nbits))
@@ -227,7 +227,7 @@
          (when (zerop ,nbits)
            (setq ,mask (%raw-instance-ref/signed-word ,bitmap ,bitmap-index)
                  ,nbits (if (= (incf ,bitmap-index) ,bitmap-limit)
-                            sb-vm::instance-length-mask
+                            sb-vm:instance-length-mask
                             sb-vm:n-word-bits)))
          (when (logbitp 0 ,mask) ,@body)
          (setq ,mask (ash ,mask -1)

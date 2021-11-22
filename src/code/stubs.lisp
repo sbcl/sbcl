@@ -162,7 +162,11 @@
   (def symbol-hash)
   (def sb-vm::symbol-extra)
   #+sb-thread (def symbol-tls-index)
-  #.(if (fboundp 'symbol-info-vector) (values) '(def symbol-info-vector))
+  (def symbol-%info) ; primitive reader always needs a stub
+  (def (setf symbol-%info) (info symbol)) ; as does primitive writer
+  ;; but the "wrapped" reader might not need a stub.
+  ;; If it's already a proper function, then it doesn't.
+  #.(if (fboundp 'symbol-dbinfo) (values) '(def symbol-dbinfo))
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
   (def get-lisp-obj-address)
