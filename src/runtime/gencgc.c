@@ -5200,9 +5200,11 @@ void gc_load_corefile_ptes(int card_table_nbits,
         while (start  < next_free_page) {
 #ifdef LISP_FEATURE_DARWIN_JIT
             if(is_code(page_table[start].type)) {
+              SET_PAGE_PROTECTED(start,1);
                 for (end = start + 1; end < next_free_page; end++) {
                     if (!page_bytes_used(end) || !is_code(page_table[end].type))
                         break;
+                    SET_PAGE_PROTECTED(end,1);
                 }
                 os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_ALL);
                 start = end+1;
@@ -5215,11 +5217,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
             }
             SET_PAGE_PROTECTED(start,1);
             for (end = start + 1; end < next_free_page; end++) {
-                if (non_protectable_page_p(end)
-#ifdef LISP_FEATURE_DARWIN_JIT
-                    || is_code(page_table[end].type)
-#endif
-                    )
+                if (non_protectable_page_p(end))
                     break;
                 SET_PAGE_PROTECTED(end,1);
             }

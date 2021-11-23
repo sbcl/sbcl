@@ -345,11 +345,6 @@ static inline void unprotect_page_index(page_index_t page_index)
 static inline void protect_page(void* page_addr,
                                 __attribute__((unused)) page_index_t page_index)
 {
-#ifdef LISP_FEATURE_DARWIN_JIT
-    if ((page_table[page_index].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE) {
-      return;
-    }
-#endif
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
     os_protect((void *)page_addr, GENCGC_CARD_BYTES, OS_VM_PROT_JIT_READ);
 
