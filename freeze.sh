@@ -123,7 +123,9 @@ if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-64-linux ]; then
 
     ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-64-linux
     sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-64-linux
+    bzip2 sbcl-$VERSION-x86-64-linux-binary.tar
     sh $SBCL_DIR/html-distribution.sh sbcl-$VERSION
+    bzip2 sbcl-$VERSION-documentation-html.tar
 
     mv $SBCL_DIR/obj/from-xc obj_from-xc_sbcl
 fi
@@ -156,7 +158,6 @@ if [ ! -f $SBCL_RELEASE_DIR/uploaded ]; then
 cat > $SBCL_RELEASE_DIR/sftp-batch <<EOF
 cd /home/frs/project/s/sb/sbcl/sbcl-rc
 put sbcl-$VERSION-x86-64-linux-binary.tar.bz2
-put sbcl-$VERSION-source.tar.bz2
 put sbcl-$VERSION-documentation-html.tar.bz2
 put sbcl-$VERSION-release-notes.txt
 EOF
