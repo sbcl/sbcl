@@ -829,6 +829,31 @@
     ((t) :done)
       ((nil) :done)))
 
+(with-test (:name :nested-catch-progv-compile)
+  (checked-compile
+   `(lambda (a b)
+      (catch 'ct
+        (flet ((f (x &key) x (throw 'ct b)))
+          (dotimes (i 1)
+            (if (< (progv '() (f a) 1) a)
+                a
+                (catch 'ct (f a)))))))))
+
+(with-test (:name (tagbody :tag-dynamic-extent))
+  (checked-compile-and-assert
+   (:optimize '(:safety 3 :debug 2))
+   `(lambda (b)
+      (declare (optimize (safety 3) (debug 2)))
+      (tagbody
+         (labels ((f (x &key) x (go tag6)))
+           (tagbody
+              (catch 'ct2 (f b))
+            2)
+           (dotimes (i 1) (f 1))
+           -1)
+       tag6))
+   ((1) nil)))
+
 (with-test (:name :fewer-cast-conversions)
   (multiple-value-bind (fun failed)
       (checked-compile
