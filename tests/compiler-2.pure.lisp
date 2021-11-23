@@ -505,6 +505,20 @@
            (%f 1))))
     (() 321)))
 
+(with-test (:name :assignment-conversion-inside-deleted-lambda)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda (b)
+      (tagbody
+         (labels ((%f13 (&optional (f13-1 0) &key &allow-other-keys)
+                    (declare (ignore f13-1))
+                    b))
+           (if nil
+               (%f13 (go tag8))
+               (%f13)))
+       tag8))
+   ((1) nil)))
+
 (with-test (:name :unconvert-tail-calls)
   (checked-compile-and-assert ()
     `(lambda ()

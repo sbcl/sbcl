@@ -1138,13 +1138,8 @@
                (block-delete-p (node-block call-return)))
       (flush-dest (return-result call-return))
       (delete-return call-return)
-      ;; A new return will be put into that lambda, don't want
-      ;; DELETE-RETURN called by DELETE-BLOCK to delete the new return
-      ;; from the lambda.
-      ;; (Previously, UNLINK-NODE was called on the return, but it
-      ;; doesn't work well on deleted blocks)
-      (setf (return-lambda call-return) nil
-            call-return nil))
+      (unlink-node call-return)
+      (setq call-return nil))
     (cond ((not return))
           ((or next-block call-return)
            (unless (block-delete-p (node-block return))
@@ -1480,7 +1475,8 @@
                  ;; Splice in the other calls, without the rest of the
                  ;; let converting return semantics machinery, since
                  ;; we've already let converted the function.
-                 (insert-let-body fun outside-call)
+                 (unless (eq outside-call (first outside-calls))
+                   (insert-let-body fun outside-call))
                  (delete-lvar-use outside-call)
                  (unless (node-tail-p outside-call)
                    (reoptimize-call outside-call)))

@@ -5980,6 +5980,20 @@
                (multiple-value-call #',name (1- x))))
       ((3) 10))))
 
+(with-test (:name :bug-1951889)
+  (checked-compile-and-assert
+   (:optimize '(:debug 2))
+   `(lambda ()
+      (block nil
+        (flet ((%f6 (x &key)
+                 (declare (ignore x))
+                 (return 0)))
+          (loop for lv3 below 1 count
+                                (if (%f6 0)
+                                    (%f6 0)
+                                    (eval (%f6 0)))))))
+   (() 0)))
+
 (with-test (:name (yes-or-no-p type))
   (checked-compile `(lambda ()
                       (yes-or-no-p nil)))
