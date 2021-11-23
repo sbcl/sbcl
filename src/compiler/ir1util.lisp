@@ -1076,11 +1076,12 @@
 (defun principal-lvar-single-valuify (lvar)
   (loop for prev = lvar then (node-lvar dest)
         for dest = (and prev (lvar-dest prev))
-        while (cast-p dest)
+        while (or (cast-p dest)
+                  (exit-p dest))
         do (setf (node-derived-type dest)
                  (make-short-values-type (list (single-value-type
                                                 (node-derived-type dest)))))
-        (reoptimize-lvar prev)))
+           (reoptimize-lvar prev)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are APPENDed to the
