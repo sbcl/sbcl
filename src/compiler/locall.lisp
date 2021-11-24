@@ -1409,7 +1409,8 @@
              ;; If a functional is explicitly inlined, we don't want
              ;; to assignment convert it, as more call-site
              ;; specialization can be done with inlining.
-             (not (functional-inlinep fun)))
+             (not (functional-inlinep fun))
+             (not (block-delete-p (lambda-block fun))))
     (let ((outside-calls nil)
           (outside-calls-ctran nil)
           (outside-calls-env nil)
