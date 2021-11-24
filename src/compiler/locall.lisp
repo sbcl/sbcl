@@ -1464,24 +1464,30 @@
                ;; derived to not return, in which case it doesn't
                ;; matter whether a given call is tail, so there is no
                ;; harm in the arbitrary choice here.
-               (let-convert fun (first outside-calls))
-               (dolist (outside-call outside-calls)
-                 ;; Splice in the other calls, without the rest of the
-                 ;; let converting return semantics machinery, since
-                 ;; we've already let converted the function.
-                 (unless (eq outside-call (first outside-calls))
-                   (insert-let-body fun outside-call))
-                 (delete-lvar-use outside-call)
-                 ;; Make sure these calls are local converted as soon
-                 ;; as possible, to avoid having a window of time
-                 ;; where there are :ASSIGNMENT lambdas floating
-                 ;; around which are still called by :FULL
-                 ;; combinations, as this confuses stuff like
-                 ;; MAYBE-TERMINATE-BLOCK.
-                 (convert-call-if-possible (lvar-use (combination-fun outside-call))
-                                           outside-call)
-                 (unless (node-tail-p outside-call)
-                   (reoptimize-call outside-call)))
+               (let ((first-outside-call (first outside-calls)))
+                 (let ((original-tail-p (node-tail-p first-outside-call)))
+                   (let-convert fun first-outside-call)
+                   (unless original-tail-p
+                     (reoptimize-call first-outside-call)))
+                 (dolist (outside-call outside-calls)
+                   ;; Splice in the other calls, without the rest of
+                   ;; the let converting return semantics machinery,
+                   ;; since we've already let converted the function.
+                   (unless (eq outside-call first-outside-call)
+                     (insert-let-body fun outside-call))
+                   (delete-lvar-use outside-call)
+                   ;; Make sure these calls are local converted as
+                   ;; soon as possible, to avoid having a window of
+                   ;; time where there are :ASSIGNMENT lambdas
+                   ;; floating around which are still called by :FULL
+                   ;; combinations, as this confuses stuff like
+                   ;; MAYBE-TERMINATE-BLOCK.
+                   (convert-call-if-possible (lvar-use (combination-fun outside-call))
+                                             outside-call)
+                   (unless (or (eq outside-call first-outside-call)
+                               (node-tail-p outside-call))
+                     (reoptimize-call first-outside-call))
+                   (setf (node-tail-p outside-call) nil)))
                t)
               (t
                (delete-lambda fun)

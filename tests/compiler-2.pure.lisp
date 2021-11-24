@@ -532,6 +532,27 @@
        tag1))
    ((1) nil)))
 
+(with-test (:name :assignment-convert-untail-outside-calls)
+  (checked-compile-and-assert ()
+   `(lambda ()
+      (flet ((%f17 (&optional f17-1)
+               (declare (ignore f17-1))
+               (block block608
+                 (block block606
+                   (flet ((h0 ()
+                            (return-from block606)))
+                     (declare (dynamic-extent #'h0))
+                     (return-from block608
+                       (progn
+                         (print #'h0)
+                         nil)))))))
+        (when nil (%f17))
+        (if t
+            (%f17)
+            (when nil
+              (%f17)))))
+    (() nil)))
+
 (with-test (:name :unconvert-tail-calls)
   (checked-compile-and-assert ()
     `(lambda ()

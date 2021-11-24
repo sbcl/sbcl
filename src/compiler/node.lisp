@@ -1007,8 +1007,8 @@
   ;;
   ;;    :ASSIGNMENT
   ;;    similar to a LET (as per FUNCTIONAL-SOMEWHAT-LETLIKE-P), but
-  ;;    can have other than one call as long as there is at most
-  ;;    one non-tail call.
+  ;;    can have more than one call as long as the calls all return to
+  ;;    the same place.
   ;;
   ;;    :OPTIONAL
   ;;    a lambda that is an entry point for an OPTIONAL-DISPATCH.
