@@ -2807,8 +2807,6 @@ unprotect_oldspace(void)
     uword_t region_bytes = 0;
 
     // should never have protection applied to gen0, do so nothing.
-    // But I don't know enough about how arm64 + darwin works.
-    // Somebody else can try removing the preceding #ifndef.
     if (from_space == 0) return;
 
     for (i = 0; i < next_free_page; i++) {
