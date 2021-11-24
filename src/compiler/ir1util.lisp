@@ -1885,14 +1885,9 @@
          (tail-set (lambda-tail-set fun)))
     (aver (lambda-return fun))
     (setf (lambda-return fun) nil)
-    ;; Lets and assignments should not derive as not returning, even
-    ;; though they get deprived of their return nodes. Deriving an
-    ;; empty type causes optimizations to start deleting blocks as
-    ;; unreachable, which we don't want for let converted lambdas.
-    (unless (member (lambda-kind fun) '(:let :assignment))
-      (when (and tail-set (not (find-if #'lambda-return
-                                        (tail-set-funs tail-set))))
-        (setf (tail-set-type tail-set) *empty-type*))))
+    (when (and tail-set (not (find-if #'lambda-return
+                                      (tail-set-funs tail-set))))
+      (setf (tail-set-type tail-set) *empty-type*)))
   (values))
 
 ;;; If any of the VARS in FUN was never referenced and was not

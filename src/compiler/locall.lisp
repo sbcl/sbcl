@@ -520,9 +520,6 @@
                    (let-convertable-p call fun))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
-        ;;; The function may have already been converted to an
-        ;;; :ASSIGNMENT lambda through the local call conversion of
-        ;;; another local call.
         (aver (member (functional-kind fun)
                       '(nil :escape :cleanup :optional :assignment)))
         (cond ((mv-combination-p call)
@@ -1171,11 +1168,7 @@
                          next-block)))
     (move-return-stuff fun call next-block)
     (merge-lets fun call)
-    (setf (node-tail-p call) nil)
-    ;; If CALL has a derive type NIL, it means that "its return" is
-    ;; unreachable, but the next BIND is still reachable; in order to
-    ;; not confuse MAYBE-TERMINATE-BLOCK...
-    (setf (node-derived-type call) *wild-type*)))
+    (setf (node-tail-p call) nil)))
 
 ;;; Reoptimize all of CALL's args and its result.
 (defun reoptimize-call (call)
@@ -1469,7 +1462,8 @@
                ;; The only time OUTSIDE-CALLS contains a mix of both
                ;; tail and non-tail calls is when calls to FUN are
                ;; derived to not return, in which case it doesn't
-               ;; matter whether a given call is tail.
+               ;; matter whether a given call is tail, so there is no
+               ;; harm in the arbitrary choice here.
                (let-convert fun (first outside-calls))
                (dolist (outside-call outside-calls)
                  ;; Splice in the other calls, without the rest of the
@@ -1478,6 +1472,14 @@
                  (unless (eq outside-call (first outside-calls))
                    (insert-let-body fun outside-call))
                  (delete-lvar-use outside-call)
+                 ;; Make sure these calls are local converted as soon
+                 ;; as possible, to avoid having a window of time
+                 ;; where there are :ASSIGNMENT lambdas floating
+                 ;; around which are still called by :FULL
+                 ;; combinations, as this confuses stuff like
+                 ;; MAYBE-TERMINATE-BLOCK.
+                 (convert-call-if-possible (lvar-use (combination-fun outside-call))
+                                           outside-call)
                  (unless (node-tail-p outside-call)
                    (reoptimize-call outside-call)))
                t)

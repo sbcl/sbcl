@@ -1383,34 +1383,43 @@ is replaced with replacement."
     (write-line "digraph G {" stream)
     (write-line "node [fontname = \"monospace\"];" stream)
     (write-line "node [shape=box];" stream)
-    (do-blocks (block component :both)
-      (cond ((eq block (component-head component))
-             (format stream "~a [label=head];"
-                     (block-number block)))
-            ((eq block (component-tail component))
-             (format stream "~a [label=tail];"
-                     (block-number block)))
-            (t
-             (format stream "~a [label=\"~a\"];~%"
-                     (block-number block)
-                     (replace-all
-                      (replace-all (with-output-to-string (*standard-output*)
-                                     (print-nodes block))
-                                   (string #\Newline)
-                                   "\\l")
-                      "\""
-                      "\\"))))
-      (let ((succ (block-succ block)))
-        (when succ
-          (loop for succ in succ
-                for attr = "[style=bold]" then ""
-                do
-                (format stream "~a -> ~a~a;~%"
-                        (block-number block)
-                        (block-number succ)
-                        attr)))
-        (when (nle-block-p block)
-          (format stream "~a -> ~a [style=dotted];~%"
-                  (block-number block)
-                  (block-number (nle-block-entry-block block))))))
+    ;; Give a unique label to every block, since BLOCK-NUMBERs may be
+    ;; uninitialized during optimization.
+    (let ((label 0)
+          (block-labels (make-hash-table :test #'eq)))
+      (do-blocks (block component :both)
+        (setf (gethash block block-labels) label)
+        (incf label))
+      (flet ((block-label (block)
+               (gethash block block-labels)))
+        (do-blocks (block component :both)
+          (cond ((eq block (component-head component))
+                 (format stream "~a [label=head];"
+                         (block-label block)))
+                ((eq block (component-tail component))
+                 (format stream "~a [label=tail];"
+                         (block-label block)))
+                (t
+                 (format stream "~a [label=\"~a\"];~%"
+                         (block-label block)
+                         (replace-all
+                          (replace-all (with-output-to-string (*standard-output*)
+                                         (print-nodes block))
+                                       (string #\Newline)
+                                       "\\l")
+                          "\""
+                          "\\"))))
+          (let ((succ (block-succ block)))
+            (when succ
+              (loop for succ in succ
+                    for attr = "[style=bold]" then ""
+                    do
+                       (format stream "~a -> ~a~a;~%"
+                               (block-label block)
+                               (block-label succ)
+                               attr)))
+            (when (nle-block-p block)
+              (format stream "~a -> ~a [style=dotted];~%"
+                      (block-label block)
+                      (block-label (nle-block-entry-block block))))))))
     (write-line "}" stream)))

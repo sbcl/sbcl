@@ -519,6 +519,19 @@
        tag8))
    ((1) nil)))
 
+(with-test (:name :nil-type-derived-before-assignment-conversion)
+  (checked-compile-and-assert ()
+   `(lambda (a)
+      (declare (ignore a))
+      (tagbody
+        (labels ((f (a)
+                   (declare (ignore a))
+                   (go tag1)))
+          (apply #'f 1 (list))
+          (apply #'f (catch 'ct (go tag1)) (list)))
+       tag1))
+   ((1) nil)))
+
 (with-test (:name :unconvert-tail-calls)
   (checked-compile-and-assert ()
     `(lambda ()

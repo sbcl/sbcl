@@ -1275,11 +1275,18 @@
          (succ (first (block-succ block))))
     (declare (ignore lvar))
     (unless (or (and (eq node (block-last block)) (eq succ tail))
-                (block-delete-p block))
-      ;; Even if the combination will never return, don't terminate if this
-      ;; is the tail call of a XEP: doing that would inhibit TCO.
-      (when (and (eq (node-derived-type node) *empty-type*)
-                 (not (xep-tail-combination-p node)))
+                (block-delete-p block)
+                ;; Even if the combination will never return, don't
+                ;; terminate if this is the tail call of a XEP: doing
+                ;; that would inhibit TCO.
+                (xep-tail-combination-p node)
+                ;; Do not consider the block for termination if this
+                ;; is a LET-like combination, since the successor of
+                ;; this node is the body of the LET.
+                (and (combination-p node)
+                     (eq (combination-kind node) :local)
+                     (functional-somewhat-letlike-p (combination-lambda node))))
+      (when (eq (node-derived-type node) *empty-type*)
         (cond (ir1-converting-not-optimizing-p
                (cond
                  ((block-last block)
