@@ -5119,6 +5119,26 @@ gc_and_save(char *filename, boolean prepend_runtime,
     lose("Attempt to save core after non-conservative GC failed.");
 }
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+/* Inexplicably, an executable page can generate spurious faults if
+ * it's not written to after changing its protection flags.
+ * Touch every page... */
+void darwin_jit_code_pages_kludge () {
+    THREAD_JIT(0);
+    page_index_t page;
+    for (page = 0; page  < next_free_page; page++) {
+        if(is_code(page_table[page].type)) {
+            char* addr = page_address(page);
+            for (unsigned i = 0; i < GENCGC_CARD_BYTES; i+=4096) {
+                volatile char* page_start = addr + i;
+                page_start[0] = page_start[0];
+            }
+        }
+    }
+    THREAD_JIT(1);
+}
+#endif
+
 /* Read corefile ptes from 'fd' which has already been positioned
  * and store into the page table */
 void gc_load_corefile_ptes(int card_table_nbits,
@@ -5226,6 +5246,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
     }
 
 #ifdef LISP_FEATURE_DARWIN_JIT
+    darwin_jit_code_pages_kludge();
     /* For some reason doing an early pthread_jit_write_protect_np sometimes fails.
        Which is weird, because it's done many times in arch_write_linkage_table_entry later.
        Adding the executable bit here avoids calling pthread_jit_write_protect_np */
