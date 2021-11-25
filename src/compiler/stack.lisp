@@ -109,8 +109,9 @@
                                  :key (lambda (block)
                                         (let ((2block (block-info block)))
                                           (merge-uvl-live-sets
-                                           (ir2-block-end-stack 2block)
-                                           (ir2-block-pushed 2block))))))
+                                           (ir2-block-start-stack 2block)
+                                           ;; these are on the stack before dx-lvar is allocated
+                                           (member dx-lvar (reverse (ir2-block-pushed 2block))))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (aver start-block)
@@ -221,24 +222,23 @@
                              ;; DX object -- that is, before the DX object --
                              ;; should be kept alive until the object is
                              ;; deallocated.
-                             ;;
-                             ;; Since DX generators end their blocks, we can
-                             ;; find out UVLs allocated before them by looking
-                             ;; at the stack at the end of the block.
                              (setq new-end (merge-uvl-live-sets
-                                            new-end (ir2-block-end-stack 2block)))
+                                            new-end (ir2-block-start-stack 2block)))
                              (setq new-end (merge-uvl-live-sets
-                                            new-end (ir2-block-pushed 2block))))))))
+                                            ;; union in the lvars
+                                            ;; pushed before LVAR in
+                                            ;; this block.
+                                            new-end (member lvar (reverse (ir2-block-pushed 2block))))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
-    ;; If a block starts with an "entry DX" node (the start of a DX
+    ;; If a block has a "entry DX" node (the start of a DX
     ;; environment) then we need to back-propagate the DX LVARs to
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
-    (let ((first-node (ctran-next (block-start block))))
-      (when (typep first-node 'entry)
-        (let ((cleanup (entry-cleanup first-node)))
+    (do-nodes (node nil block)
+      (when (typep node 'entry)
+        (let ((cleanup (entry-cleanup node)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
             (back-propagate-dx-lvars block (cleanup-info cleanup))))))
 
