@@ -830,7 +830,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun describe-component (component *standard-output*)
   (declare (type component component))
   (format t "~|~%;;;; component: ~S~2%" (component-name component))
-  (print-blocks component)
+  (print-all-blocks component)
   (values))
 
 (defun describe-ir2-component (component *standard-output*)
