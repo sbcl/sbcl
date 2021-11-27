@@ -123,20 +123,39 @@
   (if (null aux-vars)
       (let ((*lexenv* (make-lexenv :vars post-binding-lexenv)))
         (ir1-convert-progn-body start next result body))
-      (let ((ctran (make-ctran))
-            (fun-lvar (make-lvar))
-            (fun (ir1-convert-lambda-body body
-                                          (list (first aux-vars))
-                                          :aux-vars (rest aux-vars)
-                                          :aux-vals (rest aux-vals)
-                                          :post-binding-lexenv post-binding-lexenv
-                                          :debug-name (debug-name
-                                                       '&aux-bindings
-                                                       aux-vars))))
-        (reference-leaf start ctran fun-lvar fun)
-        (ir1-convert-combination-args fun-lvar ctran next result
-                                      (list (first aux-vals)))))
-  (values))
+      (collect ((current-aux-vars)
+                (current-aux-vals))
+        (current-aux-vars (pop aux-vars))
+        (current-aux-vals (pop aux-vals))
+        ;; If the values don't depend on any of the previosly defined
+        ;; variables, which is often the case with &keys, reduce
+        ;; recursion and the amount of work.
+        (loop for var = (car aux-vars)
+              for val = (car aux-vals)
+              while (and var
+                         (let ((arg-info (lambda-var-arg-info var)))
+                           (and arg-info
+                                (eq (arg-info-kind arg-info) :keyword)
+                                (symbolp val)
+                                (string= val ".DEFAULTING-TEMP."))))
+              do
+              (current-aux-vars var)
+              (current-aux-vals val)
+              (pop aux-vars)
+              (pop aux-vals))
+        (let ((ctran (make-ctran))
+              (fun-lvar (make-lvar))
+              (fun (ir1-convert-lambda-body body
+                                            (current-aux-vars)
+                                            :aux-vars aux-vars
+                                            :aux-vals aux-vals
+                                            :post-binding-lexenv post-binding-lexenv
+                                            :debug-name (debug-name
+                                                         '&aux-bindings
+                                                         aux-vars))))
+          (reference-leaf start ctran fun-lvar fun)
+          (ir1-convert-combination-args fun-lvar ctran next result
+                                        (current-aux-vals))))))
 
 ;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to bind
 ;;; the SPECVAR for each SVAR to the value of the variable is wrapped
@@ -154,25 +173,24 @@
   (declare (type ctran start next) (type (or lvar null) result)
            (list body aux-vars aux-vals svars))
   (cond
-   ((null svars)
-    (ir1-convert-aux-bindings start next result body aux-vars aux-vals
-                              post-binding-lexenv))
-   (t
-    (ctran-starts-block next)
-    (let ((cleanup (make-cleanup :kind :special-bind))
-          (var (first svars))
-          (bind-ctran (make-ctran))
-          (cleanup-ctran (make-ctran)))
-      (ir1-convert start bind-ctran nil
-                   `(%special-bind ',(leaf-source-name (lambda-var-specvar var)) ,var))
-      (setf (cleanup-mess-up cleanup) (ctran-use bind-ctran))
-      (let ((*lexenv* (make-lexenv :cleanup cleanup)))
-        (ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))
-        (ir1-convert-special-bindings cleanup-ctran next result
-                                      body aux-vars aux-vals
-                                      (rest svars)
-                                      post-binding-lexenv)))))
-  (values))
+    ((null svars)
+     (ir1-convert-aux-bindings start next result body aux-vars aux-vals
+                               post-binding-lexenv))
+    (t
+     (ctran-starts-block next)
+     (let ((cleanup (make-cleanup :kind :special-bind))
+           (var (first svars))
+           (bind-ctran (make-ctran))
+           (cleanup-ctran (make-ctran)))
+       (ir1-convert start bind-ctran nil
+                    `(%special-bind ',(leaf-source-name (lambda-var-specvar var)) ,var))
+       (setf (cleanup-mess-up cleanup) (ctran-use bind-ctran))
+       (let ((*lexenv* (make-lexenv :cleanup cleanup)))
+         (ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))
+         (ir1-convert-special-bindings cleanup-ctran next result
+                                       body aux-vars aux-vals
+                                       (rest svars)
+                                       post-binding-lexenv))))))
 
 ;;; Create a lambda node out of some code, returning the result. The
 ;;; bindings are specified by the list of VAR structures VARS. We deal
