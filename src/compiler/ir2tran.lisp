@@ -1716,6 +1716,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
              (ir2-convert-full-call node block)))))
 
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
+  ;; Slime is still using that argument
+  (aver (and (constant-lvar-p start)
+             (eql (lvar-value start) 0)))
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
@@ -1723,16 +1726,15 @@ not stack-allocated LVAR ~S." source-lvar)))))
        (loop for loc in (ir2-lvar-locs 2lvar)
              for idx upfrom 0
              unless (eq (tn-kind loc) :unused)
-               do (vop sb-vm::more-arg-or-nil node block
-                       (lvar-tn node block context)
-                       (lvar-tn node block count)
-                       idx
-                       loc)))
+             do (vop sb-vm::more-arg-or-nil node block
+                     (lvar-tn node block context)
+                     (lvar-tn node block count)
+                     idx
+                     loc)))
       (:unknown
        (let ((locs (ir2-lvar-locs 2lvar)))
          (vop* %more-arg-values node block
                ((lvar-tn node block context)
-                (lvar-tn node block start)
                 (lvar-tn node block count)
                 nil)
                ((reference-tn-list locs t))))))))

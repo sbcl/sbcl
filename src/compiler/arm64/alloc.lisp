@@ -26,7 +26,7 @@
     (let ((alloc (* (pad-data-block cons-size) cons-cells))
           (dx (node-stack-allocate-p node))
           (prev-constant))
-     (macrolet ((maybe-load (tn)
+     (macrolet ((maybe-load (tn &optional (temp 'temp))
                   (once-only ((tn tn))
                     `(sc-case ,tn
                        ((any-reg descriptor-reg)
@@ -40,35 +40,42 @@
                                      nil))
                                temp)
                               ((sc-is ,tn constant)
-                               (load-constant vop ,tn temp)
-                               temp)
+                               (load-constant vop ,tn ,temp)
+                               ,temp)
                               (t
-                               (load-immediate vop ,tn temp)
-                               temp)))
+                               (load-immediate vop ,tn ,temp)
+                               ,temp)))
                        (control-stack
                         (setf prev-constant nil)
-                        (load-stack-tn temp ,tn)
-                        temp)))))
+                        (load-stack-tn ,temp ,tn)
+                        ,temp)))))
        (pseudo-atomic (pa-flag :sync nil :elide-if dx)
          (allocation 'list alloc list-pointer-lowtag res
                      :flag-tn pa-flag
                      :stack-allocate-p dx
                      :lip lip)
-         (move ptr res)
-         (dotimes (i (1- cons-cells))
-           (storew (maybe-load (tn-ref-tn things)) ptr
-               cons-car-slot list-pointer-lowtag)
-           (setf things (tn-ref-across things))
-           (inst add ptr ptr (pad-data-block cons-size))
-           (storew ptr ptr
-               (- cons-cdr-slot cons-size)
-               list-pointer-lowtag))
-         (storew (maybe-load (tn-ref-tn things)) ptr
-             cons-car-slot list-pointer-lowtag)
-         (storew (if star
-                     (maybe-load (tn-ref-tn (tn-ref-across things)))
-                     null-tn)
-             ptr cons-cdr-slot list-pointer-lowtag))
+         (cond ((= cons-cells 1)
+                (inst stp (maybe-load (tn-ref-tn things))
+                      (if star
+                          (maybe-load (tn-ref-tn (tn-ref-across things)) ptr)
+                          null-tn)
+                      (@ tmp-tn)))
+               (t
+                (move ptr res)
+                (dotimes (i (1- cons-cells))
+                  (storew (maybe-load (tn-ref-tn things)) ptr
+                      cons-car-slot list-pointer-lowtag)
+                  (setf things (tn-ref-across things))
+                  (inst add ptr ptr (pad-data-block cons-size))
+                  (storew ptr ptr
+                      (- cons-cdr-slot cons-size)
+                      list-pointer-lowtag))
+                (storew (maybe-load (tn-ref-tn things)) ptr
+                    cons-car-slot list-pointer-lowtag)
+                (storew (if star
+                            (maybe-load (tn-ref-tn (tn-ref-across things)))
+                            null-tn)
+                    ptr cons-cdr-slot list-pointer-lowtag))))
        (move result res)))))
 
 ;;;; Special purpose inline allocators.

@@ -121,22 +121,15 @@
 ;;; as function arguments.
 ;;;
 (define-vop (%more-arg-values)
-  (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
+  (:args (context :scs (descriptor-reg any-reg) :to :save)
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
-  (:temporary (:sc any-reg :from (:argument 0)) src)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
   (:temporary (:sc any-reg) i)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (inst add src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (inst add src context skip)))
     (inst adds count num 0)
     (load-csp start)
     (inst b :eq DONE)
@@ -147,7 +140,7 @@
     LOOP
     (inst cmp i 4)
     (inst sub i i 4)
-    (inst ldr temp (@ src i))
+    (inst ldr temp (@ context i))
     (inst str temp (@ dst i))
     (inst b :ne LOOP)
     DONE))

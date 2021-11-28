@@ -115,33 +115,15 @@
 ;;; defining a new stack frame.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target loop-index))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :offset rsi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset rax-offset) temp)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) loop-index)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (if (zerop (tn-value skip))
-           (move src context)
-           (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))))
-      (any-reg
-       (cond ((= word-shift n-fixnum-tag-bits)
-              (move src context)
-              (inst sub src skip))
-             (t
-              ;; TODO: Reducing CALL-ARGUMENTS-LIMIT to something reasonable to
-              ;; allow DWORD ops without it looking like a bug would make sense.
-              ;; With a stack size of about 2MB, the limit is absurd anyway.
-              (inst neg skip)
-              (inst lea src
-                    (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
-              (inst neg skip)))))
-
+    (move src context)
     (unless (eq (tn-kind count) :unused)
       (move count num))
     (if (location= loop-index num)

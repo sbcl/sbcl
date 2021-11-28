@@ -110,25 +110,15 @@
 ;;; defining a new stack frame.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :offset esi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset eax-offset) temp)
   (:temporary (:sc unsigned-reg :offset ecx-offset) loop-index)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (if (zerop (tn-value skip))
-           (move src context)
-           (inst lea src (make-ea :dword :base context
-                                  :disp (- (* (tn-value skip)
-                                              n-word-bytes))))))
-      (any-reg
-       (move src context)
-       (inst sub src skip)))
+    (move src context)
     (move count num)
 
     (move loop-index count)

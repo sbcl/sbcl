@@ -113,9 +113,8 @@
 ;;;
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
@@ -123,15 +122,7 @@
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (inst addi src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (let ((delta (cond ((= n-fixnum-tag-bits word-shift) skip)
-                          (t (inst slwi temp-reg-tn skip
-                                   (- word-shift n-fixnum-tag-bits))
-                             temp-reg-tn))))
-         (inst add src context delta))))
+    (move src context)
     (inst mr. count num)
     (inst mr start csp-tn)
     (inst beq done)
