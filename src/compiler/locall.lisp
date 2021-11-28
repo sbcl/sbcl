@@ -73,9 +73,6 @@
                   when (and dx arg (not (lvar-dynamic-extent arg)))
                     append (handle-nested-dynamic-extent-lvars dx arg))))
       (when dx-lvars
-        ;; Stack analysis requires that the CALL ends the block, so
-        ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
-        (node-ends-block call)
         (let* ((entry (with-ir1-environment-from-node call
                         (make-entry)))
                (cleanup (make-cleanup :kind :dynamic-extent
@@ -86,6 +83,10 @@
           (setf (node-lexenv call)
                 (make-lexenv :default (node-lexenv call)
                              :cleanup cleanup))
+          ;; Make CALL end its block, so that we have a place to
+          ;; insert cleanup code and MAP-BLOCK-NLXES during stack
+          ;; analysis sees the cleanup we insert here.
+          (node-ends-block call)
           (push entry (lambda-entries (node-home-lambda entry)))
           (dolist (cell dx-lvars)
             (setf (lvar-dynamic-extent (cdr cell)) cleanup))))))

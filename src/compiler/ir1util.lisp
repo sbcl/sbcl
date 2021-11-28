@@ -1245,12 +1245,6 @@
               ;; thus the control transfer is a non-local exit.
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
-              (let ((last (block-last block)))
-                (and (valued-node-p last)
-                     (awhen (node-lvar last)
-                       ;; stack analysis wants DX-allocators to end
-                       ;; their blocks.
-                       (lvar-dynamic-extent it))))
               (neq (block-type-check block)
                    (block-type-check next)))
              nil)
@@ -1394,12 +1388,6 @@
   (values))
 
 ;;; List all NLX-INFOs which BLOCK can exit to.
-;;;
-;;; We hope that no cleanup actions are performed in the middle of
-;;; BLOCK, so it is enough to look only at cleanups in the block
-;;; end. The tricky thing is a special cleanup block; all its nodes
-;;; have the same cleanup info, corresponding to the start, so the
-;;; same approach returns safe result.
 (defun map-block-nlxes (fun block &optional dx-cleanup-fun)
   (do-nested-cleanups (cleanup (block-end-lexenv block))
     (let ((mess-up (cleanup-mess-up cleanup)))
