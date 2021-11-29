@@ -26,6 +26,7 @@
 #include "code.h"
 #include "gc-internal.h"
 #include "gc-private.h"
+#include "genesis/gc-tables.h"
 #include <stdarg.h>
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
@@ -820,9 +821,8 @@ static void print_fun_or_otherptr(lispobj obj)
         break;
     default:
         NEWLINE_OR_RETURN;
-        if (type >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG &&
-            type <= SIMPLE_BIT_VECTOR_WIDETAG) // ASSUMPTION: widetag ordering
-            printf("length = %ld", vector_len(VECTOR(obj)));
+        if (specialized_vector_widetag_p(type))
+            printf("length = %"OBJ_FMTd, vector_len(VECTOR(obj)));
         else
             printf("Unknown header object?");
         break;
