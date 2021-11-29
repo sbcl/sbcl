@@ -181,6 +181,7 @@ static inline boolean page_boxed_p(page_index_t page) {
     return (page_table[page].type & BOXED_PAGE_FLAG);
 }
 
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
 /// Return true if low 4 'type' bits are 0zz1, false otherwise (z = don't-care)
 /// i.e. true of pages which could hold boxed or partially boxed objects.
 static inline boolean page_boxed_no_region_p(page_index_t page) {
@@ -193,6 +194,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
             && !page_table[page].pinned
             && (page_table[page].gen == generation));
 }
+#endif
 
 /* Calculate the start address for the given page number. */
 inline char *
@@ -4530,7 +4532,7 @@ gc_init(void)
 int gc_card_table_nbits, gc_card_table_mask;
 char *gc_card_mark;
 
-static void gcbarrier_patch_code_range(uword_t start, void* limit)
+static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, void* limit)
 {
     extern void gcbarrier_patch_code(void*, int);
     struct varint_unpacker unpacker;
