@@ -2956,6 +2956,10 @@ struct verify_state {
 #define VERIFY_FINAL      32
 /* VERIFYING_foo indicates internal state, not a caller's option */
 #define VERIFYING_HEAP_OBJECTS 64
+/* GENERATIONAL implies HEAP_OBJECTS, but there are ranges of heap objects
+ * that are not generational - static, readonly, and metaspace -
+ * so there are no page protection checks performed for pointers from objects
+ * in such ranges */
 #define VERIFYING_GENERATIONAL 128
 
 // Helpers for verify_range
@@ -2979,41 +2983,6 @@ static boolean addr_protected_p(void* addr)
         return immobile_card_protected_p(addr);
 #endif
     lose("addr_protected_p(%p)", addr);
-}
-
-static boolean addr_range_protected_p(lispobj* addr)
-{
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (immobile_space_p((lispobj)addr))
-        return immobile_card_protected_p(addr);
-#endif
-    /* Large simple-vectors on single-object pages will scan exactly the pages
-     * which have been marked. Therefore we test only the page containing 'addr'
-     * for whether it was marked */
-    page_index_t page = find_page_index(addr);
-    lispobj* base = page_scan_start(page);
-    if (page_single_obj_p(page) && widetag_of(base) == SIMPLE_VECTOR_WIDETAG)
-        return PAGE_WRITEPROTECTED_P(page);
-
-    /* Otherwise, use the same logic as scavenge_root_gens() to decide whether any
-     * of the pages in a contiguous range containing 'addr' were touched */
-    page_index_t i = find_page_index(base);
-    generation_index_t generation = page_table[i].gen;
-    page_index_t last_page;
-    boolean write_protected = 1;
-    /* Now work forward until the end of the region */
-    for (last_page = i; ; last_page++) {
-        write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
-        if (page_ends_contiguous_block_p(last_page, generation))
-          break;
-    }
-    return write_protected;
-#else
-    // no soft card marks - the protection state is the physical protection
-    // of the specified address.
-    return addr_protected_p(addr);
-#endif
 }
 
 // NOTE: This function can produces false failure indications,
@@ -3118,17 +3087,19 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                         lose("code @ %p (g%d). word @ %p -> %"OBJ_FMTX" (g%d)",
                              state->object_start, state->object_gen,
                              where, thing, to_gen);
-                } else if (state->flags & VERIFYING_GENERATIONAL) {
-                    // When testing for old->young ptrs, if from dynamic space then use
-                    // the address of the word that holds the pointer in question,
-                    // geting the per-page generation. Immobile space has only a generation
-                    // per object, and you *must* use the correct object header address.
-                    lispobj vaddr = (lispobj)(state->vaddr ? state->vaddr : where);
-                    generation_index_t from_gen
-                        = gen_of(find_page_index((lispobj*)vaddr) >= 0 ?
-                                 vaddr : (lispobj)state->object_start);
-                    FAIL_IF(to_gen < from_gen && addr_range_protected_p((lispobj*)vaddr),
-                            "younger obj from WP page");
+                } else if ((state->flags & VERIFYING_GENERATIONAL) && to_gen < state->object_gen) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+                    /* The WP criteria are:
+                     *  - SIMPLE-VECTOR marks the page containing the cell in question
+                     *  - Everything else marks the object header */
+                    int fail_wp_check = addr_protected_p(
+                        (state->widetag == SIMPLE_VECTOR_WIDETAG) ? where : state->object_start);
+#else
+                    /* Check the page containing the pointer, but use 'vaddr' in case the pointer
+                     * had to be decoded, and so 'where' isn't the address holding that pointer */
+                    int fail_wp_check = addr_protected_p(state->vaddr ? state->vaddr : where);
+#endif
+                    FAIL_IF(fail_wp_check, "younger obj from WP page");
                 }
                 int valid;
                 if (state->flags & VERIFY_AGGRESSIVE) // Extreme paranoia mode
