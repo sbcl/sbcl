@@ -93,8 +93,10 @@
 
   (/show0 "entering !COLD-INIT")
   #+sb-show (setq */show* t)
-  (/show0 "cold-initializing streams")
-  (sb-impl::!cold-stream-init)
+  (let ((stream (!make-cold-stderr-stream)))
+    (setq *error-output* stream
+          *standard-output* stream
+          *trace-output* stream))
   (show-and-call !signal-function-cold-init)
   (show-and-call !printer-control-init) ; needed before first instance of FORMAT or WRITE-STRING
   (setq *unparse-fun-type-simplify* nil) ; needed by TLFs in target-error.lisp

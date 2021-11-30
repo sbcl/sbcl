@@ -2610,26 +2610,22 @@
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1))))
 
-;;;; machinery to make string printing work early
-
-(define-load-time-global *!cold-stderr-buf* (make-string 1 :element-type 'base-char :initial-element #\Space))
-(declaim (type (simple-base-string 1) *!cold-stderr-buf*))
-
+;;; Create a stream that works early.
 (defun !make-cold-stderr-stream ()
   (let ((stderr
           #-win32 2
-          #+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+)))
+          #+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+))
+        (buf (make-string 1 :element-type 'base-char :initial-element #\Space)))
     (%make-fd-stream
      :out (lambda (stream ch)
             (declare (ignore stream))
-            (let ((b *!cold-stderr-buf*))
-              (setf (char b 0) ch)
-              (sb-unix:unix-write stderr b 0 1)))
+            (setf (char buf 0) ch)
+            (sb-unix:unix-write stderr buf 0 1))
      :sout (lambda (stream string start end)
              (declare (ignore stream))
              (flet ((out (s start len)
                       (when (plusp len)
-                        (setf (char *!cold-stderr-buf* 0) (char s (+ start len -1))))
+                        (setf (char buf 0) (char s (+ start len -1))))
                       (sb-unix:unix-write stderr s start len)))
                (if (typep string 'simple-base-string)
                    (out string start (- end start))
@@ -2641,10 +2637,4 @@
              (declare (ignore stream arg1))
              (stream-misc-case (operation :default nil)
                (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
-                (if (eql (char *!cold-stderr-buf* 0) #\newline) 0 1)))))))
-
-(defun !cold-stream-init ()
-  (setq *!cold-stderr-buf* (make-string 1 :element-type 'base-char :initial-element #\Space)
-        *error-output* (!make-cold-stderr-stream)
-        *standard-output* *error-output*
-        *trace-output* *error-output*))
+                (if (eql (char buf 0) #\newline) 0 1)))))))
