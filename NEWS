@@ -1,14 +1,17 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.1.10:
-  * optimization: The compiler assignment-converts functions much more
-    aggressively; local or non-entry block-compiled functions
-    which always return to the same place are automatically converted into the
-    equivalent loop or goto control structures.
   * minor incompatible change: *COMPILE-PRINT* now defaults to NIL.  T gives
     the old behavior of echoing top level forms. Users who want to see a
     report of the phases of compilation can use *COMPILE-PROGRESS* and the
     corresponding COMPILE-FILE :PROGRESS argument.
+  * optimization: The compiler assignment-converts functions much more
+    aggressively; local or non-entry block-compiled functions
+    which always return to the same place are automatically converted into the
+    equivalent loop or goto control structures.
+  * enhancement: on x86-64 and ppc64 platforms, the system uses inline
+    instructions rather than page protection to implement a store barrier for
+    the garbage collector.
   * enhancement: improved reporting of code deletion notes.
   * platform support:
     ** unbound-variable restarts for amd64 are now supported.
