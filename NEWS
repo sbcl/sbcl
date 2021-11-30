@@ -2,25 +2,29 @@
 
 changes relative to sbcl-2.1.10:
   * optimization: The compiler assignment-converts functions much more
-    aggressively, meaning that local or non-entry block-compiled functions
+    aggressively; local or non-entry block-compiled functions
     which always return to the same place are automatically converted into the
-    equivalent loop or goto control structures, increasing opportunities for
-    optimization as well. For example, this is often beneficial for state
-    machines written in terms of LABELS or iteration constructs written in
-    terms of tail-recursive structures. Many more situations in which this
-    "auto-inlining" (or "contification") applies are now recognized, such as
-    in the following:
-
-    > (DEFUN FOO (V) (FLET ((F (X) ...)) (BAR (IF (READ) (F V) (F (+ V V))))))
-
-    Here the body of F is directly substituted into the control point where
-    the IF expression returns. Note that unlike inlining, this optimization
-    never increases code size.
+    equivalent loop or goto control structures.
+  * minor incompatible change: *COMPILE-PRINT* now defaults to NIL.  T gives
+    the old behavior of echoing top level forms. Users who want to see a
+    report of the phases of compilation can use *COMPILE-PROGRESS* and the
+    corresponding COMPILE-FILE :PROGRESS argument.
   * enhancement: improved reporting of code deletion notes.
-  * minor change: *COMPILE-PRINT* now defaults to NIL. T gives the old
-    behavior of echoing top level forms. Users who want to see a report of the
-    phases of compilation can use *COMPILE-PROGRESS* and the corresponding
-    COMPILE-FILE :PROGRESS argument.
+  * platform support:
+    ** unbound-variable restarts for amd64 are now supported.
+    ** bug fix: single-floats to foreign functions on 32-bit ARMel.
+       (lp#1950080, reported by Sebastien Villemot)
+    ** bug fix: opening files with names containing non-ASCII characters on
+       Windows works better.  (reported by Nikolay)
+    ** bug fix: use fp_xsave to access the floating point flags and control
+       word in Haiku signal contexts.  (Thanks to Al Hoang)
+    ** bug fix: complex single-float support on riscv64.
+    ** optimization: support for accessing elements of &rest args directly on
+       ppc64, mips, riscv.
+    ** optimization: parse a /proc file rather than executing uname for
+       SOFTWARE-VERSION on Linux
+  * bug fix: fix crash from SB-COVER:RESET-COVERAGE.  (lp#1950059, reported by
+    Gregory Czerniak)
 
 changes in sbcl-2.1.10 relative to sbcl-2.1.9:
   * incompatible change: simd-pack without a specific element-type is no
