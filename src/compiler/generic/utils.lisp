@@ -149,13 +149,14 @@
 ;;; continuation within a function.
 (defun make-unknown-values-locations (&optional unused-count unused-sp)
   (declare (ignorable unused-count unused-sp))
-  (list (cond #+x86-64
-              ;; needs support from receive-unknown-values, push-values, %more-arg-values
+  (list (cond #+(or arm64 x86-64)
+              ;; needs support from receive-unknown-values, push-values, %more-arg-values, values-list,
+              ;; nlx-entry-multiple
               (unused-sp
                (sb-c::make-unused-tn))
               (t
                (make-stack-pointer-tn)))
-        (cond #+x86-64
+        (cond #+(or arm64 x86-64)
               (unused-count
                (sb-c::make-unused-tn))
               (t

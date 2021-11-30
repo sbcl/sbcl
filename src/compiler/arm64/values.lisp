@@ -66,7 +66,8 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:vop-var vop)
   (:generator 20
-    (move start csp-tn)
+    (unless (eq (tn-kind start) :unused)
+      (move start csp-tn))
     (let (prev-constant)
       (flet ((load-tn (tn-ref)
                (let ((tn (tn-ref-tn tn-ref)))
@@ -94,16 +95,15 @@
         (cond ((= nvals 1)
                (inst str (load-tn vals) (@ csp-tn n-word-bytes :post-index)))
               (t
-               (inst add csp-tn csp-tn (* nvals n-word-bytes))
                (do ((val vals (tn-ref-across val))
                     (i 0 (1+ i)))
                    ((null val))
-                 (storew (load-tn val) start i))))))
-    (inst mov count (fixnumize nvals))))
+                 (inst str (load-tn val) (@ csp-tn n-word-bytes :post-index)))))))
+    (unless (eq (tn-kind count) :unused)
+      (inst mov count (fixnumize nvals)))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in
 ;;; unknown values continuations.
-;;;
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
   (:arg-types list)
@@ -117,7 +117,9 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start csp-tn)
+
+    (unless (eq (tn-kind start) :unused)
+      (move start csp-tn))
 
     LOOP
     (inst cmp list null-tn)
@@ -130,22 +132,29 @@
     (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-tn start)
-    (inst asr count count (- word-shift n-fixnum-tag-bits))))
+    (unless (eq (tn-kind count) :unused)
+      (inst sub count csp-tn start)
+      (inst asr count count (- word-shift n-fixnum-tag-bits)))))
 
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :to :save)
-         (num :scs (any-reg) :target count))
+         (num :scs (any-reg) :target count :to (:result 1)))
   (:arg-types * positive-fixnum)
   (:temporary (:sc descriptor-reg) temp)
   (:temporary (:sc any-reg) i)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (inst adds count num 0)
+    (cond ((eq (tn-kind count) :unused)
+           (inst cmp num 0)
+           (setf count num))
+          (t
+           (inst adds count num 0)))
+    (when (eq (tn-kind start) :unused)
+      (setf start tmp-tn))
     (move start csp-tn)
     (inst b :eq DONE)
     (inst lsl i count (- word-shift n-fixnum-tag-bits))

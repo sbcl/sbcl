@@ -194,11 +194,10 @@
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
-  (:args (top :target result)
-         (src)
+  (:args (top :target result
+              :scs (any-reg))
+         (src :to :save)
          (count :target count-words))
-  ;; Again, no SC restrictions for the args, 'cause the loading would
-  ;; happen before the entry label.
   (:info label)
   (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
@@ -207,12 +206,17 @@
             (num :scs (any-reg) :from (:argument 0)))
   (:save-p :force-to-stack)
   (:vop-var vop)
-  (:generator 30
+  (:before-load
     (emit-label label)
-    (note-this-location vop :non-local-entry)
+    (note-this-location vop :non-local-entry))
+  (:generator 30
 
     ;; Setup results, and test for the zero value case.
-    (load-stack-tn result top)
+    (if (eq (tn-kind result) :unused)
+        (setf result top)
+        (move result top))
+    (when (eq (tn-kind num) :unused)
+      (setf num tmp-tn))
     (inst mov num 0)
     ;; Shift and check for zero in one go
     (inst adds count-words zr-tn (lsl count (- word-shift n-fixnum-tag-bits)))
@@ -233,7 +237,8 @@
     ;; Reset the CSP.
     DONE
     (inst add csp-tn result num)
-    (inst lsr num num (- word-shift n-fixnum-tag-bits))))
+    (unless (eq (tn-kind num) :unused)
+      (inst lsr num num (- word-shift n-fixnum-tag-bits)))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
