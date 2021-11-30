@@ -315,11 +315,9 @@ echo TODO:
 echo 
 echo perform administrative tasks:
 echo 
-echo \* rebuild documentation with modern texinfo
 echo \* visit https://sourceforge.net/projects/sbcl/files/
 echo \* select sbcl -> $VERSION -> "view details" for the source
 echo \ \ tarball, "Select all" and Save
 echo \* mail sbcl-announce
 echo \* check and send sbcl-$VERSION-bugmail.txt to edit@bugs.launchpad.net
 echo \ \ '(sign: C-c RET s p)'
-echo "* update #lisp IRC topic (requires channel ops)"
