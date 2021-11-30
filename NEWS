@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.10:
+changes in sbcl-2.1.11 relative to sbcl-2.1.10:
   * minor incompatible change: *COMPILE-PRINT* now defaults to NIL.  T gives
     the old behavior of echoing top level forms. Users who want to see a
     report of the phases of compilation can use *COMPILE-PROGRESS* and the
