@@ -87,8 +87,7 @@
         *current-level-in-print* 0))
 
 ;;; called when a cold system starts up
-(defun !cold-init (&aux (real-choose-symbol-out-fun #'choose-symbol-out-fun)
-                        (real-failed-aver-fun #'%failed-aver))
+(defun !cold-init (&aux (real-failed-aver-fun #'%failed-aver))
   "Give the world a shove and hope it spins."
 
   (/show0 "entering !COLD-INIT")
@@ -137,13 +136,11 @@
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility. Also
   ;; allows IN-PACKAGE to work.
   (show-and-call !package-cold-init)
-  ;; debug machinery needed for printing symbols
+
+  ;; The readtable needs to be initialized for printing symbols early,
+  ;; which is useful for debugging.
   #+sb-devel
-  (progn
-    (!readtable-cold-init)
-    ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
-    (setf (symbol-function 'choose-symbol-out-fun)
-          (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol)))
+  (!readtable-cold-init)
 
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
@@ -221,9 +218,6 @@
   ;; which in turn enlivens a bunch of other "*!foo*" symbols.
   ;; Setting them to NIL helps a little bit.
   (setq *!cold-defsymbols* nil *!cold-toplevels* nil)
-
-  ;; Now that L-T-V forms have executed, the symbol output chooser works.
-  (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 
   #+win32 (show-and-call reinit-internal-real-time)
 

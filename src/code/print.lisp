@@ -405,14 +405,14 @@ variable: an unreadable object representing the error is printed instead.")
       (output-symbol object (sb-xc:symbol-package object) stream)
       ;; Write only the characters of the name, never the package
       (let ((rt *readtable*))
-        (funcall (truly-the function
-                  (choose-symbol-out-fun *print-case* (%readtable-case rt)))
-                 (symbol-name object) stream rt))))
+        (output-symbol-case-dispatch *print-case* (readtable-case rt)
+                                     (symbol-name object) stream rt))))
 
 (defun output-symbol (symbol package stream)
   (let* ((readably *print-readably*)
          (readtable (if readably *standard-readtable* *readtable*))
-         (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable))))
+         (print-case *print-case*)
+         (readtable-case (readtable-case readtable)))
     (flet ((output-token (name)
              (declare (type simple-string name))
              (cond ((or (and (readtable-normalization readtable)
@@ -431,7 +431,8 @@ variable: an unreadable object representing the error is printed instead.")
                         (write-char char stream)))
                     (write-char #\| stream))
                    (t
-                    (funcall (truly-the function out-fun) name stream readtable)))))
+                    (output-symbol-case-dispatch print-case readtable-case
+                                                 name stream readtable)))))
       (let ((name (symbol-name symbol))
             (current (sane-package)))
         (cond
@@ -580,9 +581,9 @@ variable: an unreadable object representing the error is printed instead.")
            (bases +digit-bases+)
            (base *print-base*)
            (letter-attribute
-            (case (%readtable-case readtable)
-              (#.+readtable-upcase+ uppercase-attribute)
-              (#.+readtable-downcase+ lowercase-attribute)
+            (case (readtable-case readtable)
+              (:upcase uppercase-attribute)
+              (:downcase lowercase-attribute)
               (t (logior lowercase-attribute uppercase-attribute))))
            (index 0)
            (bits 0)
@@ -706,6 +707,8 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; case hackery: One of these functions is chosen to output symbol
 ;;;; names according to the values of *PRINT-CASE* and READTABLE-CASE.
 
+(declaim (start-block output-symbol-case-dispatch))
+
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :UPCASE             :UPCASE
@@ -740,7 +743,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-capitalize-symbol (pname stream readtable)
   (declare (simple-string pname))
   (let ((prev-not-alphanum t)
-        (up (eql (%readtable-case readtable) +readtable-upcase+)))
+        (up (eq (readtable-case readtable) :upcase)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
         (write-char (if up
@@ -771,37 +774,23 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (write-string pname stream)))))
 
-(defun choose-symbol-out-fun (print-case readtable-case)
-  (macrolet
-      ((compute-fun-vector (&aux (vector (make-array 12)))
-         ;; Pack a 2D array of functions into a simple-vector.
-         ;; Major axis is *PRINT-CASE*, minor axis is %READTABLE-CASE.
-         (dotimes (readtable-case-index 4)
-           (dotimes (print-case-index 3)
-             (let ((readtable-case
-                    (elt '(:upcase :downcase :preserve :invert) readtable-case-index))
-                   (print-case
-                    (elt '(:upcase :downcase :capitalize) print-case-index)))
-               (setf (aref vector (logior (ash print-case-index 2)
-                                          readtable-case-index))
-                     (case readtable-case
-                       (:upcase
-                        (case print-case
-                          (:upcase 'output-preserve-symbol)
-                          (:downcase 'output-lowercase-symbol)
-                          (:capitalize 'output-capitalize-symbol)))
-                       (:downcase
-                        (case print-case
-                          (:upcase 'output-uppercase-symbol)
-                          (:downcase 'output-preserve-symbol)
-                          (:capitalize 'output-capitalize-symbol)))
-                       (:preserve 'output-preserve-symbol)
-                       (:invert 'output-invert-symbol))))))
-         `(load-time-value (vector ,@(map 'list (lambda (x) `(function ,x)) vector))
-                           t)))
-    (aref (compute-fun-vector)
-          (logior (case print-case (:upcase 0) (:downcase 4) (t 8))
-                  (truly-the (mod 4) readtable-case)))))
+;;; Call an output function based on PRINT-CASE and READTABLE-CASE.
+(defun output-symbol-case-dispatch (print-case readtable-case name stream readtable)
+  (ecase readtable-case
+    (:upcase
+     (ecase print-case
+       (:upcase (output-preserve-symbol name stream readtable))
+       (:downcase (output-lowercase-symbol name stream readtable))
+       (:capitalize (output-capitalize-symbol name stream readtable))))
+    (:downcase
+     (ecase print-case
+       (:upcase (output-uppercase-symbol name stream readtable))
+       (:downcase (output-preserve-symbol name stream readtable))
+       (:capitalize (output-capitalize-symbol name stream readtable))))
+    (:preserve (output-preserve-symbol name stream readtable))
+    (:invert (output-invert-symbol name stream readtable))))
+
+(declaim (end-block))
 
 ;;;; recursive objects
 

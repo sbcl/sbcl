@@ -239,15 +239,14 @@
     (cerror "Frob it anyway!" 'standard-readtable-modified-error
             :operation operation)))
 
+(declaim (inline readtable-case))
 (defun readtable-case (readtable)
-  (aref #(:upcase :downcase :preserve :invert) (%readtable-case readtable)))
+  (%readtable-case readtable))
 
 (defun (setf readtable-case) (case readtable)
   ;; This function does not accept a readtable designator, only a readtable.
   (assert-not-standard-readtable readtable '(setf readtable-case))
-  (setf (%readtable-case readtable)
-        (ecase case (:upcase 0) (:downcase 1) (:preserve 2) (:invert 3)))
-  case)
+  (setf (%readtable-case readtable) case))
 
 (declaim (inline readtable-normalization))
 (defun readtable-normalization (readtable)

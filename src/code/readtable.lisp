@@ -85,7 +85,7 @@ types for the Common Lisp expression reader."
    :read-only t)
   ;; Characters above the BASE-CHAR range
   (extended-char-table *empty-extended-char-table* :type hash-table)
-  (%readtable-case 0 :type (mod 4))
+  (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert))
   ;; Element type to use when reading a string literal with no extended-chars.
   ;; The system itself prefers base-string, but otherwise it is a contentious
   ;; issue. We don't (by default) use base-strings, because people often write:
@@ -108,8 +108,5 @@ types for the Common Lisp expression reader."
   ;; to produce a certain type of string, your code is unportable anyway.
   (%readtable-symbol-preference 'base-char :type (member character base-char))
   (%readtable-normalization #+sb-unicode t #-sb-unicode nil :type boolean))
-
-(defconstant +readtable-upcase+ 0)
-(defconstant +readtable-downcase+ 1)
 
 (declaim (freeze-type readtable))
