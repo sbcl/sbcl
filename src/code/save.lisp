@@ -463,7 +463,8 @@ sufficiently motivated to do lengthy fixes."
                          ((not (memq accessor
                                      '(%closure-fun
                                        %fun-layout %instance-layout
-                                       symbol-package symbol-name fdefn-name
+                                       symbol-package symbol-name symbol-%info
+                                       fdefn-name
                                        %numerator %denominator
                                        %realpart %imagpart
                                        %make-lisp-obj ; fdefn referent

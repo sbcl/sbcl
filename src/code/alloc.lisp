@@ -432,7 +432,8 @@
                   (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)))))
     ;; symbol-hash was initialized to 0
     (%set-symbol-global-value symbol (make-unbound-marker))
-    (setf (symbol-%info symbol) nil)
+    (%primitive sb-vm::set-slot symbol nil
+                'make-symbol sb-vm:symbol-info-slot sb-vm:other-pointer-lowtag)
     (%primitive sb-vm::set-slot symbol name
                 'make-symbol sb-vm:symbol-name-slot sb-vm:other-pointer-lowtag)
     (%set-symbol-package symbol nil)

@@ -145,7 +145,8 @@ distinct from the global value. Can also be SETF."
 ;;; Furthermore it's annoying that you can't name the CAS function (CAS fn).
 #-compare-and-swap-vops
 (defun cas-symbol-%info (symbol old new)
-  (setf (symbol-%info symbol) new)
+  (%primitive sb-vm::set-slot symbol new
+              '(setf symbol-%info) sb-vm:symbol-info-slot sb-vm:other-pointer-lowtag)
   old)
 
 ;;; Accessors for the dual-purpose info/plist slot

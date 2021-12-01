@@ -163,7 +163,6 @@
   (def sb-vm::symbol-extra)
   #+sb-thread (def symbol-tls-index)
   (def symbol-%info) ; primitive reader always needs a stub
-  (def (setf symbol-%info) (info symbol)) ; as does primitive writer
   ;; but the "wrapped" reader might not need a stub.
   ;; If it's already a proper function, then it doesn't.
   #.(if (fboundp 'symbol-dbinfo) (values) '(def symbol-dbinfo))

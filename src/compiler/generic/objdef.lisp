@@ -380,8 +380,6 @@ during backtrace.
   ;; of the user's PLIST and a PACKED-INFO or just a PACKED-INFO.
   ;; It can't hold a PLIST alone without wrapping in an extra cons cell.
   (info :ref-trans symbol-%info :ref-known (flushable)
-        :set-trans (setf symbol-%info)
-        :set-known ()
         ;; IR2-CONVERT-CASSER only knows the arg order as (OBJECT OLD NEW),
         ;; so as much as I'd like to name this (CAS SYMBOL-%INFO),
         ;; it can't be that, because it'd need args of (OLD NEW OBJECT).

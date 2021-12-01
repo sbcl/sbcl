@@ -158,14 +158,6 @@
       (truly-the (or null instance)
                  (if (listp info-holder) (cdr info-holder) info-holder)))))
 
-;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
-;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
-;;; is kept as a property on the host symbol.
-;;; The compatible "primitive" accessor must be a SETFable place.
-#+sb-xc-host
-(progn (defmacro symbol-%info (symbol) `(get ,symbol :sb-xc-globaldb-info))
-       (defun symbol-dbinfo (symbol) (symbol-%info symbol)))
-
 ;; Perform the equivalent of (GET-INFO-VALUE KIND +INFO-METAINFO-TYPE-NUM+)
 ;; but skipping the defaulting logic.
 ;; Return zero or more META-INFOs that match on KIND, which is usually

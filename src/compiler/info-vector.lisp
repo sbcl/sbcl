@@ -110,6 +110,25 @@
       (setf (%info-ref v 0) 0)
       v))
 
+;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
+;;; is kept as a property on the host symbol.
+;;; The compatible "primitive" accessor must be a SETFable place.
+#+sb-xc-host
+(progn
+  (declaim (inline symbol-%info))
+  (defun symbol-%info (symbol)
+    (get symbol :sb-xc-globaldb-info))
+  (defun symbol-dbinfo (symbol) (symbol-%info symbol))
+  ;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+  (defun update-symbol-info (symbol update-fn)
+    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+    ;; a vector describing 0 infos and 0 auxiliary keys.
+    (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
+      (when newval
+        (setf (get symbol :sb-xc-globaldb-info) newval))
+      (values))))
+
 ;; FDEFINITIONs have an info-number that admits slightly clever logic
 ;; for PACKED-INFO-FDEFN. Do not change this constant without
 ;; careful examination of that function.
@@ -691,16 +710,6 @@ This is interpreted as
 
 ;;; Some of this stuff might belong in 'symbol.lisp', but can't be,
 ;;; because 'symbol.lisp' is :NOT-HOST in build-order.
-
-;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
-#+sb-xc-host
-(defun update-symbol-info (symbol update-fn)
-  ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-  ;; a vector describing 0 infos and 0 auxiliary keys.
-  (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
-    (when newval
-      (setf (symbol-%info symbol) newval))
-    (values)))
 
 ;;; The current *INFO-ENVIRONMENT*, a structure of type INFO-HASHTABLE.
 ;;; Cheat by setting to nil before the type is proclaimed
