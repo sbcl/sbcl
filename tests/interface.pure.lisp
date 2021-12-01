@@ -310,5 +310,6 @@
                    '(1 2 3 4 5 6 7 8)))))
 
 (with-test (:name :no-v0p-ex1stsp-in-build ; spelled L33t Hax0r style on purpose
-            :skipped-on :sb-devel)         ; (otherwise self-induced failure)
+            :skipped-on (or :sb-devel
+                            :sb-xref-for-internals))
   (assert (null (apropos-list "VOP-EXISTSP"))))
