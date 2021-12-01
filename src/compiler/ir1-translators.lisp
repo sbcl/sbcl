@@ -867,27 +867,28 @@ also processed as top level forms."
       (multiple-value-call #'values
         (extract-fletish-vars definitions context) forms declarations))))
 
+;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to
+;;; potentially make a closure for each FUN in FUNS is emitted, and
+;;; then the body is converted as usual.
+;;;
+;;; When one of these FUNS is declared dynamic extent, we make a
+;;; cleanup with the ENCLOSE as the MESS-UP node and introduce it into
+;;; the lexical environment to convert the body in. We force NEXT to
+;;; start a block outside of this cleanup, causing cleanup code to be
+;;; emitted when the scope is exited.
 (defun ir1-convert-fbindings (start next result funs body)
-  (let ((ctran (make-ctran))
-        (dx-p (find-if #'leaf-dynamic-extent funs)))
-    (when dx-p
-      (ctran-starts-block ctran)
-      (ctran-starts-block next))
-    (enclose start ctran funs)
-    (cond (dx-p
-           (let* ((dummy (make-ctran))
-                  (entry (make-entry))
-                  (cleanup (make-cleanup :kind :dynamic-extent
-                                         :mess-up entry
-                                         :info (list (ctran-next start)))))
-             (push entry (lambda-entries (lexenv-lambda *lexenv*)))
-             (setf (entry-cleanup entry) cleanup)
-             (link-node-to-previous-ctran entry ctran)
-             (use-ctran entry dummy)
-
+  (let ((enclose-ctran (make-ctran)))
+    (enclose start enclose-ctran funs)
+    (cond ((some #'leaf-dynamic-extent funs)
+           (ctran-starts-block next)
+           (let ((cleanup (make-cleanup :kind :dynamic-extent
+                                        :mess-up (ctran-use enclose-ctran)))
+                 (cleanup-ctran (make-ctran)))
              (let ((*lexenv* (make-lexenv :cleanup cleanup)))
-               (ir1-convert-progn-body dummy next result body))))
-          (t (ir1-convert-progn-body ctran next result body)))))
+               (ir1-convert enclose-ctran cleanup-ctran nil '(%cleanup-point))
+               (ir1-convert-progn-body cleanup-ctran next result body))))
+          (t
+           (ir1-convert-progn-body enclose-ctran next result body)))))
 
 (def-ir1-translator flet ((definitions &body body)
                           start next result)

@@ -689,9 +689,8 @@
   ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
   ;; cleanup. This is filled when the cleanup is created (now by
   ;; locall call analysis) and is rechecked by environment
-  ;; analysis. (For closures this is a list of the enclose node during
-  ;; IR1, and a list of the LVAR of the enclose after environment
-  ;; analysis.)
+  ;; analysis. (For closures this is a list of the LVAR of the enclose
+  ;; after environment analysis.)
   (info nil :type list))
 (defprinter (cleanup :identity t)
   kind

@@ -382,43 +382,41 @@
   (declare (type component component))
   (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
     (dolist (lambda (component-lambdas component))
+      ;; If this LAMBDA is marked dynamic extent and also a closure,
+      ;; mark its ENCLOSE as DX by making it use an LVAR if it doesn't
+      ;; have one already.
+      (when (leaf-dynamic-extent lambda)
+        (let ((xep (functional-entry-fun lambda)))
+          (when (and xep (environment-closure (get-lambda-environment xep)))
+            (let ((enclose (lambda-enclose lambda)))
+              (when (and enclose (not (node-lvar enclose)))
+                (let ((lvar (make-lvar)))
+                  (use-lvar enclose lvar)
+                  (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
+                    (aver (eq (cleanup-mess-up cleanup) enclose))
+                    (setf (lvar-dynamic-extent lvar) cleanup)
+                    (setf (cleanup-info cleanup) (list lvar)))
+                  (push lvar (component-dx-lvars component))))))))
       (dolist (entry (lambda-entries lambda))
         (let ((cleanup (entry-cleanup entry)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
             (let ((real-dx-lvars '()))
               (dolist (what (cleanup-info cleanup))
-                (etypecase what
-                  (cons
-                   (let ((dx (car what))
-                         (lvar (cdr what)))
-                     (cond ((lvar-good-for-dx-p lvar dx)
-                            ;; Since the above check does deep
-                            ;; checks. we need to deal with the deep
-                            ;; results in here as well.
-                            (dolist (cell (handle-nested-dynamic-extent-lvars
-                                           dx lvar))
-                              (let ((real (principal-lvar (cdr cell))))
-                                (setf (lvar-dynamic-extent real) cleanup)
-                                (pushnew real real-dx-lvars))))
-                           (t
-                            (note-no-stack-allocation lvar)
-                            (setf (lvar-dynamic-extent lvar) nil)))))
-                  (enclose ; DX closure
-                   (let* ((funs (enclose-funs what))
-                          (dx nil))
-                     (dolist (fun funs)
-                       (when (leaf-dynamic-extent fun)
-                         (let ((xep (functional-entry-fun fun)))
-                           (when xep
-                             (cond ((environment-closure (get-lambda-environment xep))
-                                    (setq dx t))
-                                   (t
-                                    (setf (leaf-extent fun) nil)))))))
-                     (when dx
-                       (let ((lvar (make-lvar)))
-                         (use-lvar what lvar)
-                         (setf (lvar-dynamic-extent lvar) cleanup)
-                         (push lvar real-dx-lvars)))))))
+                (declare (type cons what))
+                (let ((dx (car what))
+                      (lvar (cdr what)))
+                  (cond ((lvar-good-for-dx-p lvar dx)
+                         ;; Since the above check does deep
+                         ;; checks. we need to deal with the deep
+                         ;; results in here as well.
+                         (dolist (cell (handle-nested-dynamic-extent-lvars
+                                        dx lvar))
+                           (let ((real (principal-lvar (cdr cell))))
+                             (setf (lvar-dynamic-extent real) cleanup)
+                             (pushnew real real-dx-lvars))))
+                        (t
+                         (note-no-stack-allocation lvar)
+                         (setf (lvar-dynamic-extent lvar) nil)))))
               (setf (cleanup-info cleanup) real-dx-lvars)
               (setf (component-dx-lvars component)
                     (append real-dx-lvars (component-dx-lvars component)))))))))
