@@ -1605,3 +1605,24 @@
      (flet ((f3 (&rest m) (apply test m)))
        (declare (dynamic-extent #'f3))
        (apply f1 #'f3 args)))))
+
+;;; Test that we don't preserve LVARs that just happen to be in the
+;;; same block.
+(with-test (:name :uvl-preserved-incidentally)
+  (checked-compile
+   '(lambda (b)
+     (catch 'ct2
+       (multiple-value-prog1 (multiple-value-prog1 (restart-case 0))
+         (restart-case 0)
+         b
+         0)))))
+
+(with-test (:name :uvl-preserved-incidentally.2)
+  (checked-compile
+   '(lambda ()
+     (multiple-value-prog1
+         (multiple-value-prog1 (catch 'ct2 0))
+       (restart-bind nil
+         (flet ((%f () 0))
+           (declare (dynamic-extent (function %f)))
+           (%f)))))))

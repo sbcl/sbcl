@@ -108,9 +108,11 @@
                                  use-blocks
                                  :key (lambda (block)
                                         (let ((2block (block-info block)))
+                                          ;; same as logic in UPDATE-UVL-LIVE-SETS
                                           (merge-uvl-live-sets
-                                           (ir2-block-start-stack 2block)
-                                           ;; these are on the stack before dx-lvar is allocated
+                                           (set-difference
+                                            (ir2-block-start-stack 2block)
+                                            (ir2-block-popped 2block))
                                            (member dx-lvar (reverse (ir2-block-pushed 2block))))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
@@ -223,7 +225,10 @@
                              ;; should be kept alive until the object is
                              ;; deallocated.
                              (setq new-end (merge-uvl-live-sets
-                                            new-end (ir2-block-start-stack 2block)))
+                                            new-end
+                                            (set-difference
+                                             (ir2-block-start-stack 2block)
+                                             (ir2-block-popped 2block))))
                              (setq new-end (merge-uvl-live-sets
                                             ;; union in the lvars
                                             ;; pushed before LVAR in
