@@ -149,16 +149,16 @@
             (count :scs (any-reg)))
   (:generator 20
     (cond ((eq (tn-kind count) :unused)
-           (inst cmp num 0)
            (setf count num))
           (t
-           (inst adds count num 0)))
+           (move count num)))
     (when (eq (tn-kind start) :unused)
       (setf start tmp-tn))
     (move start csp-tn)
+    ;; Shift and check for zero in one go
+    (inst adds i zr-tn (lsl count (- word-shift n-fixnum-tag-bits)))
     (inst b :eq DONE)
-    (inst lsl i count (- word-shift n-fixnum-tag-bits))
-    (inst add csp-tn start i)
+    (inst add csp-tn csp-tn i)
     LOOP
     (inst subs i i n-word-bytes)
     (inst ldr temp (@ context i))
