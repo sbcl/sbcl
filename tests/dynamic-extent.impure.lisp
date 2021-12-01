@@ -1626,3 +1626,14 @@
          (flet ((%f () 0))
            (declare (dynamic-extent (function %f)))
            (%f)))))))
+
+;;; After dx entries no longer started delimiting their blocks, there
+;;; was no reason for propagate-dx to end its own blocks either. In
+;;; fact propagate-dx started causing problems instead.
+(with-test (:name :propagate-dx-ended-block)
+  (checked-compile
+   '(lambda (c)
+     (declare (notinline - svref))
+     (let* ((v1 (svref #(1 3 4 6) 0)))
+       (declare (dynamic-extent v1))
+       (- c v1)))))

@@ -362,23 +362,21 @@
            (%delete-lvar-use node)
            (add-lvar-use node new))
          (reoptimize-lvar new)
-         (propagate-lvar-dx new old propagate-dx))
+         (when propagate-dx
+           (propagate-lvar-dx new old)))
         (t
          (update-lvar-dependencies new old)
          (flush-dest old)))
 
   (values))
 
-(defun propagate-lvar-dx (new old propagate-dx)
-  (awhen (and propagate-dx (lvar-dynamic-extent old))
-    (setf (lvar-dynamic-extent old) nil)
-    (unless (lvar-dynamic-extent new)
-      (setf (lvar-dynamic-extent new) it)
-      (setf (cleanup-info it) (subst new old (cleanup-info it)))))
-  (when (lvar-dynamic-extent new)
-    (do-uses (node new)
-      (unless (node-to-be-deleted-p node)
-        (node-ends-block node)))))
+(defun propagate-lvar-dx (new old)
+  (let ((cleanup (lvar-dynamic-extent old)))
+    (when cleanup
+      (setf (lvar-dynamic-extent old) nil)
+      (unless (lvar-dynamic-extent new)
+        (setf (lvar-dynamic-extent new) cleanup)
+        (setf (cleanup-info cleanup) (subst new old (cleanup-info cleanup)))))))
 
 (defun lexenv-contains-lambda (lambda parent-lexenv)
   (loop for lexenv = (lambda-lexenv lambda)
@@ -405,7 +403,7 @@
                                        (node-lexenv (cleanup-mess-up dx))))
       (let ((new-lvar (lambda-var-ref-lvar new-ref)))
         (when new-lvar
-          (propagate-lvar-dx new-lvar old-lvar t)
+          (propagate-lvar-dx new-lvar old-lvar)
           t)))))
 
 ;;;; block starting/creation
@@ -510,7 +508,7 @@
                                (eq (basic-combination-kind use) :local))
                       (merges use))))
                 (substitute-lvar-uses lvar value
-                                      (and lvar (eq (lvar-uses lvar) node)))
+                                      (eq (lvar-uses lvar) node))
                 (%delete-lvar-use node)
                 (prog1
                     (unlink-node node)
