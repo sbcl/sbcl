@@ -463,8 +463,8 @@
 ;;; https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
 ;;; contains a proof that triangular numbers mod 2^N visit every cell.
 
-;;; The intent here - which may be impossible to realize - was to allow GC
-;;; methods whose name is not reachable.  I couldn't get it to do the right thing.
+;;; The intent here - which may be impossible to realize - was to allow garbage-collection
+;;; of FDEFNs whose name is not reachable.  I couldn't get it to do the right thing.
 ;;; e.g. (defmethod foo (x (y cons)) ...) creates mappings:
 ;;; (SB-PCL::FAST-METHOD FOO (T CONS)) -> #<SB-KERNEL:FDEFN (SB-PCL::FAST-METHOD FOO (T CONS))>
 ;;; (SB-PCL::SLOW-METHOD FOO (T CONS)) -> #<SB-KERNEL:FDEFN (SB-PCL::SLOW-METHOD FOO (T CONS))>
