@@ -2929,16 +2929,13 @@ static int is_in_static_space(void* ptr) {
 }
 
 struct verify_state {
-    lispobj *vaddr;
+    lispobj tagged_object, object_header;
     lispobj *object_start, *object_end;
-    lispobj tagged_object_start;
     uword_t flags;
     int errors;
     generation_index_t object_gen;
     generation_index_t min_pointee_gen;
     unsigned char widetag;
-    lispobj *implicit_tagged_subrange_start,
-            *implicit_tagged_subrange_end;
 };
 
 #define VERIFY_VERBOSE    1
@@ -2989,37 +2986,48 @@ static boolean addr_protected_p(void* addr)
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
 static void
-verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
+verify_range(lispobj *vaddr,
+             sword_t nwords,
+             struct verify_state *state,
+             lispobj *object)
 {
     extern int valid_lisp_pointer_p(lispobj);
+
+    int recursive = 0;
+    if (!object) object = vaddr; else recursive = 1;
 
     /* Strict containment: no pointer from a heap space may point
      * to anything outside of a heap space. */
     boolean strict_containment = state->flags & VERIFY_FINAL;
 
-    lispobj *end = where + nwords;
     size_t count;
-    for ( ; where < end ; where += count) {
-        /* Track object boundaries unless verifying non-heap space. A 1-word
-         * range resulting from unpacking a quasi-descriptor (compact instance
-         * header, fdefn raw addr) passed in as a local var of this function,
-         * and identifiable with vaddr != 0, can't start a new object. */
-        if (!state->vaddr && where > state->object_end &&
-            (state->flags & VERIFYING_HEAP_OBJECTS)) {
-            state->object_start = where;
-            state->widetag = is_header(*where) ? widetag_of(where) : LIST_POINTER_LOWTAG;
-            state->tagged_object_start = compute_lispobj(where);
-            state->object_end = where + OBJECT_SIZE(*where, where) - 1;
-            state->object_gen = gen_of((lispobj)where);
-            // FIXME: should not have code acting as filler
-            if (state->widetag != FILLER_WIDETAG && !filler_obj_p(where)) { // Any page can have a filler on it
-                page_index_t pg = find_page_index(where);
-                if (pg >= 0) {
-                    // Assert proper page type
-                    if (state->widetag == CODE_HEADER_WIDETAG) {
-                        if (!is_code(page_table[pg].type)) lose("object @ %p is code on non-code page", where);
-                    } else {
-                        if (is_code(page_table[pg].type)) lose("object @ %p is non-code on code page", where);
+    for ( ; nwords > 0 ; vaddr += count, object += count, nwords -= count) {
+        // Track object boundaries unless verifying non-heap space.
+        if ((state->flags & VERIFYING_HEAP_OBJECTS) && !recursive
+            && (vaddr >= state->object_end)) {
+            gc_assert(vaddr == state->object_end || !state->object_end);
+            state->object_start = vaddr;
+            state->object_header = *object;
+            state->widetag = is_header(state->object_header) ?
+                             header_widetag(state->object_header) : LIST_POINTER_LOWTAG;
+            state->tagged_object = make_lispobj(vaddr, LOWTAG_FOR_WIDETAG(state->widetag));
+            state->object_end = vaddr + OBJECT_SIZE(state->object_header, object);
+            state->object_gen = -1;
+            if (state->flags & VERIFYING_GENERATIONAL) {
+                page_index_t pg = find_page_index(vaddr);
+                state->object_gen = pg >= 0 ? page_table[pg].gen : gen_of((lispobj)object);
+                // FIXME: should not have code acting as filler
+                if (state->widetag != FILLER_WIDETAG && !filler_obj_p(object)) {
+                    // Any page can have a filler on it
+                    if (pg >= 0) {
+                        // Assert proper page type
+                        if (state->widetag == CODE_HEADER_WIDETAG) {
+                            if (!is_code(page_table[pg].type))
+                                lose("object @ %p is code on non-code page", vaddr);
+                        } else {
+                            if (is_code(page_table[pg].type))
+                                lose("object @ %p is non-code on code page", vaddr);
+                        }
                     }
                 }
             }
@@ -3028,19 +3036,10 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                  fprintf(stderr, "Note: filler object @ %p\n", where); */
         }
         count = 1;
-        lispobj thing = *where;
-        if (where >= state->implicit_tagged_subrange_start &&
-            where < state->implicit_tagged_subrange_end) {
-            if (thing != 0) thing |= OTHER_POINTER_LOWTAG;
-        }
+        lispobj thing = *object;
 
-        lispobj callee;
-
-#define GC_WARN(str) \
-        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX") sees %s\n", \
-                 (void*)(uintptr_t)thing, \
-                 (lispobj)(state->vaddr ? state->vaddr : where), \
-                 state->tagged_object_start, str);
+#define GC_WARN(str) fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX") sees %s\n", \
+                (void*)(uintptr_t)thing, (uword_t)vaddr, state->tagged_object, str);
 
         if (is_lisp_pointer(thing)) {
             /* DONTFAIL mode skips most tests, performing only the strict
@@ -3072,8 +3071,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 // Must not point to a forwarding pointer
                 FAIL_IF(*native_pointer(thing) == 0x01, "forwarding ptr");
                 // Forbid pointers from R/O space into a GCed space
-                FAIL_IF((READ_ONLY_SPACE_START <= (uword_t)where &&
-                         where < read_only_space_free_pointer),
+                FAIL_IF((READ_ONLY_SPACE_START <= (uword_t)vaddr
+                         && vaddr < read_only_space_free_pointer),
                         "dynamic space from RO space");
                 if (state->widetag == CODE_HEADER_WIDETAG
                     && ! is_in_static_space(state->object_start)
@@ -3083,21 +3082,20 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     FAIL_IF(addr_protected_p(state->object_start),
                             "younger obj from WP'd code header page");
                     // 2. the object header must be marked as written
-                    if (!header_rememberedp(*state->object_start))
+                    if (!header_rememberedp(state->object_header))
                         lose("code @ %p (g%d). word @ %p -> %"OBJ_FMTX" (g%d)",
-                             state->object_start, state->object_gen,
-                             where, thing, to_gen);
+                             state->object_start, state->object_gen, vaddr, thing, to_gen);
                 } else if ((state->flags & VERIFYING_GENERATIONAL) && to_gen < state->object_gen) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
                     /* The WP criteria are:
                      *  - SIMPLE-VECTOR marks the page containing the cell in question
                      *  - Everything else marks the object header */
                     int fail_wp_check = addr_protected_p(
-                        (state->widetag == SIMPLE_VECTOR_WIDETAG) ? where : state->object_start);
+                        (state->widetag == SIMPLE_VECTOR_WIDETAG) ? vaddr : state->object_start);
 #else
                     /* Check the page containing the pointer, but use 'vaddr' in case the pointer
                      * had to be decoded, and so 'where' isn't the address holding that pointer */
-                    int fail_wp_check = addr_protected_p(state->vaddr ? state->vaddr : where);
+                    int fail_wp_check = addr_protected_p(vaddr);
 #endif
                     FAIL_IF(fail_wp_check, "younger obj from WP page");
                 }
@@ -3121,34 +3119,31 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         if (is_lisp_immediate(thing) || widetag == NO_TLS_VALUE_MARKER_WIDETAG) {
             /* skip immediates */
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
-            lose("Unhandled widetag #x%02x at %p", widetag, where);
+            lose("Unhandled widetag #x%02x at %p", widetag, vaddr);
         } else if (leaf_obj_widetag_p(widetag)) {
 #ifdef LISP_FEATURE_UBSAN
             if (specialized_vector_widetag_p(widetag)) {
-                if (is_lisp_pointer(where[1])) {
-                    struct vector* bits = (void*)native_pointer(where[1]);
+                if (is_lisp_pointer(object[1])) {
+                    struct vector* bits = (void*)native_pointer(object[1]);
                     if (header_widetag(bits->header) != SIMPLE_BIT_VECTOR_WIDETAG)
                       lose("bad shadow bits for %p", where);
                     gc_assert(header_widetag(bits->header) == SIMPLE_BIT_VECTOR_WIDETAG);
-                    gc_assert(vector_len(bits) >= vector_len((struct vector*)where));
+                    gc_assert(vector_len(bits) >= vector_len((struct vector*)object));
                 }
             }
 #endif
-            count = sizetab[widetag](where);
+            count = sizetab[widetag](object);
             if (strict_containment && gencgc_verbose
-                && widetag == SAP_WIDETAG && where[1])
-                fprintf(stderr, "\nStrange SAP %p -> %p\n",
-                        where, (void*)where[1]);
+                && widetag == SAP_WIDETAG && object[1])
+                fprintf(stderr, "\nStrange SAP %p -> %p\n", vaddr, (void*)object[1]);
         } else switch(widetag) {
                 /* boxed or partially boxed objects */
                 lispobj layout_word;
             case FUNCALLABLE_INSTANCE_WIDETAG:
             case INSTANCE_WIDETAG:
-                layout_word = layout_of(where);
+                layout_word = layout_of(object);
                 if (layout_word) {
-                    state->vaddr = where;
-                    verify_range(&layout_word, 1, state);
-                    state->vaddr = 0;
+                    verify_range(vaddr, 1, state, &layout_word);
                     gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
 #ifdef LISP_FEATURE_METASPACE
@@ -3158,7 +3153,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     if (layout->flags & 1) gc_assert(instancep(WRAPPER(wrapper)->_info));
 #endif
                     struct bitmap bitmap = get_layout_bitmap(layout);
-                    if (widetag_of(where) == FUNCALLABLE_INSTANCE_WIDETAG) {
+                    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                       gc_assert(bitmap.bits[0] == (sword_t)-1 || bitmap.bits[0] == (sword_t)6);
 #else
@@ -3166,39 +3161,40 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 #endif
                     }
                     if (lockfree_list_node_layout_p(layout)) {
-                        struct instance* node = (struct instance*)where;
+                        struct instance* node = (struct instance*)object;
                         lispobj next = node->slots[INSTANCE_DATA_START];
                         if (fixnump(next) && next) {
-                            state->vaddr = &node->slots[INSTANCE_DATA_START];
                             next |= INSTANCE_POINTER_LOWTAG;
-                            verify_range(&next, 1, state);
-                            state->vaddr = 0;
+                            verify_range(node->slots+INSTANCE_DATA_START, 1, state, &next);
                         }
                     }
                     int i;
-                    int nwords = sizetab[widetag](where);
-                    lispobj* slots = where+1;
+                    int nwords = sizetab[widetag](object);
+                    lispobj* slots = object+1;
                     for (i=0; i<(nwords-1); ++i)
-                        if (bitmap_logbitp(i, bitmap)) verify_range(slots+i, 1, state);
+                        if (bitmap_logbitp(i, bitmap)) verify_range(slots+i, 1, state, slots+i);
                     count = nwords;
                 }
                 break;
             case CODE_HEADER_WIDETAG:
                 {
-                struct code *code = (struct code *) where;
+                struct code *code = (struct code *)object;
+                gc_assert(fixnump(object[1])); // boxed size, needed for code_header_words()
                 sword_t nheader_words = code_header_words(code);
-                gc_assert(fixnump(where[1])); // boxed size
                 /* Verify the boxed section of the code data block */
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-                state->implicit_tagged_subrange_start =
-                  code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
-                state->implicit_tagged_subrange_end =
-                  state->implicit_tagged_subrange_start + code_n_named_calls(code);
+                {
+                lispobj* pfdefn = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
+                lispobj* end = pfdefn + code_n_named_calls(code);
+                for ( ; pfdefn < end ; ++pfdefn)
+                    if (*pfdefn) {
+                        lispobj tagged_ptr = *pfdefn | OTHER_POINTER_LOWTAG;
+                        verify_range(pfdefn, 1, state, &tagged_ptr);
+                    }
+                }
 #endif
-                verify_range(where + 2, nheader_words - 2, state);
-                state->implicit_tagged_subrange_start = 0;
-                state->implicit_tagged_subrange_end = 0;
+                verify_range(vaddr + 2, nheader_words - 2, state, vaddr + 2);
 
                 /* Verify the boxed section of each simple-fun */
                 for_each_simple_fun(i, fheaderp, code, 1, {
@@ -3208,8 +3204,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     gc_assert(!layout || layout == LAYOUT_OF_FUNCTION);
 #endif
                 });
-                generation_index_t my_gen = gen_of((lispobj)where);
-                boolean rememberedp = header_rememberedp(*where);
+                boolean rememberedp = header_rememberedp(code->header);
                 /* The remembered set invariant is that an object is marked "written"
                  * if and only if either it points to a younger object or is pointed
                  * to by a register or stack. (The pointed-to case assumes that the
@@ -3217,24 +3212,20 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                  * pointer into that object). Non-compacting GC does not have the
                  * "only if" part of that, nor does pre-GC verification because we
                  * don't test the generation of the newval when storing into code. */
-                if (is_in_static_space(state->object_start)) { }
+                if (is_in_static_space(object)) { }
                 else if (compacting_p() && (state->flags & VERIFY_POST_GC) ?
-                    (state->min_pointee_gen < my_gen) != rememberedp :
-                    (state->min_pointee_gen < my_gen) && !rememberedp)
+                    (state->min_pointee_gen < state->object_gen) != rememberedp :
+                    (state->min_pointee_gen < state->object_gen) && !rememberedp)
                     lose("object @ %p is gen%d min_pointee=gen%d %s",
-                         (void*)compute_lispobj(where), my_gen, state->min_pointee_gen,
+                         (void*)state->tagged_object, state->object_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
                 count = code_total_nwords(code);
                 break;
                 }
             case FDEFN_WIDETAG:
-                verify_range(where + 1, 2, state);
-                callee = fdefn_callee_lispobj((struct fdefn*)where);
-                /* For a more intelligible error, don't say that the word that
-                 * contains an errant pointer is in stack space if it isn't. */
-                state->vaddr = where + 3;
-                verify_range(&callee, 1, state);
-                state->vaddr = 0;
+                verify_range(vaddr + 1, 2, state, vaddr + 1);
+                lispobj callee = fdefn_callee_lispobj((struct fdefn*)vaddr);
+                verify_range((lispobj*)&((struct fdefn*)vaddr)->raw_addr, 1, state, &callee);
                 count = ALIGN_UP(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
             }
@@ -3244,13 +3235,14 @@ static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
     struct verify_state state;
     memset(&state, 0, sizeof state);
     state.flags = flags;
-    verify_range((lispobj*)start, end-(lispobj*)start, &state);
+    verify_range((lispobj*)start, end-(lispobj*)start, &state, 0);
     if (state.errors) lose("verify failed: %d error(s)", state.errors);
     return 0;
 }
 static uword_t verify_gen_aux(lispobj start, lispobj* end, struct verify_state* state)
 {
-    verify_range((lispobj*)start, end-(lispobj*)start, state);
+    state->object_end = 0; // reset the 'trigger' for boundary-tracking
+    verify_range((lispobj*)start, end-(lispobj*)start, state, 0);
     return 0;
 }
 static void verify_generation(generation_index_t generation, uword_t flags)
