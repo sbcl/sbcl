@@ -3554,3 +3554,10 @@
            (values (a))))
        t))
    (() 1)))
+
+(with-test (:name :%coerce-callable-for-call-with-casts)
+  (let ((f (checked-compile
+            `(lambda (x y)
+              (apply x 1 2 y)))))
+    (assert (equal (funcall f #'list '(3)) '(1 2 3)))
+    (assert (not (ctu:find-named-callees f)))))

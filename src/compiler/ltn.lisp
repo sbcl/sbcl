@@ -164,10 +164,12 @@
 #+call-symbol
 (defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node ltn-policy)
   (declare (ignore ltn-policy))
-  (let ((dest (node-dest node)))
+  (multiple-value-bind (dest dest-lvar)
+      (and (node-lvar node)
+           (principal-lvar-dest-and-lvar (node-lvar node)))
     (cond ((and (basic-combination-p dest)
                 (eq (basic-combination-kind dest) :full)
-                (eq (lvar-uses (basic-combination-fun dest)) node)
+                (eq (basic-combination-fun dest) dest-lvar)
                 ;; Everything else can't handle NIL, just don't
                 ;; bother optimizing it.
                 (not (lvar-value-is-nil fun)))
