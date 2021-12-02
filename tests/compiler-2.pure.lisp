@@ -3555,7 +3555,8 @@
        t))
    (() 1)))
 
-(with-test (:name :%coerce-callable-for-call-with-casts)
+(with-test (:name :%coerce-callable-for-call-with-casts
+            :skipped-on (not :call-symbol))
   (let ((f (checked-compile
             `(lambda (x y)
               (apply x 1 2 y)))))
