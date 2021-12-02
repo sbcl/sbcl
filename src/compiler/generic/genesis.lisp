@@ -1382,7 +1382,7 @@ core and return a descriptor to it."
                  :use '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-PROFILE"))
                 (sb-cold::package-list-for-genesis)))
         (target-pkg-list nil))
-    (labels ((init-cold-package (name &optional docstring)
+    (labels ((init-cold-package (name shadow &optional docstring)
                (let ((cold-package (allocate-struct-of-type 'package)))
                  (setf (gethash name *cold-package-symbols*)
                        (cons (cons nil nil) cold-package))
@@ -1394,6 +1394,7 @@ core and return a descriptor to it."
                               :%bits (make-fixnum-descriptor
                                       (if (system-package-p name)
                                           sb-impl::+initial-package-bits+ 0))
+                              :%shadowing-symbols (list-to-core (mapcar 'cold-intern shadow))
                               :doc-string (if docstring
                                               (set-readonly
                                                (base-string-to-core docstring))
@@ -1428,8 +1429,14 @@ core and return a descriptor to it."
                    (error "No cold package named ~S" name))))
       ;; pass 1: make all proto-packages
       (dolist (pd package-data-list)
-        (init-cold-package (sb-cold:package-data-name pd)
-                           #+sb-doc(sb-cold::package-data-doc pd)))
+        (let ((name (sb-cold:package-data-name pd)))
+          ;; Shadowing symbols include those specified in package-data-list
+          ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
+          (init-cold-package name
+                             (when (eql (mismatch name "SB-") 3)
+                               (sort (package-shadowing-symbols (find-package name))
+                                     #'string<))
+                             #+sb-doc (sb-cold::package-data-doc pd))))
       ;; pass 2: set the 'use' lists and collect the 'used-by' lists
       (dolist (pd package-data-list)
         (let ((this (find-cold-package (sb-cold:package-data-name pd)))
@@ -1778,17 +1785,6 @@ core and return a descriptor to it."
     (mapcar
      (lambda (pkgcons)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
-        (let ((shadow
-               ;; Record shadowing symbols (except from SB-XC) in SB- packages.
-               (when (eql (mismatch pkg-name "SB-") 3)
-                 ;; Be insensitive to the host's ordering.
-                 (sort (remove (find-package "SB-XC")
-                               (package-shadowing-symbols (find-package pkg-name))
-                               :key #'cl:symbol-package)
-                       #'string<))))
-          (write-slots (cdr pkg-info)
-                       :%shadowing-symbols (list-to-core
-                                            (mapcar 'cold-intern shadow))))
         (unless (member pkg-name '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
                         :test 'string=)
           (let ((host-pkg (find-package pkg-name))
@@ -2286,13 +2282,15 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (get-uninterned-symbol name) (fasl-input))))
 
+(defun read-cold-symbol-name (symbol)
+  (base-string-from-core (read-wordindexed symbol sb-vm:symbol-name-slot)))
+
 (define-cold-fop (fop-copy-symbol-save (index))
   (let* ((symbol (ref-fop-table (fasl-input) index))
          (name
           (if (symbolp symbol)
               (symbol-name symbol)
-              (base-string-from-core
-               (read-wordindexed symbol sb-vm:symbol-name-slot)))))
+              (read-cold-symbol-name symbol))))
     ;; Genesis performs additional coalescing of uninterned symbols
     (push-fop-table (get-uninterned-symbol name) (fasl-input))))
 
@@ -3189,6 +3187,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       "defined functions"
                       "undefined functions"
                       "layouts"
+                      "packages"
                       "symbols"
                       "linkage table"
                       #+sb-thread "TLS map")))
@@ -3259,22 +3258,26 @@ III. initially undefined function references (alphabetically):
                 (car pair)
                 (cold-layout-length proxy)))))
 
-  (format t "~%~|~%V. symbols (numerically):~2%")
+  (format t "~%~|~%V. packages:~2%")
+  (dolist (pair (sort (%hash-table-alist *cold-package-symbols*) #'<
+                      :key (lambda (x) (descriptor-bits (cddr x)))))
+    (format t "~x = ~a~%" (descriptor-bits (cddr pair)) (car pair)))
+
+  (format t "~%~|~%VI. symbols (numerically):~2%")
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
-  (progn
-    (format t "~%~|~%VI. linkage table:~2%")
-    (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
-                         #'< :key #'cdr))
-      (let ((name (car entry)))
-        (format t " ~:[   ~;(D)~] ~8x = ~a~%"
-                (listp name)
-                (sb-vm::linkage-table-entry-address (cdr entry))
-                (car (ensure-list name))))))
+  (format t "~%~|~%VII. linkage table:~2%")
+  (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
+                       #'< :key #'cdr))
+    (let ((name (car entry)))
+      (format t " ~:[   ~;(D)~] ~8x = ~a~%"
+              (listp name)
+              (sb-vm::linkage-table-entry-address (cdr entry))
+              (car (ensure-list name)))))
 
   #+sb-thread
-  (format t "~%~|~%VII. TLS map:~2%~:{~4x ~s~%~}"
+  (format t "~%~|~%VIII. TLS map:~2%~:{~4x ~s~%~}"
           (sort *tls-index-to-symbol* #'< :key #'car))
 
   (values))
@@ -3798,8 +3801,7 @@ III. initially undefined function references (alphabetically):
             (if strictp
                 (warm-symbol x)
                 (or (gethash (descriptor-bits x) *cold-symbols*) ; first try
-                    (make-symbol
-                     (recurse (read-wordindexed x sb-vm:symbol-name-slot))))))
+                    (make-symbol (read-cold-symbol-name x)))))
            (#.sb-vm:simple-base-string-widetag (base-string-from-core x))
            (#.sb-vm:simple-vector-widetag (vector-from-core x #'recurse))
            #-64-bit
