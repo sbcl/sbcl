@@ -944,15 +944,7 @@
                               (ecase what
                                 (:load-nargs
                                  ,@(if variable
-                                       `((move nargs-pass csp-tn)
-                                         ;; The variable args are on the stack
-                                         ;; and become the frame, but there may
-                                         ;; be <4 args and 2 stack slots are
-                                         ;; assumed allocate on the call. So
-                                         ;; need to ensure there are at least 2
-                                         ;; slots. This just adds 2 more.
-                                         (inst add csp-tn nargs-pass (* 2 n-word-bytes))
-                                         (inst sub nargs-pass nargs-pass new-fp)
+                                       `((inst sub nargs-pass csp-tn new-fp)
                                          (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
                                          ,@(do ((arg *register-arg-names* (cddr arg))
                                                 (i 0 (+ i 2))
