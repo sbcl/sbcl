@@ -133,7 +133,7 @@
        ;; But in the target, more caution is warranted because users might
        ;; DEFKNOWN a function but fail to define it. And they shouldn't be
        ;; expected to understand the failure mode and the remedy.
-       (cond ((and #-sb-xc-host (info :function :definition name)
+       (cond ((and #-sb-xc-host (find-fdefn name)
                    (info :function :info name)
                    (let ((*lexenv* (node-lexenv node)))
                      (not (fun-lexically-notinline-p name))))

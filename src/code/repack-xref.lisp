@@ -41,12 +41,8 @@
                    (funcall function name it))))
         (call-with-each-globaldb-name
          (lambda (name)
-           ;; In general it might be unsafe to call INFO with a NAME
-           ;; that is not valid for the kind of info being retrieved,
-           ;; as when the defaulting function tries to perform a
-           ;; sanity-check. But here it's safe.
-           (awhen (or (info :function :macro-function name)
-                      (info :function :definition name))
+           (awhen (or (and (symbolp name) (macro-function name))
+                      (and (legal-fun-name-p name) (find-fdefn name)))
              (cond
                ((and (fdefn-p it)
                      (typep (fdefn-fun it) 'generic-function))
