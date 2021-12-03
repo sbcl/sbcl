@@ -70,9 +70,6 @@
     (format stream "[~{~W~^ ~}]"
             (loop for i below (%instance-length obj)
                collect (%instance-ref obj i))))
-  (defmethod print-object ((self sb-int:packed-info) stream)
-    (print-unreadable-object (self stream :type t :identity t)
-      (format stream "len=~d" (sb-kernel:%instance-length self))))
   (eval-when (:compile-toplevel)
     (sb-xc:defmacro make-packed-info (n)
       ;; this file is earlier than early-vm, so we have to take
@@ -91,9 +88,12 @@
       ;; not bothering with ONCE-ONLY here (doesn't matter)
       `(%copy-instance (%make-instance (%instance-length ,info)) ,info)))
   (defmacro packed-info-len (info)
-      `(- (%instance-length ,info) sb-vm:instance-data-start))
+      `(- (%instance-length ,info) #.sb-vm:instance-data-start))
   (defmacro %info-ref (v i)
-    `(%instance-ref ,v (+ ,i #.sb-vm:instance-data-start))))
+    `(%instance-ref ,v (+ ,i #.sb-vm:instance-data-start)))
+  (defmethod print-object ((self packed-info) stream)
+    (print-unreadable-object (self stream :type t :identity t)
+      (format stream "len=~d" (packed-info-len self)))))
 
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
