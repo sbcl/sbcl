@@ -18,5 +18,8 @@
 extern void print(lispobj obj);
 extern void brief_print(lispobj obj);
 extern void reset_printer(void);
+#include "genesis/vector.h"
+#include <stdio.h>
+extern void safely_show_lstring(struct vector*, int, FILE*);
 
 #endif

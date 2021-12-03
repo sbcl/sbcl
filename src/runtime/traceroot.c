@@ -19,6 +19,7 @@
 #include "genesis/avlnode.h"
 #include "genesis/sap.h"
 #include "genesis/thread-instance.h"
+#include "print.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -430,7 +431,6 @@ static inline lispobj decode_pointer(uint32_t encoding)
 
 static void maybe_show_object_name(lispobj obj, FILE* stream)
 {
-    extern void safely_show_lstring(lispobj* string, int quotes, FILE *s);
     lispobj package, package_name;
     if (lowtag_of(obj)==OTHER_POINTER_LOWTAG)
         switch(widetag_of(native_pointer(obj))) {
@@ -440,10 +440,10 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
                 fprintf(stream, "#:");
             } else {
                 package_name = ((struct package*)native_pointer(package))->_name;
-                safely_show_lstring(native_pointer(package_name), 0, stream);
+                safely_show_lstring(VECTOR(package_name), 0, stream);
                 fputs("::", stream);
             }
-            safely_show_lstring(native_pointer(SYMBOL(obj)->name), 0, stream);
+            safely_show_lstring(VECTOR(SYMBOL(obj)->name), 0, stream);
             break;
         }
 }

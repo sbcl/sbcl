@@ -516,7 +516,6 @@ void show_lstring(struct vector * string, int quotes, FILE *s)
 
 static void brief_fun_or_otherptr(lispobj obj)
 {
-    extern void safely_show_lstring(struct vector*, int, FILE*);
     lispobj *ptr, header;
     int type;
     struct symbol *symbol;
