@@ -1051,13 +1051,15 @@
      ,(flet ((down ()
                '(do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1)) (1- i))
                      (j (truly-the (or (eql -1) index) (+ start2 replace-len -1)) (1- j)))
-                 ((< i start1))
+                 ((< j start2))
+                 (declare (optimize (insert-array-bounds-checks 0)))
                  (setf (aref seq1 i) (data-vector-ref seq2 j))))
              (up ()
                '(do ((i start1 (1+ i))
                      (j start2 (1+ j))
                      (end (+ start1 replace-len)))
                  ((>= i end))
+                 (declare (optimize (insert-array-bounds-checks 0)))
                  (setf (aref seq1 i) (data-vector-ref seq2 j)))))
         ;; "If sequence-1 and sequence-2 are the same object and the region being modified
         ;;  overlaps the region being copied from, then it is as if the entire source region

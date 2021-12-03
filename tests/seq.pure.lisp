@@ -604,3 +604,10 @@
                   :skipped-on :interpreter)
   (let ((v (vector 5)))
     (ctu:assert-no-consing (stable-sort v #'<))))
+
+(with-test (:name (replace :empty-constant))
+  (checked-compile-and-assert
+      ()
+      `(lambda (v s)
+         (replace (the simple-vector v) #() :start1 s))
+    ((#(1) 0) #(1) :test #'equalp)))
