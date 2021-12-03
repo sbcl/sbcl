@@ -176,6 +176,7 @@
 (defvar *dynamic*)
 (defvar *static*)
 (defvar *read-only*)
+(defvar core-file-name)
 
 #+immobile-space
 (progn
@@ -1044,10 +1045,11 @@ core and return a descriptor to it."
 (defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
   (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag))
-        (cold-name (set-readonly (base-string-to-core name *dynamic*))))
+        (cold-name (set-readonly (base-string-to-core name *dynamic*)))
+        (hash (make-fixnum-descriptor
+               (if core-file-name (sb-c::symbol-name-hash name) 0))))
     (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
-    (write-wordindexed symbol sb-vm:symbol-hash-slot
-                       (make-fixnum-descriptor (sb-c::symbol-name-hash name)))
+    (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
     (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
     (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)
     (write-wordindexed symbol sb-vm:symbol-package-slot *nil-descriptor*)
@@ -1163,7 +1165,6 @@ core and return a descriptor to it."
                      :depthoid (cadr flags+depthoid+inherits)
                      :inherits (cddr flags+depthoid+inherits))))))))
 
-(defvar core-file-name)
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #+metaspace '*read-only*
                                  #+immobile-space '*immobile-fixedobj*
