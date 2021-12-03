@@ -1858,11 +1858,12 @@ PACKAGE."
 ;;;; are delayed until cold-init.
 ;;;; The cold loader (GENESIS) set *!INITIAL-SYMBOLS* to the target
 ;;;; representation of the hosts's *COLD-PACKAGE-SYMBOLS*.
-;;;; The shape of this list is ((package . (externals . internals)) ...)
+;;;; The shape of this list is
+;;;;    (uninterned-symbols . ((package . (externals . internals)) ...)
 (defvar *!initial-symbols*)
 
 (defun pkg-name= (a b) (and (not (eql a 0)) (string= a b)))
-(defun !package-cold-init ()
+(defun !package-cold-init (&aux (specs (cdr *!initial-symbols*)))
   (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
   (setf *package-names* (make-info-hashtable :comparator #'pkg-name=
                                              :hash-function #'sxhash))
@@ -1873,7 +1874,7 @@ PACKAGE."
         (sb-thread:mutex-name (info-env-mutex (car *package-nickname-ids*)))
         "package nicknames")
   (with-package-names (names)
-    (dolist (spec *!initial-symbols*)
+    (dolist (spec specs)
       (let ((pkg (car spec)) (symbols (cdr spec)))
         ;; the symbol MAKE-TABLE wouldn't magically disappear,
         ;; though its only use be to name an FLET in a function
@@ -1893,11 +1894,26 @@ PACKAGE."
         (setf (package-%implementation-packages pkg) nil))))
 
   ;; pass 2 - set the 'tables' slots only after all tables have been made
-  (dolist (spec *!initial-symbols*)
+  (dolist (spec specs)
     (let ((pkg (car spec)))
       (setf (package-tables pkg)
             (map 'vector #'package-external-symbols (package-%use-list pkg)))))
 
+  ;; Having made all packages, verify that symbol hashes are good.
+  (flet ((check-hash-slot (symbols) ; a vector
+           ;; type decl is critical here - can't invoke a hairy aref routine yet
+           (dovector (symbol (the simple-vector symbols))
+             (when symbol ; skip NIL because of its magic-ness
+               (let* ((stored-hash (symbol-hash symbol))
+                      (name (symbol-name symbol))
+                      (computed-hash (compute-symbol-hash name (length name))))
+                 (aver (= stored-hash computed-hash)))))))
+    (check-hash-slot (car *!initial-symbols*))
+    (dolist (spec specs)
+      (check-hash-slot (second spec))
+      (check-hash-slot (third spec))))
+
+  ;; The joke's on you. They're pseudo-static, hence not GCable...
   (/show0 "about to MAKUNBOUND *!INITIAL-SYMBOLS*")
   (%makunbound '*!initial-symbols*))      ; (so that it gets GCed)
 

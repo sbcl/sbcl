@@ -1043,12 +1043,13 @@ core and return a descriptor to it."
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
+  (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag))
+        (cold-name (set-readonly (base-string-to-core name *dynamic*))))
     (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
-    (write-wordindexed symbol sb-vm:symbol-hash-slot (make-fixnum-descriptor 0))
+    (write-wordindexed symbol sb-vm:symbol-hash-slot
+                       (make-fixnum-descriptor (sb-c::symbol-name-hash name)))
     (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
-    (write-wordindexed symbol sb-vm:symbol-name-slot
-                       (set-readonly (base-string-to-core name *dynamic*)))
+    (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)
     (write-wordindexed symbol sb-vm:symbol-package-slot *nil-descriptor*)
     symbol))
 
@@ -1542,11 +1543,9 @@ core and return a descriptor to it."
             (cold-assign-tls-index handle index)))
         ;; Steps that only make sense when writing a core file
         (when core-file-name
-          ;; All interned symbols need a hash
-          (write-wordindexed handle sb-vm:symbol-hash-slot
-                             (make-fixnum-descriptor (sb-xc:sxhash symbol)))
-          (let ((pkg-info (cold-find-package-info (package-name package))))
-            (write-wordindexed handle sb-vm:symbol-package-slot (cdr pkg-info))
+          (let* ((pkg-info (cold-find-package-info (package-name package)))
+                 (cold-pkg (cdr pkg-info)))
+            (write-wordindexed handle sb-vm:symbol-package-slot cold-pkg)
             (record-accessibility
              (or access (nth-value 1 (find-symbol name package)))
              pkg-info handle package symbol))
@@ -1781,31 +1780,36 @@ core and return a descriptor to it."
 
   (cold-set
    'sb-impl::*!initial-symbols*
-   (list-to-core
-    (mapcar
-     (lambda (pkgcons)
-      (destructuring-bind (pkg-name . pkg-info) pkgcons
-        (unless (member pkg-name '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
-                        :test 'string=)
-          (let ((host-pkg (find-package pkg-name))
-                syms)
-            ;; Now for each symbol directly present in this host-pkg,
-            ;; i.e. accessible but not :INHERITED, figure out if the symbol
-            ;; came from a different package, and if so, make a note of it.
-            (with-package-iterator (iter host-pkg :internal :external)
-              (loop (multiple-value-bind (foundp sym accessibility) (iter)
-                      (unless foundp (return))
-                      (unless (eq (cl:symbol-package sym) host-pkg)
-                        (push (cons sym accessibility) syms)))))
-            (dolist (symcons (sort syms #'string< :key #'car))
-              (destructuring-bind (sym . accessibility) symcons
-                (record-accessibility accessibility pkg-info (cold-intern sym)
-                                      host-pkg sym)))))
-        (cold-list (cdr pkg-info)
-                   (vector-in-core (caar pkg-info))
-                   (vector-in-core (cdar pkg-info)))))
-     (sort (%hash-table-alist *cold-package-symbols*)
-           #'string< :key #'car)))) ; Sort by package-name
+   (cold-cons
+    (let (uninterned)
+      (maphash (lambda (key val) (declare (ignore key)) (push val uninterned))
+               *uninterned-symbol-table*)
+      (vector-in-core (sort uninterned #'< :key #'descriptor-bits)))
+    (list-to-core
+     (mapcar
+      (lambda (pkgcons)
+        (destructuring-bind (pkg-name . pkg-info) pkgcons
+          (unless (member pkg-name '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
+                          :test 'string=)
+            (let ((host-pkg (find-package pkg-name))
+                  syms)
+              ;; Now for each symbol directly present in this host-pkg,
+              ;; i.e. accessible but not :INHERITED, figure out if the symbol
+              ;; came from a different package, and if so, make a note of it.
+              (with-package-iterator (iter host-pkg :internal :external)
+                (loop (multiple-value-bind (foundp sym accessibility) (iter)
+                        (unless foundp (return))
+                        (unless (eq (cl:symbol-package sym) host-pkg)
+                          (push (cons sym accessibility) syms)))))
+              (dolist (symcons (sort syms #'string< :key #'car))
+                (destructuring-bind (sym . accessibility) symcons
+                  (record-accessibility accessibility pkg-info (cold-intern sym)
+                                        host-pkg sym)))))
+          (cold-list (cdr pkg-info)
+                     (vector-in-core (caar pkg-info))
+                     (vector-in-core (cdar pkg-info)))))
+      (sort (%hash-table-alist *cold-package-symbols*)
+            #'string< :key #'car))))) ; Sort by package-name
 
   (dump-symbol-infos
    (attach-fdefinitions-to-symbols
