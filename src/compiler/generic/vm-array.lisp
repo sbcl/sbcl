@@ -192,13 +192,8 @@
                    (ash 1 (aref %%simple-array-n-bits-shifts%% widetag))))
 
 (defun saetp-index-or-lose (element-type)
-  (or #+sb-xc-host
-      (position element-type sb-vm:*specialized-array-element-type-properties*
+  (or (position element-type sb-vm:*specialized-array-element-type-properties*
                 :key #'sb-vm:saetp-specifier :test #'equal)
-      #-sb-xc-host
-      (position element-type
-                #.(map 'vector #'sb-vm:saetp-specifier sb-vm:*specialized-array-element-type-properties*)
-                :test #'equal)
       (error "No saetp for ~S" element-type)))
 
 ;;; I don't understand why we didn't use this more often, instead of

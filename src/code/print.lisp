@@ -550,35 +550,35 @@ variable: an unreadable object representing the error is printed instead.")
   (declare (simple-string name))
   (macrolet ((advance (tag &optional (at-end t))
                `(progn
-                  (when (= index len)
-                    ,(if at-end '(go TEST-SIGN) '(return nil)))
-                  (setq current (schar name index)
-                        code (char-code current)
-                        bits (cond ; FIXME
-                               ((< code 160) (aref attributes code))
-                               ((upper-case-p current) uppercase-attribute)
-                               ((lower-case-p current) lowercase-attribute)
-                               (t other-attribute)))
-                  (incf index)
-                  (go ,tag)))
+                 (when (= index len)
+                   ,(if at-end '(go TEST-SIGN) '(return nil)))
+                 (setq current (schar name index)
+                       code (char-code current)
+                       bits (cond ; FIXME
+                              ((< code 160) (aref attributes code))
+                              ((upper-case-p current) uppercase-attribute)
+                              ((lower-case-p current) lowercase-attribute)
+                              (t other-attribute)))
+                 (incf index)
+                 (go ,tag)))
              (test (&rest attributes)
-               `(not (zerop
-                      (the fixnum
-                           (logand
-                            (logior ,@(mapcar
-                                       (lambda (x)
-                                         (or (cdr (assoc x
-                                                         +attribute-names+))
-                                             (error "Blast!")))
-                                       attributes))
-                            bits)))))
+                `(not (zerop
+                       (the fixnum
+                            (logand
+                             (logior ,@(mapcar
+                                        (lambda (x)
+                                          (or (cdr (assoc x
+                                                          +attribute-names+))
+                                              (error "Blast!")))
+                                        attributes))
+                             bits)))))
              (digitp ()
                `(and (< code 128) ; FIXME
                      (< (the fixnum (aref bases code)) base))))
 
     (prog ((len (length name))
-           (attributes #.+character-attributes+)
-           (bases #.+digit-bases+)
+           (attributes +character-attributes+)
+           (bases +digit-bases+)
            (base *print-base*)
            (letter-attribute
             (case (readtable-case readtable)

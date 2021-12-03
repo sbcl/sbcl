@@ -1614,5 +1614,5 @@
     (expand 'write-to-string object keys)))
 
 #-sb-xc-host
-(defun !format-init ()
-  (setq **tokenize-control-string-cache-vector** nil))
+(defun !late-format-init ()
+  (setq sb-format::**tokenize-control-string-cache-vector** nil))
