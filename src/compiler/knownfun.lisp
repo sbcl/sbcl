@@ -50,7 +50,9 @@
                         (funcall 'sb-pcl::fun-doc (transform-function transform)))
       "optimize"))
 
-(defprinter (transform) type note important)
+(defmethod print-object ((x transform) stream)
+  (print-unreadable-object (x stream :type t :identity t)
+    (princ (type-specifier (transform-type x)) stream)))
 
 ;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
