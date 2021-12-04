@@ -41,10 +41,16 @@
       (dolist (pair (let ((subclassoids (classoid-subclasses (find-classoid root))))
                       (if (listp subclassoids)
                           subclassoids
-                          (sort (%hash-table-alist subclassoids)
-                                #'string<
-                                ;; pair = (#<classoid> . #<layout>)
-                                :key (lambda (pair) (classoid-name (car pair)))))))
+                          (flet ((pred (x y)
+                                   (or (string< x y)
+                                       (and (string= x y)
+                                            (let ((xpn (package-name (cl:symbol-package x)))
+                                                  (ypn (package-name (cl:symbol-package y))))
+                                              (string< xpn ypn))))))
+                            (sort (%hash-table-alist subclassoids)
+                                  #'pred
+                                  ;; pair = (#<classoid> . #<layout>)
+                                  :key (lambda (pair) (classoid-name (car pair))))))))
         (let* ((wrapper (cdr pair))
                (dd (wrapper-info wrapper)))
           (cond
