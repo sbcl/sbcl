@@ -1609,7 +1609,7 @@ core and return a descriptor to it."
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun cold-symbol-function (symbol &optional (errorp t))
   (declare (symbol symbol))
-  (let ((f (cold-fdefn-fun (cold-fdefinition-object symbol))))
+  (let ((f (cold-fdefn-fun (ensure-cold-fdefn symbol))))
     (cond ((not (cold-null f)) f)
           (errorp (error "Expected a definition for ~S in cold load" symbol))
           (t nil))))
@@ -1812,14 +1812,14 @@ core and return a descriptor to it."
 
   #-immobile-code
   (dolist (sym sb-vm::+c-callable-fdefns+)
-    (cold-fdefinition-object sym *static*))
+    (ensure-cold-fdefn sym *static*))
 
   ;; With immobile-code, static-fdefns as a concept are useful -
   ;; the implication is that the function's definition will not change.
   ;; But the fdefn per se is not useful - callers refer to callees directly.
   #-immobile-code
   (dovector (sym sb-vm:+static-fdefns+)
-    (let* ((fdefn (cold-fdefinition-object sym *static*))
+    (let* ((fdefn (ensure-cold-fdefn sym *static*))
            (offset (- (+ (- (descriptor-bits fdefn)
                             sb-vm:other-pointer-lowtag)
                          (* sb-vm:fdefn-raw-addr-slot sb-vm:n-word-bytes))
@@ -1876,7 +1876,7 @@ core and return a descriptor to it."
   #+immobile-code
   (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
         do (cold-svset *c-callable-fdefn-vector* i
-                       (cold-fdefinition-object sym)))
+                       (ensure-cold-fdefn sym)))
 
   ;; Symbols for which no call to COLD-INTERN would occur - due to not being
   ;; referenced until warm init - must be artificially cold-interned.
@@ -2011,7 +2011,7 @@ core and return a descriptor to it."
   (write-wordindexed fdefn sb-vm:fdefn-fun-slot *nil-descriptor*)
   (write-wordindexed/raw fdefn sb-vm:fdefn-raw-addr-slot
                          (lookup-assembler-reference 'sb-vm::undefined-tramp :direct)))
-(defun cold-fdefinition-object (cold-name &optional
+(defun ensure-cold-fdefn (cold-name &optional
                                           (gspace #+immobile-space *immobile-fixedobj*
                                                   #-immobile-space *dynamic*))
   (declare (type (or symbol descriptor) cold-name))
@@ -2044,7 +2044,7 @@ core and return a descriptor to it."
 (defun cold-fset (name defn)
   (aver (= (logand (read-bits-wordindexed defn 0) sb-vm:widetag-mask)
            sb-vm:simple-fun-widetag))
-  (let ((fdefn (cold-fdefinition-object
+  (let ((fdefn (ensure-cold-fdefn
                 ;; (SETF f) was descriptorized when dumped, symbols were not.
                 (if (symbolp name)
                     (cold-intern name)
@@ -2588,7 +2588,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (cold-fset name fn)))
 
 (define-cold-fop (fop-fdefn)
-  (cold-fdefinition-object (pop-stack)))
+  (ensure-cold-fdefn (pop-stack)))
 
 (define-cold-fop (fop-known-fun)
   (let ((name (pop-stack)))
@@ -2784,7 +2784,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:symbol-value
               (descriptor-bits (cold-symbol-value sym)))
              (:named-call
-              (+ (descriptor-bits (cold-fdefinition-object sym))
+              (+ (descriptor-bits (ensure-cold-fdefn sym))
                  (- 2 sb-vm:other-pointer-lowtag))))
            kind flavor)))))
 
@@ -3304,7 +3304,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (c-symbol-name symbol)
             (if *static*                ; if we ran GENESIS
               ;; We actually ran GENESIS, use the real value.
-              (descriptor-bits (cold-fdefinition-object symbol))
+              (descriptor-bits (ensure-cold-fdefn symbol))
               ;; We didn't run GENESIS, so guess at the address.
               (+ sb-vm:nil-value
                  (* (length sb-vm:+static-symbols+)
