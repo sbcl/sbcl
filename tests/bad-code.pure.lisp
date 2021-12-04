@@ -616,3 +616,9 @@
                      (checked-compile
                       `(lambda () (defclass ,(gensym) () ((s :type (2)))))
                       :allow-warnings 'warning))))
+
+(with-test (:name :macro-as-a-function)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (find-if 'and x))
+                      :allow-warnings 'warning))))

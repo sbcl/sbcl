@@ -121,9 +121,9 @@
   ;; But at least it's generally an improvement
   ;; to fail earlier than later in many cases.
   (multiple-value-bind (fun failure-p warnings)
-      (checked-compile '(lambda ()
+      (checked-compile '(lambda (z)
                          (locally (declare (notinline sort))
-                           (sort () #'< :key 'and)))
+                           (sort () z :key 'and)))
                        :allow-warnings t)
     (declare (ignore failure-p))
     (assert (= 1 (length warnings)))
