@@ -224,8 +224,10 @@
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
-                      (if (fun-lexically-notinline-p fun-name
-                                                     (node-lexenv (lvar-dest lvar)))
+                      (if (or defined-here
+                              declared-only
+                              (fun-lexically-notinline-p fun-name
+                                                         (node-lexenv (lvar-dest lvar))))
                           lvar-type
                           (global-ftype fun-name)))
                      ((functional-p leaf)
