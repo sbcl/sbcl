@@ -3338,50 +3338,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; information is subject to change due to relocating GC, but even so
 ;;; it can be very handy when attempting to troubleshoot the early
 ;;; stages of cold load.
-(defun write-map (*standard-output*)
-  (let ((*print-pretty* nil)
-        (*print-case* :upcase))
-    (format t "Table of contents~%")
-    (format t "=================~%")
-    (let ((sections '("assembler routines"
-                      "defined functions"
-                      "undefined functions"
-                      "classoids"
-                      "layouts"
-                      "packages"
-                      "type specifiers"
-                      "symbols"
-                      "linkage table"
-                      #+sb-thread "TLS map")))
-      (dotimes (i (length sections))
-        (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
-    (format t "=================~2%")
-    (format t "I. assembler routines defined in core image: (base=~x)~2%"
-            (descriptor-bits *cold-assembler-obj*))
-    (dolist (routine *cold-assembler-routines*)
-      (let ((name (car routine)))
-        (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
-    (let ((funs nil)
-          (undefs nil))
-      (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
-                 (let ((fdefn-bits (descriptor-bits fdefn)))
-                   (if (cold-null fun)
-                       (push `(,fdefn-bits ,name) undefs)
-                       (push `(,fdefn-bits ,(descriptor-bits fun) ,name) funs))))
-               *cold-fdefn-objects*)
-      (format t "~%~|~%II.A. defined functions (alphabetically):
-
-     FDEFN   FUNCTION  NAME
-========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
-              (sort (copy-list funs) #'string<
-                    :key (lambda (x) (fun-name-block-name (caddr x)))))
-      (format t "~%~|~%II.B. defined functions (numerically):
-
-     FDEFN   FUNCTION  NAME
-========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
-              (sort (copy-list funs) #'< :key #'second))
-
-      (format t "~%~|
+(defparameter *boilerplate-text* "
 (a note about initially undefined function references: These functions
 are referred to by code which is installed by GENESIS, but they are not
 installed by GENESIS. This is not necessarily a problem; functions can
@@ -3390,13 +3347,53 @@ loaded at warm init, or elsewhere. As long as they are defined before
 they are called, everything should be OK. Things are also OK if the
 cross-compiler knew their inline definition and used that everywhere
 that they were called before the out-of-line definition is installed,
-as is fairly common for structure accessors.)
+as is fairly common for structure accessors.)")
 
+(defun write-map (*standard-output* &aux (*print-pretty* nil)
+                                         (*print-case* :upcase))
+  (format t "Table of contents~%")
+  (format t "=================~%")
+  (let ((sections '("assembler routines" "defined functions" "undefined functions"
+                    "classoids" "layouts"
+                    "packages" "symbols"
+                    "type specifiers"
+                    "linkage table" #+sb-thread "TLS map")))
+    (dotimes (i (length sections))
+      (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
+  (format t "=================~2%")
+
+  (format t "I. assembler routines defined in core image: (base=~x)~2%"
+          (descriptor-bits *cold-assembler-obj*))
+  (dolist (routine *cold-assembler-routines*)
+    (let ((name (car routine)))
+      (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
+  
+  (let ((funs nil) (undefs nil))
+    (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
+               (let ((fdefn-bits (descriptor-bits fdefn)))
+                 (if (cold-null fun)
+                     (push `(,fdefn-bits ,name) undefs)
+                     (push `(,fdefn-bits ,(descriptor-bits fun) ,name) funs))))
+             *cold-fdefn-objects*)
+    (format t "~%~|~%II.A. defined functions (alphabetically):
+
+     FDEFN   FUNCTION  NAME
+========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
+            (sort (copy-list funs) #'string<
+                  :key (lambda (x) (fun-name-block-name (caddr x)))))
+    (format t "~%~|~%II.B. defined functions (numerically):
+
+     FDEFN   FUNCTION  NAME
+========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
+              (sort (copy-list funs) #'< :key #'second))
+
+    (format t "~%~|~A~%
 III. initially undefined function references (alphabetically):
 
      FDEFN  NAME
 ==========  ====~:{~%~10,'0X  ~S~}~%"
-              (sort undefs
+            *boilerplate-text*
+            (sort undefs
                     (lambda (a b &aux (pkg-a (package-name (sb-xc:symbol-package a)))
                                       (pkg-b (package-name (sb-xc:symbol-package b))))
                       (cond ((string< pkg-a pkg-b) t)
@@ -3404,12 +3401,11 @@ III. initially undefined function references (alphabetically):
                             (t (string< a b))))
                     :key (lambda (x) (fun-name-block-name (cadr x))))))
 
-    (format t "~%~|~%IV. classoids:
+  (format t "~%~|~%IV. classoids:
 
       CELL   CLASSOID  NAME
 ========== ==========  ====~%")
-
-    (let ((dumped-classoids))
+  (let ((dumped-classoids))
       (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
         (destructuring-bind (name . cell) x
           (format t "~10,'0x ~:[          ~;~:*~10,'0X~]  ~S~%"
@@ -3419,7 +3415,7 @@ III. initially undefined function references (alphabetically):
                       (push classoid dumped-classoids)
                       (descriptor-bits classoid)))
                   name)))
-      ;; Something goes wrong when dumping classoids, so show the memory
+      ;; Things sometimes go wrong with dumped classoids, so show a memory dump too
       (terpri)
       (dolist (classoid dumped-classoids)
         (let ((nwords (logand (ash (read-bits-wordindexed classoid 0)
@@ -3430,13 +3426,13 @@ III. initially undefined function references (alphabetically):
             (format t "~2d: ~10x~%" i (read-bits-wordindexed classoid i)))
           (terpri))))
 
-    (format t "~%~|~%IV. layout names:~2%")
-    (format t "~28tBitmap  Depth  ID  Name [Length]~%")
-    (dolist (pair (sort-cold-layouts))
-      (let* ((proxy (cdr pair))
-             (descriptor (cold-layout-descriptor proxy))
-             (addr (descriptor-bits descriptor)))
-        (format t "~10,'0X -> ~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
+  (format t "~%~|~%V. layout names:~2%")
+  (format t "~28tBitmap  Depth  ID  Name [Length]~%")
+  (dolist (pair (sort-cold-layouts))
+    (let* ((proxy (cdr pair))
+           (descriptor (cold-layout-descriptor proxy))
+           (addr (descriptor-bits descriptor)))
+      (format t "~10,'0X -> ~10,'0X: ~8d   ~2D ~5D  ~S [~D]~%"
                 addr
                 #+metaspace (descriptor-bits (->wrapper descriptor))
                 #-metaspace "          "
@@ -3447,39 +3443,37 @@ III. initially undefined function references (alphabetically):
                 (cold-layout-length proxy))))
 
 
-    (format t "~%~|~%V. packages:~2%")
-    (dolist (pair (sort (%hash-table-alist *cold-package-symbols*) #'<
-                        :key (lambda (x) (descriptor-bits (cddr x)))))
-      (format t "~x = ~a~%" (descriptor-bits (cddr pair)) (car pair)))
-
-
-    (format t "~%~|~%VI. parsed type specifiers:~2%")
-    (format t "         [Hash]~%")
-    (mapc (lambda (cell)
-            (format t "~X: [~vx] ~S~%"
-                    (descriptor-bits (cdr cell))
-                    (* 2 sb-vm:n-word-bytes)
-                    (read-slot (cdr cell) :%bits)
-                    (car cell)))
-          (sort (%hash-table-alist *ctype-cache*) #'<
-                :key (lambda (x) (descriptor-bits (cdr x))))))
+  (format t "~%~|~%VI. packages:~2%")
+  (dolist (pair (sort (%hash-table-alist *cold-package-symbols*) #'<
+                      :key (lambda (x) (descriptor-bits (cddr x)))))
+    (format t "~x = ~a~%" (descriptor-bits (cddr pair)) (car pair)))
 
   (format t "~%~|~%VII. symbols (numerically):~2%")
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
-  (progn
-    (format t "~%~|~%VIII. linkage table:~2%")
-    (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
-                         #'< :key #'cdr))
-      (let ((name (car entry)))
-        (format t " ~:[   ~;(D)~] ~8x = ~a~%"
-                (listp name)
-                (sb-vm::linkage-table-entry-address (cdr entry))
-                (car (ensure-list name))))))
+  (format t "~%~|~%VIII. parsed type specifiers:~2%")
+  (format t "         [Hash]~%")
+  (mapc (lambda (cell)
+          (format t "~X: [~vx] ~S~%"
+                  (descriptor-bits (cdr cell))
+                  (* 2 sb-vm:n-word-bytes)
+                  (read-slot (cdr cell) :%bits)
+                  (car cell)))
+        (sort (%hash-table-alist *ctype-cache*) #'<
+              :key (lambda (x) (descriptor-bits (cdr x)))))
+
+  (format t "~%~|~%IX. linkage table:~2%")
+  (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
+                       #'< :key #'cdr))
+    (let ((name (car entry)))
+      (format t " ~:[   ~;(D)~] ~8x = ~a~%"
+              (listp name)
+              (sb-vm::linkage-table-entry-address (cdr entry))
+              (car (ensure-list name)))))
 
   #+sb-thread
-  (format t "~%~|~%VIV. TLS map:~2%~:{~4x ~s~%~}"
+  (format t "~%~|~%X. TLS map:~2%~:{~4x ~s~%~}"
           (sort *tls-index-to-symbol* #'< :key #'car))
 
   (values))
