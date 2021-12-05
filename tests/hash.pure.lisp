@@ -346,7 +346,7 @@
   ;; and those objects have comparators that descend.
   ;; However, there are still some things hashed by address:
   (test-this-object 'equalp (make-weak-pointer "bleep"))
-  (test-this-object 'equalp (sb-kernel::find-fdefn 'cons))
+  (test-this-object 'equalp (sb-int:find-fdefn 'cons))
   (test-this-object 'equalp #'car)
   (test-this-object 'equalp (constantly 5))
   (test-this-object 'equal (sb-sys:int-sap 0)))
@@ -371,8 +371,8 @@
             '(lambda (x y)
                (logxor (ash (sxhash (truly-the (or string null) x)) -3)
                        (sxhash (truly-the (or bit-vector null) y))))))
-        (fdefn1 (sb-kernel::find-fdefn 'sb-kernel:%sxhash-string))
-        (fdefn2 (sb-kernel::find-fdefn 'sb-kernel:%sxhash-bit-vector)))
+        (fdefn1 (sb-int:find-fdefn 'sb-kernel:%sxhash-string))
+        (fdefn2 (sb-int:find-fdefn 'sb-kernel:%sxhash-bit-vector)))
     (every (lambda (x) (member x `(,fdefn1 ,fdefn2)))
            (ctu:find-code-constants f))))
 

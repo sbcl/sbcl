@@ -89,7 +89,7 @@ Evaluation took:
         ((parent child)
          (assert (and (sb-int:singleton-p constants)
                       (eq (car constants)
-                          (sb-kernel::find-fdefn 'sb-int:bit-vector-=)))))
+                          (sb-int:find-fdefn 'sb-int:bit-vector-=)))))
         (child2
          ;; FIXME: why does CHILD2-EQUALP reference a boxed constant
          ;; equal to MOST-POSITIVE-WORD as a bignum?

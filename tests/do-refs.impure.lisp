@@ -71,7 +71,7 @@
          (symbol (gensym)))
     (setf (fdefinition symbol) closure)
     (walk-slots-test*
-     (sb-kernel::find-fdefn symbol)
+     (sb-int:find-fdefn symbol)
      (lambda (slots)
        #+immobile-code
        (and (= (length slots) 3)

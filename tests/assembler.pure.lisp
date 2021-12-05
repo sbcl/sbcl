@@ -254,7 +254,7 @@
 ;;; which I guess was broken.  immobile-code has no fdefns in static space.
 (test-util:with-test (:name :disassemble-static-fdefn
             :skipped-on (or (not :x86-64) :immobile-code))
-  (assert (< (get-lisp-obj-address (sb-kernel::find-fdefn 'sb-impl::sub-gc))
+  (assert (< (get-lisp-obj-address (sb-int:find-fdefn 'sb-impl::sub-gc))
              sb-vm:static-space-end))
   ;; Cause SUB-GC to become un-statically-linked
   (progn (trace sb-impl::sub-gc) (untrace))

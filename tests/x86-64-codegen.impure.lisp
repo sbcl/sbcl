@@ -777,7 +777,7 @@ sb-vm::(define-vop (cl-user::test)
     (let ((trampoline
             (sb-di::code-header-from-pc
              (sb-sys:int-sap (sb-vm::fdefn-raw-addr
-                              (sb-kernel::find-fdefn symbol))))))
+                              (sb-int:find-fdefn symbol))))))
       (assert (zerop (sb-kernel:code-n-entries trampoline)))
       (assert (typep (sb-di::debug-fun-from-pc trampoline 8)
                      'sb-di::bogus-debug-fun)))))
@@ -1132,7 +1132,7 @@ sb-vm::(define-vop (cl-user::test)
   ;; The normal state of the image has no "static" calls to FIND-PACKAGE
   ;; but also has no globally proclaimed NOTINLINE, because that would
   ;; suppress the optimization for CACHED-FIND-PACKAGE on a constant string.
-  (assert (not (sb-vm::fdefn-has-static-callers (sb-kernel::find-fdefn 'find-package))))
+  (assert (not (sb-vm::fdefn-has-static-callers (sb-int:find-fdefn 'find-package))))
   (assert (not (sb-int:info :function :inlinep 'find-package))))
 
 (sb-vm::define-vop (trythis)
