@@ -285,13 +285,15 @@ distinct from the global value. Can also be SETF."
   (symbol-name symbol))
 
 (defun sb-xc:symbol-package (symbol)
-  "Return the package SYMBOL was interned in, or NIL if none."
+  "Return SYMBOL's home package, or NIL if none."
   (sb-xc:symbol-package symbol))
 
 (defun %set-symbol-package (symbol package)
   (declare (type symbol symbol))
   (%set-symbol-package symbol package))
 
+;;; MAKE-SYMBOL is the external API, %MAKE-SYMBOL is the internal function receiving
+;;; a known simple-string, and %%MAKE-SYMBOL is the primitive constructor.
 (defun make-symbol (string)
   "Make and return a new symbol with the STRING as its print name."
   (declare (type string string))
