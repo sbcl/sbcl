@@ -3367,7 +3367,7 @@ as is fairly common for structure accessors.)")
   (dolist (routine *cold-assembler-routines*)
     (let ((name (car routine)))
       (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
-  
+
   (let ((funs nil) (undefs nil))
     (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
                (let ((fdefn-bits (descriptor-bits fdefn)))

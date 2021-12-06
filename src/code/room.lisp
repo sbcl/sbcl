@@ -362,10 +362,10 @@ We could try a few things to mitigate this:
              (multiple-value-bind (start end) (%space-bounds space)
                (declare (ignore start))
                (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
-               (let ((start (+ (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
-                               (ash (- sizeof-nil-in-words 2) sb-vm:word-shift))))
+               (let ((start (+ (logandc2 nil-value lowtag-mask)
+                               (ash (- sizeof-nil-in-words 2) word-shift))))
                  (map-objects-in-range fun
-                                       (ash start (- sb-vm:n-fixnum-tag-bits))
+                                       (ash start (- n-fixnum-tag-bits))
                                        end))))
 
             ((:read-only #-gencgc :dynamic)
@@ -450,10 +450,10 @@ We could try a few things to mitigate this:
                     (= (slot (deref page-table (1+ end-page)) 'start) 0))
             (return))
           (incf end-page))
-    (let ((start (sap+ base (truly-the sb-vm:signed-word
+    (let ((start (sap+ base (truly-the signed-word
                                        (logand (* start-page gencgc-card-bytes)
                                                most-positive-word))))
-          (end (sap+ base (truly-the sb-vm:signed-word
+          (end (sap+ base (truly-the signed-word
                                      (logand (+ (* end-page gencgc-card-bytes)
                                                 end-page-bytes-used)
                                              most-positive-word)))))
@@ -1289,7 +1289,7 @@ We could try a few things to mitigate this:
   #+gencgc
   (let* ((n-bits
           (progn
-            (sb-vm::close-current-gc-region)
+            (close-current-gc-region)
             (+ next-free-page 50)))
          (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
@@ -1364,16 +1364,16 @@ We could try a few things to mitigate this:
 #+sb-thread
 (defun show-tls-map ()
   (let ((list
-         (sort (sb-vm::list-allocated-objects
+         (sort (list-allocated-objects
                 :all
-                :type sb-vm:symbol-widetag
+                :type symbol-widetag
                 :test (lambda (x) (plusp (sb-kernel:symbol-tls-index x))))
                #'<
                :key #'sb-kernel:symbol-tls-index))
         (prev 0))
     (dolist (x list)
-      (let ((n  (ash (sb-kernel:symbol-tls-index x) (- sb-vm:word-shift))))
-        (when (and (> n sb-vm::primitive-thread-object-length)
+      (let ((n  (ash (sb-kernel:symbol-tls-index x) (- word-shift))))
+        (when (and (> n primitive-thread-object-length)
                    (> n (1+ prev)))
           (format t "(unused)~%"))
         (format t "~5d = ~s~%" n x)
@@ -1395,15 +1395,15 @@ We could try a few things to mitigate this:
 ;;; to fail.
 (defun print-page-contents (page)
   (let* ((start
-          (+ (current-dynamic-space-start) (* sb-vm:gencgc-card-bytes page)))
+          (+ (current-dynamic-space-start) (* gencgc-card-bytes page)))
          (end
-          (+ start sb-vm:gencgc-card-bytes)))
+          (+ start gencgc-card-bytes)))
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
 (defun map-code-objects (fun)
   (dx-flet ((filter (obj type size)
               (declare (ignore size))
-              (when (= type sb-vm:code-header-widetag)
+              (when (= type code-header-widetag)
                 (funcall fun obj)))
             (nofilter (obj type size)
               (declare (ignore type size))
@@ -1428,7 +1428,7 @@ We could try a few things to mitigate this:
     (map-code-objects #'visit)))
 
 (defun show-all-layouts ()
-  (let ((l (sb-vm::list-allocated-objects :all :test #'sb-kernel::wrapper-p))
+  (let ((l (list-allocated-objects :all :test #'sb-kernel::wrapper-p))
         zero trailing-raw trailing-tagged vanilla)
     (dolist (x l)
       (let ((m (wrapper-bitmap x)))
@@ -1463,7 +1463,7 @@ We could try a few things to mitigate this:
 
 #+ubsan
 (defun find-poisoned-vectors (&aux result)
-  (dolist (v (sb-vm:list-allocated-objects :all :type sb-vm:simple-vector-widetag)
+  (dolist (v (list-allocated-objects :all :type simple-vector-widetag)
              result)
     (when (dotimes (i (length v))
             (declare (optimize (sb-c::aref-trapping 0)))
