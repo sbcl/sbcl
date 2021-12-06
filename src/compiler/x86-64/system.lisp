@@ -557,14 +557,3 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:generator 1
     ;; atomic because the immobile gen# is in the same byte
     (inst and :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x7f)))
-
-(define-vop ()
-  (:translate update-object-layout)
-  (:args (obj :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (inst push obj)
-    (invoke-asm-routine 'call 'invalid-layout-trap vop)
-    (inst pop res)))

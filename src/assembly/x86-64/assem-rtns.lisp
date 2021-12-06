@@ -453,3 +453,26 @@
       ;; store newval into object
       (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax))))
   (inst ret 24)) ; remove 3 stack args
+
+;;; These are trampolines, but they benefit from not being in the 'tramps' file
+;;; because they'll automatically get a vop and an assembly routine this way,
+;;; where tramps only get the assembly routine.
+(define-assembly-routine (update-object-layout
+                          (:policy :fast-safe)
+                          (:translate update-object-layout)
+                          (:return-style :raw))
+    ((:arg x (descriptor-reg) rdx-offset)
+     (:res r (descriptor-reg) rdx-offset))
+  (progn x r)
+  (with-registers-preserved (lisp :except rdx-tn)
+    (call-static-fun 'update-object-layout 1)))
+
+(define-assembly-routine (sb-impl::install-hash-table-lock
+                          (:policy :fast-safe)
+                          (:translate sb-impl::install-hash-table-lock)
+                          (:return-style :raw))
+    ((:arg x (descriptor-reg) rdx-offset)
+     (:res r (descriptor-reg) rdx-offset))
+  (progn x r)
+  (with-registers-preserved (lisp :except rdx-tn)
+    (call-static-fun 'sb-impl::install-hash-table-lock 1)))

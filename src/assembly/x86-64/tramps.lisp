@@ -125,18 +125,3 @@
     (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
     (call-static-fun 'ensure-symbol-hash 1)
     (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
-
-(define-assembly-routine (sb-impl::install-hash-table-lock
-                          (:return-style :raw))
-  ()
-  (with-registers-preserved (lisp)
-    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-    (call-static-fun 'sb-impl::install-hash-table-lock 1)
-    (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc
-
-(define-assembly-routine (invalid-layout-trap (:return-style :none)) ()
-  (with-registers-preserved (lisp)
-    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
-    (call-static-fun 'update-object-layout 1)
-    (inst mov (ea 16 rbp-tn) rdx-tn)) ; result to arg passing loc
-  (inst ret)) ;  Caller pops the result
