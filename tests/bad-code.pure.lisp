@@ -621,4 +621,12 @@
   (assert (nth-value 2
                      (checked-compile
                       `(lambda (x) (find-if 'and x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (funcall 'if x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (mapcar 'and x))
                       :allow-warnings 'warning))))

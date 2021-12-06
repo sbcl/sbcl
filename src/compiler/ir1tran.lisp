@@ -230,42 +230,46 @@
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
 (defun find-global-fun (name latep)
-  (unless (info :function :kind name)
-    (setf (info :function :kind name) :function)
-    (setf (info :function :where-from name) :assumed))
-  (let ((where (info :function :where-from name)))
-    (when (and (eq where :assumed)
-               ;; Slot accessors are defined just-in-time, if not already.
-               (not (typep name '(cons (eql sb-pcl::slot-accessor))))
-               ;; In the ordinary target Lisp, it's silly to report
-               ;; undefinedness when the function is defined in the
-               ;; running Lisp. But at cross-compile time, the current
-               ;; definedness of a function is irrelevant to the
-               ;; definedness at runtime, which is what matters.
-               #-sb-xc-host (not (fboundp name))
-               ;; LATEP is true when the user has indicated that
-               ;; late-late binding is desired by using eg. a quoted
-               ;; symbol -- in which case it makes little sense to
-               ;; complain about undefined functions.
-               (not latep))
-      (note-undefined-reference name :function))
-    (let ((ftype (global-ftype name))
-          (notinline (fun-lexically-notinline-p name)))
-      (make-global-var
-       :kind :global-function
-       :%source-name name
-       :type (if (or (eq where :declared)
-                     (and (not latep)
-                          (not notinline)
-                          *derive-function-types*))
-                 ftype
-                 (specifier-type 'function))
-       :defined-type (if (and (not latep) (not notinline))
-                         ftype
-                         (specifier-type 'function))
-       :where-from (if notinline
-                       where
-                       (maybe-defined-here name where))))))
+  (let ((kind (info :function :kind name)))
+    (unless kind
+      (setf (info :function :kind name) :function)
+      (setf (info :function :where-from name) :assumed))
+    (let ((where (info :function :where-from name)))
+      (when (and (eq where :assumed)
+                 ;; Slot accessors are defined just-in-time, if not already.
+                 (not (typep name '(cons (eql sb-pcl::slot-accessor))))
+                 ;; In the ordinary target Lisp, it's silly to report
+                 ;; undefinedness when the function is defined in the
+                 ;; running Lisp. But at cross-compile time, the current
+                 ;; definedness of a function is irrelevant to the
+                 ;; definedness at runtime, which is what matters.
+                 #-sb-xc-host (not (fboundp name))
+                 ;; LATEP is true when the user has indicated that
+                 ;; late-late binding is desired by using eg. a quoted
+                 ;; symbol -- in which case it makes little sense to
+                 ;; complain about undefined functions.
+                 (not latep))
+        (note-undefined-reference name :function))
+      (case kind
+        ((:macro :special-form)
+         (compiler-warn "~(~a~) ~s where a function is expected" kind name)))
+      (let ((ftype (global-ftype name))
+            (notinline (fun-lexically-notinline-p name)))
+        (make-global-var
+         :kind :global-function
+         :%source-name name
+         :type (if (or (eq where :declared)
+                       (and (not latep)
+                            (not notinline)
+                            *derive-function-types*))
+                   ftype
+                   (specifier-type 'function))
+         :defined-type (if (and (not latep) (not notinline))
+                           ftype
+                           (specifier-type 'function))
+         :where-from (if notinline
+                         where
+                         (maybe-defined-here name where)))))))
 
 ;;; Have some DEFINED-FUN-FUNCTIONALS of a FREE-FUNS entry become invalid?
 ;;; Drop 'em.

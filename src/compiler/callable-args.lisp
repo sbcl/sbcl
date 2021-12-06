@@ -436,7 +436,7 @@
       ((and name
             (valid-function-name-p name)
             (memq (info :function :kind name) '(:macro :special-form)))
-       (compiler-warn "~(~a~) ~a where a function is expected"
+       (compiler-warn "~(~a~) ~s where a function is expected"
                       (info :function :kind name) name))
       ((fun-type-p type)
        ;; If the destination is a combination-fun that means the function
