@@ -136,8 +136,6 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
                             (void*)(1+((lispobj)pointer | LOWTAG_MASK)));
 }
 
-struct vector *symbol_name(lispobj*);
-
 extern void scrub_control_stack(void);
 extern void scrub_thread_control_stack(struct thread *);
 

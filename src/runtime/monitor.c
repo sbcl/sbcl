@@ -289,7 +289,7 @@ call_cmd(char **ptr)
         lispobj *obj = native_pointer(thing);
         switch (widetag_of(obj)) {
           case SYMBOL_WIDETAG:
-              function = symbol_function(obj);
+              function = symbol_function((struct symbol*)obj);
               if (function == NIL) {
                   printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
                   return 0;

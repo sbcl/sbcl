@@ -547,7 +547,7 @@ static void brief_fun_or_otherptr(lispobj obj)
                 if (lowtag_of(name) == OTHER_POINTER_LOWTAG
                     && widetag_of(native_pointer(name)) == SYMBOL_WIDETAG) {
                   printf(" for ");
-                  struct vector* str = symbol_name(native_pointer(name));
+                  struct vector* str = symbol_name(SYMBOL(name));
                   safely_show_lstring(str, 0, stdout);
                 }
             }
@@ -571,9 +571,9 @@ static void print_slots(char **slots, int count, lispobj *ptr)
     }
 }
 
-lispobj symbol_function(lispobj* symbol)
+lispobj symbol_function(struct symbol* symbol)
 {
-    lispobj info_holder = ((struct symbol*)symbol)->info;
+    lispobj info_holder = symbol->info;
     if (listp(info_holder))
         info_holder = CONS(info_holder)->cdr;
     if (lowtag_of(info_holder) == INSTANCE_POINTER_LOWTAG) {
@@ -642,10 +642,10 @@ static void print_fun_or_otherptr(lispobj obj)
         // Only 1 byte of a symbol header conveys its size.
         // The other bytes may be freely used by the backend.
         print_slots(symbol_slots, count & 0xFF, ptr);
-        if (symbol_function(ptr-1) != NIL)
-            print_obj("fun: ", symbol_function(ptr-1));
+        struct symbol* sym = (void*)(ptr - 1);
+        if (symbol_function(sym) != NIL) print_obj("fun: ", symbol_function(sym));
 #ifdef LISP_FEATURE_SB_THREAD
-        int tlsindex = tls_index_of((struct symbol*)(ptr-1));
+        int tlsindex = tls_index_of(sym);
         struct thread*th = get_sb_vm_thread();
         if (th != 0 && tlsindex != 0) {
             lispobj v = *(lispobj*)(tlsindex + (char*)th);
@@ -922,21 +922,20 @@ void brief_print(lispobj obj)
 
 #include "forwarding-ptr.h"
 #include "genesis/classoid.h"
-struct vector * symbol_name(lispobj * sym)
+struct vector * symbol_name(struct symbol* sym)
 {
-  if (forwarding_pointer_p(sym))
-    sym = native_pointer(forwarding_pointer_value(sym));
-  if (lowtag_of(((struct symbol*)sym)->name) != OTHER_POINTER_LOWTAG)
-      return NULL;
-  return VECTOR(follow_maybe_fp(((struct symbol*)sym)->name));
+  if (forwarding_pointer_p((lispobj*)sym))
+    sym = (void*)native_pointer(forwarding_pointer_value((lispobj*)sym));
+  lispobj name = sym->name;
+  if (lowtag_of(name) != OTHER_POINTER_LOWTAG) return NULL;
+  return VECTOR(follow_maybe_fp(name));
 }
 struct vector * classoid_name(lispobj * classoid)
 {
   if (forwarding_pointer_p(classoid))
       classoid = native_pointer(forwarding_pointer_value(classoid));
   lispobj sym = ((struct classoid*)classoid)->name;
-  return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL
-    : symbol_name(native_pointer(sym));
+  return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL : symbol_name(SYMBOL(sym));
 }
 struct vector * layout_classoid_name(lispobj * layout)
 {

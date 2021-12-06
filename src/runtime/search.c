@@ -93,7 +93,6 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
 {
     lispobj* where = (lispobj*)start;
     lispobj* limit = (lispobj*)end;
-    struct symbol *symbol;
     lispobj namelen = make_fixnum(strlen(name));
 
 #ifdef LISP_FEATURE_GENCGC
@@ -108,17 +107,16 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
 #endif
     while (where < limit) {
         lispobj word = *where;
+        struct vector *string;
         if (header_widetag(word) == SYMBOL_WIDETAG &&
-            lowtag_of((symbol = (struct symbol *)where)->name) == OTHER_POINTER_LOWTAG) {
-            struct vector *symbol_name = VECTOR(symbol->name);
-            if (gc_managed_addr_p((lispobj)symbol_name) &&
-                ((widetag_of(&symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
-                  && symbol_name->length_ == namelen // KLUDGE: abstraction leakage, but ok
-                  && !(ignore_case ? strcasecmp : strcmp)((char *)symbol_name->data, name))
+            (string = symbol_name((struct symbol*)where)) != 0 &&
+            string->length_ == namelen) {
+            if (gc_managed_addr_p((lispobj)string) &&
+                ((widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG
+                  && !(ignore_case ? strcasecmp : strcmp)((char *)string->data, name))
 #ifdef LISP_FEATURE_SB_UNICODE
-                 || (widetag_of(&symbol_name->header) == SIMPLE_CHARACTER_STRING_WIDETAG
-                     && symbol_name->length_ == namelen
-                     && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data,
+                 || (widetag_of(&string->header) == SIMPLE_CHARACTER_STRING_WIDETAG
+                     && !strcmp_ucs4_ascii((uint32_t*)string->data,
                                            (unsigned char*)name, ignore_case))
 #endif
                  ))

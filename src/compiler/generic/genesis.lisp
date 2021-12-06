@@ -3155,6 +3155,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
 (defun write-cast-operator (operator-name c-name lowtag stream)
+  (when (eq operator-name 'symbol)
+    (format stream "
+lispobj symbol_function(struct symbol* symbol);
+#include \"genesis/vector.h\"
+struct vector *symbol_name(struct symbol*);~%"))
   (format stream "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag))
 
