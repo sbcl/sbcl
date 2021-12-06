@@ -528,7 +528,7 @@ static void brief_fun_or_otherptr(lispobj obj)
             symbol = (struct symbol *)ptr;
             if (symbol->package == NIL)
                 printf("#:");
-            show_lstring(VECTOR(symbol->name), 0, stdout);
+            show_lstring(symbol_name(symbol), 0, stdout);
             break;
 
         case SIMPLE_BASE_STRING_WIDETAG:
@@ -934,6 +934,7 @@ struct vector * classoid_name(lispobj * classoid)
 {
   if (forwarding_pointer_p(classoid))
       classoid = native_pointer(forwarding_pointer_value(classoid));
+  // Classoids are named by symbols even though a CLASS name is arbitrary (theoretically)
   lispobj sym = ((struct classoid*)classoid)->name;
   return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL : symbol_name(SYMBOL(sym));
 }

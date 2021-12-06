@@ -158,7 +158,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 
 static boolean sym_stringeq(lispobj sym, const char *string, int len)
 {
-    struct vector* name = VECTOR(SYMBOL(sym)->name);
+    struct vector* name = symbol_name(SYMBOL(sym));
     return widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG
         && vector_len(name) == len
         && !memcmp(name->data, string, len);

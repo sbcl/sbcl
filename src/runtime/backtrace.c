@@ -167,7 +167,7 @@ print_entry_name (lispobj name, FILE *f)
                     fputs("::", f);
                 }
             }
-            print_string(VECTOR(follow_maybe_fp(symbol->name)), f);
+            print_string(symbol_name(symbol), f);
             break;
         case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG

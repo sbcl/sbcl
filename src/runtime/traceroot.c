@@ -443,7 +443,7 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
                 safely_show_lstring(VECTOR(package_name), 0, stream);
                 fputs("::", stream);
             }
-            safely_show_lstring(VECTOR(SYMBOL(obj)->name), 0, stream);
+            safely_show_lstring(symbol_name(SYMBOL(obj)), 0, stream);
             break;
         }
 }

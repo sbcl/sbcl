@@ -1103,7 +1103,7 @@ char* get_asm_routine_by_name(const char* name, int *index)
         for (i=2 ; i < vector_len(table) ; i += 2)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
-                && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data))) {
+                && !strcmp(name, (char*)(symbol_name(SYMBOL(sym))->data))) {
                 lispobj value = table->data[i+1];
                 // value = (start-address . (end-address . index))
                 if (index)
