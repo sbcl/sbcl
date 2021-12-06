@@ -20,7 +20,7 @@
   (defknown (setf symbol-extra) (t t) t ())
   (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
 
-(defconstant extended-symbol-size (1+ symbol-size))
+(defconstant augmented-symbol-size (1+ symbol-size))
 
 #+sb-thread
 (dovector (slot (primitive-object-slots (primitive-object 'thread)))

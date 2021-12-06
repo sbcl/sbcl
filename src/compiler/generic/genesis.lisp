@@ -1042,17 +1042,18 @@ core and return a descriptor to it."
 (defvar *cold-symbol-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
 
 ;;; Allocate (and initialize) a symbol.
-(defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
+(defun allocate-symbol (size cold-package name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag))
-        (cold-name (set-readonly (base-string-to-core name *dynamic*)))
-        (hash (make-fixnum-descriptor
-               (if core-file-name (sb-c::symbol-name-hash name) 0))))
-    (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
-    (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
-    (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
-    (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)
-    (write-wordindexed symbol sb-vm:symbol-package-slot *nil-descriptor*)
+  (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
+    (when core-file-name
+      (let* ((cold-name (set-readonly (base-string-to-core name *dynamic*)))
+             (hash (make-fixnum-descriptor
+                    (if core-file-name (sb-c::symbol-name-hash name) 0))))
+        (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
+        (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
+        (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
+        (write-wordindexed symbol sb-vm:symbol-package-slot cold-package)
+        (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1575,7 +1576,7 @@ core and return a descriptor to it."
 ;; - the target compiler doesn't and couldn't - but here it doesn't matter.
 (defun get-uninterned-symbol (name)
   (ensure-gethash name *uninterned-symbol-table*
-                  (allocate-symbol sb-vm:symbol-size name)))
+                  (allocate-symbol sb-vm:symbol-size nil name)))
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
@@ -1640,12 +1641,14 @@ core and return a descriptor to it."
       ;; any symbol naming such a macro, though things still work if the slot
       ;; doesn't exist, as long as only a deferred interpreter processor is used
       ;; and not an immediate processor.
-      (let ((handle (allocate-symbol
-                     (if (or (eq (info :function :kind symbol) :special-form)
-                             (member symbol '(sb-sys:with-pinned-objects)))
-                         sb-vm:extended-symbol-size
-                         sb-vm:symbol-size)
-                     name :gspace gspace)))
+      (let* ((pkg-info
+              (when core-file-name (cold-find-package-info (package-name package))))
+             (handle (allocate-symbol
+                      (if (or (eq (info :function :kind symbol) :special-form)
+                              (member symbol '(sb-sys:with-pinned-objects)))
+                          sb-vm:augmented-symbol-size
+                          sb-vm:symbol-size)
+                      (cdr pkg-info) name :gspace gspace)))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
@@ -1655,12 +1658,8 @@ core and return a descriptor to it."
             (cold-assign-tls-index handle index)))
         ;; Steps that only make sense when writing a core file
         (when core-file-name
-          (let* ((pkg-info (cold-find-package-info (package-name package)))
-                 (cold-pkg (cdr pkg-info)))
-            (write-wordindexed handle sb-vm:symbol-package-slot cold-pkg)
-            (record-accessibility
-             (or access (nth-value 1 (find-symbol name package)))
-             pkg-info handle package symbol))
+          (record-accessibility (or access (nth-value 1 (find-symbol name package)))
+                                pkg-info handle package symbol)
           (when (eq package *keyword-package*)
             (cold-set handle handle)))
         handle)))
@@ -1697,6 +1696,10 @@ core and return a descriptor to it."
          (name (set-readonly (base-string-to-core "NIL" *dynamic*))))
     (aver (= (descriptor-bits nil-val) sb-vm:nil-value))
 
+    (setf *nil-descriptor* nil-val
+          (gethash (descriptor-bits nil-val) *cold-symbols*) nil
+          (get nil 'cold-intern-info) nil-val)
+
     ;; Alter the first word to 0 instead of the symbol size. It reads as a fixnum,
     ;; but is meaningless. Not only that, the widetag is relatively meaningless too,
     ;; even though you can access memory at [NIL - other-pointer-lowtag].
@@ -1722,14 +1725,16 @@ core and return a descriptor to it."
     ;; not necessarily be a widetag - it could be raw bits of a struct. Finally,
     ;; the above sequence would not necessarily decrease the instruction count!
 
-    (write-wordindexed des 0 (make-fixnum-descriptor 0))
-    (write-wordindexed des 1 (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
-    (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
-    (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
-    (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-    (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
-    (setf (gethash (descriptor-bits nil-val) *cold-symbols*) nil
-          (get nil 'cold-intern-info) nil-val)))
+    (when core-file-name
+      (write-wordindexed des 0 (make-fixnum-descriptor 0))
+      ;; The header-word for NIL "as a symbol" contains a length + widetag.
+      (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
+                                                                sb-vm:symbol-widetag))
+      (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
+      (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
+      (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
+      (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name))
+    nil))
 
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
@@ -3447,7 +3452,6 @@ III. initially undefined function references (alphabetically):
                 (car pair)
                 (cold-layout-length proxy))))
 
-
   (format t "~%~|~%VI. packages:~2%")
   (dolist (pair (sort (%hash-table-alist *cold-package-symbols*) #'<
                       :key (lambda (x) (descriptor-bits (cddr x)))))
@@ -3754,8 +3758,8 @@ III. initially undefined function references (alphabetically):
            (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
-      (setf *nil-descriptor* (make-nil-descriptor)
-            *simple-vector-0-descriptor* (vector-in-core nil))
+      (make-nil-descriptor)
+      (setf *simple-vector-0-descriptor* (vector-in-core nil))
 
       (when core-file-name
         (read-structure-definitions defstruct-descriptions))
