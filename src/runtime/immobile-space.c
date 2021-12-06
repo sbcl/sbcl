@@ -767,9 +767,8 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
 
   switch (widetag_of(obj)) {
   case FDEFN_WIDETAG:
-    return younger_p(fdefn_callee_lispobj((struct fdefn*)obj),
-                     gen, keep_gen, new_gen)
-        || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
+    if (younger_p(fdefn_callee_lispobj((struct fdefn*)obj), gen, keep_gen, new_gen)) return 1;
+    break; // proceed to other slots as usual (harmlessly revisiting 'raw_addr')
   case CODE_HEADER_WIDETAG:
     // This is a simplifying trampoline around a closure or FIN.
     // The only pointerish slot is debug_info (the called function).
