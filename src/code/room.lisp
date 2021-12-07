@@ -1349,18 +1349,25 @@ We could try a few things to mitigate this:
     (with-pinned-objects (obj)
       (dotimes (i count)
         (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
-          (multiple-value-bind (lispobj ok)
+          (multiple-value-bind (lispobj ok fmt)
               (cond ((and (typep thing 'code-component)
                           (< 1 i (code-header-words thing)))
                      (values (code-header-ref thing i) t))
+                    #+compact-symbol
+                    ((and (typep thing '(and symbol (not null)))
+                          (= i symbol-name-slot))
+                     (values (list (sb-impl::symbol-package-id thing)
+                                   (symbol-name thing))
+                             t
+                             "{~{~A,~S~}}"))
                     (decode
                      (make-lisp-obj word nil)))
             (let ((*print-lines* 1)
                   (*print-pretty* t))
-              (format t "~x: ~v,'0x~:[~; = ~S~]~%"
+              (format t "~x: ~v,'0x~:[~; = ~@?~]~%"
                       (+ addr (ash i word-shift))
                       (* 2 n-word-bytes)
-                      word ok lispobj))))))))
+                      word ok (or fmt "~S") lispobj))))))))
 #+sb-thread
 (defun show-tls-map ()
   (let ((list

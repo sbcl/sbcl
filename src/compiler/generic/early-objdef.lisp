@@ -111,6 +111,9 @@
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
        #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
        #+64-bit #x100
+       ;; the name of NIL is a string which takes up 4 words preceding nil
+       (* 4 n-word-bytes)
+       ;; magic padding because of NIL's symbol/cons-like duality
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 

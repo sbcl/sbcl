@@ -1048,6 +1048,9 @@ implementation it is ~S." *!default-package-use-list*)
                       (new-length (min (+ current-length 10) +package-id-overflow+))
                       (new-vector (make-array new-length :initial-element nil)))
                  (replace new-vector vector)
+                 (with-pinned-objects (vector)
+                   (setf (extern-alien "lisp_package_vector" unsigned)
+                         (get-lisp-obj-address vector)))
                  (setf new-id current-length
                        vector new-vector
                        *id->package* vector)))
@@ -1885,6 +1888,9 @@ PACKAGE."
         (when id (setq max-id (max id max-id)))))
     (let ((a (make-array (1+ max-id) :initial-element nil)))
       (setq *id->package* a)
+      (with-pinned-objects (a)
+        (setf (extern-alien "lisp_package_vector" unsigned)
+              (get-lisp-obj-address a)))
       (do-packages (pkg)
         (let ((id (package-id pkg)))
           (when id

@@ -33,11 +33,11 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-#-immobile-space
-(define-source-transform %make-symbol (kind string)
-  (declare (ignore kind))
-  ;; Set "logically read-only" bit in pname.
-  `(sb-vm::%%make-symbol (logior-array-flags ,string ,sb-vm:+vector-shareable+)))
+#+compact-symbol
+(define-source-transform keywordp (x)
+  `(let ((object ,x))
+     (and (symbolp object)
+          (= (sb-impl::symbol-package-id object) ,sb-impl::+package-id-keyword+))))
 
 ;;; We don't want to clutter the bignum code.
 #+(and (or x86 x86-64) (not bignum-assertions))

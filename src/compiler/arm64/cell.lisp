@@ -212,6 +212,27 @@
     (unless (not-nil-tn-ref-p args)
       (inst and res res (bic-mask fixnum-tag-mask)))))
 
+(define-vop ()
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:translate sb-impl::symbol-package-id)
+  (:policy :fast-safe)
+  (:generator 1 ; ASSUMPTION: symbol-package-bits = 16
+   (inst ldrh result (@ symbol (+ (ash symbol-name-slot word-shift)
+                                  (- other-pointer-lowtag)
+                                  6))))) ; little-endian
+(define-vop ()
+  (:policy :fast-safe)
+  (:translate symbol-name)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:generator 5
+    (pseudo-atomic (pa-flag :sync nil)
+      (loadw result symbol symbol-name-slot other-pointer-lowtag)
+      (inst and result result (1- (ash 1 sb-impl::symbol-name-bits))))))
+
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
   (:args (symbol :scs (descriptor-reg))

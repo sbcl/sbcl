@@ -436,7 +436,8 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
         switch(widetag_of(native_pointer(obj))) {
         case SYMBOL_WIDETAG:
             putc(',', stream);
-            if ((package = SYMBOL(obj)->package) == NIL) {
+            package = symbol_package(SYMBOL(obj));
+            if (package == NIL) {
                 fprintf(stream, "#:");
             } else {
                 package_name = ((struct package*)native_pointer(package))->_name;

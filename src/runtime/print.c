@@ -526,7 +526,8 @@ static void brief_fun_or_otherptr(lispobj obj)
     switch (type) {
         case SYMBOL_WIDETAG:
             symbol = (struct symbol *)ptr;
-            if (symbol->package == NIL)
+            lispobj package = symbol_package(symbol);
+            if (package == NIL)
                 printf("#:");
             show_lstring(symbol_name(symbol), 0, stdout);
             break;
@@ -559,10 +560,14 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 {
     while (count-- > 0) {
         if (*slots) {
-            // kludge for half-lispword sized slot
-            print_obj(*slots,
-                      (N_WORD_BYTES == 8 && !strcmp(*slots, "boxed_size: "))
-                      ? *ptr & 0xFFFFFFFF : *ptr);
+            // kludge for encoded slots
+            lispobj word = *ptr;
+            char* slot_name = *slots;
+            if (N_WORD_BYTES == 8 && !strcmp(slot_name, "boxed_size: ")) word = word & 0xFFFFFFFF;
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+            else if (!strcmp(slot_name, "name: ")) word = decode_symbol_name(word);
+#endif
+            print_obj(slot_name, word);
             slots++;
         } else {
             print_obj("???: ", *ptr);
@@ -651,6 +656,11 @@ static void print_fun_or_otherptr(lispobj obj)
             lispobj v = *(lispobj*)(tlsindex + (char*)th);
             print_obj("tlsval: ", v);
         }
+#endif
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+        // print_obj doesn't understand raw words, so make it a fixnum
+        int pkgid = symbol_package_id(sym) << N_FIXNUM_TAG_BITS;
+        print_obj("package_id: ", pkgid);
 #endif
         break;
 
@@ -928,7 +938,8 @@ struct vector * symbol_name(struct symbol* sym)
     sym = (void*)native_pointer(forwarding_pointer_value((lispobj*)sym));
   lispobj name = sym->name;
   if (lowtag_of(name) != OTHER_POINTER_LOWTAG) return NULL;
-  return VECTOR(follow_maybe_fp(name));
+  lispobj string = decode_symbol_name(name);
+  return VECTOR(follow_maybe_fp(string));
 }
 struct vector * classoid_name(lispobj * classoid)
 {

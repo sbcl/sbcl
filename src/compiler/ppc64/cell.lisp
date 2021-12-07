@@ -16,26 +16,61 @@
 
 ;;; PPC64 can't use the NIL-as-CONS + NIL-as-symbol trick *and* avoid using
 ;;; temp-reg-tn to access symbol slots.
-;;; Since the NIL-as-CONS is necessary, and efficient accessor to lists and
+;;; Since the NIL-as-CONS is necessary, and efficient access to lists and
 ;;; instances is desirable, we lose a little on symbol access by being forced
 ;;; to pre-check for NIL.
+
+(defun read-symbol-slot (slot symbol result)
+  (let ((null-label (gen-label))
+        (done-label (gen-label)))
+    (inst cmpld symbol null-tn)
+    (inst beq null-label)
+    (loadw result symbol slot other-pointer-lowtag)
+    (inst b done-label)
+    (emit-label null-label)
+    ;; This is a very un-memorable bit of fudge factor magic
+    ;; that I have to re-figure-out every time I need it.
+    ;; Some sort of abstraction might be nice. Or not.
+    (loadw result symbol (1- slot) list-pointer-lowtag)
+    (emit-label done-label)))
+
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (cond ((member name '(symbol-name symbol-%info sb-xc:symbol-package))
-           (let ((null-label (gen-label))
-                 (done-label (gen-label)))
-             (inst cmpld object null-tn)
-             (inst beq null-label)
-             (loadw result object offset lowtag)
-             (inst b done-label)
-             (emit-label null-label)
-             (loadw result object (1- offset) list-pointer-lowtag)
-             (emit-label done-label)))
+    (cond ((member name '(symbol-%info))
+           (read-symbol-slot offset object result))
           (t
            (loadw result object offset lowtag)))))
+
+(define-vop ()
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:translate sb-impl::symbol-package-id)
+  (:policy :fast-safe)
+  (:generator 5
+   (inst cmpld symbol null-tn)
+   ;; This loads "random" bits if SYMBOL is NIL, but since RESULT is non-descriptor
+   ;; there is no harm. We check for NULL and move a constant to the result if so.
+   ;; ASSUMPTION: symbol-package-bits = 16
+   (inst lhz result symbol (+ (ash symbol-name-slot word-shift)
+                              (- other-pointer-lowtag)
+                              #+little-endian 6))
+   (inst bne done)
+   (inst lr result 1) ; SB-IMPL::+PACKAGE-ID-LISP+
+   DONE))
+(define-vop ()
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (result :scs (descriptor-reg)))
+  (:translate symbol-name)
+  (:policy :fast-safe)
+  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
+  (:generator 2
+   (pseudo-atomic (pa-flag :sync nil)
+     (read-symbol-slot symbol-name-slot symbol result)
+     (inst rldicl result result 0 sb-impl::package-id-bits))))
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))

@@ -2220,7 +2220,7 @@
   (sort (copy-list `((,sb-vm:symbol-value-slot . symbol-value)
                      (,sb-vm:symbol-info-slot . symbol-info)
                      (,sb-vm:symbol-name-slot . symbol-name)
-                     (,sb-vm:symbol-package-slot . symbol-package)))
+                     #-compact-symbol (,sb-vm:symbol-package-slot . symbol-package)))
         #'<
         :key #'car))
 

@@ -1040,6 +1040,8 @@ core and return a descriptor to it."
       tls-index)))
 
 (defvar *cold-symbol-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defun encode-symbol-name (package-id name)
+  (logior (ash package-id sb-impl::symbol-name-bits) (descriptor-bits name)))
 
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (size cold-package name &key (gspace (symbol-value *cold-symbol-gspace*)))
@@ -1052,8 +1054,16 @@ core and return a descriptor to it."
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
-        (write-wordindexed symbol sb-vm:symbol-package-slot cold-package)
-        (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)))
+        #+compact-symbol
+        (write-wordindexed/raw symbol sb-vm:symbol-name-slot
+                               (encode-symbol-name
+                                (if cold-package
+                                    (descriptor-fixnum (read-slot cold-package :id))
+                                    sb-impl::+package-id-none+)
+                                cold-name))
+        #-compact-symbol
+        (progn (write-wordindexed symbol sb-vm:symbol-package-slot cold-package)
+               (write-wordindexed symbol sb-vm:symbol-name-slot cold-name))))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1693,17 +1703,20 @@ core and return a descriptor to it."
                    #+64-bit sb-vm:simple-array-signed-byte-64-widetag
                    6 6 *static*)
   #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
-  (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
+  ;; When tracing pointers from static space, we don't process NIL as a symbol,
+  ;; i.e. we don't use scav_symbol, instead scanning it as a bunch of conses.
+  ;; So there can't be any encoded pointers to dynamic space.
+  ;; This works for now, because the name slot will either be a normal pointer
+  ;; or a pointer that is to a huge address (and hence ignored).
+  (let* ((name (set-readonly (base-string-to-core "NIL" *static*)))
+         (des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                       (* 2 sb-vm:n-word-bytes)
                                       (- sb-vm:list-pointer-lowtag
                                          ;; ALLOCATE-OTHERPTR always adds in
                                          ;; OTHER-POINTER-LOWTAG, so subtract it.
                                          sb-vm:other-pointer-lowtag))))
-         (initial-info (cold-cons nil-val nil-val))
-         ;; NIL's name is in dynamic space because any extra bytes allocated
-         ;; in static space need to be accounted for by STATIC-SYMBOL-OFFSET.
-         (name (set-readonly (base-string-to-core "NIL" *dynamic*))))
+         (initial-info (cold-cons nil-val nil-val)))
     (aver (= (descriptor-bits nil-val) sb-vm:nil-value))
 
     (setf *nil-descriptor* nil-val
@@ -1743,7 +1756,11 @@ core and return a descriptor to it."
       (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
       (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
       (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-      (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name))
+      (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
+      #+compact-symbol
+      (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
+                             (encode-symbol-name sb-impl::+package-id-lisp+ name))
+      #-compact-symbol (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name))
     nil))
 
 ;;; Since the initial symbols must be allocated before we can intern
@@ -1754,6 +1771,7 @@ core and return a descriptor to it."
   ;; NIL did not have its package assigned. Do that now.
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
     ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
+    #-compact-symbol
     (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-slot 1)
                        (cdr target-cl-pkg-info))
     (when core-file-name
@@ -2964,6 +2982,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; rather than the munged names currently exported.  --njf, 2004-08-09
     (dolist (c '(sb-impl::+package-id-none+
                  sb-impl::+package-id-keyword+
+                 sb-impl::symbol-name-bits
                  sb-vm:n-word-bits sb-vm:n-word-bytes
                  sb-vm:n-lowtag-bits sb-vm:lowtag-mask
                  sb-vm:n-widetag-bits sb-vm:widetag-mask
@@ -3176,7 +3195,21 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (format stream "
 lispobj symbol_function(struct symbol* symbol);
 #include \"genesis/vector.h\"
-struct vector *symbol_name(struct symbol*);~%"))
+struct vector *symbol_name(struct symbol*);~%
+lispobj symbol_package(struct symbol*);~%")
+    #+compact-symbol
+    (progn (format stream "#define decode_symbol_name(ptr) (ptr & (uword_t)0x~X)~%"
+                   (mask-field (byte sb-impl::symbol-name-bits 0) -1))
+           (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
+  s->name = (s->name & (uword_t)0x~X) | name;~%}~%"
+                   (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1))
+           (format stream
+                   "static inline int symbol_package_id(struct symbol* s) { return s->name >> ~D; }~%"
+                   sb-impl::symbol-name-bits))
+    #-compact-symbol
+    (progn (format stream "#define decode_symbol_name(ptr) ptr~%")
+           (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
+  s->name = name;~%}~%")))
   (format stream "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag))
 

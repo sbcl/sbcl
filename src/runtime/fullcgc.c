@@ -358,6 +358,19 @@ static void trace_object(lispobj* where)
         return;
 #endif
         break;
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+    case SYMBOL_WIDETAG:
+        {
+        struct symbol* s = (void*)where;
+        gc_mark_obj(decode_symbol_name(s->name));
+        gc_mark_obj(s->value);
+        gc_mark_obj(s->info);
+        gc_mark_obj(s->reserved);
+        // process the unnamed slot of augmented symbols
+        if ((s->header & 0xFF00) == (SYMBOL_SIZE<<8)) gc_mark_obj(*(1+&s->reserved));
+        }
+        return;
+#endif
     case FDEFN_WIDETAG:
         gc_mark_obj(fdefn_callee_lispobj((struct fdefn*)where));
         scan_to = 3;

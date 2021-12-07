@@ -199,7 +199,8 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
 }
 
 lispobj sb_kernel_package() {
-    return SYMBOL(FDEFN(SUB_GC_FDEFN)->name)->package;
+    struct symbol* s = SYMBOL(FDEFN(SUB_GC_FDEFN)->name);
+    return symbol_package(s);
 }
 
 lispobj find_package(char* package_name)

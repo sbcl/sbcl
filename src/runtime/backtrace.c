@@ -128,6 +128,28 @@ static int string_equal (struct vector *vector, char *string)
     return !strcmp((char *) vector->data, string);
 }
 
+lispobj symbol_package(struct symbol* s)
+{
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+    static int warned;
+    // if using ldb when debugging cold-init, this can be confusing to see all symbols
+    // as if they were uninterned
+    if (!lisp_package_vector) {
+        if (!warned) {
+          fprintf(stderr, "Warning: package vector has not been initialized yet\n");
+          warned = 1;
+        }
+        return NIL;
+    }
+    struct vector* v = VECTOR(lisp_package_vector);
+    int id = symbol_package_id(s);
+    if (id < fixnum_value(v->length_)) return v->data[id];
+    lose("can't decode package ID %d", id);
+#else
+    return s->package;
+#endif
+}
+
 static void
 print_entry_name (lispobj name, FILE *f)
 {
@@ -148,12 +170,12 @@ print_entry_name (lispobj name, FILE *f)
         putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
         struct symbol *symbol = SYMBOL(name);
+        lispobj package = symbol_package(symbol);
         int widetag = header_widetag(symbol->header);
         switch (widetag) {
         case SYMBOL_WIDETAG:
-            if (symbol->package != NIL) {
-                struct package *pkg
-                    = (struct package *) native_pointer(follow_maybe_fp(symbol->package));
+            if (package != NIL) {
+                struct package *pkg = (void*) native_pointer(follow_maybe_fp(package));
                 struct vector *pkg_name = VECTOR(follow_maybe_fp(pkg->_name));
                 if (string_equal(pkg_name, "COMMON-LISP"))
                     ;

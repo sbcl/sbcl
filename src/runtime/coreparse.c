@@ -429,6 +429,20 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) adjust_pointers(slots+i, 1, adj);
             continue;
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+          case SYMBOL_WIDETAG:
+            { // Copied from scav_symbol() in gc-common
+            struct symbol* s = (void*)where;
+            adjust_pointers(&s->value, 2, adj);
+            lispobj name = decode_symbol_name(s->name);
+            lispobj adjusted_name = adjust_word(adj, name);
+            // writeback the name if it changed
+            if (adjusted_name != name) set_symbol_name(s, adjusted_name);
+            int indicated_nwords = (*where>>N_WIDETAG_BITS) & 0xFF;
+            adjust_pointers(&s->reserved, indicated_nwords - 4, adj);
+            }
+            continue;
+#endif
         case FDEFN_WIDETAG:
             adjust_pointers(where+1, 2, adj);
             // For most architectures, 'raw_addr' doesn't satisfy is_lisp_pointer()
@@ -522,7 +536,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         case COMPLEX_VECTOR_WIDETAG:
         case COMPLEX_ARRAY_WIDETAG:
         // And the rest of the purely descriptor objects.
+#ifndef LISP_FEATURE_COMPACT_SYMBOL
         case SYMBOL_WIDETAG:
+#endif
         case VALUE_CELL_WIDETAG:
         case WEAK_POINTER_WIDETAG:
         case RATIO_WIDETAG:

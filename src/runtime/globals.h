@@ -122,6 +122,8 @@ extern lispobj *current_dynamic_space;
 #error "Which GC?"
 #endif
 
+extern lispobj lisp_package_vector;
+
 extern void globals_init(void);
 
 #else /* __ASSEMBLER__ */

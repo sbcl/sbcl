@@ -3222,6 +3222,15 @@ verify_range(lispobj *vaddr,
                 count = code_total_nwords(code);
                 break;
                 }
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+            case SYMBOL_WIDETAG:
+                verify_range(vaddr + 2, 2, state, vaddr + 2); // 'value' and 'info'
+                lispobj name = decode_symbol_name(((struct symbol*)object)->name);
+                verify_range(vaddr + 4, 1, state, &name);
+                verify_range(vaddr + 5, (HeaderValue(*object) & 0xFF)-4, state, vaddr + 5);
+                count = 1 + TINY_BOXED_NWORDS(*object);
+                break;
+#endif
             case FDEFN_WIDETAG:
                 verify_range(vaddr + 1, 2, state, vaddr + 1);
                 lispobj callee = fdefn_callee_lispobj((struct fdefn*)vaddr);
@@ -3303,7 +3312,17 @@ void verify_heap(uword_t flags)
 #endif
     if (verbose)
         fprintf(stderr, " [static]");
-    verify_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, flags);
+    // Because NIL might contain a funnily-encoded pointer in its NAME slot
+    // (which could really just be ignored), we have to actually "correctly"
+    // process NIL as a symbol, otherwise we'll get the warning that
+    //   "Ptr 0x10000005010010f @ 50100148 (lispobj 50100147) sees non-Lisp memory"
+    // So process it as a misaligned symbol, which is fine - we don't assert
+    // alignment of the objects, only of the final pointer
+    lispobj the_symbol_nil = NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES;
+    verify_space(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + (lispobj*)the_symbol_nil,
+                 flags);
+    // Then verify the rest of static space
+    verify_space(T - OTHER_POINTER_LOWTAG, static_space_free_pointer, flags);
     if (verbose)
         fprintf(stderr, " [dynamic]");
     verify_generation(-1, flags | VERIFYING_GENERATIONAL);
@@ -4022,6 +4041,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* The Lisp start function is stored in the core header, not a static
      * symbol. It is passed to gc_and_save() in this C variable */
     if (lisp_init_function) scavenge(&lisp_init_function, 1);
+    if (lisp_package_vector) scavenge(&lisp_package_vector, 1);
     if (gc_object_watcher)  scavenge(&gc_object_watcher, 1);
     if (alloc_profile_data) scavenge(&alloc_profile_data, 1);
 

@@ -277,6 +277,10 @@
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         (when (target-featurep '(:and :sb-thread (:or :linux :freebsd)))
           (pushnew :sb-futex sb-xc:*features*))
+        ;; All except 1 of the 64-bit architectures have a spare word in
+        ;; the SYMBOL primitive object now.
+        (when (target-featurep '(:or :x86-64 :ppc64 :arm64))
+          (push :compact-symbol sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:not :win32)))
           (push :pauseless-threadstart sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or :darwin :openbsd)))

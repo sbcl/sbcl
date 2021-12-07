@@ -570,6 +570,13 @@
 (define-info-type (:source-location :declaration) :type-spec t)
 (define-info-type (:source-location :alien-type) :type-spec t)
 
+;;; If we used the maximum number of IDs available, a package gets no ID.
+;;; Any symbols in that package must use SYMBOL-DBINFO for their package.
+;;; Technically we can't store NIL, because that would be package ID 0,
+;;; i.e. directly represented in the symbol, but this type spec has to be
+;;; correct for what INFO can return, not what it may store.
+(define-info-type (:symbol :package) :type-spec (or package null))
+
 (!defun-from-collected-cold-init-forms !info-type-cold-init)
 
 #-sb-xc-host

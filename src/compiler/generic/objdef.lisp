@@ -387,7 +387,11 @@ during backtrace.
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :ref-trans symbol-name :init :arg)
+  (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
+  ;; This slot will hold an FDEFN, pending addition of :REF-TRANS
+  ;; making everything compatible with/without the feature.
+  #+compact-symbol (reserved)
+  #-compact-symbol
   (package :ref-trans sb-xc:symbol-package
            :set-trans %set-symbol-package
            :init :null)

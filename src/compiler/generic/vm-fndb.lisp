@@ -123,6 +123,9 @@
 (defknown %set-symbol-hash (symbol hash-code)
   t ())
 
+;;; SYMBOL-PACKAGE-ID demands a vop so as to avoid placing a raw bit value
+;;; in a descriptor register on precise GC. (The SLOT vop returns a descriptor)
+(defknown sb-impl::symbol-package-id (symbol) (unsigned-byte 16))
 ;;; TODOD: I'd like to eliminate the (OR NULL) from this return type.
 ;;; For that to happen, I probably need +nil-packed-infos+ to become
 ;;; placed in static space because assembly routines may need it.
