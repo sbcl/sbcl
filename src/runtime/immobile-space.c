@@ -1651,10 +1651,11 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case SYMBOL_WIDETAG:
           // - info, name, package can not point to an immobile object
-          // - symbol value, and augmented symbol's extra slot can
+          // - symbol value, fdefn, and augmented symbol's extra slot can
           adjust_words(&((struct symbol*)where)->value, 1);
+          adjust_words(&((struct symbol*)where)->fdefn, 1);
           if (size > ALIGN_UP(SYMBOL_SIZE,2)) // augmented symbol
-              adjust_words(1 + &((struct symbol*)where)->reserved, 1);
+              adjust_words(1 + &((struct symbol*)where)->fdefn, 1);
           break;
         // Special case because we might need to mark hashtables
         // as needing rehash.

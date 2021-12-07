@@ -365,9 +365,9 @@ static void trace_object(lispobj* where)
         gc_mark_obj(decode_symbol_name(s->name));
         gc_mark_obj(s->value);
         gc_mark_obj(s->info);
-        gc_mark_obj(s->reserved);
+        gc_mark_obj(s->fdefn);
         // process the unnamed slot of augmented symbols
-        if ((s->header & 0xFF00) == (SYMBOL_SIZE<<8)) gc_mark_obj(*(1+&s->reserved));
+        if ((s->header & 0xFF00) == (SYMBOL_SIZE<<8)) gc_mark_obj(*(1+&s->fdefn));
         }
         return;
 #endif

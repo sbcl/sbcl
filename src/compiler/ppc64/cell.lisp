@@ -39,7 +39,7 @@
   (:info name offset lowtag)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (cond ((member name '(symbol-%info))
+    (cond ((member name '(symbol-%info %symbol-fdefn))
            (read-symbol-slot offset object result))
           (t
            (loadw result object offset lowtag)))))

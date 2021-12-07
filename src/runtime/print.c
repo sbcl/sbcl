@@ -578,6 +578,9 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 
 lispobj symbol_function(struct symbol* symbol)
 {
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+    if (symbol->fdefn) return FDEFN(symbol->fdefn)->fun;
+#else
     lispobj info_holder = symbol->info;
     if (listp(info_holder))
         info_holder = CONS(info_holder)->cdr;
@@ -592,6 +595,7 @@ lispobj symbol_function(struct symbol* symbol)
                 return FDEFN(fdefn)->fun;
         }
     }
+#endif
     return NIL;
 }
 

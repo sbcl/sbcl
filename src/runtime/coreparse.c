@@ -439,7 +439,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // writeback the name if it changed
             if (adjusted_name != name) set_symbol_name(s, adjusted_name);
             int indicated_nwords = (*where>>N_WIDETAG_BITS) & 0xFF;
-            adjust_pointers(&s->reserved, indicated_nwords - 4, adj);
+            adjust_pointers(&s->fdefn, indicated_nwords - 4, adj);
             }
             continue;
 #endif

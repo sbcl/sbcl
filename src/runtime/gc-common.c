@@ -711,7 +711,7 @@ static sword_t scav_symbol(lispobj *where, lispobj header) {
     // We've already processed the {hash, value, info, name}, so subtract 4 words.
     // In truth, the hash was ignored, though it might be a good place to store
     // some pointer data. 64 bits of hash is way more than enough.
-    scavenge(&s->reserved, indicated_nwords - 4);
+    scavenge(&s->fdefn, indicated_nwords - 4);
     return 1 + (indicated_nwords|1); // round to odd, then add 1 for the header
 }
 #endif

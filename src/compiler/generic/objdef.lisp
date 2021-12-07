@@ -388,9 +388,16 @@ during backtrace.
         :type (or instance list)
         :init :null)
   (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
-  ;; This slot will hold an FDEFN, pending addition of :REF-TRANS
-  ;; making everything compatible with/without the feature.
-  #+compact-symbol (reserved)
+  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
+  ;; for symbols. If we ensured that any function bound to a symbol had a
+  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
+  ;; then we would only need to store that function's raw entry address here,
+  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
+  ;; to a symbol would need a tiny trampoline, which is already the case
+  ;; for #+immobile-code.
+  #+compact-symbol
+  (fdefn :ref-trans %symbol-fdefn :ref-known ()
+         :cas-trans cas-symbol-fdefn)
   #-compact-symbol
   (package :ref-trans sb-xc:symbol-package
            :set-trans %set-symbol-package

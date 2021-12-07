@@ -40,6 +40,8 @@
 ;; Given PACKED-INFO, return the fdefn that it contains for its root name,
 ;; or nil if there is no value. NIL input is acceptable and will return NIL.
 ;; (see src/compiler/info-vector for more details)
+#-compact-symbol
+(progn
 (declaim (inline packed-info-fdefn))
 (defun packed-info-fdefn (packed-info)
   (when packed-info
@@ -54,12 +56,19 @@
                 (1+ (ash +fdefn-info-num+ info-number-bits)))
         (%info-ref packed-info
                    (1- (truly-the (integer 1 *)
-                                  (packed-info-len packed-info))))))))
+                                  (packed-info-len packed-info)))))))))
 
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefn (symbol)
   (declare (optimize (safety 0)))
+  #+compact-symbol
+  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+    ;; The slot default is 0, not NIL, because I'm thinking that it might also
+    ;; be used to store the property list if there is no FDEFN,
+    ;; or a cons of an FDEFN and list, so 0 is unambiguously "no value"
+    (if (eql fdefn 0) nil fdefn))
+  #-compact-symbol
   (packed-info-fdefn (symbol-dbinfo symbol)))
 
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
@@ -99,7 +108,17 @@
 
 (declaim (ftype (sfunction (t) fdefn) find-or-create-fdefn))
 (defun find-or-create-fdefn (name)
-  (or (find-fdefn name)
+  (cond
+    #+compact-symbol
+    ((symbolp name)
+     (let ((fdefn (sb-vm::%symbol-fdefn name)))
+       (if (eql fdefn 0)
+           (let* ((new (make-fdefn name))
+                  (actual (sb-vm::cas-symbol-fdefn name 0 new)))
+             (if (eql actual 0) new (the fdefn actual)))
+           fdefn)))
+    ((find-fdefn name))
+    (t
       ;; We won't reach here if the name was not legal
       (let (made-new)
         (dx-flet ((new (name)
@@ -117,7 +136,7 @@
             (when (and made-new
                        (typep name '(cons (eql sb-pcl::slot-accessor))))
               (sb-pcl::ensure-accessor name))
-            fdefn)))))
+            fdefn))))))
 
 ;;; Return T if FUNCTION is the error-signaling trampoline for a macro or a
 ;;; special operator. Test for this by seeing whether FUNCTION is the same

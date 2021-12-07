@@ -177,10 +177,7 @@
                           (:return-style :none)
                           (:export tail-call-symbol))
     ((:temp fun (any-reg descriptor-reg) lexenv-offset)
-     (:temp length (any-reg descriptor-reg) nl0-offset)
-     (:temp packed-info (any-reg descriptor-reg) r7-offset)
-     (:temp temp (any-reg descriptor-reg) nl1-offset)
-     (:temp temp2 (any-reg descriptor-reg) nl2-offset))
+     (:temp temp (any-reg descriptor-reg) nl1-offset))
   (inst str lr-tn (@ cfp-tn 8))
   TAIL-CALL-SYMBOL
   (inst and temp fun lowtag-mask)
@@ -191,30 +188,10 @@
   (inst cmp temp symbol-widetag)
   (inst b :ne not-callable)
 
-  (load-symbol-dbinfo packed-info fun temp)
-
-  ;; packed-info-fdefn
-  (inst cmp packed-info null-tn)
+  (loadw temp fun symbol-fdefn-slot other-pointer-lowtag)
+  (inst cmp temp 0)
   (inst b :eq undefined)
-
-  ;; read the 0th info descriptor
-  (inst ldr temp (@ packed-info
-                    (- (ash (+ instance-slots-offset instance-data-start) word-shift)
-                       instance-pointer-lowtag)))
-  (inst and temp temp (fixnumize (1- (ash 1 (* info-number-bits 2)))))
-  (inst movz temp2 (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
-  (inst cmp temp temp2)
-  (inst b :lt undefined)
-
-  ;; read the instance-length and mask out the extra bits
-  (inst ldr length (@ packed-info (- instance-pointer-lowtag)))
-  ;; these next two instructions should be one 'ubfx' but I'm not smart enough
-  (inst lsr length length instance-length-shift)
-  (inst and length length instance-length-mask)
-  (inst lsl length length word-shift)
-
-  (inst sub length length instance-pointer-lowtag)
-  (inst ldr fun (@ packed-info length))
+  (move fun temp)
   (loadw lr-tn fun fdefn-raw-addr-slot other-pointer-lowtag)
   (inst add lr-tn lr-tn 4)
   (inst br lr-tn)
