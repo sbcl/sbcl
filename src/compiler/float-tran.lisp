@@ -29,8 +29,20 @@
 (deftransform %single-float ((n) (single-float) *)
   'n)
 
+(deftransform %single-float ((n) (ratio) *)
+  '(sb-kernel::float-ratio n 'single-float))
+
+(deftransform %single-float ((n) (bignum) *)
+  '(bignum-to-float n 'single-float))
+
 (deftransform %double-float ((n) (double-float) *)
   'n)
+
+(deftransform %double-float ((n) (ratio) *)
+  '(sb-kernel::float-ratio n 'double-float))
+
+(deftransform %double-float ((n) (bignum) *)
+  '(bignum-to-float n 'double-float))
 
 ;;; RANDOM
 (macrolet ((frob (fun type)
