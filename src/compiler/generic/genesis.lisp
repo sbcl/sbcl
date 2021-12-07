@@ -1496,24 +1496,28 @@ core and return a descriptor to it."
                  :use '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-PROFILE"))
                 (sb-cold::package-list-for-genesis)))
         (target-pkg-list nil))
-    (labels ((init-cold-package (name shadow &optional docstring)
+    (labels ((init-cold-package (id name shadow &optional docstring)
                (let ((cold-package (allocate-struct-of-type 'package)))
                  (setf (gethash name *cold-package-symbols*)
                        (cons (cons nil nil) cold-package))
                  ;; Initialize string slots
                  (write-slots cold-package
+                              :id (make-fixnum-descriptor id)
                               :%name (set-readonly
                                       (base-string-to-core name))
                               :%nicknames (chill-nicknames name)
                               :%bits (make-fixnum-descriptor
                                       (if (system-package-p name)
                                           sb-impl::+initial-package-bits+ 0))
-                              :%shadowing-symbols (list-to-core (mapcar 'cold-intern shadow))
                               :doc-string (if docstring
                                               (set-readonly
                                                (base-string-to-core docstring))
                                               *nil-descriptor*)
                               :%use-list *nil-descriptor*)
+                 ;; COLD-INTERN AVERs that the package has an ID, so delay writing
+                 ;; the shadowing-symbols until the package is ready.
+                 (write-slots cold-package
+                              :%shadowing-symbols (list-to-core (mapcar 'cold-intern shadow)))
                  ;; the cddr of this will accumulate the 'used-by' package list
                  (push (list name cold-package) target-pkg-list)))
              (chill-nicknames (pkg-name)
@@ -1542,15 +1546,19 @@ core and return a descriptor to it."
                           target-pkg-list :test #'string=)
                    (error "No cold package named ~S" name))))
       ;; pass 1: make all proto-packages
-      (dolist (pd package-data-list)
-        (let ((name (sb-cold:package-data-name pd)))
+      (let ((count 2)) ; preincrement on use. the first regular package ID is 3
+        (dolist (pd package-data-list)
           ;; Shadowing symbols include those specified in package-data-list
           ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
-          (init-cold-package name
-                             (when (eql (mismatch name "SB-") 3)
-                               (sort (package-shadowing-symbols (find-package name))
-                                     #'string<))
-                             #+sb-doc (sb-cold::package-data-doc pd))))
+          (let* ((name (sb-cold:package-data-name pd))
+                 (id (cond ((string= name "KEYWORD") sb-impl::+package-id-keyword+)
+                           ((string= name "COMMON-LISP") sb-impl::+package-id-lisp+)
+                           (t (incf count))))
+                 (shadows (when (eql (mismatch name "SB-") 3)
+                            (sort (package-shadowing-symbols (find-package name))
+                                  #'string<))))
+            (init-cold-package id name shadows
+                               #+sb-doc (sb-cold::package-data-doc pd)))))
       ;; pass 2: set the 'use' lists and collect the 'used-by' lists
       (dolist (pd package-data-list)
         (let ((this (find-cold-package (sb-cold:package-data-name pd)))
@@ -1649,6 +1657,8 @@ core and return a descriptor to it."
                           sb-vm:augmented-symbol-size
                           sb-vm:symbol-size)
                       (cdr pkg-info) name :gspace gspace)))
+        (when pkg-info
+          (aver (not (zerop (descriptor-fixnum (read-slot (cdr pkg-info) :id))))))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
@@ -2952,7 +2962,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; exporting every numeric constant from SB-VM; that would work,
     ;; but the C runtime would have to be altered to use Lisp-like names
     ;; rather than the munged names currently exported.  --njf, 2004-08-09
-    (dolist (c '(sb-vm:n-word-bits sb-vm:n-word-bytes
+    (dolist (c '(sb-impl::+package-id-none+
+                 sb-impl::+package-id-keyword+
+                 sb-vm:n-word-bits sb-vm:n-word-bytes
                  sb-vm:n-lowtag-bits sb-vm:lowtag-mask
                  sb-vm:n-widetag-bits sb-vm:widetag-mask
                  sb-vm:n-fixnum-tag-bits sb-vm:fixnum-tag-mask
@@ -3455,7 +3467,9 @@ III. initially undefined function references (alphabetically):
   (format t "~%~|~%VI. packages:~2%")
   (dolist (pair (sort (%hash-table-alist *cold-package-symbols*) #'<
                       :key (lambda (x) (descriptor-bits (cddr x)))))
-    (format t "~x = ~a~%" (descriptor-bits (cddr pair)) (car pair)))
+    (let ((pkg (cddr pair)))
+      (format t "~x = ~a (ID=~d)~%" (descriptor-bits pkg) (car pair)
+              (descriptor-fixnum (read-slot pkg :id)))))
 
   (format t "~%~|~%VII. symbols (numerically):~2%")
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))

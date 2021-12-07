@@ -1040,6 +1040,20 @@ implementation it is ~S." *!default-package-use-list*)
          ;; other MAKE-PACKAGE operations, but we need the additional lock
          ;; so that it synchronizes with RENAME-PACKAGE.
          (with-package-names (table)
+           (let* ((vector *id->package*)
+                  ;; 30 is an arbitrary constant exceeding the number of builtin packages
+                  (new-id (position nil vector :start 30)))
+             (when (and (null new-id) (< (length vector) +package-id-overflow+))
+               (let* ((current-length (length vector))
+                      (new-length (min (+ current-length 10) +package-id-overflow+))
+                      (new-vector (make-array new-length :initial-element nil)))
+                 (replace new-vector vector)
+                 (setf new-id current-length
+                       vector new-vector
+                       *id->package* vector)))
+             (when new-id
+               (setf (package-id package) new-id
+                     (aref vector new-id) package)))
            (%register-package table name package))
          (atomic-incf *package-names-cookie*)
          (return package))
@@ -1177,6 +1191,8 @@ implementation it is ~S." *!default-package-use-list*)
                     (nullify-home (package-internal-symbols package))
                     (nullify-home (package-external-symbols package)))
                   (with-package-names (table)
+                    (awhen (package-id package)
+                      (setf (aref *id->package* it) nil (package-id package) nil))
                     (remove-names package table nil)
                     (setf (package-%name package) nil
                           ;; Setting PACKAGE-%NAME to NIL is required in order to
@@ -1862,6 +1878,18 @@ PACKAGE."
 ;;;;    (uninterned-symbols . ((package . (externals . internals)) ...)
 (defvar *!initial-symbols*)
 
+(defun rebuild-package-vector ()
+  (let ((max-id 0))
+    (do-packages (pkg)
+      (let ((id (package-id pkg)))
+        (when id (setq max-id (max id max-id)))))
+    (let ((a (make-array (1+ max-id) :initial-element nil)))
+      (setq *id->package* a)
+      (do-packages (pkg)
+        (let ((id (package-id pkg)))
+          (when id
+            (setf (aref a id) pkg)))))))
+
 (defun pkg-name= (a b) (and (not (eql a 0)) (string= a b)))
 (defun !package-cold-init (&aux (specs (cdr *!initial-symbols*)))
   (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
@@ -1899,6 +1927,7 @@ PACKAGE."
       (setf (package-tables pkg)
             (map 'vector #'package-external-symbols (package-%use-list pkg)))))
 
+  (rebuild-package-vector)
   ;; Having made all packages, verify that symbol hashes are good.
   (flet ((check-hash-slot (symbols) ; a vector
            ;; type decl is critical here - can't invoke a hairy aref routine yet

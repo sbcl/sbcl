@@ -284,6 +284,9 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
+(define-load-time-global *id->package* #())
+(declaim (simple-vector *id->package*))
+
 (defun sb-xc:symbol-package (symbol)
   "Return SYMBOL's home package, or NIL if none."
   (sb-xc:symbol-package symbol))

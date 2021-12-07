@@ -345,7 +345,8 @@ process to continue normally."
     ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
-      (sb-thread::init-main-thread))
+      (sb-thread::init-main-thread)
+      (rebuild-package-vector))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed

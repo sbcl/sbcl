@@ -36,6 +36,13 @@
 ;;;       symbol whose name is spelled "NIL" have the identical strange hash
 ;;;       so that the hash is a pure function of the name's characters.
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant package-id-bits 16))
+(defconstant +package-id-overflow+ (1- (ash 1 package-id-bits)))
+(defconstant +package-id-none+     0)
+(defconstant +package-id-lisp+     1)
+(defconstant +package-id-keyword+  2) ; written to constants.h by genesis
+
 (sb-xc:defstruct (package-hashtable
                   (:constructor %make-package-hashtable
                                 (cells size &aux (free size)))
@@ -63,6 +70,8 @@
   "the standard structure for the description of a package"
   ;; the name of the package, or NIL for a deleted package
   (%name nil :type (or simple-string null))
+  ;; A small integer ID, unless it overflows the global package index
+  (id nil :type (or (unsigned-byte #.package-id-bits) null))
   ;; nickname strings
   (%nicknames () :type list)
   ;; packages used by this package
