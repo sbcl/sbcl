@@ -40,7 +40,7 @@
                   (:constructor %make-package-hashtable
                                 (cells size &aux (free size)))
                   (:copier nil))
-  ;; The general-vector of symbols, with a hash-vector in its last cell.
+  ;; The general-vector of symbols
   (cells (missing-arg) :type simple-vector)
   ;; The total number of entries allowed before resizing.
   ;;
