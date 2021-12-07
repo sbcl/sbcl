@@ -630,6 +630,9 @@
 (defknown %single-float (real) single-float (movable foldable))
 (defknown %double-float (real) double-float (movable foldable))
 
+(defknown bignum-to-float (bignum symbol) float (movable foldable))
+(defknown sb-kernel::float-ratio (ratio symbol) float (movable foldable))
+
 (defknown make-single-float ((signed-byte 32)) single-float
   (movable flushable))
 
