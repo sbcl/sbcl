@@ -755,7 +755,7 @@
                              (ea-p src))
                         (emit-avx2-inst segment src dst ,prefix #x10 :l 0))
                        ((xmm-register-p dst)
-                        (emit-avx2-inst segment dst src2 ,prefix #x10 :vvvv src :l 0))
+                        (emit-avx2-inst segment src2 dst ,prefix #x10 :vvvv src :l 0))
                        (t
                         (aver (xmm-register-p src))
                         (emit-avx2-inst segment dst src ,prefix #x11 :l 0)))))))
