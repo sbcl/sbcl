@@ -2932,74 +2932,57 @@ Legal values for OFFSET are -4, -8, -12, ..."
   #-(and win32 x86-64) "LU") ; "long" is 64 bits
 
 (defun write-constants-h (*standard-output*)
-  ;; writing entire families of named constants
   (let ((constants nil))
-    (dolist (package-name '("SB-VM"
-                            ;; We also propagate magic numbers
-                            ;; related to file format,
-                            ;; which live here instead of SB-VM.
-                            "SB-FASL"
-                            ;; Home package of some constants which aren't
-                            ;; in the target Lisp but are propagated to C.
-                            "SB-COREFILE"))
-      (do-external-symbols (symbol (find-package package-name))
-        (when (cl:constantp symbol)
-          (let ((name (symbol-name symbol)))
-            (labels ( ;; shared machinery
-                     (record (string priority suffix)
-                       (push (list string
-                                   priority
-                                   (symbol-value symbol)
-                                   suffix)
-                             constants))
-                     ;; machinery for old-style CMU CL Lisp-to-C
-                     ;; arbitrary renaming, being phased out in favor of
-                     ;; the newer systematic RECORD-WITH-TRANSLATED-NAME
-                     ;; renaming
-                     (record-with-munged-name (prefix string priority)
-                       (record (concatenate
-                                'simple-string
-                                prefix
-                                (delete #\- (string-capitalize string)))
-                               priority
-                               ""))
-                     (maybe-record-with-munged-name (tail prefix priority)
-                       (when (tailwise-equal name tail)
-                         (record-with-munged-name prefix
-                                                  (subseq name 0
-                                                          (- (length name)
-                                                             (length tail)))
-                                                  priority)))
-                     ;; machinery for new-style SBCL Lisp-to-C naming
-                     (record-with-translated-name (priority large)
-                       (record (c-name name) priority
-                               (if large +c-literal-64bit+ "")))
-                     (maybe-record-with-translated-name (suffixes priority &key large)
-                       (when (some (lambda (suffix)
-                                     (tailwise-equal name suffix))
-                                   suffixes)
-                         (record-with-translated-name priority large))))
-              (maybe-record-with-translated-name '("-LOWTAG"  "-ALIGN") 0)
-              (maybe-record-with-translated-name '("-WIDETAG" "-SHIFT") 1)
-              (maybe-record-with-munged-name "-FLAG" "flag_" 2)
-              (maybe-record-with-munged-name "-TRAP" "trap_" 3)
-              (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
-              (maybe-record-with-translated-name '("SHAREABLE+" "SHAREABLE-NONSTD+") 4)
-              (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-              (maybe-record-with-translated-name '("-SIZE" "-INTERRUPTS") 6)
-              (maybe-record-with-translated-name '("-START" "-END" "-PAGE-BYTES"
-                                                   "-CARD-BYTES" "-GRANULARITY")
-                                                 7 :large t)
-              (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 8)
-              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 9)
-              (maybe-record-with-translated-name '("-CORE-SPACE-ID-FLAG") 9)
-              (maybe-record-with-translated-name '("-GENERATION+") 10))))))
-    ;; KLUDGE: these constants are sort of important, but there's no
-    ;; pleasing way to inform the code above about them.  So we fake
-    ;; it for now.  nikodemus on #lisp (2004-08-09) suggested simply
-    ;; exporting every numeric constant from SB-VM; that would work,
-    ;; but the C runtime would have to be altered to use Lisp-like names
-    ;; rather than the munged names currently exported.  --njf, 2004-08-09
+    (flet ((record (string priority symbol suffix)
+             (push (list string priority (symbol-value symbol) suffix)
+                   constants)))
+      ;; writing entire families of named constants
+      (dolist (package-name '("SB-VM"
+                              ;; We also propagate magic numbers
+                              ;; related to file format,
+                              ;; which live here instead of SB-VM.
+                              "SB-FASL"
+                              ;; Home package of some constants which aren't
+                              ;; in the target Lisp but are propagated to C.
+                              "SB-COREFILE"))
+        (do-external-symbols (symbol (find-package package-name))
+          (when (cl:constantp symbol)
+            (let ((name (symbol-name symbol)))
+              ;; Older naming convention
+              (labels ((record-camelcased (prefix string priority)
+                         (record (concatenate 'simple-string
+                                              prefix
+                                              (delete #\- (string-capitalize string)))
+                                 priority symbol ""))
+                       (maybe-record (tail prefix priority)
+                         (when (tailwise-equal name tail)
+                           (record-camelcased prefix
+                                              (subseq name 0
+                                                      (- (length name) (length tail)))
+                                              priority))))
+                (maybe-record "-FLAG" "flag_" 2)
+                (maybe-record "-TRAP" "trap_" 3)
+                (maybe-record "-SC-NUMBER" "sc_" 5))
+              ;; Newer naming convention
+              (labels ((record-translated (priority large)
+                         (record (c-name name) priority symbol
+                                 (if large +c-literal-64bit+ "")))
+                       (maybe-record (suffixes priority &key large)
+                         (when (some (lambda (suffix) (tailwise-equal name suffix))
+                                     suffixes)
+                           (record-translated priority large))))
+                (maybe-record '("-LOWTAG"  "-ALIGN") 0)
+                (maybe-record '("-WIDETAG" "-SHIFT") 1)
+                (maybe-record '("SHAREABLE+" "SHAREABLE-NONSTD+") 4)
+                (maybe-record '("-SIZE" "-INTERRUPTS") 6)
+                (maybe-record '("-START" "-END" "-PAGE-BYTES"
+                                                     "-CARD-BYTES" "-GRANULARITY")
+                                                   7 :large t)
+                (maybe-record '("-CORE-ENTRY-TYPE-CODE") 8)
+                (maybe-record '("-CORE-SPACE-ID") 9)
+                (maybe-record '("-CORE-SPACE-ID-FLAG") 9)
+                (maybe-record '("-GENERATION+") 10))))))
+    ;; Other constants that aren't necessarily grouped into families.
     (dolist (c '(sb-impl::+package-id-none+
                  sb-impl::+package-id-keyword+
                  sb-impl::symbol-name-bits
@@ -3012,22 +2995,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
                  sb-vm:short-header-max-words
                  sb-vm:array-flags-position
                  sb-vm:array-rank-position))
-      (push (list (c-symbol-name c)
-                  -1                    ; invent a new priority
-                  (symbol-value c)
-                  "")
-            constants))
-    ;; One more symbol that doesn't fit into the code above.
-    (let ((c 'sb-impl::+magic-hash-vector-value+))
-      (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+)
-            constants))
-    ;; I find this entire mechanism to be overengineered, and I'd much prefer
-    ;; a simple data table constructed via backquote perhaps.
-    ;; But this (PUSH (LIST ..)) is the worst possible way, obviously.
-    (push (list "STATIC_SPACE_OBJECTS_START" 7
-                (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
-                +c-literal-64bit+)
-          constants)
+      (record (c-symbol-name c) -1 c ""))
+    ;; More symbols that doesn't fit into the pattern above.
+    (dolist (c '(sb-impl::+magic-hash-vector-value+
+                 sb-vm::static-space-objects-start))
+      (record (c-symbol-name c) 7 #| arb |# c +c-literal-64bit+)))
+    ;; Sort by <priority, value, alpha> which is TOO COMPLICATED imho.
+    ;; Priority and then alphabetical would suffice.
     (setf constants
           (sort constants
                 (lambda (const1 const2)

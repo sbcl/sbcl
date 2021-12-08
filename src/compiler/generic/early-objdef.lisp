@@ -124,6 +124,10 @@
   (+ static-space-start
      (* 2 n-word-bytes))) ; skip the array header
 
+;;; Address at which to start parsing objects in static space when heap-walking.
+;;; Basically skip over BOXED-REGION.
+(defconstant static-space-objects-start (logandc2 sb-vm:nil-value sb-vm:lowtag-mask))
+
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
         (do-external-symbols (sym "SB-VM")
