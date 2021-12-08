@@ -4512,7 +4512,8 @@ gc_init(void)
     gc_assert(leaf_obj_widetag_p(FILLER_WIDETAG));
 }
 
-int gc_card_table_nbits, gc_card_table_mask;
+int gc_card_table_nbits;
+long gc_card_table_mask;
 char *gc_card_mark;
 
 static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, void* limit)
@@ -4574,7 +4575,8 @@ static void gc_allocate_ptes()
 
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
-    int nbits = 14, num_gc_cards = 1 << nbits;
+    int nbits = 14;
+    long num_gc_cards = 1L << nbits;
 
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
@@ -4601,10 +4603,13 @@ static void gc_allocate_ptes()
     // Regardless of the mask implied by space size, it has to be gc_card_table_nbits wide
     // even if that is excessive - when the core is restarted using a _smaller_ dynamic space
     // size than saved at - otherwise lisp could overrun the mark table.
-    num_gc_cards = 1 << gc_card_table_nbits;
+    num_gc_cards = 1L << gc_card_table_nbits;
+
     gc_card_table_mask =  num_gc_cards - 1;
     gc_card_mark = calloc(num_gc_cards, 1);
-    // fprintf(stderr, "card mark table @ %p\n", gc_card_mark);
+    if (gc_card_mark == NULL)
+        lose("failed to calloc() %ld bytes", num_gc_cards);
+
 
     gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,

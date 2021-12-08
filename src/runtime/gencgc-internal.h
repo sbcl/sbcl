@@ -150,7 +150,7 @@ extern struct page *page_table;
  *       7      F200        2
  */
 extern char * gc_card_mark;
-extern int gc_card_table_mask;
+extern long gc_card_table_mask;
 #define addr_to_card_index(addr) ((((uword_t)addr)>>GENCGC_CARD_SHIFT) & gc_card_table_mask)
 #define page_to_card_index(n) addr_to_card_index(page_address(n))
 #define PAGE_WRITEPROTECTED_P(n) (gc_card_mark[page_to_card_index(n)] & 1)
