@@ -370,41 +370,16 @@
     (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (define-vop (fixed-alloc)
-  (:args)
   (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-    ;; We special case the allocation of conses, because they're
-    ;; extremely common and because the pseudo-atomic sequence on x86
-    ;; is relatively heavyweight.  However, if the user asks for top
-    ;; speed, we accomodate him.  The primary reason that we don't
-    ;; also check for (< SPEED SPACE) is because we want the space
-    ;; savings that these out-of-line allocation routines bring whilst
-    ;; compiling SBCL itself.  --njf, 2006-07-08
-    (if (and (not stack-allocate-p)
-             (= lowtag list-pointer-lowtag) (policy node (< speed 3)))
-        (let ((dst
-               ;; FIXME: out-of-line dx-allocation
-               #.(loop for offset in *dword-regs*
-                    collect `(,offset
-                              ',(intern (format nil "ALLOCATE-CONS-TO-~A"
-                                                (svref +dword-register-names+
-                                                       offset)))) into cases
-                    finally (return `(case (tn-offset result)
-                                       ,@cases)))))
-          (aver (null type))
-          (inst call (make-fixup dst :assembly-routine)))
-        (pseudo-atomic (:elide-if stack-allocate-p)
-         (let ((nbytes (* (pad-data-block words)
-                          #+bignum-assertions (if (eql type bignum-widetag) 2 1))))
-           (allocation nil nbytes lowtag node stack-allocate-p result))
-         (when type
-           (storew (compute-object-header words type)
-                   result
-                   0
-                   lowtag))))))
+    (pseudo-atomic (:elide-if stack-allocate-p)
+      (let ((nbytes (* (pad-data-block words)
+                       #+bignum-assertions (if (eql type bignum-widetag) 2 1))))
+        (allocation nil nbytes lowtag node stack-allocate-p result))
+      (storew (compute-object-header words type) result 0 lowtag))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

@@ -139,16 +139,6 @@
   (def edi)
   (def esi))
 
-#+sb-assembling
-(macrolet ((def (tn-name &aux (reg (subseq (string tn-name) 0 3)))
-             `(define-assembly-routine (,(symbolicate "ALLOCATE-CONS-TO-" reg))
-                  ((:temp result descriptor-reg ,(tn-offset (symbol-value tn-name))))
-                (pseudo-atomic ()
-                 (allocation 'list (* 2 n-word-bytes)
-                             list-pointer-lowtag nil nil result)))))
-  (progn (def eax-tn) (def ebx-tn) (def ecx-tn)
-         (def edx-tn) (def esi-tn) (def edi-tn)))
-
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
                           (:translate ensure-symbol-tls-index)
