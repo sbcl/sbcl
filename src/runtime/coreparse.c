@@ -694,6 +694,7 @@ void calc_immobile_space_bounds()
 
 static void check_dynamic_space_addr_ok(uword_t start, uword_t size)
 {
+#ifdef LISP_FEATURE_64_BIT // don't want a -Woverflow warning on 32-bit
     uword_t end_word_addr = start + size - N_WORD_BYTES;
     // Word-aligned pointers can't address more than 48 significant bits for now.
     // If you want to lift that restriction, look at how SYMBOL-PACKAGE and
@@ -703,6 +704,7 @@ static void check_dynamic_space_addr_ok(uword_t start, uword_t size)
         lose("Panic! This version of SBCL can not address memory\n"
              "in the range %p:%p given by the OS.\nPlease report this as a bug.",
              (void*)start, (void*)(start + size));
+#endif
 }
 
 /* TODO: If static + readonly were mapped as desired without disabling ASLR
