@@ -1714,7 +1714,7 @@ static void pair_follow_fps(lispobj ht_entry[2])
 }
 
 /* Remove dead entries from weak hash tables. */
-void cull_weak_hash_tables(int (*alivep[5])(lispobj,lispobj))
+void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
 {
     struct hash_table *table, *next;
 
@@ -1722,8 +1722,9 @@ void cull_weak_hash_tables(int (*alivep[5])(lispobj,lispobj))
         next = (struct hash_table *)table->next_weak_hash_table;
         NON_FAULTING_STORE(table->next_weak_hash_table = NIL,
                            &table->next_weak_hash_table);
-        cull_weak_hash_table(table, alivep[hashtable_weakness(table)],
-                             compacting_p() ? pair_follow_fps : 0);
+        int weakness = hashtable_weakness(table);
+        gc_assert((weakness & ~3) == 0);
+        cull_weak_hash_table(table, alivep[weakness], compacting_p() ? pair_follow_fps : 0);
     }
     weak_hash_tables = NULL;
     /* Reset weak_objects only if the count is nonzero.
