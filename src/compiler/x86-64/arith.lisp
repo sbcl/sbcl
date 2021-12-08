@@ -1704,8 +1704,8 @@
 
 (declaim (inline load-bignum-length))
 (defun load-bignum-length (input output)
-  (loadw output input 0 other-pointer-lowtag)
-  (inst shr output n-widetag-bits))
+  ;; Unaligned load
+  (inst mov :dword output (ea (- 1 other-pointer-lowtag) input)))
 
 (define-vop (fast-if->-zero)
   (:args (x :scs (descriptor-reg)))

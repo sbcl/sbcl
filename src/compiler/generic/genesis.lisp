@@ -2986,6 +2986,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (dolist (c '(sb-impl::+package-id-none+
                  sb-impl::+package-id-keyword+
                  sb-impl::symbol-name-bits
+                 sb-kernel:maximum-bignum-length
                  sb-vm:n-word-bits sb-vm:n-word-bytes
                  sb-vm:n-lowtag-bits sb-vm:lowtag-mask
                  sb-vm:n-widetag-bits sb-vm:widetag-mask

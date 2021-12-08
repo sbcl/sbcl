@@ -852,10 +852,7 @@ scav_funinstance(lispobj *where, lispobj header)
     return 1 + (nslots | 1);
 }
 
-/* Bignums use the high bit as the mark, and all remaining bits
- * excluding the 8 widetag bits to convey the size.
- * To size it, shift out the high bit, the shift right by an extra bit,
- * round to odd, and add 1 for the header.
+/* Bignums use the highest bit of the header word as the GC mark bit.
  *
  * If assertions are enabled, the number of words taken up is double
  * what it would ordinarily be, which is a gross overstatement of the
@@ -863,12 +860,17 @@ scav_funinstance(lispobj *where, lispobj header)
  * i.e. ALIGN_UP(CEILING(nwords,N_WORD_BITS),2)
  * but the allocator is simplified by just doubling the space,
  * and it doesn't matter because this is only for testing */
-static inline int bignum_nwords(lispobj header) {
+static inline size_t bignum_nwords(lispobj header) {
 #ifdef LISP_FEATURE_BIGNUM_ASSERTIONS
+    // FIXME: how did I arrive at this constant? (being less than the other by some bits)
     int ndigits = ((unsigned int)header >> 8) & 0x7fffff;
     return 2 * ndigits + 2;
 #else
-    return 1 + ((header << 1 >> (1+N_WIDETAG_BITS)) | 1);
+    // NOTE: a better name for this constant would be BIGNUM_LENGTH_MASK,
+    // because hypothetically we could want a max length of #x7FFFC
+    // which would have a mask of #x7FFFF to not lose the low bits.
+    size_t ndigits = (header >> N_WIDETAG_BITS) & MAXIMUM_BIGNUM_LENGTH;
+    return 1 + (ndigits | 1); // round-to-odd + account for the header
 #endif
 }
 static inline sword_t size_bignum(lispobj *where) {
