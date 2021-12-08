@@ -318,6 +318,8 @@ parse_size_arg(char *arg, char *arg_name)
       power = 20;
     } else if (!strcasecmp("GB", tail) || !strcasecmp("GIB", tail)) {
       power = 30;
+    } else if (!strcasecmp("TB", tail) || !strcasecmp("TIB", tail)) {
+      power = 40;
     } else {
       lose("%s argument has an unknown suffix: %s", arg_name, tail);
     }
