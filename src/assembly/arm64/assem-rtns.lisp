@@ -189,8 +189,7 @@
   (inst b :ne not-callable)
 
   (loadw temp fun symbol-fdefn-slot other-pointer-lowtag)
-  (inst cmp temp 0)
-  (inst b :eq undefined)
+  (inst cbz temp undefined)
   (move fun temp)
   (loadw lr-tn fun fdefn-raw-addr-slot other-pointer-lowtag)
   (inst add lr-tn lr-tn 4)
