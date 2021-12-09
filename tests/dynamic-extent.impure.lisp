@@ -1637,3 +1637,36 @@
      (let* ((v1 (svref #(1 3 4 6) 0)))
        (declare (dynamic-extent v1))
        (- c v1)))))
+
+(with-test (:name :dx-for-optional-entries)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (declare (notinline funcall max))
+      (labels ((%f14
+                   (f14-1 f14-2
+                    &optional (f14-3 (setq a (min 13 (max 1 0))))
+                              (f14-4 (setq c 0)))
+                 (declare (ignore f14-1 f14-2 f14-3 f14-4))
+                 0))
+        (declare (dynamic-extent (function %f14)))
+        (funcall #'%f14
+                 (%f14
+                  (min 11 (max 0 c))
+                  (funcall #'%f14 a b 1)
+                  1
+                  b)
+                 0)))
+   ((1 2 3) 0)))
+
+(with-test (:name :dx-for-optional-entries.2)
+  (checked-compile-and-assert
+   (:optimize '(:speed 3))
+   `(lambda (b)
+      (declare (notinline funcall))
+      (labels ((%f1 (&optional f1-1)
+                 (declare (ignore f1-1))
+                 (shiftf b 0)))
+        (declare (dynamic-extent (function %f1)))
+        (funcall #'%f1 :bad)))
+   ((10) 10)))

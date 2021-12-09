@@ -382,21 +382,24 @@
   (declare (type component component))
   (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
     (dolist (lambda (component-lambdas component))
-      ;; If this LAMBDA is marked dynamic extent and also a closure,
-      ;; mark its ENCLOSE as DX by making it use an LVAR if it doesn't
-      ;; have one already.
-      (when (leaf-dynamic-extent lambda)
-        (let ((xep (functional-entry-fun lambda)))
-          (when (and xep (environment-closure (get-lambda-environment xep)))
-            (let ((enclose (lambda-enclose lambda)))
-              (when (and enclose (not (node-lvar enclose)))
-                (let ((lvar (make-lvar)))
-                  (use-lvar enclose lvar)
-                  (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
-                    (aver (eq (cleanup-mess-up cleanup) enclose))
-                    (setf (lvar-dynamic-extent lvar) cleanup)
-                    (setf (cleanup-info cleanup) (list lvar)))
-                  (push lvar (component-dx-lvars component))))))))
+      ;; If this FUNCTIONAL is marked dynamic extent and also a
+      ;; closure, mark its ENCLOSE as DX by making it use an LVAR if
+      ;; it doesn't have one already.
+      (let ((fun (if (eq (lambda-kind lambda) :optional)
+                     (lambda-optional-dispatch lambda)
+                     lambda)))
+        (when (leaf-dynamic-extent fun)
+          (let ((xep (functional-entry-fun fun)))
+            (when (and xep (environment-closure (get-lambda-environment xep)))
+              (let ((enclose (functional-enclose fun)))
+                (when (and enclose (not (node-lvar enclose)))
+                  (let ((lvar (make-lvar)))
+                    (use-lvar enclose lvar)
+                    (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
+                      (aver (eq (cleanup-mess-up cleanup) enclose))
+                      (setf (lvar-dynamic-extent lvar) cleanup)
+                      (setf (cleanup-info cleanup) (list lvar)))
+                    (push lvar (component-dx-lvars component)))))))))
       (dolist (entry (lambda-entries lambda))
         (let ((cleanup (entry-cleanup entry)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
