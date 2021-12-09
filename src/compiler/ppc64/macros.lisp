@@ -262,9 +262,8 @@
          (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                      :temp-tn ,temp-tn
                      :flag-tn ,flag-tn))
-       (when ,type-code
-         (inst lr ,temp-tn (compute-object-header ,size ,type-code))
-         (storew ,temp-tn ,result-tn 0 ,lowtag))
+       (inst lr ,temp-tn (compute-object-header ,size ,type-code))
+       (storew ,temp-tn ,result-tn 0 ,lowtag)
        ,@body)))
 
 (defun align-csp (temp)

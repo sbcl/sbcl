@@ -884,20 +884,20 @@
       (if stack-allocate-p
           (stack-allocation bytes (if type 0 lowtag) result)
           (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn))
-      (when type
-        (let* ((widetag (if instancep instance-widetag type))
-               (header (compute-object-header words widetag)))
-          (if (or #+compact-instance-header
-                  (and (eq name '%make-structure-instance) stack-allocate-p))
+      (let* ((widetag (if instancep instance-widetag type))
+             (header (compute-object-header words widetag)))
+        (cond #+compact-instance-header
+              ((and (eq name '%make-structure-instance) stack-allocate-p)
               ;; Write a :DWORD, not a :QWORD, because the high half will be
               ;; filled in when the layout is stored. Can't use STOREW* though,
               ;; because it tries to store as few bytes as possible,
               ;; where this instruction must write exactly 4 bytes.
-              (inst mov :dword (ea 0 result) header)
-              (storew* header result 0 0 (not stack-allocate-p)))
-          (inst or :byte result lowtag))))
+               (inst mov :dword (ea 0 result) header))
+              (t
+               (storew* header result 0 0 (not stack-allocate-p)))))
+      (inst or :byte result lowtag))
     (when instancep ; store its layout
-      (inst mov :dword (ea (+ 4 (- lowtag)) result)
+      (inst mov :dword (ea (+ 4 (- instance-pointer-lowtag)) result)
             (make-fixup type :layout))))))
 
 ;;; Allocate a non-vector variable-length object.

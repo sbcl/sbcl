@@ -248,10 +248,9 @@
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
                    :lip ,lip)
-       (when ,type-code
-         (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
-         ,@(and store-type-code
-                `((storew ,flag-tn ,result-tn 0 ,lowtag))))
+       (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
+       ,@(and store-type-code
+              `((storew ,flag-tn ,result-tn 0 ,lowtag)))
        ,@body)))
 
 ;;;; Error Code

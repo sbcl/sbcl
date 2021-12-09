@@ -203,9 +203,8 @@
              ;; bit.
              (inst or result alloc-tn (if (logbitp 0 lowtag) lowtag
                                                              (1- lowtag)))))
-      (when type
-        (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
-        (storew temp result 0 lowtag)))))
+      (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
+      (storew temp result 0 lowtag))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
