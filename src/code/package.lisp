@@ -48,7 +48,8 @@
 (defconstant +package-id-overflow+ (1- (ash 1 package-id-bits)))
 (defconstant +package-id-none+     0)
 (defconstant +package-id-lisp+     1)
-(defconstant +package-id-keyword+  2) ; written to constants.h by genesis
+(defconstant +package-id-keyword+  2)
+(defconstant +package-id-user+     3)
 
 (sb-xc:defstruct (package-hashtable
                   (:constructor %make-package-hashtable

@@ -1556,13 +1556,15 @@ core and return a descriptor to it."
                           target-pkg-list :test #'string=)
                    (error "No cold package named ~S" name))))
       ;; pass 1: make all proto-packages
-      (let ((count 2)) ; preincrement on use. the first regular package ID is 3
+      (let ((count 3)) ; preincrement on use. the first non-preassigned ID is 4
         (dolist (pd package-data-list)
           ;; Shadowing symbols include those specified in package-data-list
           ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
           (let* ((name (sb-cold:package-data-name pd))
                  (id (cond ((string= name "KEYWORD") sb-impl::+package-id-keyword+)
                            ((string= name "COMMON-LISP") sb-impl::+package-id-lisp+)
+                           ((string= name "COMMON-LISP-USER")
+                            sb-impl::+package-id-user+)
                            (t (incf count))))
                  (shadows (when (eql (mismatch name "SB-") 3)
                             (sort (package-shadowing-symbols (find-package name))
@@ -2982,32 +2984,35 @@ Legal values for OFFSET are -4, -8, -12, ..."
                 (maybe-record '("-CORE-SPACE-ID") 9)
                 (maybe-record '("-CORE-SPACE-ID-FLAG") 9)
                 (maybe-record '("-GENERATION+") 10))))))
-    ;; Other constants that aren't necessarily grouped into families.
-    (dolist (c '(sb-impl::+package-id-none+
-                 sb-impl::+package-id-keyword+
-                 sb-impl::symbol-name-bits
-                 sb-kernel:maximum-bignum-length
-                 sb-vm:n-word-bits sb-vm:n-word-bytes
-                 sb-vm:n-lowtag-bits sb-vm:lowtag-mask
-                 sb-vm:n-widetag-bits sb-vm:widetag-mask
-                 sb-vm:n-fixnum-tag-bits sb-vm:fixnum-tag-mask
-                 sb-vm:instance-length-mask
-                 sb-vm:dsd-raw-type-mask
-                 sb-vm:short-header-max-words
-                 sb-vm:array-flags-position
-                 sb-vm:array-rank-position))
-      (record (c-symbol-name c) -1 c ""))
-    ;; More symbols that doesn't fit into the pattern above.
-    (dolist (c '(sb-impl::+magic-hash-vector-value+
-                 sb-vm::static-space-objects-start))
-      (record (c-symbol-name c) 7 #| arb |# c +c-literal-64bit+)))
+      (dolist (c '(sb-impl::+package-id-none+
+                   sb-impl::+package-id-keyword+
+                   sb-impl::+package-id-lisp+
+                   sb-impl::+package-id-user+
+                   sb-impl::symbol-name-bits))
+        (record (c-symbol-name c) 3/2 #| arb |# c ""))
+      ;; Other constants that aren't necessarily grouped into families.
+      (dolist (c '(sb-kernel:maximum-bignum-length
+                   sb-vm:n-word-bits sb-vm:n-word-bytes
+                   sb-vm:n-lowtag-bits sb-vm:lowtag-mask
+                   sb-vm:n-widetag-bits sb-vm:widetag-mask
+                   sb-vm:n-fixnum-tag-bits sb-vm:fixnum-tag-mask
+                   sb-vm:instance-length-mask
+                   sb-vm:dsd-raw-type-mask
+                   sb-vm:short-header-max-words
+                   sb-vm:array-flags-position
+                   sb-vm:array-rank-position))
+        (record (c-symbol-name c) -1 c ""))
+      ;; More symbols that doesn't fit into the pattern above.
+      (dolist (c '(sb-impl::+magic-hash-vector-value+
+                   sb-vm::static-space-objects-start))
+        (record (c-symbol-name c) 7 #| arb |# c +c-literal-64bit+)))
     ;; Sort by <priority, value, alpha> which is TOO COMPLICATED imho.
     ;; Priority and then alphabetical would suffice.
     (setf constants
           (sort constants
                 (lambda (const1 const2)
-                  (if (= (second const1) (second const2))
-                      (if (= (third const1) (third const2))
+                  (if (= (second const1) (second const2)) ; priority
+                      (if (= (third const1) (third const2)) ; value
                           (string< (first const1) (first const2))
                           (< (third const1) (third const2)))
                       (< (second const1) (second const2))))))

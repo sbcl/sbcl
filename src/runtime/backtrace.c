@@ -121,13 +121,6 @@ lispobj debug_print(lispobj string)
     return 0;
 }
 
-static int string_equal (struct vector *vector, char *string)
-{
-    if (widetag_of(&vector->header) != SIMPLE_BASE_STRING_WIDETAG)
-        return 0;
-    return !strcmp((char *) vector->data, string);
-}
-
 lispobj symbol_package(struct symbol* s)
 {
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
@@ -150,6 +143,14 @@ lispobj symbol_package(struct symbol* s)
 #endif
 }
 
+#ifndef LISP_FEATURE_COMPACT_SYMBOL
+static int symbol_package_id(struct symbol* s) {
+    lispobj pkg = s->package;
+    if (pkg == NIL) return PACKAGE_ID_NONE;
+    return fixnum_value(((struct package*)native_pointer(pkg))->id);
+}
+#endif
+
 static void
 print_entry_name (lispobj name, FILE *f)
 {
@@ -170,24 +171,22 @@ print_entry_name (lispobj name, FILE *f)
         putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
         struct symbol *symbol = SYMBOL(name);
-        lispobj package = symbol_package(symbol);
+        char* prefix = 0;
         int widetag = header_widetag(symbol->header);
         switch (widetag) {
         case SYMBOL_WIDETAG:
-            if (package != NIL) {
-                struct package *pkg = (void*) native_pointer(follow_maybe_fp(package));
+            switch (symbol_package_id(symbol)) {
+            case PACKAGE_ID_NONE: prefix = "#:"; break;
+            case PACKAGE_ID_LISP: prefix = ""; break;
+            case PACKAGE_ID_USER: prefix = "CL-USER::"; break;
+            case PACKAGE_ID_KEYWORD: prefix = ":"; break;
+            }
+            if (prefix) fputs(prefix, f); else {
+                struct package *pkg
+                    = (struct package *)native_pointer(symbol_package(symbol));
                 struct vector *pkg_name = VECTOR(follow_maybe_fp(pkg->_name));
-                if (string_equal(pkg_name, "COMMON-LISP"))
-                    ;
-                else if (string_equal(pkg_name, "COMMON-LISP-USER")) {
-                    fputs("CL-USER::", f);
-                }
-                else if (string_equal(pkg_name, "KEYWORD")) {
-                    putc(':', f);
-                } else {
-                    print_string(pkg_name, f);
-                    fputs("::", f);
-                }
+                print_string(pkg_name, f);
+                fputs("::", f);
             }
             print_string(symbol_name(symbol), f);
             break;
