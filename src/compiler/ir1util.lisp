@@ -3227,7 +3227,7 @@ is :ANY, the function name is not checked."
                (lvar-fun-is
                 (combination-fun (lvar-dest lvar))
                 ;; KLUDGE: after some type derivation and merging with other types
-                ;; a path can be emerge which is erronous and has a bad constant,
+                ;; a path can emerge which is erronous and has a bad constant,
                 ;; but another value can still be good.
                 ;; see compiler.pure/generate-type-checks-on-dead-blocks
                 '(%type-check-error %type-check-error/c)))

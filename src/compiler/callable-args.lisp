@@ -443,8 +443,7 @@
        ;; is called here and not passed somewhere else, there's no longer a
        ;; need to check the function type, the arguments to the call will
        ;; do the same job.
-       (unless (let* ((dest (and lvar
-                                 (lvar-dest lvar))))
+       (unless (let* ((dest (lvar-dest lvar)))
                  (and (basic-combination-p dest)
                       (eq (basic-combination-fun dest) lvar)))
          (multiple-value-bind (args results)
