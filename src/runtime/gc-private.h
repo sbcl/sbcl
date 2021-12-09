@@ -46,6 +46,7 @@ extern void *gc_general_alloc(sword_t nbytes,int page_type_flag);
 
 #define note_transported_object(old, new) /* do nothing */
 
+extern uword_t gc_copied_nwords;
 static inline lispobj
 gc_general_copy_object(lispobj object, size_t nwords, int page_type_flag)
 {
@@ -55,6 +56,7 @@ gc_general_copy_object(lispobj object, size_t nwords, int page_type_flag)
     lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag);
 
     /* Copy the object. */
+    gc_copied_nwords += nwords;
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
 
     note_transported_object(object, new);
@@ -70,6 +72,7 @@ gc_copy_object_resizing(lispobj object, long nwords, int page_type_flag,
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
     lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag);
+    gc_copied_nwords += old_nwords;
     memcpy(new, native_pointer(object), old_nwords*N_WORD_BYTES);
     note_transported_object(object, new);
     return make_lispobj(new, lowtag_of(object));

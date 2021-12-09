@@ -62,6 +62,7 @@ os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*const scavtab[256])(lispobj *where, lispobj object);
+uword_t gc_copied_nwords;
 
 /* If sb_sprof_enabled was used and the data are not in the final form
  * (in the *SAMPLES* instance) then all code remains live.

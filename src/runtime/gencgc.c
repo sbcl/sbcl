@@ -2137,6 +2137,8 @@ wipe_nonpinned_words()
  * so the extra work here is quite minimal, even if it can generally add to
  * the number of keys in the hashtable.
  */
+uword_t gc_pinned_nwords;
+int gc_pinned_count;
 static void
 pin_object(lispobj object)
 {
@@ -2152,6 +2154,8 @@ pin_object(lispobj object)
         return;
 
     size_t nwords = OBJECT_SIZE(*object_start, object_start);
+    gc_pinned_nwords += nwords;
+    gc_pinned_count++;
     page_index_t last_page = find_page_index(object_start + nwords - 1);
     page_index_t page;
     // It would be better if it were possible to touch only the PTE for the
@@ -3769,6 +3773,7 @@ conservative_stack_scan(struct thread* th,
 }
 #endif
 
+int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
@@ -3776,6 +3781,14 @@ garbage_collect_generation(generation_index_t generation, int raise)
 {
     page_index_t i;
     struct thread *th;
+
+#ifdef COLLECT_GC_STATS
+    struct timespec t0;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    uword_t gen_usage_at_start = generations[generation].bytes_allocated;
+    uword_t higher_gen_usage_at_start =
+      raise ? generations[generation+1].bytes_allocated : 0;
+#endif
 
     gc_assert(generation <= PSEUDO_STATIC_GENERATION);
 
@@ -4138,6 +4151,50 @@ garbage_collect_generation(generation_index_t generation, int raise)
         g->bytes_allocated = generations[SCRATCH_GENERATION].bytes_allocated;
         generations[SCRATCH_GENERATION].bytes_allocated = 0;
     }
+#ifdef COLLECT_GC_STATS
+    if (show_gc_generation_throughput) {
+    struct timespec t1;
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    long et_nsec = (t1.tv_sec - t0.tv_sec)*1000000000 + (t1.tv_nsec - t0.tv_nsec);
+    sword_t bytes_retained, bytes_freed;
+    if (raise) {
+      bytes_retained = (generations[generation+1].bytes_allocated
+                        - higher_gen_usage_at_start);
+    } else {
+      bytes_retained = generations[generation].bytes_allocated;
+    }
+    bytes_freed = gen_usage_at_start - bytes_retained;
+
+    double pct_freed = gen_usage_at_start ? (double)bytes_freed / gen_usage_at_start : 0.0;
+    double et_sec = (double)et_nsec / 1000000000.0;
+    double speed = (double)(gc_copied_nwords << WORD_SHIFT) / 1024 / et_sec;
+    char *units = "KiB";
+    if (speed > 1024.0) speed /= 1024.0, units = "MiB";
+    /* The pre-GC bytes allocated should sum to copied + pinned + freed, which it
+     * more-or-less does, but there can be discrepancies because structure instances
+     * can be extended with a stable-hash slot (which isn't accounted for at all),
+     * vectors can be shrunk (part being "freed" and part being "copied", depending
+     * on the size and partial pinning),and the finalizer hash-table can have cons
+     * cells allocated to record the list of functions to call.
+     * In particular, there could be 0 usage before, and some usage after due to
+     * the finalizer table, which causes "freed" to be negative.
+     * While those factors could be accounted for in the report, it would be needlessly
+     * pedantic and confusing, and not really affect the big picture.
+     * If the MiB per sec is low, it could be that not many bytes were copied.
+     * Low speed + large count is bad though */
+    char buffer[200];
+    // can't use fprintf() inside GC because of malloc. snprintf() can deadlock too,
+    // but seems to do so much less often.
+    int n = snprintf(buffer, sizeof buffer,
+                     "gen%d: %ldw copied in %f sec (%.0f %s/sec),"
+                     " %d pinned objects (%ldw), %ldw freed (%.1f%%)\n",
+                     generation, gc_copied_nwords, et_sec, speed, units,
+                     gc_pinned_count, gc_pinned_nwords,
+                     bytes_freed >> WORD_SHIFT, pct_freed*100.0);
+    write(2, buffer, n);
+    }
+    gc_copied_nwords = gc_pinned_nwords = gc_pinned_count = 0;
+#endif
 
     /* Reset the alloc_start_page for generation. */
     RESET_ALLOC_START_PAGES();
@@ -4251,6 +4308,7 @@ extern int finalizer_thread_runflag;
  *
  * We stop collecting at gencgc_oldest_gen_to_gc, even if this is less than
  * last_gen (oh, and note that by default it is NUM_GENERATIONS-1) */
+long tot_gc_nsec;
 void
 collect_garbage(generation_index_t last_gen)
 {
@@ -4263,6 +4321,10 @@ collect_garbage(generation_index_t last_gen)
      * remap_free_pages was called. */
     static page_index_t high_water_mark = 0;
 
+#ifdef COLLECT_GC_STATS
+    struct timespec t_gc_start;
+    clock_gettime(CLOCK_MONOTONIC, &t_gc_start);
+#endif
     FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
     log_generation_stats(gc_logfile, "=== GC Start ===");
 
@@ -4473,6 +4535,14 @@ collect_garbage(generation_index_t last_gen)
         gc_prove_liveness(0, gc_object_watcher, 0, 0, gc_traceroot_criterion);
 #endif
     }
+
+#ifdef COLLECT_GC_STATS
+    struct timespec t_gc_done;
+    clock_gettime(CLOCK_MONOTONIC, &t_gc_done);
+    long et_nsec = (t_gc_done.tv_sec - t_gc_start.tv_sec)*1000000000
+      + (t_gc_done.tv_nsec - t_gc_start.tv_nsec);
+    tot_gc_nsec += et_nsec;
+#endif
 
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");

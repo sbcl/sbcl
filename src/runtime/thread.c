@@ -264,7 +264,8 @@ void* read_current_thread() {
 extern pthread_key_t foreign_thread_ever_lispified;
 #endif
 
-#if defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
+#if !defined COLLECT_GC_STATS && \
+  defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
 #define COLLECT_GC_STATS
 #endif
 #ifdef COLLECT_GC_STATS

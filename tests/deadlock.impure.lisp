@@ -9,6 +9,9 @@
           sb-thread:wait-on-semaphore
           sb-thread:with-mutex))
 
+(when (sb-sys:find-dynamic-foreign-symbol-address "show_gc_generation_throughput")
+  (setf (extern-alien "show_gc_generation_throughput" int) 0))
+
 (with-test (:name :deadlock-detection.1)
   (loop
     repeat 1000
