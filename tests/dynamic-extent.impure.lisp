@@ -1670,3 +1670,17 @@
         (declare (dynamic-extent (function %f1)))
         (funcall #'%f1 :bad)))
    ((10) 10)))
+
+(with-test (:name :no-stack-cleanup-before-return)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((identity (eval '#'identity))
+               (continuation (eval '(lambda (&rest args)
+                                     args))))
+           (flet ((f (n fn)
+                    (funcall fn n (vector))))
+             (f 1
+                (lambda (j &rest points)
+                  (apply continuation  j (mapcar identity points)))))))
+    (() '(1 #()) :test #'equalp)))

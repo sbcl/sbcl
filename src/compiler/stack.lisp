@@ -517,7 +517,9 @@
                    (not (eq (ir2-block-start-stack (block-info succ))
                             top)))
           ;; Return resets the stack, so no need to clean anything.
-          (unless (return-p (block-last succ))
-            (insert-stack-cleanups block succ))))))
+          (let ((start (block-last succ)))
+            (unless (and (return-p start)
+                         (eq (block-start succ) (node-prev start)))
+              (insert-stack-cleanups block succ)))))))
 
   (values))
