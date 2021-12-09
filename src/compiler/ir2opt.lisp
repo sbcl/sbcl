@@ -1007,6 +1007,13 @@
                  (t
                   (return)))))
 
+;;; stack-analyze may have avoided creating a cleanup
+;;; leaving this unused
+(defoptimizer (vop-optimize current-stack-pointer) (vop)
+  (let ((tn (tn-ref-tn (vop-results vop))))
+    (when (not (tn-reads tn))
+      (delete-vop vop))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))
