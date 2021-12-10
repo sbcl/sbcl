@@ -19,7 +19,8 @@ static inline uint32_t UNALIGNED_LOAD32(void* p) {
     memcpy(&val, p, 4);
     return val;
 }
-static inline void UNALIGNED_STORE32(void* p, uint32_t val) {
+// 'volatile' works around a spurious GCC warning
+static inline void UNALIGNED_STORE32(void* volatile p, uint32_t val) {
     memcpy(p, &val, 4);
 }
 #ifdef LISP_FEATURE_64_BIT
