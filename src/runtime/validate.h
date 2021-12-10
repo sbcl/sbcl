@@ -21,7 +21,9 @@
 #define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
 
 /* eventually choosable per-thread: */
+#ifndef DEFAULT_CONTROL_STACK_SIZE // CFLAGS=-D... can set this
 #define DEFAULT_CONTROL_STACK_SIZE (2*1024*1024)
+#endif
 
 /* constants derived from the fundamental constants in passed by GENESIS */
 #define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
