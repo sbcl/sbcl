@@ -246,11 +246,11 @@
          (let ((p (position #\/ x :from-end t)))
            (if p (subseq x (1+ p)) x)))
         ((symbolp x)
-         (let ((name (translate (symbol-name x) spaces)))
-           (when (eq (symbol-package x) core-nil) ; uninterned
+         (let ((package-id (sb-impl::symbol-package-id x))
+               (name (translate (symbol-name x) spaces)))
+           (when (eq package-id 0) ; uninterned
              (return-from recurse (string-downcase name)))
-           (let* ((package-id (sb-impl::symbol-package-id x))
-                  (package (truly-the package
+           (let* ((package (truly-the package
                                       (aref (core-pkg-id->package core) package-id)))
                   (package-name (translate (package-%name package) spaces)))
              ;; The name-cleaning code wants to compare against symbols

@@ -431,6 +431,8 @@ void execute_full_mark_phase()
         where += listp(obj) ? 2 : sizetab[widetag_of(where)](where);
     }
 #endif
+    // In case this is not the same as (symbol-value '*id->package*)
+    gc_mark_obj(lisp_package_vector);
     do {
         lispobj ptr = gc_dequeue();
         gc_dcheck(ptr != 0);
