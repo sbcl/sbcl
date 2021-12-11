@@ -111,61 +111,45 @@ static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
 #define PTR_SCAVTAB_INDEX(ptr) ((uint32_t)ptr>>(N_LOWTAG_BITS-2))&3
 #endif
 
-static inline void scav1(lispobj* object_ptr, lispobj object)
+/* Fixup the pointer in 'object' which is stored at *addr.
+ * That is, rewrite *addr if (and only if) 'object' got moved.
+ *
+ * As a precondition of calling this, 'object' must satisfy is_lisp_pointer().
+ *
+ * For GENCGC only:
+ * - With 32-bit words, is_lisp_pointer(object) returns true if addr
+ *   contains a broken heart marker (0x01), so we need a sanity check
+ *   as the last case.
+ * - With 64-bit words, is_lisp_pointer(object) is false when addr
+ *   contains a broken heart marker (0x01), so this won't get called.
+ */
+static inline void scav1(lispobj* addr, lispobj object)
 {
-    // GENCGC only:
-    // * With 32-bit words, is_lisp_pointer(object) returns true if object_ptr
-    //   points to a forwarding pointer, so we need a sanity check inside the
-    //   branch for is_lisp_pointer(). For maximum efficiency, check that only
-    //   after from_space_p() returns false, so that valid pointers into
-    //   from_space incur no extra test. This could be improved further by
-    //   skipping the FP check if 'object' points within dynamic space, i.e.,
-    //   when find_page_index() returns >= 0. That would entail injecting
-    //   from_space_p() explicitly into the loop, so as to separate the
-    //   "was a page found at all" condition from the page generation test.
 
-    // * With 64-bit words, is_lisp_pointer(object) is false when object_ptr
-    //   points to a forwarding pointer, and the fixnump() test also returns
-    //   false, so we'll indirect through scavtab[]. This will safely invoke
-    //   scav_lose(), detecting corruption without any extra cost.
-    //   The major difference between that and the explicit test is that you
-    //   won't see 'start' and 'n_words', but if you need those, chances are
-    //   you'll want to run under an external debugger in the first place.
-    //   [And btw it sure would be nice to assert statically
-    //   that is_lisp_pointer(0x01) is indeed false]
-
-#define FIX_POINTER() { \
-    lispobj *ptr = native_pointer(object); \
-    if (forwarding_pointer_p(ptr)) \
-        *object_ptr = forwarding_pointer_value(ptr); \
-    else /* Scavenge that pointer. */ \
-        scav_ptr[PTR_SCAVTAB_INDEX(object)](object_ptr, object);  \
+    page_index_t page;
+    // It's a performance boost to treat from_space_p() as a leaky abstraction
+    // because reading one word at *native_pointer(object) is easier than
+    // looking in a hashset. 9 times out of 10 times we need to read that word
+    // anyway, and if the object was already forwarded, we never need pinned_p.
+    if ((page = find_page_index((void*)object)) >= 0) {
+        if (page_table[page].gen == from_space) {
+            if (forwarding_pointer_p(native_pointer(object)))
+                *addr = forwarding_pointer_value(native_pointer(object));
+            else if (!pinned_p(object, page))
+                scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
+        }
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    page_index_t page;
-    // It would be fine, though suboptimal, to use from_space_p() here.
-    // If it returns false, we don't want to call immobile_space_p()
-    // unless the pointer is *not* into dynamic space.
-    if ((page = find_page_index((void*)object)) >= 0) {
-        if (page_table[page].gen == from_space && !pinned_p(object, page))
-            FIX_POINTER();
-    } else if (immobile_space_p(object)) {
+    // Test immobile_space_p() only if object was definitely not in dynamic space
+    else if (immobile_space_p(object)) {
         lispobj *ptr = base_pointer(object);
         if (immobile_obj_gen_bits(ptr) == from_space)
             enliven_immobile_obj(ptr, 1);
     }
-#else
-    if (from_space_p(object)) {
-        FIX_POINTER();
-    } else {
-#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
-        if (forwarding_pointer_p(object_ptr))
-          lose("unexpected forwarding pointer in scavenge @ %p",
-               object_ptr);
 #endif
-        /* It points somewhere other than oldspace. Leave it
-         * alone. */
-    }
+#if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
+    else if (object == 1)
+          lose("unexpected forwarding pointer in scavenge @ %p", addr);
 #endif
 }
 
