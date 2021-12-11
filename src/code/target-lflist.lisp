@@ -113,8 +113,11 @@
 
 (declaim (inline get-next))
 (defun get-next (node)
-  (with-pinned-objects (node) ; pinning a node also pins its 'next'
-    (let ((%next (%node-next node)))
+  ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
+  (#+cheneygc sb-sys:without-gcing #+gencgc progn
+   (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
+          (%next (%node-next node)))
+      (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
       (values (truly-the list-node
                (%make-lisp-obj (logior (get-lisp-obj-address %next)
                                        sb-vm:instance-pointer-lowtag)))
@@ -333,6 +336,10 @@
     (do-lockfree-list (x list) (incf n))
     n))
 
+;;; This function is not really part of the API. It preserve the deletion bit,
+;;; which doesn't really make sense from an interface perspective.
+;;; However, when devising tests of the algorithms, it is useful to capture
+;;; a complete snapshot of the list.
 (defun copy-lfl (lfl)
   (labels ((copy-chain (node)
              (if (eq node *tail-atom*)

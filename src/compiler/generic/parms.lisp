@@ -185,8 +185,7 @@
     *gc-pending*
     #+sb-safepoint sb-impl::*in-safepoint*
     #+sb-thread *stop-for-gc-pending*
-    ;; non-x86oid gencgc object pinning
-    #+(and gencgc (not (or x86 x86-64))) *pinned-objects*
+    *pinned-objects*
     #+gencgc (*gc-pin-code-pages* 0)
     ;; things needed for non-local-exit
     (*current-catch-block* 0)

@@ -183,7 +183,9 @@
   (let* ((anode *5*)
          (next (%node-next anode)))
     (assert (fixnump next))
-    (with-pinned-objects (anode)
+    ;; maybe this should be a keyword to WITH-PINNED-OBJECTS saying
+    ;; to explicitly cons onto the list of pins?
+    (let ((sb-vm::*pinned-objects* (cons anode sb-vm::*pinned-objects*)))
       (gc)
       ;; nowhere do we reference node *10* in this test,
       ;; so there's no reason the GC should want not to move that node

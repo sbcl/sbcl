@@ -2188,24 +2188,6 @@ pin_object(lispobj object)
                                  1);
             })
     }
-
-    if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG) {
-        struct instance* instance = INSTANCE(object);
-        lispobj layout = instance_layout((lispobj*)instance);
-        if (layout && lockfree_list_node_layout_p(LAYOUT(layout))) {
-            // When pinning a logically deleted lockfree list node, always pin the
-            // successor too, since the Lisp code will reconstruct the next node's tagged
-            // pointer from the native pointer. Since we're still in the object pinning phase
-            // of GC, layouts can't have been forwarded yet.
-            // Note also that this 'pin' does not need to happen for mark-only GC.
-            // The pin is from an address perspective, not a liveness perspective,
-            // because the instance scavenger would correctly trace this reference.
-            lispobj next = instance->slots[INSTANCE_DATA_START];
-            // Be sure to ignore an uninitialized word containing 0.
-            if (fixnump(next) && next && from_space_p(next | INSTANCE_POINTER_LOWTAG))
-                pin_object(next | INSTANCE_POINTER_LOWTAG);
-        }
-    }
 }
 
 #if !GENCGC_IS_PRECISE || defined LISP_FEATURE_PPC64
@@ -2261,7 +2243,7 @@ preserve_pointer(void *addr)
  * pin_object() will always do the right thing and ignore multiple
  * calls with the same object in the same collection pass.
  */
-static void __attribute__((unused)) pin_exact_root(lispobj obj)
+static void pin_exact_root(lispobj obj)
 {
     // These tests are performed in approximate order of quickness to check.
 
@@ -2285,9 +2267,9 @@ static void __attribute__((unused)) pin_exact_root(lispobj obj)
 #ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:
 #endif
-        object_start = fun_code_header(object_start);
+        obj = make_lispobj(fun_code_header(object_start), OTHER_POINTER_LOWTAG);
     }
-    pin_object(compute_lispobj(object_start));
+    pin_object(obj);
 }
 
 
@@ -3773,6 +3755,30 @@ conservative_stack_scan(struct thread* th,
 }
 #endif
 
+static void scan_explicit_pins(struct thread* th)
+{
+    lispobj pin_list = read_TLS(PINNED_OBJECTS, th);
+    for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
+        lispobj object = CONS(pin_list)->car;
+        pin_exact_root(object);
+        if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG) {
+            struct instance* instance = INSTANCE(object);
+            lispobj layout = instance_layout((lispobj*)instance);
+            // Since we're still in the pinning phase of GC, layouts can't have moved yet,
+            // so there is no forwarding check needed here.
+            if (layout && lockfree_list_node_layout_p(LAYOUT(layout))) {
+                /* A logically-deleted explicitly-pinned lockfree list node pins its
+                 * successor too, since Lisp reconstructs the next node's tagged pointer
+                 * from an untagged pointer currently stored in %NEXT of this node. */
+                lispobj successor = instance->slots[INSTANCE_DATA_START];
+                // Be sure to ignore an uninitialized word containing 0.
+                if (successor && fixnump(successor))
+                    pin_exact_root(successor | INSTANCE_POINTER_LOWTAG);
+            }
+        }
+    }
+}
+
 int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
@@ -3892,21 +3898,17 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (conservative_stack) {
         for_each_thread(th) {
             if (th->state_word.state == STATE_DEAD) continue;
+            scan_explicit_pins(th);
 #if !GENCGC_IS_PRECISE
             /* Pin everything in fromspace with a stack root, and also set the
              * sticky card mark on any page (in any generation)
              * referenced from the stack. */
             conservative_stack_scan(th, generation, &raise);
-#else
-            // Pin code if needed, and then *PINNED-OBJECTS*
-#  ifdef LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_PPC64
+            // Pin code if needed
             semiconservative_pin_stack(th, generation);
-#  elif !defined(reg_CODE)
+#elif !defined(reg_CODE)
             pin_stack(th);
-#  endif
-            lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
-            for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr )
-                pin_exact_root(CONS(pin_list)->car);
 #endif
         }
     }
@@ -3940,6 +3942,11 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 lispobj fun = VECTOR(info)->data[0];
                 gc_assert(functionp(fun));
 #ifdef LISP_FEATURE_X86_64
+                /* FIXME: re. the following remark that pin_exact_root() "does not
+                 * work", does it have to be that way? It seems the issue is that
+                 * pin_exact_root does absolutely nothing for objects in immobile space.
+                 * Are there other objects we call it on which could be in immobile-space
+                 * and should it be made to deal with them? */
                 // slight KLUDGE: 'fun' is a simple-fun in immobile-space,
                 // and pin_exact_root() doesn't work. In all probability 'fun'
                 // is pseudo-static, but let's use the right pinning function.
