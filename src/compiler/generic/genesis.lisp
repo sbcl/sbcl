@@ -1556,7 +1556,7 @@ core and return a descriptor to it."
                           target-pkg-list :test #'string=)
                    (error "No cold package named ~S" name))))
       ;; pass 1: make all proto-packages
-      (let ((count 3)) ; preincrement on use. the first non-preassigned ID is 4
+      (let ((count 4)) ; preincrement on use. the first non-preassigned ID is 5
         (dolist (pd package-data-list)
           ;; Shadowing symbols include those specified in package-data-list
           ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
@@ -1565,6 +1565,7 @@ core and return a descriptor to it."
                            ((string= name "COMMON-LISP") sb-impl::+package-id-lisp+)
                            ((string= name "COMMON-LISP-USER")
                             sb-impl::+package-id-user+)
+                           ((string= name "SB-KERNEL") sb-impl::+package-id-kernel+)
                            (t (incf count))))
                  (shadows (when (eql (mismatch name "SB-") 3)
                             (sort (package-shadowing-symbols (find-package name))
@@ -2988,6 +2989,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    sb-impl::+package-id-keyword+
                    sb-impl::+package-id-lisp+
                    sb-impl::+package-id-user+
+                   sb-impl::+package-id-kernel+
                    sb-impl::symbol-name-bits))
         (record (c-symbol-name c) 3/2 #| arb |# c ""))
       ;; Other constants that aren't necessarily grouped into families.

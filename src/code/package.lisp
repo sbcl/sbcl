@@ -50,6 +50,7 @@
 (defconstant +package-id-lisp+     1)
 (defconstant +package-id-keyword+  2)
 (defconstant +package-id-user+     3)
+(defconstant +package-id-kernel+   4)
 
 (sb-xc:defstruct (package-hashtable
                   (:constructor %make-package-hashtable

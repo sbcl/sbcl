@@ -198,46 +198,6 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
     return 0;
 }
 
-lispobj sb_kernel_package() {
-    struct symbol* s = SYMBOL(FDEFN(SUB_GC_FDEFN)->name);
-    return symbol_package(s);
-}
-
-lispobj find_package(char* package_name)
-{
-    // Use SB-KERNEL::SUB-GC to get a hold of the SB-KERNEL package,
-    // which contains the symbol *PACKAGE-NAMES*.
-    static unsigned int kernelpkg_hint;
-    lispobj* package_names = search_package_symbols(sb_kernel_package(),
-                                                    "*PACKAGE-NAMES*",
-                                                    &kernelpkg_hint);
-    if (!package_names)
-        return 0;
-    sword_t namelen = strlen(package_name);
-    struct instance* names = (struct instance*)
-        native_pointer(((struct symbol*)package_names)->value);
-    struct vector* cells = (struct vector*)
-        native_pointer(names->slots[INSTANCE_DATA_START]);
-#define LFHASH_KEY_OFFSET 3 /* KLUDGE */
-    int n = (vector_len(cells) - LFHASH_KEY_OFFSET) >> 1;
-    gc_assert(make_fixnum(n) == cells->data[0]);
-    int i;
-    // Search *PACKAGE-NAMES* for the package
-    for (i=0; i<n; ++i) {
-        lispobj element = cells->data[LFHASH_KEY_OFFSET+i];
-        if (is_lisp_pointer(element)) {
-            struct vector* string = (struct vector*)native_pointer(element);
-            if (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG
-                && vector_len(string) == namelen
-                && !memcmp(string->data, package_name, namelen)) {
-                element = cells->data[LFHASH_KEY_OFFSET+n+i];
-                return listp(element) ? CONS(element)->car : element;
-            }
-        }
-    }
-    return 0;
-}
-
 lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 {
     return package ? search_package_symbols(package, symbol_name, hint) : 0;

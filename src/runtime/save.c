@@ -254,7 +254,9 @@ void unwind_binding_stack()
     write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
     unsigned int hint = 0;
     char symbol_name[] = "*SAVE-LISP-CLOBBERED-GLOBALS*";
-    lispobj* sym = find_symbol(symbol_name, sb_kernel_package(), &hint);
+    lispobj* sym = find_symbol(symbol_name,
+                               VECTOR(lisp_package_vector)->data[PACKAGE_ID_KERNEL],
+                               &hint);
     lispobj value;
     int i;
     if (!sym || !simple_vector_p(value = ((struct symbol*)sym)->value))
