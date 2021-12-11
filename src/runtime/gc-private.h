@@ -246,7 +246,7 @@ static inline struct bitmap get_layout_bitmap(struct layout* layout)
     const int layout_id_vector_fixed_capacity = 7;
 #ifdef LISP_FEATURE_64_BIT
     sword_t depthoid = layout->flags;
-    // Depthoid is stored in the upper 4 bytes of the header, as a fixnum.
+    // Depthoid is stored in the upper 4 bytes of 'flags', as a fixnum.
     depthoid >>= (32 + N_FIXNUM_TAG_BITS);
     int extra_id_words =
       (depthoid > layout_id_vector_fixed_capacity) ?
@@ -298,7 +298,7 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
  * It has to do with the way the sanitizer intercepts calls
  * to sigaction() - it mucks with your sa_mask :-(.
  *
- * This macro take an aribtrary expression as the 'operation' rather than
+ * This macro take an arbitrary expression as the 'operation' rather than
  * an address and value to assign, for two reasons:
  * 1. there may be more than one store operation that has to be
  *    within the scope of the lifted write barrier,
