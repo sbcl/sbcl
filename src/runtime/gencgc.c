@@ -1751,7 +1751,7 @@ static inline int not_condemned_p(page_index_t page)
 // Only a bignum, code blob, or vector could be on a single-object page.
 #define potential_largeobj_p(w) \
   (w==BIGNUM_WIDETAG || w==CODE_HEADER_WIDETAG || \
-   (w>=SIMPLE_VECTOR_WIDETAG && w<=SIMPLE_CHARACTER_STRING_WIDETAG))
+   (w>=SIMPLE_VECTOR_WIDETAG && w < COMPLEX_BASE_STRING_WIDETAG))
 
 #if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
