@@ -1229,7 +1229,7 @@ void gc_start_the_world()
                       + (gc_end_time.tv_nsec - gc_start_time.tv_nsec);
     if (stw_elapsed < 0 || gc_elapsed < 0) {
         char errmsg[] = "GC: Negative times?\n";
-        write(2, errmsg, sizeof errmsg-1);
+        ignore_value(write(2, errmsg, sizeof errmsg-1));
     } else {
         stw_sum_duration += stw_elapsed;
         if (stw_elapsed < stw_min_duration) stw_min_duration = stw_elapsed;
