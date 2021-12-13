@@ -631,7 +631,6 @@
   ;; from COMPONENT-LAMBDAS.
   (reanalyze-functionals nil :type list)
   (delete-blocks nil :type list)
-  (nlx-info-generated-p nil :type boolean)
   ;; this is filled by environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.

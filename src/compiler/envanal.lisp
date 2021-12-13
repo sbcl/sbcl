@@ -50,7 +50,6 @@
           (setf (functional-kind fun) nil)
           (delete-functional fun)))))
 
-  (setf (component-nlx-info-generated-p component) t)
   (values))
 
 ;;; If FUN has an environment, return it, otherwise assign an empty
