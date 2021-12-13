@@ -1748,6 +1748,11 @@ static inline int not_condemned_p(page_index_t page)
              (is_code(page_table[page].type) && pin_all_dynamic_space_code)));
 }
 
+// Only a bignum, code blob, or vector could be on a single-object page.
+#define potential_largeobj_p(w) \
+  (w==BIGNUM_WIDETAG || w==CODE_HEADER_WIDETAG || \
+   (w>=SIMPLE_VECTOR_WIDETAG && w<=SIMPLE_CHARACTER_STRING_WIDETAG))
+
 #if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
@@ -1768,7 +1773,23 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
-    /* quick check 2: Unless the page can hold code, the pointer's lowtag must
+    /* If this is such a page, do a quick check for widetag.
+     * Code pages allow random interior pointers, but only a correctly
+     * tagged pointer to the boxed words. Tagged interior pointers to SIMPLE-FUNs
+     * are just as good as any untagged instruction pointer. */
+    lispobj* object_start;
+    if (page_single_obj_p(addr_page_index)) {
+        object_start = page_scan_start(addr_page_index);
+        int widetag = widetag_of(object_start);
+        if (instruction_ptr_p((char*)addr, object_start) ||
+            (potential_largeobj_p(widetag) &&
+             // Conveniently all potential largeobjs are OTHER_POINTER
+             make_lispobj(object_start, OTHER_POINTER_LOWTAG) == addr))
+            return object_start;
+        return 0;
+    }
+
+    /* Unless the page can hold code, the pointer's lowtag must
      * correspond to the widetag of the object. The object header can safely
      * be read even if it turns out that the pointer is not valid,
      * because the pointer was in bounds for the page.
@@ -1787,19 +1808,16 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
         if (pinned_p(addr, addr_page_index)) return 0;
     }
 
-    /* Filter out anything which can't be a pointer to a Lisp object
-     * (or, as a special case which also requires pinning, a return
-     * address referring to something in a code component). This is
-     * expensive but important, since it vastly reduces the
-     * probability that random garbage will be bogusly interpreted as
-     * a pointer which prevents a page from moving. */
-    lispobj* object_start = search_dynamic_space((void*)addr);
+    /* I think this search can't fail. We've already verified that the
+     * pointer is within range for its page. */
+    object_start = search_dynamic_space((void*)addr);
     if (!object_start) return 0;
 
     /* If the containing object is a code object and 'addr' points
      * anywhere beyond the boxed words,
      * presume it to be a valid unboxed return address. */
-    if (instruction_ptr_p((void*)addr, object_start))
+    if (instruction_ptr_p((void*)addr, object_start) ||
+        properly_tagged_descriptor_p((void*)addr, object_start))
         return object_start;
 
     // FIXME: I think there is a window of GC vulnerability regarding FINs
@@ -1808,16 +1826,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
     // garbage because there is no _tagged_ pointer to it.
     // This is an almost impossible situation to arise, but seems worth some study.
 
-    /* Large object pages only contain ONE object, and it will never
-     * be a CONS.  However, arrays and bignums can be allocated larger
-     * than necessary and then shrunk to fit, leaving what look like
-     * (0 . 0) CONSes at the end.  These appear valid to
-     * properly_tagged_descriptor_p(), so pick them off here. */
-    if ((listp(addr) && page_single_obj_p(addr_page_index))
-        || !properly_tagged_descriptor_p((void*)addr, object_start))
-        return 0;
-
-    return object_start;
+    return 0;
 }
 #elif defined LISP_FEATURE_PPC64
 static inline int untagged_fdefn_p(lispobj addr) {
@@ -1989,7 +1998,7 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 #endif
 }
 
-void deposit_filler(uword_t addr, sword_t nbytes) {
+static void deposit_filler(uword_t addr, sword_t nbytes) {
     gc_assert(nbytes >= 0);
     if (nbytes > 0) {
         sword_t nwords = nbytes >> WORD_SHIFT;

@@ -262,6 +262,11 @@
   ;; NIL element type is not in the contiguous range of widetags
   ;; corresponding to SIMPLE-UNBOXED-ARRAY
   simple-array-nil-widetag
+
+  ;; IF YOU CHANGE THIS ORDER, THEN MANUALLY VERIFY CORRECTNESS OF:
+  ;; - leaf_obj_widetag_p()
+  ;; - conservative_root_p()
+  ;; - anything else I forgot to mention
   simple-vector-widetag                     ;
   simple-bit-vector-widetag                 ;
   simple-array-unsigned-byte-2-widetag      ;
