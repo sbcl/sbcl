@@ -1817,7 +1817,8 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
      * anywhere beyond the boxed words,
      * presume it to be a valid unboxed return address. */
     if (instruction_ptr_p((void*)addr, object_start) ||
-        properly_tagged_descriptor_p((void*)addr, object_start))
+        (properly_tagged_descriptor_p((void*)addr, object_start)
+         && widetag_of(object_start) != FILLER_WIDETAG))
         return object_start;
 
     // FIXME: I think there is a window of GC vulnerability regarding FINs
