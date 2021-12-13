@@ -219,30 +219,22 @@ find_page_index(void *addr)
 #define SINGLE_OBJECT_FLAG (1<<4)
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
-#define page_has_smallobj_pins(page) \
-  (page_table[page].pinned && !page_single_obj_p(page))
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
-    // FIXME: this gets called if !compacting_p,
-    // but most people don't run with extra debug assertions,
-    // and if you enable them, you'll pretty quickly crash here.
-    // gc_dcheck(compacting_p());
-#if !GENCGC_IS_PRECISE
-    return page_has_smallobj_pins(page)
-        && hopscotch_containsp(&pinned_objects, obj);
-#else
-    /* There is almost never anything in the hashtable on precise platforms */
-    if (!pinned_objects.count || !page_has_smallobj_pins(page))
-        return 0;
-# ifdef RETURN_PC_WIDETAG
-    /* Conceivably there could be a precise GC without RETURN-PC objects */
+    // Single-object pages can be pinned, but the object doesn't go
+    // in the hashtable. I'm a little surprised that the return value
+    // should be 0 in such case, but I think this never gets called
+    // on large objects because they've all been "moved" to newspace
+    // by adjusting the page table. Perhaps this should do:
+    //   gc_assert(!page_single_obj_p(page))
+    if (!page_table[page].pinned || page_single_obj_p(page)) return 0;
+#ifdef RETURN_PC_WIDETAG
     if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG)
         obj = make_lispobj(fun_code_header(native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
-# endif
-    return hopscotch_containsp(&pinned_objects, obj);
 #endif
+    return hopscotch_containsp(&pinned_objects, obj);
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
