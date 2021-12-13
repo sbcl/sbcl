@@ -1734,13 +1734,9 @@ static inline boolean plausible_tag_p(lispobj addr)
  *
  * A non-large-object page that is marked "pinned" does not suffice
  * to be considered entirely pinned if it contains other than code.
- *
- * (I would have named this "wholly_pinned_p" were it not for the additional
- * check about from_space, because that's kind of a misnomer in as much as
- * pinning pertains only to fromspace.)
  */
 int pin_all_dynamic_space_code;
-static inline int not_condemned_p(page_index_t page)
+static inline int immune_set_memberp(page_index_t page)
 {
     return (page_table[page].gen != from_space)
         || (page_table[page].pinned &&
@@ -1769,7 +1765,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
         (!is_lisp_pointer(addr) && enforce_lowtag) ||
-        (compacting_p() && not_condemned_p(addr_page_index)))
+        (compacting_p() && immune_set_memberp(addr_page_index)))
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
@@ -1847,7 +1843,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     // quick check 1: within from_space and within page usage
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
-        (compacting_p() && not_condemned_p(addr_page_index)))
+        (compacting_p() && immune_set_memberp(addr_page_index)))
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
@@ -2268,7 +2264,7 @@ static void pin_exact_root(lispobj obj)
     page_index_t page = find_page_index((void*)obj);
     if (page < 0) return;
     // 4. Ignore if not in the condemned set.
-    if (not_condemned_p(page)) return;
+    if (immune_set_memberp(page)) return;
 
     // Never try to pin an interior pointer - always use base pointers.
     lispobj *object_start = native_pointer(obj);
@@ -3602,7 +3598,7 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
     if (page < 0) return;
-    if (not_condemned_p(page)) return;
+    if (immune_set_memberp(page)) return;
 
     struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
     if (code) {
