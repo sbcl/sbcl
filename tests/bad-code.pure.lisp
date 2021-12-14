@@ -630,3 +630,12 @@
                      (checked-compile
                       `(lambda (x) (mapcar 'and x))
                       :allow-warnings 'warning))))
+
+(with-test (:name :replace-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x y)
+                         (declare (bit-vector x)
+                                  (string y))
+                         (replace x y :start1 10))
+                      :allow-warnings 'warning))))

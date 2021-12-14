@@ -1102,6 +1102,25 @@
                        :node node)
   (transform-replace nil node)))
 
+(defoptimizer (replace ir2-hook) ((seq1 seq2 &key &allow-other-keys) node block)
+  (declare (ignore block))
+  (block nil
+    (flet ((element-type (lvar)
+             (let ((type (lvar-type lvar)))
+               (unless (csubtypep type (specifier-type 'array))
+                 (return))
+               (multiple-value-bind (upgraded other)
+                   (array-type-upgraded-element-type type)
+                 (or other upgraded)))))
+      (let ((type1 (element-type seq1))
+            (type2 (element-type seq2)))
+        (unless (or (eq type1 *wild-type*)
+                    (eq type2 *wild-type*)
+                    (types-equal-or-intersect type1 type2))
+          (let ((*compiler-error-context* node))
+            (compiler-warn "Incompatible array element types: ~a and ~a"
+                           (type-specifier type1)
+                           (type-specifier type2))))))))
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
@@ -1120,32 +1139,32 @@
   (binding* ((n-elems-per-word (truncate sb-vm:n-word-bits n-bits-per-elem))
              ((src-word src-elt) (truncate (lvar-value src-offset) n-elems-per-word))
              ((dst-word dst-elt) (truncate (lvar-value dst-offset) n-elems-per-word)))
-        ;; Avoid non-word aligned copies.
-        (unless (and (zerop src-elt) (zerop dst-elt))
-          (give-up-ir1-transform))
-        ;; Avoid copies where we would have to insert code for
-        ;; determining the direction of copying.
-        (unless (= src-word dst-word)
-          (give-up-ir1-transform))
-        `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word)))
-               (extra (mod length ,n-elems-per-word)))
-           (declare (type index end))
-           ;; Handle any bits at the end.
-           (unless (zerop extra)
-             ;; MASK selects just the bits that we want from the ending word of
-             ;; the source array. The number of bits to shift out is
-             ;;   (- n-word-bits (* extra n-bits-per-elem))
-             ;; which is equal mod n-word-bits to the expression below.
-             (let ((mask (shift-towards-start
-                          most-positive-word (* extra ,(- n-bits-per-elem)))))
-               (%set-vector-raw-bits
-                dst end (logior (logand (%vector-raw-bits src end) mask)
-                                (logandc2 (%vector-raw-bits dst end) mask)))))
-           ;; Copy from the end to save a register.
-           (do ((i (1- end) (1- i)))
-               ((< i ,src-word))
-             (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
-           (values))))
+    ;; Avoid non-word aligned copies.
+    (unless (and (zerop src-elt) (zerop dst-elt))
+      (give-up-ir1-transform))
+    ;; Avoid copies where we would have to insert code for
+    ;; determining the direction of copying.
+    (unless (= src-word dst-word)
+      (give-up-ir1-transform))
+    `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word)))
+           (extra (mod length ,n-elems-per-word)))
+       (declare (type index end))
+       ;; Handle any bits at the end.
+       (unless (zerop extra)
+         ;; MASK selects just the bits that we want from the ending word of
+         ;; the source array. The number of bits to shift out is
+         ;;   (- n-word-bits (* extra n-bits-per-elem))
+         ;; which is equal mod n-word-bits to the expression below.
+         (let ((mask (shift-towards-start
+                      most-positive-word (* extra ,(- n-bits-per-elem)))))
+           (%set-vector-raw-bits
+            dst end (logior (logand (%vector-raw-bits src end) mask)
+                            (logandc2 (%vector-raw-bits dst end) mask)))))
+       ;; Copy from the end to save a register.
+       (do ((i (1- end) (1- i)))
+           ((< i ,src-word))
+         (%set-vector-raw-bits dst i (%vector-raw-bits src i)))
+       (values))))
 
 ;;; Detect misuse with sb-devel. "Misuse" means mismatched array element types
 #-sb-devel
