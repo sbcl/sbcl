@@ -95,6 +95,7 @@
   (if print
       (format t "~D roots~%" (length roots))
       roots))
+(compile 'actually-get-stack-roots)
 (defun get-stack-roots (&rest rest)
   (apply #'actually-get-stack-roots (%make-lisp-obj (sap-int (current-sp))) rest))
 
@@ -131,7 +132,9 @@
 ;;; between the current SP and end of stack.
 (test-util:with-test (:name :expected-gc-roots
                       :skipped-on (or :interpreter (not :pauseless-threadstart)))
-  (let ((list (tryit :print nil)))
+  (let ((list
+         (delete (sb-kernel:fun-code-header #'actually-get-stack-roots)
+                 (tryit :print nil))))
     ;; should be not many things pointed to by the stack
     (assert (< (length list) #+x86    38   ; more junk, I don't know why
                              #+x86-64 30   ; less junk, I don't know why
