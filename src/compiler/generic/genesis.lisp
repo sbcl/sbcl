@@ -1695,6 +1695,14 @@ core and return a descriptor to it."
       (:internal (push symbol-descriptor (cdr access-lists)))
       (t (error "~S inaccessible in package ~S" host-symbol host-package)))))
 
+;;; a hash table mapping from fdefinition names to descriptors of cold
+;;; objects
+;;;
+;;; Note: Since fdefinition names can be lists like '(SETF FOO), and
+;;; we want to have only one entry per name, this must be an 'EQUAL
+;;; hash table, not the default 'EQL.
+(defvar *cold-fdefn-objects*)
+
 ;;; Construct and return a value for use as *NIL-DESCRIPTOR*.
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
@@ -1760,6 +1768,10 @@ core and return a descriptor to it."
       (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
       (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
       (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
+      #+ppc64
+      (progn
+        (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) (ensure-cold-fdefn nil))
+        (remhash nil *cold-fdefn-objects*))
       #+compact-symbol
       (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
                              (encode-symbol-name sb-impl::+package-id-lisp+ name))
@@ -1978,14 +1990,6 @@ core and return a descriptor to it."
     (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core $1f0))))
 
 ;;;; functions and fdefinition objects
-
-;;; a hash table mapping from fdefinition names to descriptors of cold
-;;; objects
-;;;
-;;; Note: Since fdefinition names can be lists like '(SETF FOO), and
-;;; we want to have only one entry per name, this must be an 'EQUAL
-;;; hash table, not the default 'EQL.
-(defvar *cold-fdefn-objects*)
 
 ;;; Given a cold representation of a symbol, return a warm
 ;;; representation.
