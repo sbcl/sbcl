@@ -15,7 +15,7 @@
   (defparameter large-n-words (/ sb-vm:large-object-size sb-vm:n-word-bytes))
   (defparameter large-n-conses (/ large-n-words 2))))
 
-(with-test (:name :no-conses-on-large-object-pages :skipped-on (:not :gencgc))
+(with-test (:name :no-&rest-on-large-object-pages :skipped-on (:not :gencgc))
   ;; adding in a 2-word vector header makes it at least large-object-size.
   ;; The threshold in the allocator is exact equality for that.
   (let ((definitely-large-vector (make-array (- large-n-words 2)))
@@ -25,11 +25,14 @@
     (assert (large-object-p definitely-large-vector))
     (assert (not (large-object-p not-large-vector)))
     (assert (not (large-object-p (list 1 2)))))
-  (let ((fun1 (checked-compile
+  (let ((fun (checked-compile '(lambda (&rest params) params))))
+    (assert (not (large-object-p (apply fun (make-list large-n-conses)))))))
+
+(with-test (:name :no-list-on-large-object-pages
+                  :skipped-on (:or (:not :gencgc) :ppc :ppc64))
+  (let* ((fun (checked-compile
                '(lambda ()
                  (macrolet ((expand (n) `(list ,@(loop for i from 1 to n collect i))))
                    (expand #.large-n-conses)))))
-        (fun2 (checked-compile '(lambda (&rest params) params))))
-    (let ((list (funcall fun1)))
-      (assert (not (large-object-p list)))
-      (assert (not (large-object-p (apply fun2 list)))))))
+         (list (funcall fun)))
+    (assert (not (large-object-p list)))))

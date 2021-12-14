@@ -458,3 +458,18 @@
                                    unsigned-long))
            sap (length buffer))
           vector)))))
+
+;;; For (CAS SAP-REF-{8,16,32})
+(defknown sign-extend ((signed-byte 64) t) fixnum
+    (foldable flushable movable))
+
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  (:args (val :scs (signed-reg)))
+  (:arg-types signed-num (:constant fixnum))
+  (:info size)
+  (:results (res :scs (signed-reg)))
+  (:result-types fixnum)
+  (:generator 1
+    (inst* (ecase size (8 'extsb) (16 'extsh) (32 'extsw)) res val)))
