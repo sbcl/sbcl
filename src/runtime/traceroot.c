@@ -1047,15 +1047,6 @@ int gc_prove_liveness(void(*context_scanner)(),
         CONS(output)->car = make_fixnum(0);
         return 0;
     }
-    // Put back lowtags on pinned objects, since wipe_nonpinned_words() removed
-    // them. But first test whether lowtags were already repaired
-    // in case prove_liveness() is called after gc_prove_liveness().
-    if (n_pins>0 && !is_lisp_pointer(pins[0])) {
-        int i;
-        for(i=n_pins-1; i>=0; --i) {
-            pins[i] = compute_lispobj((lispobj*)pins[i]);
-        }
-    }
     n_paths = trace_paths(context_scanner, input, paths, ignore,
                           n_pins, (lispobj*)pins, criterion);
     CONS(output)->car = make_fixnum(n_paths);
@@ -1068,6 +1059,7 @@ int gc_prove_liveness(void(*context_scanner)(),
 int prove_liveness(lispobj objects, int criterion)
 {
     extern struct hopscotch_table pinned_objects;
-    extern int gc_n_stack_pins;
-    return gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
+    extern int gc_pin_count;
+    extern lispobj* gc_filtered_pins;
+    return gc_prove_liveness(0, objects, gc_pin_count, gc_filtered_pins, criterion);
 }
