@@ -376,7 +376,7 @@
       (setf (lvar-dynamic-extent old) nil)
       (unless (lvar-dynamic-extent new)
         (setf (lvar-dynamic-extent new) cleanup)
-        (setf (cleanup-info cleanup) (subst new old (cleanup-info cleanup)))))))
+        (setf (cleanup-nlx-info cleanup) (subst new old (cleanup-nlx-info cleanup)))))))
 
 (defun lexenv-contains-lambda (lambda parent-lexenv)
   (loop for lexenv = (lambda-lexenv lambda)
@@ -1384,25 +1384,6 @@
     (setf (block-next block) next)
     (setf (block-prev next) block))
   (values))
-
-;;; List all NLX-INFOs which BLOCK can exit to.
-(defun map-block-nlxes (fun block &optional dx-cleanup-fun)
-  (do-nested-cleanups (cleanup (block-end-lexenv block))
-    (let ((mess-up (cleanup-mess-up cleanup)))
-      (case (cleanup-kind cleanup)
-        ((:block :tagbody)
-         (aver (entry-p mess-up))
-         (loop for exit in (entry-exits mess-up)
-            for nlx-info = (exit-nlx-info exit)
-            do (funcall fun nlx-info)))
-        ((:catch :unwind-protect)
-         (aver (combination-p mess-up))
-         (let* ((arg-lvar (first (basic-combination-args mess-up)))
-                (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
-           (funcall fun nlx-info)))
-        ((:dynamic-extent)
-         (when dx-cleanup-fun
-           (funcall dx-cleanup-fun cleanup)))))))
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
@@ -2496,7 +2477,7 @@ is :ANY, the function name is not checked."
   (declare (type exit exit))
   (let* ((entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
-        (block (first (block-succ (node-block exit)))))
+         (block (first (block-succ (node-block exit)))))
     (dolist (nlx (environment-nlx-info (node-environment entry)) nil)
       (when (and (eq (nlx-info-block nlx) block)
                  (eq (nlx-info-cleanup nlx) cleanup))

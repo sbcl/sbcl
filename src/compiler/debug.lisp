@@ -1042,7 +1042,7 @@
                                      lvar-or-cell)
                                     (t
                                      (cont-num lvar-or-cell))))
-                                (cleanup-info cleanup))))
+                                (cleanup-nlx-info cleanup))))
                (t
                 (format t "entry ~S" (entry-exits node))))))
           (exit

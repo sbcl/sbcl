@@ -690,11 +690,11 @@
   ;; locall call analysis) and is rechecked by environment
   ;; analysis. (For closures this is a list of the LVAR of the enclose
   ;; after environment analysis.)
-  (info nil :type list))
+  (nlx-info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
-  (info :test info))
+  (nlx-info :test nlx-info))
 
 ;;; The ENVIRONMENT structure represents the result of environment analysis.
 (defstruct (environment (:copier nil))
