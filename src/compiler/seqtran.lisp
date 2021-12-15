@@ -1122,6 +1122,45 @@
                            (type-specifier type1)
                            (type-specifier type2))))))))
 
+(defun check-substitute-args (new seq node)
+  (let ((seq-type (lvar-type seq))
+        (new-type (lvar-type new)))
+    (when (and (neq new-type *wild-type*)
+               (csubtypep seq-type (specifier-type 'array)))
+      (let ((element-type (multiple-value-bind (upgraded other)
+                              (array-type-upgraded-element-type seq-type)
+                            (or other upgraded))))
+        (unless (or (eq element-type *wild-type*)
+                    (types-equal-or-intersect new-type element-type))
+          (let ((*compiler-error-context* node))
+            (compiler-warn "Can't substitute ~a into ~a"
+                           (type-specifier new-type)
+                           (type-specifier seq-type))))))))
+
+(defoptimizer (substitute ir2-hook) ((new old seq &key &allow-other-keys) node block)
+  (declare (ignore old block))
+  (check-substitute-args new seq node))
+
+(defoptimizer (substitute-if ir2-hook) ((new predicate seq &key &allow-other-keys) node block)
+  (declare (ignore predicate block))
+  (check-substitute-args new seq node))
+
+(defoptimizer (substitute-if-not ir2-hook) ((new predicate seq &key &allow-other-keys) node block)
+  (declare (ignore predicate block))
+  (check-substitute-args new seq node))
+
+(defoptimizer (nsubstitute ir2-hook) ((new old seq &key &allow-other-keys) node block)
+  (declare (ignore old block))
+  (check-substitute-args new seq node))
+
+(defoptimizer (nsubstitute-if ir2-hook) ((new predicate seq &key &allow-other-keys) node block)
+  (declare (ignore predicate block))
+  (check-substitute-args new seq node))
+
+(defoptimizer (nsubstitute-if-not ir2-hook) ((new predicate seq &key &allow-other-keys) node block)
+  (declare (ignore predicate block))
+  (check-substitute-args new seq node))
+
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
 ;;; both the source and the destination and we are copying from the same

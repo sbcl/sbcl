@@ -639,3 +639,11 @@
                                   (string y))
                          (replace x y :start1 10))
                       :allow-warnings 'warning))))
+
+(with-test (:name :substitute-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (substitute 10 #\a x))
+                      :allow-warnings 'warning))))
