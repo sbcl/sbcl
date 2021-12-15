@@ -452,12 +452,21 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             continue;
         case CODE_HEADER_WIDETAG:
             if (filler_obj_p(where)) {
+                // OMGWTF! Why does a filler code object merit adjustment?
                 if (where[2]) adjust_word_at(where+2, adj);
                 continue;
             }
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+            // Process each untagged fdefn pointer.
+            lispobj* fdefns_start = code->constants + code_n_funs(code)
+              * CODE_SLOTS_PER_SIMPLE_FUN;
+            int i;
+            for (i=code_n_named_calls(code)-1; i>=0; --i)
+                adjust_word_at(fdefns_start+i, adj);
+#endif
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || \
     defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
             // Fixup absolute jump table
