@@ -4130,9 +4130,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         goto maybe_verify;
     }
 
-    lispobj* the_symbol_nil = (lispobj*)(NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES);
-    heap_scavenge(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + the_symbol_nil);
-    heap_scavenge((lispobj*)(T - OTHER_POINTER_LOWTAG), static_space_free_pointer);
+    heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START - N_WORD_BYTES, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
