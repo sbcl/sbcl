@@ -578,24 +578,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 
 lispobj symbol_function(struct symbol* symbol)
 {
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
     if (symbol->fdefn) return FDEFN(symbol->fdefn)->fun;
-#else
-    lispobj info_holder = symbol->info;
-    if (listp(info_holder))
-        info_holder = CONS(info_holder)->cdr;
-    if (lowtag_of(info_holder) == INSTANCE_POINTER_LOWTAG) {
-        struct instance* info = INSTANCE(info_holder);
-        // Do the same thing as PACKED-INFO-FDEFN
-        lispobj elt = info->slots[INSTANCE_DATA_START];
-        if (fixnump(elt) && (fixnum_value(elt) & 07777) >= 07701) {
-            int len = (info->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
-            lispobj fdefn = info->slots[len-1];
-            if (lowtag_of(fdefn) == OTHER_POINTER_LOWTAG)
-                return FDEFN(fdefn)->fun;
-        }
-    }
-#endif
     return NIL;
 }
 

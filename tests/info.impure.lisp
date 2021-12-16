@@ -139,8 +139,7 @@
 
 (test-util:with-test (:name :globaldb-info-iterate)
   (let ((s (with-output-to-string (*standard-output*) (show-info '*))))
-    (dolist (x '(#-compact-symbol (:function :definition)
-                 (:function :type)
+    (dolist (x '((:function :type)
                  (:function :where-from) (:function :kind)
                  (:function :info) (:function :source-transform)
                  (:type :kind) (:type :builtin)
@@ -158,7 +157,6 @@
   (flet ((try (x)
            (assert (eq (find-fdefn x) (info :function :definition x)))))
     (do-all-symbols (s)
-      #-compact-symbol (try s)
       (try `(setf ,s))
       (try `(cas ,s)))))
 

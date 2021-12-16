@@ -2175,7 +2175,6 @@ core and return a descriptor to it."
        (let* ((cold-sym (cold-intern warm-sym))
               (fdefn))
          (declare (ignorable fdefn))
-         #+compact-symbol
          (let ((word (%info-ref info 0)))
            (when (and (>= (ldb (byte info-number-bits 0) word) 1)
                       (= (ldb (byte info-number-bits info-number-bits) word)
@@ -2199,7 +2198,6 @@ core and return a descriptor to it."
                                   (descriptor elt)))
                         (sb-impl::packed-info-cells info))))))
            (when pack (write-wordindexed cold-sym sb-vm:symbol-info-slot pack))
-           #+compact-symbol ; no FDEFN-SLOT otherwise
            (when fdefn (write-wordindexed cold-sym sb-vm:symbol-fdefn-slot fdefn))))))
 
 ;;;; fixups and related stuff

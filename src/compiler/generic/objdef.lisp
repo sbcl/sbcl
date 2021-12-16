@@ -395,7 +395,6 @@ during backtrace.
   ;; thereby removing the FDEFN for any global symbol. Any closure assigned
   ;; to a symbol would need a tiny trampoline, which is already the case
   ;; for #+immobile-code.
-  #+compact-symbol
   (fdefn :ref-trans %symbol-fdefn :ref-known ()
          :cas-trans cas-symbol-fdefn)
   #-compact-symbol
