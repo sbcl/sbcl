@@ -208,16 +208,13 @@ void coalesce_similar_objects()
     uword_t arg = (uword_t)&ht;
 
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
-#ifndef LISP_FEATURE_WIN32
-    // Apparently this triggers the "Unable to recommit" lossage message
-    // in handle_access_violation() in src/runtime/win32-os.c
     coalesce_range((lispobj*)READ_ONLY_SPACE_START,
                    (lispobj*)READ_ONLY_SPACE_END,
                    arg);
     lispobj* the_symbol_nil = (lispobj*)(NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES);
     coalesce_range(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + the_symbol_nil, arg);
     coalesce_range((lispobj*)(T - OTHER_POINTER_LOWTAG), static_space_free_pointer, arg);
-#endif
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);
     coalesce_range((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, arg);
