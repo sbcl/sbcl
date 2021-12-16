@@ -461,9 +461,14 @@
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
-  (:temporary (:scs (non-descriptor-reg)) temp card)
-  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
+  (:temporary (:scs (non-descriptor-reg)) temp #+gencgc card)
+  #+gencgc (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 10
+    #+cheneygc
+    (progn (inst addi temp index (- other-pointer-lowtag))
+           (inst stwx value object temp))
+    #+gencgc
+    (progn
     ;; Load the card mask
     (inst lr temp (make-fixup "gc_card_table_mask" :foreign-dataref)) ; address of linkage entry
     (loadw temp temp)      ; address of gc_card_table_mask
@@ -486,7 +491,7 @@
         (inst ori temp temp #x40)
         (inst stb temp object byte))
       (inst addi temp index (- other-pointer-lowtag))
-      (inst stwx value object temp))))
+      (inst stwx value object temp)))))
 
 ;;;; raw instance slot accessors
 

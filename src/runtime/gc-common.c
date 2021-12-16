@@ -125,7 +125,14 @@ static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
  */
 static inline void scav1(lispobj* addr, lispobj object)
 {
-
+#ifdef LISP_FEATURE_CHENEYGC
+    if (from_space_p(object)) {
+        if (forwarding_pointer_p(native_pointer(object)))
+            *addr = forwarding_pointer_value(native_pointer(object));
+        else
+            scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
+    }
+#else
     page_index_t page;
     // It's a performance boost to treat from_space_p() as a leaky abstraction
     // because reading one word at *native_pointer(object) is easier than
@@ -150,6 +157,7 @@ static inline void scav1(lispobj* addr, lispobj object)
 #if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
     else if (object == 1)
           lose("unexpected forwarding pointer in scavenge @ %p", addr);
+#endif
 #endif
 }
 
@@ -1691,15 +1699,24 @@ cull_weak_hash_table (struct hash_table *hash_table,
 static void pair_follow_fps(lispobj ht_entry[2])
 {
     lispobj obj = ht_entry[0];
-    /* It's ok to test forwarding_pointer_p() regardless of whether obj is pinned
-     * or in the GCed generation, as long as the address is within range */
-    if (is_lisp_pointer(obj) && find_page_index((void*)obj) >= 0 &&
-        forwarding_pointer_p(native_pointer(obj)))
+    /* Define a macro to safely test forwarding_pointer_p().
+     * This could, in general, use 'from_space_p', however, from_space_p is more
+     * strict than "can we determine that it's OK to call forwarding_pointer_p".
+     * For gencgc it's OK to call forwarded_pointer_p even if the object is
+     * not in from_space, and so the test need not involve pinned_p */
+#ifdef LISP_FEATURE_CHENEYGC
+#define IS_FORWARDED(x) (is_lisp_pointer(x) && from_space_p(x) && \
+                        forwarding_pointer_p(native_pointer(x)))
+#else
+#define IS_FORWARDED(x) (is_lisp_pointer(x) && find_page_index((void*)x) >= 0 && \
+                        forwarding_pointer_p(native_pointer(x)))
+#endif
+    if (IS_FORWARDED(obj))
         ht_entry[0] = forwarding_pointer_value(native_pointer(obj));
     obj = ht_entry[1];
-    if (is_lisp_pointer(obj) && find_page_index((void*)obj) >= 0 &&
-        forwarding_pointer_p(native_pointer(obj)))
+    if (IS_FORWARDED(obj))
         ht_entry[1] = forwarding_pointer_value(native_pointer(obj));
+#undef IS_FORWARDED
 }
 
 /* Remove dead entries from weak hash tables. */
