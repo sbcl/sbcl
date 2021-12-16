@@ -4130,7 +4130,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         goto maybe_verify;
     }
 
-    heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START - N_WORD_BYTES, static_space_free_pointer);
+    heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
