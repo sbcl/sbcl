@@ -1,4 +1,5 @@
-(with-test (:name :symbol-name-coalescing)
+(with-test (:name :symbol-name-coalescing
+                  :fails-on :win32)
   (dolist (testcase '("LAYOUTS" "CLASS1" "DST-OFFSET" "NIL" #-sb-unicode "T"))
     (let ((symbols (find-all-symbols testcase)))
       (assert (> (length symbols) 1))
