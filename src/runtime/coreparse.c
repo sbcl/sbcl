@@ -604,6 +604,7 @@ static void relocate_heap(struct heap_adjust* adj)
                         (char*)adj->range[i].start + adj->range[i].delta,
                         (char*)adj->range[i].end + adj->range[i].delta);
     }
+    relocate_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, adj);
     relocate_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
@@ -1317,7 +1318,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
       lispobj* end = static_space_free_pointer;
       while (where<end) {
         // This falsely treats NIL as 4 conses but it doesn't really matter.
-        // The garbage collectors do too.
+        // The garbage collector gets it right!
         graph_visit(0, compute_lispobj(where), &reached);
         where += OBJECT_SIZE(*where, where);
       }

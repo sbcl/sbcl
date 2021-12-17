@@ -3386,17 +3386,8 @@ void verify_heap(uword_t flags)
 #endif
     if (verbose)
         fprintf(stderr, " [static]");
-    // Because NIL might contain a funnily-encoded pointer in its NAME slot
-    // (which could really just be ignored), we have to actually "correctly"
-    // process NIL as a symbol, otherwise we'll get the warning that
-    //   "Ptr 0x10000005010010f @ 50100148 (lispobj 50100147) sees non-Lisp memory"
-    // So process it as a misaligned symbol, which is fine - we don't assert
-    // alignment of the objects, only of the final pointer
-    lispobj the_symbol_nil = NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES;
-    verify_space(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + (lispobj*)the_symbol_nil,
-                 flags);
-    // Then verify the rest of static space
-    verify_space(T - OTHER_POINTER_LOWTAG, static_space_free_pointer, flags);
+    verify_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, flags);
+    verify_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, flags);
     if (verbose)
         fprintf(stderr, " [dynamic]");
     verify_generation(-1, flags | VERIFYING_GENERATIONAL);
@@ -4130,6 +4121,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         goto maybe_verify;
     }
 
+    heap_scavenge((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 
     /* All generations but the generation being GCed need to be

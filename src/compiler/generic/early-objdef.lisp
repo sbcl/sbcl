@@ -103,31 +103,6 @@
     other-immediate-1-lowtag
     other-pointer-lowtag))
 
-(defconstant nil-value
-    (+ static-space-start
-       ;; boxed_region precedes NIL
-       ;; 8 is the number of words to reserve at the beginning of static space
-       ;; prior to the words of NIL.
-       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
-       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
-       #+64-bit #x100
-       ;; the name of NIL is a string which takes up 4 words preceding nil
-       (* 4 n-word-bytes)
-       ;; magic padding because of NIL's symbol/cons-like duality
-       (* 2 n-word-bytes)
-       list-pointer-lowtag))
-
-;;; BOXED-REGION is address in static space at which a 'struct alloc_region'
-;;; is overlaid on a lisp vector with element type WORD.
-#-sb-thread
-(defconstant boxed-region
-  (+ static-space-start
-     (* 2 n-word-bytes))) ; skip the array header
-
-;;; Address at which to start parsing objects in static space when heap-walking.
-;;; Basically skip over BOXED-REGION.
-(defconstant static-space-objects-start (logandc2 sb-vm:nil-value sb-vm:lowtag-mask))
-
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
         (do-external-symbols (sym "SB-VM")

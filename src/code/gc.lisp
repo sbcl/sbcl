@@ -78,27 +78,6 @@ and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
 
-;;; Start of static objects:
-;;;
-;;;   32-bit w/threads     |   32-bit no threads     |      64-bit
-;;;  --------------------  | --------------------    | ---------------------
-;;;       padding          |      padding            |      padding
-;;;  NIL: header (#x07__)  | NIL: header (#x06__)    | NIL: header (#x05__)
-;;;       hash             |      hash               |      hash
-;;;       value            |      value              |      value
-;;;       info             |      info               |      info
-;;;       name             |      name               |      name
-;;;       fdefn            |      fdefn              |      fdefn
-;;;       package          |      package            |      (unused)
-;;;       tls_index        |   T: header             |   T: header
-;;;       (unused)         |                         |
-;;;    T: header           |                         |
-;;;  -------------------   | --------------------    | ---------------------
-;;;    SYMBOL_SIZE=8       |   SYMBOL_SIZE=7         |   SYMBOL_SIZE=6
-;;;    NIL is 10 words     |   NIL is 8 words        |   NIL is 8 words
-
-(defconstant sb-vm::sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
-
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (cond ((not (sb-vm:is-lisp-pointer (get-lisp-obj-address object))) 0)

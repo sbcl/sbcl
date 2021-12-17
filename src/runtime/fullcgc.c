@@ -415,6 +415,7 @@ void execute_full_mark_phase()
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
 #endif
+    trace_object((lispobj*)NIL_SYMBOL_SLOTS_START);
     lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
     lispobj* end = static_space_free_pointer;
     while (where < end) {

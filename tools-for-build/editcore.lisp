@@ -78,7 +78,7 @@
   (find id (cdr spaces) :key #'space-id))
 (defun compute-nil-object (spaces)
   (let ((space (get-space static-core-space-id spaces)))
-    (%make-lisp-obj (logior (space-addr space) #x137)))) ; SUPER KLUDGE
+    (%make-lisp-obj (logior (space-addr space) #x117)))) ; SUPER KLUDGE
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
 ;;; the range at which the core is now mapped during execution of this tool,

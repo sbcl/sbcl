@@ -1714,13 +1714,7 @@ core and return a descriptor to it."
                    #+64-bit sb-vm:simple-array-signed-byte-64-widetag
                    6 6 *static*)
   #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
-  ;; When tracing pointers from static space, we don't process NIL as a symbol,
-  ;; i.e. we don't use scav_symbol, instead scanning it as a bunch of conses.
-  ;; So there can't be any encoded pointers to dynamic space.
-  ;; This works for now, because the name slot will either be a normal pointer
-  ;; or a pointer that is to a huge address (and hence ignored).
-  (let* ((name (set-readonly (base-string-to-core "NIL" *static*)))
-         (des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
+  (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                       (* 2 sb-vm:n-word-bytes)
                                       (- sb-vm:list-pointer-lowtag
@@ -1735,47 +1729,44 @@ core and return a descriptor to it."
           (get nil 'cold-intern-info) nil-val)
 
     ;; Alter the first word to 0 instead of the symbol size. It reads as a fixnum,
-    ;; but is meaningless. Not only that, the widetag is relatively meaningless too,
-    ;; even though you can access memory at [NIL - other-pointer-lowtag].
-    ;; In practice, you can never utilize the fact that NIL has a widetag,
-    ;; and therefore any use of NIL-as-symbol must pre-check for NIL. Consider:
-    ;;   50100000: 0000000000000000 = 0
-    ;;   50100008: 0000000000000045
-    ;;   50100010: 0000000050100017 = NIL              <-- base address of NIL
-    ;;   50100018: 0000000050100017 = NIL
-    ;;   50100020: 0000001000000007 = (NIL ..)
-    ;;   50100028: 000000100000800F = "NIL"
-    ;;   50100030: 0000001000000013 = #<PACKAGE "COMMON-LISP">
-    ;;   50100038: 0000000000000000 = 0
+    ;; but is meaningless. In practice, Lisp code can not utilize the fact that NIL
+    ;; has a widetag; any use of NIL-as-symbol must pre-check for NIL. Consider:
+    ;;   50100100: 0000000000000000 = 0
+    ;;   50100108: 000000000000052D      <- 5 words follow, widetag = #x2D
+    ;;   50100110: 0000000050100117
+    ;;   50100118: 0000000050100117
+    ;;   50100120: 0000001000000007 = (NIL . #<SB-INT:PACKED-INFO len=3 {1000002FF3}>)
+    ;;   50100128: 000100100000400F
+    ;;   50100130: 0000000000000000 = 0
     ;;
-    ;; Indeed *(char*)(NIL-0xf) = *(char*)0x50100008 = 0x45, /* if little-endian */
+    ;; Indeed *(char*)(NIL-0xf) = #x2D, /* if little-endian */
     ;; so why can't we exploit this to improve SYMBOLP? Hypothetically:
     ;;    if (((ptr & 7) == 7) && *(char*)(ptr-15) == SYMBOL_WIDETAG) { }
     ;; which is true of NIL and all other symbols, but wrong, because it assumes
     ;; that _any_ cons cell could be accessed at a negative displacement from its
     ;; base address. Only NIL (viewed as a cons) has this property.
-    ;; Performing that test on a cons at the first word of a page following an
-    ;; unreadable page would fault. Moreover, the word preceding a random cons would
-    ;; not necessarily be a widetag - it could be raw bits of a struct. Finally,
+    ;; Otherwise we would be reading random bytes or inaccessible memory. Finally,
     ;; the above sequence would not necessarily decrease the instruction count!
+    ;; Those points aside, gencgc correctly calls scav_symbol() on NIL.
 
     (when core-file-name
-      (write-wordindexed des 0 (make-fixnum-descriptor 0))
-      ;; The header-word for NIL "as a symbol" contains a length + widetag.
-      (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
-                                                                sb-vm:symbol-widetag))
-      (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
-      (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
-      (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-      (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
-      #+ppc64
-      (progn
-        (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) (ensure-cold-fdefn nil))
-        (remhash nil *cold-fdefn-objects*))
-      #+compact-symbol
-      (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
-                             (encode-symbol-name sb-impl::+package-id-lisp+ name))
-      #-compact-symbol (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name))
+      (let ((name (set-readonly (base-string-to-core "NIL"))))
+        (write-wordindexed des 0 (make-fixnum-descriptor 0))
+        ;; The header-word for NIL "as a symbol" contains a length + widetag.
+        (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
+                                                                  sb-vm:symbol-widetag))
+        (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
+        (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
+        (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
+        (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
+        #+ppc64
+        (progn
+          (write-wordindexed des (+ 1 sb-vm:symbol-fdefn-slot) (ensure-cold-fdefn nil))
+          (remhash nil *cold-fdefn-objects*))
+        #+compact-symbol
+        (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
+                               (encode-symbol-name sb-impl::+package-id-lisp+ name))
+        #-compact-symbol (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
     nil))
 
 ;;; Since the initial symbols must be allocated before we can intern
@@ -3008,6 +2999,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (record (c-symbol-name c) -1 c ""))
       ;; More symbols that doesn't fit into the pattern above.
       (dolist (c '(sb-impl::+magic-hash-vector-value+
+                   sb-vm::nil-symbol-slots-start
+                   sb-vm::nil-symbol-slots-end
                    sb-vm::static-space-objects-start))
         (record (c-symbol-name c) 7 #| arb |# c +c-literal-64bit+)))
     ;; Sort by <priority, value, alpha> which is TOO COMPLICATED imho.
