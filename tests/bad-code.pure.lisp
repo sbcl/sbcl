@@ -647,3 +647,10 @@
                          (declare (string x))
                          (substitute 10 #\a x))
                       :allow-warnings 'warning))))
+
+(with-test (:name :make-array-initial-contents-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n c)
+                         (make-array n :element-type 'bit :initial-contents (the string c)))
+                      :allow-warnings 'warning))))
