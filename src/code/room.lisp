@@ -842,19 +842,6 @@ We could try a few things to mitigate this:
 
 ;;;; LIST-ALLOCATED-OBJECTS, LIST-REFERENCING-OBJECTS
 
-(defvar *ignore-after* nil)
-
-(defun valid-obj (space x)
-  (or (not (eq space :dynamic))
-      ;; this test looks bogus if the allocator doesn't work linearly,
-      ;; which I suspect is the case for GENCGC.  -- CSR, 2004-06-29
-      (< (get-lisp-obj-address x) (get-lisp-obj-address *ignore-after*))))
-
-(defun maybe-cons (space x stuff)
-  (if (valid-obj space x)
-      (cons x stuff)
-      stuff))
-
 (defun list-allocated-objects (space &key type larger smaller count
                                      test)
   (declare (type (or (eql :all) spaces) space)
@@ -1112,16 +1099,16 @@ We could try a few things to mitigate this:
 (defun map-referencing-objects (fun space object)
   (declare (type (or (eql :all) spaces) space))
   (declare (dynamic-extent fun))
-  (unless *ignore-after*
-    (setq *ignore-after* (cons 1 2)))
-  (let ((fun (%coerce-callable-to-fun fun)))
+  (let (list)
     (map-allocated-objects
      (lambda (referer widetag size)
        (declare (ignore widetag size))
-       (when (and (valid-obj space referer) ; semi-bogus!
+       ;; Don't count a self-reference as a reference
+       (when (and (neq referer object)
                   (references-p referer object))
-         (funcall fun referer)))
-     space)))
+         (push referer list)))
+     space)
+    (mapc (%coerce-callable-to-fun fun) list)))
 
 (defun list-referencing-objects (space object)
   (collect ((res))
