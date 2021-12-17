@@ -113,6 +113,12 @@
       (locally
          (declare (optimize (safety 0)
                             (sb-c::alien-funcall-saves-fp-and-pc 0)))
+      #+cheneygc (when (> nelements 0)
+                   ;; cheneygc can't handle a WP fault in memcpy()
+                   ;; because "if(!foreign_function_call_active ..."
+                   (let ((last (truly-the index (+ dst-start (1- nelements)))))
+                     (data-vector-set (truly-the ,vtype dst) last
+                                      (data-vector-ref (truly-the ,vtype dst) last))))
        ,(if (= bytes-per-element sb-vm:n-word-bytes)
           `(if ,always-call-out-p
                ,(use-memmove)

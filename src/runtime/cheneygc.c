@@ -163,15 +163,9 @@ collect_garbage(generation_index_t ignore)
                        (lispobj*)get_binding_stack_pointer(th),
                        0);
 
-#ifdef PRINTNOISE
-    printf("Scavenging static space %p - %p (%d words) ...\n",
-           (void*)STATIC_SPACE_START,
-           current_static_space_free_pointer,
-           (int)(current_static_space_free_pointer
-                 - (lispobj *) STATIC_SPACE_START));
-#endif
     heap_scavenge(((lispobj *)STATIC_SPACE_START),
                   current_static_space_free_pointer);
+    if (lisp_package_vector) scavenge(&lisp_package_vector, 1);
 
     /* Scavenge newspace. */
 #ifdef PRINTNOISE
