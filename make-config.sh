@@ -437,11 +437,15 @@ then
     esac
 else
     case $sbcl_arch in
-        x86|x86-64|arm64)
+        x86|x86-64)
             case $sbcl_os in
                 linux|darwin|freebsd)
                     WITH_FEATURES="$WITH_FEATURES :sb-thread"
             esac
+    esac
+    case $sbcl_arch in
+        arm64)
+            WITH_FEATURES="$WITH_FEATURES :sb-thread"
     esac
 fi
 
