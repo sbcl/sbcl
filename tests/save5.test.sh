@@ -12,9 +12,6 @@ run_sbcl <<EOF
     (exit :code 42))
   ;; The symbol SB-ALIEN::DEFINE-ALIEN-CALLBACK exists (can be read)
   ;; no matter whether support for it exists.
-  ;; I don't know why this crashes for ppc64 big-endian but passes
-  ;; for little-endian. My guess is ABI v1 versus v2.
-  #-(and ppc64 big-endian)
   (when (member :alien-callbacks sb-impl:+internal-features+)
     (fmakunbound 'bar)
     (sb-alien::define-alien-callback foo int () 42)

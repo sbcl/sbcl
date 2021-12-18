@@ -25,12 +25,12 @@
 ;;;; "The stack pointer (stored in r1) shall maintain quadword alignment."
 ;;;; (quadword = 16 bytes)
 (defconstant +stack-alignment-mask+ 15)
+(defconstant +stack-frame-size+ #+little-endian 12 #+big-endian 14)
 
 (defstruct arg-state
   (gpr-args 0)
   (fpr-args 0)
-  (stack-frame-size #+little-endian 12
-                    #+big-endian 14))
+  (stack-frame-size +stack-frame-size+))
 
 (defun int-arg (state prim-type reg-sc stack-sc)
   (let ((reg-args (arg-state-gpr-args state)))
@@ -140,7 +140,7 @@
       (values (make-wired-tn* 'positive-fixnum any-reg-sc-number nsp-offset)
               (let ((size (arg-state-stack-frame-size arg-state)))
                 (cond #+little-endian
-                      ((= size 12)
+                      ((= size +stack-frame-size+)
                        ;; no stack args
                        0)
                       (t
@@ -261,7 +261,9 @@
              (make-random-tn :kind :normal :sc (sc-or-lose
                                                 'double-reg) :offset
                                                 n)))
-      (let* ((segment (make-segment)))
+      (let* ((segment (make-segment))
+             #+big-endian
+             (function-descriptor-size 24))
         (assemble (segment 'nil)
           ;; Copy args from registers or stack to new position
           ;; on stack.
@@ -310,8 +312,7 @@
                    (save-arg (type words)
                      (let ((integerp (not (alien-float-type-p type)))
                            (in-offset (+ (* in-words-processed n-word-bytes)
-                                         (* 12 n-word-bytes
-                                            #+big-endian 2)))
+                                         (* +stack-frame-size+ n-word-bytes)))
                            (out-offset (- (* out-words-processed n-word-bytes)
                                           arg-store-pos)))
                        (cond (integerp
@@ -385,6 +386,11 @@
                               (incf out-words-processed))
                              (t
                               (bug "Unknown alien floating point type: ~S" type))))))
+              ;; Leave a gap for a PPC64ELF ABIv1 function descriptor,
+              ;; to be filled in later relative to the SAP.
+              #+big-endian
+              (dotimes (k (/ function-descriptor-size 4)) ; nop is 4 bytes
+                (inst nop))
               (mapc #'save-arg
                     argument-types
                     (mapcar (lambda (arg)
@@ -410,9 +416,17 @@
               (inst stdu stack-pointer stack-pointer (- frame-size))
 
               ;; And make the call.
+              #+little-endian
               (load-address-into
                r0
                (foreign-symbol-address "callback_wrapper_trampoline"))
+              #+big-endian
+              (destructuring-bind (r2 r12) (mapcar #'make-gpr '(2 12))
+                (load-address-into
+                 r12
+                 (foreign-symbol-address "callback_wrapper_trampoline"))
+                (inst ld r0 r12 0)
+                (inst ld r2 r12 8))
               (inst mtlr r0)
               (inst blrl)
 
@@ -451,6 +465,13 @@
                                            :element-type '(unsigned-byte 8)
                                            :initial-contents buffer))
                (sap (vector-sap vector)))
+          ;; Fill in the PPC64ELF ABIv1 function descriptor that
+          ;; points just past the end of itself, to the first
+          ;; instruction of the wrapper.  This assembler wrapper only
+          ;; cares about the address, so leave the other descriptor
+          ;; fields filled with no-op instructions.
+          #+big-endian
+          (setf (sap-ref-64 sap 0) (+ (sap-int sap) function-descriptor-size))
           (alien-funcall
            (extern-alien "ppc_flush_icache"
                          (function void
