@@ -199,7 +199,7 @@ os_context_pc_addr(os_context_t *context)
 os_context_register_t   *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
-    return NULL;
+    return (os_context_register_t*)(&context->uc_mcontext->__ns.__v[offset]);
 }
 
 void
