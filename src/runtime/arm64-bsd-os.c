@@ -38,7 +38,6 @@
 #include <errno.h>
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                   /* success */
@@ -140,7 +139,46 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     __builtin___clear_cache(address, address + length);
 }
+#elif defined LISP_FEATURE_FREEBSD
+os_context_register_t   *
+os_context_register_addr(os_context_t *context, int offset)
+{
+      switch (offset) {
+        case reg_LR:    return (&context->uc_mcontext.mc_gpregs.gp_lr);
+        case reg_NSP:   return (&context->uc_mcontext.mc_gpregs.gp_sp);
+        default:        return (&context->uc_mcontext.mc_gpregs.gp_x[offset]);
+    }
+}
 
+os_context_register_t *
+os_context_pc_addr(os_context_t *context)
+{
+    return os_context_register_addr(context, 32);
+}
+
+os_context_register_t *
+os_context_lr_addr(os_context_t *context)
+{
+    return os_context_register_addr(context, reg_LR);
+}
+
+void
+os_restore_fp_control(os_context_t *context)
+{
+    /* FIXME: Implement. */
+}
+
+os_context_register_t   *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return (os_context_register_t*) &context->uc_mcontext.mc_fpregs.fp_q[offset];
+}
+
+void
+os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+{
+    __builtin___clear_cache(address, address + length);
+}
 #elif defined (LISP_FEATURE_DARWIN)
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int regno)

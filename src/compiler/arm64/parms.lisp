@@ -80,7 +80,7 @@
     (defparameter dynamic-0-space-end   #x66fff000)))
 
 #+gencgc
-(!gencgc-space-setup #+(or linux openbsd) #xF0000000
+(!gencgc-space-setup #+(or linux openbsd freebsd) #xF0000000
                      #+darwin #x300000000
                      #+netbsd #x2F0000000
                      :dynamic-space-start
