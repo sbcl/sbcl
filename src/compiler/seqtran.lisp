@@ -1129,18 +1129,19 @@
              initial-contents)
     (let* ((saetp (find (lvar-value widetag) sb-vm:*specialized-array-element-type-properties*
                         :key #'sb-vm:saetp-typecode))
-           (element-type (sb-vm:saetp-ctype saetp)))
-      (let* ((initial-contents-type (lvar-type initial-contents))
-             (initial-contents-element-type
-               (multiple-value-bind (upgraded other)
-                   (array-type-upgraded-element-type initial-contents-type)
-                 (or other upgraded))))
-        (unless (or (eq initial-contents-element-type *wild-type*)
-                    (types-equal-or-intersect element-type initial-contents-element-type))
-          (let ((*compiler-error-context* node))
-            (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
-                           (type-specifier initial-contents-type)
-                           (sb-vm:saetp-specifier saetp))))))))
+           (element-type (sb-vm:saetp-ctype saetp))
+           (initial-contents-type (lvar-type initial-contents)))
+      (when (csubtypep initial-contents-type (specifier-type 'array))
+        (let ((initial-contents-element-type
+                (multiple-value-bind (upgraded other)
+                    (array-type-upgraded-element-type initial-contents-type)
+                  (or other upgraded))))
+          (unless (or (eq initial-contents-element-type *wild-type*)
+                      (types-equal-or-intersect element-type initial-contents-element-type))
+            (let ((*compiler-error-context* node))
+              (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
+                             (type-specifier initial-contents-type)
+                             (sb-vm:saetp-specifier saetp)))))))))
 
 (defun check-substitute-args (new seq node)
   (let ((seq-type (lvar-type seq))
