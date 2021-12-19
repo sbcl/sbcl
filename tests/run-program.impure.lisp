@@ -166,14 +166,13 @@
 ;;; agressive about flushing them. So, here's another test using :PTY.
 
 #-win32
-(with-test (:name :is-/bin/ed-installed?)
-  (assert (probe-file "/bin/ed")))
+(unless (probe-file "/bin/ed") (push :no-bin-ed-installed *features*))
 
 #-win32
 (progn
   (defparameter *tmpfile* (scratch-file-name))
 
-  (with-test (:name (run-program :/bin/ed))
+  (with-test (:name (run-program :/bin/ed) :skipped-on :no-bin-ed-installed)
     (with-open-file (f *tmpfile*
                        :direction :output
                        :if-exists :supersede)
@@ -269,7 +268,8 @@
 ;; We can't check for the signal itself since run-program.c resets the
 ;; forked process' signal mask to defaults. But the default is `stop'
 ;; of which we can be notified asynchronously by providing a status hook.
-(with-test (:name (run-program :inherit-stdin) :fails-on :win32)
+(with-test (:name (run-program :inherit-stdin) :fails-on :win32
+                  :skipped-on :no-bin-ed-installed)
   (let (stopped)
     (flet ((status-hook (proc)
              (case (process-status proc)
