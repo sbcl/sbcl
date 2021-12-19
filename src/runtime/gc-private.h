@@ -106,7 +106,7 @@ extern boolean test_weak_triggers(int (*)(lispobj), void (*)(lispobj));
 
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_object(lispobj object, sword_t nwords);
-lispobj  copy_large_object(lispobj object, sword_t nwords, int page_type_flag);
+lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_type_flag);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);

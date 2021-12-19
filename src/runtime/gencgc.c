@@ -1485,7 +1485,7 @@ gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type_
  * Possibly assign different 'gen' and 'allocated' values.
  *
  * maybe_adjust_large_object() specifies 'from_space' for 'new_gen'
- * and copy_large_object() specifies 'new_space'
+ * and copy_possibly_large_object() specifies 'new_space'
  */
 
 static uword_t adjust_obj_ptes(page_index_t first_page,
@@ -1622,15 +1622,11 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
  *
  */
 lispobj
-copy_large_object(lispobj object, sword_t nwords, int page_type_flag)
+copy_possibly_large_object(lispobj object, sword_t nwords, int page_type_flag)
 {
     page_index_t first_page;
 
     CHECK_COPY_PRECONDITIONS(object, nwords);
-
-    if ((nwords > 1024*1024) && gencgc_verbose) {
-        FSHOW((stderr, "/copy_large_object: %"OS_VM_SIZE_FMT"\n", nwords));
-    }
 
     /* Check whether it's a large object. */
     first_page = find_page_index((void *)object);

@@ -305,7 +305,7 @@ trans_code(struct code *code)
 
     /* prepare to transport the code vector */
     lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
-    lispobj l_new_code = copy_large_object(l_code,
+    lispobj l_new_code = copy_possibly_large_object(l_code,
                                            code_total_nwords(code),
                                            CODE_PAGE_TYPE);
 
@@ -619,7 +619,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.
-    // That decision is made in general_copy_large_object().
+    // That decision is made in copy_possibly_large_object().
     if (copy != object) {
         set_forwarding_pointer(first_pointer, copy);
 #ifdef LISP_FEATURE_GENCGC
@@ -875,7 +875,7 @@ static sword_t scav_bignum(lispobj __attribute__((unused)) *where, lispobj heade
 static lispobj trans_bignum(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-    return copy_large_object(object, bignum_nwords(*native_pointer(object)),
+    return copy_possibly_large_object(object, bignum_nwords(*native_pointer(object)),
                              UNBOXED_PAGE_FLAG);
 }
 
@@ -953,7 +953,7 @@ trans_vector_t(lispobj object)
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     sword_t length = vector_len(VECTOR(object));
-    return copy_large_object(object, ALIGN_UP(length + 2, 2), BOXED_PAGE_FLAG);
+    return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), BOXED_PAGE_FLAG);
 }
 
 static sword_t
@@ -1013,7 +1013,7 @@ static inline void check_shadow_bits(__attribute((unused)) lispobj* v) {
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = vector_len(VECTOR(object)); \
-    return copy_large_object(object, ALIGN_UP(nwords + 2, 2), \
+    return copy_possibly_large_object(object, ALIGN_UP(nwords + 2, 2), \
                              SPECIALIZED_VECTOR_PAGE_FLAG); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \

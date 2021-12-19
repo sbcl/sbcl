@@ -79,7 +79,7 @@ gc_general_alloc(sword_t bytes, int page_type_flag) {
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords) {
     return copy_object(object,nwords);
 }
-lispobj  copy_large_object(lispobj object, sword_t nwords, int page_type_flag) {
+lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_type_flag) {
     return copy_object(object,nwords);
 }
 
