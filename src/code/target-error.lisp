@@ -295,7 +295,7 @@ with that condition (or with no condition) will be returned."
         (make-layout (hash-layout-name name)
                      (make-undefined-classoid name)
                      :info (wrapper-info cond-layout)
-                     :flags +condition-layout-flag+
+                     :flags (logior +condition-layout-flag+ +strictly-boxed-flag+)
                      :inherits new-inherits
                      :depthoid -1
                      :length (wrapper-length cond-layout)))))

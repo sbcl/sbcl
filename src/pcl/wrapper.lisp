@@ -43,7 +43,7 @@
        (make-layout (hash-layout-name name)
                     (make-standard-classoid :name name)
                     :length length
-                    :flags +pcl-object-layout-flag+
+                    :flags (logior +pcl-object-layout-flag+ +strictly-boxed-flag+)
                     :bitmap bitmap
                     :invalid nil)))))
 
@@ -73,7 +73,8 @@
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
         (make-layout (hash-layout-name name) classoid
                      :bitmap +layout-all-tagged+
-                     :invalid nil :length length :flags +pcl-object-layout-flag+)))
+                     :invalid nil :length length
+                     :flags (logior +pcl-object-layout-flag+ +strictly-boxed-flag+))))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
             (layout (classoid-wrapper found)))

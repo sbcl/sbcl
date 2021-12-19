@@ -2301,6 +2301,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "+FILE-STREAM-LAYOUT-FLAG+"
                "+STRING-STREAM-LAYOUT-FLAG+"
                "+SEQUENCE-LAYOUT-FLAG+"
+               "+STRICTLY-BOXED-FLAG+"
                "+LAYOUT-ALL-TAGGED+"
                "**PRIMITIVE-OBJECT-LAYOUTS**"
 

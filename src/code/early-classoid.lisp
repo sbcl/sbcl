@@ -103,6 +103,7 @@
 (defconstant +string-stream-layout-flag+     #b001000000)
 (defconstant +stream-layout-flag+            #b010000000)
 (defconstant +sequence-layout-flag+          #b100000000)
+(defconstant +strictly-boxed-flag+          #b1000000000)
 (defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 
 ;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
@@ -309,9 +310,17 @@
                      (stream            ,+stream-layout-flag+)
                      (sequence          ,+sequence-layout-flag+)))
           (flags 0))
-      (dolist (x (cons wrapper (coerce (wrapper-inherits wrapper) 'list)) flags)
+      (dolist (x (cons wrapper (coerce (wrapper-inherits wrapper) 'list)))
         (let ((cell (assoc (wrapper-classoid-name x) mapping)))
-          (when cell (setq flags (logior flags (second cell))))))))
+          (when cell (setq flags (logior flags (second cell))))))
+      (let ((dd (wrapper-%info wrapper)))
+        (when (or (logtest flags (logior +pathname-layout-flag+ +condition-layout-flag+))
+                  (and (logtest flags +structure-layout-flag+)
+                       dd
+                       (every (lambda (x) (eq (dsd-raw-type x) t))
+                              (dd-slots dd))))
+          (setf flags (logior flags +strictly-boxed-flag+))))
+      flags))
   (defun wrapper-bitmap (wrapper)
     (acond ((wrapper-%info wrapper) (dd-bitmap it)) (t +layout-all-tagged+))))
 

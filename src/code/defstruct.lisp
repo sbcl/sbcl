@@ -1655,6 +1655,10 @@ or they must be declared locally notinline at each call site.~@:>"
                     (svref inherits (1- (length inherits))))))))
     (unless (dd-alternate-metaclass info)
       (setq flags +structure-layout-flag+))
+    (cond ((some #'dsd-rsd-index (dd-slots info))) ; mixed boxed + raw (or wholly raw)
+          ((not (dd-alternate-metaclass info))
+           (setf flags (logior flags +strictly-boxed-flag+))))
+    ;; FIXME: explain why this is #-sb-xc-host.
     #-sb-xc-host
     (dovector (ancestor inherits)
       (setq flags (logior (logand (logior +stream-layout-flag+
