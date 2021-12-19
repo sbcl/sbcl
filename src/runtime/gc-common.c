@@ -261,33 +261,7 @@ void scan_binding_stack()
 #endif
 }
 
-static lispobj trans_fun_header(lispobj object); /* forward decls */
 static lispobj trans_short_boxed(lispobj object);
-
-static sword_t
-scav_fun_pointer(lispobj *where, lispobj object)
-{
-    gc_dcheck(functionp(object));
-
-    /* Object is a pointer into from_space - not a FP. */
-    lispobj *first_pointer = native_pointer(object);
-
-    /* must transport object -- object may point to either a function
-     * header, a funcallable instance header, or a closure header. */
-    lispobj copy = widetag_of(first_pointer) == SIMPLE_FUN_WIDETAG
-      ? trans_fun_header(object) : trans_short_boxed(object);
-
-    if (copy != object) {
-        /* Set forwarding pointer */
-        set_forwarding_pointer(first_pointer,copy);
-    }
-
-    CHECK_COPY_POSTCONDITIONS(copy, FUN_POINTER_LOWTAG);
-
-    *where = copy;
-
-    return 1;
-}
 
 extern int pin_all_dynamic_space_code;
 static struct code *
@@ -349,7 +323,31 @@ trans_code(struct code *code)
     return new_code;
 }
 
-sword_t scav_code_header(lispobj *object, lispobj header);
+static sword_t
+scav_fun_pointer(lispobj *where, lispobj object)
+{
+    gc_dcheck(functionp(object));
+
+    lispobj* fun = (void*)(object - FUN_POINTER_LOWTAG);
+    lispobj copy;
+    // object may be a simple-fun header, a funcallable instance, or closure
+    if (widetag_of(fun) != SIMPLE_FUN_WIDETAG) {
+        copy = trans_short_boxed(object);
+    } else {
+        uword_t offset = (HeaderValue(*fun) & FUN_HEADER_NWORDS_MASK) * N_WORD_BYTES;
+        /* Transport the whole code object */
+        struct code *code = trans_code((struct code *) ((uword_t) fun - offset));
+        copy  = make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
+    }
+
+    if (copy != object) { // large code won't undergo physical copy
+        set_forwarding_pointer(fun, copy);
+        *where = copy;
+    }
+
+    CHECK_COPY_POSTCONDITIONS(copy, FUN_POINTER_LOWTAG);
+    return 1;
+}
 
 static lispobj
 trans_code_header(lispobj object)
@@ -416,20 +414,6 @@ scav_fun_header(lispobj *where, lispobj object)
     return 0; /* bogus return value to satisfy static type checking */
 }
 #endif /* LISP_FEATURE_X86 */
-
-static lispobj
-trans_fun_header(lispobj object)
-{
-    struct simple_fun *fheader = (struct simple_fun *) native_pointer(object);
-    uword_t offset =
-        (HeaderValue(fheader->header) & FUN_HEADER_NWORDS_MASK) * N_WORD_BYTES;
-
-    /* Transport the whole code object */
-    struct code *code = trans_code((struct code *) ((uword_t) fheader - offset));
-
-    return make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
-}
-
 
 /*
  * instances
@@ -622,13 +606,8 @@ scav_other_pointer(lispobj *where, lispobj object)
     // That decision is made in copy_possibly_large_object().
     if (copy != object) {
         set_forwarding_pointer(first_pointer, copy);
-#ifdef LISP_FEATURE_GENCGC
         *where = copy;
-#endif
     }
-#ifndef LISP_FEATURE_GENCGC
-    *where = copy;
-#endif
     CHECK_COPY_POSTCONDITIONS(copy, OTHER_POINTER_LOWTAG);
     return 1;
 }
@@ -1780,6 +1759,7 @@ size_lose(lispobj *where)
  * initialization
  */
 
+sword_t scav_code_header(lispobj *object, lispobj header);
 sword_t scav_weak_pointer(lispobj *where, lispobj object);
 #include "genesis/gc-tables.h"
 
