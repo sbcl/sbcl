@@ -187,9 +187,9 @@
   #+gencgc
   (binding*  ((imm-size (typep size '(unsigned-byte 15)))
               ((region-base-tn field-offset)
-               #-sb-thread (values null-tn (- boxed-region nil-value))
+               #-sb-thread (values null-tn (- mixed-region nil-value))
                #+sb-thread (values thread-base-tn
-                                   (* thread-boxed-tlab-slot n-word-bytes))))
+                                   (* thread-mixed-tlab-slot n-word-bytes))))
 
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)

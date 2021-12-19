@@ -177,7 +177,7 @@
   (declare (ignore stack-p node))
   (binding* ((imm-size (typep size '(unsigned-byte 15)))
              ((region-base-tn field-offset)
-              (values thread-base-tn (* thread-boxed-tlab-slot n-word-bytes))))
+              (values thread-base-tn (* thread-mixed-tlab-slot n-word-bytes))))
 
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)

@@ -988,7 +988,7 @@ static int trace_paths(void (*context_scanner)(),
         }
         ++i;
     } while (weak_pointers != NIL);
-    ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
+    ensure_region_closed(&mixed_region, BOXED_PAGE_FLAG);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
 #if TRACEROOT_USE_ABSL_HASHMAP
     absl_hashmap_destroy(inverted_heap);

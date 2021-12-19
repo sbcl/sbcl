@@ -527,7 +527,7 @@ during backtrace.
   ;; Deterministic consing profile recording area.
   (profile-data :c-type "uword_t *" :pointer t)
   ;; Thread-local allocation buffers
-  #+gencgc (boxed-tlab :c-type "struct alloc_region" :length 4)
+  #+gencgc (mixed-tlab :c-type "struct alloc_region" :length 4)
   #+gencgc (unboxed-tlab :c-type "struct alloc_region" :length 4)
   ;; END of slots to keep near the beginning.
 
@@ -643,7 +643,7 @@ during backtrace.
 ;;; need them there.
 (defconstant nil-value
     (+ static-space-start
-       ;; boxed_region precedes NIL
+       ;; mixed_region precedes NIL
        ;; 8 is the number of words to reserve at the beginning of static space
        ;; prior to the words of NIL.
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
@@ -653,10 +653,10 @@ during backtrace.
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
-;;; BOXED-REGION is address in static space at which a 'struct alloc_region'
+;;; MIXED-REGION is address in static space at which a 'struct alloc_region'
 ;;; is overlaid on a lisp vector with element type WORD.
 #-sb-thread
-(defconstant boxed-region
+(defconstant mixed-region
   (+ static-space-start
      (* 2 n-word-bytes))) ; skip the array header
 
@@ -706,7 +706,7 @@ during backtrace.
 (defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
 
 ;;; Address at which to start scanning static symbols when heap-walking.
-;;; Basically skip over BOXED-REGION (if it's in static space) and NIL.
+;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.
 ;;; Or: go to NIL's header word, subtract 1 word, and add in the physical
 ;;; size of NIL in bytes that we report for primitive-object-size.
 (defconstant static-space-objects-start

@@ -241,7 +241,7 @@
          (store-symbol-value flag-tn *allocation-pointer*))
         #+gencgc
         (t
-         (let ((region-disp (- boxed-region nil-value))
+         (let ((region-disp (- mixed-region nil-value))
                (alloc (gen-label))
                (back-from-alloc (gen-label)))
            (inst ldr result-tn (@ null-tn region-disp)) ; free ptr

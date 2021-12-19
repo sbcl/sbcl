@@ -103,6 +103,6 @@ static inline enum prot_mode protection_mode(page_index_t page) {
 #endif
 
 #ifndef LISP_FEATURE_SB_THREAD
-#define SINGLE_THREAD_BOXED_REGION (struct alloc_region*)(STATIC_SPACE_START + 2*N_WORD_BYTES)
+#define SINGLE_THREAD_MIXED_REGION (struct alloc_region*)(STATIC_SPACE_START + 2*N_WORD_BYTES)
 #endif
 #endif /* _GENCGC_PRIVATE_H_ */

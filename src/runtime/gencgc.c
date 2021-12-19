@@ -872,7 +872,7 @@ static inline boolean region_closed_p(struct alloc_region* region) {
     return !region->start_addr;
 }
 #define ASSERT_REGIONS_CLOSED() \
-    gc_assert(!((uintptr_t)boxed_region.start_addr \
+    gc_assert(!((uintptr_t)mixed_region.start_addr \
                |(uintptr_t)unboxed_region.start_addr \
                |(uintptr_t)code_region.start_addr))
 
@@ -2358,7 +2358,7 @@ static void pin_exact_root(lispobj obj)
 
 
 #define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
-#define IN_BOXED_REGION_P(a) IN_REGION_P(a,boxed)||IN_REGION_P(a,code)
+#define IN_BOXED_REGION_P(a) IN_REGION_P(a,mixed)||IN_REGION_P(a,code)
 
 /* Return true if 'ptr' is OK to be on a write-protected page
  * of an object in 'gen'. That is, if the pointer does not point to a younger object */
@@ -2781,7 +2781,7 @@ static void gc_close_all_regions()
 {
     ensure_region_closed(&code_region, CODE_PAGE_TYPE);
     ensure_region_closed(&unboxed_region, UNBOXED_PAGE_FLAG);
-    ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
+    ensure_region_closed(&mixed_region, BOXED_PAGE_FLAG);
 }
 
 /* Do a complete scavenge of the newspace generation. */
@@ -4435,12 +4435,12 @@ collect_garbage(generation_index_t last_gen)
      *   in a unithread build.
      * So we need to close them for those two cases.
      */
-#ifdef SINGLE_THREAD_BOXED_REGION
-    ensure_region_closed(SINGLE_THREAD_BOXED_REGION, BOXED_PAGE_FLAG);
+#ifdef SINGLE_THREAD_MIXED_REGION
+    ensure_region_closed(SINGLE_THREAD_MIXED_REGION, BOXED_PAGE_FLAG);
 #endif
     struct thread *th;
     for_each_thread(th) {
-        ensure_region_closed(&th->boxed_tlab, BOXED_PAGE_FLAG);
+        ensure_region_closed(&th->mixed_tlab, BOXED_PAGE_FLAG);
         ensure_region_closed(&th->unboxed_tlab, UNBOXED_PAGE_FLAG);
     }
     gc_close_all_regions();
@@ -4783,7 +4783,7 @@ static void gc_allocate_ptes()
 
     /* Initialize gc_alloc. */
     gc_alloc_generation = 0;
-    gc_init_region(&boxed_region);
+    gc_init_region(&mixed_region);
     gc_init_region(&unboxed_region);
     gc_init_region(&code_region);
 }
@@ -4913,7 +4913,7 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #ifdef LISP_FEATURE_SB_THREAD
 # define TLAB(x) x
 #else
-# define TLAB(x) SINGLE_THREAD_BOXED_REGION
+# define TLAB(x) SINGLE_THREAD_MIXED_REGION
 #endif
 
 #define DEFINE_LISP_ENTRYPOINT(name, tlab, page_type) \
@@ -4922,13 +4922,13 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     return lisp_alloc(TLAB(tlab), nbytes, page_type, self); }
 
 DEFINE_LISP_ENTRYPOINT(alloc_unboxed, &self->unboxed_tlab, UNBOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc, &self->boxed_tlab, BOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc_list, &self->boxed_tlab, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc, &self->mixed_tlab, BOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc_list, &self->mixed_tlab, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
 
 #ifdef LISP_FEATURE_SPARC
-void boxed_region_rollback(sword_t size)
+void mixed_region_rollback(sword_t size)
 {
-    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
+    struct alloc_region *region = SINGLE_THREAD_MIXED_REGION;
     gc_assert(region->free_pointer > region->end_addr);
     region->free_pointer = (char*)region->free_pointer - size;
     gc_assert(region->free_pointer >= region->start_addr
@@ -5013,8 +5013,8 @@ int gencgc_handle_wp_violation(void* fault_addr)
                 lisp_backtrace(10);
                 fprintf(stderr,
                         "Fault @ %p, page %"PAGE_INDEX_FMT" not marked as write-protected:\n"
-                        "  boxed_region.first_page: %"PAGE_INDEX_FMT","
-                        "  boxed_region.last_page %"PAGE_INDEX_FMT"\n"
+                        "  mixed_region.first_page: %"PAGE_INDEX_FMT","
+                        "  mixed_region.last_page %"PAGE_INDEX_FMT"\n"
                         "  page.scan_start_offset: %"OS_VM_SIZE_FMT"\n"
                         "  page.bytes_used: %u\n"
                         "  page.allocated: %d\n"
@@ -5023,8 +5023,8 @@ int gencgc_handle_wp_violation(void* fault_addr)
                         "  page.generation: %d\n",
                         fault_addr,
                         page_index,
-                        find_page_index(boxed_region.start_addr),
-                        boxed_region.last_page,
+                        find_page_index(mixed_region.start_addr),
+                        mixed_region.last_page,
                         (uintptr_t)page_scan_start_offset(page_index),
                         page_bytes_used(page_index),
                         page_table[page_index].type,
@@ -5217,8 +5217,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
-#ifdef SINGLE_THREAD_BOXED_REGION // clean up static-space object pre-save.
-    gc_init_region(SINGLE_THREAD_BOXED_REGION);
+#ifdef SINGLE_THREAD_MIXED_REGION // clean up static-space object pre-save.
+    gc_init_region(SINGLE_THREAD_MIXED_REGION);
 #endif
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();

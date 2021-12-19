@@ -207,15 +207,15 @@
         (progn
           ;; load-pair can't base off null-tn because the displacement
           ;; has to be a multiple of 8
-          (load-immediate-word flag-tn boxed-region)
+          (load-immediate-word flag-tn mixed-region)
           (inst ldp result-tn flag-tn (@ flag-tn 0)))
         #+sb-thread
-        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-boxed-tlab-slot)))
+        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-mixed-tlab-slot)))
         (inst add result-tn tmp-tn (add-sub-immediate size result-tn))
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
-        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- boxed-region nil-value))))
-        #+sb-thread (storew result-tn thread-tn thread-boxed-tlab-slot)
+        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- mixed-region nil-value))))
+        #+sb-thread (storew result-tn thread-tn thread-mixed-tlab-slot)
 
         (emit-label BACK-FROM-ALLOC)
         (inst add result-tn tmp-tn lowtag)

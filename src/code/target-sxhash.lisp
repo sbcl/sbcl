@@ -27,13 +27,13 @@
   (let ((word
          ;; threads imply gencgc. use the per-thread alloc region pointer
          #+sb-thread
-         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-boxed-tlab-slot))
+         (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-mixed-tlab-slot))
          #+(and (not sb-thread) cheneygc)
          (sap-int (dynamic-space-free-pointer))
          ;; dynamic-space-free-pointer increments only when a page is full.
-         ;; Using boxed_region directly is finer-grained.
+         ;; Using mixed_region directly is finer-grained.
          #+(and (not sb-thread) gencgc)
-         (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm::boxed-region) 0)))
+         (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm::mixed-region) 0)))
     ;; counter should increase by 1 for each cons cell allocated
     (ash word (- (1+ sb-vm:word-shift)))))
 

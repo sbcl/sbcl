@@ -252,7 +252,7 @@ static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
     int rs1;
     int size;
     int immed;
-    extern void boxed_region_rollback(sword_t);
+    extern void mixed_region_rollback(sword_t);
 
     if (foreign_function_call_active)
       lose("Allocation trap inside foreign code.");
@@ -283,7 +283,7 @@ static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
         size = or_inst & 0x1fff;
     else
         size = *os_context_register_addr(context, or_inst & 0x1f);
-    boxed_region_rollback(size);
+    mixed_region_rollback(size);
 
     fake_foreign_function_call(context);
 

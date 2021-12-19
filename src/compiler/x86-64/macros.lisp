@@ -107,7 +107,7 @@
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-tn
 (eval-when (:compile-toplevel)
-  (aver (<= (1+ thread-boxed-tlab-slot) 15))
+  (aver (<= (1+ thread-mixed-tlab-slot) 15))
   (aver (<= (1+ thread-unboxed-tlab-slot) 15)))
 
 ;;; Access a thread slot at a fixed index. If GPR-TN is provided,

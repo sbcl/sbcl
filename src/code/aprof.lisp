@@ -261,9 +261,9 @@
                   ;; Figure out if we're looking at an allocation buffer
                   (let ((disp (ash (machine-ea-disp ea) (- sb-vm:word-shift))))
                     (awhen (case disp
-                            ((#.sb-vm::thread-boxed-tlab-slot
+                            ((#.sb-vm::thread-mixed-tlab-slot
                               #.sb-vm::thread-unboxed-tlab-slot) :tlab-freeptr)
-                            ((#.(1+ sb-vm::thread-boxed-tlab-slot)
+                            ((#.(1+ sb-vm::thread-mixed-tlab-slot)
                               #.(1+ sb-vm::thread-unboxed-tlab-slot)) :tlab-limit))
                       (setq ea it))))
                 (setf (car tail) ea)) ; change the EA

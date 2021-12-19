@@ -204,8 +204,8 @@
      ;; it.
      #+gencgc
      (t
-      (loadw result-tn null-tn 0 (- nil-value boxed-region)) ; free_pointer
-      (loadw temp-tn null-tn 1 (- nil-value boxed-region))   ; end_addr
+      (loadw result-tn null-tn 0 (- nil-value mixed-region)) ; free_pointer
+      (loadw temp-tn null-tn 1 (- nil-value mixed-region))   ; end_addr
 
       (without-scheduling ()
         (let ((done (gen-label))
@@ -227,7 +227,7 @@
           ;; the branch delay slot to write back the free-pointer
           ;; (on overflow restore it the trap handler to a good value),
           ;; and fold the lowtag addition into the size subtraction.
-          (storew result-tn null-tn 0 (- nil-value boxed-region))
+          (storew result-tn null-tn 0 (- nil-value mixed-region))
           ;; Compute the base pointer and add lowtag.
           (cond ((integerp size)
                  (inst sub result-tn (- size lowtag)))

@@ -487,9 +487,9 @@ We could try a few things to mitigate this:
   #+gencgc
   (let ((region-struct
           #+sb-thread (sap+ (sb-thread::current-thread-sap)
-                            (ash thread-boxed-tlab-slot word-shift))
+                            (ash thread-mixed-tlab-slot word-shift))
           ;; If no threads, the alloc_region struct is in static space.
-          #-sb-thread (int-sap boxed-region)))
+          #-sb-thread (int-sap mixed-region)))
     ;; The 'start_addr' field is at word index 3 of the structure (see gencgc-alloc-region.h).
     (unless (eql (sap-ref-word region-struct (ash 3 word-shift)) 0)
       (alien-funcall (extern-alien "gc_close_region" (function void system-area-pointer int))
