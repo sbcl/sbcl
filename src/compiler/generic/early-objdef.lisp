@@ -329,10 +329,6 @@
 ;; nonetheless, opportunities for sharing abound.
 (defconstant +vector-shareable-nonstd+ #x10)
 
-;; Weak vectors that are not hash-table backing vectors use this bit to track
-;; whether we've already recorded the vector for deferred scavenging.
-;; Hash-tables use an entirely different mechanism. Flag bit used only in C.
-(defconstant vector-weak-visited-flag  #x08)
 ;; All hash-table backing vectors are marked with this bit.
 ;; Essentially it informs GC that the vector has a high-water mark.
 (defconstant vector-hashing-flag       #x04)

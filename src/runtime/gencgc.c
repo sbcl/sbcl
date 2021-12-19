@@ -3830,7 +3830,7 @@ conservative_stack_scan(struct thread* th,
 }
 #endif
 
-static void scan_explicit_pins(struct thread* th)
+static void scan_explicit_pins(__attribute__((unused)) struct thread* th)
 {
     lispobj pin_list = read_TLS(PINNED_OBJECTS, th);
     for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {

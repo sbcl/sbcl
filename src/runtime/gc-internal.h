@@ -95,12 +95,17 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
   ((int)(header) & ((flag_VectorWeak|flag_VectorHashing) << ARRAY_FLAGS_POSITION)) == \
     (flag_VectorWeak << ARRAY_FLAGS_POSITION)
 
-// Mask out the fullcgc mark bit when asserting header validity
+// This bit can be anything that doesn't conflict with the fullcgc mark bit or a bit
+// seen by lisp. Byte index 0 is the widetag, byte indices 1 and 2 are for the array-rank
+// and vector-flags, depending on how src/compiler/generic/early-objdef assigns them.
+#define WEAK_VECTOR_VISITED_BIT (1<<24)
+
+// Assert that the 'v' is a weak (not hashing) simple-vector and was visited,
+// and then clear the visited bit.
 #define UNSET_WEAK_VECTOR_VISITED(v) \
-  gc_assert((v->header & (0xff << ARRAY_FLAGS_POSITION | 0xff)) ==     \
-    (((flag_VectorWeakVisited|flag_VectorWeak) << ARRAY_FLAGS_POSITION) \
-     | SIMPLE_VECTOR_WIDETAG)); \
-  v->header ^= flag_VectorWeakVisited << ARRAY_FLAGS_POSITION
+  gc_assert((v->header & (WEAK_VECTOR_VISITED_BIT | 0xff << ARRAY_FLAGS_POSITION | 0xff)) == \
+    (WEAK_VECTOR_VISITED_BIT | flag_VectorWeak << ARRAY_FLAGS_POSITION | SIMPLE_VECTOR_WIDETAG)); \
+  v->header ^= WEAK_VECTOR_VISITED_BIT
 
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h. These constants are used in gc-common,

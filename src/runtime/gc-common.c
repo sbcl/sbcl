@@ -1156,10 +1156,10 @@ extern uword_t gc_private_cons(uword_t, uword_t);
 
 void add_to_weak_vector_list(lispobj* vector, lispobj header)
 {
-    if (!vector_flagp(header, VectorWeakVisited)) {
+    if (!(header & WEAK_VECTOR_VISITED_BIT)) {
         weak_vectors = (struct cons*)gc_private_cons((uword_t)vector,
                                                      (uword_t)weak_vectors);
-        *vector |= flag_VectorWeakVisited << ARRAY_FLAGS_POSITION;
+        *vector |= WEAK_VECTOR_VISITED_BIT;
     }
 }
 
