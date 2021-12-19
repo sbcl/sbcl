@@ -271,8 +271,7 @@
 ;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
 ;;; and WORDS words long. Note: it is your responsibility to ensure that the
 ;;; relation between LENGTH and WORDS is correct.
-;;; The extra bit beyond N_WIDETAG_BITS is for the vector weakness flag.
-;;; Note that in almost all situations the first argument is a constant.
+;;; Note that in almost all situations the first argument (TYPE) is a constant.
 ;;; There are only 3 places that it can be non-constant, and not at all
 ;;; after self-build is complete. The three non-constant places are from:
 ;;;  - ALLOCATE-VECTOR-WITH-WIDETAG in src/code/array
