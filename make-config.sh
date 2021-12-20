@@ -439,7 +439,7 @@ else
     case $sbcl_arch in
         x86|x86-64)
             case $sbcl_os in
-                linux|darwin|freebsd)
+                linux|darwin)
                     WITH_FEATURES="$WITH_FEATURES :sb-thread"
             esac
     esac
