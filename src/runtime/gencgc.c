@@ -4933,6 +4933,12 @@ DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, &self->mixed_tlab,
                        BOXED_PAGE_FLAG)
 DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, BOXED_PAGE_FLAG)
 
+void close_thread_region() {
+    __attribute__((unused)) struct thread *self = get_sb_vm_thread();
+    struct alloc_region *region = TLAB(&self->mixed_tlab);
+    ensure_region_closed(region, BOXED_PAGE_FLAG);
+}
+
 lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
 {
     struct thread *th = get_sb_vm_thread();

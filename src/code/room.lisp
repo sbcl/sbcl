@@ -430,7 +430,7 @@ We could try a few things to mitigate this:
        ;; prove to be an issue with concurrent systems, or with
        ;; spectacularly poor timing for closing an allocation region
        ;; in a single-threaded system.
-  (close-current-gc-region)
+  (close-thread-alloc-region)
   (do ((initial-next-free-page next-free-page)
        (base (int-sap (current-dynamic-space-start)))
        (start-page 0)
@@ -475,27 +475,15 @@ We could try a few things to mitigate this:
                                   (< start-page initial-next-free-page))))))
     (setq start-page (1+ end-page))))
 
-;; Start with a Lisp rendition of ensure_region_closed() on the active
-;; thread's region, since users are often surprised to learn that a
-;; just-consed object can't necessarily be seen by MAP-ALLOCATED-OBJECTS.
+;; Users are often surprised to learn that a just-consed object can't
+;; necessarily be seen by MAP-ALLOCATED-OBJECTS, so close the region
+;; to update the page table.
 ;; Since we're in WITHOUT-GCING, there can be no interrupts.
-;; This is probably better than calling MAP-OBJECTS-IN-RANGE on the
-;; thread's region, because then we might visit some page twice
-;; by doing that.
-;; (And seeing small consing by other threads is hopeless either way)
-(defun close-current-gc-region ()
-  #+gencgc
-  (let ((region-struct
-          #+sb-thread (sap+ (sb-thread::current-thread-sap)
-                            (ash thread-mixed-tlab-slot word-shift))
-          ;; If no threads, the alloc_region struct is in static space.
-          #-sb-thread (int-sap mixed-region)))
-    ;; The 'start_addr' field is at word index 3 of the structure (see gencgc-alloc-region.h).
-    (unless (eql (sap-ref-word region-struct (ash 3 word-shift)) 0)
-      (alien-funcall (extern-alien "gc_close_region" (function void system-area-pointer int))
-                     region-struct
-                     1)) ; ASSUMPTION: BOXED_PAGE_FLAG = 1
-    nil))
+;; Moreover it's probably not safe in the least to walk any thread's
+;; allocation region, unless the observer and observed aren't consing.
+(defun close-thread-alloc-region ()
+  #+gencgc (alien-funcall (extern-alien "close_thread_region" (function void)))
+  nil)
 
 ;;;; MEMORY-USAGE
 
@@ -1276,7 +1264,7 @@ We could try a few things to mitigate this:
   #+gencgc
   (let* ((n-bits
           (progn
-            (close-current-gc-region)
+            (close-thread-alloc-region)
             (+ next-free-page 50)))
          (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
