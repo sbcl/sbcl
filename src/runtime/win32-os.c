@@ -791,7 +791,8 @@ set_up_win64_seh_thunk(size_t page_size)
     struct win64_seh_data *seh_data = (void *) WIN64_SEH_DATA_ADDR;
     DWORD64 base = (DWORD64) seh_data;
 
-    uint8_t *dthunk = seh_data->direct_thunk;
+    // 'volatile' works around "warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]"
+    volatile uint8_t *dthunk = seh_data->direct_thunk;
     dthunk[0] = 0x41; // pop r15
     dthunk[1] = 0x5F;
     dthunk[2] = 0xFF; // call rbx
@@ -801,7 +802,7 @@ set_up_win64_seh_thunk(size_t page_size)
     dthunk[6] = 0xC3; // ret
     dthunk[7] = 0x90; // nop (padding)
 
-    uint8_t *ithunk = seh_data->indirect_thunk;
+    volatile uint8_t *ithunk = seh_data->indirect_thunk;
     ithunk[0] = 0x41; // pop r15
     ithunk[1] = 0x5F;
     ithunk[2] = 0xFF; // call qword ptr [rbx]
@@ -811,7 +812,7 @@ set_up_win64_seh_thunk(size_t page_size)
     ithunk[6] = 0xC3; // ret
     ithunk[7] = 0x90; // nop (padding)
 
-    uint8_t *tramp = seh_data->handler_trampoline;
+    volatile uint8_t *tramp = seh_data->handler_trampoline;
     tramp[0] = 0xFF; // jmp qword ptr [rip+2]
     tramp[1] = 0x25;
     UNALIGNED_STORE32((tramp+2), 2);

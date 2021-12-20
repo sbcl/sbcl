@@ -309,7 +309,7 @@ void create_main_lisp_thread(lispobj function) {
     pthread_key_create(&foreign_thread_ever_lispified, 0);
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    lispobj *args = NULL;
+    __attribute__((unused)) lispobj *args = NULL;
 #endif
     ASSOCIATE_OS_THREAD(th);
     ASSIGN_CURRENT_THREAD(th);
@@ -462,7 +462,7 @@ unregister_thread(struct thread *th,
 
     arch_os_thread_cleanup(th);
 
-    struct extra_thread_data *semaphores = thread_extra_data(th);
+    __attribute__((unused)) struct extra_thread_data *semaphores = thread_extra_data(th);
 #ifdef LISP_FEATURE_UNIX
     os_sem_destroy(&semaphores->sprof_sem);
 #endif
