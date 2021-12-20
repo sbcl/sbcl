@@ -972,19 +972,4 @@
      (c-call "alloc_immobile_fixedobj")
      (move result rax))))
 
-(define-vop (alloc-dynamic-space-code)
-  (:args (total-words :scs (signed-reg) :target c-arg1))
-  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset) c-arg1)
-  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) rax)
-  (:results (result :scs (descriptor-reg)))
-  (:node-var node)
-  (:generator 50
-   (inst mov c-arg1 total-words)
-   ;; RSP needn't be restored because the allocators all return immediately
-   ;; which has that effect
-   (inst and rsp-tn -16)
-   (pseudo-atomic () (c-call "alloc_code_object"))
-   ;; RESULT is a tagged ptr. MOV doesn't need to be inside the PSEUDO-ATOMIC.
-   (inst mov result rax)))
-
 ) ; end MACROLET

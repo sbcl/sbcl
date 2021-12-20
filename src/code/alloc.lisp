@@ -484,14 +484,10 @@
                                         (ash 2 n-fixnum-tag-bits)
                                         other-pointer-lowtag
                                         (eq space :immobile)))
-              ;;; x86-64 has a vop which is nothing more than wrapping
-               ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
-               ;; The vop is defined in such a way that it can't be inserted into
-               ;; this fuction, but instead needs an out-of-line call to a helper function
-               ;; (because it clobbers all registers and doesn't indicate that)
-               #+(and x86-64 (not win32))
-               (alloc-dynamic-space-code total-words)
-               #-(and x86-64 (not win32))
+               ;; x86-64 has a vop which wraps pseudo-atomic around the foreign call,
+               ;; as is the custom for allocation trampolines.
+               #+x86-64 (%primitive sb-vm::alloc-code total-words)
+               #-x86-64
                (without-gcing
                  (%make-lisp-obj
                   (alien-funcall (extern-alien "alloc_code_object"

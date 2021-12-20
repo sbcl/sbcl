@@ -386,10 +386,6 @@
       (return (loop (cond ((>= (incf i) len) (return t))
                           ((eq thing (svref things i)) (return nil))))))))
 
-;;; Allocate a code object.
-(defun alloc-dynamic-space-code (total-words)
-  (values (%primitive alloc-dynamic-space-code (the fixnum total-words))))
-
 (define-load-time-global *never-statically-link* '(find-package))
 ;;; Remove calls via fdefns from CODE. This is called after compiling
 ;;; to memory, or when saving a core.

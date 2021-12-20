@@ -4802,8 +4802,8 @@ static void gc_allocate_ptes()
  * region is full, so in most cases it's not needed. */
 
 int gencgc_alloc_profiler;
-NO_SANITIZE_MEMORY lispobj*
-lisp_alloc(struct alloc_region *region, sword_t nbytes,
+static NO_SANITIZE_MEMORY lispobj*
+lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
            int page_type_flag, struct thread *thread)
 {
     os_vm_size_t trigger_bytes = 0;
@@ -4876,10 +4876,9 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
             }
         }
     }
-    if (nbytes >= LARGE_OBJECT_SIZE && !(page_type_flag & CONS_PAGE_FLAG))
+    if (largep)
         new_obj = gc_alloc_large(nbytes, page_type_flag, region);
     else {
-        page_type_flag &= ~CONS_PAGE_FLAG;
         ensure_region_closed(region, page_type_flag);
         gc_alloc_new_region(nbytes, page_type_flag, region);
         new_obj = region->free_pointer;
@@ -4916,14 +4915,60 @@ lisp_alloc(struct alloc_region *region, sword_t nbytes,
 # define TLAB(x) SINGLE_THREAD_MIXED_REGION
 #endif
 
-#define DEFINE_LISP_ENTRYPOINT(name, tlab, page_type) \
+// Code allocation is always serialized
+#ifdef LISP_FEATURE_WIN32
+CRITICAL_SECTION code_allocator_lock; // threads are mandatory for win32
+#elif defined LISP_FEATURE_SB_THREAD
+static pthread_mutex_t code_allocator_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+#define DEFINE_LISP_ENTRYPOINT(name, largep, tlab, page_type) \
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = get_sb_vm_thread(); \
-    return lisp_alloc(TLAB(tlab), nbytes, page_type, self); }
+    return lisp_alloc(largep, TLAB(tlab), nbytes, page_type, self); }
 
-DEFINE_LISP_ENTRYPOINT(alloc_unboxed, &self->unboxed_tlab, UNBOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc, &self->mixed_tlab, BOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc_list, &self->mixed_tlab, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc_unboxed, nbytes >= LARGE_OBJECT_SIZE, &self->unboxed_tlab,
+                       UNBOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, &self->mixed_tlab,
+                       BOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, BOXED_PAGE_FLAG)
+
+lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
+{
+    struct thread *th = get_sb_vm_thread();
+    // x86-64 uses pseudo-atomic. Others should too, but instead use WITHOUT-GCING
+#ifndef LISP_FEATURE_X86_64
+    if (read_TLS(GC_INHIBIT, th) == NIL)
+        lose("alloc_code_object called with GC enabled.");
+#endif
+
+    sword_t nbytes = total_words * N_WORD_BYTES;
+    /* Allocations of code are all serialized. We might also acquire
+     * free_pages_lock depending on availability of space in the region */
+    int result = thread_mutex_lock(&code_allocator_lock);
+    gc_assert(!result);
+    struct code *code =
+        (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, &code_region, nbytes, CODE_PAGE_TYPE, th);
+    result = thread_mutex_unlock(&code_allocator_lock);
+    gc_assert(!result);
+    THREAD_JIT(0);
+
+    code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
+    // Code pages are not prezeroed, so these assignments are essential to prevent GC
+    // from seeing bad pointers if it runs as soon as the mutator allows GC.
+    code->boxed_size = 0;
+    code->debug_info = 0;
+    ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
+    THREAD_JIT(1);
+
+    return make_lispobj(code, OTHER_POINTER_LOWTAG);
+}
+void close_code_region() {
+    __attribute__((unused)) int result = thread_mutex_lock(&code_allocator_lock);
+    gc_assert(!result);
+    ensure_region_closed(&code_region, CODE_PAGE_TYPE);
+    thread_mutex_unlock(&code_allocator_lock);
+}
 
 #ifdef LISP_FEATURE_SPARC
 void mixed_region_rollback(sword_t size)
