@@ -966,10 +966,9 @@
              (let ((lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
-                  (unless (= (length initial-contents) ,(or c-length 'length))
-                    (error "~S has ~D elements, vector length is ~D."
-                           :initial-contents (length initial-contents)
-                           ,(or c-length 'length)))
+                  (let ((content-length (length initial-contents)))
+                   (unless (= content-length ,(or c-length 'length))
+                     (initial-contents-error content-length  ,(or c-length 'length))))
                   ,(wrap `(replace ,data-alloc-form initial-contents)))))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least

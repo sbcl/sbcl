@@ -476,6 +476,11 @@
 (defun widetag->element-type (widetag)
   (svref +widetag->element-type+ (- (ash widetag -2) 32)))
 
+(defun initial-contents-error (content-length length)
+  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+                                the vector length is ~W."
+         content-length length))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -505,9 +510,7 @@
                    (contents-p
                     (let ((content-length (length initial-contents)))
                       (unless (= total-size content-length)
-                        (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
-                                the vector length is ~W."
-                               content-length total-size)))
+                        (initial-contents-error content-length total-size)))
                     (replace vector initial-contents))
                    #+ubsan
                    (t

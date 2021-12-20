@@ -1113,7 +1113,7 @@
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
     array (flushable))
-
+(defknown initial-contents-error (t t) nil)
 (defknown fill-data-vector (vector list sequence) vector ()
   :result-arg 0)
 
