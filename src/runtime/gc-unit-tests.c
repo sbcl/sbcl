@@ -18,8 +18,9 @@
 
 void test_adjust_obj_ptes()
 {
-   void shrink_obj_test(int ending_size, int created_type,
-                        struct page *expected_result);
+    void shrink_obj_test(int ending_size, int created_type,
+                         struct page *expected_result);
+    char card_table[1];
 
     // Mock out the dynamic space. Always allocate one extra page in
     // the page table as a sentinel.
@@ -27,6 +28,9 @@ void test_adjust_obj_ptes()
     page_table_pages = MAX_PAGES_FOR_TEST;
     posix_memalign((void**)&DYNAMIC_SPACE_START, GENCGC_CARD_BYTES,
                    MAX_PAGES_FOR_TEST * GENCGC_CARD_BYTES);
+    gc_card_table_nbits = 1;
+    gc_card_table_mask = 1;
+    gc_card_mark = card_table;
 
     struct alloc_region test_region;
     int npages, fuzz;
@@ -51,7 +55,7 @@ void test_adjust_obj_ptes()
             for (gen=0; gen < NUM_GENERATIONS; ++gen)
               generations[gen].bytes_allocated = 0;
             bytes_allocated = 0;
-            void *result = gc_alloc_large(request, UNBOXED_PAGE_FLAG, &test_region);
+            void *result = gc_alloc_large(request, PAGE_TYPE_UNBOXED, &test_region);
 
             // Assert some things about the reference object.
             gc_assert(result == (void*)DYNAMIC_SPACE_START);
@@ -66,8 +70,8 @@ void test_adjust_obj_ptes()
             // (1) object is "moved" [sic] from boxed to unboxed page,
             // (2) object was initially on unboxed page, stays on unboxed page.
             free(page_table);
-            shrink_obj_test(request, BOXED_PAGE_FLAG, expected_result);
-            shrink_obj_test(request, UNBOXED_PAGE_FLAG, expected_result);
+            shrink_obj_test(request, PAGE_TYPE_MIXED, expected_result);
+            shrink_obj_test(request, PAGE_TYPE_UNBOXED, expected_result);
         }
 }
 
@@ -104,7 +108,7 @@ void shrink_obj_test(int ending_size, int initial_type,
                 sword_t freed = adjust_obj_ptes(find_page_index(result),
                                                 ending_size/N_WORD_BYTES,
                                                 SCRATCH_GENERATION,
-                                                SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG);
+                                                SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED);
 
                 // After changing the size, all pages should have the correct
                 // number of bytes used, and the bytes freed should be as expected.
