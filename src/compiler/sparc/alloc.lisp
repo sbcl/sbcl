@@ -123,7 +123,7 @@
     (pseudo-atomic ()
       (allocation nil (pad-data-block words) lowtag result :temp-tn temp
                   :stack-p stack-allocate-p)
-        (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
+        (inst li temp (compute-object-header words type))
         (storew temp result 0 lowtag))))
 
 (define-vop (var-alloc)

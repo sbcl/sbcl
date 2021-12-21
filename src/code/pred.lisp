@@ -537,4 +537,14 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
              (bresult (if result 1 0))
              (expected-bresult (if expected-result 1 0)))
         (unless (= bresult expected-bresult)
+          ;; If a test fails, there's a chance of getting into a recursive error here
+          ;; because, among other things, *BASE-CHAR-NAME-ALIST* has not been filled in,
+          ;; so then you're get into an error printing#(#\h #\E #\l #\l #\o).
+          ;; Hopefully the write-string calls will work though.
+          (progn
+            (write-string "test failed: ")
+            (write (get-lisp-obj-address x) :base 16 :radix t)
+            (write-char #\space)
+            (write (get-lisp-obj-address y) :base 16 :radix t)
+            (terpri))
           (error "failed test (EQUALP ~S ~S)" x y))))))

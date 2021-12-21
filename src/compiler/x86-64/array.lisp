@@ -99,6 +99,8 @@
   array-dimensions-offset other-pointer-lowtag
   (any-reg) positive-fixnum %set-array-dimension)
 
+(symbol-macrolet ((rank-disp
+                    (- (/ array-rank-position n-byte-bits) other-pointer-lowtag)))
 (define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
@@ -106,7 +108,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 3
-    (inst movzx '(:byte :dword) res (ea (- 2 other-pointer-lowtag) x))
+    (inst movzx '(:byte :dword) res (ea rank-disp x))
     (inst inc :byte res)))
 
 (define-vop ()
@@ -117,8 +119,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp :byte (ea (- 2 other-pointer-lowtag) array)
-          (encode-array-rank rank))))
+    (inst cmp :byte (ea rank-disp array) (encode-array-rank rank))))
 
 (define-vop (array-vectorp simple-type-predicate)
   ;; SIMPLE-TYPE-PREDICATE says that it takes stack locations, but that's no good.
@@ -130,7 +131,7 @@
             (let ((arg (car (sb-c::combination-args node))))
               (csubtypep (sb-c::lvar-type arg) (specifier-type 'array)))))
   (:generator 1
-    (inst cmp :byte (ea (- 2 other-pointer-lowtag) array) (encode-array-rank 1))))
+    (inst cmp :byte (ea rank-disp array) (encode-array-rank 1)))))
 
 ;;;; bounds checking routine
 (defun emit-bounds-check (vop %test-fixnum array index limit)

@@ -1906,5 +1906,5 @@ function to be removed without further warning."
 
 (defun weak-vector-p (x)
   (and (simple-vector-p x)
-       #+(or x86 x86-64) (test-header-bit x (ash vector-weak-flag array-flags-data-position))
+       #+(or x86 x86-64) (test-header-data-bit x (ash vector-weak-flag array-flags-data-position))
        #-(or x86 x86-64) (logtest (get-header-data x) (ash vector-weak-flag array-flags-data-position))))

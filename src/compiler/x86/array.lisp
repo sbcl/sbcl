@@ -48,6 +48,8 @@
   array-dimensions-offset other-pointer-lowtag
   (any-reg) positive-fixnum %set-array-dimension)
 
+(symbol-macrolet ((rank-disp
+                    (- (/ array-rank-position n-byte-bits) other-pointer-lowtag)))
 (define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
@@ -55,9 +57,9 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst movzx res (make-ea :byte :disp (- 2 other-pointer-lowtag) :base x))
-    ;; not all registers have an addressable low byte,
-    ;; so the simple trick used on x86-64 won't work.
+    (inst movzx res (make-ea :byte :disp rank-disp :base x))
+    ;; not all registers have an addressable low byte, so the simple trick
+    ;; used on x86-64 of adding 1 to the 8-bit register won't work.
     (inst inc res)
     (inst and res array-rank-mask)))
 
@@ -69,8 +71,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp (make-ea :byte :disp (- 2 other-pointer-lowtag) :base array)
-          (encode-array-rank rank))))
+    (inst cmp (make-ea :byte :disp rank-disp :base array) (encode-array-rank rank))))
 
 (define-vop (array-vectorp simple-type-predicate)
   ;; SIMPLE-TYPE-PREDICATE says that it takes stack locations, but that's no good.
@@ -82,8 +83,7 @@
             (let ((arg (car (sb-c::combination-args node))))
               (csubtypep (sb-c::lvar-type arg) (specifier-type 'array)))))
   (:generator 1
-    (inst cmp (make-ea :byte :disp (- 2 other-pointer-lowtag) :base array)
-          (encode-array-rank 1))))
+    (inst cmp (make-ea :byte :disp rank-disp :base array) (encode-array-rank 1)))))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)

@@ -58,8 +58,10 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldrb res (@ x #+little-endian (- 2 other-pointer-lowtag)
-                        #+big-endian    (- 1 other-pointer-lowtag)))
+    ;; convert ARRAY-RANK-POSITION to byte index and compensate for endianness
+    ;; ASSUMPTION: n-widetag-bits = 8 and rank is adjacent to widetag
+    (inst ldrb res (@ x #+little-endian (- 1 other-pointer-lowtag)
+                        #+big-endian    (- 2 other-pointer-lowtag)))
     (inst add res res 1)
     (inst and res res array-rank-mask)))
 

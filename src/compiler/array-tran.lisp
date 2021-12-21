@@ -1514,8 +1514,8 @@
              ;; the CONSTRAINT-PROPAGATE-IF optimizer have the most
              ;; chances to run.
              (delay-ir1-transform node :ir1-phases))
-           (if (vop-existsp :named test-header-bit)
-               `(test-header-bit array
+           (if (vop-existsp :named test-header-data-bit)
+               `(test-header-data-bit array
                                  (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))
                `(logtest (get-header-data array)
                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))

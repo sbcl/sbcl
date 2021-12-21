@@ -240,7 +240,10 @@
    (flet ((store-widetag (value ptr slot lowtag)
              (inst mov (object-slot-ea
                         ptr slot lowtag
-                        (if (typep value '(and integer (not (unsigned-byte 8)))) :word :byte))
+                        (typecase value
+                          ((unsigned-byte 8) :byte)
+                          ((unsigned-byte 16) :word)
+                          (t :dword)))
                    value)))
     (let ((size (sc-case words
                   (immediate
@@ -259,7 +262,6 @@
        (allocation nil size other-pointer-lowtag node nil result)
        (sc-case type
          (immediate
-          (aver (typep (tn-value type) '(unsigned-byte 9)))
           (store-widetag (tn-value type) result 0 other-pointer-lowtag))
          (t
           (storew type result 0 other-pointer-lowtag)))

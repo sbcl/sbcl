@@ -57,7 +57,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst lbu res x (- 2 other-pointer-lowtag))
+    (inst lbu res x (- (/ array-rank-position n-byte-bits) other-pointer-lowtag))
     (inst addi res res 1)
     (inst andi res res array-rank-mask)))
 

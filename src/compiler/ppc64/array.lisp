@@ -65,8 +65,10 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst lbz res x #+little-endian (- 2 other-pointer-lowtag)
-                    #+big-endian    (- 5 other-pointer-lowtag))
+    ;; convert ARRAY-RANK-POSITION to byte index and compensate for endianness
+    ;; ASSUMPTION: n-widetag-bits = 8 and rank is adjacent to widetag
+    (inst lbz res x #+little-endian (- 1 other-pointer-lowtag)
+                    #+big-endian    (- 6 other-pointer-lowtag))
     (inst addi res res 1)
     (inst andi. res res array-rank-mask)))
 

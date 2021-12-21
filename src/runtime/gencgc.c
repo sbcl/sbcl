@@ -5468,8 +5468,8 @@ void gc_show_pte(lispobj obj)
 {
     page_index_t page = find_page_index((void*)obj);
     if (page>=0) {
-        printf("page %"PAGE_INDEX_FMT" gen %d type %x ss %p used %x%s\n",
-               page, page_table[page].gen, page_table[page].type,
+        printf("page %"PAGE_INDEX_FMT" base %p gen %d type %x ss %p used %x%s\n",
+               page, page_address(page), page_table[page].gen, page_table[page].type,
                page_scan_start(page), page_bytes_used(page),
                PAGE_WRITEPROTECTED_P(page)? " WP":"");
         return;

@@ -57,7 +57,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldub res x (- 1 other-pointer-lowtag)) ; big-endian only
+    ;; 2 = ARRAY-RANK-POSITION adjusted for endianness
+    (inst ldub res x (- 2 other-pointer-lowtag)) ; big-endian only
     (inst add res res 1)
     (inst and res res array-rank-mask)))
 

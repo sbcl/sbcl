@@ -275,6 +275,9 @@
   simple-array-complex-single-float-widetag ;
   simple-array-complex-double-float-widetag ;
 
+  ;; WARNING: If you change the order of anything here,
+  ;; be sure to examine COMPUTE-OBJECT-HEADER to see that it works
+  ;; properly for all non-simple array headers.
   simple-base-string-widetag                ;  D6   E1  D6   E1       \
   #+sb-unicode                              ;                          |
   simple-character-string-widetag           ;  DA   E5                 | Strings
@@ -297,15 +300,15 @@
 
 ;;; Byte index:           3           2           1           0
 ;;;                 +-----------------------------------+-----------+
-;;;                 |  unused   |   rank   <|>   flags  |  widetag  |
+;;;                 |  extra    |   flags   |    rank   |  widetag  |
 ;;;                 +-----------+-----------+-----------+-----------+
 ;;;                 |<---------- HEADER DATA ---------->|
 
-;;; Having contiguous rank and widetag allows
-;;; SIMPLE-ARRAY-HEADER-OF-RANK-P to be done with just one comparison.
-;;; Other backends may not be ready to switch the order yet.
-(defconstant array-rank-position  #-arm64 16 #+arm64 8)
-(defconstant array-flags-position #-arm64 8  #+arm64 16)
+;;; "extra" contains a generation number for immobile space as well as the fullcgc mark bit
+;;; (bit index 31) and the visitedp bit (bit index 30) for weak vectors.
+;;; Rank and widetag adjacent lets SIMPLE-ARRAY-HEADER-OF-RANK-P be just one comparison.
+(defconstant array-rank-position    8)
+(defconstant array-flags-position  16)
 
 (defconstant array-flags-data-position (- array-flags-position n-widetag-bits))
 (defconstant +array-fill-pointer-p+    #x80)

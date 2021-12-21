@@ -59,7 +59,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst ldrsb res (@ x (- (/ array-rank-position n-word-bytes)
+    (inst ldrsb res (@ x (- (/ array-rank-position n-byte-bits)
                           other-pointer-lowtag)))
     (inst add res res 1)))
 
@@ -72,7 +72,7 @@
   (:arg-types * (:constant t))
   (:conditional :eq)
   (:generator 2
-    (inst ldrb x (@ array (- (/ array-rank-position n-word-bytes)
+    (inst ldrb x (@ array (- (/ array-rank-position n-byte-bits)
                             other-pointer-lowtag)))
     (inst cmp x (add-sub-immediate (encode-array-rank rank)))))
 
