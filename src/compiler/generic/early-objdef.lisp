@@ -304,16 +304,41 @@
 ;;;                 +-----------+-----------+-----------+-----------+
 ;;;                 |<---------- HEADER DATA ---------->|
 
-;;; "extra" contains a generation number for immobile space as well as the fullcgc mark bit
-;;; (bit index 31) and the visitedp bit (bit index 30) for weak vectors.
+;;; "extra" contain the following fields:
+;;;  - generation number for immobile space (4 low bits of extra)
+;;;  - fullcgc mark bit (header bit index 31), not used by Lisp
+;;;  - visitedp (header bit index 30) for weak vectors, not used by Lisp
+;;;  - ALLOC-DYNAMIC-EXTENT (bit index 29), not used by lisp
+;;;  - ALLOC-MIXED-REGION (bit index 28), not used by Lisp
+
+;; When I finish implementing "highly unsafe" dynamic-extent allocation, allowing
+;; uninitialized SIMPLE-VECTORs on the stack, _correct_ Lisp code won't be affected
+;; (it's an error to read before writing an element), nor will conservative GC.
+;; But in order to make printing (Lisp and/or ldb) not crashy, we may need to act
+;; as though *PRINT-ARRAY* were NIL on those.
+;; (I don't know what to do if such a vector insists on being printed readably)
+(defconstant +vector-alloc-dynamic-extent-bit+ (ash 1 29))
+
+;; A vector with ALLOC-MIXED-REGION can never be moved to a purely boxed page,
+;; and vectors not so marked could be. This would allow small simple-vectors
+;; to benefit from the same GC optimization as large ones, wherein we scan
+;; only their marked cards without regard to object base address.
+;; A hash-table vector must not move to a pure boxed page, but we can't indicate
+;; a vector as hashing until after it has been properly initialized.
+;; The table algorithms expects to see certain values in the first and last elements,
+;; and shoving all the initialization into pseudo-atomic would be nontrivial.
+;; So we need a different flag bit that can be set immediately on creation,
+;; just in case GC occurs before a hash table vector is flagged as hashing.
+;; Note: ALLOCATE-VECTOR on 32-bit wants its first argument to be POSITIVE-FIXNUM.
+;; so this is the highest bit index that can be used satisfying that restriction.
+;; Once set, this bit can never be cleared.
+(defconstant +vector-alloc-mixed-region-bit+ (ash 1 28))
+
 ;;; Rank and widetag adjacent lets SIMPLE-ARRAY-HEADER-OF-RANK-P be just one comparison.
 (defconstant array-rank-position    8)
 (defconstant array-flags-position  16)
 
 (defconstant array-flags-data-position (- array-flags-position n-widetag-bits))
-(defconstant +array-fill-pointer-p+    #x80)
-
-(defconstant +vector-dynamic-extent+   #x40)
 
 ;; A vector tagged as +VECTOR-SHAREABLE+ is logically readonly,
 ;; and permitted to be shared with another vector per the CLHS standard
@@ -332,6 +357,8 @@
 ;; nonetheless, opportunities for sharing abound.
 (defconstant +vector-shareable-nonstd+ #x10)
 
+;; All arrays have a fill-pointer bit, but only vectors can have a 1 here.
+(defconstant +array-fill-pointer-p+    #x80)
 ;; All hash-table backing vectors are marked with this bit.
 ;; Essentially it informs GC that the vector has a high-water mark.
 (defconstant vector-hashing-flag       #x04)

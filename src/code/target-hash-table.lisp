@@ -304,13 +304,25 @@ Examples:
 ;;; initially, because the vector can't hold a backpointer to the table
 ;;; since the table hasn't been made yet. (GC asserts that every weak hash-table
 ;;; storage vector has a table pointer - no exceptions)
+;;; Also we can't set the HASHING bit in the header until the vector is prepared,
+;;; but if GC occurs meanwhile, it must not move this to a purely boxed page.
+;;; But we can set the ALLOC-MIXED bit. That's what it's there for.
 (defmacro %alloc-kv-pairs (size)
-  `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
-                        :initial-element +empty-ht-slot+)))
+  `(let* ((nwords
+           (truly-the index (+ (* 2 (truly-the index/2 ,size))
+                               ,kv-pairs-overhead-slots)))
+          (v (truly-the simple-vector
+                        (allocate-vector (logior sb-vm::+vector-alloc-mixed-region-bit+
+                                                 sb-vm:simple-vector-widetag)
+                                         nwords nwords))))
+     (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+     (fill v (make-unbound-marker))
      (setf (kv-vector-high-water-mark v) 0)
      (setf (kv-vector-rehash-stamp v) 0)
      ;; If GC observes VECTOR-HASHING-FLAG, it needs to see a valid value
      ;; in the 'supplement' slot. Neither 0 nor +empty-ht-slot+ is valid.
+     ;; And if we ever get non-prezeroed-memory to work, this will be even more
+     ;; important to do things in the right order.
      (setf (kv-vector-supplement v) nil)
      (logior-array-flags v sb-vm:vector-hashing-flag)
      v))
