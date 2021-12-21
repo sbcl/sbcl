@@ -135,23 +135,20 @@
 
 (define-vop (simple-array-header-of-rank-p type-predicate)
   (:translate sb-c::simple-array-header-of-rank-p)
-  (:info target not-p rank)
+  (:info rank)
+  (:conditional :e)
   (:arg-types * (:constant t))
   (:generator 2
-    (unless (other-pointer-tn-ref-p args)
-      (%test-lowtag value temp (if not-p
-                                   target
-                                   drop-through)
-                    t other-pointer-lowtag))
-    (inst cmp :word (ea (- other-pointer-lowtag) value)
-      (dpb (encode-array-rank rank)
-        (byte 8 array-rank-position)
-        simple-array-widetag))
-    (inst jmp (if not-p
-                  :ne
-                  :eq)
-      target)
-    drop-through))
+    (let ((c (dpb (encode-array-rank rank) (byte 8 array-rank-position)
+                  simple-array-widetag)))
+      (cond ((other-pointer-tn-ref-p args)
+             (inst cmp :word (ea (- other-pointer-lowtag) value) c))
+            (t
+             (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+             (inst test :byte temp lowtag-mask)
+             (inst jmp :ne OUT)
+             (inst cmp :word (ea temp) c))))
+    OUT))
 
 ;;;; bounds checking routine
 (defun emit-bounds-check (vop %test-fixnum array index limit)
