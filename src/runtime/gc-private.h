@@ -22,13 +22,31 @@
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
+/* TODO: The following objects should be allocated to BOXED pages instead of MIXED pages:
+ * - CONS, VALUE-CELL, (COMPLEX INTEGER), RATIO, ARRAY headers
+ * - simple-vector that is neither weak nor hashing
+ * - wholly-boxed instances
+ * These pointer-containing objects MUST NOT be allocated to BOXED pages:
+ * - weak-pointer (requires deferred scavenge)
+ * - hash-table vector and weak vector (complicated)
+ * - closure and funcallable-instance (contains untagged pointer)
+ * - symbol (contains encoded pointer)
+ * - fdefn (contains untagged pointer)
+ *
+ * Each BOXED page can be linearly scanned without calling type-specific methods
+ * when processing the root set
+ */
 static inline void *
 gc_general_alloc(sword_t nbytes, int page_type_flag)
 {
     void *gc_alloc_with_region(struct alloc_region*,sword_t,int);
-    if (1 <= page_type_flag && page_type_flag <= 3)
-        return gc_alloc_with_region(&gc_alloc_region[page_type_flag-1],
-                                    nbytes, page_type_flag);
+    struct alloc_region* r = 0;
+    switch (page_type_flag) {
+    case PAGE_TYPE_MIXED: r = &mixed_region; break;
+    case PAGE_TYPE_CODE: r = &code_region; break;
+    case PAGE_TYPE_UNBOXED: r = &unboxed_region; break;
+    }
+    if (r) return gc_alloc_with_region(r, nbytes, page_type_flag);
     lose("bad page type flag: %d", page_type_flag);
 }
 #else

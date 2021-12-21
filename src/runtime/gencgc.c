@@ -172,11 +172,6 @@ struct hopscotch_table pinned_objects;
 /* This is always 0 except during gc_and_save() */
 lispobj lisp_init_function;
 
-/// Constants defined in gc-internal:
-///   #define BOXED_PAGE_FLAG 1
-///   #define UNBOXED_PAGE_FLAG 2
-///   #define OPEN_REGION_PAGE_FLAG 8
-
 static inline boolean page_free_p(page_index_t page) {
     return (page_table[page].type == FREE_PAGE_FLAG);
 }
@@ -187,7 +182,8 @@ static inline boolean page_boxed_p(page_index_t page) {
 
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
 /// Return true if low 4 'type' bits are 0zz1, false otherwise (z = don't-care)
-/// i.e. true of pages which could hold boxed or partially boxed objects.
+/// i.e. true of pages which could hold boxed or partially boxed (mixed) objects,
+/// including pages of code.
 static inline boolean page_boxed_no_region_p(page_index_t page) {
     return (page_table[page].type & 9) == BOXED_PAGE_FLAG;
 }
@@ -482,10 +478,13 @@ write_generation_stats(FILE *file)
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
             if (!page_free_p(page) && page_table[page].gen == i) {
-                // translate BOXED -> 0, UNBOXED -> 1, CODE -> 2
-                int k = (page_table[page].type & PAGE_TYPE_MASK) - 1;
-                if (page_single_obj_p(page)) k += 3;
-                pagect[k]++;
+                int column = 0;
+                switch (page_table[page].type & PAGE_TYPE_MASK) {
+                case PAGE_TYPE_UNBOXED: column = 1; break;
+                case PAGE_TYPE_CODE: column = 2; break;
+                }
+                if (page_single_obj_p(page)) column += 3;
+                pagect[column]++;
                 if (page_table[page].pinned) pinned_cnt++;
             }
         struct generation* gen = &generations[i];
@@ -747,7 +746,8 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     boolean usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
-    boolean must_zero = ((page_type == BOXED_PAGE_FLAG && usable_by_lisp) || page_type == 0);
+    boolean must_zero = ((page_type & BOXED_PAGE_FLAG) != 0 && usable_by_lisp
+                         && !is_code(page_type)) || page_type == 0;
 #endif
 
     if (gc_allocate_dirty) { // For testing only
@@ -842,19 +842,23 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
 struct alloc_region gc_alloc_region[3];
 
 static page_index_t
-  alloc_start_pages[4], // one each for large, boxed, unboxed, code
+  alloc_start_pages[8], // one for each value of PAGE_TYPE_x
   gencgc_alloc_start_page; // initializer for the preceding array
 
 #define RESET_ALLOC_START_PAGES() \
         alloc_start_pages[0] = gencgc_alloc_start_page; \
         alloc_start_pages[1] = gencgc_alloc_start_page; \
         alloc_start_pages[2] = gencgc_alloc_start_page; \
-        alloc_start_pages[3] = gencgc_alloc_start_page
+        alloc_start_pages[3] = gencgc_alloc_start_page; \
+        alloc_start_pages[4] = gencgc_alloc_start_page; \
+        alloc_start_pages[5] = gencgc_alloc_start_page; \
+        alloc_start_pages[6] = gencgc_alloc_start_page; \
+        alloc_start_pages[7] = gencgc_alloc_start_page;
 
 static inline page_index_t
 alloc_start_page(int page_type_flag, int large)
 {
-    if (!(page_type_flag >= 1 && page_type_flag <= 3))
+    if (!(page_type_flag >= 1 && page_type_flag <= 7))
         lose("bad page_type_flag: %d", page_type_flag);
     return alloc_start_pages[large ? 0 : page_type_flag];
 }
@@ -862,7 +866,7 @@ alloc_start_page(int page_type_flag, int large)
 static inline void
 set_alloc_start_page(int page_type_flag, int large, page_index_t page)
 {
-    if (!(page_type_flag >= 1 && page_type_flag <= 3))
+    if (!(page_type_flag >= 1 && page_type_flag <= 7))
         lose("bad page_type_flag: %d", page_type_flag);
     alloc_start_pages[large ? 0 : page_type_flag] = page;
 }
@@ -976,7 +980,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type_flag), et_bzeroing);
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-    if (page_type_flag == CODE_PAGE_TYPE) {
+    if (page_type_flag == PAGE_TYPE_CODE) {
         page_index_t first = first_page;
         if (page_bytes_used(first) != 0) {
             first++;
@@ -1250,7 +1254,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     *addr = 0;
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-    if (page_type_flag == CODE_PAGE_TYPE) {
+    if (page_type_flag == PAGE_TYPE_CODE) {
         os_protect(page_address(first_page), npage_bytes(1+last_page-first_page), OS_VM_PROT_ALL);
     }
 #endif
@@ -1363,7 +1367,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             nbytes_goal = gencgc_alloc_granularity;
 #if !defined(LISP_FEATURE_64_BIT)
         // Increase the region size to avoid excessive fragmentation
-        if (page_type_flag == CODE_PAGE_TYPE && nbytes_goal < 65536)
+        if (page_type_flag == PAGE_TYPE_CODE && nbytes_goal < 65536)
             nbytes_goal = 65536;
 #endif
     }
@@ -1385,7 +1389,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             // XXX: Prefer to start non-code on new pages.
             //      This is temporary until scavenging of small-object pages
             //      is made a little more intelligent (work in progress).
-            if (bytes_found < nbytes && page_type_flag != CODE_PAGE_TYPE) {
+            if (bytes_found < nbytes && !is_code(page_type_flag)) {
                 if (bytes_found > most_bytes_found)
                     most_bytes_found = bytes_found;
                 first_page++;
@@ -1658,7 +1662,7 @@ copy_possibly_large_object(lispobj object, sword_t nwords, int page_type_flag)
 lispobj
 copy_unboxed_object(lispobj object, sword_t nwords)
 {
-    return gc_general_copy_object(object, nwords, UNBOXED_PAGE_FLAG);
+    return gc_general_copy_object(object, nwords, PAGE_TYPE_UNBOXED);
 }
 
 /*
@@ -1722,8 +1726,6 @@ static inline boolean plausible_tag_p(lispobj addr)
     return other_immediate_lowtag_p(widetag)
         && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
 }
-
-#define is_code(type) ((type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
 
 /* Return true if and only if everything on the specified page is NOT subject
  * to evacuation, i.e. either the page is not in 'from_space', or is entirely
@@ -1832,9 +1834,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     struct page* page = &page_table[addr_page_index];
     // We allow ambiguous pointers to code and untagged fdefn pointers.
-    if (!((page->type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE
-          || untagged_fdefn_p(addr)))
-        return 0;
+    if (!(is_code(page->type) || untagged_fdefn_p(addr))) return 0;
 
     // quick check 1: within from_space and within page usage
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
@@ -1869,11 +1869,11 @@ maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
 
     /* Check whether it's a vector or bignum object. */
     lispobj widetag = widetag_of(where);
-    if (widetag == SIMPLE_VECTOR_WIDETAG)
-        page_type_flag = SINGLE_OBJECT_FLAG | BOXED_PAGE_FLAG;
+    if (widetag == SIMPLE_VECTOR_WIDETAG) // TODO: choose MIXED or BOXED
+        page_type_flag = SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED;
 #ifndef LISP_FEATURE_UBSAN
     else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
-        page_type_flag = SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG;
+        page_type_flag = SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED;
 #endif
     else
         return;
@@ -2779,9 +2779,9 @@ static void newspace_full_scavenge(generation_index_t generation)
 
 static void gc_close_all_regions()
 {
-    ensure_region_closed(&code_region, CODE_PAGE_TYPE);
-    ensure_region_closed(&unboxed_region, UNBOXED_PAGE_FLAG);
-    ensure_region_closed(&mixed_region, BOXED_PAGE_FLAG);
+    ensure_region_closed(&code_region, PAGE_TYPE_CODE);
+    ensure_region_closed(&unboxed_region, PAGE_TYPE_UNBOXED);
+    ensure_region_closed(&mixed_region, PAGE_TYPE_MIXED);
 }
 
 /* Do a complete scavenge of the newspace generation. */
@@ -4146,7 +4146,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         page_index_t first = 0;
         while (first < next_free_page) {
             if (page_table[first].gen != from_space
-                || (page_table[first].type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE
+                || !is_code(page_table[first].type)
                 || !page_bytes_used(first)) {
                 ++first;
                 continue;
@@ -4436,12 +4436,12 @@ collect_garbage(generation_index_t last_gen)
      * So we need to close them for those two cases.
      */
 #ifdef SINGLE_THREAD_MIXED_REGION
-    ensure_region_closed(SINGLE_THREAD_MIXED_REGION, BOXED_PAGE_FLAG);
+    ensure_region_closed(SINGLE_THREAD_MIXED_REGION, PAGE_TYPE_MIXED);
 #endif
     struct thread *th;
     for_each_thread(th) {
-        ensure_region_closed(&th->mixed_tlab, BOXED_PAGE_FLAG);
-        ensure_region_closed(&th->unboxed_tlab, UNBOXED_PAGE_FLAG);
+        ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
+        ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
     }
     gc_close_all_regions();
 
@@ -4801,6 +4801,7 @@ static void gc_allocate_ptes()
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
+#define PERMIT_ALLOC_LARGE 16 // any bit that does not conflict with PAGE_TYPE_*
 int gencgc_alloc_profiler;
 static NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
@@ -4830,7 +4831,7 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         // That's actually most of them, but I haven't tested that they're right.
         // e.g. x86 forgoes inline allocation depending on policy,
         // and git revision 05047647 tweaked the edge case for PPC.
-        gc_assert(page_type_flag == CODE_PAGE_TYPE);
+        gc_assert(page_type_flag == PAGE_TYPE_CODE);
 #endif
         return(new_obj);        /* yup */
     }
@@ -4928,15 +4929,15 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     return lisp_alloc(largep, TLAB(tlab), nbytes, page_type, self); }
 
 DEFINE_LISP_ENTRYPOINT(alloc_unboxed, nbytes >= LARGE_OBJECT_SIZE, &self->unboxed_tlab,
-                       UNBOXED_PAGE_FLAG)
+                       PAGE_TYPE_UNBOXED)
 DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, &self->mixed_tlab,
-                       BOXED_PAGE_FLAG)
-DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, BOXED_PAGE_FLAG)
+                       PAGE_TYPE_MIXED)
+DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, PAGE_TYPE_MIXED)
 
 void close_thread_region() {
     __attribute__((unused)) struct thread *self = get_sb_vm_thread();
     struct alloc_region *region = TLAB(&self->mixed_tlab);
-    ensure_region_closed(region, BOXED_PAGE_FLAG);
+    ensure_region_closed(region, PAGE_TYPE_MIXED);
 }
 
 lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
@@ -4954,7 +4955,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     int result = thread_mutex_lock(&code_allocator_lock);
     gc_assert(!result);
     struct code *code =
-        (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, &code_region, nbytes, CODE_PAGE_TYPE, th);
+        (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, &code_region, nbytes, PAGE_TYPE_CODE, th);
     result = thread_mutex_unlock(&code_allocator_lock);
     gc_assert(!result);
     THREAD_JIT(0);
@@ -4972,7 +4973,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
 void close_code_region() {
     __attribute__((unused)) int result = thread_mutex_lock(&code_allocator_lock);
     gc_assert(!result);
-    ensure_region_closed(&code_region, CODE_PAGE_TYPE);
+    ensure_region_closed(&code_region, PAGE_TYPE_CODE);
     thread_mutex_unlock(&code_allocator_lock);
 }
 
@@ -5133,9 +5134,8 @@ prepare_for_final_gc ()
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
         // Turn every page to boxed so that the layouts of instances
         // which were relocated to unboxed pages get scanned and fixed.
-        if ((page_table[i].type & PAGE_TYPE_MASK) == UNBOXED_PAGE_FLAG)
-            page_table[i].type =
-                (page_table[i].type | BOXED_PAGE_FLAG) & ~UNBOXED_PAGE_FLAG;
+        if ((page_table[i].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED)
+            page_table[i].type = PAGE_TYPE_MIXED;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
             int used = page_bytes_used(i);
             page_table[i].gen = HIGHEST_NORMAL_GENERATION;
@@ -5371,17 +5371,17 @@ void gc_load_corefile_ptes(int card_table_nbits,
         for ( i = 0 ; i < npages ; ++i, ++page ) {
             struct corefile_pte pte;
             memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
-            // Low 2 bits of the corefile_pte hold the 'type' flags.
+            // Low 3 bits of the scan_start hold the 'type' flags.
             // Low bit of bytes_used indicates a large (a/k/a single) object.
             char type = ((pte.bytes_used & 1) ? SINGLE_OBJECT_FLAG : 0)
-                        | (pte.sso & 0x03);
+                        | (pte.sso & 0x07);
             page_table[page].type = type;
             pte.bytes_used &= ~1;
             if (type != FREE_PAGE_FLAG) {
                 /* It is possible, though rare, for the saved page table
                  * to contain free pages below alloc_ptr. */
                 set_page_bytes_used(page, pte.bytes_used);
-                set_page_scan_start_offset(page, pte.sso & ~0x03);
+                set_page_scan_start_offset(page, pte.sso & ~0x07);
                 page_table[page].gen = gen;
                 set_page_need_to_zero(page, 1);
             }
@@ -5454,10 +5454,10 @@ void gc_store_corefile_ptes(struct corefile_pte *ptes)
         /* Thanks to alignment requirements, the two low bits
          * are always zero, so we can use them to store the
          * allocation type -- region is always closed, so only
-         * the two low bits of allocation flags matter. */
+         * the three low bits of allocation flags matter. */
         uword_t word = page_scan_start_offset(i);
-        gc_assert((word & 0x03) == 0);
-        ptes[i].sso = word | (0x03 & page_table[i].type);
+        gc_assert((word & 0x07) == 0);
+        ptes[i].sso = word | (0x07 & page_table[i].type);
         page_bytes_t used = page_bytes_used(i);
         gc_assert(!(used & LOWTAG_MASK));
         ptes[i].bytes_used = used | page_single_obj_p(i);

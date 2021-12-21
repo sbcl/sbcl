@@ -425,8 +425,8 @@ unregister_thread(struct thread *th,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 
     block_blockable_signals(0);
-    ensure_region_closed(&th->mixed_tlab, BOXED_PAGE_FLAG);
-    ensure_region_closed(&th->unboxed_tlab, UNBOXED_PAGE_FLAG);
+    ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
+    ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
     pop_gcing_safety(&scribble->safety);
     lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -452,8 +452,8 @@ unregister_thread(struct thread *th,
     /* FIXME: this nests the free_pages_lock inside the all_threads_lock.
      * There's no reason for that, so closing of regions should be done
      * sooner to eliminate an ordering constraint. */
-    ensure_region_closed(&th->mixed_tlab, BOXED_PAGE_FLAG);
-    ensure_region_closed(&th->unboxed_tlab, UNBOXED_PAGE_FLAG);
+    ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
+    ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
     unlink_thread(th);
     thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);

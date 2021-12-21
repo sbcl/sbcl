@@ -98,7 +98,7 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 lispobj
 copy_object(lispobj object, sword_t nwords)
 {
-    return gc_general_copy_object(object, nwords, BOXED_PAGE_FLAG);
+    return gc_general_copy_object(object, nwords, PAGE_TYPE_MIXED);
 }
 
 #ifdef LISP_FEATURE_PPC64
@@ -281,7 +281,7 @@ trans_code(struct code *code)
     lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
     lispobj l_new_code = copy_possibly_large_object(l_code,
                                            code_total_nwords(code),
-                                           CODE_PAGE_TYPE);
+                                           PAGE_TYPE_CODE);
 
 #ifdef LISP_FEATURE_GENCGC
     if (l_new_code == l_code)
@@ -426,7 +426,7 @@ static inline lispobj copy_instance(lispobj object)
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
     int original_length = instance_length(header);
 
-    int page_type = BOXED_PAGE_FLAG;
+    int page_type = PAGE_TYPE_MIXED;
 #ifdef LISP_FEATURE_GENCGC
     lispobj layout = instance_layout(INSTANCE(object));
     if (layout) {
@@ -444,7 +444,7 @@ static inline lispobj copy_instance(lispobj object)
         if (gen == PSEUDO_STATIC_GENERATION) {
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             if (bitmap.nwords == 1 && !bitmap.bits[0]) {
-                page_type = UNBOXED_PAGE_FLAG;
+                page_type = PAGE_TYPE_UNBOXED;
                 // ++n_unboxed_instances; // for metrics gathering
             }
         }
@@ -541,7 +541,7 @@ trans_list(lispobj object)
 {
     /* Copy 'object'. */
     struct cons *copy = (struct cons *)
-        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
+        gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
     lispobj new_list_pointer = make_lispobj(copy, LIST_POINTER_LOWTAG);
     copy->car = CONS(object)->car;
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
@@ -558,7 +558,7 @@ trans_list(lispobj object)
         }
         /* Copy 'cdr'. */
         struct cons *cdr_copy = (struct cons*)
-            gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
+            gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
         cdr_copy->car = ((struct cons*)native_cdr)->car;
         /* Grab the cdr before it is clobbered. */
         lispobj next = ((struct cons*)native_cdr)->cdr;
@@ -855,7 +855,7 @@ static lispobj trans_bignum(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
     return copy_possibly_large_object(object, bignum_nwords(*native_pointer(object)),
-                             UNBOXED_PAGE_FLAG);
+                             PAGE_TYPE_UNBOXED);
 }
 
 #ifndef LISP_FEATURE_X86_64
@@ -932,7 +932,9 @@ trans_vector_t(lispobj object)
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     sword_t length = vector_len(VECTOR(object));
-    return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), BOXED_PAGE_FLAG);
+    // TODO: choose between PAGE_TYPE_MIXED or PAGE_TYPE_BOXED here.
+    // BOXED will be more efficient, but excludes weak and hashing vectors.
+    return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), PAGE_TYPE_MIXED);
 }
 
 static sword_t
@@ -961,9 +963,9 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 #ifdef LISP_FEATURE_UBSAN
 // If specialized vectors point to a vector of bits in their first
 // word after the header, they can't be relocated to unboxed pages.
-#define SPECIALIZED_VECTOR_PAGE_FLAG BOXED_PAGE_FLAG
+#define SPECIALIZED_VECTOR_PAGE_FLAG PAGE_TYPE_MIXED
 #else
-#define SPECIALIZED_VECTOR_PAGE_FLAG UNBOXED_PAGE_FLAG
+#define SPECIALIZED_VECTOR_PAGE_FLAG PAGE_TYPE_UNBOXED
 #endif
 
 static inline void check_shadow_bits(__attribute((unused)) lispobj* v) {
@@ -1579,7 +1581,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                 lispobj val = kv_vector[2 * index + 1];
                 gc_assert(!is_lisp_pointer(val));
                 struct cons *cons = (struct cons*)
-                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
+                  gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
                 // Lisp code which manipulates the culled_values slot must use
                 // compare-and-swap, but C code need not, because GC runs in one
                 // thread and has stopped the Lisp world.
@@ -1604,14 +1606,14 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             struct cons *cons;
             if ((index & ~0x3FFF) | (bucket & ~0x3FFF)) { // large values
                 cons = (struct cons*)
-                  gc_general_alloc(2 * sizeof(struct cons), BOXED_PAGE_FLAG);
+                  gc_general_alloc(2 * sizeof(struct cons), PAGE_TYPE_CONS);
                 cons->car = make_lispobj(cons + 1, LIST_POINTER_LOWTAG);
                 cons[1].car = make_fixnum(index);  // which cell became free
                 cons[1].cdr = make_fixnum(bucket); // which chain was it in
                 if (!compacting_p()) gc_mark_obj(cons->car);
             } else { // small values
                 cons = (struct cons*)
-                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
+                  gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
                 cons->car = ((index << 14) | bucket) << N_FIXNUM_TAG_BITS;
             }
             cons->cdr = hash_table->smashed_cells;
@@ -1721,7 +1723,7 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
         hopscotch_reset(&weak_objects);
 #ifdef LISP_FEATURE_GENCGC
     // Close the region used when pushing items to the finalizer queue
-    ensure_region_closed(&mixed_region, BOXED_PAGE_FLAG);
+    ensure_region_closed(&cons_region, PAGE_TYPE_CONS);
 #endif
 }
 

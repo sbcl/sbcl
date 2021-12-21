@@ -70,12 +70,12 @@ static struct cons* private_cons_impl()
     if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_CARD_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
-        page = alloc_start_page(UNBOXED_PAGE_FLAG, 0);
+        page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
         page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_CARD_BYTES,
-                                  SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG, 0);
+                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED, 0);
         // See question about last_page in gc_alloc_large
-        set_alloc_start_page(UNBOXED_PAGE_FLAG, 0, page);
+        set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);
 
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
@@ -83,7 +83,7 @@ static struct cons* private_cons_impl()
         gc_assert(last_page == page);
         gc_assert(!PAGE_WRITEPROTECTED_P(page));
         page_table[page].gen = 0;
-        page_table[page].type = UNBOXED_PAGE_FLAG;
+        page_table[page].type = PAGE_TYPE_UNBOXED;
         zero_dirty_pages(page, page, 0);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused

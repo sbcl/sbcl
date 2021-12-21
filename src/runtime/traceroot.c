@@ -464,7 +464,7 @@ static boolean root_p(lispobj ptr, int criterion)
 static lispobj mkcons(lispobj car, lispobj cdr)
 {
     struct cons *cons = (struct cons*)
-        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
+        gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
     cons->car = car;
     cons->cdr = cdr;
     return make_lispobj(cons, LIST_POINTER_LOWTAG);
@@ -475,7 +475,7 @@ static lispobj liststar3(lispobj x, lispobj y, lispobj z) {
 static lispobj make_sap(char* value)
 {
     struct sap *sap = (struct sap*)
-        gc_general_alloc(sizeof(struct sap), BOXED_PAGE_FLAG);
+        gc_general_alloc(sizeof(struct sap), PAGE_TYPE_UNBOXED);
     sap->header = (1<<N_WIDETAG_BITS) | SAP_WIDETAG;
     sap->pointer = value;
     return make_lispobj(sap, OTHER_POINTER_LOWTAG);
@@ -988,7 +988,7 @@ static int trace_paths(void (*context_scanner)(),
         }
         ++i;
     } while (weak_pointers != NIL);
-    ensure_region_closed(&mixed_region, BOXED_PAGE_FLAG);
+    ensure_region_closed(&mixed_region, PAGE_TYPE_MIXED);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
 #if TRACEROOT_USE_ABSL_HASHMAP
     absl_hashmap_destroy(inverted_heap);

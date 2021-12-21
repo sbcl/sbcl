@@ -97,9 +97,10 @@ struct page {
         /*
          * The low 4 bits of 'type' are interpreted as:
          *  0000 free
-         *  ?001 boxed data
-         *  ?010 unboxed data
-         *  ?011 code
+         *  ?001 strictly boxed data (pointers, immediates, object headers)
+         *  ?010 strictly unboxed data
+         *  ?011 mixed boxed/unboxed non-code objects
+         *  ?111 code
          *  1??? open region
          * The high bit indicates that the page holds part of or the entirety
          * of a single object and no other objects.

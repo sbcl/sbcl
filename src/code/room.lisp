@@ -1367,11 +1367,11 @@ We could try a few things to mitigate this:
          (let ((*print-level* 2) (*print-lines* 1))
            (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))
 (defun print-all-code ()
-  (walk-dynamic-space #'print-it #x7f #b11 #b11))
+  (walk-dynamic-space #'print-it #x7f #b01111 #b00111))
 (defun print-large-code ()
-  (walk-dynamic-space #'print-it #x7f #b10011 #b10011))
+  (walk-dynamic-space #'print-it #x7f #b11111 #b10111))
 (defun print-large-unboxed ()
-  (walk-dynamic-space #'print-it #x7f #b10011 #b10010))
+  (walk-dynamic-space #'print-it #x7f #b11111 #b10010))
 ;;; Use this only if you know what you're doing. It can fail because a page
 ;;; that needs to continue onto the next page will cause the "overrun" check
 ;;; to fail.
@@ -1400,7 +1400,7 @@ We could try a few things to mitigate this:
       (alien-funcall (extern-alien "close_code_region" (function void)))
       (walk-dynamic-space #'nofilter
                           #b1111111 ; all generations
-                          3 3))))
+                          #b111 #b111)))) ; type mask and constraint
 
 (export 'code-from-serialno)
 (defun code-from-serialno (serial)
