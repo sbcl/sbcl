@@ -675,21 +675,21 @@
 ;;;
 ;;; Secondary return value is true if passing the generated tests implies that
 ;;; the array has a header.
-(defun test-array-dimensions (obj type stype
+(defun test-array-dimensions (original-obj type stype
                               simple-array-header-p)
   (declare (type array-type type stype))
-  (let ((obj `(truly-the ,(type-specifier stype) ,obj))
+  (let ((obj `(truly-the ,(type-specifier stype) ,original-obj))
         (dims (array-type-dimensions type))
         (header-test (if simple-array-header-p
-                         `(simple-array-header-p ,obj)
-                         `(array-header-p ,obj))))
+                         `(simple-array-header-p ,original-obj)
+                         `(array-header-p ,original-obj))))
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
       (cond ((cdr dims)
              (values `(,@(if (and simple-array-header-p
                                   (vop-existsp :translate simple-array-header-of-rank-p)
                                   (eq (array-type-dimensions stype) '*))
-                             `((simple-array-header-of-rank-p ,obj ,(length dims)))
+                             `((simple-array-header-of-rank-p ,original-obj ,(length dims)))
                              `(,header-test
                                ,@(when (eq (array-type-dimensions stype) '*)
                                    (if (vop-existsp :translate %array-rank=)

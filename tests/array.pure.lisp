@@ -670,3 +670,11 @@
       (assert (eq (aref b 3) 'd))
       (assert (eq (aref b 4) 'e))
       (assert (eq (aref b 5) 'e)))))
+
+(with-test (:name :test-array-dimensions-other-pointer-check)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (typep a '(simple-array t (2 1))))
+    ((1) nil)
+    ((#2A((1) (1))) t)))
