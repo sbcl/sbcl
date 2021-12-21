@@ -1175,7 +1175,11 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
             if (!filler_obj_p(where)) assign_generation(where, gen);
             where += OBJECT_SIZE(*where, where);
         }
-        fprintf(stderr, "WARNING: demoted immobile objects to gen%d\n", gen);
+        // If the regression suite is run with core pages in gen0 (to more aggressively
+        // test code page transporting), we don't want to cause failures in 'script.test.sh'
+        // and some other things that look for an exact match on textual output.
+        if (gencgc_verbose)
+            fprintf(stderr, "WARNING: demoted immobile objects to gen%d\n", gen);
     }
 
     n_pages = fixedobj_len / IMMOBILE_CARD_BYTES;

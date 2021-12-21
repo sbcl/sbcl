@@ -1862,9 +1862,8 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
  * if this is missed, just may delay the moving of objects to unboxed
  * pages, and the freeing of pages. */
 static void
-maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
+maybe_adjust_large_object(lispobj* where, page_index_t first_page, sword_t nwords)
 {
-    lispobj* where = (lispobj*)page_address(first_page);
     int page_type_flag;
 
     /* Check whether it's a vector or bignum object. */
@@ -2193,10 +2192,13 @@ wipe_nonpinned_words()
  * be a code object if pin_all_dynamic_space_code is 1.
  *
  * The rationale for doing some extra work on code components is that without it,
- * every test of pinned_p() on an object would have to check if the pointer
- * is to a simple-fun - entailing an extra read of the header - and mapping
- * to its code component if so.  Since more calls to pinned_p occur than to
- * pin_object, the extra burden should be on this function.
+ * every call to pinned_p() would entail this logic:
+ *   if the object is a simple-fun then
+ *     read the header
+ *     if already forwarded then return "no"
+ *     else go backwards to the code header and test pinned_p().
+ * But we can avoid that by making every embedded function pinned
+ * whenever the containing object is pinned.
  * Experimentation bears out that this is the better technique.
  * Also, we wouldn't often expect code components in the collected generation
  * so the extra work here is quite minimal, even if it can generally add to
@@ -2210,52 +2212,39 @@ static void pin_object(lispobj object)
     }
 
     lispobj* object_start = native_pointer(object);
-    page_index_t first_page = find_page_index(object_start);
-    if (!page_single_obj_p(first_page)
-        && hopscotch_containsp(&pinned_objects, object))
+    page_index_t page = find_page_index(object_start);
+
+    /* Large object: the 'pinned' bit in the PTE on the first page should be definitive
+     * for that object. However, all occupied pages have to marked pinned,
+     * because move_pinned_pages_to_newspace() looks at pages as if they're independent.
+     * That seems to be the only place that cares how many pages' pinned bits are affected
+     * here for large objects, though I do wonder why we can't move the object right now
+     * and be done with it */
+    if (page_single_obj_p(page)) {
+        if (page_table[page].pinned) return;
+        sword_t nwords = OBJECT_SIZE(*object_start, object_start);
+        maybe_adjust_large_object(object_start, page, nwords);
+        page_index_t last_page = find_page_index(object_start + nwords - 1);
+        while (page <= last_page) page_table[page++].pinned = 1;
         return;
-
-    size_t nwords = OBJECT_SIZE(*object_start, object_start);
-    page_index_t last_page = find_page_index(object_start + nwords - 1);
-    page_index_t page;
-    // It would be better if it were possible to touch only the PTE for the
-    // first page of a large object instead of touching N page table entries.
-    // I'm not sure how well the rest of GC would handle that.
-    for (page = first_page; page <= last_page; ++page) {
-        /* Oldspace pages were unprotected at start of GC.
-         * Assert this here, because the previous logic used to,
-         * and page protection bugs are scary */
-        gc_assert(!PAGE_WRITEPROTECTED_P(page));
-        /* Mark the page as containing pinned objects. */
-        page_table[page].pinned = 1;
     }
 
-    if (page_single_obj_p(first_page)) {
-        return maybe_adjust_large_object(first_page, nwords);
-    }
+    // Multi-object page (the usual case) - presence in the hash table is the pinned criterion.
+    // The 'pinned' bit is a coarse-grained test of whether to bother looking in the table.
+    if (hopscotch_containsp(&pinned_objects, object)) return;
 
     hopscotch_insert(&pinned_objects, object, 1);
+    page_table[page].pinned = 1;
     struct code* maybe_code = (struct code*)native_pointer(object);
-    /* If we didn't insert simple-funs into the hash-table, then pinned_p()
-     * would become convoluted. The logic would be something like:
-     * - if the object is a simple-fun then
-     *     read the header
-     *     if already forwarded then return "no"
-     *     else go backwards to the code header
-     *     look in pinned_objects
-     */
-    if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG) {
-        // Avoid reading the code trailer word until the debug info is set.
-        // Prior to that being set, the unboxed payload is full of random bytes,
-        // but neither can here be references to any of its simple-funs from
-        // other objects until the debug info is filled in.
-        if (maybe_code->debug_info)
-            for_each_simple_fun(i, fun, maybe_code, 0, {
-                hopscotch_insert(&pinned_objects,
-                                 make_lispobj(fun, FUN_POINTER_LOWTAG),
-                                 1);
-            })
-    }
+    // Avoid iterating over embedded simple-funs until the debug info is set.
+    // Prior to that, the unboxed payload will contain random bytes.
+    // There can't be references to any of the simple-funs
+    // until the object is fully constructed.
+    if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG && maybe_code->debug_info)
+        for_each_simple_fun(i, fun, maybe_code, 0, {
+            hopscotch_insert(&pinned_objects, make_lispobj(fun, FUN_POINTER_LOWTAG), 1);
+            page_table[find_page_index(fun)].pinned = 1;
+        })
 }
 
 #if !GENCGC_IS_PRECISE || defined LISP_FEATURE_PPC64
