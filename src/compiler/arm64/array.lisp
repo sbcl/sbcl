@@ -78,7 +78,6 @@
 
 (define-vop (simple-array-header-of-rank-p type-predicate)
   (:translate sb-c::simple-array-header-of-rank-p)
-  (:policy :fast-safe)
   (:info target not-p rank)
   (:arg-types * (:constant t))
   (:generator 2

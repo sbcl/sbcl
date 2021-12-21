@@ -132,16 +132,36 @@
               (csubtypep (sb-c::lvar-type arg) (specifier-type 'array)))))
   (:generator 1
     (inst cmp :byte (ea rank-disp array) (encode-array-rank 1)))))
+
+(define-vop (simple-array-header-of-rank-p type-predicate)
+  (:translate sb-c::simple-array-header-of-rank-p)
+  (:info target not-p rank)
+  (:arg-types * (:constant t))
+  (:generator 2
+    (unless (other-pointer-tn-ref-p args)
+      (%test-lowtag value temp (if not-p
+                                   target
+                                   drop-through)
+                    t other-pointer-lowtag))
+    (inst cmp :word (ea (- other-pointer-lowtag) value)
+      (dpb (encode-array-rank rank)
+        (byte 8 array-rank-position)
+        simple-array-widetag))
+    (inst jmp (if not-p
+                  :ne
+                  :eq)
+      target)
+    drop-through))
 
 ;;;; bounds checking routine
 (defun emit-bounds-check (vop %test-fixnum array index limit)
   (let*  ((use-length-p (null limit))
           (error
-           (if use-length-p
-               (generate-error-code vop 'sb-kernel::invalid-vector-index-error
-                                    array index)
-               (generate-error-code vop 'invalid-array-index-error array limit
-                                    index)))
+            (if use-length-p
+                (generate-error-code vop 'sb-kernel::invalid-vector-index-error
+                                     array index)
+                (generate-error-code vop 'invalid-array-index-error array limit
+                                     index)))
           (bound (if (and (tn-p limit) (sc-is limit immediate))
                      (let ((value (tn-value limit)))
                        (cond ((and %test-fixnum
@@ -159,34 +179,34 @@
                            (fixnumize value)
                            value))
                      index)))
-      (cond ((typep bound '(integer * -1))
-             ;; Power of two bound, can be checked for fixnumness at
-             ;; the same time as it always occupies a consecutive bit
-             ;; range, everything else, including the tag, has to be
-             ;; zero.
-             (inst test index (if (eql bound -1)
-                                  index ;; zero?
-                                  bound))
-             (inst jmp :ne error))
-            (t
-             (when (and %test-fixnum (not (integerp index)))
-               (%test-fixnum index nil error t))
-             (cond (use-length-p
-                    (let ((len (vector-len-ea array)))
-                      (cond ((integerp index)
-                             (inst cmp vector-len-op-size len index)
-                             (inst jmp :be error))
-                            (t
-                             (inst cmp vector-len-op-size index len)
-                             (inst jmp :nb error)))))
-                   ((integerp bound)
-                    (inst cmp index bound)
-                    (inst jmp :nb error))
-                   (t
-                    (if (eql index 0)
-                        (inst test bound bound)
-                        (inst cmp bound index))
-                    (inst jmp :be error)))))))
+    (cond ((typep bound '(integer * -1))
+           ;; Power of two bound, can be checked for fixnumness at
+           ;; the same time as it always occupies a consecutive bit
+           ;; range, everything else, including the tag, has to be
+           ;; zero.
+           (inst test index (if (eql bound -1)
+                                index ;; zero?
+                                bound))
+           (inst jmp :ne error))
+          (t
+           (when (and %test-fixnum (not (integerp index)))
+             (%test-fixnum index nil error t))
+           (cond (use-length-p
+                  (let ((len (vector-len-ea array)))
+                    (cond ((integerp index)
+                           (inst cmp vector-len-op-size len index)
+                           (inst jmp :be error))
+                          (t
+                           (inst cmp vector-len-op-size index len)
+                           (inst jmp :nb error)))))
+                 ((integerp bound)
+                  (inst cmp index bound)
+                  (inst jmp :nb error))
+                 (t
+                  (if (eql index 0)
+                      (inst test bound bound)
+                      (inst cmp bound index))
+                  (inst jmp :be error)))))))
 
 (define-vop (check-bound)
   (:translate %check-bound)
