@@ -1052,3 +1052,36 @@ if a restart was invoked."
         (let ((the-symbol (intern "FROBOLA" package)))
           (assert (eq (symbol-package the-symbol) package)))))
     (assert (> n 65450)))) ; assert that we exercised lots of bit patterns
+
+;;; The concept behind the intricate storage representation of local nicknames
+;;; was that adding a nickname does not create a strong reference to the
+;;; nicknamed package, but nonetheless avoids having to do a FIND-PACKAGE
+;;; on its actual name. This is efficient, but it is complicated because
+;;; it involves weak objects. Here is a test which asserts that.
+;;; [It probably would have been fine to penalize DELETE-PACKAGE by forcing
+;;; it to scan all other packages for local nicknames of the deleted one,
+;;; but I guess I didn't want to do that. But I wonder if it might be possible
+;;; to reduce the complexity now that we have package IDs.]
+(defvar *the-weak-ptr*) ; to determine that the test worked
+(defun prepare-nickname-weakness-test ()
+  (setq *the-weak-ptr* (make-weak-pointer (make-package "SOMEPACKAGE")))
+  (make-package "MYPKG" :use '("CL"))
+  (add-package-local-nickname "SP" "SOMEPACKAGE" "MYPKG")
+  (intern "ZOOK" "SOMEPACKAGE")
+  (let ((*package* (find-package "MYPKG")))
+    (assert (eq (find-symbol "ZOOK" "SP")
+                (find-symbol "ZOOK" "SOMEPACKAGE")))))
+
+(with-test (:name :local-nicknames-like-weak-pointers)
+  (prepare-nickname-weakness-test)
+  ;; Check that SP is a local nickname
+  (assert (let ((*package* (find-package "MYPKG"))) (find-symbol "ZOOK" "SP")))
+  ;;; But not a global name of any package
+  (assert-error  (find-symbol "ZOOK" "SP"))
+  (delete-package "SOMEPACKAGE")
+  (sb-sys:scrub-control-stack)
+  (gc :full t)
+  (assert (not (weak-pointer-value *the-weak-ptr*)))
+  (assert-error (let ((*package* (find-package "MYPKG")))
+                  ;; the nickname magically went away!
+                  (find-symbol "ZOOK" "SP"))))
