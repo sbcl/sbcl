@@ -70,7 +70,7 @@ tv_diff(struct timeval *x, struct timeval *y)
 #endif
 
 void *
-gc_general_alloc(sword_t bytes, int page_type_flag) {
+gc_general_alloc(sword_t bytes, int page_type) {
     lispobj *new=new_space_free_pointer;
     new_space_free_pointer+=(bytes/N_WORD_BYTES);
     return new;
@@ -79,7 +79,7 @@ gc_general_alloc(sword_t bytes, int page_type_flag) {
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords) {
     return copy_object(object,nwords);
 }
-lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_type_flag) {
+lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_type) {
     return copy_object(object,nwords);
 }
 

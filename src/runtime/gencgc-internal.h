@@ -171,12 +171,12 @@ extern page_index_t page_table_pages;
 /* forward declarations */
 
 void update_dynamic_space_free_pointer(void);
-void gc_close_region(struct alloc_region *alloc_region, int page_type_flag);
+void gc_close_region(struct alloc_region *alloc_region, int page_type);
 static inline void ensure_region_closed(struct alloc_region *alloc_region,
-                                        int page_type_flag)
+                                        int page_type)
 {
     if (alloc_region->start_addr)
-        gc_close_region(alloc_region, page_type_flag);
+        gc_close_region(alloc_region, page_type);
 }
 
 static inline void gc_set_region_empty(struct alloc_region *region)
