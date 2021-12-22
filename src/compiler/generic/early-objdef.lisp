@@ -307,7 +307,7 @@
 ;;; "extra" contain the following fields:
 ;;;  - generation number for immobile space (4 low bits of extra)
 ;;;  - fullcgc mark bit (header bit index 31), not used by Lisp
-;;;  - visitedp (header bit index 30) for weak vectors, not used by Lisp
+;;;  - VISITED bit (header bit index 30) for weak vectors, not used by Lisp
 ;;;  - ALLOC-DYNAMIC-EXTENT (bit index 29), not used by lisp
 ;;;  - ALLOC-MIXED-REGION (bit index 28), not used by Lisp
 
