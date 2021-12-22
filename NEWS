@@ -1,5 +1,16 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.1.11:
+  * platform support:
+    ** bug fix: correct encoding for vmovsd.  (lp#1953483, reported by Marco
+       Heisig)
+    ** bug fix: support ABIv1 callbacks on big-endian ppc64.  (lp#1900343,
+       thanks to Thomas Fitzsimmons)
+  * bug fix: don't use the current type of functions when redefining them in
+    another file.  (lp#1953214, reported by Nicolas Hafner)
+  * bug fix: eliminate stack cleanups more conservatively.  (lp#1954330,
+    reported by Daniel Kochmański)
+
 changes in sbcl-2.1.11 relative to sbcl-2.1.10:
   * minor incompatible change: *COMPILE-PRINT* now defaults to NIL.  T gives
     the old behavior of echoing top level forms. Users who want to see a
