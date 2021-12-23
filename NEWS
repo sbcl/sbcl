@@ -6,8 +6,10 @@ changes relative to sbcl-2.1.11:
        Heisig)
     ** bug fix: support ABIv1 callbacks on big-endian ppc64.  (lp#1900343,
        thanks to Thomas Fitzsimmons)
-  * bug fix: don't use the current type of functions when redefining them in
-    another file.  (lp#1953214, reported by Nicolas Hafner)
+  * enhancement: catch type mismatches for REPLACE, SUBSTITUTE, MAKE-ARRAY
+    with :INITIAL-CONTENTS.
+  * bug fix: don't use the current type of non-returning functions when
+    redefining them in another file. (lp#1953214, reported by Nicolas Hafner)
   * bug fix: eliminate stack cleanups more conservatively.  (lp#1954330,
     reported by Daniel Kochmański)
 
