@@ -2542,7 +2542,7 @@ mechanism for inter-thread communication."
                           (cons (info :variable :wired-tls symbol) symbol))
                         (cdr *thread-local-specials*)))
           (*package* *keyword-package*))
-      (write list :stream output :readably t)
+      (write list :stream output :readably t :pretty nil)
       (terpri output)))
   ;; Prevent further use of DEFINE-THREAD-LOCAL after compiling this file
   ;; because the definition of INIT-THREAD-LOCAL-STORAGE is now frozen.
