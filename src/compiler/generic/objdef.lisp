@@ -96,27 +96,27 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (fill-pointer :type index
                 :ref-trans %array-fill-pointer
-                :ref-known (flushable foldable)
+                :ref-known (flushable)
                 :set-trans (setf %array-fill-pointer)
                 :set-known ())
   (elements :type index
             :ref-trans %array-available-elements
-            :ref-known (flushable foldable)
+            :ref-known (flushable)
             :set-trans (setf %array-available-elements)
             :set-known ())
   (data :type array
         :ref-trans %array-data ; might be a vector, might not be
-        :ref-known (flushable foldable)
+        :ref-known (flushable)
         :set-trans (setf %array-data)
         :set-known ())
   (displacement :type index
                 :ref-trans %array-displacement
-                :ref-known (flushable foldable)
+                :ref-known (flushable)
                 :set-trans (setf %array-displacement)
                 :set-known ())
   (displaced-p :type t
                :ref-trans %array-displaced-p
-               :ref-known (flushable foldable)
+               :ref-known (flushable)
                :set-trans (setf %array-displaced-p)
                :set-known ())
   (displaced-from :type list

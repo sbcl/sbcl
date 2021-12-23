@@ -678,3 +678,10 @@
          (typep a '(simple-array t (2 1))))
     ((1) nil)
     ((#2A((1) (1))) t)))
+
+(with-test (:name :typep-constant-%array-data-folding)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (typep "abcd" '(simple-array t 2)))
+    (() nil)))
