@@ -1104,23 +1104,33 @@
 
 (defoptimizer (replace ir2-hook) ((seq1 seq2 &key &allow-other-keys) node block)
   (declare (ignore block))
-  (block nil
-    (flet ((element-type (lvar)
-             (let ((type (lvar-type lvar)))
-               (unless (csubtypep type (specifier-type 'array))
-                 (return))
+  (flet ((element-type (lvar)
+           (let ((type (lvar-type lvar)))
+             (when (csubtypep type (specifier-type 'array))
                (multiple-value-bind (upgraded other)
                    (array-type-upgraded-element-type type)
-                 (or other upgraded)))))
-      (let ((type1 (element-type seq1))
-            (type2 (element-type seq2)))
-        (unless (or (eq type1 *wild-type*)
-                    (eq type2 *wild-type*)
-                    (types-equal-or-intersect type1 type2))
-          (let ((*compiler-error-context* node))
-            (compiler-warn "Incompatible array element types: ~a and ~a"
-                           (type-specifier type1)
-                           (type-specifier type2))))))))
+                 (or other upgraded))))))
+    (let ((type1 (element-type seq1))
+          (type2 (element-type seq2)))
+      (when (and type1
+                 (neq type1 *wild-type*))
+        (if type2
+            (unless (or (eq type2 *wild-type*)
+                        (types-equal-or-intersect type1 type2))
+              (let ((*compiler-error-context* node))
+                (compiler-warn "Incompatible array element types: ~a and ~a"
+                               (type-specifier type1)
+                               (type-specifier type2))))
+            (when (constant-lvar-p seq2)
+              (map nil (lambda (x)
+                         (unless (ctypep x type1)
+                           (let ((*compiler-error-context* node))
+                             (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
+                                            x
+                                            (type-specifier type1)))
+                           (return-from replace-ir2-hook-optimizer))
+                         x)
+                   (lvar-value seq2))))))))
 
 (defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents &allow-other-keys)
                                       node block)

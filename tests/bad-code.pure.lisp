@@ -654,3 +654,12 @@
                       `(lambda (n c)
                          (make-array n :element-type 'bit :initial-contents (the string c)))
                       :allow-warnings 'warning))))
+
+
+(with-test (:name :replace-constant-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (replace x '(1 2 3)))
+                      :allow-warnings 'warning))))
