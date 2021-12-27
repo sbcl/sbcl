@@ -22,12 +22,17 @@
           (defun info-name-list (symbol)
             (let ((packed-info (symbol-dbinfo symbol))
                   (list))
-              (when packed-info
-                (do-packed-info-aux-key (packed-info key-index)
-                  (push (construct-globaldb-name (%info-ref packed-info key-index) symbol)
-                        list))
-                (nconc (and (plusp (packed-info-field packed-info 0 0)) (list symbol))
-                       (nreverse list)))))
+              (cond (packed-info
+                     (do-packed-info-aux-key (packed-info key-index)
+                                             (push (construct-globaldb-name (%info-ref packed-info key-index) symbol)
+                                                   list))
+                     (nconc (and (or (plusp (packed-info-field packed-info 0 0))
+                                     ;; fdefns are stored directly in the symbol.
+                                     (fboundp symbol))
+                                 (list symbol))
+                            (nreverse list)))
+                    ((fboundp symbol)
+                     (list symbol)))))
           ;; Call FUNCTION once for each Name in globaldb that has information associated
           ;; with it, passing the function the Name as its only argument.
           (defun call-with-each-globaldb-name (fun-designator)
