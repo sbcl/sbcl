@@ -1153,20 +1153,23 @@
                              (type-specifier initial-contents-type)
                              (sb-vm:saetp-specifier saetp)))))))))
 
-(defun check-substitute-args (new seq node)
+(defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))
-        (new-type (lvar-type new)))
-    (when (and (neq new-type *wild-type*)
+        (item-type (lvar-type item)))
+    (when (and (neq item-type *wild-type*)
                (csubtypep seq-type (specifier-type 'array)))
       (let ((element-type (multiple-value-bind (upgraded other)
                               (array-type-upgraded-element-type seq-type)
                             (or other upgraded))))
         (unless (or (eq element-type *wild-type*)
-                    (types-equal-or-intersect new-type element-type))
+                    (types-equal-or-intersect item-type element-type))
           (let ((*compiler-error-context* node))
-            (compiler-warn "Can't substitute ~a into ~a"
-                           (type-specifier new-type)
+            (compiler-warn format-string
+                           (type-specifier item-type)
                            (type-specifier seq-type))))))))
+
+(defun check-substitute-args (new seq node)
+  (check-sequence-item new seq node "Can't substitute ~a into ~a"))
 
 (defoptimizer (substitute ir2-hook) ((new old seq &key &allow-other-keys) node block)
   (declare (ignore old block))
@@ -1191,6 +1194,18 @@
 (defoptimizer (nsubstitute-if-not ir2-hook) ((new predicate seq &key &allow-other-keys) node block)
   (declare (ignore predicate block))
   (check-substitute-args new seq node))
+
+(defoptimizer (vector-fill* ir2-hook) ((seq item &key &allow-other-keys) node block)
+  (declare (ignore block))
+  (check-sequence-item item seq node "Can't fill ~a into ~a"))
+
+(defoptimizer (vector-push ir2-hook) ((item vector) node block)
+  (declare (ignore block))
+  (check-sequence-item item vector node "Can't push ~a into ~a"))
+
+(defoptimizer (vector-push-extend ir2-hook) ((item vector &optional min-extension) node block)
+  (declare (ignore block min-extension))
+  (check-sequence-item item vector node "Can't push ~a into ~a"))
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from

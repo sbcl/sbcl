@@ -663,3 +663,26 @@
                          (declare (string x))
                          (replace x '(1 2 3)))
                       :allow-warnings 'warning))))
+
+(with-test (:name :fill-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (fill x 1))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :vector-push-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (vector-push 1 x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (vector-push-extend 1 x))
+                      :allow-warnings 'warning))))
+
