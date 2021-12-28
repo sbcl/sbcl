@@ -354,6 +354,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c:fun-info-ltn-annotate . sb-c:ltn-annotate)
                             (sb-c:fun-info-optimizer . sb-c:optimizer)
                             (sb-c:fun-info-ir2-convert . sb-c:ir2-convert)
+                            (sb-c::fun-info-ir2-hook . sb-c::ir2-hook)
                             (sb-c::fun-info-stack-allocate-result
                              . sb-c::stack-allocate-result)
                             (sb-c::fun-info-constraint-propagate
