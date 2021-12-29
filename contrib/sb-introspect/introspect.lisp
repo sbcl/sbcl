@@ -616,7 +616,18 @@ or a method combination name."
                 ;; entry.
                 (setf (definition-source-form-number source-location)
                       xref-form-number)
-                (push (cons name source-location) result))))
+                (let ((name (cond ((sb-c::transform-p name)
+                                   (append (%fun-name fun)
+                                           (let* ((type (sb-c::transform-type name))
+                                                  (type-spec (type-specifier type)))
+                                             (and (sb-kernel:fun-type-p type)
+                                                  (list (second type-spec))))))
+                                  ((sb-c::vop-info-p name)
+                                   (list 'sb-c:define-vop
+                                         (sb-c::vop-info-name name)))
+                                  (t
+                                   name))))
+                  (push (cons name source-location) result)))))
           xrefs))))
     result))
 
