@@ -94,8 +94,36 @@
      (t
       block))))
 
+;;; Attempt to walk blocks that are in the same loop first, so that
+;;; they are more likely to be the fall-through case. This causes a
+;;; conditional branch that leaves a loop (and probably branches
+;;; forwards) to fall through most of the time, which is generally
+;;; faster and has better locality of reference. Without this change,
+;;; the successors would always be traversed in the order they appear
+;;; in the list, so some loops would look like
+;;;   L0: conditionally branch to L1 if the loop should continue
+;;;       break out of loop somehow
+;;;   L1: loop body
+;;;       jump to L0
+;;; which needlessly takes the conditional branch on every loop
+;;; iteration.
+(defun control-relevance-to (pred succ)
+  (declare (type cblock pred succ))
+  (cond
+    ((or (null (block-loop pred)) (null (block-loop succ))) 1)
+    ((>= (loop-depth (block-loop succ)) (loop-depth (block-loop pred))) 2)
+    (t 0)))
+
+(defun control-order-successors (block successors)
+  (if (and (= (length successors) 2)
+           (< (control-relevance-to block (first successors))
+              (control-relevance-to block (second successors))))
+      (list (second successors) (first successors))
+      successors))
+
 ;;; Do a graph walk linking blocks into the emit order as we go. We
-;;; call FIND-ROTATED-LOOP-HEAD to do while-loop optimization.
+;;; call FIND-ROTATED-LOOP-HEAD to do while-loop optimization, and
+;;; CONTROL-ORDER-SUCCESSORS to optimize other sorts of loops.
 ;;;
 ;;; We treat blocks ending in tail local calls to other environments
 ;;; specially. We can't walked the called function immediately, since
@@ -134,7 +162,7 @@
                (let ((component-tail (component-tail (block-component block)))
                      (block-succ (block-succ block))
                      (fun nil))
-                 (dolist (succ block-succ)
+                 (dolist (succ (control-order-successors block block-succ))
                    (unless (eq (first (block-succ succ)) component-tail)
                      (let ((res (control-analyze-block succ tail)))
                        (when res (setq fun res)))))
