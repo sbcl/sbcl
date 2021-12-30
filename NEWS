@@ -2,16 +2,24 @@
 
 changes relative to sbcl-2.1.11:
   * platform support:
+    ** support for FreeBSD on 64-bit arm platforms has been added.
+    ** the :SB-LINKABLE-RUNTIME build-time feature is now supported on 32-bit
+       and 64-bit arm platforms, and on the FreeBSD operating system.
     ** bug fix: correct encoding for vmovsd.  (lp#1953483, reported by Marco
        Heisig)
     ** bug fix: support ABIv1 callbacks on big-endian ppc64.  (lp#1900343,
        thanks to Thomas Fitzsimmons)
+    ** bug fix: don't misuse mprotect() in dynamic space on Windows.
+       (lp#1955723, reported by 3b)
   * enhancement: catch type mismatches for REPLACE, SUBSTITUTE, MAKE-ARRAY
     with :INITIAL-CONTENTS.
+  * optimization: printing symbols is around 10% faster than previously.
   * bug fix: don't use the current type of non-returning functions when
     redefining them in another file. (lp#1953214, reported by Nicolas Hafner)
   * bug fix: eliminate stack cleanups more conservatively.  (lp#1954330,
     reported by Daniel Kochmański)
+  * bug fix: check consistently in tests for the existence of VOPs.
+    (lp#1952896, reported by Sébastien Villemot)
 
 changes in sbcl-2.1.11 relative to sbcl-2.1.10:
   * minor incompatible change: *COMPILE-PRINT* now defaults to NIL.  T gives
