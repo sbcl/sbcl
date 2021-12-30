@@ -1140,18 +1140,29 @@
     (let* ((saetp (find (lvar-value widetag) sb-vm:*specialized-array-element-type-properties*
                         :key #'sb-vm:saetp-typecode))
            (element-type (sb-vm:saetp-ctype saetp))
-           (initial-contents-type (lvar-type initial-contents)))
-      (when (csubtypep initial-contents-type (specifier-type 'array))
-        (let ((initial-contents-element-type
-                (multiple-value-bind (upgraded other)
-                    (array-type-upgraded-element-type initial-contents-type)
-                  (or other upgraded))))
-          (unless (or (eq initial-contents-element-type *wild-type*)
-                      (types-equal-or-intersect element-type initial-contents-element-type))
-            (let ((*compiler-error-context* node))
-              (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
-                             (type-specifier initial-contents-type)
-                             (sb-vm:saetp-specifier saetp)))))))))
+           (initial-contents-type (lvar-type initial-contents))
+           (initial-contents-element-type
+             (if (csubtypep initial-contents-type (specifier-type 'array))
+                 (multiple-value-bind (upgraded other)
+                     (array-type-upgraded-element-type initial-contents-type)
+                   (or other upgraded))
+                 *wild-type*)))
+      (cond ((not (or (eq initial-contents-element-type *wild-type*)
+                      (types-equal-or-intersect element-type initial-contents-element-type)))
+             (let ((*compiler-error-context* node))
+               (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
+                              (type-specifier initial-contents-type)
+                              (sb-vm:saetp-specifier saetp))))
+            ((constant-lvar-p initial-contents)
+             (map nil (lambda (x)
+                        (unless (ctypep x element-type)
+                          (let ((*compiler-error-context* node))
+                            (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
+                                           x
+                                           (type-specifier element-type)))
+                          (return-from %make-array-ir2-hook-optimizer))
+                        x)
+                  (lvar-value initial-contents)))))))
 
 (defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))

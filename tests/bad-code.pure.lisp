@@ -655,6 +655,13 @@
                          (make-array n :element-type 'bit :initial-contents (the string c)))
                       :allow-warnings 'warning))))
 
+(with-test (:name :make-array-initial-contents-constant-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n)
+                         (make-array n :element-type 'bit :initial-contents '(a b c)))
+                      :allow-warnings 'warning))))
+
 
 (with-test (:name :replace-constant-type-mismatch)
   (assert (nth-value 2
