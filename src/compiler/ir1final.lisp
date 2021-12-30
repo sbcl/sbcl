@@ -226,45 +226,47 @@
                  ;; REDUCE can call with zero arguments.
                  (neq (lvar-fun-name (combination-fun node) t) 'reduce))
         (map-callable-arguments
-           (lambda (lvar args results &key no-function-conversion &allow-other-keys)
-             (declare (ignore results))
-             (unless no-function-conversion
-               (let ((ref (lvar-uses lvar))
-                     (arg-count (length args)))
-                 (labels ((translate-two-args (name)
-                            (and (eql arg-count 2)
-                                 (not (fun-lexically-notinline-p name (node-lexenv node)))
-                                 (cadr (assoc name *two-arg-functions*))))
-                          (translate (ref)
-                            (let* ((leaf (ref-leaf ref))
-                                   (fun-name (and (constant-p leaf)
-                                                  (constant-value leaf)))
-                                   (replacement
-                                     (cond ((and fun-name (symbolp fun-name))
-                                            (or (translate-two-args fun-name)
-                                                (and (not (memq (info :function :kind fun-name)
-                                                                '(:macro :special-form)))
-                                                     fun-name)))
-                                           ((and (global-var-p leaf)
-                                                 (eq (global-var-kind leaf) :global-function))
-                                            (translate-two-args (global-var-%source-name leaf)))))
-                                   (*compiler-error-context* node))
-                              (and replacement
-                                   (find-global-fun replacement t)))))
-                   (cond ((ref-p ref)
-                          (let ((replacement (translate ref)))
-                            (when replacement
-                              (change-ref-leaf ref replacement))))
-                         ((cast-p ref)
-                          (let* ((cast ref)
-                                 (ref (lvar-uses (cast-value cast))))
-                            (when (ref-p ref)
-                              (let ((replacement (translate ref)))
-                                (when replacement
-                                  (change-ref-leaf ref replacement :recklessly t)
-                                  (setf (node-derived-type cast)
-                                        (lvar-derived-type (cast-value cast)))))))))))))
-           node)
+         (lambda (lvar args results &key no-function-conversion &allow-other-keys)
+           (declare (ignore results))
+           ;; Process annotations while the original values are still there.
+           (process-annotations lvar)
+           (unless no-function-conversion
+             (let ((ref (lvar-uses lvar))
+                   (arg-count (length args)))
+               (labels ((translate-two-args (name)
+                          (and (eql arg-count 2)
+                               (not (fun-lexically-notinline-p name (node-lexenv node)))
+                               (cadr (assoc name *two-arg-functions*))))
+                        (translate (ref)
+                          (let* ((leaf (ref-leaf ref))
+                                 (fun-name (and (constant-p leaf)
+                                                (constant-value leaf)))
+                                 (replacement
+                                   (cond ((and fun-name (symbolp fun-name))
+                                          (or (translate-two-args fun-name)
+                                              (and (not (memq (info :function :kind fun-name)
+                                                              '(:macro :special-form)))
+                                                   fun-name)))
+                                         ((and (global-var-p leaf)
+                                               (eq (global-var-kind leaf) :global-function))
+                                          (translate-two-args (global-var-%source-name leaf)))))
+                                 (*compiler-error-context* node))
+                            (and replacement
+                                 (find-global-fun replacement t)))))
+                 (cond ((ref-p ref)
+                        (let ((replacement (translate ref)))
+                          (when replacement
+                            (change-ref-leaf ref replacement))))
+                       ((cast-p ref)
+                        (let* ((cast ref)
+                               (ref (lvar-uses (cast-value cast))))
+                          (when (ref-p ref)
+                            (let ((replacement (translate ref)))
+                              (when replacement
+                                (change-ref-leaf ref replacement :recklessly t)
+                                (setf (node-derived-type cast)
+                                      (lvar-derived-type (cast-value cast)))))))))))))
+         node)
         ;; One more thing: builtin higher-order functions utilized by builtin macros
         ;; can impart a policy change to the callee, but it can't (easily) be done
         ;; strictly lexically, because the policy would leak downward.
