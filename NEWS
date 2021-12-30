@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.1.11:
+changes in sbcl-2.2.0 relative to sbcl-2.1.11:
   * platform support:
     ** support for FreeBSD on 64-bit arm platforms has been added.
     ** the :SB-LINKABLE-RUNTIME build-time feature is now supported on 32-bit
