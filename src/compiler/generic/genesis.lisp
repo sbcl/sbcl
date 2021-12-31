@@ -1497,12 +1497,12 @@ core and return a descriptor to it."
   (let ((package-data-list
          ;; docstrings are set in src/cold/warm. It would work to do it here,
          ;; but seems preferable not to saddle Genesis with such responsibility.
-         (list* (sb-cold:make-package-data :name "COMMON-LISP" :doc nil)
-                (sb-cold:make-package-data :name "KEYWORD" :doc nil)
+         (list* (sb-cold:make-package-data :name "COMMON-LISP" :documentation nil)
+                (sb-cold:make-package-data :name "KEYWORD" :documentation nil)
                 ;; ANSI encourages us to put extension packages
                 ;; in the USE list of COMMON-LISP-USER.
                 (sb-cold:make-package-data
-                 :name "COMMON-LISP-USER" :doc nil
+                 :name "COMMON-LISP-USER" :documentation nil
                  :use '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-PROFILE"))
                 (sb-cold::package-list-for-genesis)))
         (target-pkg-list nil))
@@ -1558,7 +1558,7 @@ core and return a descriptor to it."
       ;; pass 1: make all proto-packages
       (let ((count 4)) ; preincrement on use. the first non-preassigned ID is 5
         (dolist (pd package-data-list)
-          ;; Shadowing symbols include those specified in package-data-list
+          ;; Shadowing symbols include those specified in exports.lisp
           ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
           (let* ((name (sb-cold:package-data-name pd))
                  (id (cond ((string= name "KEYWORD") sb-impl::+package-id-keyword+)
@@ -1571,7 +1571,7 @@ core and return a descriptor to it."
                             (sort (package-shadowing-symbols (find-package name))
                                   #'string<))))
             (init-cold-package id name shadows
-                               #+sb-doc (sb-cold::package-data-doc pd)))))
+                               #+sb-doc (sb-cold::package-data-documentation pd)))))
       ;; pass 2: set the 'use' lists and collect the 'used-by' lists
       (dolist (pd package-data-list)
         (let ((this (find-cold-package (sb-cold:package-data-name pd)))

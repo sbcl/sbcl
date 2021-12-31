@@ -1,0 +1,176 @@
+;;;; -*- Lisp -*-
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+;;; The following symbols may be referenced without seeing a definition
+;;; during make-host-2. No warning will result.
+;;; This list is read after target packages are created.
+((;; CL, EXT, KERNEL
+  allocate-instance
+  compute-applicable-methods
+  slot-makunbound
+  make-load-form-saving-slots
+  sb-vm:map-allocated-objects
+  sb-ext:primitive-object-size
+  sb-vm::remove-static-links)
+ ;; CLOS implementation
+ (sb-mop:class-finalized-p
+  sb-mop:class-prototype
+  sb-mop:class-slots
+  sb-pcl::eql-specializer-to-ctype
+  sb-mop:finalize-inheritance
+  sb-mop:generic-function-name
+  (setf sb-mop:generic-function-name)
+  sb-mop:slot-definition-allocation
+  sb-mop:slot-definition-name
+  sb-pcl::method-p
+  sb-mop:method-function
+  sb-pcl::%force-cache-flushes
+  sb-pcl::check-wrapper-validity
+  sb-pcl::class-has-a-forward-referenced-superclass-p
+  sb-pcl::class-wrapper
+  sb-pcl::compute-gf-ftype
+  sb-pcl::definition-source
+  sb-pcl::ensure-accessor
+  sb-pcl:ensure-class-finalized)
+ ;; CLOS-based packages
+ (sb-gray:stream-clear-input
+  sb-gray:stream-clear-output
+  sb-gray:stream-file-position
+  sb-gray:stream-finish-output
+  sb-gray:stream-force-output
+  sb-gray:stream-fresh-line
+  sb-gray:stream-line-column
+  sb-gray:stream-line-length
+  sb-gray:stream-listen
+  sb-gray:stream-peek-char
+  sb-gray:stream-read-byte
+  sb-gray:stream-read-char
+  sb-gray:stream-read-char-no-hang
+  sb-gray:stream-read-line
+  sb-gray:stream-read-sequence
+  sb-gray:stream-terpri
+  sb-gray:stream-unread-char
+  sb-gray:stream-write-byte
+  sb-gray:stream-write-char
+  sb-gray:stream-write-sequence
+  sb-gray:stream-write-string
+  sb-sequence:concatenate
+  sb-sequence:copy-seq
+  sb-sequence:count
+  sb-sequence:count-if
+  sb-sequence:count-if-not
+  sb-sequence:delete
+  sb-sequence:delete-duplicates
+  sb-sequence:delete-if
+  sb-sequence:delete-if-not
+  (setf sb-sequence:elt)
+  sb-sequence:elt
+  sb-sequence:emptyp
+  sb-sequence:fill
+  sb-sequence:find
+  sb-sequence:find-if
+  sb-sequence:find-if-not
+  (setf sb-sequence:iterator-element)
+  sb-sequence:iterator-endp
+  sb-sequence:iterator-step
+  sb-sequence:length
+  sb-sequence:make-sequence-iterator
+  sb-sequence:make-sequence-like
+  sb-sequence:map
+  sb-sequence:merge
+  sb-sequence:mismatch
+  sb-sequence:nreverse
+  sb-sequence:nsubstitute
+  sb-sequence:nsubstitute-if
+  sb-sequence:nsubstitute-if-not
+  sb-sequence:position
+  sb-sequence:position-if
+  sb-sequence:position-if-not
+  sb-sequence:reduce
+  sb-sequence:remove
+  sb-sequence:remove-duplicates
+  sb-sequence:remove-if
+  sb-sequence:remove-if-not
+  sb-sequence:replace
+  sb-sequence:reverse
+  sb-sequence:search
+  sb-sequence:sort
+  sb-sequence:stable-sort
+  sb-sequence:subseq
+  sb-sequence:substitute
+  sb-sequence:substitute-if
+  sb-sequence:substitute-if-not)
+ ;; Fast interpreter
+ #+sb-fasteval
+ (sb-interpreter:%fun-ftype
+  sb-interpreter:env-policy
+  sb-interpreter:eval-in-environment
+  sb-interpreter:find-lexical-fun
+  sb-interpreter:find-lexical-var
+  sb-interpreter::flush-everything
+  sb-interpreter::fun-lexically-notinline-p
+  sb-interpreter:lexenv-from-env
+  sb-interpreter::lexically-unlocked-symbol-p
+  sb-interpreter:list-locals
+  sb-interpreter::reconstruct-syntactic-closure-env)
+ ;; Simple-streams symbols in SB-IMPL
+ (sb-impl::s-%charpos
+  sb-impl::s-%clear-output
+  sb-impl::s-%file-length
+  sb-impl::s-%file-name
+  sb-impl::s-%file-position
+  sb-impl::s-%file-string-length
+  sb-impl::s-%finish-output
+  sb-impl::s-%force-output
+  sb-impl::s-%fresh-line
+  sb-impl::s-%line-length
+  sb-impl::s-%peek-char
+  sb-impl::s-%read-byte
+  sb-impl::s-%read-char
+  sb-impl::s-%read-char-no-hang
+  sb-impl::s-%read-line
+  sb-impl::s-%stream-external-format
+  sb-impl::s-%terpri
+  sb-impl::s-%unread-char
+  sb-impl::s-%write-byte
+  sb-impl::s-%write-char
+  sb-impl::s-%write-line
+  sb-impl::s-%write-sequence
+  sb-impl::s-%write-string)
+ ;; Other
+ (sb-debug::find-interrupted-name-and-frame
+  sb-impl::encapsulate-generic-function
+  sb-impl::encapsulated-generic-function-p
+  sb-impl::get-processes-status-changes
+  sb-impl::step-form
+  sb-impl::step-values
+  sb-impl::stringify-package-designator
+  sb-impl::stringify-string-designator
+  sb-impl::stringify-string-designators
+  sb-impl::unencapsulate-generic-function)
+ ;; The following functions are in fact defined during make-host-2
+ ;; but they are non-toplevel so they appear to be undefined.
+ (sb-int:gensymify*
+  sb-int:keywordicate
+  sb-int:package-symbolicate
+  sb-int:symbolicate
+  sb-kernel::preinform-compiler-about-accessors
+  sb-kernel::preinform-compiler-about-slot-functions
+  sb-impl::bytes-per-utf8-character-aref
+  sb-impl::bytes-per-utf8-character-sap-ref-8
+  sb-impl::user-homedir-namestring
+  sb-c::apply-core-fixups
+  sb-c::compiled-debug-info-char-offset
+  sb-c::compiled-debug-info-tlf-number
+  sb-c::fopcompilable-p
+  sb-c::pack-xref-data
+  sb-c::prepare-for-compile
+  sb-sys:reinit-internal-real-time))

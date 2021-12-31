@@ -21,17 +21,15 @@
 
 (setq *features* (union *features* sb-impl:+internal-features+))
 
-(defstruct package-data name doc shadow export reexport import-from use)
 (export 'package-data)
-(dolist (data (with-open-file (f (merge-pathnames "package-data-list.lisp-expr" *load-pathname*))
-                (read f)))
-  (labels ((flatten (tree)
-             (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
-                     tree)))
-    (let ((*package* (find-package (package-data-name data))))
-      (dolist (x (flatten (package-data-export data)))
-        (let ((symbol (intern x)))
-          (ignore-errors (export symbol)))))))
+(defmacro defpackage* (name &rest options)
+  `(let ((*package* (find-package ,name)))
+     (dolist (x ',(loop for option in options
+                        when (eq (first option) :export)
+                          append (rest option)))
+       (let ((symbol (intern x)))
+         (ignore-errors (export symbol))))))
+(load (merge-pathnames "exports.lisp" *load-pathname*))
 
 (sb-ext:unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP"

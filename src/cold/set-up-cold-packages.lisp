@@ -147,14 +147,11 @@
   ;; a string designator for the package name
   (name (error "missing PACKAGE-DATA-NAME datum"))
   ;; a doc string
-  (doc (error "missing PACKAGE-DOC datum"))
+  (documentation (error "missing PACKAGE-DOCUMENATION datum"))
   ;; a list of string designators for shadowing symbols
   shadow
-  ;; a tree containing names for exported symbols which'll be set up at package
-  ;; creation time, and NILs, which are ignored. (This is a tree in order to
-  ;; allow constructs like '("ENOSPC" #+LINUX ("EDQUOT" "EISNAM" "ENAVAIL"
-  ;; "EREMOTEIO")) to be used in initialization. NIL entries in the tree are
-  ;; ignored for the same reason of notational convenience.)
+  ;; a list of string designators for exported symbols which'll be set
+  ;; up at package creation time.
   export
   ;; a list of string designators for exported symbols which don't necessarily
   ;; originate in this package (so their EXPORT operations should be handled
@@ -165,7 +162,7 @@
   ;; package to import from, and the remaining elements are the names of
   ;; symbols to import.
   import-from
-  ;; a tree of string designators for package names of other packages
+  ;; a list of string designators for package names of other packages
   ;; which this package uses
   use)
 
@@ -401,94 +398,102 @@
   (assert (equal *package-symbol-counts* (compute-cl-package-symbol-counts))))
 
 (defun create-target-packages (package-data-list)
-  (labels ((flatten (tree)
-             (let ((result (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
-                                   tree)))
-               (when (< (length (remove-duplicates result :test 'equal))
-                        (length result))
-                 (error "Duplicates in package-data-list: ~a~%"
-                        (mapcon (lambda (x)
-                                  (when (member (car x) (cdr x) :test 'equal)
-                                    (list (car x))))
-                                result)))
-               result)))
+  (hide-host-packages)
 
-    (hide-host-packages)
+  ;; Build all packages that we need, and initialize them as far as we
+  ;; can without referring to any other packages.
+  (dolist (package-data package-data-list)
+    (let ((package (make-package (package-data-name package-data) :use nil)))
+      (dolist (string (package-data-shadow package-data))
+        (shadow string package))
+      (dolist (string (package-data-export package-data))
+        (export (intern string package) package))))
+  ;; Now that all packages exist, we can set up package-package
+  ;; references.
+  (dolist (package-data package-data-list)
+    (use-package (substitute "XC-STRICT-CL" "CL"
+                             (package-data-use package-data)
+                             :test 'string=)
+                 (package-data-name package-data))
+    (dolist (sublist (package-data-import-from package-data))
+      (let ((from-package (first sublist)))
+        (import (mapcar (lambda (name) (intern name from-package))
+                        (rest sublist))
+                (package-data-name package-data)))))
 
-    ;; Build all packages that we need, and initialize them as far as we
-    ;; can without referring to any other packages.
-    (dolist (package-data package-data-list)
-      (let* ((name (package-data-name package-data))
-             (package (make-package name :use nil)))
-        ;; Walk the tree of shadowing names
-        (dolist (string (flatten (package-data-shadow package-data)))
-          (shadow string package))
-        ;; Walk the tree of exported names, exporting each name.
-        (dolist (string (flatten (package-data-export package-data)))
-          (export (intern string package) package))))
+  (unhide-host-format-funs)
 
-    ;; Now that all packages exist, we can set up package-package
-    ;; references.
-    (dolist (package-data package-data-list)
-      (use-package (substitute "XC-STRICT-CL" "CL"
-                               (package-data-use package-data)
-                               :test 'string=)
-                   (package-data-name package-data))
-      (dolist (sublist (package-data-import-from package-data))
-        (let ((from-package (first sublist)))
-          (import (mapcar (lambda (name) (intern name from-package))
-                          (rest sublist))
-                  (package-data-name package-data)))))
-
-    (unhide-host-format-funs)
-
-    ;; Now that all package-package references exist, we can handle
-    ;; REEXPORT operations. (We have to wait until now because they
-    ;; interact with USE operations.)  This code handles dependencies
-    ;; properly, but is somewhat ugly.
-    (let (done)
-      (labels
-          ((reexport (package-data)
-             (let ((package (find-package (package-data-name package-data))))
-               (cond
-                 ((member package done))
-                 ((null (package-data-reexport package-data))
-                  (push package done))
-                 (t
-                  (mapcar #'reexport
-                          (remove-if-not
-                           (lambda (x)
-                             (member x (package-data-use package-data)
-                                     :test #'string=))
-                           package-data-list
-                           :key #'package-data-name))
-                  (dolist (symbol-name
-                           (flatten (package-data-reexport package-data)))
-                    (multiple-value-bind (symbol status)
-                        (find-symbol symbol-name package)
-                      (unless status
-                        (error "No symbol named ~S is accessible in ~S."
-                               symbol-name package))
-                      (when (eq (symbol-package symbol) package)
-                        (error
-                         "~S is not inherited/imported, but native to ~S."
-                         symbol-name package))
-                      (export symbol package)))
-                  (push package done))))))
-        (dolist (x package-data-list)
-          (reexport x))
-        (assert (= (length done) (length package-data-list)))))))
+  ;; Now that all package-package references exist, we can handle
+  ;; REEXPORT operations. (We have to wait until now because they
+  ;; interact with USE operations.)  This code handles dependencies
+  ;; properly, but is somewhat ugly.
+  (let (done)
+    (labels
+        ((reexport (package-data)
+           (let ((package (find-package (package-data-name package-data))))
+             (cond
+               ((member package done))
+               ((null (package-data-reexport package-data))
+                (push package done))
+               (t
+                (mapcar #'reexport
+                        (remove-if-not
+                         (lambda (x)
+                           (member x (package-data-use package-data)
+                                   :test #'string=))
+                         package-data-list
+                         :key #'package-data-name))
+                (dolist (symbol-name (package-data-reexport package-data))
+                  (multiple-value-bind (symbol status)
+                      (find-symbol symbol-name package)
+                    (unless status
+                      (error "No symbol named ~S is accessible in ~S."
+                             symbol-name package))
+                    (when (eq (symbol-package symbol) package)
+                      (error
+                       "~S is not inherited/imported, but native to ~S."
+                       symbol-name package))
+                    (export symbol package)))
+                (push package done))))))
+      (dolist (x package-data-list)
+        (reexport x))
+      (assert (= (length done) (length package-data-list))))))
 
 (export '*undefined-fun-allowlist*)
 (defvar *undefined-fun-allowlist* (make-hash-table :test 'equal))
-(let ((list
-       (with-open-file (data (find-bootstrap-file "^package-data-list.lisp-expr"))
-         ;; There's no need to use the precautionary READ-FROM-FILE function
-         ;; with package-data-list because it is not a customization file.
-         (create-target-packages (let ((*readtable* *xc-readtable*)) (read data)))
-         (let ((*readtable* *xc-readtable*)) (read data)))))
-  (dolist (name (apply #'append list))
-    (setf (gethash name *undefined-fun-allowlist*) t)))
+
+(defparameter *package-data-list* '())
+
+;;; Like DEFPACKAGE, but can handle :REEXPORT.
+(defmacro defpackage* (name &rest options)
+  (let ((flattened-options '()))
+    (dolist (option options)
+      (destructuring-bind (kind . args) option
+        (case kind
+          ((:use :export :reexport :shadow)
+           (let ((existing-option (assoc kind flattened-options)))
+             (if existing-option
+                 (setf (second (second existing-option))
+                       (append (second (second existing-option)) args))
+                 (push (list kind (list 'quote args)) flattened-options))))
+          ((:import-from)
+           (let ((existing-option (assoc kind flattened-options)))
+             (if existing-option
+                 (push args (second (second existing-option)))
+                 (push (list kind (list 'quote (list args))) flattened-options))))
+          ((:documentation)
+           (push option flattened-options)))))
+    `(push (make-package-data :name ',name ,@(mapcan #'identity flattened-options))
+           *package-data-list*)))
+
+(let ((*readtable* *xc-readtable*))
+  (load (find-bootstrap-file "^exports.lisp"))
+  (create-target-packages *package-data-list*))
+
+(with-open-file (data (find-bootstrap-file "^undefined-fun-allowlist.lisp-expr"))
+  (let ((*readtable* *xc-readtable*))
+    (dolist (name (apply #'append (read data)))
+      (setf (gethash name *undefined-fun-allowlist*) t))))
 
 (defvar *asm-package-use-list*
   '("SB-ASSEM" "SB-DISASSEM"
@@ -514,19 +519,17 @@
 (make-assembler-package (backend-asm-package-name))
 
 (defun package-list-for-genesis ()
-  (append (let ((*readtable* *xc-readtable*))
-            (read-from-file "^package-data-list.lisp-expr" nil))
+  (append *package-data-list*
           (let ((asm-package (backend-asm-package-name)))
             (list (make-package-data :name asm-package
                                      :use (list* "CL" *asm-package-use-list*)
-                                     :doc nil)))))
+                                     :documentation nil)))))
 
 ;;; Not all things shown by this are actually unused. Some get removed
 ;;; by the tree-shaker as intended.
 #+nil
 (defun show-unused-exports (&aux nonexistent uninteresting)
-  (dolist (entry (with-open-file (find-bootstrap-file "^package-data-list.lisp-expr")
-                   (read f)))
+  (dolist (entry *package-data-list*)
     (let ((pkg (find-package (package-data-name entry))))
       (dolist (string (mapcan (lambda (x) (if (stringp x) (list x) x))
                               (package-data-export entry)))
