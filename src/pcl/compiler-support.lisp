@@ -35,15 +35,16 @@
 ;;;; STANDARD-CLASS
 
 (deftransform sb-pcl::pcl-instance-p ((object))
+  ;; We declare SPECIFIER-TYPE notinline here because otherwise the
+  ;; literal classoid reflection/dumping machinery will instantiate
+  ;; the type at Genesis time, confusing PCL bootstrapping.
+  (declare (notinline specifier-type))
   (let* ((otype (lvar-type object))
          (standard-object (specifier-type 'standard-object)))
     ;; Flush tests whose result is known at compile time.
     (cond ((csubtypep otype standard-object) t)
           ((not (types-equal-or-intersect otype standard-object)) nil)
           (t `(%pcl-instance-p object)))))
-
-(defun sb-pcl::safe-code-p (&optional env)
-  (policy (or env (make-null-lexenv)) (eql safety 3)))
 
 (declaim (ftype function sb-pcl::parse-specialized-lambda-list))
 (define-source-context defmethod (name &rest stuff)
@@ -62,6 +63,8 @@
   `(progn
      (define-function-name-syntax ,name (,var) ,@body)
      (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
+
+(pushnew 'sb-pcl::slot-accessor sb-pcl::*internal-pcl-generalized-fun-name-symbols*)
 
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
   (when (= (length list) 4)

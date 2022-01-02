@@ -178,3 +178,6 @@
                              `(defun ,predicate (x) (typep x ',class-name))))
                          *!early-class-predicates*))))
   (define-class-predicates))
+
+(defun safe-code-p (&optional env)
+  (sb-c::policy (or env (sb-c::make-null-lexenv)) (eql safety 3)))

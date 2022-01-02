@@ -41,6 +41,14 @@
 (defun slot-boundp-name (slot-name)
   (list 'slot-accessor :global slot-name 'boundp))
 
+(define-function-name-syntax slot-accessor (list)
+  (when (= (length list) 4)
+    (destructuring-bind (class slot rwb) (cdr list)
+      (when (and (member rwb '(sb-pcl::reader sb-pcl::writer sb-pcl::boundp))
+                 (symbolp slot)
+                 (symbolp class))
+        (values t slot)))))
+
 ;;; This is the object that we stick into a slot to tell us that it is
 ;;; unbound. It is the same as the marker for unbound symbols.
 ;;; There are two ways to check whether a slot is unbound:

@@ -27,15 +27,6 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(defpackage "SB-WALKER"
-  (:use "CL" "SB-INT" "SB-EXT")
-  (:documentation "internal: a code walker used by PCL")
-  (:export "DEFINE-WALKER-TEMPLATE"
-           "WALK-FORM"
-           "*WALK-FORM-EXPAND-MACROS-P*"
-           "VAR-LEXICAL-P" "VAR-SPECIAL-P"
-           "VAR-GLOBALLY-SPECIAL-P"
-           "VAR-DECLARATION"))
 (in-package "SB-WALKER")
 
 ;;;; forward references

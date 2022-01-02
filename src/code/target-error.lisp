@@ -1012,6 +1012,13 @@ with that condition (or with no condition) will be returned."
 (define-condition floating-point-inexact   (arithmetic-error) ())
 (define-condition floating-point-invalid-operation (arithmetic-error) ())
 
+(define-condition illegal-class-name-error (error)
+  ((name :initarg :name :reader illegal-class-name-error-name))
+  (:default-initargs :name (missing-arg))
+  (:report (lambda (condition stream)
+             (format stream "~@<~S is not a legal class name.~@:>"
+                     (illegal-class-name-error-name condition)))))
+
 (define-condition print-not-readable (error)
   ((object :reader print-not-readable-object :initarg :object))
   (:report

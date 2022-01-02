@@ -25,11 +25,22 @@
   sb-mop:class-prototype
   sb-mop:class-slots
   sb-pcl::eql-specializer-to-ctype
+  sb-pcl::try-finalize-inheritance
   sb-mop:finalize-inheritance
   sb-mop:generic-function-name
+  sb-pcl::%obsolete-instance-trap
+  sb-mop:ensure-class
+  sb-pcl::instance-structure-protocol-error
+  make-instance
+  sb-pcl::make-arg-info
+  sb-pcl::make-structure-class-defstruct-form
   (setf sb-mop:generic-function-name)
   sb-mop:slot-definition-allocation
   sb-mop:slot-definition-name
+  sb-pcl::slot-accessor-std-p
+  slot-unbound
+  sb-pcl::specializer-applicable-using-type-p
+  sb-pcl::specializer-class-or-nil
   sb-pcl::method-p
   sb-mop:method-function
   sb-pcl::%force-cache-flushes

@@ -774,10 +774,18 @@
 
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
-  (intercept (max min + sqrt acos acosh asin asinh atan atanh conjugate cos cosh fceiling ffloor fround ftruncate phase sin sinh tan tanh) (&rest args)
+  (intercept (max min + acos acosh asin asinh atan atanh conjugate cos cosh fceiling ffloor fround ftruncate phase sin sinh tan tanh) (&rest args)
     (dispatch :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-result-format args))))
+
+  (intercept (sqrt) (&rest args)
+    (destructuring-bind (x) args
+      (if (zerop x)
+          x
+          (dispatch :me
+                    (make-flonum (realnumify x)
+                                 (pick-result-format x))))))
 
   (intercept (*) (&rest args)
     (dispatch :me

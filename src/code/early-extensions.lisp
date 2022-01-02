@@ -740,6 +740,10 @@ NOTE: This interface is experimental and subject to change."
 (defun legal-fun-name-p (name)
   (values (valid-function-name-p name)))
 
+(declaim (inline legal-class-name-p))
+(defun legal-class-name-p (thing)
+  (symbolp thing))
+
 ;;; * extended-function-designator: an object that denotes a function and that is one of:
 ;;;   a function name (denoting the function it names in the global environment),
 ;;;   or a function (denoting itself). The consequences are undefined if a function name

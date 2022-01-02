@@ -1732,8 +1732,14 @@ unspecified elements into a completed to-pathname based on the to-wildname."
         (parse-host (logical-chunkify namestr start end)))
       (values host :unspecific (directory) name type version))))
 
-(define-load-time-global *logical-pathname-defaults*
+;;; Return a value suitable, e.g., for preinitializing
+;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
+;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
+(defun make-trivial-default-logical-pathname ()
   (intern-pathname (make-logical-host :name "") :unspecific nil nil nil nil))
+
+(define-load-time-global *logical-pathname-defaults*
+  (make-trivial-default-logical-pathname))
 
 (defun logical-namestring-p (x)
   (and (stringp x)

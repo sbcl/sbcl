@@ -2789,7 +2789,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
 (defpackage* "SB-WALKER"
   (:documentation "internal: a code walker used by PCL")
-  (:use "CL" "SB-INT" "SB-EXT"))
+  (:use "CL" "SB-INT" "SB-EXT")
+  (:export "DEFINE-WALKER-TEMPLATE"
+           "WALK-FORM"
+           "*WALK-FORM-EXPAND-MACROS-P*"
+           "VAR-LEXICAL-P" "VAR-SPECIAL-P"
+           "VAR-GLOBALLY-SPECIAL-P"
+           "VAR-DECLARATION"))
 
 (defpackage* "SB-UNICODE"
   (:documentation "public: algorithms for Unicode data")
@@ -3052,6 +3058,7 @@ possibly temporarily, because it might be used internally.")
             ;; messing with PATHNAMEs
 
            "MAKE-TRIVIAL-DEFAULT-PATHNAME"
+           "MAKE-TRIVIAL-DEFAULT-LOGICAL-PATHNAME"
            "PHYSICALIZE-PATHNAME"
            "SANE-DEFAULT-PATHNAME-DEFAULTS"
            "SBCL-HOMEDIR-PATHNAME"
@@ -3264,6 +3271,7 @@ possibly temporarily, because it might be used internally.")
 
            "LEGAL-VARIABLE-NAME-P"
            "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
+           "LEGAL-CLASS-NAME-P"
            "FUN-NAME-BLOCK-NAME"
            "FUN-NAME-INLINE-EXPANSION"
            "LISTEN-SKIP-WHITESPACE"

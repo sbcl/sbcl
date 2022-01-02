@@ -18,6 +18,39 @@
 ;;; use it?)
 (define-load-time-global *type-system-initialized* nil)
 (!cold-init-forms (setq *type-system-initialized* nil))
+
+(in-package "SB-PCL")
+
+(declaim (#+sb-xc-host special #-sb-xc-host global *the-class-t*
+                  *the-class-slot-object*
+                  *the-class-structure-object*
+                  *the-class-standard-object*
+                  *the-class-function*
+                  *the-class-funcallable-standard-object*
+                  *the-class-system-class*
+                  *the-class-slot-class*
+                  *the-class-condition-class*
+                  *the-class-structure-class*
+                  *the-class-standard-class*
+                  *the-class-funcallable-standard-class*
+                  *the-class-forward-referenced-class*
+                  *the-class-method*
+                  *the-class-standard-method*
+                  *the-class-standard-reader-method*
+                  *the-class-standard-writer-method*
+                  *the-class-standard-boundp-method*
+                  *the-class-global-reader-method*
+                  *the-class-global-writer-method*
+                  *the-class-global-boundp-method*
+                  *the-class-standard-generic-function*
+                  *the-class-standard-direct-slot-definition*
+                  *the-class-standard-effective-slot-definition*
+
+                  *the-eslotd-standard-class-slots*
+                  *the-eslotd-funcallable-standard-class-slots*))
+
+(in-package "SB-KERNEL")
+
 
 ;;;; the CLASSOID structure
 
@@ -1164,11 +1197,11 @@ between the ~A definition and the ~A definition"
      (pathname :depth 1
                :predicate pathnamep
                :length ,(+ 7 sb-vm:instance-data-start)
-               :prototype-form (make-pathname))
+               :prototype-form (make-trivial-default-pathname))
      (logical-pathname :depth 2
                        :predicate logical-pathname-p
                        :length ,(+ 7 sb-vm:instance-data-start)
-                       :prototype-form (make-pathname :host "SYS")
+                       :prototype-form (make-trivial-default-logical-pathname)
                        :inherits (pathname))
 
      ;; These last few are strange. STREAM has only T as an ancestor,

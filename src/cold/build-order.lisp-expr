@@ -578,6 +578,19 @@
 
  #-(or x86 x86-64) ("src/compiler/generic/sanctify" :not-host)
 
+ ;;; PCL things. This stuff used to happen in the warm load, but now
+ ;;; as PCL gets more integrated into the system, we'd like to
+ ;;; bootstrap things like classes at the same time as the rest of the
+ ;;; type system.
+ ("src/pcl/walk" :not-host)
+ ("src/pcl/low" :not-host)
+ ("src/pcl/macros" :not-host)
+ ("src/pcl/ecd" :not-host)
+ ("src/pcl/compiler-support" :not-host)
+ ("src/pcl/defs" :not-host)
+ ("src/pcl/wrapper" :not-host)
+ ("src/pcl/class-init" :not-host)
+
  ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -590,6 +603,7 @@
  ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")
+ ("src/pcl/defclass")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; other target-code-building stuff which can't be processed until
@@ -619,8 +633,7 @@
   ;; It could be done in genesis, but not earlier,
   ;; since the host has a package of that name.
   "src/code/defpackage"
-  "src/code/target-lflist"
-  "src/pcl/walk") ; needs DEFPACKAGE
+  "src/code/target-lflist")
 
  #+sb-fasteval
  ("src/interpreter/macros"
@@ -656,13 +669,7 @@
  ;; (arbitrary) linearization of the declared build
  ;; order dependencies from the old PCL defsys.lisp
  ;; dependency database.
- ("src/pcl/low"
-  "src/pcl/macros"
-  "src/pcl/compiler-support"
-  "src/pcl/defclass"
-  "src/pcl/defs"
-  "src/pcl/fngen"
-  "src/pcl/wrapper"
+ ("src/pcl/fngen"
   "src/pcl/cache"
   "src/pcl/dlisp"
   "src/pcl/boot"

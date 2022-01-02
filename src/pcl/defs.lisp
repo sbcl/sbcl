@@ -181,45 +181,48 @@
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (define-load-time-global *built-in-classes*
-  (labels ((direct-supers (class)
-             (/noshow "entering DIRECT-SUPERS" (classoid-name class))
-             (if (typep class 'built-in-classoid)
-                 (built-in-classoid-direct-superclasses class)
-                 (let ((inherits (wrapper-inherits (classoid-wrapper class))))
-                   (/noshow inherits)
-                   (list (svref inherits (1- (length inherits)))))))
-           (direct-subs (class)
-             (/noshow "entering DIRECT-SUBS" (classoid-name class))
-             (collect ((res))
-               (let ((subs (classoid-subclasses class)))
-                 (/noshow subs)
-                 (when subs
-                   (sb-kernel::do-subclassoids ((sub wrapper) class)
-                     (declare (ignore wrapper))
-                     (/noshow sub)
-                     (when (member class (direct-supers sub) :test #'eq)
-                       (res sub)))))
-               (res))))
-    (mapcar (lambda (kernel-bic-entry)
-              (/noshow "setting up" kernel-bic-entry)
-              (let* ((name (car kernel-bic-entry))
-                     (class (find-classoid name)))
-                (/noshow name class)
-                `(,name
-                  ,(mapcar #'classoid-name (direct-supers class))
-                  ,(mapcar #'classoid-name (direct-subs class))
-                  ,(map 'list #'wrapper-classoid-name
-                        (reverse (wrapper-inherits (classoid-wrapper class))))
-                  ,(eval (getf (cdr kernel-bic-entry) :prototype-form)))))
-            (remove-if (lambda (kernel-bic-entry)
-                         (member (first kernel-bic-entry)
-                                 ;; remove special classes (T and our
-                                 ;; SYSTEM-CLASSes) from the
-                                 ;; BUILT-IN-CLASS list
-                                 '(t function stream sequence
-                                   file-stream string-stream
-                                   slot-object)))
-                       sb-kernel::*builtin-classoids*))))
+    (macrolet
+        ((frob ()
+           (labels ((direct-supers (class)
+                      (/noshow "entering DIRECT-SUPERS" (classoid-name class))
+                      (if (typep class 'built-in-classoid)
+                          (built-in-classoid-direct-superclasses class)
+                          (let ((inherits (wrapper-inherits (classoid-wrapper class))))
+                            (/noshow inherits)
+                            (list (svref inherits (1- (length inherits)))))))
+                    (direct-subs (class)
+                      (/noshow "entering DIRECT-SUBS" (classoid-name class))
+                      (collect ((res))
+                        (let ((subs (classoid-subclasses class)))
+                          (/noshow subs)
+                          (when subs
+                            (sb-kernel::do-subclassoids ((sub wrapper) class)
+                              (declare (ignore wrapper))
+                              (/noshow sub)
+                              (when (member class (direct-supers sub) :test #'eq)
+                                (res sub)))))
+                        (res))))
+             `(list ,@(mapcar (lambda (kernel-bic-entry)
+                                (/noshow "setting up" kernel-bic-entry)
+                                (let* ((name (car kernel-bic-entry))
+                                       (class (find-classoid name)))
+                                  (/noshow name class)
+                                  `(list ',name
+                                         ',(mapcar #'classoid-name (direct-supers class))
+                                         ',(mapcar #'classoid-name (direct-subs class))
+                                         ',(map 'list #'wrapper-classoid-name
+                                                (reverse (wrapper-inherits (classoid-wrapper class))))
+                                         ,(getf (cdr kernel-bic-entry) :prototype-form))))
+                            (remove-if (lambda (kernel-bic-entry)
+                                         (member (first kernel-bic-entry)
+                                                 ;; remove special classes (T and our
+                                                 ;; SYSTEM-CLASSes) from the
+                                                 ;; BUILT-IN-CLASS list
+                                                 '(t function stream sequence
+                                                   file-stream string-stream
+                                                   slot-object)))
+                                       sb-kernel::*builtin-classoids*))))))
+      (frob)))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid

@@ -1975,11 +1975,6 @@ bootstrapping.
                            macro.~@:>")
           :format-arguments (list fun-name)))
 
-(define-load-time-global *sgf-wrapper*
-  (!boot-make-wrapper (!early-class-size 'standard-generic-function)
-                      'standard-generic-function
-                      sb-kernel::standard-gf-primitive-obj-layout-bitmap))
-
 (define-load-time-global *sgf-slots-init*
   (mapcar (lambda (canonical-slot)
             (if (memq (getf canonical-slot :name) '(arg-info source))
@@ -2176,16 +2171,6 @@ bootstrapping.
            (!bootstrap-slot-index 'global-writer-method s)
            (!bootstrap-slot-index 'global-boundp-method s))))
 
-(defconstant-eqx +standard-method-class-names+
-  '(standard-method standard-reader-method
-    standard-writer-method standard-boundp-method
-    global-reader-method global-writer-method
-    global-boundp-method)
-  #'equal)
-
-(declaim (list **standard-method-classes**))
-(defglobal **standard-method-classes** nil)
-
 (defun safe-method-specializers (method)
   (if (member (class-of method) **standard-method-classes** :test #'eq)
       (clos-slots-ref (std-instance-slots method) +sm-specializers-index+)
@@ -2259,7 +2244,7 @@ bootstrapping.
               ((and (consp name)
                     (member (car name)
                             *internal-pcl-generalized-fun-name-symbols*))
-                nil)
+               nil)
               (t (let* ((symbol (fun-name-block-name name))
                         (package (symbol-package symbol)))
                    (and (or (eq package *pcl-package*)

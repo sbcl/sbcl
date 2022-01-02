@@ -52,7 +52,7 @@
 
 ;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.
 (defun set-symbol-global-value (sym val)
-  (error "Can't set symbol-global-value: ~S ~S" sym val))
+  (setf (symbol-value sym) val))
 
 (defun %defun (name lambda &optional inline-expansion)
   (declare (ignore inline-expansion))

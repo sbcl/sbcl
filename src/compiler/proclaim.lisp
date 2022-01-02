@@ -69,6 +69,17 @@
      (compiler-error "~@<Illegal function name: ~S.~@:>" name)))
   name)
 
+;;; Check that NAME is a valid class name, returning the name if OK,
+;;; and signalling an error if not.
+(declaim (inline sb-pcl::check-class-name))
+(defun sb-pcl::check-class-name (name &optional (allow-nil t))
+  ;; Apparently, FIND-CLASS and (SETF FIND-CLASS) accept any symbol,
+  ;; but DEFCLASS only accepts non-NIL symbols.
+  (if (or (not (legal-class-name-p name))
+          (and (null name) (not allow-nil)))
+      (error 'illegal-class-name-error :name name)
+      name))
+
 ;;; This is called to do something about SETF functions that overlap
 ;;; with SETF macros. Perhaps we should interact with the user to see
 ;;; whether the macro should be blown away, but for now just give a
