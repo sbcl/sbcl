@@ -59,9 +59,10 @@
             ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
             ;; is compiled for the class.
             (defstruct-p (and (eq **boot-state** 'complete)
+                              #-sb-xc-host
                               (let ((mclass (find-class metaclass nil)))
                                 (and mclass
-                                     (#+sb-xc-host subtypep #-sb-xc-host *subtypep
+                                     (*subtypep
                                       mclass
                                       *the-class-structure-class*))))))
         (let* ((defclass-form

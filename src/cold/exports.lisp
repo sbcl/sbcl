@@ -3240,8 +3240,8 @@ possibly temporarily, because it might be used internally.")
 
             ;; debuggers' little helpers
 
-           #+sb-show("*/SHOW*"
-                       "HEXSTR")
+           #+sb-show "*/SHOW*"
+           #+sb-show "HEXSTR"
            "/SHOW"  "/NOSHOW"
            "/SHOW0" "/NOSHOW0"
 
