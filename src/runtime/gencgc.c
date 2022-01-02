@@ -3732,7 +3732,7 @@ conservative_stack_scan(struct thread* th,
      * unless the context is scanned.
      *
      * For the thread which initiates GC there will usually not be a
-     * sigcontexts, though there could, in theory be it it performs
+     * sigcontext, though there could, in theory be if it performs
      * GC while handling an interruption */
 
     void (*context_method)(os_context_register_t) =
@@ -3771,23 +3771,20 @@ conservative_stack_scan(struct thread* th,
     }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
-    if(th==get_sb_vm_thread()) {
-        esp = stack_hot_end;
-    } else {
-        sword_t i,free;
-        lispobj* esp1;
-        free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-        for(i=free-1;i>=0;i--) {
-            os_context_t *c = nth_interrupt_context(i, th);
-            esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
-            if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end) {
-                if ((void*)esp1<esp) esp = esp1;
-                preserve_context_registers(context_method, c);
-            }
-        }
+    int i;
+    for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
+        os_context_t *c = nth_interrupt_context(i, th);
+        preserve_context_registers(context_method, c);
+        lispobj* esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
+        if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end && (void*)esp1 < esp)
+            esp = esp1;
+    }
+    if (th == get_sb_vm_thread()) {
+        lispobj* esp1 = PTR_ALIGN_DOWN(stack_hot_end, N_WORD_BYTES);
+        if ((void*)esp1 < esp) esp = esp1;
     }
 # else
-    esp = stack_hot_end;
+    esp = PTR_ALIGN_DOWN(stack_hot_end, N_WORD_BYTES);
 # endif
     if (!esp || esp == (void*) -1)
         UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
@@ -3800,13 +3797,9 @@ conservative_stack_scan(struct thread* th,
     lispobj exclude_from = (lispobj)th->control_stack_start;
     lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
 
-    // This loop would be more naturally expressed as
-    //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
-    // However there is a very subtle problem with that: 'esp = &raise'
-    // is not necessarily properly aligned to be a stack pointer!
-    void **ptr;
-    for (ptr = ((void **)th->control_stack_end)-1; ptr >= (void**)esp;  ptr--) {
-        lispobj word = (lispobj)*ptr;
+    lispobj* ptr;
+    for (ptr = esp; ptr < th->control_stack_end; ptr++) {
+        lispobj word = *ptr;
         // Also note that we can eliminate small fixnums from consideration
         // since there is no memory on the 0th page.
         // (most OSes don't let users map memory there, though they used to).
@@ -3846,7 +3839,8 @@ int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
-garbage_collect_generation(generation_index_t generation, int raise)
+garbage_collect_generation(generation_index_t generation, int raise,
+                           void* approximate_stackptr)
 {
     page_index_t i;
     struct thread *th;
@@ -3964,7 +3958,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
             /* Pin everything in fromspace with a stack root, and also set the
              * sticky card mark on any page (in any generation)
              * referenced from the stack. */
-            conservative_stack_scan(th, generation, &raise);
+            conservative_stack_scan(th, generation, approximate_stackptr);
 #elif defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
@@ -4445,7 +4439,7 @@ collect_garbage(generation_index_t last_gen)
         print_generation_stats();
 
     if (gc_mark_only) {
-        garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0);
+        garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0, &last_gen);
         goto finish;
     }
 
@@ -4487,7 +4481,7 @@ collect_garbage(generation_index_t last_gen)
 
         memset(n_scav_calls, 0, sizeof n_scav_calls);
         memset(n_scav_skipped, 0, sizeof n_scav_skipped);
-        garbage_collect_generation(gen, raise);
+        garbage_collect_generation(gen, raise, &last_gen);
 
         if (gencgc_verbose)
             fprintf(stderr,
