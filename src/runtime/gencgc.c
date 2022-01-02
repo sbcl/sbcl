@@ -2306,6 +2306,61 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(void *addr)
     if (found) gc_mark_obj(compute_lispobj(found));
     return found != 0;
 }
+#define STICKY_MARK 2
+static inline void sticky_mark_large_object(page_index_t page, lispobj word)
+{
+    /* Given that 'page' holds a large object, if 'word' is the correctly-tagged
+     * pointer to the base of a simple-vector, then set the sticky mark on any
+     * already-marked page of the object */
+    lispobj* scan_start = page_scan_start(page);
+    switch (widetag_of(scan_start)) {
+    case CODE_HEADER_WIDETAG:
+        /* Stores to code are done pseudo-atomically with affecting the card mark.
+         * Therefore we don't need to do anything else. The "next" store
+         * won't create an old->young pointer, since it already happened */
+        return;
+    case SIMPLE_VECTOR_WIDETAG:
+        if (word != make_lispobj(scan_start, OTHER_POINTER_LOWTAG)) return;
+        generation_index_t gen = page_table[page].gen;
+        // FIXME: maybe use the vector's size (in case of shrinkage)
+        // rather than the allocation region's extent ?
+        while (1) {
+            if (!PAGE_WRITEPROTECTED_P(page)) SET_PAGE_PROTECTED(page, STICKY_MARK);
+            if (page_ends_contiguous_block_p(page, gen)) return;
+            ++page;
+        }
+    }
+}
+__attribute__((unused)) static void sticky_preserve_pointer(os_context_register_t word)
+{
+    /* Additional logic for soft marks: any word that is potentially a
+     * tagged pointer to a page being written must preserve the mark regardless
+     * of what update_writeprotection() thinks. That's because the mark is set
+     * prior to storing. If GC occurs in between setting the mark and storing,
+     * then resetting the mark would be wrong if the subsequent store
+     * creates an old->young pointer.
+     * Mark stickiness is checked only once per invocation of collect_garbge(),
+     * so it when scanning interrupt contexts for generation 0 but not higher gens.
+     * Also note the two scenarios:
+     * (1) tagged pointer to a large simple-vector, but we scan card-by-card
+     * for specifically the marked cards.  This has to be checked first
+     * so as not to fail to see subsequent cards if the first is marked.
+     * (2) tagged pointer to an object that marks only the page containing
+     * the object base */
+    if (is_lisp_pointer(word)) {
+        page_index_t page = find_page_index((void*)word);
+        if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
+            && (word & (GENCGC_CARD_BYTES - 1)) < page_bytes_used(page)
+            && plausible_tag_p(word)) { // "plausible" is good enough
+            if (page_single_obj_p(page))
+                sticky_mark_large_object(page, word);
+            else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
+                SET_PAGE_PROTECTED(page, STICKY_MARK);
+            }
+        }
+    }
+    preserve_pointer((void*)word);
+}
 #endif
 
 /* Pin an unambiguous descriptor object which may or may not be a pointer.
@@ -2433,8 +2488,6 @@ static boolean ptr_ok_to_writeprotect(lispobj obj, generation_index_t gen)
  * that lead to invariant loss with FDEFNs. This might not be a problem
  * in practice. At least it seems like it never has been.
  */
-#define STICKY_MARK 2
-
 static lispobj*
 update_writeprotection(page_index_t first_page, page_index_t last_page,
                        lispobj* start, lispobj* limit)
@@ -2535,10 +2588,10 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         protect_page(page_address(page), page); // just do it, there's zero overhead
 #else
-      if (!PAGE_WRITEPROTECTED_P(page)) // Try to avoid a system call
-          protect_page(page_address(page), page);
+        // Try to avoid a system call
+        if (!PAGE_WRITEPROTECTED_P(page)) protect_page(page_address(page), page);
 #endif
-      return 0;
+    return 0;
 }
 
 /* Is this page holding a normal (non-weak, non-hashtable) large-object
@@ -3581,60 +3634,6 @@ move_pinned_pages_to_newspace()
     }
 }
 
-static void __attribute__((unused))
-sticky_mark_large_vector(page_index_t page, lispobj word)
-{
-    /* Given that 'page' holds a large object, if 'word' is the correctly-tagged
-     * pointer to the base of a simple-vector, then set the sticky mark on any
-     * already-marked page of the object */
-    lispobj* scan_start = page_scan_start(page);
-    switch (widetag_of(scan_start)) {
-    case CODE_HEADER_WIDETAG:
-        /* Stores to code are done pseudo-atomically with affecting the card mark.
-         * Therefore we don't need to do anything else. The "next" store
-         * won't create an old->young pointer, since it already happened */
-        return;
-    case SIMPLE_VECTOR_WIDETAG:
-        if (word != make_lispobj(scan_start, OTHER_POINTER_LOWTAG)) return;
-        generation_index_t gen = page_table[page].gen;
-        while (1) {
-            if (!PAGE_WRITEPROTECTED_P(page)) SET_PAGE_PROTECTED(page, STICKY_MARK);
-            if (page_ends_contiguous_block_p(page, gen)) return;
-            ++page;
-        }
-    }
-}
-
-static void __attribute__((unused)) sticky_mark_card_if_marked(lispobj word)
-{
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    /* Additional logic for soft marks: any word that is potentially a
-     * tagged pointer to a page being written must preserve the mark regardless
-     * of what update_write_protection() thinks. That's because the mark is set
-     * prior to storing. If GC occurs in between setting the mark and storing,
-     * then resetting the mark would be wrong if the subsequent store
-     * creates an old->young pointer.
-     * Mark stickiness is checked only once per invocation of collect_garbge(),
-     * so do it when scanning stacks for generation 0 but not higher gens.
-     * Also note the two scenarios:
-     * (1) tagged pointer to a large simple-vector, but we scan card-by-card
-     * for specifically the marked cards.  This has to be checked first
-     * so as not to fail to see subsequent pages if the first is marked.
-     * (2) tagged pointer to an object that marks only the page containing
-     * the object base */
-    page_index_t page = find_page_index((void*)word);
-    if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
-        && (word & (GENCGC_CARD_BYTES - 1)) < page_bytes_used(page)
-        && plausible_tag_p(word)) { // "plausible" is good enough
-        if (page_single_obj_p(page))
-            sticky_mark_large_vector(page, word);
-        else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
-            SET_PAGE_PROTECTED(page, STICKY_MARK);
-        }
-    }
-#endif
-}
-
 lispobj *
 dynamic_space_code_from_pc(char *pc)
 {
@@ -3684,9 +3683,8 @@ static void semiconservative_pin_stack(struct thread* th,
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
-            preserve_pointer((void*)word); // maybe pin something, tagged pointer or not
-            // If pointer lowtagged, then possibly set stickiness
-            if (gen == 0 && is_lisp_pointer(word)) sticky_mark_card_if_marked(word);
+            if (gen == 0) sticky_preserve_pointer(word);
+            else preserve_pointer((void*)word);
         }
         preserve_pointer((void*)*os_context_lr_addr(context));
         preserve_pointer((void*)*os_context_ctr_addr(context));
@@ -3727,16 +3725,22 @@ conservative_stack_scan(struct thread* th,
     /* there are potentially two stacks for each thread: the main
      * stack, which may contain Lisp pointers, and the alternate stack.
      * We don't ever run Lisp code on the altstack, but it may
-     * host a sigcontext with lisp objects in it */
+     * host a sigcontext with lisp objects in it.
+     * Actually, STOP_FOR_GC has a signal context on the main stack,
+     * and the values it in will be *above* the stack-pointer in it
+     * at the point of interruption, so we would not scan all registers
+     * unless the context is scanned.
+     *
+     * For the thread which initiates GC there will usually not be a
+     * sigcontexts, though there could, in theory be it it performs
+     * GC while handling an interruption */
 
-    /* what we need to do: (1) find the stack pointer for the main
-     * stack; scavenge it (2) find the interrupt context on the
-     * alternate stack that might contain lisp values, and scavenge
-     * that */
-
-    /* we assume that none of the preceding applies to the thread that
-     * initiates GC.  If you ever call GC from inside an altstack
-     * handler, you will lose. */
+    void (*context_method)(os_context_register_t) =
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        gen == 0 ? sticky_preserve_pointer : (void (*)(os_context_register_t))preserve_pointer;
+#else
+        (void (*)(os_context_register_t))preserve_pointer;
+#endif
 
     void* esp = (void*)-1;
 # if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -3762,8 +3766,7 @@ conservative_stack_scan(struct thread* th,
         while (k > 0) {
             os_context_t* context = nth_interrupt_context(--k, th);
             if (context)
-                preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                           context);
+                preserve_context_registers(context_method, context);
         }
     }
 #  endif
@@ -3779,8 +3782,7 @@ conservative_stack_scan(struct thread* th,
             esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
             if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end) {
                 if ((void*)esp1<esp) esp = esp1;
-                preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                           c);
+                preserve_context_registers(context_method, c);
             }
         }
     }
@@ -3811,7 +3813,6 @@ conservative_stack_scan(struct thread* th,
         if (word >= BACKEND_PAGE_BYTES &&
             !(exclude_from <= word && word < exclude_to)) {
             preserve_pointer((void*)word);
-            if (gen == 0 && is_lisp_pointer(word)) sticky_mark_card_if_marked(word);
         }
     }
 }

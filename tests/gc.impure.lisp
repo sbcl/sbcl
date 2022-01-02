@@ -348,17 +348,26 @@
 
 #+sb-thread
 (with-test (:name :concurrently-alloc-code)
-  (let ((gc-thread
+  ;; this debug setting may or may not find a problem, but it can't hurt to try
+  (setf (extern-alien "pre_verify_gen_0" int) 1)
+  (let ((worker-th
          (sb-thread:make-thread
           (let ((stop (+ (get-internal-real-time)
-                         internal-time-units-per-second)))
-            (lambda ()
+                         (* 3 internal-time-units-per-second))))
+            (lambda (&aux (n 0))
               (loop while (<= (get-internal-real-time) stop)
-                    do (gc) (sleep 0)))))))
-    (loop (compile nil `(lambda () (print 20)))
-          (unless (sb-thread:thread-alive-p gc-thread)
-            (return)))
-    (sb-thread:join-thread gc-thread)))
+                    do (compile nil `(lambda () (print 20)))
+                       (incf n))
+              n)))))
+    (let ((gcs 0))
+      (loop (gc) (incf gcs)
+            (unless (sb-thread:thread-alive-p worker-th)
+              (return))
+            (sb-unix:nanosleep 0 (random 100000)))
+      (let ((compiles (sb-thread:join-thread worker-th)))
+        (format t "~&Compiled ~D times, GC'ed ~D times~%"
+                compiles gcs))))
+  (setf (extern-alien "pre_verify_gen_0" int) 0))
 
 (defun parse-address-range (line)
   ;; I hope nothing preceding the match of "-" could be a false positive.
