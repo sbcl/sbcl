@@ -32,8 +32,8 @@
 (defvar *slot-names-for-this-defclass*)
 
 ;; forward declarations so the host doesn't warn these to be undefined functions.
-(declaim (ftype (function (t t) (values boolean &optional)) *subtypep))
-(declaim (ftype (function (t) (values list &optional)) class-direct-slots))
+(declaim (ftype (function (t t) (values t t &optional)) *subtypep))
+(declaim (ftype (function (t) (values t &optional)) class-direct-slots))
 (declaim (ftype (function (t t t) (values cons t t t &optional)) make-structure-class-defstruct-form))
 
 ;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is
