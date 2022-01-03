@@ -1190,6 +1190,7 @@ struct visitor {
     struct hopscotch_table *reached;
 };
 
+static void trace_sym(lispobj, struct symbol*, struct hopscotch_table*);
 #define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,seen)
 static void graph_visit(lispobj __attribute__((unused)) referer,
                         lispobj ptr,
@@ -1242,6 +1243,8 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             for(i=2; i<=nwords; ++i) RECURSE(obj[i]);
             break;
         case SYMBOL_WIDETAG:
+            trace_sym(ptr, SYMBOL(ptr), seen);
+            break;
         case WEAK_POINTER_WIDETAG:
             nwords = TINY_BOXED_NWORDS(*obj);
             for(i=1; i<=nwords; ++i) RECURSE(obj[i]);
@@ -1257,6 +1260,16 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
                 for(i=1; i<size; ++i) RECURSE(obj[i]);
             }
       }
+}
+static void trace_sym(lispobj ptr, struct symbol* sym, struct hopscotch_table* seen)
+{
+    RECURSE(decode_symbol_name(sym->name));
+    RECURSE(sym->value);
+    RECURSE(sym->info);
+    RECURSE(sym->fdefn);
+    int indicated_nwords = HeaderValue(sym->header) & 0xFF;
+    if (indicated_nwords + 1 > SYMBOL_SIZE) // has one more slot with no name
+        RECURSE(1[&sym->fdefn]); // ASSUMPTION: slot order
 }
 
 static void tally(lispobj ptr, struct visitor* v)
@@ -1283,6 +1296,17 @@ static void tally(lispobj ptr, struct visitor* v)
     }
 }
 
+/* This printing in here is useful, but it's too much to output in make-target-2,
+ * because genesis dumps a ton of unreachable objects.
+ * The reason is this: cold-load has no way of knowing if a literal loaded
+ * from fasl and written to core is really supposed to be consumed by target.
+ * e.g. if it's a string naming a foreign fixup, who reads that string?
+ * Answer: The host, but it appears in the cold core as if the target will need it.
+ * The only way to rectify this defect is just not worth doing - each literal
+ * would have to be kept only as a host proxy until such time as we actually refer
+ * to it from another object that is definitely in the cold core, via FOP-LOAD-CODE
+ * and who know what else. Thus it remains a graph tracing problem in nature,
+ * which is best left to GC */
 static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct visitor* v = (struct visitor*)arg;
@@ -1290,10 +1314,7 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
     while (obj < limit) {
         lispobj ptr = compute_lispobj(obj);
         tally(ptr, v);
-        // Weird stuff happens in genesis where this logic thinks that the
-        // cold core holds a ton of unreachable objects. I have no idea why.
-        if (!hopscotch_get(v->reached, ptr, 0))
-            printf("object not reached: %p\n", (void*)ptr);
+        if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
         obj += OBJECT_SIZE(*obj, obj);
     }
     return 0;
@@ -1314,11 +1335,10 @@ static void sanity_check_loaded_core(lispobj initial_function)
                      1<<18, /* initial size */
                      0);
     {
+      trace_sym(NIL, SYMBOL(NIL), &reached);
       lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
       lispobj* end = static_space_free_pointer;
       while (where<end) {
-        // This falsely treats NIL as 4 conses but it doesn't really matter.
-        // The garbage collector gets it right!
         graph_visit(0, compute_lispobj(where), &reached);
         where += OBJECT_SIZE(*where, where);
       }

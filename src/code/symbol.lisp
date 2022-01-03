@@ -289,6 +289,11 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
+;; FIXME: I think it would almost certainly be _less_ confusing
+;; if this were strictly a C variable, and not in both Lisp and C.
+;; C can't do without it for backtraces, and we could always use an alien var
+;; from lisp, whereas the other way (only a Lisp symbol) has a chicken-and-egg
+;; problem: C can't find a Lisp symbol unless it can find the package.
 (define-load-time-global *id->package* #())
 (declaim (simple-vector *id->package*))
 

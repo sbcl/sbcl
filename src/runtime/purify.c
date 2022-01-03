@@ -658,6 +658,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
     pscav(lisp_sig_handlers, NSIG, 0);
+    pscav(&lisp_package_vector, 1, 0);
 
 #ifdef PRINTNOISE
     printf(" stack");
@@ -677,25 +678,6 @@ purify(lispobj static_roots, lispobj read_only_roots)
            (lispobj *)get_binding_stack_pointer(all_threads) -
            all_threads->binding_stack_start,
           0);
-
-    /* The original CMU CL code had scavenge-read-only-space code
-     * controlled by the Lisp-level variable
-     * *SCAVENGE-READ-ONLY-SPACE*. It was disabled by default, and it
-     * wasn't documented under what circumstances it was useful or
-     * safe to turn it on, so it's been turned off in SBCL. If you
-     * want/need this functionality, and can test and document it,
-     * please submit a patch. */
-#if 0
-    if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != UNBOUND_MARKER_WIDETAG
-        && SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
-      unsigned  read_only_space_size =
-          read_only_space_free_pointer - (lispobj *)READ_ONLY_SPACE_START;
-      fprintf(stderr,
-              "scavenging read only space: %d bytes\n",
-              read_only_space_size * sizeof(lispobj));
-      pscav( (lispobj *)READ_ONLY_SPACE_START, read_only_space_size, 0);
-    }
-#endif
 
 #ifdef PRINTNOISE
     printf(" static");
