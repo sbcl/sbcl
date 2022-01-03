@@ -433,7 +433,6 @@
 ;;; this is not something we want to export. Nikodemus thinks the
 ;;; right thing is to support a low-level non-stream like IO layer,
 ;;; akin to java.nio.
-(declaim (inline output-raw-bytes))
 (define-deprecated-function :final "1.0.8.16" output-raw-bytes write-sequence
     (stream thing &optional start end)
   (write-or-buffer-output stream thing (or start 0) (or end (length thing))))
