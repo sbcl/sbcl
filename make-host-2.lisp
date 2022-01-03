@@ -23,25 +23,40 @@
 (let (fail
       variables
       functions
-      types)
-  (sb-xc:with-compilation-unit ()
-    (load "src/cold/compile-cold-sbcl.lisp")
-    ;; Enforce absence of unexpected forward-references to warm loaded code.
-    ;; Looking into a hidden detail of this compiler seems fair game.
-    (when sb-c::*undefined-warnings*
-      (setf fail t)
-      (dolist (warning sb-c::*undefined-warnings*)
-        (case (sb-c::undefined-warning-kind warning)
-          (:variable (setf variables t))
-          (:type (setf types t))
-          (:function (setf functions t))))))
+      types
+      warnp
+      style-warnp)
+  ;; Even the host may get STYLE-WARNINGS from e.g. cross-compiling
+  ;; macro definitions. FIXME: This is duplicate code from make-host-1
+  (handler-bind ((style-warning
+                   (lambda (c)
+                     (signal c)
+                     (setq style-warnp 'style-warning)))
+                 (simple-warning
+                   (lambda (c)
+                     (declare (ignore c))
+                     (setq warnp 'warning))))
+    (sb-xc:with-compilation-unit ()
+      (load "src/cold/compile-cold-sbcl.lisp")
+      ;; Enforce absence of unexpected forward-references to warm loaded code.
+      ;; Looking into a hidden detail of this compiler seems fair game.
+      (when sb-c::*undefined-warnings*
+        (setf fail t)
+        (dolist (warning sb-c::*undefined-warnings*)
+          (case (sb-c::undefined-warning-kind warning)
+            (:variable (setf variables t))
+            (:type (setf types t))
+            (:function (setf functions t)))))))
   ;; Exit the compilation unit so that the summary is printed. Then complain.
   ;; win32 is not clean
   (when (and fail (not (target-featurep :win32)))
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-ALLOWLIST*?)~]"
-            variables types functions)))
+            variables types functions))
+  (when (and (or warnp style-warnp) *fail-on-warnings*)
+    (cerror "Proceed anyway"
+            "make-host-2 stopped due to unexpected ~A raised from the host." (or warnp style-warnp))))
 
 #-clisp ; DO-ALL-SYMBOLS seems to kill CLISP at random
 (do-all-symbols (s)

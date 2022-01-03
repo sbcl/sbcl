@@ -31,6 +31,11 @@
 (defvar *writers-for-this-defclass*)
 (defvar *slot-names-for-this-defclass*)
 
+;; forward declarations so the host doesn't warn these to be undefined functions.
+(declaim (ftype (function (t t) (values boolean &optional)) *subtypep))
+(declaim (ftype (function (t) (values list &optional)) class-direct-slots))
+(declaim (ftype (function (t t t) (values cons t t t &optional)) make-structure-class-defstruct-form))
+
 ;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is
 ;;; fixed. DEFCLASS always expands into a call to LOAD-DEFCLASS. Until
 ;;; the meta-braid is set up, LOAD-DEFCLASS has a special definition
@@ -59,7 +64,6 @@
             ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
             ;; is compiled for the class.
             (defstruct-p (and (eq **boot-state** 'complete)
-                              #-sb-xc-host
                               (let ((mclass (find-class metaclass nil)))
                                 (and mclass
                                      (*subtypep
@@ -82,9 +86,6 @@
                                    ,@(and (safe-code-p env)
                                           '(t))))))
           (if defstruct-p
-              #+sb-xc-host
-              (error "Can't define structure classes yet.")
-              #-sb-xc-host
               (progn
                 ;; FIXME: (YUK!) Why do we do this? Because in order
                 ;; to make the defstruct form, we need to know what
