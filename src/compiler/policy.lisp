@@ -197,16 +197,6 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
              (policy-presence-bits policy)) (if presentp 1 0))
   policy)
 
-;;; Is it deprecated?
-(declaim (ftype function deprecation-warn))
-(defun policy-quality-deprecation-warning (quality)
-  (case quality
-    ((merge-tail-calls)
-     (deprecation-warn :final "SBCL" "1.0.53.74" 'policy quality nil :runtime-error nil)
-     t)
-    (otherwise
-     nil)))
-
 ;; ANSI-specified default of 1 for each quality.
 (defglobal **baseline-policy** nil)
 ;; Baseline policy altered with (TYPE-CHECK 0)
@@ -398,10 +388,9 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
               (values quality raw-value)))
         (let ((index (policy-quality-name-p quality)))
           (cond ((not index)
-                 (or (policy-quality-deprecation-warning quality)
-                     (compiler-warn
-                      "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
-                      quality spec)))
+                 (compiler-warn
+                  "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
+                  quality spec))
                 ((not (typep raw-value 'policy-quality))
                  (compiler-warn
                   "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
