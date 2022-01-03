@@ -895,10 +895,12 @@
                (inst mov :dword (ea 0 result) header))
               (t
                (storew* header result 0 0 (not stack-allocate-p)))))
-      (inst or :byte result lowtag))
-    (when instancep ; store its layout
-      (inst mov :dword (ea (+ 4 (- instance-pointer-lowtag)) result)
-            (make-fixup type :layout))))))
+      ;; GC can make the best choice about placement if it has a layout.
+      ;; Of course with conservative GC the object will be pinned anyway,
+      ;; but still, always having a layout is a good thing.
+      (when instancep ; store its layout, while still in pseudo-atomic
+        (inst mov :dword (ea 4 result) (make-fixup type :layout)))
+      (inst or :byte result lowtag)))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
