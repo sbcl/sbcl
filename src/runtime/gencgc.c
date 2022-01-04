@@ -2403,7 +2403,10 @@ static void pin_exact_root(lispobj obj)
 #define IN_BOXED_REGION_P(a) IN_REGION_P(a,mixed)||IN_REGION_P(a,code)
 
 /* Return true if 'ptr' is OK to be on a write-protected page
- * of an object in 'gen'. That is, if the pointer does not point to a younger object */
+ * of an object in 'gen'. That is, if the pointer does not point to a younger object.
+ * Note: 'ptr' is _sometimes_ an ambiguous pointer - we do not utilize the layout bitmap
+ * when scanning instances for pointers, so we will occasionally see a raw word for 'ptr'.
+ * Also, 'ptr might not have a lowtag (such as lockfree list node successor), */
 static boolean ptr_ok_to_writeprotect(lispobj obj, generation_index_t gen)
 {
     page_index_t index;
@@ -2531,7 +2534,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
     for ( where = start ; where < limit ; where += nwords ) {
         lispobj word = *where;
         if (is_cons_half(word)) {
-            if (!ptr_ok_to_writeprotect(word, gen)) return where;
+            if (is_lisp_pointer(word) && !ptr_ok_to_writeprotect(word, gen)) return where;
             word = where[1];
             if (is_lisp_pointer(word) && !ptr_ok_to_writeprotect(word, gen)) return where+1;
             nwords = 2;
