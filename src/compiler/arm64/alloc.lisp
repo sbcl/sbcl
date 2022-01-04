@@ -95,9 +95,7 @@
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
-  (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
-  (:ignore label)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
@@ -113,7 +111,11 @@
                              (logior
                               (ash (1- size) n-widetag-bits)
                               closure-widetag))
-        (storew-pair pa-flag 0 function closure-fun-slot tmp-tn)))))
+        (cond (label
+               (inst adr lip label fun-pointer-lowtag)
+               (storew-pair pa-flag 0 lip closure-fun-slot tmp-tn))
+              (t
+               (storew pa-flag tmp-tn)))))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;

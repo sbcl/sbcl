@@ -277,12 +277,12 @@
               (when closure
                 (let* ((entry-info (lambda-info xep))
                        (tn (entry-info-closure-tn entry-info))
-                       #-x86-64
+                       #-(or x86-64 arm64)
                        (entry (make-load-time-constant-tn :entry xep))
                        (env (node-environment node))
                        (leaf-dx-p (and lvar (leaf-dynamic-extent fun))))
                   (aver (entry-info-offset entry-info))
-                  (vop make-closure node ir2-block #-x86-64 entry
+                  (vop make-closure node ir2-block #-(or x86-64 arm64) entry
                                     (entry-info-offset entry-info) (length closure)
                                     leaf-dx-p tn)
                   (loop for what in closure and n from 0 do

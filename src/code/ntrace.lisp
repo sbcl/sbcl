@@ -706,17 +706,20 @@ functions when called with no arguments."
             ;; original underlying function so that the original's entry point
             ;; can be redirected to a tracing wrapper, which will produce trace
             ;; output and invoke the closure which invokes the original fun.
-            #+x86-64
+            #+(or x86-64 arm64)
             (let ((closure (%primitive sb-vm::make-closure nil 0 nil)))
               (with-pinned-objects (closure traced-fun)
                 (setf (sap-ref-word (int-sap (get-lisp-obj-address closure))
                                     (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
                       ;; Disregard the fun-self slot of fun.
+                      #+x86-64
                       (+ (get-lisp-obj-address traced-fun)
                          (- sb-vm:fun-pointer-lowtag)
-                         (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
+                         (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
+                      #+arm64
+                      (get-lisp-obj-address traced-fun)))
               closure)
-            #-x86-64 (%primitive sb-vm::make-closure traced-fun nil 0 nil))
+            #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun nil 0 nil))
            (closure
             ;; Same as above, but simpler - the original closure will redirect
             ;; to the tracing wraper, which will invoke a new closure that is
