@@ -33,11 +33,6 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-(define-source-transform keywordp (x)
-  `(let ((object ,x))
-     (and (symbolp object)
-          (= (sb-impl::symbol-package-id object) ,sb-impl::+package-id-keyword+))))
-
 ;;; We don't want to clutter the bignum code.
 #+(and (or x86 x86-64) (not bignum-assertions))
 (define-source-transform sb-bignum:%bignum-ref (bignum index)

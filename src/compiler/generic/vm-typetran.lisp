@@ -186,3 +186,9 @@
           when (subsetp union-types types :test #'type=)
           return (values (aref predicates (1+ x))
                          (set-difference types union-types)))))
+
+(sb-c::unless-vop-existsp (:translate keywordp)
+(define-source-transform keywordp (x)
+  `(let ((object ,x))
+     (and (non-null-symbol-p object)
+          (= (sb-impl::symbol-package-id object) ,sb-impl::+package-id-keyword+)))))

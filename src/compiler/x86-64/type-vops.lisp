@@ -481,6 +481,18 @@
   (:translate non-null-symbol-p)
   (:generator 3 (test-other-ptr value args symbol-widetag temp out) out))
 
+(eval-when (:compile-toplevel) (aver (= sb-impl::package-id-bits 16)))
+(define-vop (keywordp symbolp)
+  (:translate keywordp)
+  (:generator 3
+    (inst lea temp (ea (- other-pointer-lowtag) value))
+    (inst test :byte temp lowtag-mask)
+    (inst jmp :ne out)
+    (inst cmp :byte (ea temp) symbol-widetag)
+    (inst jmp :ne out)
+    (inst cmp :word (ea (+ (ash symbol-name-slot word-shift) 6) temp) sb-impl::+package-id-keyword+)
+    out))
+
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
