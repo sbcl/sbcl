@@ -702,7 +702,7 @@ void calc_immobile_space_bounds()
 }
 #endif
 
-static void check_dynamic_space_addr_ok(uword_t start, uword_t size)
+__attribute__((unused)) static void check_dynamic_space_addr_ok(uword_t start, uword_t size)
 {
 #ifdef LISP_FEATURE_64_BIT // don't want a -Woverflow warning on 32-bit
     uword_t end_word_addr = start + size - N_WORD_BYTES;
@@ -1168,11 +1168,7 @@ void asm_routine_poke(const char* routine, int offset, char byte)
 }
 
 // Caution: use at your own risk
-#undef DEBUG_CORE_LOADING
-#ifdef DEBUG_CORE_LOADING
-#ifdef LISP_FEATURE_CHENEYGC
-#  error "Can't define DEBUG_CORE_LOADING for cheneygc"
-#endif
+#if defined DEBUG_CORE_LOADING && DEBUG_CORE_LOADING
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "genesis/layout.h"
@@ -1321,7 +1317,10 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
 }
 
 #ifdef LISP_FEATURE_GENCGC
-#define dynamic_space_pointer_p(ptr) (find_page_index((void*)ptr) >= 0)
+#define count_this_pointer_p(ptr) (find_page_index((void*)ptr) >= 0)
+#endif
+#ifdef LISP_FEATURE_CHENEYGC
+#define count_this_pointer_p(ptr) (1)
 #endif
 
 static void sanity_check_loaded_core(lispobj initial_function)
@@ -1348,11 +1347,17 @@ static void sanity_check_loaded_core(lispobj initial_function)
     int key_index;
     lispobj ptr;
     for_each_hopscotch_key(key_index, ptr, reached)
-        if (dynamic_space_pointer_p(ptr))
-            tally(ptr, &v[0]);
+        if (count_this_pointer_p(ptr)) tally(ptr, &v[0]);
     // Pass 2: Count all heap objects
     v[1].reached = &reached;
+#ifdef LISP_FEATURE_GENCGC
     walk_generation(visit, -1, (uword_t)&v[1]);
+#endif
+#ifdef LISP_FEATURE_CHENEYGC
+    visit((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, (uword_t)&v[1]);
+    visit((lispobj*)STATIC_SPACE_START, static_space_free_pointer, (uword_t)&v[1]);
+#endif
+
     // Pass 3: Compare
     // Start with the conses
     v[0].headers[0].words = v[0].headers[0].count * 2;
