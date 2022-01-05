@@ -332,7 +332,7 @@ static void trace_object(lispobj* where)
             return;
         }
         break;
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined (LISP_FEATURE_ARM64)
     /* on x86[-64], closure->fun is a fixnum-qua-pointer. Convert it to a lisp
      * pointer to mark it, but not on platforms where it's already a descriptor */
     case CLOSURE_WIDETAG:

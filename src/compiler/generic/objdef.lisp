@@ -232,7 +232,7 @@ during backtrace.
                                      :widetag simple-fun-widetag)
   ;; All three function primitive-objects have the first word after the header
   ;; as some kind of entry point, either the address to jump to, in the case
-  ;; of x86, or the Lisp function to jump to, for everybody else.
+  ;; of x86oids and arm64, or the Lisp function to jump to, for everybody else.
   (self :set-known ()
         :set-trans (setf %simple-fun-self))
   ;; This slot used to be named CODE, but that was misleaing because the
@@ -262,8 +262,8 @@ during backtrace.
                                    ;; closures which requires that the length be
                                    ;; a compile-time constant.
                                    :alloc-trans %alloc-closure)
-  (fun :init :arg :ref-trans #+(or x86 x86-64) %closure-callee
-                             #-(or x86 x86-64) %closure-fun)
+  (fun :init :arg :ref-trans #+(or x86 x86-64 arm64) %closure-callee
+                             #-(or x86 x86-64 arm64) %closure-fun)
   ;; 'fun' is an interior pointer to code, but we also need the base pointer
   ;; for MPS. I'm trying to figure out how to avoid this word of overhead,
   ;; but it works for the time being.

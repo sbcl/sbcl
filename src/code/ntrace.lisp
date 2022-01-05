@@ -700,75 +700,72 @@ functions when called with no arguments."
 (defun encapsulate-funobj (traced-fun &optional fdefn)
   (declare (type (or simple-fun closure) traced-fun))
   (let* ((proxy-fun
-          (typecase traced-fun
-           (simple-fun
-            ;; Generate a "closure" (that closes over nothing) which calls the
-            ;; original underlying function so that the original's entry point
-            ;; can be redirected to a tracing wrapper, which will produce trace
-            ;; output and invoke the closure which invokes the original fun.
-            #+(or x86-64 arm64)
-            (let ((closure (%primitive sb-vm::make-closure nil 0 nil)))
-              (with-pinned-objects (closure traced-fun)
-                (setf (sap-ref-word (int-sap (get-lisp-obj-address closure))
-                                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
-                      ;; Disregard the fun-self slot of fun.
-                      #+x86-64
-                      (+ (get-lisp-obj-address traced-fun)
-                         (- sb-vm:fun-pointer-lowtag)
-                         (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
-                      #+arm64
-                      (get-lisp-obj-address traced-fun)))
-              closure)
-            #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun nil 0 nil))
-           (closure
-            ;; Same as above, but simpler - the original closure will redirect
-            ;; to the tracing wraper, which will invoke a new closure that is
-            ;; behaviorally identical to the original closure.
-            (sb-impl::copy-closure traced-fun))))
+           (typecase traced-fun
+             (simple-fun
+              ;; Generate a "closure" (that closes over nothing) which calls the
+              ;; original underlying function so that the original's entry point
+              ;; can be redirected to a tracing wrapper, which will produce trace
+              ;; output and invoke the closure which invokes the original fun.
+              #+(or x86-64 arm64)
+              (let ((closure (%primitive sb-vm::make-closure nil 0 nil)))
+                (with-pinned-objects (closure traced-fun)
+                  (setf (sap-ref-word (int-sap (get-lisp-obj-address closure))
+                                      (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                        ;; Disregard the fun-self slot of fun.
+                        (+ (get-lisp-obj-address traced-fun)
+                           (- sb-vm:fun-pointer-lowtag)
+                           (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
+                closure)
+              #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun nil 0 nil))
+             (closure
+              ;; Same as above, but simpler - the original closure will redirect
+              ;; to the tracing wraper, which will invoke a new closure that is
+              ;; behaviorally identical to the original closure.
+              (sb-impl::copy-closure traced-fun))))
          (info (make-trace-info :what (cond (fdefn (fdefn-name fdefn))
                                             (t (%fun-name traced-fun)))
                                 :encapsulated t
                                 :named t
                                 :report 'trace))
          (tracing-wrapper
-          (compile-funobj-encapsulation 'trace-call info proxy-fun)))
+           (compile-funobj-encapsulation 'trace-call info proxy-fun)))
     (with-pinned-objects (tracing-wrapper)
-      (let (#+(or x86 x86-64)
+      (let (#+(or x86 x86-64 arm64)
             (tracing-wrapper-entry
-             (+ (get-lisp-obj-address tracing-wrapper)
-                (- sb-vm:fun-pointer-lowtag)
-                (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
+              (+ (get-lisp-obj-address tracing-wrapper)
+                 (- sb-vm:fun-pointer-lowtag)
+                 (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
         (typecase traced-fun
-         (simple-fun
-          (let ((code (fun-code-header traced-fun)))
-            (set-tracing-bit code code-is-traced)
-            (let ((fun-header-word-index
-                   (with-pinned-objects (code)
-                     (let ((delta (- (get-lisp-obj-address traced-fun)
-                                     (get-lisp-obj-address code)
-                                     sb-vm:fun-pointer-lowtag
-                                     (- sb-vm:other-pointer-lowtag))))
-                       (aver (not (logtest delta sb-vm:lowtag-mask)))
-                       (ash delta (- sb-vm:word-shift))))))
-              ;; the entry point in CODE points to the tracing wrapper
-              (setf (code-header-ref code (1+ fun-header-word-index))
-                    #+(or x86 x86-64) (make-lisp-obj tracing-wrapper-entry)
-                    #-(or x86 x86-64) tracing-wrapper))))
-         (closure
-          (with-pinned-objects (traced-fun)
-            ;; redirect the original closure to the tracing wrapper
-            #+(or x86 x86-64)
-            (setf (sap-ref-word (int-sap (get-lisp-obj-address traced-fun))
-                                (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
-                  tracing-wrapper-entry)
-            #-(or x86 x86-64 darwin-jit)
-            (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
-                                   (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
-                  tracing-wrapper)
-            #+darwin-jit
-            (setf (sb-vm::sap-ref-word-jit (int-sap (get-lisp-obj-address traced-fun))
-                                           (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
-                  (get-lisp-obj-address tracing-wrapper)))))))
+          (simple-fun
+           (let ((code (fun-code-header traced-fun)))
+             (set-tracing-bit code code-is-traced)
+             (let ((fun-header-word-index
+                     (with-pinned-objects (code)
+                       (let ((delta (- (get-lisp-obj-address traced-fun)
+                                       (get-lisp-obj-address code)
+                                       sb-vm:fun-pointer-lowtag
+                                       (- sb-vm:other-pointer-lowtag))))
+                         (aver (not (logtest delta sb-vm:lowtag-mask)))
+                         (ash delta (- sb-vm:word-shift))))))
+               ;; the entry point in CODE points to the tracing wrapper
+               (setf (code-header-ref code (1+ fun-header-word-index))
+                     #+(or x86 x86-64 arm64) (make-lisp-obj tracing-wrapper-entry)
+                     #-(or x86 x86-64 arm64) tracing-wrapper))))
+          (closure
+           (with-pinned-objects (traced-fun)
+             ;; redirect the original closure to the tracing wrapper
+             #+(or x86 x86-64)
+             (setf (sap-ref-word (int-sap (get-lisp-obj-address traced-fun))
+                                 (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                   tracing-wrapper-entry)
+             #-(or x86 x86-64 darwin-jit)
+             (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
+                                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                   tracing-wrapper)
+             #+darwin-jit
+             (setf (sb-vm::sap-ref-word-jit (int-sap (get-lisp-obj-address traced-fun))
+                                            (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                   tracing-wrapper-entry))))))
     ;; Update fdefn's raw-addr slot to point to the tracing wrapper
     (when (and fdefn (eq (fdefn-fun fdefn) traced-fun))
       (setf (fdefn-fun fdefn) tracing-wrapper))

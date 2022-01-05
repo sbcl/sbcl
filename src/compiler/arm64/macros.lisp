@@ -90,21 +90,10 @@
                          #+big-endian `(+ ,n-offset (1- n-word-bytes))))
       `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
-;;; Macros to handle the fact that our stack pointer isn't actually in
-;;; a register (or won't be, by the time we're done).
-
-;;; Macros to handle the fact that we cannot use the machine native call and
-;;; return instructions.
-
-(defmacro lisp-jump (function lip)
-  "Jump to the lisp lip LIP."
-  `(let ((function ,function)
-         (lip ,lip))
+(defmacro lisp-jump (lip)
+  `(let ((lip ,lip))
      (aver (sc-is lip interior-reg))
-     (inst add lip function
-           (+ (- (ash simple-fun-insts-offset word-shift)
-                 fun-pointer-lowtag)
-              4))
+     (inst add lip lip 4)
      (inst br lip)))
 
 (defmacro lisp-return (lip return-style)

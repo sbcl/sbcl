@@ -56,19 +56,19 @@
 (declaim (inline assign-simple-fun-self))
 (defun assign-simple-fun-self (fun)
   (let ((self ;; x86 backends store the address of the entrypoint in 'self'
-          #+(or x86 x86-64)
+          #+(or x86 x86-64 arm64)
           (%make-lisp-obj
            (truly-the word (+ (get-lisp-obj-address fun)
                               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
                               (- sb-vm:fun-pointer-lowtag))))
           ;; non-x86 backends store the function itself (what else?) in 'self'
-          #-(or x86 x86-64) fun))
+          #-(or x86 x86-64 arm64) fun))
     #-darwin-jit
     (setf (sb-vm::%simple-fun-self fun) self)
     #+darwin-jit
     (sb-vm::jit-patch (+ (get-lisp-obj-address fun)
-                  (- sb-vm:fun-pointer-lowtag)
-                  (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
+                         (- sb-vm:fun-pointer-lowtag)
+                         (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
                (get-lisp-obj-address self))))
 
 (flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p)

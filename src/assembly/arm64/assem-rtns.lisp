@@ -136,8 +136,8 @@
      (:temp r3 descriptor-reg r3-offset))
 
   (prepare-for-tail-call-variable nargs args count dest temp r0 r1 r2 r3)
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lip))
+  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lip))
 
 #+sb-assembling
 (define-assembly-routine
@@ -169,8 +169,8 @@
   (inst b :eq call)
   (inst b (make-fixup 'tail-call-symbol :assembly-routine))
   call
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lip))
+  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lip))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol

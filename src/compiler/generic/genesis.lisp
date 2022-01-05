@@ -2707,12 +2707,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
           #+compact-instance-header
           (write-wordindexed/raw fn 0 (logior (ash (cold-layout-descriptor-bits 'function) 32)
                                               (read-bits-wordindexed fn 0)))
-          #+(or x86 x86-64) ; store a machine-native pointer to the function entry
+          #+(or x86 x86-64 arm64) ; store a machine-native pointer to the function entry
           ;; note that the bit pattern looks like fixnum due to alignment
           (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
                                  (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
                                     (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
-          #-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
+          #-(or x86 x86-64 arm64) ; store a pointer back to the function itself in 'self'
           (write-wordindexed fn sb-vm:simple-fun-self-slot fn))
         (dotimes (i sb-vm:code-slots-per-simple-fun)
           (write-wordindexed des header-index (svref stack stack-index))

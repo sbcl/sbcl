@@ -384,7 +384,7 @@ trans_return_pc_header(lispobj object)
 }
 #endif /* RETURN_PC_WIDETAG */
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
 /* Closures hold a pointer to the raw simple-fun entry address instead of the
  * tagged object so that CALL [RAX+const] can be used to invoke it. */
 static sword_t

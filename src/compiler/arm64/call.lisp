@@ -896,10 +896,6 @@
                         :to :eval)
                        ,(if named 'name-pass 'lexenv))))
 
-     ,@(unless named
-         `((:temporary (:scs (descriptor-reg) :to :eval)
-                       function)))
-
      (:temporary (:sc any-reg :offset nargs-offset :to
                       ,(if (eq return :fixed)
                            :save
@@ -1030,8 +1026,8 @@
                               `(inst br lip)
                               `(inst blr lip))
                           (if (eq return :tail)
-                              `(tail-call-unnamed lexenv function lip fun-type)
-                              `(call-unnamed lexenv function lip fun-type))))
+                              `(tail-call-unnamed lexenv lip fun-type)
+                              `(call-unnamed lexenv lip fun-type))))
 
                    ,@(ecase return
                        (:fixed
@@ -1089,7 +1085,7 @@
     (inst br tmp-tn)))
 
 ;;; Invoke the function-designator FUN.
-(defun tail-call-unnamed (lexenv fun lip type)
+(defun tail-call-unnamed (lexenv lip type)
   (case type
     (:symbol
      (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
@@ -1103,14 +1099,11 @@
          (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
          (inst br tmp-tn))
        call
-       (loadw fun lexenv closure-fun-slot fun-pointer-lowtag)
-       (inst add lip fun
-             (+ (- (ash simple-fun-insts-offset word-shift)
-                   fun-pointer-lowtag)
-                4))
+       (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
+       (inst add lip lip 4)
        (inst br lip)))))
 
-(defun call-unnamed (lexenv fun lip type)
+(defun call-unnamed (lexenv lip type)
   (case type
     (:symbol
      (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
@@ -1125,10 +1118,7 @@
          (inst blr tmp-tn)
          (inst b ret))
        call
-       (loadw fun lexenv closure-fun-slot fun-pointer-lowtag)
-       (inst add lip fun
-             (- (ash simple-fun-insts-offset word-shift)
-                fun-pointer-lowtag))
+       (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
        (inst blr lip)
        ret))))
 

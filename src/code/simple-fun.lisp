@@ -50,9 +50,9 @@
 
 (macrolet ((new-closure (nvalues)
              ;; argument is the number of INFO words
-             #-(or x86 x86-64)
+             #-(or x86 x86-64 arm64)
              `(sb-vm::%alloc-closure ,nvalues (%closure-fun closure))
-             #+(or x86 x86-64)
+             #+(or x86 x86-64 arm64)
              `(with-pinned-objects ((%closure-fun closure))
                 ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                 ;; valid across GC due to %CLOSURE-FUN being pinned

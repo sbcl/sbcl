@@ -224,10 +224,7 @@ no_args:
 
         // Load the closure-fun (or simple-fun-self), in case we're
 	// trying to call a closure.
-        ldr     reg_R3, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-
-	// And, finally, call into Lisp!
-	add	reg_LR, reg_R3, #SIMPLE_FUN_INSTS_OFFSET
+        ldr     reg_LR, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
         blr     reg_LR
 
 	// Correct stack pointer for return processing.

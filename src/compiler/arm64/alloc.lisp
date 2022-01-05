@@ -108,11 +108,9 @@
                     :stack-allocate-p stack-allocate-p
                     :lip lip)
         (load-immediate-word pa-flag
-                             (logior
-                              (ash (1- size) n-widetag-bits)
-                              closure-widetag))
+                             (logior (ash (1- size) n-widetag-bits) closure-widetag))
         (cond (label
-               (inst adr lip label fun-pointer-lowtag)
+               (inst adr lip label (ash simple-fun-insts-offset word-shift))
                (storew-pair pa-flag 0 lip closure-fun-slot tmp-tn))
               (t
                (storew pa-flag tmp-tn)))))))
