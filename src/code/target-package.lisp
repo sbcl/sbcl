@@ -1050,7 +1050,7 @@ implementation it is ~S." *!default-package-use-list*)
                  (replace new-vector vector)
                  (with-pinned-objects (vector)
                    (setf (extern-alien "lisp_package_vector" unsigned)
-                         (get-lisp-obj-address vector)))
+                         (get-lisp-obj-address new-vector)))
                  (setf new-id current-length
                        vector new-vector
                        *id->package* vector)))
