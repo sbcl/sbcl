@@ -76,13 +76,9 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:info name offset lowtag)
-  (:temporary (:scs (non-descriptor-reg)) t1)
-  (:vop-var vop)
+  (:ignore name)
+  (:results)
   (:generator 1
-    ;; gencgc does not need to emit the barrier for constructors
-    (unless (member name '(%make-structure-instance make-weak-pointer
-                           %make-ratio %make-complex))
-      (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value))
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -93,9 +89,7 @@
   (:info name offset lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg) :from :load))
-  (:vop-var vop)
   (:generator 5
-    (emit-gc-store-barrier object nil (list temp) (vop-nth-arg 2 vop) new)
     (inst sync)
     (inst li temp (- (* offset n-word-bytes) lowtag))
     LOOP
@@ -120,7 +114,6 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
-    (emit-gc-store-barrier symbol nil (list temp) (vop-nth-arg 2 vop) new)
     (inst sync)
     (load-tls-index temp symbol)
     ;; Thread-local area, no synchronization needed.
@@ -194,9 +187,7 @@
 (define-vop (set)
   (:args (symbol :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
-  (:temporary (:sc non-descriptor-reg) tls-slot)
-  (:temporary (:sc any-reg) temp)
-  (:vop-var vop)
+  (:temporary (:sc any-reg) tls-slot temp)
   (:generator 4
     (load-tls-index tls-slot symbol)
     (inst ldx temp thread-base-tn tls-slot)
@@ -205,7 +196,6 @@
     (inst stdx value thread-base-tn tls-slot)
     (inst b DONE)
     GLOBAL-VALUE
-    (emit-gc-store-barrier symbol nil (list tls-slot) (vop-nth-arg 1 vop) value)
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     DONE))
 
@@ -352,7 +342,6 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (emit-gc-store-barrier fdefn nil (list type))
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
       (inst cmpdi type simple-fun-widetag)
@@ -442,7 +431,7 @@
   (:variant closure-info-offset fun-pointer-lowtag)
   (:translate %closure-index-ref))
 
-(define-vop (%closure-index-set descriptor-word-index-set)
+(define-vop (%closure-index-set word-index-set)
   (:variant closure-info-offset fun-pointer-lowtag)
   (:translate %closure-index-set))
 
@@ -498,7 +487,7 @@
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance positive-fixnum))
 
-(define-vop (instance-index-set descriptor-word-index-set)
+(define-vop (instance-index-set word-index-set)
   (:policy :fast-safe)
   (:translate %instance-set)
   (:variant instance-slots-offset instance-pointer-lowtag)
