@@ -319,8 +319,11 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
 
         inst = *pc;
         trap = inst & 0xff;
+#ifdef LISP_FEATURE_GENCGC
         if (trap == trap_Allocation) handle_allocation_trap(context, pc);
-        else handle_trap(context,trap);
+        else
+#endif
+            handle_trap(context,trap);
     }
     else if ((siginfo->si_code) == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {

@@ -218,6 +218,7 @@
   (inst b back-label))
 
 (defun allocation (type size lowtag result-tn &key flag-tn stack-allocate-p)
+  #+cheneygc (declare (ignore type))
   ;; Normal allocation to the heap.
   (cond (stack-allocate-p
          (load-csp result-tn)

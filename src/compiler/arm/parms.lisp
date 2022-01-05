@@ -93,6 +93,7 @@
 ;;; Link these as data entries so that we store only the address of the
 ;;; handwritten assembly code in the linkage able, and not a trampoline
 ;;; to the trampoline. The ALLOCATION macro just wants an address.
+#+gencgc
 (setq *linkage-space-predefined-entries* '(("alloc_tramp" t)
                                            ("list_alloc_tramp" t)))
 

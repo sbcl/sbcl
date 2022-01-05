@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
+#include <stdlib.h>
 #include "sbcl.h"
 #include "runtime.h"
 #include "os.h"
@@ -93,6 +94,7 @@ lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_typ
  */
 char gc_allocate_dirty = 0;
 
+#if 0
 static void verify_range(int purified, lispobj *base, lispobj *end);
 void show_spaces()
 {
@@ -112,6 +114,7 @@ void verify_heap(int purified)
     if (!purified)
     verify_range(0, current_dynamic_space, dynamic_space_free_pointer);
 }
+#endif
 
 /* Note: The generic GC interface we're implementing passes us a
  * last_generation argument. That's meaningless for us, since we're
@@ -505,6 +508,7 @@ sword_t scav_code_header(lispobj *where, lispobj header)
     return code_total_nwords(code);
 }
 
+#if 0
 static boolean in_stack_range_p(lispobj ptr)
 {
     struct thread* th = all_threads;
@@ -603,3 +607,4 @@ void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname)
     fprintf(f, "--\n");
     fclose(f);
 }
+#endif
