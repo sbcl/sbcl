@@ -263,7 +263,7 @@ void unwind_binding_stack()
         fprintf(stderr, "warning: bad value in %s\n", symbol_name);
     else for(i=vector_len(VECTOR(value))-1; i>=0; --i)
         SYMBOL(VECTOR(value)->data[i])->value = UNBOUND_MARKER_WIDETAG;
-    // these lisp pointers in C variables are like weak-pointers
+    // these are akin to weak-pointers
     lisp_package_vector = 0;
     alloc_profile_data = 0;
     if (verbose) printf("done]\n");

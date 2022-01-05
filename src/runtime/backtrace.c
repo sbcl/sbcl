@@ -123,10 +123,10 @@ lispobj debug_print(lispobj string)
 
 lispobj symbol_package(struct symbol* s)
 {
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
     static int warned;
-    // if using ldb when debugging cold-init, this can be confusing to see all symbols
-    // as if they were uninterned
+    // If using ldb when debugging cold-init, this can be confusing to see all symbols
+    // as if they were uninterned, but package-IDs are always available in the symbol.
+    // End-users should never see this failure.
     if (!lisp_package_vector) {
         if (!warned) {
           fprintf(stderr, "Warning: package vector has not been initialized yet\n");
@@ -136,20 +136,9 @@ lispobj symbol_package(struct symbol* s)
     }
     struct vector* v = VECTOR(lisp_package_vector);
     int id = symbol_package_id(s);
-    if (id < fixnum_value(v->length_)) return v->data[id];
+    if (id < vector_len(v)) return v->data[id];
     lose("can't decode package ID %d", id);
-#else
-    return s->package;
-#endif
 }
-
-#ifndef LISP_FEATURE_COMPACT_SYMBOL
-static int symbol_package_id(struct symbol* s) {
-    lispobj pkg = s->package;
-    if (pkg == NIL) return PACKAGE_ID_NONE;
-    return fixnum_value(((struct package*)native_pointer(pkg))->id);
-}
-#endif
 
 static void
 print_entry_name (lispobj name, FILE *f)

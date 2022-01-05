@@ -2219,8 +2219,7 @@
 (define-load-time-global *grokked-symbol-slots*
   (sort (copy-list `((,sb-vm:symbol-value-slot . symbol-value)
                      (,sb-vm:symbol-info-slot . symbol-info)
-                     (,sb-vm:symbol-name-slot . symbol-name)
-                     #-compact-symbol (,sb-vm:symbol-package-slot . symbol-package)))
+                     (,sb-vm:symbol-name-slot . symbol-name)))
         #'<
         :key #'car))
 

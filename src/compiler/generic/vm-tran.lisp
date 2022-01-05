@@ -33,7 +33,6 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-#+compact-symbol
 (define-source-transform keywordp (x)
   `(let ((object ,x))
      (and (symbolp object)

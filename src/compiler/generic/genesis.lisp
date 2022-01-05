@@ -1049,6 +1049,9 @@ core and return a descriptor to it."
   (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
     (when core-file-name
       (let* ((cold-name (set-readonly (base-string-to-core name *dynamic*)))
+             (pkg-id (if cold-package
+                         (descriptor-fixnum (read-slot cold-package :id))
+                         sb-impl::+package-id-none+))
              (hash (make-fixnum-descriptor
                     (if core-file-name (sb-c::symbol-name-hash name) 0))))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
@@ -1056,13 +1059,10 @@ core and return a descriptor to it."
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
         #+compact-symbol
         (write-wordindexed/raw symbol sb-vm:symbol-name-slot
-                               (encode-symbol-name
-                                (if cold-package
-                                    (descriptor-fixnum (read-slot cold-package :id))
-                                    sb-impl::+package-id-none+)
-                                cold-name))
+                               (encode-symbol-name pkg-id cold-name))
         #-compact-symbol
-        (progn (write-wordindexed symbol sb-vm:symbol-package-slot cold-package)
+        (progn (write-wordindexed symbol sb-vm:symbol-package-id-slot
+                                  (make-fixnum-descriptor pkg-id))
                (write-wordindexed symbol sb-vm:symbol-name-slot cold-name))))
     symbol))
 
@@ -1778,8 +1778,8 @@ core and return a descriptor to it."
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
     ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
     #-compact-symbol
-    (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-slot 1)
-                       (cdr target-cl-pkg-info))
+    (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-id-slot 1)
+                       (make-fixnum-descriptor sb-impl::+package-id-lisp+))
     (when core-file-name
       (record-accessibility :external target-cl-pkg-info *nil-descriptor*)))
   ;; Intern the others.
@@ -3194,15 +3194,15 @@ lispobj symbol_function(struct symbol* symbol);
 #include \"genesis/vector.h\"
 struct vector *symbol_name(struct symbol*);~%
 lispobj symbol_package(struct symbol*);~%")
+    (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
+            #+compact-symbol (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
+            #-compact-symbol "fixnum_value(s->package_id)")
     #+compact-symbol
     (progn (format stream "#define decode_symbol_name(ptr) (ptr & (uword_t)0x~X)~%"
                    (mask-field (byte sb-impl::symbol-name-bits 0) -1))
            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
   s->name = (s->name & (uword_t)0x~X) | name;~%}~%"
-                   (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1))
-           (format stream
-                   "static inline int symbol_package_id(struct symbol* s) { return s->name >> ~D; }~%"
-                   sb-impl::symbol-name-bits))
+                   (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1)))
     #-compact-symbol
     (progn (format stream "#define decode_symbol_name(ptr) ptr~%")
            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {

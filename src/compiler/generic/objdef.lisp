@@ -398,9 +398,9 @@ during backtrace.
   (fdefn :ref-trans %symbol-fdefn :ref-known ()
          :cas-trans cas-symbol-fdefn)
   #-compact-symbol
-  (package :ref-trans sb-xc:symbol-package
-           :set-trans %set-symbol-package
-           :init :null)
+  (package-id :type index ; actually 16 bits. (Could go in the header)
+              :ref-trans sb-impl::symbol-package-id
+              :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.
   ;; For the 32-bit architectures, reading this slot as a descriptor

@@ -289,28 +289,21 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
-;; FIXME: I think it would almost certainly be _less_ confusing
-;; if this were strictly a C variable, and not in both Lisp and C.
-;; C can't do without it for backtraces, and we could always use an alien var
-;; from lisp, whereas the other way (only a Lisp symbol) has a chicken-and-egg
-;; problem: C can't find a Lisp symbol unless it can find the package.
-(define-load-time-global *id->package* #())
-(declaim (simple-vector *id->package*))
+(define-symbol-macro *id->package*
+    (truly-the simple-vector
+     (sap-ref-lispobj (foreign-symbol-sap "lisp_package_vector" t) 0)))
+(export '*id->package*)
 
 (defun sb-xc:symbol-package (symbol)
   "Return SYMBOL's home package, or NIL if none."
-  #+compact-symbol
   (let ((id (symbol-package-id symbol)))
     (truly-the (or null package)
                (if (= id +package-id-overflow+)
                    (values (info :symbol :package symbol))
-                   (aref *id->package* id))))
-  #-compact-symbol
-  (sb-xc:symbol-package symbol))
+                   (aref *id->package* id)))))
 
 (defun %set-symbol-package (symbol package)
   (declare (type symbol symbol))
-  #+compact-symbol
   (let* ((new-id (cond ((not package) +package-id-none+)
                        ((package-id package))
                        (t +package-id-overflow+)))
@@ -319,8 +312,11 @@ distinct from the global value. Can also be SETF."
     (with-pinned-objects (name)
       (let ((name-bits (logior (ash new-id (- sb-vm:n-word-bits package-id-bits))
                                (get-lisp-obj-address name))))
+        (declare (ignorable name-bits))
         (when (= new-id +package-id-overflow+) ; put the package in the dbinfo
           (setf (info :symbol :package symbol) package))
+        #-compact-symbol (set-symbol-package-id symbol new-id)
+        #+compact-symbol
         (with-pinned-objects (symbol)
           (setf (sap-ref-word (int-sap (get-lisp-obj-address symbol))
                               (- (ash sb-vm:symbol-name-slot sb-vm:word-shift)
@@ -329,9 +325,7 @@ distinct from the global value. Can also be SETF."
     ;; CLEAR-INFO is inefficient, so try not to call it.
     (when (and (= old-id +package-id-overflow+) (/= new-id +package-id-overflow+))
       (clear-info :symbol :package symbol))
-    package)
-  #-compact-symbol ; vop translates
-  (%set-symbol-package symbol package))
+    package))
 
 ;;; MAKE-SYMBOL is the external API, %MAKE-SYMBOL is the internal function receiving
 ;;; a known simple-string, and %%MAKE-SYMBOL is the primitive constructor.
@@ -376,7 +370,7 @@ distinct from the global value. Can also be SETF."
                        (char= (char name (1- (length name))) #\*)))
               (sb-vm::make-immobile-symbol name)
               (sb-vm::%%make-symbol name)))))
-    #+compact-symbol (%set-symbol-package symbol nil)
+    (%set-symbol-package symbol nil)
     symbol))
 
 (defun get (symbol indicator &optional (default nil))
@@ -486,10 +480,7 @@ distinct from the global value. Can also be SETF."
 
 (defun keywordp (object)
   "Return true if Object is a symbol in the \"KEYWORD\" package."
-  #+compact-symbol (keywordp object) ; transformed
-  #-compact-symbol
-  (and (symbolp object)
-       (eq (sb-xc:symbol-package object) *keyword-package*)))
+  (keywordp object)) ; transformed
 
 ;;;; GENSYM and friends
 

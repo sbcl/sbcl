@@ -87,7 +87,7 @@ lispobj *current_auto_gc_trigger;
 lispobj *current_dynamic_space;
 #endif
 
-lispobj lisp_package_vector; // needed if #+compact-symbol
+lispobj lisp_package_vector;
 
 void globals_init(void)
 {

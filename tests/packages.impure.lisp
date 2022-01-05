@@ -1012,11 +1012,15 @@ if a restart was invoked."
     (assert (eq (foo-intern "X") (find-symbol "X" "PKG-B")))))
 
 ;;; It's extremely unlikely that a user would make >2^16 packages, but test that it works.
-(with-test (:name :ridiculous-amount-of-packages :skipped-on (:not :compact-symbol))
-  (make-package "WATPACKAGE")
+(defun grow-id->package-vector ()
   (let ((table (make-array 65535 :initial-element nil))) ; grow once only. Sorry for cheating
-    (replace table sb-impl::*id->package*)
-    (setf sb-impl::*id->package* table))
+    (replace table sb-impl:*id->package*)
+    (setf sb-impl:*id->package* table)))
+(compile 'grow-id->package-vector)
+
+(with-test (:name :ridiculous-amount-of-packages)
+  (make-package "WATPACKAGE")
+  (grow-id->package-vector) ; grow once only. Sorry for cheating
   (loop
     ;; This loop unfortunately takes 2 seconds, which kind of speaks to
     ;; the slowness of package creation. I don't think we need to improve that,

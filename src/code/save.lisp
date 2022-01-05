@@ -70,7 +70,6 @@
 (export 'sb-kernel::*save-lisp-clobbered-globals* 'sb-kernel)
 (define-load-time-global sb-kernel::*save-lisp-clobbered-globals*
     '#(sb-impl::*exit-lock*
-       sb-impl::*id->package*
        sb-thread::*make-thread-lock*
        sb-thread::*initial-thread*
        ;; Saving *JOINABLE-THREADS* could cause catastophic failure on restart.
