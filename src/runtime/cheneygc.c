@@ -35,6 +35,7 @@
 #include "code.h"
 #include "private-cons.inc"
 #include "getallocptr.h"
+#include "genesis/gc-tables.h" // for leaf_obj_widetag_p
 
 /* So you need to debug? */
 #if 0
@@ -92,9 +93,30 @@ lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_typ
  */
 char gc_allocate_dirty = 0;
 
+static void verify_range(int purified, lispobj *base, lispobj *end);
+void show_spaces()
+{
+    fprintf(stderr, " R/O     = %10p:%10p\n", (void*)READ_ONLY_SPACE_START, read_only_space_free_pointer);
+    fprintf(stderr, " static  = %10p:%10p\n", (void*)STATIC_SPACE_START, static_space_free_pointer);
+    fprintf(stderr, " dynamic = %10p:%10p\n", current_dynamic_space, dynamic_space_free_pointer);
+    struct thread* th = all_threads;
+    fprintf(stderr, " stack   = %10p:%10p\n",
+            th->control_stack_start,
+            access_control_stack_pointer(th));
+}
+void verify_heap(int purified)
+{
+    show_spaces();
+    verify_range(purified, (lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer);
+    verify_range(purified, (lispobj*)STATIC_SPACE_START, static_space_free_pointer);
+    if (!purified)
+    verify_range(0, current_dynamic_space, dynamic_space_free_pointer);
+}
+
 /* Note: The generic GC interface we're implementing passes us a
  * last_generation argument. That's meaningless for us, since we're
  * not a generational GC. So we ignore it. */
+int n_gcs;
 void
 collect_garbage(generation_index_t ignore)
 {
@@ -127,6 +149,7 @@ collect_garbage(generation_index_t ignore)
 
     /* Set up from space and new space pointers. */
 
+    // ++n_gcs; fprintf(stderr, "[%d] pre-verify:\n", n_gcs); verify_heap(0);
     from_space = current_dynamic_space;
     from_space_free_pointer = get_alloc_pointer();
 
@@ -165,7 +188,7 @@ collect_garbage(generation_index_t ignore)
 
     heap_scavenge(((lispobj *)STATIC_SPACE_START),
                   current_static_space_free_pointer);
-    if (lisp_package_vector) scavenge(&lisp_package_vector, 1);
+    scavenge(&lisp_package_vector, 1);
 
     /* Scavenge newspace. */
 #ifdef PRINTNOISE
@@ -215,6 +238,7 @@ collect_garbage(generation_index_t ignore)
     thread_sigmask(SIG_SETMASK, &old, 0);
 
     gc_active_p = 0;
+    // fprintf(stderr, "post-verify:\n"); verify_heap(0);
 
 #ifdef PRINTNOISE
     gettimeofday(&stop_tv, (struct timezone *) 0);
@@ -479,4 +503,103 @@ sword_t scav_code_header(lispobj *where, lispobj header)
     })
 
     return code_total_nwords(code);
+}
+
+static boolean in_stack_range_p(lispobj ptr)
+{
+    struct thread* th = all_threads;
+    return (ptr >= (uword_t)th->control_stack_start &&
+            ptr < (uword_t)access_control_stack_pointer(th));
+}
+
+static boolean valid_space_p(int purified, lispobj ptr)
+{
+    if ((ptr >= READ_ONLY_SPACE_START && ptr < (uword_t)read_only_space_free_pointer) ||
+        (ptr >= STATIC_SPACE_START && ptr < (uword_t)static_space_free_pointer) ||
+        (!purified &&
+         ((ptr >= (uword_t)current_dynamic_space && ptr < (uword_t)dynamic_space_free_pointer) ||
+          in_stack_range_p(ptr))))
+        return 1;
+    return 0;
+}
+
+void check_ptr(int purified, lispobj* where, lispobj ptr)
+{
+    if (!is_lisp_pointer(ptr)) return;
+
+    if (!valid_space_p(purified, ptr)) {
+        fprintf(stderr, "Sus' pointer %p @ %p outside expected ranges\n",
+                (void*)ptr, where);
+        return;
+    }
+
+    // must be properly tagged
+    if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
+        gc_assert(is_cons_half(CONS(ptr)->car));
+        gc_assert(is_cons_half(CONS(ptr)->cdr));
+    } else {
+        int widetag = widetag_of(native_pointer(ptr));
+        if (LOWTAG_FOR_WIDETAG(widetag) != lowtag_of(ptr) && !in_stack_range_p(ptr))
+            lose("Widetag/lowtag mismatch on %p", (void*)ptr);
+    }
+}
+
+#define CHECK_PTR(x,y) check_ptr(purified,x,y)
+
+static void
+verify_range(int purified, lispobj *base, lispobj *end)
+{
+    lispobj* where = base;
+    int len, i;
+    lispobj layout;
+    for ( ; where < end ; where += OBJECT_SIZE(*where, where) ) {
+        if (is_cons_half(*where)) {
+          CHECK_PTR(where+0, where[0]);
+          CHECK_PTR(where+1, where[1]);
+        } else switch (widetag_of(where)) {
+          case INSTANCE_WIDETAG:
+            layout = instance_layout(where);
+            if (layout) {
+                gc_assert(layoutp(layout));
+                len = instance_length(*where);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+                for (i=0; i<len; ++i)
+                    if (bitmap_logbitp(i, bitmap)) CHECK_PTR(where+i+1, where[1+i]);
+            }
+            break;
+          case CODE_HEADER_WIDETAG:
+            len = code_header_words((struct code*)where);
+            for(i=2; i<len; ++i) CHECK_PTR(where+i, where[i]);
+            break;
+          case FDEFN_WIDETAG:
+            CHECK_PTR(where+1, where[1]);
+            CHECK_PTR(where+2, where[2]);
+            CHECK_PTR(where+3, fdefn_callee_lispobj((struct fdefn*)where));
+            break;
+          case CLOSURE_WIDETAG:
+          case FUNCALLABLE_INSTANCE_WIDETAG:
+            // Scan the closure's trampoline word.
+            CHECK_PTR(where+1, fun_taggedptr_from_self(where[1]));
+            len = SHORT_BOXED_NWORDS(*where);
+            for(i=2; i<=len; ++i) CHECK_PTR(where+i, where[i]);
+            break;
+          default:
+            if (!leaf_obj_widetag_p(widetag_of(where))) {
+                int size = sizetab[widetag_of(where)](where);
+                for(i=1; i<size; ++i) CHECK_PTR(where+i, where[i]);
+            }
+          }
+    }
+}
+
+void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname)
+{
+    FILE *f;
+    f = fopen(pathname, "w");
+    while (where < limit) {
+        fprintf(f, "%p: %x\n", where, *where);
+        where += OBJECT_SIZE(*where, where);
+    }
+    fprintf(f, "--\n");
+    fclose(f);
 }
