@@ -814,16 +814,7 @@ Experimental: interface subject to change."
                          ;; bits are packed in the opposite order. And thankfully,
                          ;; this fix seems not to depend on whether the numbering
                          ;; scheme is MSB 0 or LSB 0, afaict.
-                         (let* ((wp
-                                 (let ((card-index
-                                        (logand
-                                         (ash (get-lisp-obj-address object) ; pinned above
-                                              (- (integer-length (1- sb-vm:gencgc-card-bytes))))
-                                         (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
-                                   (eql 1 (sb-sys:sap-ref-8
-                                           (sb-alien:extern-alien "gc_card_mark"
-                                                                  sb-sys:system-area-pointer)
-                                           card-index))))
+                         (let* ((wp (page-protected-p object))
                                 (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
                                 (flags (sb-alien:slot page 'sb-vm::flags))

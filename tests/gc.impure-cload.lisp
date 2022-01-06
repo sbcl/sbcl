@@ -179,8 +179,7 @@
   (let* ((foo (svref *junk* n-conses-per-page))
          (page (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address foo)))
          (gen (slot (deref sb-vm::page-table page) 'sb-vm::gen))
-         (flags (slot (deref sb-vm::page-table page) 'sb-vm::flags))
-         (wp (logbitp page-write-protect-bit flags))
+         (wp (sb-sys:with-pinned-objects (foo) (sb-kernel:page-protected-p foo)))
          (page-addr (+ sb-vm:dynamic-space-start
                        (* sb-vm:gencgc-card-bytes page)))
          (aok t))
@@ -203,8 +202,7 @@
     (assert (= (sb-kernel:generation-of (sb-kernel:%instance-layout foo)) 0))
 
     ;; And the page with FOO must have gotten touched
-    (assert (not (logbitp page-write-protect-bit
-                          (slot (deref sb-vm::page-table page) 'sb-vm::flags))))
+    (sb-sys:with-pinned-objects (foo) (assert (not (sb-kernel:page-protected-p foo))))
 
     ;; It requires *two* GCs, not one, to cause this bug.
     ;; The first GC sees that the page with the FOO on it was touched,
@@ -216,9 +214,7 @@
     (gc)
     #+nil
     (format t "~&page ~d: wp=~a~%"
-            page
-            (logbitp page-write-protect-bit
-                     (slot (deref sb-vm::page-table page) 'sb-vm::flags)))
+            page (sb-kernel:page-protected-p foo))
 
     ;; This GC would fail in the verify step because it trashes the apparently
     ;; orphaned layout, which actually does have a referer.

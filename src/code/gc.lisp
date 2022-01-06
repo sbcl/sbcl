@@ -421,6 +421,19 @@ Note: currently changes to this value are lost when saving core."
 (define-alien-variable generations
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
+
+#+gencgc
+(progn
+(export 'page-protected-p)
+(defun page-protected-p (object) ; OBJECT must be pinned by caller
+  (let ((card-index
+         (logand (ash (get-lisp-obj-address object)
+                      (- (integer-length (1- sb-vm:gencgc-card-bytes))))
+                 (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
+    (eql 1 (sb-sys:sap-ref-8
+            (sb-alien:extern-alien "gc_card_mark" sb-sys:system-area-pointer)
+            card-index)))))
+
 (macrolet ((def (slot doc &optional setfp)
              `(progn
                 (defun ,(symbolicate "GENERATION-" slot) (generation)
