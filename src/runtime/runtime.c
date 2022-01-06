@@ -540,7 +540,7 @@ parse_argv(struct memsize_options memsize_options,
                 print_version();
                 exit(0);
             } else if ((n_consumed = is_memsize_arg(argv, argi, argc, &merge_core_pages))) {
-                argi += 2;
+                argi += n_consumed;
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 debug_environment_p = 1;
                 ++argi;
