@@ -27,11 +27,10 @@
     (extern-alien "dynamic_space_free_pointer" system-area-pointer)))
 
 (declaim (inline dynamic-usage))
-#+gencgc
 (defun dynamic-usage ()
-  (extern-alien "bytes_allocated" os-vm-size-t))
-#-gencgc
-(defun dynamic-usage ()
+  #+gencgc
+  (extern-alien "bytes_allocated" os-vm-size-t)
+  #-gencgc
   (truly-the word
              (- (sap-int (sb-c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
@@ -98,8 +97,7 @@ run in any thread.")
 
 ;;;; internal GC
 
-(define-alien-routine collect-garbage int
-  (#+gencgc last-gen #-gencgc ignore int))
+(define-alien-routine collect-garbage int (last-gen int))
 
 #+(or sb-thread sb-safepoint)
 (progn
@@ -110,35 +108,10 @@ run in any thread.")
   (defun gc-stop-the-world ())
   (defun gc-start-the-world ()))
 
-#+gencgc
-(progn
-  (define-alien-variable ("gc_logfile" %gc-logfile) (* char))
-  (defun (setf gc-logfile) (pathname)
-    (let ((new (when pathname
-                 (make-alien-string
-                  (native-namestring (translate-logical-pathname pathname)
-                                     :as-file t))))
-          (old %gc-logfile))
-      (setf %gc-logfile new)
-      (when old
-        (free-alien old))
-      pathname))
-  (defun gc-logfile ()
-    "Return the pathname used to log garbage collections. Can be SETF.
-Default is NIL, meaning collections are not logged. If non-null, the
-designated file is opened before and after each collection, and generation
-statistics are appended to it."
-    (let ((val (cast %gc-logfile c-string)))
-      (when val
-        (native-pathname val)))))
-
 (declaim (inline dynamic-space-size))
 (defun dynamic-space-size ()
   "Size of the dynamic space in bytes."
   (extern-alien "dynamic_space_size" os-vm-size-t))
-#+gencgc
-(define-symbol-macro sb-vm:dynamic-space-end
-  (+ (dynamic-space-size) sb-vm:dynamic-space-start))
 
 ;;;; SUB-GC
 
@@ -397,16 +370,39 @@ Note: currently changes to this value are lost when saving core."
 
 ;;;; GENCGC specifics
 ;;;;
-;;;; For documentation convenience, these have stubs on non-GENCGC platforms
-;;;; as well.
 #+gencgc
+(progn
+
+(define-symbol-macro sb-vm:dynamic-space-end
+    (+ (dynamic-space-size) sb-vm:dynamic-space-start))
+
+(define-alien-variable ("gc_logfile" %gc-logfile) (* char))
+
+(defun (setf gc-logfile) (pathname)
+  (let ((new (when pathname
+               (make-alien-string
+                (native-namestring (translate-logical-pathname pathname)
+                                   :as-file t))))
+        (old %gc-logfile))
+    (setf %gc-logfile new)
+    (when old
+      (free-alien old))
+    pathname))
+(defun gc-logfile ()
+    "Return the pathname used to log garbage collections. Can be SETF.
+Default is NIL, meaning collections are not logged. If non-null, the
+designated file is opened before and after each collection, and generation
+statistics are appended to it."
+  (let ((val (cast %gc-logfile c-string)))
+    (when val
+      (native-pathname val))))
+
 (deftype generation-index ()
   `(integer 0 ,sb-vm:+pseudo-static-generation+))
 
 ;;; FIXME: GENERATION (and PAGE, as seen in room.lisp) should probably be
 ;;; defined in Lisp, and written to header files by genesis, instead of this
 ;;; OAOOMiness -- this duplicates the struct definition in gencgc.c.
-#+gencgc
 (define-alien-type generation
     (struct generation
             (bytes-allocated os-vm-size-t)
@@ -417,13 +413,9 @@ Note: currently changes to this value are lost when saving core."
             (cum-sum-bytes-allocated os-vm-size-t)
             (minimum-age-before-gc double)))
 
-#+gencgc
 (define-alien-variable generations
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
-
-#+gencgc
-(progn
 (export 'page-protected-p)
 (defun page-protected-p (object) ; OBJECT must be pinned by caller
   (let ((card-index
@@ -432,32 +424,18 @@ Note: currently changes to this value are lost when saving core."
                  (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
     (eql 1 (sb-sys:sap-ref-8
             (sb-alien:extern-alien "gc_card_mark" sb-sys:system-area-pointer)
-            card-index)))))
+            card-index))))
 
-(macrolet ((def (slot doc &optional setfp)
+(macrolet ((def (slot doc &optional adjustable)
              `(progn
                 (defun ,(symbolicate "GENERATION-" slot) (generation)
                   ,doc
-                  #+gencgc
                   (declare (generation-index generation))
-                  #-gencgc
-                  (declare (ignore generation))
-                  #-gencgc
-                  (error "~S is a GENCGC only function and unavailable in this build"
-                         ',slot)
-                  #+gencgc
                   (slot (deref generations generation) ',slot))
-                ,@(when setfp
-                        `((defun (setf ,(symbolicate "GENERATION-" slot)) (value generation)
-                            #+gencgc
-                            (declare (generation-index generation))
-                            #-gencgc
-                            (declare (ignore value generation))
-                            #-gencgc
-                            (error "(SETF ~S) is a GENCGC only function and unavailable in this build"
-                                   ',slot)
-                            #+gencgc
-                            (setf (slot (deref generations generation) ',slot) value)))))))
+                ,@(when adjustable
+                    `((defun (setf ,(symbolicate "GENERATION-" slot)) (value generation)
+                        (declare (generation-index generation))
+                        (setf (slot (deref generations generation) ',slot) value)))))))
   (def bytes-consed-between-gcs
       "Number of bytes that can be allocated to GENERATION before that
 generation is considered for garbage collection. This value is meaningless for
@@ -498,16 +476,11 @@ objects allocated to the generation have seen younger objects promoted to it.
 Available on GENCGC platforms only.
 
 Experimental: interface subject to change."
-    #+gencgc
     (declare (generation-index generation))
-    #-gencgc (declare (ignore generation))
-    #-gencgc
-    (error "~S is a GENCGC only function and unavailable in this build."
-           'generation-average-age)
-    #+gencgc
     (alien-funcall (extern-alien "generation_average_age"
                                  (function double generation-index-t))
                    generation))
+)
 
 (macrolet ((cases ()
              `(cond ((< (current-dynamic-space-start) addr
