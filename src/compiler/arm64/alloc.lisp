@@ -109,11 +109,8 @@
                     :lip lip)
         (load-immediate-word pa-flag
                              (logior (ash (1- size) n-widetag-bits) closure-widetag))
-        (cond (label
-               (inst adr lip label (ash simple-fun-insts-offset word-shift))
-               (storew-pair pa-flag 0 lip closure-fun-slot tmp-tn))
-              (t
-               (storew pa-flag tmp-tn)))))))
+        (inst adr lip label (ash simple-fun-insts-offset word-shift))
+        (storew-pair pa-flag 0 lip closure-fun-slot tmp-tn)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;

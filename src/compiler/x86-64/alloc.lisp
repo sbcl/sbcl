@@ -800,39 +800,37 @@
             result fdefn-raw-addr-slot other-pointer-lowtag)))
 
 (define-vop (make-closure)
-  ; (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
   (:temporary (:sc any-reg) temp)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
-   (let* ((words (+ length closure-info-offset)) ; including header
-          (bytes (pad-data-block words))
-          (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
-     (unless stack-allocate-p
-       (instrument-alloc closure-widetag bytes node (list result temp) thread-tn))
-     (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-       (if stack-allocate-p
-           (stack-allocation bytes fun-pointer-lowtag result)
-           (allocation nil bytes fun-pointer-lowtag result node temp thread-tn))
-       (storew* #-immobile-space header ; write the widetag and size
-                #+immobile-space        ; ... plus the layout pointer
-                (progn (inst mov temp header)
-                       (inst or temp #-sb-thread (static-symbol-value-ea 'function-layout)
-                                     #+sb-thread
-                                     (thread-slot-ea thread-function-layout-slot))
-                       temp)
-                result 0 fun-pointer-lowtag (not stack-allocate-p)))
-     ;; Finished with the pseudo-atomic instructions
-     (when label
-       ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
-       (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-       (storew temp result closure-fun-slot fun-pointer-lowtag)
-       #+metaspace
-       (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
-         (inst lea temp (rip-relative-ea origin :code))
-         (storew temp result closure-code-slot fun-pointer-lowtag))))))
+    (let* ((words (+ length closure-info-offset)) ; including header
+           (bytes (pad-data-block words))
+           (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
+      (unless stack-allocate-p
+        (instrument-alloc closure-widetag bytes node (list result temp) thread-tn))
+      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+        (if stack-allocate-p
+            (stack-allocation bytes fun-pointer-lowtag result)
+            (allocation nil bytes fun-pointer-lowtag result node temp thread-tn))
+        (storew* #-immobile-space header ; write the widetag and size
+                 #+immobile-space        ; ... plus the layout pointer
+                 (progn (inst mov temp header)
+                        (inst or temp #-sb-thread (static-symbol-value-ea 'function-layout)
+                                      #+sb-thread
+                                      (thread-slot-ea thread-function-layout-slot))
+                        temp)
+                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
+      ;; Finished with the pseudo-atomic instructions
+      ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
+      (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
+      (storew temp result closure-fun-slot fun-pointer-lowtag)
+      #+metaspace
+      (let ((origin (sb-assem::asmstream-data-origin-label sb-assem:*asmstream*)))
+        (inst lea temp (rip-relative-ea origin :code))
+        (storew temp result closure-code-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
