@@ -832,44 +832,6 @@
     (with-shift-operands
       (move ecx amount)
       (inst shl result :cl))))
-(define-vop (fast-ash-left/fixnum-modfx=>fixnum
-             fast-ash-left/fixnum=>fixnum)
-  (:translate ash-left-modfx)
-  (:args-var args)
-  (:generator 3
-    (with-shift-operands
-      (move ecx amount)
-      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                         (specifier-type '(mod 63)))
-        (inst cmp amount 63)
-        (inst jmp :be OKAY)
-        (zeroize result))
-      OKAY
-      (inst shl result :cl))))
-
-(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
-             fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod64))
-
-(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
-             fast-ash-c/fixnum=>fixnum)
-  (:variant :modular)
-  (:translate ash-left-modfx))
-
-(define-vop (fast-ash-left/unsigned-mod64=>unsigned
-             fast-ash-left/unsigned=>unsigned)
-  (:translate ash-left-mod64)
-  (:args-var args)
-  (:generator 3
-    (with-shift-operands
-      (move ecx amount)
-      (unless (csubtypep (tn-ref-type (tn-ref-across args)) ;; amount
-                         (specifier-type '(mod 63)))
-        (inst cmp amount 63)
-        (inst jmp :be OKAY)
-        (zeroize result))
-      OKAY
-      (inst shl result :cl))))
 
 (define-vop (fast-ash-left/fixnum-modfx=>fixnum
              fast-ash-left/fixnum=>fixnum)
