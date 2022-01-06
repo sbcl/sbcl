@@ -261,12 +261,11 @@ page_ends_contiguous_block_p(page_index_t page_index,
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
- * Clear all other flags as well, since they don't mean anything,
- * and a store is simpler than a bitwise operation */
+ * Clear all the flags that don't pertain to a free page */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
-    page_table[page].type = page_table[page].padding
-        = page_table[page].write_protected_cleared = page_table[page].pinned = 0;
+    page_table[page].type = 0;
+    page_table[page].write_protected_cleared = page_table[page].pinned = 0;
     SET_PAGE_PROTECTED(page,0);
 }
 
@@ -1303,7 +1302,7 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 /* Test whether page 'index' can continue a non-large-object region
  * having specified 'gen' and 'allocated' values. */
 static inline boolean
-page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
+page_extensible_p(page_index_t index, generation_index_t gen, int type) {
 #ifdef LISP_FEATURE_BIG_ENDIAN /* TODO: implement the simpler test */
     /* Counterintuitively, gcc prefers to see sequential tests of the bitfields,
      * versus one test "!(p.write_protected | p.pinned)".
@@ -1313,7 +1312,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
      * test that 1 bit, which is a literal rendering of the user-written code.
      */
     boolean result =
-           page_table[index].type == allocated
+           page_table[index].type == type
         && page_table[index].gen == gen
         && !PAGE_WRITEPROTECTED_P(index)
         && !page_table[index].pinned;
@@ -1328,17 +1327,18 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
      * in the 'to' generation that is currently un-write-protected but with
      * write_protected_cleared flag = 1 because it was at some point WP'ed.
      * Those pages are usable, so we do have to mask out the 'cleared' bit.
+     * Also, the 'need_zerofill' bit can have any value.
      *
-     *      pin -\
-     *            v
-     * #b11111111_10_11111
+     *      pin -\   /-- need_zerofill
+     *            v v
+     * #b11111111_10011111
      *             ^ ^^^^^ -- type
      *     WP-clr /
      *
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
-    return ((*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|allocated))
-      && !PAGE_WRITEPROTECTED_P(index);
+    int bits_match = ((*(int16_t*)(&page_table[index].gen-1) & 0xFF9F) == ((gen<<8)|type));
+    return bits_match && !PAGE_WRITEPROTECTED_P(index);
 #endif
 }
 

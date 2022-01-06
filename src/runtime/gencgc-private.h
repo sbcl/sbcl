@@ -14,19 +14,10 @@
 
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type);
 
-/// There is some additional cleverness that could potentially be had -
-/// the "need_to_zero" bit (a/k/a "page dirty") is obviously 1 if the page
-/// contains objects. Only for an empty page must we distinguish between pages
-/// not needing be zero-filled before next use and those which must be.
-/// Thus, masking off the dirty bit could be avoided by not storing it for
-/// any in-use page. But since that's not what we do - we set the bit to 1
-/// as soon as a page is used - we do have to mask off the bit.
-#define page_bytes_used(index) (page_table[index].bytes_used_ & ~1)
-#define page_need_to_zero(index) (page_table[index].bytes_used_ & 1)
-#define set_page_bytes_used(index,val) \
-  page_table[index].bytes_used_ = (val) | page_need_to_zero(index)
-#define set_page_need_to_zero(index,val) \
-  page_table[index].bytes_used_ = page_bytes_used(index) | val
+#define page_bytes_used(index) page_table[index].bytes_used_
+#define page_need_to_zero(index) page_table[index].need_zerofill
+#define set_page_bytes_used(index,val) page_table[index].bytes_used_ = val
+#define set_page_need_to_zero(index,val) page_table[index].need_zerofill = val
 
 #if !CONDENSED_PAGE_TABLE
 

@@ -32,6 +32,10 @@
                  list))
 
 #+gencgc
+(progn
+(defun page-need-to-zero (index)
+  (logbitp #+little-endian 5 #+big-endian 2
+           (slot (deref sb-vm::page-table index) 'sb-vm::flags)))
 (defun test-private-consing ()
   (let ((conses-per-page ; subtract one for the page header cons
          (1- (/ sb-vm:gencgc-card-bytes (* 2 sb-vm:n-word-bytes))))
@@ -47,9 +51,10 @@
         (push index pages)
         (assert (= cons (+ base-address (* 2 sb-vm:n-word-bytes))))
         ;; bytes-used should correspond to 2 conses,
-        ;; and the dirty flag should be 1.
+        ;; and the need_zerofill bit should be 1.
         (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used)
-                   (logior (* 4 sb-vm:n-word-bytes) 1)))
+                   (* 4 sb-vm:n-word-bytes)))
+        (assert (page-need-to-zero index))
         (dotimes (i (1- conses-per-page))
           (setq final (private-list (incf counter))))
         (assert (= final (+ base-address sb-vm:gencgc-card-bytes
@@ -67,7 +72,8 @@
     (alien-funcall (extern-alien "gc_dispose_private_pages" (function void)))
     ;; Each of the pages should have zero bytes used and need-to-zero = 1
     (dolist (index pages)
-      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used) 1)))))
+      (assert (page-need-to-zero index))
+      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used) 0))))))
 
 #-gencgc
 (defun test-private-consing ()

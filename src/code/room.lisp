@@ -442,9 +442,7 @@ We could try a few things to mitigate this:
     (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
                    start-page end-page))
     (setq end-page start-page)
-    (loop (setq end-page-bytes-used
-                ;; The low bit of bytes-used is the need-to-zero flag.
-                (logandc1 1 (slot (deref page-table end-page) 'bytes-used)))
+    (loop (setq end-page-bytes-used (slot (deref page-table end-page) 'bytes-used))
           ;; See 'page_ends_contiguous_block_p' in gencgc.c
           (when (or (< end-page-bytes-used gencgc-card-bytes)
                     (= (slot (deref page-table (1+ end-page)) 'start) 0))

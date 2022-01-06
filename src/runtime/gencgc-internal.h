@@ -105,11 +105,11 @@ struct page {
          * The high bit indicates that the page holds part of or the entirety
          * of a single object and no other objects.
          * Constants for this field are defined in gc-internal.h, the
-         * xxx_PAGE_FLAG definitions.
-         *
-         * If the page is free, all the following fields are zero. */
+         * xxx_PAGE_FLAG definitions. */
         type :5,
-        padding :1,
+        /* Whether the page was used at all. This is the only bit that can
+         * be 1 on a free page */
+        need_zerofill :1,
         /* This flag is set when the above write_protected flag is
          * cleared by the SIGBUS handler (or SIGSEGV handler, for some
          * OSes). This is useful for re-scavenging pages that are
