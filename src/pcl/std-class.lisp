@@ -1655,8 +1655,19 @@
            (push (car cell) added)))
 
        (replace-wrapper-and-slots instance nwrapper nslots)
-       (update-instance-for-redefined-class
-        instance added discarded plist)
+       ;; The obsolete instance protocol does not specify what happens if
+       ;; an error is signaled in U-I-F-R-C and there is a nonlocal exit
+       ;; outside; it may result in a half-updated instance whose
+       ;; structure is updated but whose added slots are not initialized.
+       ;; (See CLHS 3.7.2.)
+       ;; The approach taken here is to abort the update process, as defined
+       ;; in CLHS 4.3.6, altogether, and restore the instance to its obsolete
+       ;; state; this way the programmer can try to fix the U-I-F-R-C code
+       ;; which signaled an error and try to access the instance again
+       ;; in order to try and update it again.
+       (sb-sys:nlx-protect (update-instance-for-redefined-class
+                            instance added discarded plist)
+         (replace-wrapper-and-slots instance owrapper oslots))
 
        nwrapper))
     (*in-obsolete-instance-trap* #.(find-layout 'structure-object))
@@ -1714,7 +1725,20 @@
     ;; Users need to synchronize their own access when changing class.
     (replace-wrapper-and-slots copy old-wrapper old-slots)
     (replace-wrapper-and-slots instance new-wrapper new-slots)
-    (apply #'update-instance-for-different-class copy instance initargs)
+
+    ;; The CLHS does not specify what happens if an error is signaled in
+    ;; U-I-F-D-C and there is a nonlocal exit outside; it may result in a
+    ;; half-updated instance whose class is updated but whose added slots
+    ;; are not initialized. (See CLHS 3.7.2.)
+    ;; The approach taken here is to abort the change-class process, as
+    ;; defined in CLHS 4.3.6, altogether, and restore the instance to its
+    ;; previous state; this way the programmer can try to fix the U-I-F-D-C
+    ;; code which signaled an error and try to CHANGE-CLASS the instance
+    ;; again.
+    (sb-sys:nlx-protect (apply #'update-instance-for-different-class
+                               copy instance initargs)
+      (replace-wrapper-and-slots instance old-wrapper old-slots))
+
     instance))
 ) ; end MACROLET
 
