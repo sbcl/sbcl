@@ -288,4 +288,5 @@
          (slab-capacity ,slab) ,capacity
          (slab-chunk-size ,slab) ,chunksize))
 
+#+gencgc
 (defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))
