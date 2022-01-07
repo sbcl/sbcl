@@ -2238,11 +2238,22 @@ static void pin_object(lispobj object)
     // Prior to that, the unboxed payload will contain random bytes.
     // There can't be references to any of the simple-funs
     // until the object is fully constructed.
-    if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG && maybe_code->debug_info)
+    if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG && maybe_code->debug_info) {
         for_each_simple_fun(i, fun, maybe_code, 0, {
             hopscotch_insert(&pinned_objects, make_lispobj(fun, FUN_POINTER_LOWTAG), 1);
             page_table[find_page_index(fun)].pinned = 1;
         })
+#ifdef RETURN_PC_WIDETAG
+        /* Return PCs can't go in the hash-table, because there's no way to find them.
+         * But from_space_p() has to return false on return PCs in pinned code.
+         * pinned_p is mostly OK, but it needs to see the 'pinned' bit on for the page
+         * having the return PC. There's a chance that we would not set it properly
+         * in page-spanning objects, so loop over pages just like for a large object */
+        size_t nwords = OBJECT_SIZE(*object_start, object_start);
+        page_index_t last_page = find_page_index(object_start + nwords - 1);
+        while (page <= last_page) page_table[page++].pinned = 1;
+#endif
+    }
 }
 
 #if !GENCGC_IS_PRECISE || defined LISP_FEATURE_PPC64
