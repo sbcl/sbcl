@@ -649,23 +649,7 @@ void execute_full_sweep_phase()
     if (sweeplog)
         fflush(sweeplog);
 
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     free_page = next_free_page;
-#else
-    page_index_t first_page, last_page;
-    for (first_page = 0; first_page < next_free_page; ++first_page)
-        if (PAGE_WRITEPROTECTED_P(first_page)
-            && protection_mode(first_page) == PHYSICAL) {
-            last_page = first_page;
-            while (PAGE_WRITEPROTECTED_P(last_page+1)
-                   && protection_mode(last_page+1) == PHYSICAL)
-                ++last_page;
-            os_protect(page_address(first_page),
-                       (last_page - first_page + 1) * GENCGC_PAGE_BYTES,
-                       OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
-            first_page = last_page;
-        }
-#endif
     while (free_page < page_table_pages) {
         page_table[free_page++].type = FREE_PAGE_FLAG;
     }

@@ -3546,33 +3546,6 @@ write_protect_generation_pages(generation_index_t generation)
 #endif
 }
 
-static void unprotect_all_pages()
-{
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    // This function remove physical protection only, and does not alter
-    // the WP bit, so therefore do nothing for soft card marks.
-    return;
-#endif
-#ifndef LISP_FEATURE_DARWIN_JIT
-    os_protect(page_address(0), npage_bytes(next_free_page), OS_VM_PROT_ALL);
-#else
-    page_index_t start = 0, end;
-    while (start  < next_free_page) {
-
-        if (!is_code(page_table[start].type) && page_words_used(start)) {
-            for (end = start + 1; end < next_free_page; end++) {
-                if (is_code(page_table[end].type) || !page_words_used(end))
-                    break;
-            }
-            os_protect(page_address(start), npage_bytes(end - start), OS_VM_PROT_READ | OS_VM_PROT_WRITE);
-            start = end+1;
-        } else {
-            start++;
-        }
-    }
-#endif
-}
-
 #if !GENCGC_IS_PRECISE
 static void
 preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_register_t),
@@ -3947,10 +3920,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
          * break chains of objects causing accidental reachability.
          * Subsequent GC cycles will compact and reclaims space as usual. */
         from_space = new_space = -1;
-
-        // Unprotect the dynamic space but leave page_table bits alone
-        if (ENABLE_PAGE_PROTECTION)
-            unprotect_all_pages();
 
         // Allocate pages from dynamic space for the work queue.
         extern void prepare_for_full_mark_phase();
