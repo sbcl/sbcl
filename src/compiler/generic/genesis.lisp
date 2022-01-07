@@ -3609,7 +3609,7 @@ III. initially undefined function references (alphabetically):
                      ;; KLUDGE to avoid compiler note about one or the other
                      ;; branch of this IF being unreachable.
                      (declare (notinline typep))
-                     (if (typep sb-vm:gencgc-page-bytes '(unsigned-byte 16))
+                     (if (typep sb-vm::gencgc-page-words '(unsigned-byte 16))
                          '#'(setf bvref-16)
                          '#'(setf bvref-32))))
           (funcall (setter) usage ptes (+ pte-offset sb-vm:n-word-bytes)))))
