@@ -3676,7 +3676,8 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
 }
 
 #ifdef LISP_FEATURE_PPC64
-static void semiconservative_pin_stack(struct thread* th) {
+static void semiconservative_pin_stack(struct thread* th,
+                                       generation_index_t gen) {
     /* Stack can only pin code, since it contains return addresses.
      * Non-code pointers on stack do *not* pin anything, and may be updated
      * when scavenging.
@@ -3696,7 +3697,8 @@ static void semiconservative_pin_stack(struct thread* th) {
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
-            preserve_pointer((void*)word); // maybe pin something, tagged pointer or not
+            if (gen == 0) sticky_preserve_pointer(word);
+            else preserve_pointer((void*)word);
         }
         preserve_pointer((void*)*os_context_lr_addr(context));
         preserve_pointer((void*)*os_context_ctr_addr(context));
@@ -3973,7 +3975,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
             conservative_stack_scan(th, generation, approximate_stackptr);
 #elif defined LISP_FEATURE_PPC64
             // Pin code if needed
-            semiconservative_pin_stack(th);
+            semiconservative_pin_stack(th, generation);
 #elif !defined(reg_CODE)
             pin_stack(th);
 #endif

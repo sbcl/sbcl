@@ -77,8 +77,10 @@
   (defreg thread 30)
   (defreg lip 31)
 
+  ;; nl5 is reserved for the GC card table base. It's restored after every
+  ;; foreign call, since it coincides with the sixth C arg-passing register.
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
+      nl0 nl1 nl2 nl3 nl4 #|nl5|# nl6 cfunc nargs nfp)
 
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra lexenv l0 l1)
