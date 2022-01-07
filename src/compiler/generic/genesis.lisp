@@ -3580,11 +3580,11 @@ III. initially undefined function references (alphabetically):
 #+gencgc
 (defun output-page-table (gspace data-page core-file write-word verbose)
   ;; Write as many PTEs as there are pages used.
-  ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
+  ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
          (n-ptes (ceiling data-bytes sb-vm:gencgc-page-bytes))
          (sizeof-usage ; see similar expression in 'src/code/room'
-          (if (typep sb-vm:gencgc-page-bytes '(unsigned-byte 16)) 2 4))
+          (if (typep sb-vm::gencgc-page-words '(unsigned-byte 16)) 2 4))
          (sizeof-corefile-pte (+ sb-vm:n-word-bytes sizeof-usage))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb-vm:n-word-bytes))
          (n-code 0)
@@ -3594,7 +3594,7 @@ III. initially undefined function references (alphabetically):
     (dotimes (page-index n-ptes)
       (let* ((pte-offset (* page-index sizeof-corefile-pte))
              (pte (aref (gspace-page-table gspace) page-index))
-             (usage (page-bytes-used pte))
+             (usage (/ (page-bytes-used pte) sb-vm:n-word-bytes))
              (sso (if (plusp usage)
                       (- (* page-index sb-vm:gencgc-page-bytes)
                          (* (page-scan-start pte) sb-vm:n-word-bytes))

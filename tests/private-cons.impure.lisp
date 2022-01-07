@@ -50,10 +50,9 @@
              (final))
         (push index pages)
         (assert (= cons (+ base-address (* 2 sb-vm:n-word-bytes))))
-        ;; bytes-used should correspond to 2 conses,
+        ;; words-used should be 4, for 2 conses,
         ;; and the need_zerofill bit should be 1.
-        (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used)
-                   (* 4 sb-vm:n-word-bytes)))
+        (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::words-used) 4))
         (assert (page-need-to-zero index))
         (dotimes (i (1- conses-per-page))
           (setq final (private-list (incf counter))))
@@ -70,10 +69,10 @@
         (assert (= (sb-vm::find-page-index (sb-sys:sap-int sap))
                    (pop pages)))))
     (alien-funcall (extern-alien "gc_dispose_private_pages" (function void)))
-    ;; Each of the pages should have zero bytes used and need-to-zero = 1
+    ;; Each of the pages should have zero words used and need-to-zero = 1
     (dolist (index pages)
       (assert (page-need-to-zero index))
-      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used) 0))))))
+      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::words-used) 0))))))
 
 #-gencgc
 (defun test-private-consing ()

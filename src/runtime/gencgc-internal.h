@@ -29,6 +29,7 @@
 #error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
 #endif
 
+#define GENCGC_PAGE_WORDS (GENCGC_PAGE_BYTES/N_WORD_BYTES)
 extern char *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
@@ -51,10 +52,10 @@ int gencgc_handle_wp_violation(void *);
 # if GENCGC_PAGE_BYTES > UINT_MAX
 #   error "GENCGC_PAGE_BYTES unexpectedly large."
 # else
-    typedef unsigned int page_bytes_t;
+    typedef unsigned int page_words_t;
 # endif
 #else
-  typedef unsigned short page_bytes_t;
+  typedef unsigned short page_words_t;
 #endif
 
 /* Note that this structure is also used from Lisp-side in
@@ -84,12 +85,11 @@ struct page {
     os_vm_size_t scan_start_offset_;
 #endif
 
-    /* the number of bytes of this page that are used. This may be less
-     * than the actual bytes used for pages within the current
+    /* the number of lispwords of this page that are used. This may be less
+     * than the usage at an instant in time for pages within the current
      * allocation regions. MUST be 0 for unallocated pages.
-     * When read, the low bit has to be masked off.
      */
-    page_bytes_t bytes_used_;
+    page_words_t words_used_;
 
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
@@ -159,7 +159,7 @@ extern long gc_card_table_mask;
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset
-  page_bytes_t bytes_used;
+  page_words_t words_used; // low bit is the 'large object' flag
 };
 
 /* values for the page.allocated field */

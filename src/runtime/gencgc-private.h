@@ -14,9 +14,11 @@
 
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type);
 
-#define page_bytes_used(index) page_table[index].bytes_used_
+typedef unsigned int page_bytes_t;
+#define page_words_used(index) page_table[index].words_used_
+#define page_bytes_used(index) ((page_bytes_t)page_table[index].words_used_<<WORD_SHIFT)
 #define page_need_to_zero(index) page_table[index].need_zerofill
-#define set_page_bytes_used(index,val) page_table[index].bytes_used_ = val
+#define set_page_bytes_used(index,val) page_table[index].words_used_ = ((val)>>WORD_SHIFT)
 #define set_page_need_to_zero(index,val) page_table[index].need_zerofill = val
 
 #if !CONDENSED_PAGE_TABLE

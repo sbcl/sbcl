@@ -287,3 +287,5 @@
   `(setf (slab-sizeclass ,slab) (ash ,sizeclass n-fixnum-tag-bits)
          (slab-capacity ,slab) ,capacity
          (slab-chunk-size ,slab) ,chunksize))
+
+(defconstant gencgc-page-words (/ gencgc-page-bytes n-word-bytes))

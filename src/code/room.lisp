@@ -260,10 +260,9 @@
               (start #+64-bit (unsigned 32) #-64-bit signed)
               ;; On platforms with small enough GC pages, this field
               ;; will be a short. On platforms with larger ones, it'll
-              ;; be an int.
-              ;; Measured in bytes; the low bit has to be masked off.
-              (bytes-used (unsigned
-                           #.(if (typep gencgc-page-bytes '(unsigned-byte 16))
+              ;; be an int. It should probably never be an int.
+              (words-used (unsigned
+                           #.(if (typep gencgc-page-words '(unsigned-byte 16))
                                  16
                                  32)))
               (flags (unsigned 8))
@@ -442,7 +441,8 @@ We could try a few things to mitigate this:
     (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-page-bytes)))
                    start-page end-page))
     (setq end-page start-page)
-    (loop (setq end-page-bytes-used (slot (deref page-table end-page) 'bytes-used))
+    (loop (setq end-page-bytes-used
+                (ash (slot (deref page-table end-page) 'words-used) word-shift))
           ;; See 'page_ends_contiguous_block_p' in gencgc.c
           (when (or (< end-page-bytes-used gencgc-page-bytes)
                     (= (slot (deref page-table (1+ end-page)) 'start) 0))
