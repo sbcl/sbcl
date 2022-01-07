@@ -589,96 +589,94 @@ necessary, since type inference may take arbitrarily long to converge.")
       ;; control, so this won't delete anything.
       (dfo-as-needed component))
 
-    (unwind-protect
-        (progn
-          (maybe-mumble "IR2Tran ")
-          (entry-analyze component)
-          (ir2-convert component)
+    (maybe-mumble "IR2Tran ")
+    (entry-analyze component)
+    (ir2-convert component)
 
-          (when (policy *lexenv* (>= speed compilation-speed))
-            (maybe-mumble "Copy ")
-            (copy-propagate component))
+    (when (policy *lexenv* (>= speed compilation-speed))
+      (maybe-mumble "Copy ")
+      (copy-propagate component))
 
-          (ir2-optimize component)
+    (ir2-optimize component)
 
-          (select-representations component)
-          ;; Try to combine consecutive uses of %INSTANCE-SET.
-          ;; This can't be done prior to selecting representations
-          ;; because SELECT-REPRESENTATIONS might insert some
-          ;; things like MOVE-FROM-DOUBLE which makes the
-          ;; "consecutive" vops no longer consecutive.
-          (ir2-optimize-stores component)
+    (select-representations component)
+    ;; Try to combine consecutive uses of %INSTANCE-SET.
+    ;; This can't be done prior to selecting representations
+    ;; because SELECT-REPRESENTATIONS might insert some
+    ;; things like MOVE-FROM-DOUBLE which makes the
+    ;; "consecutive" vops no longer consecutive.
+    (ir2-optimize-stores component)
 
-          (when *check-consistency*
-            (maybe-mumble "Check2 ")
-            (check-ir2-consistency component))
+    (when *check-consistency*
+      (maybe-mumble "Check2 ")
+      (check-ir2-consistency component))
 
-          (delete-unreferenced-tns component)
+    (delete-unreferenced-tns component)
 
-          (maybe-mumble "Life ")
-          (lifetime-analyze component)
+    (maybe-mumble "Life ")
+    (lifetime-analyze component)
 
-          (when *compile-progress*
-            (compiler-mumble "") ; Sync before doing more output.
-            (pre-pack-tn-stats component *standard-output*))
+    (when *compile-progress*
+      (compiler-mumble "")            ; Sync before doing more output.
+      (pre-pack-tn-stats component *standard-output*))
 
-          (when *check-consistency*
-            (maybe-mumble "CheckL ")
-            (check-life-consistency component))
+    (when *check-consistency*
+      (maybe-mumble "CheckL ")
+      (check-life-consistency component))
 
-          (maybe-mumble "Pack ")
-          (sb-regalloc:pack component)
+    (maybe-mumble "Pack ")
+    (sb-regalloc:pack component)
 
-          (when *check-consistency*
-            (maybe-mumble "CheckP ")
-            (check-pack-consistency component))
+    (when *check-consistency*
+      (maybe-mumble "CheckP ")
+      (check-pack-consistency component))
 
-          (delete-no-op-vops component)
-          (ir2-optimize-jumps component)
-          (optimize-constant-loads component)
-          (when *compiler-trace-output*
-            (when (memq :ir1 *compile-trace-targets*)
-              (describe-component component *compiler-trace-output*))
-            (when (memq :ir2 *compile-trace-targets*)
-              (describe-ir2-component component *compiler-trace-output*)))
+    (delete-no-op-vops component)
+    (ir2-optimize-jumps component)
+    (optimize-constant-loads component)
+    (when *compiler-trace-output*
+      (when (memq :ir1 *compile-trace-targets*)
+        (describe-component component *compiler-trace-output*))
+      (when (memq :ir2 *compile-trace-targets*)
+        (describe-ir2-component component *compiler-trace-output*)))
 
-          (maybe-mumble "Code ")
-          (multiple-value-bind (segment text-length fun-table
-                                elsewhere-label fixup-notes alloc-points)
-              (let ((*compiler-trace-output*
-                      (and (memq :vop *compile-trace-targets*)
-                           *compiler-trace-output*)))
-                (generate-code component))
-            (declare (ignorable text-length fun-table))
+    (maybe-mumble "Code ")
+    (multiple-value-bind (segment text-length fun-table
+                          elsewhere-label fixup-notes alloc-points)
+        (let ((*compiler-trace-output*
+                (and (memq :vop *compile-trace-targets*)
+                     *compiler-trace-output*)))
+          (generate-code component))
+      (declare (ignorable text-length fun-table))
 
-            (let ((bytes (sb-assem:segment-contents-as-vector segment))
-                  (object *compile-object*)
-                  (*elsewhere-label* elsewhere-label)) ; KLUDGE
+      (let ((bytes (sb-assem:segment-contents-as-vector segment))
+            (object *compile-object*)
+            (*elsewhere-label* elsewhere-label)) ; KLUDGE
 
-              #-sb-xc-host
-              (when (and *compiler-trace-output*
-                         (memq :disassemble *compile-trace-targets*))
-                (let ((ranges
-                        (maplist (lambda (list)
-                                   (cons (+ (car list)
-                                            (ash sb-vm:simple-fun-insts-offset
-                                                 sb-vm:word-shift))
-                                         (or (cadr list) text-length)))
-                                 fun-table)))
-                  (format *compiler-trace-output*
-                          "~|~%Disassembly of code for ~S~2%" component)
-                  (sb-disassem:disassemble-assem-segment
-                   bytes ranges *compiler-trace-output*)))
+        #-sb-xc-host
+        (when (and *compiler-trace-output*
+                   (memq :disassemble *compile-trace-targets*))
+          (let ((ranges
+                  (maplist (lambda (list)
+                             (cons (+ (car list)
+                                      (ash sb-vm:simple-fun-insts-offset
+                                           sb-vm:word-shift))
+                                   (or (cadr list) text-length)))
+                           fun-table)))
+            (format *compiler-trace-output*
+                    "~|~%Disassembly of code for ~S~2%" component)
+            (sb-disassem:disassemble-assem-segment
+             bytes ranges *compiler-trace-output*)))
 
-              (funcall (etypecase object
-                         (fasl-output (maybe-mumble "FASL") #'fasl-dump-component)
-                         #-sb-xc-host   ; no compiling to core
-                         (core-object (maybe-mumble "Core") #'make-core-component)
-                         (null (lambda (&rest dummies)
-                                 (declare (ignore dummies)))))
-                       component segment (length bytes)
-                       fixup-notes alloc-points
-                       object))))))
+        (funcall (etypecase object
+                   (fasl-output (maybe-mumble "FASL") #'fasl-dump-component)
+                   #-sb-xc-host         ; no compiling to core
+                   (core-object (maybe-mumble "Core") #'make-core-component)
+                   (null (lambda (&rest dummies)
+                           (declare (ignore dummies)))))
+                 component segment (length bytes)
+                 fixup-notes alloc-points
+                 object))))
 
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) :dead)
