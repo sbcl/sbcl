@@ -48,9 +48,9 @@ int gencgc_handle_wp_violation(void *);
 # define CONDENSED_PAGE_TABLE 0
 #endif
 
-#if GENCGC_PAGE_BYTES > USHRT_MAX
-# if GENCGC_PAGE_BYTES > UINT_MAX
-#   error "GENCGC_PAGE_BYTES unexpectedly large."
+#if GENCGC_PAGE_WORDS > USHRT_MAX
+# if GENCGC_PAGE_WORDS > UINT_MAX
+#   error "GENCGC_PAGE_WORDS unexpectedly large."
 # else
     typedef unsigned int page_words_t;
 # endif
