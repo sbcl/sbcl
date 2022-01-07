@@ -412,7 +412,7 @@
 ;; Special case for dynamic space code/data segregation
 #+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type)
-  (let* ((words-per-page (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes))
+  (let* ((words-per-page (/ sb-vm:gencgc-page-bytes sb-vm:n-word-bytes))
          (holder (ecase page-type
                    (:code (gspace-code-free-ranges gspace))
                    (:mixed (gspace-non-code-free-ranges gspace))))
@@ -420,7 +420,7 @@
                          (cdr holder)))) ; dummy cons cell simplifies writeback
     (labels ((alignedp (word-index) ; T if WORD-INDEX aligns to a GC page boundary
                (not (logtest (* word-index sb-vm:n-word-bytes)
-                             (1- sb-vm:gencgc-card-bytes))))
+                             (1- sb-vm:gencgc-page-bytes))))
              (page-index (word-index)
                (values (floor word-index words-per-page)))
              (pte (index) ; create on demand
@@ -444,7 +444,7 @@
                       (end-page (page-index (1- end-word-index))))
                  ;; pages from start to end (exclusive) must be full
                  (loop for index from start-page below end-page
-                       do (setf (page-bytes-used (pte index)) sb-vm:gencgc-card-bytes))
+                       do (setf (page-bytes-used (pte index)) sb-vm:gencgc-page-bytes))
                  ;; Compute the difference between the word-index at the start of
                  ;; end-page and the end-word.
                  (setf (page-bytes-used (pte end-page))
@@ -3027,7 +3027,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
   #+gencgc ; value never needed in Lisp, so therefore not a defconstant
   (format t "#define GENCGC_CARD_SHIFT ~D~%"
-            (1- (integer-length sb-vm:gencgc-card-bytes)))
+            (1- (integer-length sb-vm:gencgc-page-bytes)))
 
   (let ((size #+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
               #+gencgc sb-vm::default-dynamic-space-size))
@@ -3582,9 +3582,9 @@ III. initially undefined function references (alphabetically):
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
-         (n-ptes (ceiling data-bytes sb-vm:gencgc-card-bytes))
+         (n-ptes (ceiling data-bytes sb-vm:gencgc-page-bytes))
          (sizeof-usage ; see similar expression in 'src/code/room'
-          (if (typep sb-vm:gencgc-card-bytes '(unsigned-byte 16)) 2 4))
+          (if (typep sb-vm:gencgc-page-bytes '(unsigned-byte 16)) 2 4))
          (sizeof-corefile-pte (+ sb-vm:n-word-bytes sizeof-usage))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb-vm:n-word-bytes))
          (n-code 0)
@@ -3596,7 +3596,7 @@ III. initially undefined function references (alphabetically):
              (pte (aref (gspace-page-table gspace) page-index))
              (usage (page-bytes-used pte))
              (sso (if (plusp usage)
-                      (- (* page-index sb-vm:gencgc-card-bytes)
+                      (- (* page-index sb-vm:gencgc-page-bytes)
                          (* (page-scan-start pte) sb-vm:n-word-bytes))
                       0))
              (type-bits (if (plusp usage)
@@ -3609,7 +3609,7 @@ III. initially undefined function references (alphabetically):
                      ;; KLUDGE to avoid compiler note about one or the other
                      ;; branch of this IF being unreachable.
                      (declare (notinline typep))
-                     (if (typep sb-vm:gencgc-card-bytes '(unsigned-byte 16))
+                     (if (typep sb-vm:gencgc-page-bytes '(unsigned-byte 16))
                          '#'(setf bvref-16)
                          '#'(setf bvref-32))))
           (funcall (setter) usage ptes (+ pte-offset sb-vm:n-word-bytes)))))

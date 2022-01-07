@@ -38,7 +38,7 @@
            (slot (deref sb-vm::page-table index) 'sb-vm::flags)))
 (defun test-private-consing ()
   (let ((conses-per-page ; subtract one for the page header cons
-         (1- (/ sb-vm:gencgc-card-bytes (* 2 sb-vm:n-word-bytes))))
+         (1- (/ sb-vm:gencgc-page-bytes (* 2 sb-vm:n-word-bytes))))
         (counter 0)
         (pages)
         (recycle-me))
@@ -46,7 +46,7 @@
       (let* ((cons (private-list (incf counter)))
              (index (sb-vm::find-page-index cons))
              (base-address
-              (+ sb-vm:dynamic-space-start (* index sb-vm:gencgc-card-bytes)))
+              (+ sb-vm:dynamic-space-start (* index sb-vm:gencgc-page-bytes)))
              (final))
         (push index pages)
         (assert (= cons (+ base-address (* 2 sb-vm:n-word-bytes))))
@@ -57,7 +57,7 @@
         (assert (page-need-to-zero index))
         (dotimes (i (1- conses-per-page))
           (setq final (private-list (incf counter))))
-        (assert (= final (+ base-address sb-vm:gencgc-card-bytes
+        (assert (= final (+ base-address sb-vm:gencgc-page-bytes
                             (* -2 sb-vm:n-word-bytes))))
         (push final recycle-me)))
     (dolist (list recycle-me)

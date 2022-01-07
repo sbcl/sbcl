@@ -47,9 +47,9 @@ int gencgc_handle_wp_violation(void *);
 # define CONDENSED_PAGE_TABLE 0
 #endif
 
-#if GENCGC_CARD_BYTES > USHRT_MAX
-# if GENCGC_CARD_BYTES > UINT_MAX
-#   error "GENCGC_CARD_BYTES unexpectedly large."
+#if GENCGC_PAGE_BYTES > USHRT_MAX
+# if GENCGC_PAGE_BYTES > UINT_MAX
+#   error "GENCGC_PAGE_BYTES unexpectedly large."
 # else
     typedef unsigned int page_bytes_t;
 # endif
@@ -210,7 +210,7 @@ find_page_index(void *addr)
 {
     if (addr >= (void*)DYNAMIC_SPACE_START) {
         page_index_t index = ((uintptr_t)addr -
-                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
+                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_PAGE_BYTES;
         if (index < page_table_pages)
             return (index);
     }

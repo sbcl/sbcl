@@ -278,7 +278,7 @@
      :dynamic)
     (assert (not (find 1 (bit-and code-bits data-bits))))
     (let* ((code-bytes-consumed
-             (* (count 1 code-bits) sb-vm:gencgc-card-bytes))
+             (* (count 1 code-bits) sb-vm:gencgc-page-bytes))
            (waste
              (- total-code-size code-bytes-consumed)))
       ;; This should be true for all platforms.
@@ -325,7 +325,7 @@
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
-     (when (>= (sb-ext:primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))
+     (when (>= (sb-ext:primitive-object-size obj) (* 4 sb-vm:gencgc-page-bytes))
        (let* ((addr (sb-kernel:get-lisp-obj-address obj))
               (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
          (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
@@ -455,7 +455,7 @@
           (end (+ (sb-kernel:get-lisp-obj-address c)
                   (- sb-vm:list-pointer-lowtag)
                   (* 2 sb-vm:n-word-bytes))))
-     (when (zerop (logand end (1- sb-vm:gencgc-card-bytes)))
+     (when (zerop (logand end (1- sb-vm:gencgc-page-bytes)))
        (return)))))
 (defglobal *go* nil)
 

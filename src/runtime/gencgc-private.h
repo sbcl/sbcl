@@ -42,7 +42,7 @@ static void __attribute__((unused))
 set_page_scan_start_offset(page_index_t index, os_vm_size_t offset)
 {
     // If the offset is nonzero and page-aligned
-    unsigned int lsb = offset !=0 && IS_ALIGNED(offset, GENCGC_CARD_BYTES);
+    unsigned int lsb = offset !=0 && IS_ALIGNED(offset, GENCGC_PAGE_BYTES);
     os_vm_size_t scaled = (offset >> (lsb ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb;
     if (scaled > SCAN_START_OFS_MAX) {
         // Assert that if offset exceed the max representable value,

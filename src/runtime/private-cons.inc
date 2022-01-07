@@ -67,12 +67,12 @@ static struct cons* private_cons_impl()
     page_bytes_t bytes_used;
     struct cons* cons;
 
-    if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_CARD_BYTES) {
+    if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_PAGE_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
         page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
         page_index_t last_page __attribute__((unused)) =
-            gc_find_freeish_pages(&page, GENCGC_CARD_BYTES,
+            gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
                                   SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED, 0);
         // See question about last_page in gc_alloc_large
         set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);

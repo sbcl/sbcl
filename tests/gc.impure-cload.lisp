@@ -49,7 +49,7 @@
     (let ((a (make-array 4 :element-type 'sb-ext:word))
           (code-size
            #+64-bit 10240
-           #-64-bit (- (* 4 sb-vm:gencgc-card-bytes) (* 2 sb-vm:n-word-bytes)))
+           #-64-bit (- (* 4 sb-vm:gencgc-page-bytes) (* 2 sb-vm:n-word-bytes)))
           (saved-region-start)
           (saved-region-end))
       (symbol-macrolet ((free-ptr (aref a 0))
@@ -138,7 +138,7 @@
     nil))
 
 (defconstant n-conses-per-page
-  (/ sb-vm:gencgc-card-bytes (* 2 sb-vm:n-word-bytes)))
+  (/ sb-vm:gencgc-page-bytes (* 2 sb-vm:n-word-bytes)))
 
 (defparameter *junk*
   (make-array (1+ (* 2 n-conses-per-page))))
@@ -181,7 +181,7 @@
          (gen (slot (deref sb-vm::page-table page) 'sb-vm::gen))
          (wp (sb-sys:with-pinned-objects (foo) (sb-kernel:page-protected-p foo)))
          (page-addr (+ sb-vm:dynamic-space-start
-                       (* sb-vm:gencgc-card-bytes page)))
+                       (* sb-vm:gencgc-page-bytes page)))
          (aok t))
     (declare (ignorable gen wp))
     ; (format t "~&page ~d: gen=~d flags=~b (wp=~a)~%" page gen flags wp))
@@ -192,7 +192,7 @@
        (unless (typep obj '(or (cons (eql 1) (eql 2)) foo))
          (setq aok nil)))
      (sb-kernel:%make-lisp-obj page-addr)
-     (sb-kernel:%make-lisp-obj (+ page-addr sb-vm:gencgc-card-bytes)))
+     (sb-kernel:%make-lisp-obj (+ page-addr sb-vm:gencgc-page-bytes)))
     (assert aok) ; page should have nothing but a foo and the conses
 
     (change-foo-layout foo)

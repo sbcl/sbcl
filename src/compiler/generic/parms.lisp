@@ -133,7 +133,7 @@
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
          (defconstant gencgc-card-shift
-           (integer-length (1- sb-vm:gencgc-card-bytes)))
+           (integer-length (1- sb-vm:gencgc-page-bytes)))
          ;; This is a constant during build, but a different value
          ;; can be patched directly into the affected machine code
          ;; when the core is loaded based on dynamic-space-size.
@@ -142,7 +142,7 @@
          ;; to be safe than sorry - using too many bits rather than too few.
          (defconstant gencgc-card-table-index-nbits
            (integer-length (1- (ceiling sb-vm::default-dynamic-space-size
-                                        sb-vm::gencgc-card-bytes))))
+                                        sb-vm::gencgc-page-bytes))))
          (defconstant gencgc-card-table-index-mask
            (1- (ash 1 gencgc-card-table-index-nbits)))))))
 

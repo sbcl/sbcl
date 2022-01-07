@@ -413,7 +413,7 @@
 #+(and gencgc (or riscv x86 x86-64 ppc) (not win32) (not ubsan))
 (progn
   (setq *print-array* nil)
-  (setq *large-obj* (make-array (* sb-vm:gencgc-card-bytes 4)
+  (setq *large-obj* (make-array (* sb-vm:gencgc-page-bytes 4)
                                 :element-type '(unsigned-byte 8)))
   (sb-ext:gc :gen 1) ; Array won't move to a large unboxed page until GC'd
   (deftest allocation-information.5
@@ -463,7 +463,7 @@
                ;; 16K might fit in the free space of an open region,
                ;; and by accident would not go on a large object page.
                (sb-c:allocate-code-object nil 0 0
-                (max (* 4 sb-vm:gencgc-card-bytes) #-64-bit 65536))))
+                (max (* 4 sb-vm:gencgc-page-bytes) #-64-bit 65536))))
       (declare (notinline format))
       (format (make-string-output-stream) "~%")
       (loop for i from 1 to sb-vm:+highest-normal-generation+
@@ -480,7 +480,7 @@
     (locally
       (declare (notinline format))
       ;; Create a bignum using 4 GC cards
-      (setq *b* (ash 1 (* sb-vm:gencgc-card-bytes sb-vm:n-byte-bits 4)))
+      (setq *b* (ash 1 (* sb-vm:gencgc-page-bytes sb-vm:n-byte-bits 4)))
       (setq *negb* (- *b*))
       (and (let ((props (get-small-bignum-allocation-information)))
              ;; *SMALL-BIGNUM* was created as a large boxed object

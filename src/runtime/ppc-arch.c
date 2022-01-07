@@ -377,8 +377,8 @@ handle_allocation_trap(os_context_t * context)
 
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
-    if ((((unsigned long)mixed_region.end_addr + size) / GENCGC_CARD_BYTES) ==
-        (((unsigned long)mixed_region.end_addr) / GENCGC_CARD_BYTES)) {
+    if ((((unsigned long)mixed_region.end_addr + size) / GENCGC_PAGE_BYTES) ==
+        (((unsigned long)mixed_region.end_addr) / GENCGC_PAGE_BYTES)) {
       fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
               size, (void*)target_ptr);
       fprintf(stderr, "    dynamic_space_free_pointer: %p, mixed_region.end_addr %p\n",

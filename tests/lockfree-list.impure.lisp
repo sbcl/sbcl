@@ -213,8 +213,8 @@
     (warn "Can't properly scan: page start is a lower address"))
   (sb-sys:without-gcing
     (let* ((where (sb-sys:sap+ (sb-sys:int-sap (current-dynamic-space-start))
-                               (* page sb-vm:gencgc-card-bytes)))
-           (limit (sb-sys:sap+ where sb-vm:gencgc-card-bytes))
+                               (* page sb-vm:gencgc-page-bytes)))
+           (limit (sb-sys:sap+ where sb-vm:gencgc-page-bytes))
            (gens 0))
       (do ((where where (sb-sys:sap+ where sb-vm:n-word-bytes)))
           ((sap>= where limit) gens)

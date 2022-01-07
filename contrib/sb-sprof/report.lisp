@@ -9,7 +9,7 @@
   #-gencgc
   sb-c:+backend-page-bytes+
   #+gencgc
-  (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-card-bytes))
+  (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-page-bytes))
 
 (deftype report-type ()
   '(member nil :flat :graph))

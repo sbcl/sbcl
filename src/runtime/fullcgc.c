@@ -95,10 +95,10 @@ static void* get_free_page() {
 char *suballocator_free_ptr, *suballocator_end_ptr;
 
 static void* allocate_cons_mark_bits() {
-    int nbytes = GENCGC_CARD_BYTES / (2 * N_WORD_BYTES) / 8;
+    int nbytes = GENCGC_PAGE_BYTES / (2 * N_WORD_BYTES) / 8;
     if (suballocator_free_ptr + nbytes > suballocator_end_ptr) {
         suballocator_free_ptr = get_free_page();
-        suballocator_end_ptr = suballocator_free_ptr + GENCGC_CARD_BYTES;
+        suballocator_end_ptr = suballocator_free_ptr + GENCGC_PAGE_BYTES;
     }
     void* mem = suballocator_free_ptr;
     suballocator_free_ptr += nbytes;
@@ -153,10 +153,10 @@ static lispobj gc_dequeue()
 struct hopscotch_table mark_bits;
 
 static inline uword_t compute_page_key(lispobj cons) {
-    return ALIGN_DOWN(cons, GENCGC_CARD_BYTES);
+    return ALIGN_DOWN(cons, GENCGC_PAGE_BYTES);
 }
 static inline int compute_dword_number(lispobj cons) {
-    return (cons & (GENCGC_CARD_BYTES - 1)) >> (1+WORD_SHIFT);
+    return (cons & (GENCGC_PAGE_BYTES - 1)) >> (1+WORD_SHIFT);
 }
 
 static inline int cons_markedp(lispobj pointer) {
@@ -661,7 +661,7 @@ void execute_full_sweep_phase()
                    && protection_mode(last_page+1) == PHYSICAL)
                 ++last_page;
             os_protect(page_address(first_page),
-                       (last_page - first_page + 1) * GENCGC_CARD_BYTES,
+                       (last_page - first_page + 1) * GENCGC_PAGE_BYTES,
                        OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
             first_page = last_page;
         }

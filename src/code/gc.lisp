@@ -373,6 +373,11 @@ Note: currently changes to this value are lost when saving core."
 #+gencgc
 (progn
 
+;; A small amount of backward-compatibility in case anyone uses
+;; the -CARD- size. Of couse, it's about to become different
+;; from the -PAGE- size, so any code that uses this is probably wrong.
+(define-symbol-macro gencgc-card-bytes gencgc-page-bytes)
+
 (define-symbol-macro sb-vm:dynamic-space-end
     (+ (dynamic-space-size) sb-vm:dynamic-space-start))
 
@@ -420,7 +425,7 @@ statistics are appended to it."
 (defun page-protected-p (object) ; OBJECT must be pinned by caller
   (let ((card-index
          (logand (ash (get-lisp-obj-address object)
-                      (- (integer-length (1- sb-vm:gencgc-card-bytes))))
+                      (- (integer-length (1- sb-vm:gencgc-page-bytes))))
                  (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
     (eql 1 (sb-sys:sap-ref-8
             (sb-alien:extern-alien "gc_card_mark" sb-sys:system-area-pointer)

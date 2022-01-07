@@ -26,8 +26,8 @@ void test_adjust_obj_ptes()
     // the page table as a sentinel.
     struct page expected_result[1+MAX_PAGES_FOR_TEST];
     page_table_pages = MAX_PAGES_FOR_TEST;
-    posix_memalign((void**)&DYNAMIC_SPACE_START, GENCGC_CARD_BYTES,
-                   MAX_PAGES_FOR_TEST * GENCGC_CARD_BYTES);
+    posix_memalign((void**)&DYNAMIC_SPACE_START, GENCGC_PAGE_BYTES,
+                   MAX_PAGES_FOR_TEST * GENCGC_PAGE_BYTES);
     gc_card_table_nbits = 1;
     gc_card_table_mask = 1;
     gc_card_mark = card_table;
@@ -39,7 +39,7 @@ void test_adjust_obj_ptes()
     // i.e. 2*N_WORD_BYTES, the smallest allocatable thing.
     for (npages = 1 ; npages <= 8; ++npages)
         for (fuzz = -3; fuzz <= 3; ++fuzz) {
-            int request = npages * GENCGC_CARD_BYTES + (N_WORD_BYTES*2)*fuzz;
+            int request = npages * GENCGC_PAGE_BYTES + (N_WORD_BYTES*2)*fuzz;
             // Mock out initial state: region is freshly initialized, linear
             // scan for free space from start of heap,
             // and pick the generation.
@@ -87,7 +87,7 @@ void shrink_obj_test(int ending_size, int initial_type,
     // at the desired size.
     for (npages = 1 ; npages <= 10; ++npages)
         for (fuzz = -4; fuzz <= 4; ++fuzz) {
-            int initial_size = npages * GENCGC_CARD_BYTES + (N_WORD_BYTES*2)*fuzz;
+            int initial_size = npages * GENCGC_PAGE_BYTES + (N_WORD_BYTES*2)*fuzz;
             // Test only makes sense where the original size exceeds
             // or is equal to the ending size.
             if (initial_size >= ending_size) {

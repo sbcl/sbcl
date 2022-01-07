@@ -263,7 +263,7 @@
               ;; be an int.
               ;; Measured in bytes; the low bit has to be masked off.
               (bytes-used (unsigned
-                           #.(if (typep gencgc-card-bytes '(unsigned-byte 16))
+                           #.(if (typep gencgc-page-bytes '(unsigned-byte 16))
                                  16
                                  32)))
               (flags (unsigned 8))
@@ -412,7 +412,7 @@ We could try a few things to mitigate this:
        ;; in order to determine what regions contain objects.
 
        ;; We explicitly presume that any pages in an allocation region
-       ;; that are in-use have a BYTES-USED of GENCGC-CARD-BYTES
+       ;; that are in-use have a BYTES-USED of GENCGC-PAGE-BYTES
        ;; (indicating a full page) or an otherwise-valid BYTES-USED.
        ;; We also presume that the pages of an open allocation region
        ;; after the first page, and any pages that are unallocated,
@@ -420,7 +420,7 @@ We could try a few things to mitigate this:
 
        ;; Our procedure is to scan forward through the page table,
        ;; maintaining an "end pointer" until we reach a page where
-       ;; BYTES-USED is not GENCGC-CARD-BYTES or we reach
+       ;; BYTES-USED is not GENCGC-PAGE-BYTES or we reach
        ;; NEXT-FREE-PAGE.  We then MAP-OBJECTS-IN-RANGE if the range
        ;; is not empty, and proceed to the next page (unless we've hit
        ;; NEXT-FREE-PAGE).
@@ -439,20 +439,20 @@ We could try a few things to mitigate this:
       ((> start-page initial-next-free-page))
          ;; The type constraint on page indices is probably too generous,
          ;; but it does its job of producing efficient code.
-    (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
+    (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-page-bytes)))
                    start-page end-page))
     (setq end-page start-page)
     (loop (setq end-page-bytes-used (slot (deref page-table end-page) 'bytes-used))
           ;; See 'page_ends_contiguous_block_p' in gencgc.c
-          (when (or (< end-page-bytes-used gencgc-card-bytes)
+          (when (or (< end-page-bytes-used gencgc-page-bytes)
                     (= (slot (deref page-table (1+ end-page)) 'start) 0))
             (return))
           (incf end-page))
     (let ((start (sap+ base (truly-the signed-word
-                                       (logand (* start-page gencgc-card-bytes)
+                                       (logand (* start-page gencgc-page-bytes)
                                                most-positive-word))))
           (end (sap+ base (truly-the signed-word
-                                     (logand (+ (* end-page gencgc-card-bytes)
+                                     (logand (+ (* end-page gencgc-page-bytes)
                                                 end-page-bytes-used)
                                              most-positive-word)))))
       (when (sap> end start)
@@ -1174,7 +1174,7 @@ We could try a few things to mitigate this:
                                                   :initial-element 0)))
   (flet ((dump-page (page-num)
            (format stream "~&Page ~D~%" page-num)
-           (let ((where (+ dynamic-space-start (* page-num gencgc-card-bytes)))
+           (let ((where (+ dynamic-space-start (* page-num gencgc-page-bytes)))
                  (seen-filler nil))
              (loop
                (let* ((obj (let ((sap (int-sap where)))
@@ -1193,7 +1193,7 @@ We could try a few things to mitigate this:
                  (loop for index from page-num to (find-page-index (1- where))
                        do (setf (sbit pages index) 1)))
                (let ((next-page (find-page-index where)))
-                 (cond ((= (logand where (1- gencgc-card-bytes)) 0)
+                 (cond ((= (logand where (1- gencgc-page-bytes)) 0)
                         (format stream "~&-- END OF PAGE --~%")
                         (return next-page))
                        ((eq next-page page-num))
@@ -1206,7 +1206,7 @@ We could try a few things to mitigate this:
                      (setq i (dump-page i))
                      (incf i)))))
     (let* ((n-pages (count 1 pages))
-           (tot (* n-pages gencgc-card-bytes))
+           (tot (* n-pages gencgc-page-bytes))
            (waste (- tot n-code-bytes)))
       (format t "~&Used-bytes=~D Pages=~D Waste=~D (~F%)~%"
               n-code-bytes n-pages waste
@@ -1291,7 +1291,7 @@ We could try a few things to mitigate this:
                do (cond ((= (sbit other-array index) 1)
                          (format t "~&broken on page index ~d base ~x~%"
                                  index
-                                 (+ dynamic-space-start (* index gencgc-card-bytes)))
+                                 (+ dynamic-space-start (* index gencgc-page-bytes)))
                          (alien-funcall (extern-alien "ldb_monitor" (function void))))
                         (t
                          (setf (sbit array index) 1))))))
@@ -1375,9 +1375,9 @@ We could try a few things to mitigate this:
 ;;; to fail.
 (defun print-page-contents (page)
   (let* ((start
-          (+ (current-dynamic-space-start) (* gencgc-card-bytes page)))
+          (+ (current-dynamic-space-start) (* gencgc-page-bytes page)))
          (end
-          (+ start gencgc-card-bytes)))
+          (+ start gencgc-page-bytes)))
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
 (defun map-code-objects (fun)

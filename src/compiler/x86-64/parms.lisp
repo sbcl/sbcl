@@ -40,7 +40,7 @@
 ;;; *strictly* boxed pages, and mixed-tagged/raw-word pages.
 ;;; Alternatively, GC could try to skip over the cards at the start of a contiguous
 ;;; block until it gets to the cards that are actully marked.
-(defconstant gencgc-card-bytes 16384)
+(defconstant gencgc-page-bytes 16384)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding

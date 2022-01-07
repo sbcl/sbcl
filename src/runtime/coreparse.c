@@ -921,11 +921,11 @@ process_directory(int count, struct ndir_entry *entry,
                 }
 #else /* gencgc */
                 {
-                uword_t aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
+                uword_t aligned_start = ALIGN_UP(addr, GENCGC_PAGE_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
-                    dynamic_space_size -= GENCGC_CARD_BYTES;
+                    dynamic_space_size -= GENCGC_PAGE_BYTES;
                 DYNAMIC_SPACE_START = addr = aligned_start;
                 check_dynamic_space_addr_ok(addr, dynamic_space_size);
                 }

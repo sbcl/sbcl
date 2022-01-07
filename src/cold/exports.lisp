@@ -435,6 +435,7 @@ structure representations")
            "SIMPLE-FUN-SELF-SLOT"
            "SIMPLE-FUN-SOURCE-SLOT"
            "GENCGC-CARD-BYTES"
+           "GENCGC-PAGE-BYTES"
            "GENCGC-ALLOC-GRANULARITY"
            "GENCGC-RELEASE-GRANULARITY"
            #+(or arm64 ppc ppc64 sparc riscv) "PSEUDO-ATOMIC-INTERRUPTED-FLAG"

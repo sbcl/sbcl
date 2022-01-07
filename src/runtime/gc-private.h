@@ -356,7 +356,7 @@ static inline void unprotect_page_index(page_index_t page_index)
     int card = page_to_card_index(page_index);
     if (gc_card_mark[card] == 1) gc_card_mark[card] = 0; // NEVER CHANGE '2' to '0'
 #else
-    os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_JIT_ALL);
+    os_protect(page_address(page_index), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
     SET_PAGE_PROTECTED(page_index, 0);
@@ -367,7 +367,7 @@ static inline void protect_page(void* page_addr,
                                 __attribute__((unused)) page_index_t page_index)
 {
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    os_protect((void *)page_addr, GENCGC_CARD_BYTES, OS_VM_PROT_JIT_READ);
+    os_protect((void *)page_addr, GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ);
 
     /* Note: we never touch the write_protected_cleared bit when protecting
      * a page. Consider two random threads that reach their SIGSEGV handlers
