@@ -1840,18 +1840,29 @@ bootstrapping.
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
                   initargs source-location)
-  (when (and (eq **boot-state** 'complete)
-             (fboundp gf-spec))
-    (let* ((gf (fdefinition gf-spec))
-           (method (and (generic-function-p gf)
-                        (generic-function-methods gf)
-                        (find-method gf qualifiers specializers nil))))
-      (when method
-        (warn 'sb-kernel:redefinition-with-defmethod
-              :name gf-spec
-              :new-location source-location
-              :old-method method
-              :qualifiers qualifiers :specializers specializers))))
+  (block nil
+    (when (and (eq **boot-state** 'complete)
+               (fboundp gf-spec))
+      (restart-bind
+          ((continue (lambda ()
+                       (fmakunbound gf-spec)
+                       (return))
+                     :report-function
+                     (lambda (stream)
+                       (format stream "Unbind the generic function"))
+                     :test-function
+                     (lambda (c)
+                       (typep c 'find-method-length-mismatch))))
+        (let* ((gf (fdefinition gf-spec))
+               (method (and (generic-function-p gf)
+                            (generic-function-methods gf)
+                            (find-method gf qualifiers specializers nil))))
+          (when method
+            (warn 'sb-kernel:redefinition-with-defmethod
+                  :name gf-spec
+                  :new-location source-location
+                  :old-method method
+                  :qualifiers qualifiers :specializers specializers))))))
   (let ((method (apply #'add-named-method
                        gf-spec qualifiers specializers lambda-list
                        'source source-location
