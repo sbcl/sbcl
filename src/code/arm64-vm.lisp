@@ -102,8 +102,7 @@
         (when arg-count
           (setf (context-register context nargs-offset)
                 (get-lisp-obj-address arg-count)))
-        (setf (context-register context lexenv-offset) fun-addr
-              (context-register context lr-offset) entry)
+        (setf (context-register context lexenv-offset) fun-addr)
         (set-context-pc context entry)))))
 
 #+darwin-jit
