@@ -19,7 +19,7 @@
         (ct-err-not-boundp 0))
     (dolist (line (split-string
                    (with-output-to-string (stream)
-                     (disassemble 'try-ccase :stream stream))
+                     (sb-disassem:disassemble-code-component #'try-ccase :stream stream))
                    #\newline))
       (cond ((search "OBJECT-NOT-VECTOR" line) (incf ct-err-not-vector))
             ((search "UNBOUND-SYMBOL-ERROR" line) (incf ct-err-not-boundp))))

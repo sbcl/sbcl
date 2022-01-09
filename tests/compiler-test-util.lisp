@@ -135,7 +135,7 @@
 (defun count-full-calls (name function)
   (let ((code (with-output-to-string (s)
                 (let ((*print-right-margin* 120))
-                  (disassemble function :stream s))))
+                  (sb-disassem:disassemble-code-component function :stream s))))
         (n 0))
     (flet ((asm-line-calls-name-p (line name)
              (dolist (herald '("#<FDEFN" "#<SB-KERNEL:FDEFN" "#<FUNCTION"))

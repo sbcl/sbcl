@@ -1846,62 +1846,39 @@
   (let* ((function (%fun-fun function))
          (code (fun-code-header function))
          (fun-map (code-fun-map code))
-         (fname (%simple-fun-name function))
          (sfcache (make-source-form-cache))
-         (first-block-seen-p nil)
-         (nil-block-seen-p nil)
-         (last-offset 0)
-         (last-debug-fun nil)
-         (segments nil))
-    (flet ((add-seg (offs len df)
-             (when (> len 0)
-               (push (make-code-segment code offs len
-                                        :debug-fun df
-                                        :source-form-cache sfcache)
-                     segments))))
-      (loop for fmap-entry = fun-map then next
-            for offset = (sb-c::compiled-debug-fun-offset fmap-entry)
-            for next = (sb-c::compiled-debug-fun-next fmap-entry)
-            do
-            (when first-block-seen-p
-              (add-seg last-offset
-                       (- offset last-offset)
-                       last-debug-fun)
-              (setf last-debug-fun nil))
-            (setf last-offset offset)
-            (let ((name (sb-c::compiled-debug-fun-name fmap-entry))
-                  (kind (sb-c::compiled-debug-fun-kind fmap-entry)))
-              #+nil
-              (format t ";;; SAW ~S ~S ~S,~S ~W,~W~%"
-                      name kind first-block-seen-p nil-block-seen-p
-                      last-offset
-                      (sb-c::compiled-debug-fun-start-pc fmap-entry))
-              (cond (#+nil (eq last-offset fun-offset)
-                     (and (equal name fname)
-                          (null kind)
-                          (not first-block-seen-p))
-                     (setf first-block-seen-p t))
-                    ((eq kind :external)
-                     (when first-block-seen-p
-                       (return)))
-                    ((eq kind nil)
-                     (when nil-block-seen-p
-                       (return))
-                     (when first-block-seen-p
-                       (setf nil-block-seen-p t))))
-              (setf last-debug-fun
-                    (sb-di::make-compiled-debug-fun fmap-entry code)))
-            while next)
-      (let ((max-offset (%code-text-size code)))
-        (when (and first-block-seen-p last-debug-fun)
-          (add-seg last-offset
-                   (- max-offset last-offset)
-                   last-debug-fun))
-        (if (null segments) ; FIXME: when does this happen? Comment PLEASE
-            (let ((offs (fun-insts-offset function)))
-              (list
-               (make-code-segment code offs (- max-offset offs))))
-            (nreverse segments))))))
+         (fun-start (fun-insts-offset function))
+         (max-offset (%code-text-size code)))
+    (loop for cdf = fun-map then next
+          for offset = (sb-c::compiled-debug-fun-offset cdf)
+          for next = (sb-c::compiled-debug-fun-next cdf)
+          when (and (not (sb-c::compiled-debug-fun-kind cdf))
+                    (>= offset fun-start))
+          do (let* ((len (-
+                          (if next
+                              (sb-c::compiled-debug-fun-offset next)
+                              max-offset)
+                          offset))
+                    (elsewhere (sb-c::compiled-debug-fun-elsewhere-pc cdf))
+                    (elsewhere-len (and next
+                                        (- (sb-c::compiled-debug-fun-elsewhere-pc next)
+                                           elsewhere))))
+               (when (plusp len)
+                 (let ((df (sb-di::make-compiled-debug-fun cdf code)))
+                   (return (list* (make-code-segment code offset len
+                                                     :debug-fun df
+                                                     :source-form-cache sfcache)
+                                  (and next ;; otherwise the above segment will already contain elsewhere
+                                       (plusp elsewhere-len)
+                                       (list (make-code-segment code elsewhere elsewhere-len
+                                                                :debug-fun df
+                                                                :source-form-cache sfcache))))))))
+          while next
+          finally
+          ;; FIXME: when does this happen? Comment PLEASE
+          (return
+            (list
+             (make-code-segment code fun-start (- max-offset fun-start)))))))
 
 ;;; Return a list of the segments of memory containing machine code
 ;;; instructions for the code-component CODE. If START-OFFSET and/or
