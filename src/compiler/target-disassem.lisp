@@ -318,16 +318,6 @@
               (seg-virtual-location seg)
               (seg-code seg)))))
 
-;;;; function ops
-
-;;; the offset of FUNCTION from the start of its code-component's
-;;; instruction area
-(defun fun-insts-offset (simple-fun) ; FUNCTION *must* be pinned
-  (declare (type simple-fun simple-fun))
-  (- (get-lisp-obj-address simple-fun)
-     sb-vm:fun-pointer-lowtag
-     (sap-int (code-instructions (fun-code-header simple-fun)))))
-
 ;;;; operations on code-components (which hold the instructions for
 ;;;; one or more functions)
 
@@ -1847,7 +1837,7 @@
          (code (fun-code-header function))
          (fun-map (code-fun-map code))
          (sfcache (make-source-form-cache))
-         (fun-start (fun-insts-offset function))
+         (fun-start (sb-di::function-start-pc-offset function))
          (max-offset (%code-text-size code)))
     (loop for cdf = fun-map then next
           for offset = (sb-c::compiled-debug-fun-offset cdf)
