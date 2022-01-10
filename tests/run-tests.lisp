@@ -186,26 +186,27 @@
         (error "Missing input file in manifest: ~S~%" filename))))
 
 (defparameter *ignore-symbol-value-change*
-  (append '(sb-c::*code-serialno*
-            sb-impl::*package-names-cookie*
-            sb-impl::*available-buffers*
-            sb-impl::*token-buf-pool*
-            sb-impl::*user-hash-table-tests*
-            sb-kernel:*eval-calls*
-            sb-kernel::*type-cache-nonce*
-            sb-ext:*gc-run-time*
-            sb-kernel::*gc-epoch*
-            sb-int:*n-bytes-freed-or-purified*
-            sb-disassem::*disassem-inst-space*
-            sb-disassem::*assembler-routines-by-addr*
-            sb-thread::*joinable-threads*
-            sb-thread::*starting-threads*
-            sb-thread::*all-threads*
-            sb-vm::*free-tls-index*
-            sb-vm::*store-barriers-potentially-emitted*
-            sb-vm::*store-barriers-emitted*
-            sb-pcl::*dfun-constructors*)
-          sb-impl::*cache-vector-symbols*))
+  (flet ((maybe (x y) (find-symbol y x)))
+    (append `(sb-c::*code-serialno*
+              sb-impl::*package-names-cookie*
+              sb-impl::*available-buffers*
+              sb-impl::*token-buf-pool*
+              sb-impl::*user-hash-table-tests*
+              ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
+              sb-kernel::*type-cache-nonce*
+              sb-ext:*gc-run-time*
+              sb-kernel::*gc-epoch*
+              sb-int:*n-bytes-freed-or-purified*
+              sb-disassem::*disassem-inst-space*
+              sb-disassem::*assembler-routines-by-addr*
+              ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
+              ,(maybe "SB-THREAD" "*STARTING-THREADS*")
+              sb-thread::*all-threads*
+              ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
+              ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
+              ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
+              sb-pcl::*dfun-constructors*)
+            sb-impl::*cache-vector-symbols*)))
 
 (defun collect-symbol-values ()
   (let (result)
