@@ -1,6 +1,4 @@
-#-sb-thread (sb-ext:exit :code 104)
-
-(use-package "SB-THREAD")
+#-sb-thread (throw 'run-tests::stop t)
 
 (let ((count (make-array 8 :initial-element 0)))
   (defun closure-one ()
@@ -56,8 +54,8 @@
                                  (when stop (return))
                                  (funcall fun))
                (serious-condition (c) (setf condition c)))))
-      (let ((changer (make-thread #'changer :name "changer"))
-            (test (make-thread #'test :name "test")))
+      (let ((changer (sb-thread:make-thread #'changer :name "changer"))
+            (test (sb-thread:make-thread #'test :name "test")))
               ;; The two closures above are fairly carefully crafted
               ;; so that if given the wrong lexenv they will tend to
               ;; do some serious damage, but it is of course difficult

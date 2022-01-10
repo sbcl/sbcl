@@ -1,10 +1,16 @@
-(in-package "SB-THREAD")
+#+cheneygc (throw 'run-tests::stop t)
 
-#+cheneygc (sb-ext:exit :code 104)
+(shadow "ASSERT-ERROR") ; conflict between SB-KERNEL:ASSERT-ERROR, ASSERTOID:ASSERT-ERROR
+(use-package "SB-KERNEL")
+(use-package "SB-THREAD")
+(import 'sb-sys::(sap-int sap+ vector-sap without-gcing))
+(import 'sb-int::(binding* descriptor-sap))
 
 ;;; Test out-of-memory (or something) that goes wrong in pthread_create
 #+pauseless-threadstart ; no SB-THREAD::PTHREAD-CREATE symbol if not
 (test-util:with-test (:name :failed-thread-creation)
+  ;; This test needs to ensure that nothing is in *ALL-THREADS* to begin with.
+  (sb-thread::join-pthread-joinables #'identity)
   (let ((encapsulation
           (compile nil
                    '(lambda (realfun thread stack-base)
@@ -14,17 +20,17 @@
         (success))
     (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
     (unwind-protect
-         (handler-case (sb-thread:make-thread #'list :name "thisfails")
+         (handler-case (make-thread #'list :name "thisfails")
            (error (e)
              (setq success (search "Could not create new OS thread" (write-to-string e)))))
       (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
     (assert success))
   (let ((threads sb-thread::*starting-threads*))
-    (when (find-if-not #'sb-thread:thread-ephemeral-p threads)
+    (when (find-if-not #'thread-ephemeral-p threads)
       (error "Should not see new thread in starting list: ~S" threads)))
   (let ((threads (remove sb-thread::*initial-thread*
                          (sb-thread::avltree-list sb-thread::*all-threads*))))
-    (when (find-if-not #'sb-thread:thread-ephemeral-p threads)
+    (when (find-if-not #'thread-ephemeral-p threads)
       (error "Should not see new thread in running list: ~S" threads))))
 
 (defun actually-get-stack-roots (current-sp
@@ -148,7 +154,7 @@
 ;; lp#1595699
 (test-util:with-test (:name :start-thread-in-without-gcing
                       :skipped-on (not :pauseless-threadstart))
-  (assert (eq (sb-thread:join-thread
-               (sb-sys:without-gcing
-                   (sb-thread:make-thread (lambda () 'hi))))
+  (assert (eq (join-thread
+               (without-gcing
+                   (make-thread (lambda () 'hi))))
               'hi)))
