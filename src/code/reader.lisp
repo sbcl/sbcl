@@ -250,7 +250,7 @@
 
 (declaim (inline readtable-normalization))
 (defun readtable-normalization (readtable)
-  "Returns T if READTABLE normalizes strings to NFKC, and NIL otherwise.
+  "Returns T if READTABLE normalizes symbols to NFKC, and NIL otherwise.
 The READTABLE-NORMALIZATION of the standard readtable is T."
   (%readtable-normalization readtable))
 
