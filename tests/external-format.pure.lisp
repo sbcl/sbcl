@@ -63,7 +63,7 @@
 #-sb-unicode
 (progn
   (test-util:report-test-status)
-  (sb-ext:exit :code 104))
+  (throw 'run-tests::stop t))
 
 ;;; Test UTF-8 writing and reading of 1, 2, 3 and 4 octet characters with
 ;;; all possible offsets. Tests for buffer edge bugs. fd-stream buffers are

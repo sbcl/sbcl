@@ -1,5 +1,5 @@
 ;; -*- coding: utf-8 -*-
-#+(or (not sb-unicode) unicode-lite) (sb-ext:exit :code 104)
+#+(or (not sb-unicode) unicode-lite) (throw 'run-tests::stop t)
 
 (let ((str (coerce '(#\u0041 #\uff71 #\uff21 #\u3042 #\u6f3e #\u71f9 #\u91ed)
                    'string))

@@ -365,6 +365,7 @@
                ;; polluting any sort of gobal namespace with compiler metadata
                ;; as long as the function is named by just a symbol or (SETF x).
                (shadow '("DEFMETHOD"
+                         "EXIT"
                          ;; Hiding IN-PACKAGE is a good preventative measure.
                          ;; There are other ways to do nasty things of course.
                          ;; Deliberately violating a package lock has got to be impure.
@@ -396,7 +397,7 @@
                            (cons :interpreter *features*)
                            *features*)))
                 (let ((start (get-internal-real-time)))
-                  (funcall test-fun file)
+                  (catch 'stop (funcall test-fun file))
                   (log-file-elapsed-time file start log))))
             (skip-file ())))
         (sb-int:unencapsulate 'open 'open-guard)

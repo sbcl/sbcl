@@ -1,4 +1,4 @@
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (throw 'run-tests::stop t)
 (use-package "SB-THREAD")
 
 (with-test (:name (:condition-variable :notify-multiple)
