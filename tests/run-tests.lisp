@@ -233,6 +233,42 @@
       (unless (eq val (cdr item))
         (error "Symbol value differs: ~S" (car item))))))
 
+;;; Apparently this function is dangerous to call, for 2 reasons:
+;;; 1. in general, MAP-ALLOCATED-OBJECTS is vulnerable to changes to the
+;;;    page table made by other others
+;;; 2. apparently it's possible for GENERIC-FUNCTION-P to crash.
+;;;    Why, I do not know, but here's the backtrace:
+;;;      Memory fault at 0x5 (pc=0x52a14f28 [code 0x52a14b50+0x3D8 ID 0x2e70], fp=0x7ff0502a74b0, sp=0x7ff0502a7480) tid 2633983
+;;;         0: fp=0x7ff0502a74b0 pc=0x52a14f28 SB-KERNEL::CLASSOID-TYPEP
+;;;         1: fp=0x7ff0502a7558 pc=0x5333a7af (LAMBDA (SB-VM::OBJ SB-VM::WIDETAG SB-VM::SIZE) :IN SB-VM::LIST-ALLOCATED-OBJECTS)
+;;;         2: fp=0x7ff0502a75a8 pc=0x52aecd06 SB-VM::MAP-OBJECTS-IN-RANGE
+;;;         3: fp=0x7ff0502a75f0 pc=0x52cb19ce SB-VM::WALK-DYNAMIC-SPACE
+;;;         4: fp=0x7ff0502a7670 pc=0x52a6f5a6 SB-VM::MAP-ALLOCATED-OBJECTS
+;;;         5: fp=0x7ff0502a7728 pc=0x5333a3ff SB-VM::LIST-ALLOCATED-OBJECTS
+;;;         6: fp=0x7ff0502a7760 pc=0x5341989e RUN-TESTS::SUMMARIZE-GENERIC-FUNCTIONS
+;;;         7: fp=0x7ff0502a78f0 pc=0x5341b7e8 RUN-TESTS::PURE-RUNNER
+(defun summarize-generic-functions ()
+  #+nil
+  (loop for gf in (sb-vm:list-allocated-objects :all
+                                                :test #'sb-pcl::generic-function-p)
+        collect (cons gf
+                      (when (and (slot-exists-p gf 'sb-pcl::methods)
+                                 (slot-boundp gf 'sb-pcl::methods))
+                        (length (sb-mop:generic-function-methods gf))))))
+
+
+;;; Because sb-pcl::compile-or-load-defgeneric is disabled in pure tests,
+;;; there should be no way to cause this to fail in pure tests except by direct
+;;; use of ADD-METHOD or REMOVE-METHOD.
+(defun compare-gf-summary (expected)
+  (dolist (item expected)
+    (let* ((gf (car item))
+           (n-old (cdr item))
+           (n-new (when (and (slot-exists-p gf 'sb-pcl::methods)
+                             (slot-boundp gf 'sb-pcl::methods))
+                    (length (sb-mop:generic-function-methods gf)))))
+      (assert (eql n-old n-new)))))
+
 (defun tersely-summarize-globaldb ()
   (let* ((symbols-with-properties)
          (types-ht (make-hash-table))
@@ -335,6 +371,7 @@
              (initial-packages (list-all-packages))
              (global-symbol-values (when actually-pure
                                      (collect-symbol-values)))
+             (gf-summary (summarize-generic-functions))
              (globaldb-summary (when actually-pure
                                  (tersely-summarize-globaldb)))
              (test-package
@@ -411,6 +448,7 @@
         (sb-int:unencapsulate 'open 'open-guard)
         (when actually-pure
           (compare-symbol-values global-symbol-values)
+          (compare-gf-summary gf-summary)
           (globaldb-cleanup initial-packages globaldb-summary)
           (dolist (symbol '(sb-pcl::compile-or-load-defgeneric
                             sb-kernel::%compiler-defclass))
