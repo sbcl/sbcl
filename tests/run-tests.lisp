@@ -207,10 +207,8 @@
               ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
               ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
               ,(maybe "SB-VM" "*ALLOCATION-POINTER*")
-              
+              ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
               sb-pcl::*dfun-constructors*
-              #+sb-fasteval
-              sb-interpreter::*last-toplevel-env*
               #+win32
               sb-impl::*waitable-timer-handle*
               #+win32
