@@ -44,7 +44,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        "timer.impure"
                        "bug-1180102.impure"
                        "gethash-concurrency.impure"
-                       "arith.pure"))
+                       "arith-slow.pure"))
 (defun choose-order (tests)
   (sort tests
         (lambda (a b)
