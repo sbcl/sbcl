@@ -205,7 +205,13 @@
               ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
               ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
               ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
-              sb-pcl::*dfun-constructors*)
+              ,(maybe "SB-VM" "*ALLOCATION-POINTER*")
+              sb-thread::*sprof-data*
+              sb-pcl::*dfun-constructors*
+              #+sb-fasteval
+              sb-interpreter::*last-toplevel-env*
+              #+win32
+              sb-impl::*waitable-timer-handle*)
             sb-impl::*cache-vector-symbols*)))
 
 (defun collect-symbol-values ()
