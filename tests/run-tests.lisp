@@ -186,7 +186,8 @@
         (error "Missing input file in manifest: ~S~%" filename))))
 
 (defparameter *ignore-symbol-value-change*
-  (flet ((maybe (x y) (find-symbol y x)))
+  (flet ((maybe (p s) (and (find-package p)
+                           (find-symbol s p))))
     (append `(sb-c::*code-serialno*
               sb-impl::*package-names-cookie*
               sb-impl::*available-buffers*
