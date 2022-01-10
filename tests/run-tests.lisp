@@ -185,6 +185,126 @@
         (format *error-output* "~&Assumed valid input file: ~S" filename)
         (error "Missing input file in manifest: ~S~%" filename))))
 
+(defparameter *ignore-symbol-value-change*
+  (append '(sb-c::*code-serialno*
+            sb-impl::*package-names-cookie*
+            sb-impl::*available-buffers*
+            sb-impl::*token-buf-pool*
+            sb-impl::*user-hash-table-tests*
+            sb-kernel:*eval-calls*
+            sb-kernel::*type-cache-nonce*
+            sb-ext:*gc-run-time*
+            sb-kernel::*gc-epoch*
+            sb-int:*n-bytes-freed-or-purified*
+            sb-disassem::*disassem-inst-space*
+            sb-disassem::*assembler-routines-by-addr*
+            sb-thread::*joinable-threads*
+            sb-thread::*starting-threads*
+            sb-thread::*all-threads*
+            sb-vm::*free-tls-index*
+            sb-vm::*store-barriers-potentially-emitted*
+            sb-vm::*store-barriers-emitted*
+            sb-pcl::*dfun-constructors*)
+          sb-impl::*cache-vector-symbols*))
+
+(defun collect-symbol-values ()
+  (let (result)
+    (do-all-symbols (s)
+      (when (and (not (keywordp s))
+                 (boundp s)
+                 (not (constantp s))
+                 (sb-int:system-package-p (symbol-package s))
+                 (not (member s *ignore-symbol-value-change*)))
+        (push (cons s (symbol-value s)) result)))
+    result))
+
+(defun compare-symbol-values (expected)
+  (dolist (item expected)
+    (let ((val (symbol-value (car item))))
+      (unless (eq val (cdr item))
+        (error "Symbol value differs: ~S" (car item))))))
+
+(defun tersely-summarize-globaldb ()
+  (let* ((symbols-with-properties)
+         (types-ht (make-hash-table))
+         (setfs-ht (make-hash-table))
+         (structure-classoids
+          (sb-kernel:classoid-subclasses
+           (sb-kernel:find-classoid 'structure-object)))
+         (ignored-stream-classoids
+          '(sb-gray:fundamental-binary-output-stream
+            sb-gray:fundamental-binary-input-stream
+            sb-gray:fundamental-binary-stream
+            sb-gray:fundamental-character-stream
+            sb-gray:fundamental-output-stream
+            sb-gray:fundamental-input-stream))
+         (standard-classoids
+          (sb-kernel:classoid-subclasses
+           (sb-kernel:find-classoid 'standard-object)))
+         (condition-classoids
+          (sb-kernel:classoid-subclasses
+           (sb-kernel:find-classoid 'condition))))
+    (do-all-symbols (s)
+      (when (symbol-plist s)
+        (push s symbols-with-properties))
+      (when (sb-int:info :type :kind s)
+        (setf (gethash s types-ht) t))
+      (when (sb-int:info :setf :expander s)
+        (setf (gethash s setfs-ht) t)))
+    ;; The first element of this list is employed to delete new structure definitions
+    ;; after the test file is executed.  The other elements are used only as a comparison
+    ;; to see that nothing else was altered in the classoid or type namespace, etc.
+    (list (loop for key being each hash-key of structure-classoids
+                collect (sb-kernel:classoid-name key))
+          (loop for key being each hash-key of standard-classoids
+                unless (member (sb-kernel:classoid-name key)
+                               ignored-stream-classoids)
+                collect (sb-kernel:classoid-name key))
+          (loop for key being each hash-key of condition-classoids
+                collect (sb-kernel:classoid-name key))
+          (sort symbols-with-properties #'string<)
+          (sb-impl::info-env-count sb-int:*info-environment*)
+          (hash-table-count types-ht)
+          (hash-table-count setfs-ht))))
+
+(defun structure-classoid-ancestors (classoid)
+  (map 'list 'sb-kernel:wrapper-classoid-name
+       (sb-kernel:wrapper-inherits (sb-kernel:classoid-wrapper classoid))))
+
+(defun globaldb-cleanup (initial-packages globaldb-summary)
+  ;; Package deletion suffices to undo DEFVAR,DEFTYPE,DEFSETF,DEFUN,DEFMACRO
+  ;; but not DEFSTRUCT or DEFCLASS.
+  ;; UNDECLARE-STRUCTURE isn't destructive enough for our needs here.
+  (let* ((saved-structure-classoids (first globaldb-summary))
+         (worklist
+          (loop for key being each hash-key
+                of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 'structure-object))
+                unless (member (the (and symbol (not null))
+                                    (sb-kernel:classoid-name key))
+                               saved-structure-classoids)
+               collect key)))
+    (dolist (classoid worklist)
+      (let* ((name (sb-kernel:classoid-name classoid))
+             (direct-super
+              (sb-kernel:classoid-name
+               (car (sb-kernel:classoid-direct-superclasses classoid)))))
+        (sb-mop:remove-direct-subclass (find-class direct-super) (find-class name))
+        (dolist (ancestor (structure-classoid-ancestors classoid))
+          ;; (format t "~&Removing ~s from ~s~%" name ancestor)
+          (remhash classoid
+                   (sb-kernel:classoid-subclasses (sb-kernel:find-classoid
+                                                   ancestor)))))))
+  (dolist (package (list-all-packages))
+    (unless (member package initial-packages)
+      (delete-package package)))
+  (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
+        for index from 0
+        unless (equal x y)
+        do (let ((*print-pretty* nil))
+             (warn "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
+                   index (list (set-difference x y)
+                               (set-difference y x))))))
+
 (defun pure-runner (files test-fun log)
   (unless files
     (return-from pure-runner))
@@ -203,6 +323,11 @@
               (not (or (search ".impure" (namestring file))
                        (search ".impure-cload" (namestring file)))))
              (packages-to-use '("ASSERTOID" "TEST-UTIL"))
+             (initial-packages (list-all-packages))
+             (global-symbol-values (when actually-pure
+                                     (collect-symbol-values)))
+             (globaldb-summary (when actually-pure
+                                 (tersely-summarize-globaldb)))
              (test-package
               (if actually-pure
                   (make-package
@@ -234,11 +359,15 @@
         ;; DEF{constant,fun,macro,parameter,setf,type,var} are generally ok
         ;; except when DEFfoo defines something too hairy to hang off a symbol.
         (cond (actually-pure
-               (shadow '("DEFSTRUCT" "DEFMETHOD"
+               ;; DEFMACRO and DEFUN are allowed in pure tests because their effect
+               ;; is undone by deleting the package. We're pretty good now about not
+               ;; polluting any sort of gobal namespace with compiler metadata
+               ;; as long as the function is named by just a symbol or (SETF x).
+               (shadow '("DEFMETHOD"
                          ;; Hiding IN-PACKAGE is a good preventative measure.
                          ;; There are other ways to do nasty things of course.
                          ;; Deliberately violating a package lock has got to be impure.
-                         "IN-PACKAGE" "WITHOUT-PACKAGE-LOCKS")
+                         "IN-PACKAGE" "*PACKAGE*" "WITHOUT-PACKAGE-LOCKS")
                        test-package)
                ;; We have pure tests that exercise the DEFCLASS and DEFGENERIC
                ;; macros to generate macroexpansion-time errors.  That's mostly ok.
@@ -253,7 +382,11 @@
                                            (apply f args))))))
               (t
                (use-package packages-to-use test-package)))
-        (let ((*package* test-package))
+        (let ((*package* test-package)
+              (sb-impl::*gentemp-counter* sb-impl::*gentemp-counter*)
+              (sb-c::*check-consistency* sb-c::*check-consistency*)
+              (sb-c::*policy-min* sb-c::*policy-min*)
+              (sb-c::*policy-max* sb-c::*policy-max*))
           (restart-case
             (handler-bind ((error (make-error-handler file)))
               (let* ((sb-ext:*evaluator-mode* *test-evaluator-mode*)
@@ -267,10 +400,11 @@
             (skip-file ())))
         (sb-int:unencapsulate 'open 'open-guard)
         (when actually-pure
+          (compare-symbol-values global-symbol-values)
+          (globaldb-cleanup initial-packages globaldb-summary)
           (dolist (symbol '(sb-pcl::compile-or-load-defgeneric
                             sb-kernel::%compiler-defclass))
-            (sb-int:unencapsulate symbol 'defblah-guard))
-          (delete-package test-package))))
+            (sb-int:unencapsulate symbol 'defblah-guard)))))
     (makunbound '*allowed-inputs*)
     ;; after all the files are done
     (append-failures)))

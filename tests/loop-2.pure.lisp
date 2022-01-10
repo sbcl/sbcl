@@ -11,12 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 ;;; Bug 49b, reported by Peter Van Eynde 2000-07-25, was fixed by
 ;;; Alexey Dejneka's patch on sbcl-devel 2001-09-30.
 ;;;
-;;; (This test is impure because we create a scratch package to work with.)
 (let ((package (make-package "loop-test-scratch")))
   (intern "blah" package)
   (let ((blah2 (intern "blah2" package)))

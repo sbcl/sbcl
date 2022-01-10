@@ -11,10 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defpackage :profile-test
-  (:use :cl :sb-thread))
-
-(in-package :profile-test)
+(use-package "SB-THREAD")
 
 (defun miller-rabin-prime-p (n &optional (s 50))
  "Miller-Rabin primality test written by R. Matthew Emerson."
@@ -57,7 +54,7 @@
              (w (make-semaphore))
              (workers
               (loop repeat n-workers
-                    collect (sb-thread:make-thread
+                    collect (make-thread
                              (let ((rs (make-random-state)))
                                (lambda ()
                                  (block nil
@@ -73,16 +70,14 @@
                                          t)))))))))
         (loop repeat n-workers do (wait-on-semaphore r))
         (signal-semaphore w n-workers)
-        (mapcar #'sb-thread:join-thread workers))))
-
-(in-package :cl-user)
+        (mapcar #'join-thread workers))))
 
 (with-test (:name (profile :threads)
                   :broken-on :win32)
-  (profile "PROFILE-TEST")
+  (profile #.(package-name cl:*package*))
   ;; This used to signal an error with threads
   (let* ((n #+sb-thread 5 #-sb-thread 1)
-         (res (profile-test::waste-cpu-cycles 10 256 n))
+         (res (waste-cpu-cycles 10 256 n))
          (want (make-list n :initial-element t)))
     (unless (equal res want)
       (error "wanted ~S, got ~S" want res)))

@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package "CL-USER")
-
 ;;; test case from Utz-Uwe Haus
 (defstruct some-struct
   (a 0 :type integer))

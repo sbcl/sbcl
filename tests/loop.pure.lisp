@@ -90,7 +90,7 @@
 (assert (= (loop for nil being the external-symbols of :cl count t) 978))
 (assert (= (loop for x being the external-symbols of :cl count x) 977))
 
-(let ((*package* (find-package :cl)))
+(let ((cl:*package* (find-package :cl)))
   (assert (= (loop for x being each external-symbol count t) 978)))
 
 (assert (eq (loop for a = (return t) return nil) t))

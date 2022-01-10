@@ -1,6 +1,3 @@
-;;;; This file is for floating-point-related tests which have side
-;;;; effects (e.g. executing DEFUN).
-
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
@@ -11,8 +8,6 @@
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
-
-(cl:in-package :cl-user)
 
 ;;; Hannu Rummukainen reported a CMU CL bug on cmucl-imp@cons.org 26
 ;;; Jun 2000. This is the test case for it.

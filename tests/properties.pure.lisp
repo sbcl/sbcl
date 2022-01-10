@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 (defun test-symbol (symbol)
   (setf (symbol-plist symbol) nil)
   (setf (get symbol 'foo) '(my list))

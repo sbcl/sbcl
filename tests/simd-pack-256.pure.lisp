@@ -14,6 +14,7 @@
 #-sb-simd-pack-256 (exit :code 104)
 
 (when (zerop (sb-alien:extern-alien "avx2_supported" int))
+  (format t "~&INFO: simd-pack-256 not supported")
   (exit :code 104))
 
 (defun make-constant-packs ()
