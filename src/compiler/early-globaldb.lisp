@@ -237,6 +237,10 @@
                             .whole.)))
                     .whole.))))
 
+  ;; ECL bug workaround: INFO ceases to be a valid macrolet name
+  ;; because it tries to run the compiler-macro before the local macro.
+  ;; In particular, "(collect ((info)) ...)" will not compile correctly.
+  #-host-quirks-ecl
   (def info (category kind name)
     `(truly-the (values ,(meta-info-type-spec meta-info) boolean)
                 (get-info-value ,name ,(meta-info-number meta-info))))

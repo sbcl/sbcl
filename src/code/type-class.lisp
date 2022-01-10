@@ -424,12 +424,16 @@
                  (loop for name in type-class-fun-slots
                        append `(,(keywordicate name)
                                 (,(type-class-fun-slot name) parent))))))))
-    ;; Careful: type-classes are very complicated things to redefine.
-    ;; For the sake of parallelized make-host-1 we have to allow
-    ;; redefinition, but it has to be a no-op.
     #+sb-xc-host
-    `(unless (find ',name *type-classes* :key #'type-class-name)
-       (vector-push ,make-it *type-classes*))
+    `(progn
+       ;; Careful: type-classes are very complicated things to redefine.
+       ;; For the sake of parallelized make-host-1 we have to allow
+       ;; redefinition, but it has to be a no-op.
+       (unless (find ',name *type-classes* :key #'type-class-name)
+         (vector-push ,make-it *type-classes*))
+       ;; I have no idea what compiler bug could be worked around by adding a form here,
+       ;; but this certainly achieves something, somehow.
+       #+host-quirks-cmu (print (aref *type-classes* (1- (length *type-classes*)))))
 
     #+sb-xc
     (let ((type-class-index

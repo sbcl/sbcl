@@ -427,12 +427,14 @@
                (or (aref (gspace-page-table gspace) index)
                    (setf (aref (gspace-page-table gspace) index) (make-page))))
              (assign-page-types (page-type start-word-index count)
+               ;; CMUCL incorrectly warns that the result of ADJUST-ARRAY
+               ;; must not be discarded.
+               #+host-quirks-cmu (declare (notinline adjust-array))
                (let ((start-page (page-index start-word-index))
                      (end-page (page-index (+ start-word-index (1- count)))))
                  (unless (> (length (gspace-page-table gspace)) end-page)
-                   (setf (gspace-page-table gspace)
-                         (adjust-array (gspace-page-table gspace) (1+ end-page)
-                                       :initial-element nil)))
+                   (adjust-array (gspace-page-table gspace) (1+ end-page)
+                                 :initial-element nil))
                  (loop for page-index from start-page to end-page
                        for pte = (pte page-index)
                        do (if (null (page-type pte))

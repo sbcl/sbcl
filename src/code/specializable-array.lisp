@@ -59,7 +59,14 @@
                                    (initial-contents nil contentsp)
                                    (initial-element 0)
                                    (retain-specialization-for-after-xc-core))
-  (declare (notinline cl:make-array))
+  ;; ECL fails to compile MAKE-ARRAY when keyword args are not literal keywords. e.g.:
+  ;; (DEFUN TRY (DIMS SELECT VAL)
+  ;;   (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)) ->
+  ;; "The macro form (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)
+  ;;  was not expanded successfully.
+  ;;  Error detected:
+  ;;  The key (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) is not allowed"
+  #+host-quirks-ecl (declare (notinline cl:make-array))
 
   (aver element-type)
   ;; Canonicalize
