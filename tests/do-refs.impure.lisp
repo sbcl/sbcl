@@ -28,7 +28,8 @@
 
 (defstruct foo (z 0 :type sb-ext:word) (x 'x) (y 'y))
 
-(test-util:with-test (:name :walk-slots-trivial) ; lists and vectors
+(test-util:with-test (:name :walk-slots-trivial ; lists and vectors
+                            :fails-on :interpreter)
   (walk-slots-test '(a . b) '(a b))
   (walk-slots-test #(a b c) '(a b c))
   (walk-slots-test #(a b c d) '(a b c d))
@@ -90,7 +91,8 @@
   ((a :initform 1) (b :initform 2)
    (c :initform 3) (d :initform 4) (e :initform 5)))
 
-(test-util:with-test (:name :walk-slots-standard-instance)
+(test-util:with-test (:name :walk-slots-standard-instance
+                            :fails-on :interpreter)
   (let ((o (make-instance 'mystdinst)))
     (walk-slots-test* o
                       (lambda (slots)
@@ -99,7 +101,8 @@
                                (eq clos-slots (sb-pcl::std-instance-slots o))))))))
 
 (define-condition cfoo (simple-condition) ((a :initarg :a) (b :initarg :b) (c :initform 'c)))
-(test-util:with-test (:name :walk-slots-condition-instance)
+(test-util:with-test (:name :walk-slots-condition-instance
+                            :fails-on :interpreter)
   (let ((instance (make-condition 'cfoo :a 'ay :b 'bee :format-arguments "wat")))
     (walk-slots-test instance
                      `(,(find-layout 'cfoo) (c c format-control nil)
