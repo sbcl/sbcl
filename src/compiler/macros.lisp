@@ -11,6 +11,24 @@
 
 (in-package "SB-C")
 
+;;;; DEFTYPEs
+
+;;; An INLINEP value describes how a function is called. The values
+;;; have these meanings:
+;;;     NIL     No declaration seen: do whatever you feel like, but don't
+;;;             dump an inline expansion.
+;;; NOTINLINE  NOTINLINE declaration seen: always do full function call.
+;;;    INLINE  INLINE declaration seen: save expansion, expanding to it
+;;;             if policy favors.
+;;; MAYBE-INLINE
+;;;             Retain expansion, but only use it opportunistically.
+;;;             MAYBE-INLINE is quite different from INLINE. As explained
+;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
+;;;             instantiated once per component, INLINE - for all
+;;;             references (even under #'without FUNCALL)."
+(deftype inlinep () '(member inline maybe-inline notinline nil))
+
+
 ;;;; source-hacking defining forms
 
 ;;; Parse a DEFMACRO-style lambda-list, setting things up so that a

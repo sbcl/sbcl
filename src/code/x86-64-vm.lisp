@@ -386,6 +386,8 @@
       (return (loop (cond ((>= (incf i) len) (return t))
                           ((eq thing (svref things i)) (return nil))))))))
 
+(define-load-time-global *static-linker-lock* (sb-thread:make-mutex :name "static linker"))
+
 (define-load-time-global *never-statically-link* '(find-package))
 ;;; Remove calls via fdefns from CODE. This is called after compiling
 ;;; to memory, or when saving a core.
@@ -453,7 +455,7 @@
             (setf (aref replacements fdefn-index) nil))))
       (let ((stored-locs (if any-ambiguous
                              (make-array fdefns-count :initial-element nil))))
-        (with-system-mutex (sb-c::*static-linker-lock*)
+        (with-system-mutex (*static-linker-lock*)
           (dolist (fixup fixups)
             (binding* ((fdefn-index (car fixup) :exit-if-null)
                        (offset (cdr fixup))

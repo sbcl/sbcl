@@ -152,7 +152,7 @@
 ;;; current jump address, which means we need to fix them *all* before anyone
 ;;; else gets an opportunity to change the fdefn-fun of this same fdefn again.
 (defun sb-vm::remove-static-links (fdefn)
-  (sb-int:with-system-mutex (sb-c::*static-linker-lock*)
+  (sb-int:with-system-mutex (sb-vm::*static-linker-lock*)
     (let ((fun-entry (sb-vm::fdefn-raw-addr fdefn))
           (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
       (flet ((code-statically-links-fdefn-p (code)
