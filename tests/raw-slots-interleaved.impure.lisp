@@ -78,7 +78,8 @@
     (push (sb-kernel:%instance-ref struct i) result))
   (nreverse result))
 
-(with-test (:name :sign-extended-bitmap)
+(with-test (:name :sign-extended-bitmap
+            :fails-on :interpreter)
   ;; could have 100 or 101 physical payload slots depending on
   ;; presence of a padding word
   (assert (>= (length (collect-slot-values (make-100slots))) 100)))
@@ -101,7 +102,8 @@
 (defvar *afoo* (make-foo1))
 (assert (= (sb-kernel:wrapper-length (sb-kernel:wrapper-of *afoo*))
            (sb-kernel:%instance-length *afoo*)))
-(with-test (:name :tagged-slot-iterator-macro)
+(with-test (:name :tagged-slot-iterator-macro
+            :fails-on :interpreter)
   ;; on 32-bit, the logical length is 14, which means 15 words (with header),
   ;; but slot index 14 (word index 15) exists after padding to 16 memory words.
   ;; It is allowed to hold a fixnum (or any non-pointer) but naught else.
