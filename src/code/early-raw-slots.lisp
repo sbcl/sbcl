@@ -195,18 +195,28 @@
 ;;; It's more efficient than iterating over DSD-SLOTS, and editcore would
 ;;; have a harder time using DSD-SLOTS. But it's too complicated.
 #-sb-xc-host
-(defmacro do-instance-tagged-slot ((index-var thing &optional (pad t) bitmap-expr)
+(defmacro do-instance-tagged-slot ((index-var thing &optional (pad t) layout-expr)
                                    &body body)
-  (with-unique-names (instance bitmap mask bitmap-index bitmap-limit nbits end)
+  (with-unique-names (instance layout mask bitmap-index bitmap-limit nbits end)
     `(let* ((,instance ,thing)
-            (,bitmap ,(or bitmap-expr `(%instance-layout ,instance)))
+            (,layout ,(or layout-expr
+                          ;; %INSTANCE-LAYOUT is defknown'ed to return a LAYOUT,
+                          ;; but heap walking might encounter an instance with no layout,
+                          ;; hence the need to access the layout without assuming
+                          ;; it to be of that type.
+                          `(let ((l #+compact-instance-header
+                                    (%primitive %instance-layout ,instance)
+                                    #-compact-instance-header
+                                    (%instance-ref ,instance 0)))
+                             (truly-the sb-vm:layout
+                                        (if (eql l 0) #.(find-layout 't) l)))))
             ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
             ;; because it's not user-visible data.
-            (,mask (ash (%raw-instance-ref/signed-word ,bitmap (type-dd-length sb-vm:layout))
+            (,mask (ash (%raw-instance-ref/signed-word ,layout (type-dd-length sb-vm:layout))
                         (- sb-vm:instance-data-start)))
             ;; Start counting from the next bitmap word as we've consumed one already
             (,bitmap-index (1+ (type-dd-length sb-vm:layout)))
-            (,bitmap-limit (%instance-length ,bitmap))
+            (,bitmap-limit (%instance-length ,layout))
             ;; If this was the last word of the bitmap, then the high bit
             ;; is infinitely sign-extended, and we can keep right-shifting
             ;; the mask word indefinitely. Most bitmaps will have only 1 word,
@@ -225,7 +235,7 @@
          (declare (type index ,index-var))
          ;; If mask was fully consumed, fetch the next bitmap word
          (when (zerop ,nbits)
-           (setq ,mask (%raw-instance-ref/signed-word ,bitmap ,bitmap-index)
+           (setq ,mask (%raw-instance-ref/signed-word ,layout ,bitmap-index)
                  ,nbits (if (= (incf ,bitmap-index) ,bitmap-limit)
                             sb-vm:instance-length-mask
                             sb-vm:n-word-bits)))

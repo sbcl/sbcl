@@ -322,7 +322,12 @@
           (setf flags (logior flags +strictly-boxed-flag+))))
       flags))
   (defun wrapper-bitmap (wrapper)
-    (acond ((wrapper-%info wrapper) (dd-bitmap it)) (t +layout-all-tagged+))))
+    (acond ((wrapper-%info wrapper) (dd-bitmap it))
+           ;; Give T a 0 bitmap. It's arbitrary, but when we need some layout
+           ;; that has this bitmap we can use the layout of T.
+           ((eq wrapper (find-layout t)) 0)
+           (t
+            +layout-all-tagged+))))
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))

@@ -11,6 +11,9 @@
 
 (in-package sb-vm)
 
+(test-util:with-test (:name :safe-layoutless-instance)
+  (assert (not (sb-vm::references-p (sb-kernel:%make-instance 5) '(foo)))))
+
 (defun collect-slot-values (obj &aux result)
   (flet ((slots (x)
            #+metaspace (if (typep x 'sb-vm:layout) (setq x (sb-kernel::layout-friend x)))
