@@ -286,11 +286,11 @@
 ;;; Bug #316325: "return values of alien calls assumed truncated to
 ;;; correct width on x86"
 #+x86-64
-(sb-alien::define-alien-callback truncation-test (unsigned 64)
+(define-alien-callable truncation-test (unsigned 64)
     ((foo (unsigned 64)))
   foo)
 #+x86
-(sb-alien::define-alien-callback truncation-test (unsigned 32)
+(define-alien-callable truncation-test (unsigned 32)
     ((foo (unsigned 32)))
   foo)
 
@@ -304,7 +304,7 @@
                `(with-alien ((fun (* (function ,type
                                                #+x86-64 (unsigned 64)
                                                #+x86 (unsigned 32)))
-                                  :local (alien-sap truncation-test)))
+                                  :local (alien-sap (alien-callable-function 'truncation-test))))
                   (let ((result (alien-funcall fun ,input)))
                     (assert (= result ,output))))))
     #+x86-64

@@ -39,10 +39,10 @@
       (sb-alien:load-shared-object solib)))
 
 ;;;; Just exercise a ton of calls from 1 thread
-(sb-alien::define-alien-callback perftestcb int () 0)
+(define-alien-callable perftestcb int () 0)
 (defun trivial-call-test (n)
   (with-alien ((testfun (function int system-area-pointer int) :extern "minimal_perftest"))
-    (alien-funcall testfun (alien-sap perftestcb) n)))
+    (alien-funcall testfun (alien-sap (alien-callable-function 'perftestcb)) n)))
 (time (trivial-call-test 200000))
 
 ;;;;
@@ -56,7 +56,7 @@
 (defglobal *print-greetings-and-salutations* (or #+linux t))
 
 (defglobal *semaphore* nil)
-(sb-alien::define-alien-callback testcb int ((arg1 c-string) (arg2 double))
+(define-alien-callable testcb int ((arg1 c-string) (arg2 double))
   (when *semaphore* (sb-thread:signal-semaphore *semaphore*))
   (let ((cell (assoc sb-thread:*current-thread* *seen-threads*))
         (result (floor (* (length arg1) arg2))))
@@ -117,7 +117,7 @@
       (setq *keepon* t)
       (with-alien ((testfun (function int system-area-pointer int int)
                             :extern "call_thing_from_threads"))
-        (assert (eql (alien-funcall testfun (alien-sap testcb) n-threads n-calls)
+        (assert (eql (alien-funcall testfun (alien-sap (alien-callable-function 'testcb)) n-threads n-calls)
                      1)))
       (setq *keepon* nil)
       (sb-thread:barrier (:write))
@@ -158,7 +158,7 @@
 
 ;;; Check that you get an error trying to join a foreign thread
 (defglobal *my-foreign-thread* nil)
-(sb-alien::define-alien-callback tryjointhis int ()
+(define-alien-callable tryjointhis int ()
   (setq *my-foreign-thread* sb-thread:*current-thread*)
   (dotimes (i 10)
     (write-char #\.) (force-output)
@@ -172,7 +172,7 @@
      (extern-alien "pthread_create"
                    (function int system-area-pointer unsigned
                              system-area-pointer unsigned))
-     (sb-sys:vector-sap pthread) 0 (alien-sap tryjointhis) 0)
+     (sb-sys:vector-sap pthread) 0 (alien-sap (alien-callable-function 'tryjointhis)) 0)
     (format t "Alien pthread is ~x~%" (aref pthread 0))
     (let (found)
       (loop

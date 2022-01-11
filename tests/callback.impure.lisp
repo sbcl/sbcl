@@ -58,7 +58,7 @@
   (size int)
   (compar (function int (* double) (* double))))
 
-(sb-alien::define-alien-callback double*-cmp int ((arg1 (* double)) (arg2 (* double)))
+(define-alien-callable double*-cmp int ((arg1 (* double)) (arg2 (* double)))
   (let ((a1 (deref arg1))
         (a2 (deref arg2)))
     (cond ((= a1 a2) 0)
@@ -73,69 +73,56 @@
     (qsort (sb-sys:vector-sap vector)
            (length vector)
            (alien-size double :bytes)
-           double*-cmp))
+           (alien-callable-function 'double*-cmp)))
   (assert (equalp vector sorted)))
 
 ;;; returning floats
 
-(sb-alien::define-alien-callback redefined-fun int ()
-    0)
+(define-alien-callable redefined-fun int ()
+  0)
 
 (eval
- '(sb-alien::define-alien-callback redefined-fun int ()
+ '(define-alien-callable redefined-fun int ()
    42))
 
-(assert (= 42 (alien-funcall redefined-fun)))
+(assert (= 42 (alien-funcall (alien-callable-function 'redefined-fun))))
 
-(sb-alien::define-alien-callback return-single float ((x float))
+(define-alien-callable return-single float ((x float))
   x)
 
-(sb-alien::define-alien-callback return-double double ((x double))
+(define-alien-callable return-double double ((x double))
   x)
 
 (defconstant spi (coerce pi 'single-float))
 
-(assert (= spi (alien-funcall return-single spi)))
-(assert (= pi (alien-funcall return-double pi)))
+(assert (= spi (alien-funcall (alien-callable-function 'return-single) spi)))
+(assert (= pi (alien-funcall (alien-callable-function 'return-double) pi)))
 
-;;; invalidation
+;;; redefining and invalidating alien callables
 
-(sb-alien::define-alien-callback to-be-invalidated int ()
-  5)
+(define-alien-callable foo int ()
+  13)
 
-(assert (= 5 (alien-funcall to-be-invalidated)))
+(defvar *old-foo* (alien-callable-function 'foo))
 
-(multiple-value-bind (p valid) (sb-alien::alien-callback-p to-be-invalidated)
+(multiple-value-bind (p valid) (sb-alien::alien-callback-p *old-foo*)
   (assert p)
   (assert valid))
 
-(sb-alien::invalidate-alien-callback to-be-invalidated)
+(assert (= 13 (alien-funcall *old-foo*)))
 
-(multiple-value-bind (p valid) (sb-alien::alien-callback-p to-be-invalidated)
+(define-alien-callable foo int ()
+  26)
+
+(multiple-value-bind (p valid) (sb-alien::alien-callback-p *old-foo*)
   (assert p)
   (assert (not valid)))
 
 (multiple-value-bind (res err)
-    (ignore-errors (alien-funcall to-be-invalidated))
+    (ignore-errors (alien-funcall *old-foo*))
   (assert (and (not res) (typep err 'error))))
 
-;;; getting and setting the underlying function
-
-(sb-alien::define-alien-callback foo int ()
-  13)
-
-(defvar *foo* #'foo)
-
-(assert (eq #'foo (sb-alien::alien-callback-function foo)))
-
-(defun bar ()
-  26)
-
-(setf (sb-alien::alien-callback-function foo) #'bar)
-
-(assert (eq #'bar (sb-alien::alien-callback-function foo)))
-
-(assert (= 26 (alien-funcall foo)))
+(assert (= 26 (alien-funcall (alien-callable-function 'foo))))
 
 ;;; callbacks with void return values
 

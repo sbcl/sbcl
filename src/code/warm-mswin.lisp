@@ -161,7 +161,7 @@
 (defvar *console-control-enabled* nil)
 (defvar *console-control-spec* nil)
 
-(sb-alien::define-alien-callback *alien-console-control-handler* (:stdcall int)
+(define-alien-callable alien-console-control-handler (:stdcall int)
     ((event-code int))
   (if (ignore-errors (funcall *console-control-handler* event-code)) 1 0))
 
@@ -183,7 +183,7 @@ true to stop searching)." *console-control-spec*)
      (setf *console-control-enabled* nil))
     ((or symbol function)
      (setf *console-control-handler* new-handler)
-     (aver (plusp (set-console-ctrl-handler *alien-console-control-handler* 1)))))
+     (aver (plusp (set-console-ctrl-handler (alien-callable-function 'alien-console-control-handler) 1)))))
   (setf *console-control-spec* new-handler))
 
 (defun initialize-console-control-handler (&optional reset-to-default-p)

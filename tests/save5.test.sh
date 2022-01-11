@@ -10,12 +10,10 @@ run_sbcl <<EOF
   (defun bar ()
     (format t "~&Callbacks not supported, skipping~%")
     (exit :code 42))
-  ;; The symbol SB-ALIEN::DEFINE-ALIEN-CALLBACK exists (can be read)
-  ;; no matter whether support for it exists.
   (when (member :alien-callbacks sb-impl:+internal-features+)
     (fmakunbound 'bar)
-    (sb-alien::define-alien-callback foo int () 42)
-    (defun bar () (exit :code (alien-funcall foo))))
+    (sb-alien:define-alien-callable foo int () 42)
+    (defun bar () (exit :code (alien-funcall (sb-alien:alien-callable-function 'foo)))))
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \

@@ -279,20 +279,6 @@ callback to signal an error."
       (parse-callback-specification result-type typed-lambda-list)
     `(alien-callback ,specifier (lambda ,lambda-list ,@forms))))
 
-;;; FIXME: Should subsequent (SETF FDEFINITION) affect the callback or not?
-;;; What about subsequent DEFINE-ALIEN-CALLBACKs? My guess is that changing
-;;; the FDEFINITION should invalidate the callback, and redefining the
-;;; callback should change existing callbacks to point to the new defintion.
-(defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
-  "Defines #'NAME as a function with the given body and lambda-list, and NAME as
-the alien callback for that function with the given alien type."
-  (declare (symbol name))
-  (multiple-value-bind (specifier lambda-list)
-      (parse-callback-specification result-type typed-lambda-list)
-    `(progn
-       (defun ,name ,lambda-list ,@forms)
-       (defparameter ,name (alien-callback ,specifier #',name)))))
-
 ;;;; Alien callables
 
 (define-load-time-global *alien-callables* (make-hash-table :test #'eq)
