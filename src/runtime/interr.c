@@ -124,7 +124,14 @@ lose(char *fmt, ...)
     va_list ap;
     /* Block signals to prevent other threads, timers and such from
      * interfering. If only all threads could be stopped somehow. */
-    block_blockable_signals(0);
+
+#ifdef LISP_FEATURE_WIN32
+    /* pthread_sigmask is emulated on windows, if lose() happens very early
+       it may not be ready to work yet. */
+    if (get_sb_vm_thread())
+#endif
+      block_blockable_signals(0);
+
     fprintf(stderr, "fatal error encountered");
     va_start(ap, fmt);
     print_message(fmt, ap);
