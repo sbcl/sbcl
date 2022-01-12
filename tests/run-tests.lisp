@@ -442,7 +442,7 @@
                            (cons :interpreter *features*)
                            *features*)))
                 (let ((start (get-internal-real-time)))
-                  (catch 'stop (funcall test-fun file))
+                  (funcall test-fun file)
                   (log-file-elapsed-time file start log))))
             (skip-file ())))
         (sb-int:unencapsulate 'open 'open-guard)

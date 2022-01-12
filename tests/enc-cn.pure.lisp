@@ -1,6 +1,6 @@
 ;;; -*- coding: utf-8 -*-
 ;;; enc-cn.impure.lisp: test case for enc-cn.lisp and enc-cn-tbl.lisp
-#+(or (not sb-unicode) unicode-lite) (throw 'run-tests::stop t)
+#+(or (not sb-unicode) unicode-lite) (invoke-restart 'run-tests::skip-file)
 
 (let ((str (coerce '(#\u0031 #\u0041 #\uff21 #\u3042 #\u80e1 #\u73a5 #\u59ee)
                    'string))

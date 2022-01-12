@@ -1,4 +1,4 @@
-#+cheneygc (throw 'run-tests::stop t)
+#+cheneygc (invoke-restart 'run-tests::skip-file)
 
 (shadow "ASSERT-ERROR") ; conflict between SB-KERNEL:ASSERT-ERROR, ASSERTOID:ASSERT-ERROR
 (use-package "SB-KERNEL")

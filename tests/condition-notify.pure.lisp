@@ -1,4 +1,4 @@
-#-sb-thread (throw 'run-tests::stop t)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 (use-package "SB-THREAD")
 
 (with-test (:name (:condition-variable :notify-multiple)

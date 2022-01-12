@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-simd-pack (throw 'run-tests::stop t)
+#-sb-simd-pack (invoke-restart 'run-tests::skip-file)
 (defun make-constant-packs ()
   (values (sb-kernel:%make-simd-pack-ub64 1 2)
           (sb-kernel:%make-simd-pack-ub32 0 0 0 0)

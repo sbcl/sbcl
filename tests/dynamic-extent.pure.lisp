@@ -12,7 +12,7 @@
 ;;;; more information.
 
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (throw 'run-tests::stop t))
+  (invoke-restart 'run-tests::skip-file))
 
 (load "compiler-test-util.lisp")
 (use-package :ctu)

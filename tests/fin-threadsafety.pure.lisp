@@ -1,4 +1,4 @@
-#-sb-thread (throw 'run-tests::stop t)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (let ((count (make-array 8 :initial-element 0)))
   (defun closure-one ()

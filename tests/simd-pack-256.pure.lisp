@@ -11,11 +11,11 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-simd-pack-256 (throw 'run-tests::stop t)
+#-sb-simd-pack-256 (invoke-restart 'run-tests::skip-file)
 
 (when (zerop (sb-alien:extern-alien "avx2_supported" int))
   (format t "~&INFO: simd-pack-256 not supported")
-  (throw 'run-tests::stop t))
+  (invoke-restart 'run-tests::skip-file))
 
 (defun make-constant-packs ()
   (values (sb-ext:%make-simd-pack-256-ub64 1 2 3 4)
