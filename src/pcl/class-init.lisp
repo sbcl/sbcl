@@ -602,7 +602,7 @@
                                         info
                                         (cdr (find-slot-cell wrapper slot-name))))))
                              (when typecheck
-                               (funcall typecheck new-value)))
+                               (setf new-value (funcall typecheck new-value))))
                            ;; Then call the real writer.
                            (funcall writer-fun new-value instance)))))
     (set-fun-name (if safe-p

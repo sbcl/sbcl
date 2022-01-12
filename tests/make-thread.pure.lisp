@@ -3,7 +3,7 @@
 (shadow "ASSERT-ERROR") ; conflict between SB-KERNEL:ASSERT-ERROR, ASSERTOID:ASSERT-ERROR
 (use-package "SB-KERNEL")
 (use-package "SB-THREAD")
-(import 'sb-sys::(sap-int sap+ vector-sap without-gcing))
+(import 'sb-sys::(int-sap sap-int sap+ vector-sap without-gcing))
 (import 'sb-int::(binding* descriptor-sap))
 
 ;;; Test out-of-memory (or something) that goes wrong in pthread_create

@@ -121,7 +121,7 @@
          (info (cdr cell))
          (typecheck (slot-info-typecheck info)))
     (when typecheck
-      (funcall typecheck new-value))
+      (setf new-value (funcall typecheck new-value)))
     (cond ((fixnump location)
            (if (std-instance-p object)
                (setf (standard-instance-access object location) new-value)
@@ -152,7 +152,7 @@
          (info (cdr cell))
          (typecheck (slot-info-typecheck info)))
     (when typecheck
-      (funcall typecheck new-value))
+      (setf new-value (funcall typecheck new-value)))
     (let ((old (cond ((fixnump location)
                       (if (std-instance-p object)
                           (cas (standard-instance-access object location) old-value new-value)

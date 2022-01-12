@@ -222,7 +222,7 @@
                  ;; for CLOS typechecking when it's not in use.
                  `(if typecheck
                       (make-mf-lambda
-                       (funcall (the function typecheck) nv)
+                       (setf nv (funcall (the function typecheck) nv))
                        ,@body)
                       (make-mf-lambda
                        ,@body))))

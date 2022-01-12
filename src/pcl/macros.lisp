@@ -141,14 +141,7 @@
                                 (bind `((,object-var ,object))))
                            (setf object object-var)
                            bind)))
-          ;; What's going on by not assuming that #'(SETF x) returns NEW-VALUE?
-          ;; It seems wrong to return anything other than what the SETF fun
-          ;; yielded. By analogy, when the SETF macro changes (SETF (F x) v)
-          ;; into (funcall #'(setf F) ...), it does not insert any code to
-          ;; enforce V as the overall value. So we do we do that here???
-          (form `(let ((.new-value. ,new-value))
-                   ,(call-gf 'slot-writer-name object slot-name env '(.new-value.))
-                   .new-value.)))
+          (form (call-gf 'slot-writer-name object slot-name env (list new-value))))
       (if bind-object
           `(let ,bind-object ,form)
           form))))

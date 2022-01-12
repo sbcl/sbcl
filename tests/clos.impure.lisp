@@ -2677,3 +2677,19 @@
 (with-test (:name :removing-a-class)
   (sb-ext:gc :full t)
   (assert (not (sb-ext:weak-pointer-value *removing-a-class*))))
+
+(locally (declare (optimize safety))
+  (defclass setf-slot-value-restart ()
+    ((a :type integer
+        :accessor setf-slot-value-restart-a))))
+
+(with-test (:name :setf-slot-value-restart)
+  (let ((instance (make-instance 'setf-slot-value-restart)))
+    (handler-bind ((type-error
+                     (lambda (c) (use-value 1 c))))
+      (setf (slot-value instance 'a) 'x))
+    (assert (eql (slot-value instance 'a) 1))
+    (handler-bind ((type-error
+                     (lambda (c) (use-value 2 c))))
+      (setf (setf-slot-value-restart-a instance) 'y))
+    (assert (eql (setf-slot-value-restart-a instance) 2))))
