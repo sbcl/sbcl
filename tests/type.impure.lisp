@@ -299,6 +299,14 @@
 (define-condition condition-foo2 (condition-foo1) ())
 (define-condition condition-foo3 (condition-foo2) ())
 (define-condition condition-foo4 (condition-foo3) ())
+(with-test (:name :add-subclassoid)
+  (flet ((has-subs (name n)
+           (= n (length (sb-kernel:classoid-subclasses
+                         (sb-kernel:find-classoid name))))))
+  (assert (has-subs 'condition-foo1 3)) ; has foo{2,3,4}
+  (assert (has-subs 'condition-foo2 2)) ; has foo{3,4}
+  (assert (has-subs 'condition-foo3 1)) ; has foo4
+  (assert (has-subs 'condition-foo4 0))))
 
 ;;; inline type tests
 (format t "~&/setting up *TESTS-OF-INLINE-TYPE-TESTS*~%")

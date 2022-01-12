@@ -270,39 +270,44 @@ between the ~A definition and the ~A definition"
 
 (defun add-subclassoid (super sub wrapper)
   (with-system-mutex ((classoid-lock super))
-    (let ((table (classoid-subclasses super)))
-      (block nil
-        (when (hash-table-p table)
-          (return (setf (gethash sub table) wrapper)))
-        (let ((count 0))
-          (dolist (cell table)
-            (when (eq (car cell) sub)
-              (return (setf (cdr cell) wrapper)))
-            (incf (truly-the fixnum count)))
-          (when (<= count 7)
-            (setf (classoid-subclasses super) (acons sub wrapper table))
-            (sb-thread:barrier (:write))
-            (return wrapper)))
-        ;; Upgrade to a hash-table
-        (let ((new #+sb-xc-host (make-hash-table :test 'eq)
-                   #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
-                                                 :test 'eq)))
-          (loop for (key . val) in table do (setf (gethash key new) val))
-          (setf (gethash sub new) wrapper)
-          (setf (classoid-subclasses super) new)
-          (sb-thread:barrier (:write))
-          wrapper)))))
+    (let ((table (classoid-subclasses super))
+          (count 0))
+      (cond ((hash-table-p table)
+             (setf (gethash sub table) wrapper))
+            ((dolist (cell table)
+               (when (eq (car cell) sub)
+                 (return (setf (cdr cell) wrapper)))
+               (incf (truly-the fixnum count))))
+            ((<= count 7)
+             (setf (classoid-subclasses super) (acons sub wrapper table))
+             ;; Is this barrier really necessary? mutex release is a release barrier.
+             ;; I was probably struggling with crashes in the 'classoid-typep.impure'
+             ;; test, and was just trying anything and everything.
+             (sb-thread:barrier (:write))
+             wrapper)
+            (t
+             ;; Upgrade to a hash-table
+             (let ((new #+sb-xc-host (make-hash-table :test 'eq)
+                        #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
+                                                      :test 'eq)))
+               (loop for (key . val) in table do (setf (gethash key new) val))
+               (setf (gethash sub new) wrapper)
+               (setf (classoid-subclasses super) new)
+               (sb-thread:barrier (:write))
+               wrapper))))))
 
 ;;; Mnemonic device: the argument order is as GETHASH (1st = key, 2nd = table).
 ;;; But the 2nd arg is the superclassoid, *not* its subclassoid table,
 ;;; because the mutex is stored in the classoid, not the table.
 (defun get-subclassoid (sub super)
   (sb-thread:barrier (:read))
-  (when (classoid-subclasses super)
-    (with-system-mutex ((classoid-lock super))
-      (let ((table (classoid-subclasses super)))
-        (cond ((listp table) (cdr (assq sub table)))
-              (t (values (gethash sub table))))))))
+  (let ((table (classoid-subclasses super)))
+  (when table
+    (cond ((listp table) (cdr (assq sub table)))
+          (t
+           ;; our hash-table are not safe to read with a single writer
+           (with-system-mutex ((classoid-lock super))
+             (values (gethash sub table))))))))
 
 ;;; Mnemonic device: it's like REMHASH (1st = key, 2nd = table)
 (defun remove-subclassoid (sub super)
