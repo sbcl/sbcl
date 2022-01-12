@@ -233,24 +233,14 @@
       (unless (eq val (cdr item))
         (error "Symbol value differs: ~S" (car item))))))
 
-;;; Apparently this function is dangerous to call, for 2 reasons:
-;;; 1. in general, MAP-ALLOCATED-OBJECTS is vulnerable to changes to the
-;;;    page table made by other others
-;;; 2. apparently it's possible for GENERIC-FUNCTION-P to crash.
-;;;    Why, I do not know, but here's the backtrace:
-;;;      Memory fault at 0x5 (pc=0x52a14f28 [code 0x52a14b50+0x3D8 ID 0x2e70], fp=0x7ff0502a74b0, sp=0x7ff0502a7480) tid 2633983
-;;;         0: fp=0x7ff0502a74b0 pc=0x52a14f28 SB-KERNEL::CLASSOID-TYPEP
-;;;         1: fp=0x7ff0502a7558 pc=0x5333a7af (LAMBDA (SB-VM::OBJ SB-VM::WIDETAG SB-VM::SIZE) :IN SB-VM::LIST-ALLOCATED-OBJECTS)
-;;;         2: fp=0x7ff0502a75a8 pc=0x52aecd06 SB-VM::MAP-OBJECTS-IN-RANGE
-;;;         3: fp=0x7ff0502a75f0 pc=0x52cb19ce SB-VM::WALK-DYNAMIC-SPACE
-;;;         4: fp=0x7ff0502a7670 pc=0x52a6f5a6 SB-VM::MAP-ALLOCATED-OBJECTS
-;;;         5: fp=0x7ff0502a7728 pc=0x5333a3ff SB-VM::LIST-ALLOCATED-OBJECTS
-;;;         6: fp=0x7ff0502a7760 pc=0x5341989e RUN-TESTS::SUMMARIZE-GENERIC-FUNCTIONS
-;;;         7: fp=0x7ff0502a78f0 pc=0x5341b7e8 RUN-TESTS::PURE-RUNNER
+(defun safe-gf-p (x)
+  (declare (notinline sb-kernel:%fun-layout))
+  (and (sb-kernel:funcallable-instance-p x)
+       (not (eq (opaque-identity (sb-kernel:%fun-layout x)) 0))
+       (sb-pcl::generic-function-p x)))
+
 (defun summarize-generic-functions ()
-  #+nil
-  (loop for gf in (sb-vm:list-allocated-objects :all
-                                                :test #'sb-pcl::generic-function-p)
+  (loop for gf in (sb-vm:list-allocated-objects :all :test #'safe-gf-p)
         collect (cons gf
                       (when (and (slot-exists-p gf 'sb-pcl::methods)
                                  (slot-boundp gf 'sb-pcl::methods))
@@ -296,52 +286,59 @@
         (setf (gethash s types-ht) t))
       (when (sb-int:info :setf :expander s)
         (setf (gethash s setfs-ht) t)))
-    ;; The first element of this list is employed to delete new structure definitions
-    ;; after the test file is executed.  The other elements are used only as a comparison
-    ;; to see that nothing else was altered in the classoid or type namespace, etc.
+    ;; The first two elements of this list are employed to delete new structure
+    ;; and condition definitions after the test file is executed.
+    ;; The other elements are used only as a comparison to see that nothing else
+    ;; was altered in the classoid or type namespace, etc.
     (list (loop for key being each hash-key of structure-classoids
+                collect (sb-kernel:classoid-name key))
+          (loop for key being each hash-key of condition-classoids
                 collect (sb-kernel:classoid-name key))
           (loop for key being each hash-key of standard-classoids
                 unless (member (sb-kernel:classoid-name key)
                                ignored-stream-classoids)
-                collect (sb-kernel:classoid-name key))
-          (loop for key being each hash-key of condition-classoids
                 collect (sb-kernel:classoid-name key))
           (sort symbols-with-properties #'string<)
           (sb-impl::info-env-count sb-int:*info-environment*)
           (hash-table-count types-ht)
           (hash-table-count setfs-ht))))
 
-(defun structure-classoid-ancestors (classoid)
-  (map 'list 'sb-kernel:wrapper-classoid-name
+(defun structureish-classoid-ancestors (classoid)
+  (map 'list 'sb-kernel:wrapper-classoid
        (sb-kernel:wrapper-inherits (sb-kernel:classoid-wrapper classoid))))
 
 (defun globaldb-cleanup (initial-packages globaldb-summary)
   ;; Package deletion suffices to undo DEFVAR,DEFTYPE,DEFSETF,DEFUN,DEFMACRO
   ;; but not DEFSTRUCT or DEFCLASS.
   ;; UNDECLARE-STRUCTURE isn't destructive enough for our needs here.
-  (let* ((saved-structure-classoids (first globaldb-summary))
-         (worklist
-          (loop for key being each hash-key
-                of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 'structure-object))
-                unless (member (the (and symbol (not null))
-                                    (sb-kernel:classoid-name key))
-                               saved-structure-classoids)
-               collect key)))
-    (dolist (classoid worklist)
-      (let* ((name (sb-kernel:classoid-name classoid))
-             (direct-super
-              (sb-kernel:classoid-name
-               (car (sb-kernel:classoid-direct-superclasses classoid)))))
-        (sb-mop:remove-direct-subclass (find-class direct-super) (find-class name))
-        (dolist (ancestor (structure-classoid-ancestors classoid))
-          ;; (format t "~&Removing ~s from ~s~%" name ancestor)
-          (remhash classoid
-                   (sb-kernel:classoid-subclasses (sb-kernel:find-classoid
-                                                   ancestor)))))))
-  (dolist (package (list-all-packages))
-    (unless (member package initial-packages)
-      (delete-package package)))
+  (flet ((delete-classoids (root saved-names)
+           (let ((worklist
+                  (loop for key being each hash-key
+                     of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid root))
+                     unless (member (the (and symbol (not null))
+                                         (sb-kernel:classoid-name key))
+                                    saved-names)
+                     collect key)))
+             (dolist (classoid worklist)
+               (dolist (ancestor (structureish-classoid-ancestors classoid))
+                 (sb-kernel::remove-subclassoid classoid ancestor))
+               (let ((direct-supers
+                      (mapcar 'sb-kernel:classoid-pcl-class
+                              (sb-kernel:classoid-direct-superclasses classoid)))
+                     (this-class (sb-kernel:classoid-pcl-class classoid)))
+                 (dolist (super direct-supers)
+                   (sb-mop:remove-direct-subclass super this-class)))))))
+    (delete-classoids 'structure-object (first globaldb-summary))
+    (delete-classoids 'condition (second globaldb-summary)))
+  (let (delete)
+    (dolist (package (list-all-packages))
+      (unless (member package initial-packages)
+        (push package delete)))
+    ;; Do all UNUSE-PACKAGE operations first
+    (dolist (package delete )
+      (unuse-package (package-use-list package) package))
+    ;; Then all deletions
+    (mapc 'delete-package delete))
   (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
         for index from 0
         unless (equal x y)

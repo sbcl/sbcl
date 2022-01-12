@@ -9,46 +9,49 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
-(use-package :test-util)
-
 ;;; Bug from CLOCC.
+;;; http://clocc.sourceforge.net/
 (defpackage :p1
   (:use :cl)
   (:export #:code #:code-msg #:%code-msg))
-(in-package :p1)
-(define-condition code ()
-  ((msg :reader code-msg :reader %code-msg :initarg :msg)))
+(define-condition p1:code ()
+  ((p1::msg :reader p1:code-msg :reader p1:%code-msg :initarg :msg)))
 
 (defpackage :p2
   (:use :cl :p1))
-(in-package :p2)
-(define-condition code1 (code)
-  ((msg :accessor code-msg :initarg :msg)))
+(define-condition p2::code1 (p1:code)
+  ((p2::msg :accessor p1:code-msg :initarg :msg)))
 
-(let ((code (make-condition 'code :msg 1)))
-  (assert (typep code 'code))
-  (assert (eql (code-msg code) 1))
-  (assert (eql (%code-msg code) 1)))
-(let ((code (make-condition 'code1 :msg 1)))
-  (assert (typep code 'code))
-  (assert (eql (code-msg code) 1))
-  (assert (eql (%code-msg code) 1))
-  (setf (code-msg code) 2)
-  (assert (eql (code-msg code) 2))
-  (assert (eql (%code-msg code) 1)))
-
-(in-package :cl-user)
+;;; This test asserts that:
+;;;  - distinct symbols create distinct slots, unlike with DEFSTRUCT
+;;;     where slots are compared by string=
+;;;  - two slots can be initialized by one initarg
+;;;  - an accessor can shadow an identically-named inherited accessor
+;;;     and read/write a different slot
+(with-test (:name :condition-slot-package-confusion)
+  (let ((code (make-condition 'p1:code :msg 1)))
+    (assert (typep code 'p1:code))
+    (assert (eql (p1:code-msg code) 1))
+    (assert (eql (p1:%code-msg code) 1)))
+  (let ((code (make-condition 'p2::code1 :msg 1)))
+    (assert (typep code 'p1:code))
+    (assert (eql (p1:code-msg code) 1))
+    (assert (eql (p1:%code-msg code) 1))
+    (setf (p1:code-msg code) 2)
+    (assert (eql (p1:code-msg code) 2))
+    (assert (eql (p1:%code-msg code) 1))))
 
 ;;; Check that initializing the condition class metaobject doesn't create
 ;;; any instances. Reported by Marco Baringer on sbcl-devel Mon, 05 Jul 2004.
 (defvar *condition-count* 0)
 (define-condition counted-condition () ((slot :initform (incf *condition-count*))))
-(defmethod frob-counted-condition ((x counted-condition)) x)
+;; What purpose was this DEFMETHOD serving? None as far as I can tell.
+;; (defmethod frob-counted-condition ((x counted-condition)) x)
 (assert (= 0 *condition-count*))
 (assert (typep (sb-mop:class-prototype (find-class 'counted-condition))
                '(and condition counted-condition)))
+(opaque-identity (make-condition 'counted-condition))
+(assert (= 1 *condition-count*))
 
 (define-condition picky-condition () ())
 
