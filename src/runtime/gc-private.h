@@ -437,6 +437,17 @@ static inline int instance_length(lispobj header)
     return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
 }
 
+// One bit differentiates FUNCALLABLE_INSTANCE_WIDETAG from INSTANCE_WIDETAG.
+// This is index of that bit.
+#define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
+static inline boolean instanceoid_widetag_p(int widetag) {
+    return (widetag | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER)) == FUNCALLABLE_INSTANCE_WIDETAG;
+}
+static inline int instanceoid_length(lispobj header) {
+    return (header & (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER))
+        ? (int)(HeaderValue(header) & SHORT_HEADER_MAX_WORDS) : instance_length(header);
+}
+
 /// instance_layout() and layout_of() macros takes a lispobj* and are lvalues
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 
@@ -456,7 +467,7 @@ static inline int instance_length(lispobj header)
 // first 4 words of funcallable instance are: header, trampoline, layout, fin-fun
 # define funinstance_layout(native_ptr) ((lispobj*)native_ptr)[2]
 # define layout_of(native_ptr) \
-  ((lispobj*)native_ptr)[1+((widetag_of(native_ptr)>>LAYOUT_SELECTOR_BIT)&1)]
+  ((lispobj*)native_ptr)[1+((widetag_of(native_ptr)>>FUNINSTANCE_SELECTOR_BIT_NUMBER)&1)]
 
 #endif
 

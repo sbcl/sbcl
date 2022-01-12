@@ -114,8 +114,8 @@ void shrink_obj_test(int ending_size, int initial_type,
                 // number of bytes used, and the bytes freed should be as expected.
                 gc_assert(freed == (initial_size - ending_size));
                 for (page=0; page<MAX_PAGES_FOR_TEST; ++page) {
-                    gc_assert(page_table[page].bytes_used_ ==
-                              expected_result[page].bytes_used_);
+                    gc_assert(page_table[page].words_used_ ==
+                              expected_result[page].words_used_);
                     gc_assert(page_table[page].scan_start_offset_ ==
                               expected_result[page].scan_start_offset_);
                     gc_assert(page_table[page].type ==
@@ -131,6 +131,12 @@ void shrink_obj_test(int ending_size, int initial_type,
 
 void run_gencgc_tests()
 {
+    // Assert that widetags do not satisfy is_lisp_pointer
+    gc_assert(!is_lisp_pointer(CHARACTER_WIDETAG));
+    gc_assert(!is_lisp_pointer(SIMPLE_VECTOR_WIDETAG));
+    // Assert that INSTANCE_WIDETAG is 1 bit different from FUNCALLABLE_INSTANCE
+    gc_assert((INSTANCE_WIDETAG | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER))
+              == FUNCALLABLE_INSTANCE_WIDETAG);
     test_adjust_obj_ptes();
 }
 

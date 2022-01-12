@@ -283,14 +283,9 @@ static void trace_object(lispobj* where)
     lispobj header = *where;
     int widetag = header_widetag(header);
 
-    switch (widetag) {
-    case INSTANCE_WIDETAG:
-        return trace_using_layout(instance_layout(where),
-                                  where, instance_length(header));
-    case FUNCALLABLE_INSTANCE_WIDETAG:
-        return trace_using_layout(funinstance_layout(where),
-                                  where, HeaderValue(header) & SHORT_HEADER_MAX_WORDS);
-    }
+    if (instanceoid_widetag_p(widetag))
+        return trace_using_layout(layout_of(where), where,
+                                  instanceoid_length(header));
     sword_t scan_from = 1;
     sword_t scan_to = sizetab[widetag](where);
     sword_t i;

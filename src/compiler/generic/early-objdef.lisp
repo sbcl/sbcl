@@ -201,23 +201,23 @@
                                             ;                          |
   symbol-widetag                            ;  26   2D  26   2D       /
 
-  code-header-widetag                       ;  2A   31  2A   31
+  instance-widetag                          ;  2A   31  2A   31
 
-  simple-fun-widetag                        ;  2E   35  2E   35
-  closure-widetag                           ;  32   39  32   39
-  funcallable-instance-widetag              ;  36   3D  36   3D
+  funcallable-instance-widetag              ;  2E   35  2E   35
+  simple-fun-widetag                        ;  32   39  32   39
+  closure-widetag                           ;  36   3D  36   3D
+  code-header-widetag                       ;  3A   41  3A   41
 
   ;; x86[-64] does not have objects with this widetag,
-  #-(or x86 x86-64 arm64) return-pc-widetag ;  3A   41  3A   41
+  #-(or x86 x86-64 arm64) return-pc-widetag ;  3E   45  3E   45
   #+(or x86 x86-64 arm64) lra-widetag-notused
 
-  value-cell-widetag                        ;  3E   45  3E   45
-  character-widetag                         ;  42   49  42   49
-  sap-widetag                               ;  46   4D  46   4D
-  #-64-bit unbound-marker-widetag           ;  4A   51  4A   51
+  value-cell-widetag                        ;  42   49  42   49
+  character-widetag                         ;  46   4D  46   4D
+  sap-widetag                               ;  4A   51  4A   51
+  #-64-bit unbound-marker-widetag           ;  4E   55  4E   55
   #+64-bit unused00-widetag
-  weak-pointer-widetag                      ;  4E   55  4E   55
-  instance-widetag                          ;  52   59  52   59
+  weak-pointer-widetag                      ;  52   59  52   59
   fdefn-widetag                             ;  56   5D  56   5D
 
   no-tls-value-marker-widetag               ;  5A   61  5A   61
@@ -291,6 +291,11 @@
   complex-array-widetag                     ;  EE   F9  E6   F1
   unused-array-widetag                      ;  F2   FD  EA   F5
 ))
+
+;;; Check that INSTANCE and FUNCALLABLE-INSTANCE differ at exactly 1 bit.
+(eval-when (:compile-toplevel)
+  (assert (= (logxor instance-widetag funcallable-instance-widetag)
+             #b100)))
 
 (defconstant-eqx +function-widetags+
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)

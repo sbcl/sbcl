@@ -3086,12 +3086,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (sb-xc:byte-position (symbol-value symbol)))
     (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
             (c-symbol-name symbol)
-            (sb-xc:mask-field (symbol-value symbol) -1)))
-  ;; find a 1 bit in funcallable-instance-widetag not in instance-widetag
-  (format t "#define LAYOUT_SELECTOR_BIT ~d~%"
-          (let ((mask (logandc2 sb-vm:funcallable-instance-widetag sb-vm:instance-widetag)))
-            (aver (plusp mask))
-            (1- (integer-length mask)))))
+            (sb-xc:mask-field (symbol-value symbol) -1))))
 
 (defun write-regnames-h (stream)
   (declare (ignorable stream))
