@@ -432,6 +432,7 @@
         (let ((*package* test-package)
               (sb-impl::*gentemp-counter* sb-impl::*gentemp-counter*)
               (sb-c::*check-consistency* sb-c::*check-consistency*)
+              (sb-c:*compile-to-memory-space* sb-c:*compile-to-memory-space*)
               (sb-c::*policy-min* sb-c::*policy-min*)
               (sb-c::*policy-max* sb-c::*policy-max*))
           (restart-case
@@ -445,6 +446,7 @@
                   (funcall test-fun file)
                   (log-file-elapsed-time file start log))))
             (skip-file ())))
+        (sb-impl::disable-stepping)
         (sb-int:unencapsulate 'open 'open-guard)
         (when actually-pure
           (compare-symbol-values global-symbol-values)

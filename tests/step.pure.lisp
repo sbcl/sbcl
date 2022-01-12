@@ -11,12 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-#+interpreter (sb-ext:exit :code 104)
 ;; No stepper support on some platforms.
-#-(or x86 x86-64 ppc sparc mips arm arm64)
-(sb-ext:exit :code 104)
+#+(or interpreter ppc64 riscv) (invoke-restart 'run-tests::skip-file)
 
 ;; These tests should either with code in dynamic space
 ;; or immobile space, but they only accidentally worked
