@@ -314,32 +314,64 @@
          :operation '/
          :operands (list this that)))
 
+(defun restart-type-error (type condition pc-offset)
+  (let ((tn-offset (car *current-internal-error-args*)))
+    (labels ((retry-value (value)
+               (if (typep value type)
+                   value
+                   (try (make-condition 'type-error
+                                        :expected-type type
+                                        :datum value
+                                        :context "while restarting a type error."))))
+             (set-value (value)
+               (sb-di::sub-set-debug-var-slot
+                nil tn-offset (retry-value value)
+                *current-internal-error-context*)
+               (sb-vm::incf-context-pc *current-internal-error-context*
+                                       pc-offset)
+               (return-from restart-type-error))
+             (try (condition)
+               (restart-case (error condition)
+                 (use-value (value)
+                   :report (lambda (stream)
+                             (format stream "Use specified value."))
+                   :interactive read-evaluated-form
+                   (set-value value)))))
+      (try condition))))
+
+(defun object-not-type-error (object type)
+  (if (invalid-array-p object)
+      (invalid-array-error object)
+      (let* ((context (sb-di:error-context))
+             (condition
+               (make-condition (if (and (%instancep object)
+                                        (wrapper-invalid (%instance-wrapper object)))
+                                   ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
+                                   ;; more information in that it says that the object may have at some point
+                                   ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
+                                   'layout-invalid
+                                   'type-error)
+                               :datum object
+                               :expected-type (typecase type
+                                                (classoid-cell
+                                                 (classoid-cell-name type))
+                                                (wrapper
+                                                 (wrapper-proper-name type))
+                                                (t
+                                                 type))
+                               :context (and (not (integerp context))
+                                             context))))
+        (if (integerp context)
+            (restart-type-error type condition context)
+            (error condition)))))
+
 (macrolet ((def (errname fun-name)
              `(setf (svref **internal-error-handlers**
                            ,(error-number-or-lose errname))
                     (fdefinition ',fun-name))))
   (def etypecase-failure-error etypecase-failure)
-  (def ecase-failure-error ecase-failure))
-
-(deferr object-not-type-error (object type)
-  (if (invalid-array-p object)
-      (invalid-array-error object)
-      (error (if (and (%instancep object)
-                      (wrapper-invalid (%instance-wrapper object)))
-                 ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
-                 ;; more information in that it says that the object may have at some point
-                 ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
-                 'layout-invalid
-                 'type-error)
-             :datum object
-             :expected-type (typecase type
-                              (classoid-cell
-                               (classoid-cell-name type))
-                              (wrapper
-                               (wrapper-proper-name type))
-                              (t
-                               type))
-             :context (sb-di:error-context))))
+  (def ecase-failure-error ecase-failure)
+  (def object-not-type-error object-not-type-error))
 
 (deferr odd-key-args-error ()
   (%program-error "odd number of &KEY arguments"))
@@ -450,13 +482,10 @@
                                   :format-arguments (list slot-name struct-name)
                                   :datum (make-unbound-marker)
                                   :expected-type (if dsd (dsd-type dsd) 't))))
-                       (error 'type-error
-                              :datum (sb-di::sub-access-debug-var-slot
-                                      fp (first arguments) alien-context)
-                              :expected-type
-                              (car (svref sb-c:+backend-internal-errors+
-                                          error-number))
-                              :context context)))
+                       (object-not-type-error (sb-di::sub-access-debug-var-slot
+                                               fp (first arguments) alien-context)
+                                              (car (svref sb-c:+backend-internal-errors+
+                                                          error-number)))))
                  (let ((handler
                          (and (typep error-number `(mod ,n-internal-error-handlers))
                               (svref **internal-error-handlers** error-number))))

@@ -453,7 +453,10 @@
 ;;; source level because our fixed-values conventions are optimized
 ;;; for the common MV-BIND case.
 (defun make-type-check-form (types cast)
-  (let ((temps (make-gensym-list (length types))))
+  (let* ((temps (make-gensym-list (length types)))
+         (context (cast-context cast))
+         (restart (and (eq context :restart)
+                       (setf context (opaquely-quote (make-restart-location))))))
     (lambda (dummy)
       `(multiple-value-bind ,temps ,dummy
          ,@(mapcar
@@ -464,15 +467,18 @@
                          (let ((*unparse-fun-type-simplify* t))
                            (type-specifier type-to-check)))
                        (test (if not `(not ,spec) spec)))
-                  `(unless
-                       ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
-                          (%source-transform-typep temp test))
-                     ,(internal-type-error-call temp
-                                                (if (fun-designator-type-p type-to-report)
-                                                    ;; Simplify
-                                                    (specifier-type 'function-designator)
-                                                    type-to-report)
-                                                (cast-context cast))))))
+                  `(progn
+                     (unless
+                         ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
+                            (%source-transform-typep temp test))
+                       ,(internal-type-error-call temp
+                                                  (if (fun-designator-type-p type-to-report)
+                                                      ;; Simplify
+                                                      (specifier-type 'function-designator)
+                                                      type-to-report)
+                                                  context))
+                     ,@(and restart
+                            `((restart-point ,restart)))))))
             temps
             types)
          (values ,@temps)))))

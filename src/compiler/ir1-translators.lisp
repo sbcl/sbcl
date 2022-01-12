@@ -1043,7 +1043,8 @@ care."
                                        derive-type-only
                                        truly
                                        source-form
-                                       use-annotations)
+                                       use-annotations
+                                       restart)
                            form)
                           start next result)
   (let ((value-type (if (ctype-p value-type)
@@ -1051,7 +1052,12 @@ care."
                         (values-specifier-type value-type)))
         (*current-path* (if source-form
                             (ensure-source-path source-form)
-                            *current-path*)))
+                            *current-path*))
+        (context (cond (restart
+                        ;; For now, these share the same place in the debug info
+                        (aver (not context))
+                        :restart)
+                       (context))))
     (cond (derive-type-only
            ;; For something where we really know the type and need no mismatch checking,
            ;; e.g. structure accessors

@@ -610,3 +610,12 @@
                    (invoke-restart 'store-value :nope))))))
       (ggg+1)
       (assert success))))
+
+(with-test (:name :restart-type-error)
+  (let ((fun (checked-compile '(lambda (x)
+                                (sb-kernel:the* (fixnum :restart t) x)))))
+    (handler-bind
+        ((type-error
+           (lambda (c)
+             (use-value 2 c))))
+      (assert (eql (funcall fun 'a) 2)))))
