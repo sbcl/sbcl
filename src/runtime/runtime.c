@@ -593,7 +593,8 @@ parse_argv(struct memsize_options memsize_options,
             int wargc;
             wchar_t** wargv;
             wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
-            sbcl_argv = successful_malloc((2 + wargc - argi) * sizeof(wchar_t *));
+            sbcl_argv = successful_malloc((((argi < wargc) ? (wargc - argi) : 0) + 2)
+                                          * sizeof(wchar_t *));
             sbcl_argv[0] = wargv[0];
             while (argi < wargc) {
                 wchar_t *warg = wargv[argi++];
