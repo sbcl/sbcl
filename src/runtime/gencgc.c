@@ -380,19 +380,16 @@ os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
  * into *n_write_protected the count of write-protected pages.
  */
 static page_index_t
-count_generation_pages(generation_index_t generation,
-                       page_index_t* n_write_protected)
+count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
 {
-    page_index_t i, total = 0, wp = 0;
+    page_index_t i, total = 0, dirty = 0;
 
     for (i = 0; i < next_free_page; i++)
         if (!page_free_p(i) && (page_table[i].gen == generation)) {
             total++;
-            if (PAGE_WRITEPROTECTED_P(i))
-                wp++;
+            if (!PAGE_WRITEPROTECTED_P(i)) dirty++;
         }
-    if (n_write_protected)
-        *n_write_protected = wp;
+    if (n_dirty) *n_dirty = dirty;
     return total;
 }
 
@@ -459,7 +456,7 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            "Gen  Boxed   Code    Raw  LgBox LgCode  LgRaw  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
+            "Gen  Boxed   Code    Raw  LgBox LgCode  LgRaw  Pin       Alloc     Waste        Trig   Dirty GCs Mem-age\n");
 
     generation_index_t i, begin, end;
     // Print from the lowest gen that has any allocated pages.
@@ -488,8 +485,8 @@ write_generation_stats(FILE *file)
             }
         struct generation* gen = &generations[i];
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
-        page_index_t tot_pages, n_protected;
-        tot_pages = count_generation_pages(i, &n_protected);
+        page_index_t tot_pages, n_dirty;
+        tot_pages = count_generation_pages(i, &n_dirty);
         gc_assert(tot_pages ==
                   pagect[0] + pagect[1] + pagect[2] + pagect[3] + pagect[4] + pagect[5]);
         fprintf(file,
@@ -498,17 +495,16 @@ write_generation_stats(FILE *file)
                 " %4"PAGE_INDEX_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %9"OS_VM_SIZE_FMT
-                " %11"OS_VM_SIZE_FMT
-                " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
+                " %11"OS_VM_SIZE_FMT,
                 i,
                 pagect[0], pagect[2], pagect[1], pagect[3], pagect[5], pagect[4],
                 pinned_cnt,
                 (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
-                (uintptr_t)gen->gc_trigger,
-                n_protected,
-                gen->num_gc,
-                generation_average_age(i));
+                (uintptr_t)gen->gc_trigger);
+        // gen0 pages are never WPed
+        fprintf(file, i==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
+        fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(i));
     }
     fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n",
             (uintptr_t)bytes_allocated);
