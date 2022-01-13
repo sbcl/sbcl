@@ -4853,12 +4853,6 @@ DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, &self->mixed_tlab,
                        PAGE_TYPE_MIXED)
 DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, PAGE_TYPE_MIXED)
 
-void close_thread_region() {
-    __attribute__((unused)) struct thread *self = get_sb_vm_thread();
-    struct alloc_region *region = TLAB(&self->mixed_tlab);
-    ensure_region_closed(region, PAGE_TYPE_MIXED);
-}
-
 lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
 {
     struct thread *th = get_sb_vm_thread();
@@ -4889,11 +4883,34 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
 
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
+/* The two exported "close_region" functions are called from Lisp prior to
+ * heap-walking. They must never get interrupted by STOP_FOR_GC while holding
+ * either the free page lock or code allocation lock.
+ * Normally this is guaranteed by pseudo-atomic, but in the interest of simplicity,
+ * these are plain foreign calls without aid of a vop. */
+static void close_region_helper(struct alloc_region *region, int pt)
+{
+    sigset_t savedmask;
+    int result;
+    block_blockable_signals(&savedmask);
+    if (pt == PAGE_TYPE_CODE) {
+        result = thread_mutex_lock(&code_allocator_lock);
+        gc_assert(!result);
+    }
+    ensure_region_closed(region, pt);
+    if (pt == PAGE_TYPE_CODE) {
+        result = thread_mutex_unlock(&code_allocator_lock);
+        gc_assert(!result);
+    }
+    thread_sigmask(SIG_SETMASK, &savedmask, 0);
+}
+void close_thread_region() {
+    __attribute__((unused)) struct thread *self = get_sb_vm_thread();
+    struct alloc_region *region = TLAB(&self->mixed_tlab);
+    close_region_helper(region, PAGE_TYPE_MIXED);
+}
 void close_code_region() {
-    __attribute__((unused)) int result = thread_mutex_lock(&code_allocator_lock);
-    gc_assert(!result);
-    ensure_region_closed(&code_region, PAGE_TYPE_CODE);
-    thread_mutex_unlock(&code_allocator_lock);
+    close_region_helper(&code_region, PAGE_TYPE_CODE);
 }
 
 #ifdef LISP_FEATURE_SPARC
