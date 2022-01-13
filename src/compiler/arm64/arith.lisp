@@ -942,7 +942,7 @@
   (:arg-types unsigned-num (:constant (satisfies abs-add-sub-immediate-p)))
   (:info y))
 
-(defmacro define-conditional-vop (tran cond unsigned)
+(defmacro define-conditional-vop (tran cond unsigned &optional no-constant)
   `(progn
      ,@(loop for (suffix cost signed constant) in
              '((/fixnum 4 t)
@@ -954,6 +954,8 @@
              for value = (if (eq suffix '-c/fixnum)
                              '(fixnumize y)
                              'y)
+             unless (and constant
+                         no-constant)
              collect
              `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)" tran suffix))
                            ,(intern (format nil "~:@(FAST-CONDITIONAL~A~)" suffix)))
@@ -971,7 +973,27 @@
 
 (define-conditional-vop < :lt :lo)
 (define-conditional-vop > :gt :hi)
-(define-conditional-vop eql :eq :eq)
+(define-conditional-vop eql :eq :eq t)
+
+(define-vop (fast-eql-integer/c)
+  (:args (x :scs (any-reg signed-reg unsigned-reg)))
+  (:arg-types (:or tagged-num signed-num unsigned-num)
+              (:constant signed-word))
+  (:info y)
+  (:translate eql)
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:generator 3
+    (let* ((abs-y (abs y))
+           (constant (if (sc-is x any-reg)
+                         (ash abs-y n-fixnum-tag-bits)
+                         abs-y))
+           (constant (if (add-sub-immediate-p constant)
+                         constant
+                         (load-immediate-word tmp-tn constant))))
+      (if (minusp y)
+          (inst cmn x constant)
+          (inst cmp x constant)))))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not
 ;;; just a known fixnum.
@@ -999,19 +1021,7 @@
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
-(define-vop (fast-eql-c/fixnum)
-  (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (satisfies fixnum-abs-add-sub-immediate-p)))
-  (:info y)
-  (:translate eql)
-  (:policy :fast-safe)
-  (:conditional :eq)
-  (:generator 3
-    (if (minusp y)
-        (inst cmn x (fixnumize (abs y)))
-        (inst cmp x (fixnumize y)))))
-
-(define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
+(define-vop (generic-eql-c/fixnum fast-eql-integer/c)
   (:args (x :scs (any-reg descriptor-reg)))
   (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:variant-cost 6))
