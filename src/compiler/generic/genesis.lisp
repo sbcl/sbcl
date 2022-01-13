@@ -3001,6 +3001,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (record (c-symbol-name c) -1 c ""))
       ;; More symbols that doesn't fit into the pattern above.
       (dolist (c '(sb-impl::+magic-hash-vector-value+
+                   ;; These next two flags bits use different naming conventions unfortunately,
+                   ;; but one's a vector header bit, the other a layout flag bit.
+                   sb-vm::+vector-alloc-mixed-region-bit+
+                   sb-kernel::+strictly-boxed-flag+
                    sb-vm::nil-symbol-slots-start
                    sb-vm::nil-symbol-slots-end
                    sb-vm::static-space-objects-start))

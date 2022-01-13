@@ -1470,6 +1470,12 @@ or they must be declared locally notinline at each call site.~@:>"
                         :modify old-layout))))
   (values))
 
+(defun dd-custom-gc-method-p (dd)
+  (cond ((eq (dd-name dd) 'sb-lockless::list-node) t)
+        ((dd-include dd)
+         (dd-custom-gc-method-p
+          (wrapper-info (compiler-layout-or-lose (car (dd-include dd))))))))
+
 ;;; Compute DD's bitmap, storing 1 for each tagged word.
 ;;; The GC can parse signed fixnums and bignums, with which we can
 ;;; represent an unlimited number of "&rest" slots all with the same
@@ -1578,11 +1584,7 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; As of now this only pertains to lockfree-singly-linked-list nodes
     ;; and descendant types. (The lockfree list uses one pointer bit
     ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
-    (when (named-let has-custom-gc-method ((dd dd))
-            (cond ((eq (dd-name dd) 'sb-lockless::list-node) t)
-                  ((dd-include dd)
-                   (has-custom-gc-method
-                    (wrapper-info (compiler-layout-or-lose (car (dd-include dd))))))))
+    (when (dd-custom-gc-method-p dd)
       (aver (eq rest :unspecific))
       (return-from calculate-dd-bitmap minimal-bitmap))
 
@@ -1656,7 +1658,8 @@ or they must be declared locally notinline at each call site.~@:>"
     (unless (dd-alternate-metaclass info)
       (setq flags +structure-layout-flag+))
     (cond ((some #'dsd-rsd-index (dd-slots info))) ; mixed boxed + raw (or wholly raw)
-          ((not (dd-alternate-metaclass info))
+          ((and (not (dd-alternate-metaclass info))
+                (not (dd-custom-gc-method-p info)))
            (setf flags (logior flags +strictly-boxed-flag+))))
     ;; FIXME: explain why this is #-sb-xc-host.
     #-sb-xc-host

@@ -2,6 +2,9 @@
 
 #-gencgc (sb-ext:exit :code 104)
 
+(assert (not (logtest (sb-kernel:wrapper-flags (find-layout 'keyed-node))
+                      sb-kernel::+strictly-boxed-flag+)))
+
 ;;; Make sure no promotions occur so that objects will be movable
 ;;; throughout these tests.
 (setf (generation-number-of-gcs-before-promotion 0) 1000000)

@@ -320,6 +320,13 @@
                        (every (lambda (x) (eq (dsd-raw-type x) t))
                               (dd-slots dd))))
           (setf flags (logior flags +strictly-boxed-flag+))))
+      ;; KLUDGE: I really don't care to make defstruct-with-alternate-metaclass
+      ;; any more complicated than necessary. It is unable to express that
+      ;; these funcallable instances can go on pure boxed pages.
+      ;; (The trampoline is always an assembler routine, thus ignorable)
+      (when (member (wrapper-classoid-name wrapper)
+                    '(sb-pcl::ctor sb-pcl::%method-function))
+        (setf flags (logior flags +strictly-boxed-flag+)))
       flags))
   (defun wrapper-bitmap (wrapper)
     (acond ((wrapper-%info wrapper) (dd-bitmap it))
