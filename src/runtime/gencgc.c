@@ -915,12 +915,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     page_index_t i;
     int ret;
 
-    /*
-    FSHOW((stderr,
-           "/alloc_new_region for %d bytes from gen %d\n",
-           nbytes, gc_alloc_generation));
-    */
-
     /* Check that the region is in a reset state. */
     gc_assert(region_closed_p(alloc_region));
     INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
@@ -1041,9 +1035,6 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
     for (i = new_areas_index-1, c = 0; (i >= 0) && (c < 8); i--, c++) {
         size_t area_end =
             npage_bytes(new_areas[i].page) + new_areas[i].offset + new_areas[i].size;
-        /*FSHOW((stderr,
-               "/add_new_area S1 %d %d %d %d\n",
-               i, c, new_area_start, area_end));*/
         if (new_area_start == area_end) {
             new_areas[i].size += size;
             return;
@@ -1053,9 +1044,6 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
     new_areas[new_areas_index].page = first_page;
     new_areas[new_areas_index].offset = offset;
     new_areas[new_areas_index].size = size;
-    /*FSHOW((stderr,
-           "/new_area %d page %d offset %d size %d\n",
-           new_areas_index, first_page, offset, size));*/
     new_areas_index++;
 }
 
@@ -1591,11 +1579,6 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         page++;
     }
 
-    if ((bytes_freed > 0) && gencgc_verbose) {
-        FSHOW((stderr,
-               "/adjust_obj_ptes() freed %"OS_VM_SIZE_FMT"\n",
-               bytes_freed));
-    }
     // If this freed nothing, it ought to have gone through the fast path.
     gc_assert(bytes_freed != 0);
     return bytes_freed;
@@ -2787,9 +2770,6 @@ static void newspace_full_scavenge(generation_index_t generation)
 {
     page_index_t i;
 
-    FSHOW((stderr,
-           "/starting one full scan of newspace generation %d\n",
-           generation));
     for (i = 0; i < next_free_page; i++) {
         if ((page_table[i].gen == generation) && page_boxed_p(i)
             && (page_words_used(i) != 0)
@@ -2816,9 +2796,6 @@ static void newspace_full_scavenge(generation_index_t generation)
     }
     /* Enable recording of all new allocation regions */
     record_new_regions_below = 1 + page_table_pages;
-    FSHOW((stderr,
-           "/done with one full scan of newspace generation %d\n",
-           generation));
 }
 
 static void gc_close_all_regions()
@@ -2844,10 +2821,6 @@ scavenge_newspace(generation_index_t generation)
 
     /* Flush the current regions updating the page table. */
     gc_close_all_regions();
-
-    /*FSHOW((stderr,
-             "The first scan is finished; current_new_areas_index=%d.\n",
-             current_new_areas_index));*/
 
     while (1) {
         if (!new_areas_index && !immobile_scav_queue_count) { // possible stopping point
@@ -3541,9 +3514,6 @@ write_protect_generation_pages(generation_index_t generation)
         printf("HW protected %d, SW protected %d\n", n_hw_prot, n_sw_prot);
         page_index_t __attribute((unused)) n_total, n_protected;
         n_total = count_generation_pages(generation, &n_protected);
-        FSHOW((stderr,
-               "/write protected %d of %d pages in generation %d\n",
-               n_protected, n_total, generation));
     }
 #endif
 }
@@ -4369,7 +4339,6 @@ collect_garbage(generation_index_t last_gen)
     struct timespec t_gc_start;
     clock_gettime(CLOCK_MONOTONIC, &t_gc_start);
 #endif
-    FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
     log_generation_stats(gc_logfile, "=== GC Start ===");
 
     gc_active_p = 1;
@@ -4380,9 +4349,6 @@ collect_garbage(generation_index_t last_gen)
         gc_mark_only = 1;
     } else if (last_gen > 1+PSEUDO_STATIC_GENERATION) {
         // This is a completely non-obvious thing to do, but whatever...
-        FSHOW((stderr,
-               "/collect_garbage: last_gen = %d, doing a level 0 GC\n",
-               last_gen));
         last_gen = 0;
     }
 
@@ -4447,13 +4413,6 @@ collect_garbage(generation_index_t last_gen)
             }
         }
 
-        if (gencgc_verbose > 1) {
-            struct generation* __attribute__((unused)) g = &generations[gen];
-            FSHOW((stderr,
-                   "starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
-                   gen, raise, g->bytes_allocated, g->gc_trigger, g->num_gc));
-        }
-
         /* If an older generation is being filled, then update its
          * memory age. */
         if (raise == 1) {
@@ -4475,7 +4434,6 @@ collect_garbage(generation_index_t last_gen)
         generations[gen].cum_sum_bytes_allocated = 0;
 
         if (gencgc_verbose > 1) {
-            FSHOW((stderr, "GC of generation %d finished:\n", gen));
             print_generation_stats();
         }
 
@@ -4981,12 +4939,6 @@ boolean continue_after_memoryfault_on_unprotected_pages = 0;
 int gencgc_handle_wp_violation(void* fault_addr)
 {
     page_index_t page_index = find_page_index(fault_addr);
-
-#if QSHOW_SIGNALS
-    FSHOW((stderr,
-           "heap WP violation? fault_addr=%p, page_index=%"PAGE_INDEX_FMT"\n",
-           fault_addr, page_index));
-#endif
 
     /* Check whether the fault is within the dynamic space. */
     if (page_index == (-1)) {
