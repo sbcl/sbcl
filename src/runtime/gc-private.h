@@ -62,7 +62,13 @@ extern void *gc_general_alloc(sword_t nbytes,int page_type);
     gc_dcheck(lowtag_of(copy) == lowtag); \
     gc_dcheck(!from_space_p(copy));
 
-#define note_transported_object(old, new) /* do nothing */
+/* For debugging purposes, you can make this macro as complicated as you like,
+ * such as checking various other aspects of the object in 'old' */
+#if defined COLLECT_GC_STATS && COLLECT_GC_STATS
+#define NOTE_TRANSPORTING(old, new, nwords) gc_copied_nwords += nwords
+#else
+#define NOTE_TRANSPORTING(old, new, nwords) /* do nothing */
+#endif
 
 extern uword_t gc_copied_nwords;
 static inline lispobj
@@ -72,12 +78,10 @@ gc_general_copy_object(lispobj object, size_t nwords, int page_type)
 
     /* Allocate space. */
     lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type);
+    NOTE_TRANSPORTING(object, new,  nwords);
 
     /* Copy the object. */
-    gc_copied_nwords += nwords;
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
-
-    note_transported_object(object, new);
 
     return make_lispobj(new, lowtag_of(object));
 }
@@ -90,9 +94,8 @@ gc_copy_object_resizing(lispobj object, long nwords, int page_type,
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
     lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type);
-    gc_copied_nwords += old_nwords;
+    NOTE_TRANSPORTING(object, new, old_nwords);
     memcpy(new, native_pointer(object), old_nwords*N_WORD_BYTES);
-    note_transported_object(object, new);
     return make_lispobj(new, lowtag_of(object));
 }
 

@@ -21,9 +21,9 @@
 ;;; and running the cross-compiler to produce target FASL files).
 (defpackage "SB-COLD" (:use "CL"))
 
-;;; #+sbcl ; use at your own risk!
-;;; (when (sb-sys:find-dynamic-foreign-symbol-address "show_gc_generation_throughput")
-;;;   (setf (extern-alien "show_gc_generation_throughput" int) 1))
+#+nil ; change to #+sbcl if desired, but at your own risk!
+(when (sb-sys:find-dynamic-foreign-symbol-address "show_gc_generation_throughput")
+  (setf (extern-alien "show_gc_generation_throughput" int) 1))
 
 (in-package "SB-COLD")
 

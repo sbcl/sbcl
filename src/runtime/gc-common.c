@@ -542,6 +542,7 @@ trans_list(lispobj object)
     /* Copy 'object'. */
     struct cons *copy = (struct cons *)
         gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
+    NOTE_TRANSPORTING(object, copy, CONS_SIZE);
     lispobj new_list_pointer = make_lispobj(copy, LIST_POINTER_LOWTAG);
     copy->car = CONS(object)->car;
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
@@ -559,6 +560,7 @@ trans_list(lispobj object)
         /* Copy 'cdr'. */
         struct cons *cdr_copy = (struct cons*)
             gc_general_alloc(sizeof(struct cons), PAGE_TYPE_CONS);
+        NOTE_TRANSPORTING(cdr, cdr_copy, CONS_SIZE);
         cdr_copy->car = ((struct cons*)native_cdr)->car;
         /* Grab the cdr before it is clobbered. */
         lispobj next = ((struct cons*)native_cdr)->cdr;
