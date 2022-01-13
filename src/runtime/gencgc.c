@@ -2389,36 +2389,33 @@ static void pin_exact_root(lispobj obj)
 }
 
 
-#define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
-#define IN_BOXED_REGION_P(a) IN_REGION_P(a,mixed)||IN_REGION_P(a,code)
-
 /* Return true if 'ptr' is OK to be on a write-protected page
  * of an object in 'gen'. That is, if the pointer does not point to a younger object.
  * Note: 'ptr' is _sometimes_ an ambiguous pointer - we do not utilize the layout bitmap
  * when scanning instances for pointers, so we will occasionally see a raw word for 'ptr'.
  * Also, 'ptr might not have a lowtag (such as lockfree list node successor), */
-static boolean ptr_ok_to_writeprotect(lispobj obj, generation_index_t gen)
+static boolean ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
 {
     page_index_t index;
-    void* ptr = (void*)obj;
     lispobj __attribute__((unused)) header;
 
     /* Check that it's in the dynamic space */
-    if ((index = find_page_index(ptr)) != -1) {
+    if ((index = find_page_index((void*)ptr)) != -1) {
             int pointee_gen = page_table[index].gen;
             if (/* Does it point to a younger or the temp. generation? */
                 (pointee_gen < gen || pointee_gen == SCRATCH_GENERATION) &&
-
-                /* and an in-use part of the page? */
-                (((lispobj)ptr & (GENCGC_PAGE_BYTES-1)) < page_bytes_used(index) ||
-                 ((page_table[index].type & OPEN_REGION_PAGE_FLAG)
-                  && (IN_BOXED_REGION_P(ptr) || IN_REGION_P(ptr,unboxed))))) {
+                /* and an in-use part of the page?
+                 * Formerly this examined the bounds of each open region,
+                 * but that is extra work with little benefit. It is faster
+                 * to treat all of any page with an open region as in-use.
+                 * It will self-correct when the region gets closed */
+                ((page_table[index].type & OPEN_REGION_PAGE_FLAG)
+                 || (ptr & (GENCGC_PAGE_BYTES-1)) < page_bytes_used(index)))
                 return 0;
-            }
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        else if (immobile_space_p((lispobj)ptr) &&
-                 other_immediate_lowtag_p(header = *native_pointer((lispobj)ptr))) {
+        else if (immobile_space_p(ptr) &&
+                 other_immediate_lowtag_p(header = *native_pointer(ptr))) {
             // This is *possibly* a pointer to an object in immobile space,
             // given that above two conditions were satisfied.
             // But unlike in the dynamic space case, we need to read a byte
@@ -2429,8 +2426,8 @@ static boolean ptr_ok_to_writeprotect(lispobj obj, generation_index_t gen)
             int pointee_gen = gen; // Make comparison fail if we fall through
             switch (header_widetag(header)) {
             case SIMPLE_FUN_WIDETAG:
-                if (functionp((lispobj)ptr)) {
-                    lispobj* code = fun_code_header(FUNCTION((lispobj)ptr));
+                if (functionp(ptr)) {
+                    lispobj* code = fun_code_header(FUNCTION(ptr));
                     // This is a heuristic, since we're not actually looking for
                     // an object boundary. Precise scanning of 'page' would obviate
                     // the guard conditions here.
@@ -2440,7 +2437,7 @@ static boolean ptr_ok_to_writeprotect(lispobj obj, generation_index_t gen)
                 }
                 break;
             default:
-                pointee_gen = immobile_obj_generation(native_pointer((lispobj)ptr));
+                pointee_gen = immobile_obj_generation(native_pointer(ptr));
             }
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.
