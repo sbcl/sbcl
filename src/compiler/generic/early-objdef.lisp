@@ -201,12 +201,17 @@
                                             ;                          |
   symbol-widetag                            ;  26   2D  26   2D       /
 
-  instance-widetag                          ;  2A   31  2A   31
+  #-64-bit instance-widetag                 ;  2A       2A
+  #-64-bit funcallable-instance-widetag     ;  2E       2E
+  #-64-bit simple-fun-widetag               ;  32       32
+  #-64-bit closure-widetag                  ;  36       36
+  #-64-bit code-header-widetag              ;  3A       3A
 
-  funcallable-instance-widetag              ;  2E   35  2E   35
-  simple-fun-widetag                        ;  32   39  32   39
-  closure-widetag                           ;  36   3D  36   3D
-  code-header-widetag                       ;  3A   41  3A   41
+  #+64-bit code-header-widetag              ;       31       31
+  #+64-bit instance-widetag                 ;       35       35
+  #+64-bit simple-fun-widetag               ;       39       39
+  #+64-bit funcallable-instance-widetag     ;       3D       3D
+  #+64-bit closure-widetag                  ;       41       41
 
   ;; x86[-64] does not have objects with this widetag,
   #-(or x86 x86-64 arm64) return-pc-widetag ;  3E   45  3E   45
@@ -294,8 +299,10 @@
 
 ;;; Check that INSTANCE and FUNCALLABLE-INSTANCE differ at exactly 1 bit.
 (eval-when (:compile-toplevel)
-  (assert (= (logxor instance-widetag funcallable-instance-widetag)
-             #b100)))
+  #-64-bit (assert (= (logxor instance-widetag funcallable-instance-widetag)
+                      #b0100))
+  #+64-bit (assert (= (logxor instance-widetag funcallable-instance-widetag)
+                      #b1000)))
 
 (defconstant-eqx +function-widetags+
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
