@@ -3057,21 +3057,22 @@ struct verify_state {
 #define VERIFY_PRE_GC     2
 #define VERIFY_POST_GC    4
 #define VERIFY_AGGRESSIVE 8
+#define VERIFY_TAGS       16
 /* QUICK = skip most tests. This is intended for use when GC is believed
  * to be correct per se (i.e. not for debugging GC), and so the verify
  * pass executes more quickly */
-#define VERIFY_QUICK      16
+#define VERIFY_QUICK      32
 /* FINAL = warn about pointers from heap space to non-heap space.
  * Such pointers would normally be ignored and do not be flagged as failure.
  * This can be used in conjunction with QUICK, AGGRESSIVE, or neither. */
-#define VERIFY_FINAL      32
+#define VERIFY_FINAL      64
 /* VERIFYING_foo indicates internal state, not a caller's option */
-#define VERIFYING_HEAP_OBJECTS 64
+#define VERIFYING_HEAP_OBJECTS 128
 /* GENERATIONAL implies HEAP_OBJECTS, but there are ranges of heap objects
  * that are not generational - static, readonly, and metaspace -
  * so there are no page protection checks performed for pointers from objects
  * in such ranges */
-#define VERIFYING_GENERATIONAL 128
+#define VERIFYING_GENERATIONAL 256
 
 // Helpers for verify_range
 generation_index_t gc_gen_of(lispobj obj, int defaultval) {
@@ -3154,6 +3155,8 @@ verify_range(lispobj *vaddr,
 
 #define GC_WARN(str) fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX") sees %s\n", \
                 (void*)(uintptr_t)thing, (uword_t)vaddr, state->tagged_object, str);
+#define FAIL_IF(what, why) if (what) { \
+    if (++state->errors > 25) lose("Too many errors"); else GC_WARN(why); }
 
         if (is_lisp_pointer(thing)) {
             /* DONTFAIL mode skips most tests, performing only the strict
@@ -3162,11 +3165,17 @@ verify_range(lispobj *vaddr,
                 GC_WARN("non-Lisp memory");
             generation_index_t to_gen = gen_of(thing);
             if (to_gen < state->min_pointee_gen) state->min_pointee_gen = to_gen;
+            if ((state->flags & VERIFY_TAGS) && find_page_index((void*)thing) >= 0) {
+                if (listp(thing)) {
+                    FAIL_IF(!(is_cons_half(CONS(thing)->car) && is_cons_half(CONS(thing)->cdr)),
+                            "non-cons");
+                } else {
+                    FAIL_IF(LOWTAG_FOR_WIDETAG(widetag_of(native_pointer(thing))) != lowtag_of(thing),
+                            "incompatible widetag");
+                }
+            }
             if (state->flags & VERIFY_QUICK)
                 continue;
-
-#define FAIL_IF(what, why) if (what) { \
-    if (++state->errors > 25) lose("Too many errors"); else GC_WARN(why); }
 
             page_index_t page_index = find_page_index((void*)thing);
             if (page_index >= 0 || immobile_space_p(thing)) {
