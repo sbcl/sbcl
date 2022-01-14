@@ -956,9 +956,6 @@ with that condition (or with no condition) will be returned."
                (t
                 ""))))))
 
-(define-condition retry-unbound-variable
-    (simple-condition unbound-variable) ())
-
 (define-condition undefined-function (cell-error)
   ((not-yet-loaded :initform nil :reader not-yet-loaded :initarg :not-yet-loaded))
   (:report

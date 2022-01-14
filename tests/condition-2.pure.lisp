@@ -594,25 +594,15 @@
 
 (with-test (:name :restart-unbound-variable
                   :skipped-on (not (and (or :arm64 :x86-64) :sb-thread)))
-  (let ((success nil))
-    (handler-bind
-        ((unbound-variable
-          (lambda (e)
-            ;; This is kinda whacky, I'd have preferred to
-            ;; see a TYPE-ERROR here, but instead we signal
-            ;; RETRY-UNBOUND-VARIABLE which is a system-internal
-            ;; type name, and a format control describing the problem
-            ;; Apparently I don't understand anything anyway,
-            ;; because why is this *same* handler still accessible?
-            (cond ((typep e 'sb-kernel::retry-unbound-variable)
-                   (when (search ":NOPE is not of type INTEGER"
-                                 (write-to-string e :escape nil))
-                     (setq success t))
-                   (invoke-restart 'use-value 1))
-                  (t
-                   (invoke-restart 'store-value :nope))))))
-      (ggg+1)
-      (assert success))))
+  (handler-bind
+      ((type-error
+         (lambda (c)
+           (assert (eql (type-error-datum c) :nope))
+           (use-value 1 c)))
+       (unbound-variable
+         (lambda (e)
+           (store-value :nope e))))
+    (assert (eql (ggg+1) 2))))
 
 (with-test (:name :restart-type-error)
   (let ((fun (checked-compile '(lambda (x)

@@ -221,10 +221,12 @@
                    (info :variable :type symbol)
                  (if (and defined
                           (not (ctypep value type)))
-                     (still-bad (sb-format:tokens
-                                 "Type mismatch when restarting unbound symbol error:~@
-                                 ~s is not of type ~/sb-impl:print-type/")
-                                value type)
+                     (try (make-condition 'type-error
+                                          :datum value
+                                          :expected-type (type-specifier type)
+                                          :context
+                                          (format nil "while restarting unbound variable ~a."
+                                                  symbol)))
                      value)))
              (set-value (value &optional set-symbol)
                (sb-di::sub-set-debug-var-slot
@@ -238,12 +240,7 @@
              (retry-evaluation ()
                (if (boundp symbol)
                    (set-value (symbol-value symbol))
-                   (still-bad "~s is still unbound" symbol)))
-             (still-bad (format-control &rest format-arguments)
-               (try (make-condition 'retry-unbound-variable
-                                    :name symbol
-                                    :format-control format-control
-                                    :format-arguments format-arguments)))
+                   (try condition)))
              (try (condition)
                (restart-case (error condition)
                  (continue ()
