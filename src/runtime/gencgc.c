@@ -917,8 +917,8 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
 
     /* Check that the region is in a reset state. */
     gc_assert(region_closed_p(alloc_region));
-    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret == 0);
+    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
+    gc_assert(ret);
     first_page = alloc_start_page(page_type, 0);
 
     INSTRUMENTING(
@@ -953,8 +953,8 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
     }
-    ret = thread_mutex_unlock(&free_pages_lock);
-    gc_assert(ret == 0);
+    ret = mutex_release(&free_pages_lock);
+    gc_assert(ret);
 
     /* If the first page was only partial, don't check whether it's
      * zeroed (it won't be) and don't zero it (since the parts that
@@ -1072,8 +1072,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
 
     int ret;
-    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret == 0);
+    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
+    gc_assert(ret);
 
     // Mark the region as closed on its first page.
     page_table[first_page].type &= ~(OPEN_REGION_PAGE_FLAG);
@@ -1148,8 +1148,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         reset_page_flags(next_page);
         next_page++;
     }
-    ret = thread_mutex_unlock(&free_pages_lock);
-    gc_assert(ret == 0);
+    ret = mutex_release(&free_pages_lock);
+    gc_assert(ret);
 
     /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
@@ -1162,8 +1162,8 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
     page_index_t first_page, last_page;
     int ret;
 
-    INSTRUMENTING(ret = thread_mutex_lock(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret == 0);
+    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
+    gc_assert(ret);
 
     first_page = alloc_start_page(page_type, 1);
     // FIXME: really we want to try looking for space following the highest of
@@ -1222,8 +1222,8 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
-    ret = thread_mutex_unlock(&free_pages_lock);
-    gc_assert(ret == 0);
+    ret = mutex_release(&free_pages_lock);
+    gc_assert(ret);
 
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type)
@@ -1261,7 +1261,7 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
     }
     else {
         /* FIXME: assert free_pages_lock held */
-        (void)thread_mutex_unlock(&free_pages_lock);
+        (void)mutex_release(&free_pages_lock);
 #ifndef LISP_FEATURE_WIN32
         gc_assert(get_pseudo_atomic_atomic(thread));
         clear_pseudo_atomic_atomic(thread);
@@ -4865,12 +4865,12 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     sword_t nbytes = total_words * N_WORD_BYTES;
     /* Allocations of code are all serialized. We might also acquire
      * free_pages_lock depending on availability of space in the region */
-    int result = thread_mutex_lock(&code_allocator_lock);
-    gc_assert(!result);
+    int result = mutex_acquire(&code_allocator_lock);
+    gc_assert(result);
     struct code *code =
         (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, &code_region, nbytes, PAGE_TYPE_CODE, th);
-    result = thread_mutex_unlock(&code_allocator_lock);
-    gc_assert(!result);
+    result = mutex_release(&code_allocator_lock);
+    gc_assert(result);
     THREAD_JIT(0);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
@@ -4894,13 +4894,13 @@ static void close_region_helper(struct alloc_region *region, int pt)
     int result;
     block_blockable_signals(&savedmask);
     if (pt == PAGE_TYPE_CODE) {
-        result = thread_mutex_lock(&code_allocator_lock);
-        gc_assert(!result);
+        result = mutex_acquire(&code_allocator_lock);
+        gc_assert(result);
     }
     ensure_region_closed(region, pt);
     if (pt == PAGE_TYPE_CODE) {
-        result = thread_mutex_unlock(&code_allocator_lock);
-        gc_assert(!result);
+        result = mutex_release(&code_allocator_lock);
+        gc_assert(result);
     }
     thread_sigmask(SIG_SETMASK, &savedmask, 0);
 }

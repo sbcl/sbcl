@@ -662,8 +662,8 @@ static unsigned int claim_index(int qty)
 static boolean NO_SANITIZE_MEMORY
 instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
 {
-    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    int __attribute__((unused)) ret = mutex_acquire(&alloc_profiler_lock);
+    gc_assert(ret);
     uword_t next_pc = *sp;
     // The instrumentation site was 8-byte aligned
     uword_t return_pc = ALIGN_DOWN(next_pc, 8);
@@ -701,11 +701,11 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
     }
 #if 0
     if (!code) {
-        int ret = thread_mutex_lock(&free_pages_lock);
-        gc_assert(ret == 0);
+        int ret = mutex_acquire(&free_pages_lock);
+        gc_assert(ret);
         ensure_region_closed(code_region);
-        int ret = thread_mutex_unlock(&free_pages_lock);
-        gc_assert(ret == 0);
+        int ret = mutex_release(&free_pages_lock);
+        gc_assert(ret);
         code = component_ptr_from_pc(pc);
     }
 #endif
@@ -754,8 +754,8 @@ allocation_tracker_counted(uword_t* sp)
         if (index != 2)
             record_pc((char*)pc, index, 0);
     }
-    int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    int __attribute__((unused)) ret = mutex_release(&alloc_profiler_lock);
+    gc_assert(ret);
 }
 
 void AMD64_SYSV_ABI
@@ -787,8 +787,8 @@ allocation_tracker_sized(uword_t* sp)
         if (index != 0) // can't record a PC for the overflow counts
             record_pc((char*)pc, index, 1);
     }
-    int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    int __attribute__((unused)) ret = mutex_release(&alloc_profiler_lock);
+    gc_assert(ret);
 }
 
 #include "x86-arch-shared.inc"

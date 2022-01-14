@@ -397,10 +397,10 @@ init_new_thread(struct thread *th,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     csp_around_foreign_call(th) = (lispobj)scribble;
 #endif
-    lock_ret = thread_mutex_lock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
+    lock_ret = mutex_acquire(&all_threads_lock);
+    gc_assert(lock_ret);
     link_thread(th);
-    thread_mutex_unlock(&all_threads_lock);
+    ignore_value(mutex_release(&all_threads_lock));
 
     /* Kludge: Changed the order of some steps between the safepoint/
      * non-safepoint versions of this code.  Can we unify this more?
@@ -433,11 +433,11 @@ unregister_thread(struct thread *th,
      * thread, but since we are either exiting lisp code as a lisp
      * thread that is dying, or exiting lisp code to return to
      * former status as a C thread, it won't wait long. */
-    lock_ret = thread_mutex_lock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
+    lock_ret = mutex_acquire(&all_threads_lock);
+    gc_assert(lock_ret);
     unlink_thread(th);
-    lock_ret = thread_mutex_unlock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
+    lock_ret = mutex_release(&all_threads_lock);
+    gc_assert(lock_ret);
 
     arch_os_thread_cleanup(th);
 
@@ -606,23 +606,23 @@ static struct thread* get_recyclebin_item()
 {
     struct thread* result = 0;
     int rc;
-    rc = thread_mutex_lock(&recyclebin_lock);
-    gc_assert(!rc);
+    rc = mutex_acquire(&recyclebin_lock);
+    gc_assert(rc);
     if (recyclebin_threads) {
         result = recyclebin_threads;
         recyclebin_threads = result->next;
     }
-    thread_mutex_unlock(&recyclebin_lock);
+    ignore_value(mutex_release(&recyclebin_lock));
     return result ? result->os_address : 0;
 }
 static void put_recyclebin_item(struct thread* th)
 {
     int rc;
-    rc = thread_mutex_lock(&recyclebin_lock);
-    gc_assert(!rc);
+    rc = mutex_acquire(&recyclebin_lock);
+    gc_assert(rc);
     th->next = recyclebin_threads;
     recyclebin_threads = th;
-    thread_mutex_unlock(&recyclebin_lock);
+    ignore_value(mutex_release(&recyclebin_lock));
 }
 void empty_thread_recyclebin()
 {
@@ -630,11 +630,7 @@ void empty_thread_recyclebin()
     sigset_t old;
     block_deferrable_signals(&old);
     // no big deal if already locked (recursive GC?)
-#ifdef LISP_FEATURE_WIN32
     if (TryEnterCriticalSection(&recyclebin_lock)) {
-#else
-    if (!pthread_mutex_trylock(&recyclebin_lock)) {
-#endif
         struct thread* this = recyclebin_threads;
         while (this) {
             struct thread* next = this->next;
@@ -642,7 +638,7 @@ void empty_thread_recyclebin()
             this = next;
         }
         recyclebin_threads = 0;
-        thread_mutex_unlock(&recyclebin_lock);
+        ignore_value(mutex_release(&recyclebin_lock));
     }
     thread_sigmask(SIG_SETMASK, &old, 0);
 }
@@ -1109,13 +1105,8 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
 }
 #endif
 
-#ifdef LISP_FEATURE_WIN32
 int try_acquire_gc_lock() { return TryEnterCriticalSection(&in_gc_lock); }
-void release_gc_lock() { LeaveCriticalSection(&in_gc_lock); }
-#else
-int try_acquire_gc_lock() { return !pthread_mutex_trylock(&in_gc_lock); }
-void release_gc_lock() { pthread_mutex_unlock(&in_gc_lock); }
-#endif
+int release_gc_lock() { return mutex_release(&in_gc_lock); }
 
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
@@ -1162,8 +1153,8 @@ void gc_stop_the_world()
     int rc;
 
     /* Keep threads from registering with GC while the world is stopped. */
-    rc = thread_mutex_lock(&all_threads_lock);
-    gc_assert(rc == 0);
+    rc = mutex_acquire(&all_threads_lock);
+    gc_assert(rc);
 
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for_each_thread(th) {
@@ -1239,8 +1230,8 @@ void gc_start_the_world()
         }
     }
 
-    lock_ret = thread_mutex_unlock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
+    lock_ret = mutex_release(&all_threads_lock);
+    gc_assert(lock_ret);
 }
 
 #endif /* !LISP_FEATURE_SB_SAFEPOINT */
@@ -1302,12 +1293,12 @@ void wake_thread(struct thread_instance* lispthread)
         // but without them, make-target-contrib hangs in bsd-sockets.
         sigset_t oldset;
         block_deferrable_signals(&oldset);
-        thread_mutex_lock(&all_threads_lock);
+        mutex_acquire(&all_threads_lock);
         sb_pthr_kill(thread, 1); // can't fail
 # ifdef LISP_FEATURE_SB_SAFEPOINT
         wake_thread_impl(lispthread);
 # endif
-        thread_mutex_unlock(&all_threads_lock);
+        mutex_release(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
 #elif defined LISP_FEATURE_SB_SAFEPOINT
     wake_thread_impl(lispthread);

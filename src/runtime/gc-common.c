@@ -1293,19 +1293,19 @@ void finalizer_thread_stop () {
 pthread_mutex_t finalizer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t finalizer_condvar = PTHREAD_COND_INITIALIZER;
 void finalizer_thread_wait () {
-    thread_mutex_lock(&finalizer_mutex);
+    ignore_value(mutex_acquire(&finalizer_mutex));
     if (finalizer_thread_runflag)
         pthread_cond_wait(&finalizer_condvar, &finalizer_mutex);
-    thread_mutex_unlock(&finalizer_mutex);
+    ignore_value(mutex_release(&finalizer_mutex));
 }
 void finalizer_thread_wake() {
     pthread_cond_broadcast(&finalizer_condvar);
 }
 void finalizer_thread_stop() {
-    thread_mutex_lock(&finalizer_mutex);
+    ignore_value(mutex_acquire(&finalizer_mutex));
     finalizer_thread_runflag = 0;
     pthread_cond_broadcast(&finalizer_condvar);
-    thread_mutex_unlock(&finalizer_mutex);
+    ignore_value(mutex_release(&finalizer_mutex));
 }
 #endif
 #endif

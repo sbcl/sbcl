@@ -71,7 +71,7 @@ static int
 install_segment (unsigned long start, unsigned long size) {
     int selector;
 
-    thread_mutex_lock(&modify_ldt_lock);
+    ignore_value(mutex_acquire(&modify_ldt_lock));
 
     selector = ldt_index_selector(find_free_ldt_index());
     struct ssd ssd = { selector,
@@ -83,7 +83,7 @@ install_segment (unsigned long start, unsigned long size) {
         lose("Couldn't install segment for thread-local data");
     }
 
-    thread_mutex_unlock(&modify_ldt_lock);
+    ignore_value(mutex_release(&modify_ldt_lock));
 
     return selector;
 }
@@ -125,11 +125,11 @@ int arch_os_thread_cleanup(struct thread *thread) {
 
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
 
-    thread_mutex_lock(&modify_ldt_lock);
+    ignore_value(mutex_acquire(&modify_ldt_lock));
     if (sysi86(SI86DSCR, &delete) < 0) {
       lose("Couldn't remove segment");
     }
-    thread_mutex_unlock(&modify_ldt_lock);
+    ignore_value(mutex_release(&modify_ldt_lock));
 #endif
     return 1;                   /* success */
 }

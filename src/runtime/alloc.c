@@ -61,8 +61,8 @@ unsigned int max_alloc_point_counters;
 
 void allocation_profiler_start()
 {
-    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    int __attribute__((unused)) ret = mutex_acquire(&alloc_profiler_lock);
+    gc_assert(ret);
     if (!alloc_profiling && simple_vector_p(alloc_profile_data)) {
         max_alloc_point_counters = vector_len(VECTOR(alloc_profile_data))/2;
         size_t size = N_WORD_BYTES * max_alloc_point_counters;
@@ -94,16 +94,16 @@ void allocation_profiler_start()
                 "allocation profiler already started\n" :
                 "profile metadata not created\n");
     }
-    ret = thread_mutex_unlock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    ret = mutex_release(&alloc_profiler_lock);
+    gc_assert(ret);
     fflush(stdout);
 }
 
 // This is not exactly threadsafe. Don't try anything fancy.
 void allocation_profiler_stop()
 {
-    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    int __attribute__((unused)) ret = mutex_acquire(&alloc_profiler_lock);
+    gc_assert(ret);
     if (alloc_profiling) {
         alloc_profiling = 0;
         struct thread* th;
@@ -113,8 +113,8 @@ void allocation_profiler_stop()
     } else {
         fprintf(stderr, "allocation profiler not started\n");
     }
-    ret = thread_mutex_unlock(&alloc_profiler_lock);
-    gc_assert(ret == 0);
+    ret = mutex_release(&alloc_profiler_lock);
+    gc_assert(ret);
 #if 0
     if (warning_issued) {
         fprintf(stderr, "allocation profile needed %d counters\n",

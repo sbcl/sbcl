@@ -106,8 +106,8 @@ const char* gc_phase_names[GC_NPHASES] = {
 #define SET_THREAD_STOP_PENDING(th,state) \
     write_TLS(STOP_FOR_GC_PENDING,state,th)
 #define WITH_ALL_THREADS_LOCK \
-    thread_mutex_lock(&all_threads_lock); \
-    RUN_BODY_ONCE(all_threads_lock, thread_mutex_unlock(&all_threads_lock))
+    mutex_acquire(&all_threads_lock); \
+    RUN_BODY_ONCE(all_threads_lock, mutex_release(&all_threads_lock))
 #else
 #define CURRENT_THREAD_VAR(name)
 #define THREAD_STOP_PENDING(th) NIL
@@ -187,8 +187,8 @@ gc_state_lock()
 {
     odxprint(safepoints,"GC state to be locked");
 #ifdef LISP_FEATURE_SB_THREAD
-    int result = thread_mutex_lock(&gc_state.lock);
-    gc_assert(!result);
+    int result = mutex_acquire(&gc_state.lock);
+    gc_assert(result);
 #endif
     if (gc_state.master) {
         fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d (%s)\n",
@@ -210,8 +210,8 @@ gc_state_unlock()
     gc_assert(get_sb_vm_thread()==gc_state.master);
     gc_state.master = NULL;
 #ifdef LISP_FEATURE_SB_THREAD
-    int result = thread_mutex_unlock(&gc_state.lock);
-    gc_assert(!result);
+    int result = mutex_release(&gc_state.lock);
+    gc_assert(result);
 #endif
     odxprint(safepoints,"%s","GC state unlocked");
 }
@@ -925,7 +925,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
         return;
 
     wake_thread_io(thread);
-    thread_mutex_unlock(&all_threads_lock);
+    mutex_release(&all_threads_lock);
 
     WITH_GC_STATE_LOCK {
         if (gc_state.phase == GC_NONE) {
@@ -934,7 +934,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
         }
     }
 
-    thread_mutex_lock(&all_threads_lock);
+    mutex_acquire(&all_threads_lock);
     return;
 }
 # else
